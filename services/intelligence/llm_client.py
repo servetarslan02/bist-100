@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 # Yeni Google GenAI SDK (tercih edilen)
 try:
     from google import genai
+
     GENAI_NEW_AVAILABLE = True
 except ImportError:
     GENAI_NEW_AVAILABLE = False
@@ -30,6 +31,7 @@ except ImportError:
 # Eski Google GenerativeAI SDK (fallback)
 try:
     import google.generativeai as legacy_genai
+
     GENAI_LEGACY_AVAILABLE = True
 except ImportError:
     GENAI_LEGACY_AVAILABLE = False
@@ -84,6 +86,7 @@ class LLMClient:
         # 3. Config settings
         try:
             from services.core.config import settings
+
             key = getattr(settings, "gemini_api_key", None) or getattr(settings, "GEMINI_API_KEY", None) or ""
             if key:
                 key_str = str(key).strip()
@@ -151,13 +154,16 @@ class LLMClient:
         if self._new_client is not None:
             try:
                 from google.genai import types
+
                 function_declarations = []
                 for s in tool_schemas:
-                    function_declarations.append({
-                        "name": s["name"],
-                        "description": s["description"],
-                        "parameters": s.get("parameters", {}),
-                    })
+                    function_declarations.append(
+                        {
+                            "name": s["name"],
+                            "description": s["description"],
+                            "parameters": s.get("parameters", {}),
+                        }
+                    )
 
                 models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
                 for mod in dict.fromkeys(models_to_try):
@@ -260,7 +266,9 @@ class LLMClient:
         context_block = ""
         if context:
             try:
-                context_block = f"\n\nBAĞLAM:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
+                context_block = (
+                    f"\n\nBAĞLAM:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
+                )
             except Exception:
                 context_block = f"\n\nBAĞLAM: {str(context)}"
 
@@ -342,10 +350,12 @@ METİN:
                 continue
             for part in candidate.content.parts:
                 if hasattr(part, "function_call") and part.function_call:
-                    result["tool_calls"].append({
-                        "name": part.function_call.name,
-                        "arguments": dict(part.function_call.args),
-                    })
+                    result["tool_calls"].append(
+                        {
+                            "name": part.function_call.name,
+                            "arguments": dict(part.function_call.args),
+                        }
+                    )
                 elif hasattr(part, "text") and part.text:
                     result["text"] = part.text
 
@@ -364,10 +374,7 @@ METİN:
 
     def _mock_text_response(self, prompt: str, context: dict | None) -> str:
         """Mock metin yanıtı."""
-        return (
-            "[LLM Mock] Analiz tamamlandı. "
-            "Gemini API anahtarı eklendiğinde gerçek analiz üretilecek."
-        )
+        return "[LLM Mock] Analiz tamamlandı. Gemini API anahtarı eklendiğinde gerçek analiz üretilecek."
 
     def _mock_structured_response(self) -> dict[str, Any]:
         """Mock yapılandırılmış yanıt."""

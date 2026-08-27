@@ -49,9 +49,13 @@ Sektör karşılaştırması → Şirket kalitesi
 from services.features.fundamental import fundamental_feature_engine
 
 fund = {
-    "price": 305.25, "pe_ratio": 8.5, "free_cash_flow": 6800000,
-    "revenue": 100000000, "market_cap": 100000000,
-    "profit_margin": 0.10, "debt_to_equity": 0.45,
+    "price": 305.25,
+    "pe_ratio": 8.5,
+    "free_cash_flow": 6800000,
+    "revenue": 100000000,
+    "market_cap": 100000000,
+    "profit_margin": 0.10,
+    "debt_to_equity": 0.45,
 }
 
 features = fundamental_feature_engine.compute_all_fundamental_features(fund)

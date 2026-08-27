@@ -20,6 +20,7 @@ from services.core.config_loader import ConfigLoader
 # CONFIG LOADING TESTS
 # =====================================================
 
+
 def test_config_load_from_file():
     """Config dosyasından yükleme çalışmalı."""
     ConfigLoader.reset()
@@ -103,6 +104,7 @@ def test_config_type_accessors():
 # ENVIRONMENT OVERRIDE TESTS
 # =====================================================
 
+
 def test_env_override():
     """Environment variable override çalışmalı."""
     ConfigLoader.reset()
@@ -129,7 +131,8 @@ def test_env_override():
 
     # Temizle
     del os.environ["ALPHA_APP_PORT"]
-    if "ALPHA_RISK_MAX_DRAWDOWN_PCT" in os.environ: del os.environ["ALPHA_RISK_MAX_DRAWDOWN_PCT"]
+    if "ALPHA_RISK_MAX_DRAWDOWN_PCT" in os.environ:
+        del os.environ["ALPHA_RISK_MAX_DRAWDOWN_PCT"]
 
     ConfigLoader.reset()
     return "Env Override", len(issues) == 0, issues
@@ -165,6 +168,7 @@ def test_env_type_conversion():
 # =====================================================
 # SECRET HANDLING TESTS
 # =====================================================
+
 
 def test_secret_from_env():
     """Secret'lar ENV'den okunmalı, config dosyasından değil."""
@@ -209,6 +213,7 @@ def test_secret_empty_when_not_set():
 # ENVIRONMENT DETECTION TESTS
 # =====================================================
 
+
 def test_environment_detection():
     """Ortam tespiti doğru olmalı."""
     ConfigLoader.reset()
@@ -238,6 +243,7 @@ def test_environment_detection():
 # DEEP MERGE TESTS
 # =====================================================
 
+
 def test_deep_merge():
     """Deep merge çalışmalı."""
     issues = []
@@ -263,6 +269,7 @@ def test_deep_merge():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -316,5 +323,6 @@ def run_all():
 
 if __name__ == "__main__":
     import sys
+
     ok = run_all()
     sys.exit(0 if ok else 1)

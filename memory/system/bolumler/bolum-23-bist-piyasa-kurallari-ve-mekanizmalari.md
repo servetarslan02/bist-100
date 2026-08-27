@@ -91,15 +91,15 @@ BIST-100 endeksi %5 düştüğünde → tüm piyasa durdurulur
 from services.core.market_calendar import market_calendar
 
 # Hisse bazlı kontrol
-market_calendar.add_halt("THYAO", datetime(2026, 8, 16, 11, 0),
-    datetime(2026, 8, 16, 11, 30), reason="CIRCUIT_BREAKER")
+market_calendar.add_halt("THYAO", datetime(2026, 8, 16, 11, 0), datetime(2026, 8, 16, 11, 30), reason="CIRCUIT_BREAKER")
 
 is_open = market_calendar.is_market_open(datetime(2026, 8, 16, 11, 15))
 # is_open: False (devre kesici aktif)
 
 # Endeks bazlı kontrol
-market_calendar.add_halt(None, datetime(2026, 8, 16, 14, 0),
-    datetime(2026, 8, 16, 14, 30), reason="MARKET_CIRCUIT_BREAKER")
+market_calendar.add_halt(
+    None, datetime(2026, 8, 16, 14, 0), datetime(2026, 8, 16, 14, 30), reason="MARKET_CIRCUIT_BREAKER"
+)
 ```
 
 ### Devre kesici sonrası strateji:
@@ -163,7 +163,7 @@ def check_gross_settlement(ticker):
         return {
             "is_gross": True,
             "effect": "Same-day settlement required",
-            "impact": "Reduced liquidity, higher spread"
+            "impact": "Reduced liquidity, higher spread",
         }
     return {"is_gross": False}
 ```
@@ -186,15 +186,15 @@ Sürekli işlem: Fiyat limitleri seans içinde güncellenir
 # services/core/price_limits.py
 def check_price_limit(ticker, current_price, reference_price):
     change_pct = (current_price - reference_price) / reference_price * 100
-    
+
     limit = get_price_limit(ticker)  # %10, %5, veya %20
-    
+
     if abs(change_pct) >= limit:
         return {
             "limit_hit": True,
             "direction": "UP" if change_pct > 0 else "DOWN",
             "change_pct": change_pct,
-            "limit": limit
+            "limit": limit,
         }
     return {"limit_hit": False, "change_pct": change_pct}
 ```
@@ -217,13 +217,13 @@ Birleşme/devralma → birkaç gün durdurma
 # services/core/halt_monitor.py
 def check_halt(ticker):
     halt_info = get_halt_info(ticker)
-    
+
     if halt_info["is_halted"]:
         return {
             "halted": True,
             "reason": halt_info["reason"],
             "expected_resume": halt_info["resume_time"],
-            "action": "NO_TRADE"
+            "action": "NO_TRADE",
         }
     return {"halted": False}
 ```
@@ -249,19 +249,13 @@ def calculate_commission(amount, broker_rate=0.0003):
     broker_fee = amount * broker_rate
     bist_fee = amount * 0.00004
     mkk_fee = amount * 0.00001
-    
+
     subtotal = broker_fee + bist_fee + mkk_fee
     bsmv = subtotal * 0.05
-    
+
     total = max(subtotal + bsmv, 1.0)  # minimum ₺1
-    
-    return {
-        "broker_fee": broker_fee,
-        "bist_fee": bist_fee,
-        "mkk_fee": mkk_fee,
-        "bsmv": bsmv,
-        "total": total
-    }
+
+    return {"broker_fee": broker_fee, "bist_fee": bist_fee, "mkk_fee": mkk_fee, "bsmv": bsmv, "total": total}
 ```
 
 ---
@@ -284,14 +278,14 @@ Teminat: SPAN sistemi ile hesaplanır
 def check_viop_margin(position):
     # SPAN bazlı teminat hesaplama
     span_margin = calculate_span_margin(position)
-    
+
     # Mevcut teminat yeterli mi?
     if account_margin < span_margin * 1.2:  # %20 tampon
         return {
             "margin_call": True,
             "required": span_margin * 1.2,
             "available": account_margin,
-            "action": "REDUCE_POSITION"
+            "action": "REDUCE_POSITION",
         }
     return {"margin_call": False}
 ```
@@ -334,16 +328,13 @@ def check_spk_compliance(action, ticker, amount, portfolio):
                 "notification_required": True,
                 "authority": "SPK",
                 "deadline": "2 business days",
-                "action": "NOTIFY_BEFORE_TRADING"
+                "action": "NOTIFY_BEFORE_TRADING",
             }
-    
+
     # Manipülasyon kontrolü
     if is_spoofing_pattern(action, ticker, portfolio):
-        return {
-            "violation": "POTENTIAL_MANIPULATION",
-            "action": "BLOCK"
-        }
-    
+        return {"violation": "POTENTIAL_MANIPULATION", "action": "BLOCK"}
+
     return {"compliant": True}
 ```
 

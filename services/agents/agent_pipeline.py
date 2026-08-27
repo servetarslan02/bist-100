@@ -40,6 +40,7 @@ logger = structlog.get_logger()
 @dataclass
 class PipelineResult:
     """Agent pipeline sonucu."""
+
     ticker: str
     timestamp: str
     synthesis: SynthesisResult
@@ -120,6 +121,7 @@ class AgentPipelineOrchestrator:
         if enable_memory:
             _default_path = memory_path or "data/agent_memory"
             import os
+
             os.makedirs(_default_path, exist_ok=True)
             for role in ["TECHNICAL", "FUNDAMENTAL", "NEWS", "MACRO", "RISK", "SYNTHESIS"]:
                 path = f"{_default_path}/{role}_memory.json"
@@ -174,13 +176,12 @@ class AgentPipelineOrchestrator:
 
         # === PHASE 1: PARALLEL RESEARCH ===
         research_roles = [
-            AgentRole.TECHNICAL, AgentRole.FUNDAMENTAL,
-            AgentRole.NEWS, AgentRole.MACRO,
+            AgentRole.TECHNICAL,
+            AgentRole.FUNDAMENTAL,
+            AgentRole.NEWS,
+            AgentRole.MACRO,
         ]
-        agents = {
-            role: BaseAgent(role, llm_client=self.llm_client)
-            for role in research_roles
-        }
+        agents = {role: BaseAgent(role, llm_client=self.llm_client) for role in research_roles}
         tasks = self._create_tasks(ticker, research_roles, full_context)
 
         parallel_result = await self.runner.run_agents(agents, tasks, self.llm_client)
@@ -226,9 +227,7 @@ class AgentPipelineOrchestrator:
 
         # === PHASE 7: MEMORY UPDATE ===
         if self.enable_memory:
-            await self._update_memories(
-                ticker, parallel_result.results, synthesis
-            )
+            await self._update_memories(ticker, parallel_result.results, synthesis)
 
         total_duration = (time.monotonic() - start) * 1000
 
@@ -322,7 +321,4 @@ class AgentPipelineOrchestrator:
         if not self.enable_memory:
             return {"enabled": False}
 
-        return {
-            role_name: memory.get_performance_summary()
-            for role_name, memory in self._memories.items()
-        }
+        return {role_name: memory.get_performance_summary() for role_name, memory in self._memories.items()}

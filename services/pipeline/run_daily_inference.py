@@ -27,7 +27,7 @@ def run_alpha_engine_sync():
         return
 
     # Son 63 gunluk egitim dongusu (Optuna ile)
-    common_dates = list(sorted([d.strftime('%Y-%m-%d') for d in bm_df.index]))
+    common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
     if len(common_dates) < 200:
         return
 
@@ -36,11 +36,7 @@ def run_alpha_engine_sync():
     target_date = common_dates[-1]
 
     # Optuna egitimi
-    success = engine.train(
-        market_data, bm_df, sector_map,
-        train_start, train_end,
-        optimize=True
-    )
+    success = engine.train(market_data, bm_df, sector_map, train_start, train_end, optimize=True)
 
     if not success:
         return
@@ -60,6 +56,7 @@ def run_alpha_engine_sync():
     # DB'ye kaydet
     async def save_to_db():
         from services.core.database import pg_execute
+
         query = """
             INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime)
             VALUES ($1, $2, $3)
@@ -75,5 +72,6 @@ def run_alpha_engine_sync():
     except Exception:
         asyncio.run(save_to_db())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_alpha_engine_sync()

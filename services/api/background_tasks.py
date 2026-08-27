@@ -18,11 +18,13 @@ async def radar_cache_refresher():
     while True:
         try:
             from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
+
             current_phase = bist_session_fsm.get_phase()
 
             if current_phase != BISTMarketPhase.CLOSED:
                 # Seans açık — gerçek veri çek
                 from .v1.market import _fetch_radar_fresh
+
                 await _fetch_radar_fresh(limit=1000)
             # else: Seans kapalı — cache'i koru, sahte veri üretme
 
@@ -45,6 +47,7 @@ async def ml_learning_scheduler():
 
     try:
         from ..learning.learning_pipeline import LearningPipeline
+
         pipeline = LearningPipeline()
         loop = asyncio.get_event_loop()
         logger.info("ml_scheduler: Başlangıç eksik eğitim/veri telafi kontrolü yapılıyor...")
@@ -57,6 +60,7 @@ async def ml_learning_scheduler():
         await asyncio.sleep(4 * 3600)
         try:
             from ..learning.learning_pipeline import LearningPipeline
+
             pipeline = LearningPipeline()
             loop = asyncio.get_event_loop()
             logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
@@ -72,6 +76,7 @@ async def auto_storage_optimizer():
         await asyncio.sleep(12 * 3600)
         try:
             from ..core.database import ch_execute
+
             ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
             logger.info("auto_storage_optimizer: Periyodik ZSTD disk sıkıştırması ve temizliği tamamlandı.")
         except Exception as e:
@@ -86,12 +91,16 @@ async def paper_trading_scheduler():
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
         from services.pipeline.run_unified_daily import run_morning_execution_cycle
+
         cur_pos = paper_orchestrator.portfolio.get_all_positions()
         pending = paper_orchestrator.store.load_pending_signals()
         now_tr = datetime.now(TR_TZ)
         if now_tr.weekday() < 5 and (len(cur_pos) == 0 or len(pending) > 0):
-            logger.info("paper_trading_scheduler: Başlangıç otonom portföy başlatma/telafi döngüsü çalıştırılıyor...",
-                       positions=len(cur_pos), pending=len(pending))
+            logger.info(
+                "paper_trading_scheduler: Başlangıç otonom portföy başlatma/telafi döngüsü çalıştırılıyor...",
+                positions=len(cur_pos),
+                pending=len(pending),
+            )
             await run_morning_execution_cycle()
     except Exception as e:
         logger.warning(f"paper_trading_scheduler startup catchup error: {e}")
@@ -111,12 +120,15 @@ async def paper_trading_scheduler():
 
         target_time, phase = min(upcoming, key=lambda x: x[0])
         sleep_seconds = (target_time - now).total_seconds()
-        logger.info(f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')} TR) tetiklenecek.")
+        logger.info(
+            f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')} TR) tetiklenecek."
+        )
         await asyncio.sleep(sleep_seconds)
 
         if datetime.now(TR_TZ).weekday() < 5:
             try:
                 from services.pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
+
                 if phase == "MORNING":
                     logger.info("paper_trading_scheduler: Sabah açılışı yürütme döngüsü başlıyor...")
                     await run_morning_execution_cycle()

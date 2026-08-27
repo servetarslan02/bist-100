@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class BISTFeatureDef:
     """BIST-specific feature tanımı."""
+
     name: str
     description: str
     category: str  # "session", "circuit_breaker", "settlement", "compliance", "microstructure"
@@ -27,7 +28,6 @@ class BISTFeatureDef:
 
 # BIST-specific feature tanımları
 BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
-
     # === SEANS FAZI FEATURES ===
     BISTFeatureDef(
         name="is_opening_auction",
@@ -71,7 +71,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="float",
         importance="medium",
     ),
-
     # === DEVRE KESICI FEATURES ===
     BISTFeatureDef(
         name="circuit_breaker_count_today",
@@ -122,7 +121,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="float",
         importance="high",
     ),
-
     # === TAKAS VE UYUMLULUK FEATURES ===
     BISTFeatureDef(
         name="is_gross_settlement",
@@ -166,7 +164,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="bool",
         importance="high",
     ),
-
     # === PİYASA MİKRO YAPI FEATURES ===
     BISTFeatureDef(
         name="bid_ask_spread",
@@ -203,7 +200,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="int",
         importance="medium",
     ),
-
     # === PAZAR VE SEKTÖR FEATURES ===
     BISTFeatureDef(
         name="market_type",
@@ -233,7 +229,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="float",
         importance="medium",
     ),
-
     # === KURUMSAL FEATURES ===
     BISTFeatureDef(
         name="institutional_ownership_pct",
@@ -256,7 +251,6 @@ BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
         dtype="float",
         importance="high",
     ),
-
     # === VİOP FEATURES ===
     BISTFeatureDef(
         name="viop_open_interest_change",

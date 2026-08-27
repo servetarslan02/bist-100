@@ -23,15 +23,16 @@ logger = structlog.get_logger()
 @dataclass
 class Prediction:
     """Prediction çıktısı — canonical contract."""
+
     ticker: str
-    direction: str              # UP / DOWN / NEUTRAL
+    direction: str  # UP / DOWN / NEUTRAL
     expected_return_pct: float  # Beklenen getiri %
-    confidence: float           # 0-1
-    uncertainty: float          # Tahmin belirsizliği
-    time_horizon: int           # Gün
-    risk_reward: float          # Risk/getiri oranı
-    quality_grade: str          # A+/A/B/C/D
-    model_source: str           # "ml" / "ensemble" / "rule_based" / "fallback"
+    confidence: float  # 0-1
+    uncertainty: float  # Tahmin belirsizliği
+    time_horizon: int  # Gün
+    risk_reward: float  # Risk/getiri oranı
+    quality_grade: str  # A+/A/B/C/D
+    model_source: str  # "ml" / "ensemble" / "rule_based" / "fallback"
     calibrated_confidence: float = 0.0
     model_agreement: float = 0.0
 
@@ -39,6 +40,7 @@ class Prediction:
 @dataclass
 class MultiHorizonPrediction:
     """Çoklu ufuk prediction."""
+
     ticker: str
     predictions: dict[int, Prediction]  # horizon → Prediction
     consensus_direction: str = "NEUTRAL"
@@ -58,6 +60,7 @@ def compute_prediction(
     model_agreement: float | None = None,
 ) -> Prediction:
     """Model prediction'dan structured prediction üret."""
+
     def _s(v):
         return float(v) if isinstance(v, (int, float)) and np.isfinite(float(v)) else 0.0
 

@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class PipelineConfig:
     """Feature Pipeline konfigürasyonu."""
+
     drift_threshold: float = 0.25
     enable_drift_detection: bool = True
     save_to_store: bool = True
@@ -29,6 +30,7 @@ class PipelineConfig:
 @dataclass
 class PipelineResult:
     """Pipeline çalıştırma sonucu."""
+
     ticker: str
     feature_count: int
     drift_report: dict[str, Any] | None = None
@@ -100,13 +102,21 @@ class FeaturePipeline:
                     current_close = float(closes[-1])
                     if current_close > 0:
                         if len(closes) >= 2 and closes[-2] > 0:
-                            targets = targets.with_columns(pl.lit(float((current_close / closes[-2]) - 1.0)).alias('return_1d'))
+                            targets = targets.with_columns(
+                                pl.lit(float((current_close / closes[-2]) - 1.0)).alias("return_1d")
+                            )
                         if len(closes) >= 6 and closes[-6] > 0:
-                            targets = targets.with_columns(pl.lit(float((current_close / closes[-6]) - 1.0)).alias('return_5d'))
+                            targets = targets.with_columns(
+                                pl.lit(float((current_close / closes[-6]) - 1.0)).alias("return_5d")
+                            )
                         if len(closes) >= 11 and closes[-11] > 0:
-                            targets = targets.with_columns(pl.lit(float((current_close / closes[-11]) - 1.0)).alias('return_10d'))
+                            targets = targets.with_columns(
+                                pl.lit(float((current_close / closes[-11]) - 1.0)).alias("return_10d")
+                            )
                         if len(closes) >= 21 and closes[-21] > 0:
-                            targets = targets.with_columns(pl.lit(float((current_close / closes[-21]) - 1.0)).alias('return_20d'))
+                            targets = targets.with_columns(
+                                pl.lit(float((current_close / closes[-21]) - 1.0)).alias("return_20d")
+                            )
         except Exception:
             logger.warning("Caught Exception in _compute_target_features", exc_info=True)
 
@@ -135,35 +145,62 @@ class FeaturePipeline:
 
             # Seans fazı features
             phase = bist_session_fsm.get_phase(ticker=ticker)
-            bist = bist.with_columns(pl.lit(1.0 if phase in {
-                BISTMarketPhase.OPENING_AUCTION_COLLECTION,
-                BISTMarketPhase.OPENING_AUCTION_DETERMINATION
-            } else 0.0).alias('is_opening_auction'))
-            bist = bist.with_columns(pl.lit(1.0 if phase in {
-                BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
-                BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
-                BISTMarketPhase.CLOSING_PRICE_TRADING
-            } else 0.0).alias('is_closing_auction'))
-            bist = bist.with_columns(pl.lit(1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0).alias('is_continuous_auction'))
+            bist = bist.with_columns(
+                pl.lit(
+                    1.0
+                    if phase
+                    in {BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.OPENING_AUCTION_DETERMINATION}
+                    else 0.0
+                ).alias("is_opening_auction")
+            )
+            bist = bist.with_columns(
+                pl.lit(
+                    1.0
+                    if phase
+                    in {
+                        BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+                        BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
+                        BISTMarketPhase.CLOSING_PRICE_TRADING,
+                    }
+                    else 0.0
+                ).alias("is_closing_auction")
+            )
+            bist = bist.with_columns(
+                pl.lit(1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0).alias("is_continuous_auction")
+            )
 
             # Devre kesici features
             cb_status = auto_circuit_breaker.get_status()
-            bist = bist.with_columns(pl.lit(1.0 if cb_status.get("ebdks_active", False) else 0.0).alias('ebdks_active'))
-            bist = bist.with_columns(pl.lit(float(cb_status.get("ebdks_triggered_today", 0))).alias('ebdks_triggered_today'))
-            bist = bist.with_columns(pl.lit(float(cb_status.get("bist100_change_pct", 0))).alias('bist100_change_pct'))
+            bist = bist.with_columns(pl.lit(1.0 if cb_status.get("ebdks_active", False) else 0.0).alias("ebdks_active"))
+            bist = bist.with_columns(
+                pl.lit(float(cb_status.get("ebdks_triggered_today", 0))).alias("ebdks_triggered_today")
+            )
+            bist = bist.with_columns(pl.lit(float(cb_status.get("bist100_change_pct", 0))).alias("bist100_change_pct"))
 
             # EBDKS'ye mesafe
             bist100_change = cb_status.get("bist100_change_pct", 0)
-            bist = bist.with_columns(pl.lit(float(bist100_change + 6.0)).alias('bist100_distance_to_ebdks'))  # %6 eşiğine mesafe
+            bist = bist.with_columns(
+                pl.lit(float(bist100_change + 6.0)).alias("bist100_distance_to_ebdks")
+            )  # %6 eşiğine mesafe
 
             # Uptick rule
-            bist = bist.with_columns(pl.lit(1.0 if short_selling_monitor._uptick_rule_active else 0.0).alias('uptick_rule_active'))
+            bist = bist.with_columns(
+                pl.lit(1.0 if short_selling_monitor._uptick_rule_active else 0.0).alias("uptick_rule_active")
+            )
 
             # Brüt takas
-            bist = bist.with_columns(pl.lit(1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0).alias('is_gross_settlement'))
+            bist = bist.with_columns(
+                pl.lit(1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0).alias(
+                    "is_gross_settlement"
+                )
+            )
 
             # Açığa satış uygunluk
-            bist = bist.with_columns(pl.lit(1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0).alias('short_sale_eligible'))
+            bist = bist.with_columns(
+                pl.lit(1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0).alias(
+                    "short_sale_eligible"
+                )
+            )
 
         except Exception as e:
             logger.debug("BIST feature computation failed", ticker=ticker, error=str(e))
@@ -173,9 +210,7 @@ class FeaturePipeline:
     def _check_drift(self, ticker: str, current_features: dict[str, float]) -> dict[str, Any]:
         """Referans istatistikler ile mevcut özellikler arasındaki drift kontrolü."""
         if ticker not in self._reference_stats:
-            self._reference_stats[ticker] = {
-                k: float(v) for k, v in current_features.items()
-            }
+            self._reference_stats[ticker] = {k: float(v) for k, v in current_features.items()}
             return {"drifted_features": 0, "status": "baseline_established"}
 
         ref = self._reference_stats[ticker]

@@ -45,7 +45,16 @@ class TestPaperStateStore(unittest.TestCase):
         os.unlink(self.tmp.name)
 
     def test_save_and_load_portfolio_state(self):
-        snap = {"date": "2024-01-15", "cash": 900000, "initial_capital": 1000000, "positions": [], "trades": [], "orders": [], "equity_curve": [], "last_updated": ""}
+        snap = {
+            "date": "2024-01-15",
+            "cash": 900000,
+            "initial_capital": 1000000,
+            "positions": [],
+            "trades": [],
+            "orders": [],
+            "equity_curve": [],
+            "last_updated": "",
+        }
         self.store.save_portfolio_state(snap)
         loaded = self.store.load_portfolio_state()
         self.assertIsNotNone(loaded)
@@ -53,7 +62,16 @@ class TestPaperStateStore(unittest.TestCase):
         self.assertEqual(loaded["initial_capital"], 1000000)
 
     def test_positions_persistence(self):
-        pos = [{"ticker": "THYAO", "quantity": 100, "avg_cost": 250, "current_price": 260, "sector": "Havacilik", "market_value": 26000}]
+        pos = [
+            {
+                "ticker": "THYAO",
+                "quantity": 100,
+                "avg_cost": 250,
+                "current_price": 260,
+                "sector": "Havacilik",
+                "market_value": 26000,
+            }
+        ]
         self.store.save_positions(pos)
         loaded = self.store.load_positions()
         self.assertEqual(len(loaded), 1)
@@ -124,8 +142,11 @@ class TestVirtualPortfolio(unittest.TestCase):
 
     def test_max_drawdown(self):
         self.portfolio._equity_curve = [
-            {"equity": 1000000}, {"equity": 1100000}, {"equity": 1050000},
-            {"equity": 950000}, {"equity": 1000000},
+            {"equity": 1000000},
+            {"equity": 1100000},
+            {"equity": 1050000},
+            {"equity": 950000},
+            {"equity": 1000000},
         ]
         self.portfolio._max_equity = 1100000
         dd = self.portfolio.get_max_drawdown()
@@ -155,8 +176,12 @@ class TestPaperExecutionEngine(unittest.TestCase):
 
     def test_buy_execution(self):
         order = self.engine.execute_signal(
-            date="2024-01-15", ticker="THYAO", side="BUY",
-            quantity=100, signal_price=250, market_price=250,
+            date="2024-01-15",
+            ticker="THYAO",
+            side="BUY",
+            quantity=100,
+            signal_price=250,
+            market_price=250,
         )
         self.assertEqual(order["status"], "FILLED")
         self.assertGreater(order["execution_price"], 0)
@@ -165,16 +190,24 @@ class TestPaperExecutionEngine(unittest.TestCase):
 
     def test_sell_execution(self):
         order = self.engine.execute_signal(
-            date="2024-01-15", ticker="THYAO", side="SELL",
-            quantity=100, signal_price=260, market_price=260,
+            date="2024-01-15",
+            ticker="THYAO",
+            side="SELL",
+            quantity=100,
+            signal_price=260,
+            market_price=260,
         )
         self.assertEqual(order["status"], "FILLED")
         self.assertLess(order["execution_price"], 260)  # Slippage
 
     def test_liquidity_partial_fill(self):
         order = self.engine.execute_signal(
-            date="2024-01-15", ticker="THYAO", side="BUY",
-            quantity=1_000_000, signal_price=250, market_price=250,
+            date="2024-01-15",
+            ticker="THYAO",
+            side="BUY",
+            quantity=1_000_000,
+            signal_price=250,
+            market_price=250,
             avg_volume=1_000,  # Cok dusuk hacim
         )
         self.assertEqual(order["status"], "PARTIAL_FILL")
@@ -189,8 +222,11 @@ class TestPaperExecutionEngine(unittest.TestCase):
 
     def test_slippage_bounds(self):
         slippage = self.engine._compute_slippage(
-            quantity=1000, avg_volume=1_000_000,
-            volatility=0.5, spread_pct=0.2, side="BUY",
+            quantity=1000,
+            avg_volume=1_000_000,
+            volatility=0.5,
+            spread_pct=0.2,
+            side="BUY",
         )
         self.assertLessEqual(slippage, 0.005)  # Max 0.5%
         self.assertGreaterEqual(slippage, 0)
@@ -198,8 +234,12 @@ class TestPaperExecutionEngine(unittest.TestCase):
     def test_signal_vs_execution_price_different(self):
         """Look-ahead bias test: signal_price != execution_price olabilmeli."""
         order = self.engine.execute_signal(
-            date="2024-01-15", ticker="THYAO", side="BUY",
-            quantity=100, signal_price=250, market_price=255,  # Farkli!
+            date="2024-01-15",
+            ticker="THYAO",
+            side="BUY",
+            quantity=100,
+            signal_price=250,
+            market_price=255,  # Farkli!
         )
         self.assertEqual(order["signal_price"], 250)
         self.assertNotEqual(order["execution_price"], 250)
@@ -213,9 +253,7 @@ class TestPaperRiskGate(unittest.TestCase):
         self.portfolio = VirtualPortfolio(initial_capital=1_000_000)
 
     def test_position_size_limit(self):
-        checks = self.gate.check_all(
-            self.portfolio, "THYAO", "BUY", 50000, 250, sector="Havacilik"
-        )
+        checks = self.gate.check_all(self.portfolio, "THYAO", "BUY", 50000, 250, sector="Havacilik")
         allowed = self.gate.is_trade_allowed(checks)
         self.assertFalse(allowed)
         block_reason = self.gate.get_block_reason(checks)
@@ -224,26 +262,27 @@ class TestPaperRiskGate(unittest.TestCase):
     def test_sector_concentration(self):
         self.portfolio.open_position("THYAO", 1000, 250, sector="Havacilik", date="2024-01-15")
         self.portfolio.open_position("PGSUS", 1000, 200, sector="Havacilik", date="2024-01-15")
-        checks = self.gate.check_all(
-            self.portfolio, "THYAO2", "BUY", 100, 250, sector="Havacilik"
-        )
+        checks = self.gate.check_all(self.portfolio, "THYAO2", "BUY", 100, 250, sector="Havacilik")
         self.assertTrue(any(c["check_name"] == "sector_concentration" for c in checks))
 
     def test_drawdown_kill_switch(self):
         self.portfolio._equity_curve = [
-            {"equity": 1000000}, {"equity": 700000},  # %30 drawdown
+            {"equity": 1000000},
+            {"equity": 700000},  # %30 drawdown
         ]
         self.portfolio._max_equity = 1000000
-        checks = self.gate.check_all(
-            self.portfolio, "THYAO", "BUY", 100, 250
-        )
+        checks = self.gate.check_all(self.portfolio, "THYAO", "BUY", 100, 250)
         allowed = self.gate.is_trade_allowed(checks)
         self.assertFalse(allowed)
         self.assertTrue(self.gate._kill_switch_active)
 
     def test_data_quality_no_trade(self):
         checks = self.gate.check_all(
-            self.portfolio, "THYAO", "BUY", 100, 250,
+            self.portfolio,
+            "THYAO",
+            "BUY",
+            100,
+            250,
             data_quality_ok=False,
         )
         allowed = self.gate.is_trade_allowed(checks)
@@ -252,7 +291,11 @@ class TestPaperRiskGate(unittest.TestCase):
 
     def test_model_validity_no_trade(self):
         checks = self.gate.check_all(
-            self.portfolio, "THYAO", "BUY", 100, 250,
+            self.portfolio,
+            "THYAO",
+            "BUY",
+            100,
+            250,
             model_version_valid=False,
         )
         allowed = self.gate.is_trade_allowed(checks)
@@ -288,12 +331,35 @@ class TestPerformanceTracker(unittest.TestCase):
 
     def test_full_metrics(self):
         equity_curve = [
-            {"equity": 1000000}, {"equity": 1010000}, {"equity": 1005000},
-            {"equity": 1020000}, {"equity": 1015000},
+            {"equity": 1000000},
+            {"equity": 1010000},
+            {"equity": 1005000},
+            {"equity": 1020000},
+            {"equity": 1015000},
         ]
         trades = [
-            {"trade_id": "T1", "ticker": "THYAO", "side": "SELL", "quantity": 100, "entry_price": 250, "exit_price": 260, "realized_pnl": 1000, "commission": 10, "holding_days": 5},
-            {"trade_id": "T2", "ticker": "GARAN", "side": "SELL", "quantity": 200, "entry_price": 100, "exit_price": 95, "realized_pnl": -1000, "commission": 10, "holding_days": 4},
+            {
+                "trade_id": "T1",
+                "ticker": "THYAO",
+                "side": "SELL",
+                "quantity": 100,
+                "entry_price": 250,
+                "exit_price": 260,
+                "realized_pnl": 1000,
+                "commission": 10,
+                "holding_days": 5,
+            },
+            {
+                "trade_id": "T2",
+                "ticker": "GARAN",
+                "side": "SELL",
+                "quantity": 200,
+                "entry_price": 100,
+                "exit_price": 95,
+                "realized_pnl": -1000,
+                "commission": 10,
+                "holding_days": 4,
+            },
         ]
         metrics = self.engine.compute_full_metrics(equity_curve, trades)
         self.assertIn("sharpe_ratio", metrics)
@@ -329,13 +395,15 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         data = {}
         for t in tickers:
             prices = 100 + np.cumsum(np.random.randn(len(dates)) * 2)
-            df = pl.DataFrame({
-                'Open': prices * 0.99,
-                'High': prices * 1.02,
-                'Low': prices * 0.98,
-                'Close': prices,
-                'Volume': np.random.randint(1_000_000, 10_000_000, len(dates)),
-            }.Series(dates))
+            df = pl.DataFrame(
+                {
+                    "Open": prices * 0.99,
+                    "High": prices * 1.02,
+                    "Low": prices * 0.98,
+                    "Close": prices,
+                    "Volume": np.random.randint(1_000_000, 10_000_000, len(dates)),
+                }.Series(dates)
+            )
             data[t] = df
         return data
 
@@ -358,8 +426,15 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik"}
 
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 10,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "regime": "BULL"},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 10,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "regime": "BULL",
+            },
         ]
 
         report = self.orch.run_daily_cycle(
@@ -377,8 +452,15 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         sector_map = {"THYAO": "Havacilik"}
 
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 10,
-             "confidence": 0.85, "model_version": "Challenger_v1", "regime": "BULL"},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 10,
+                "confidence": 0.85,
+                "model_version": "Challenger_v1",
+                "regime": "BULL",
+            },
         ]
 
         report = self.orch.run_daily_cycle(
@@ -398,10 +480,24 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         signals_by_date = {}
         for d in date_strs:
             signals_by_date[d] = [
-                {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 8,
-                 "confidence": 0.8, "model_version": "LambdaRank_v3_LOCKED", "regime": "BULL"},
-                {"ticker": "GARAN", "direction": "LONG", "rank": 2, "score": 12,
-                 "confidence": 0.75, "model_version": "LambdaRank_v3_LOCKED", "regime": "BULL"},
+                {
+                    "ticker": "THYAO",
+                    "direction": "LONG",
+                    "rank": 1,
+                    "score": 8,
+                    "confidence": 0.8,
+                    "model_version": "LambdaRank_v3_LOCKED",
+                    "regime": "BULL",
+                },
+                {
+                    "ticker": "GARAN",
+                    "direction": "LONG",
+                    "rank": 2,
+                    "score": 12,
+                    "confidence": 0.75,
+                    "model_version": "LambdaRank_v3_LOCKED",
+                    "regime": "BULL",
+                },
             ]
 
         report = self.orch.run_backtest_replay(
@@ -428,8 +524,8 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertEqual(report["status"], "NO_TRADE")
 
     def test_paper_results_not_leaking_to_training(self):
-        self.assertFalse(hasattr(self.orch, 'train_model'))
-        self.assertFalse(hasattr(self.orch, 'fit'))
+        self.assertFalse(hasattr(self.orch, "train_model"))
+        self.assertFalse(hasattr(self.orch, "fit"))
         self.assertEqual(self.orch._champion_version, "LambdaRank_v3_LOCKED")
 
 
@@ -467,7 +563,7 @@ class TestNoLeakage(unittest.TestCase):
 
     def test_no_training_methods(self):
         orch = PaperTradingOrchestrator()
-        forbidden_methods = ['train', 'fit', 'update_weights', 'backpropagate']
+        forbidden_methods = ["train", "fit", "update_weights", "backpropagate"]
         for method in forbidden_methods:
             self.assertFalse(hasattr(orch, method), f"Leakage risk: {method} exists")
 
@@ -476,7 +572,13 @@ class TestNoLeakage(unittest.TestCase):
         tmp.close()
         store = PaperStateStore(tmp.name)
 
-        entry = {"timestamp": "2024-01-15T10:00:00", "date": "2024-01-15", "entry_type": "TRADE", "ticker": "THYAO", "reason": "Test"}
+        entry = {
+            "timestamp": "2024-01-15T10:00:00",
+            "date": "2024-01-15",
+            "entry_type": "TRADE",
+            "ticker": "THYAO",
+            "reason": "Test",
+        }
         store.append_audit(entry)
 
         logs = store.load_audit_log(entry_type="TRADE")

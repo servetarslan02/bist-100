@@ -165,9 +165,9 @@ class AlternativeFeatureEngine:
                 if result.get("sentiment_score") is not None:
                     features["llm_kap_sentiment"] = result["sentiment_score"]
                     features["llm_kap_confidence"] = result["confidence"]
-                    features["llm_kap_impact"] = {
-                        "LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3
-                    }.get(result.get("impact_level", "LOW"), 0)
+                    features["llm_kap_impact"] = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}.get(
+                        result.get("impact_level", "LOW"), 0
+                    )
                     break
 
         # Haber metinleri
@@ -185,6 +185,7 @@ class AlternativeFeatureEngine:
 
             if sentiments:
                 import numpy as np
+
                 features["llm_news_sentiment"] = float(np.mean(sentiments))
                 features["llm_news_sentiment_std"] = float(np.std(sentiments))
                 features["llm_news_count"] = len(sentiments)
@@ -203,6 +204,7 @@ class AlternativeFeatureEngine:
 
         if sentiment_scores:
             import numpy as np
+
             composite["alt_sentiment_avg"] = float(np.mean(sentiment_scores))
             composite["alt_sentiment_consensus"] = float(
                 sum(1 for s in sentiment_scores if s > 0) / len(sentiment_scores)
@@ -216,10 +218,9 @@ class AlternativeFeatureEngine:
 
         if growth_signals:
             import numpy as np
+
             composite["alt_growth_avg"] = float(np.mean(growth_signals))
-            composite["alt_growth_consensus"] = float(
-                sum(1 for s in growth_signals if s > 0) / len(growth_signals)
-            )
+            composite["alt_growth_consensus"] = float(sum(1 for s in growth_signals if s > 0) / len(growth_signals))
 
         # 3. Alternatif veri güvenilirlik skoru
         non_zero_sources = sum(1 for v in features.values() if v != 0)
@@ -232,41 +233,84 @@ class AlternativeFeatureEngine:
         """Tüm mümkün feature adları."""
         return [
             # Google Trends
-            "google_trends_score", "google_trends_avg_30d",
-            "google_trends_momentum_7d", "google_trends_momentum_30d",
-            "google_trends_volatility", "google_trends_percentile",
-            "google_trends_relative", "google_trends_trend", "google_trends_zscore",
+            "google_trends_score",
+            "google_trends_avg_30d",
+            "google_trends_momentum_7d",
+            "google_trends_momentum_30d",
+            "google_trends_volatility",
+            "google_trends_percentile",
+            "google_trends_relative",
+            "google_trends_trend",
+            "google_trends_zscore",
             # BKM Credit Card
-            "cc_spend_growth", "cc_spend_growth_mom", "cc_transaction_count",
-            "cc_avg_transaction", "cc_online_ratio", "cc_vs_sector",
-            "cc_seasonal_deviation", "cc_foreign_ratio",
+            "cc_spend_growth",
+            "cc_spend_growth_mom",
+            "cc_transaction_count",
+            "cc_avg_transaction",
+            "cc_online_ratio",
+            "cc_vs_sector",
+            "cc_seasonal_deviation",
+            "cc_foreign_ratio",
             # Kariyer.net Jobs
-            "job_posting_count", "job_posting_growth", "job_tech_ratio",
-            "job_management_ratio", "job_remote_ratio", "job_diversity",
+            "job_posting_count",
+            "job_posting_growth",
+            "job_tech_ratio",
+            "job_management_ratio",
+            "job_remote_ratio",
+            "job_diversity",
             # Ekşi Sözlük
-            "eksi_sentiment", "eksi_volume", "eksi_positive_ratio",
-            "eksi_negative_ratio", "eksi_avg_favorites", "eksi_max_favorites",
-            "eksi_sentiment_std", "eksi_controversial",
+            "eksi_sentiment",
+            "eksi_volume",
+            "eksi_positive_ratio",
+            "eksi_negative_ratio",
+            "eksi_avg_favorites",
+            "eksi_max_favorites",
+            "eksi_sentiment_std",
+            "eksi_controversial",
             # LLM Sentiment
-            "llm_kap_sentiment", "llm_kap_confidence", "llm_kap_impact",
-            "llm_news_sentiment", "llm_news_sentiment_std", "llm_news_count",
+            "llm_kap_sentiment",
+            "llm_kap_confidence",
+            "llm_kap_impact",
+            "llm_news_sentiment",
+            "llm_news_sentiment_std",
+            "llm_news_count",
             # Investing.com
-            "investing_sentiment", "investing_volume", "investing_positive_ratio",
-            "investing_negative_ratio", "investing_sentiment_std", "investing_technical_rating",
+            "investing_sentiment",
+            "investing_volume",
+            "investing_positive_ratio",
+            "investing_negative_ratio",
+            "investing_sentiment_std",
+            "investing_technical_rating",
             # Satellite
-            "sat_factory_activity", "sat_factory_ndvi", "sat_warehouse_activity",
-            "sat_airport_activity", "sat_office_activity",
-            "sat_ndvi_avg", "sat_ndbi_avg", "sat_activity_index", "sat_location_count",
+            "sat_factory_activity",
+            "sat_factory_ndvi",
+            "sat_warehouse_activity",
+            "sat_airport_activity",
+            "sat_office_activity",
+            "sat_ndvi_avg",
+            "sat_ndbi_avg",
+            "sat_activity_index",
+            "sat_location_count",
             # Reconciliation
-            "alt_reliability_score", "alt_consensus_score", "alt_source_count",
+            "alt_reliability_score",
+            "alt_consensus_score",
+            "alt_source_count",
             # Composite
-            "alt_sentiment_avg", "alt_sentiment_consensus",
-            "alt_growth_avg", "alt_growth_consensus", "alt_data_coverage",
+            "alt_sentiment_avg",
+            "alt_sentiment_consensus",
+            "alt_growth_avg",
+            "alt_growth_consensus",
+            "alt_data_coverage",
             # Social (mevcut)
-            "social_sentiment", "social_volume", "social_viral",
-            "social_positive_ratio", "social_mention_count",
+            "social_sentiment",
+            "social_volume",
+            "social_viral",
+            "social_positive_ratio",
+            "social_mention_count",
             # Web Scraping (mevcut)
-            "web_traffic_change", "app_ranking_change", "review_count_growth",
+            "web_traffic_change",
+            "app_ranking_change",
+            "review_count_growth",
             "price_vs_competitors",
         ]
 

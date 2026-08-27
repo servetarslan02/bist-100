@@ -14,7 +14,7 @@ os.environ.setdefault("JWT_SECRET", "alpha-bist-test-secret-key-32-chars-minimum
 os.environ.setdefault("API_KEY_SECRET", "alpha-bist-api-secret-key-32-chars-minimum")
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.api.app import app
 
@@ -40,7 +40,7 @@ assert resp_news.status_code == 200, "Haber API yanıt vermedi!"
 news_data = resp_news.json()
 print(f"  ✓ Çekilen Haber Sayısı: {news_data.get('count', 0)} adet")
 if news_data.get("news"):
-    print(f"  ✓ Örnek Canlı Akış: \"{news_data['news'][0].get('title', '')[:65]}...\"")
+    print(f'  ✓ Örnek Canlı Akış: "{news_data["news"][0].get("title", "")[:65]}..."')
 
 # 3. Canlı Küresel Makro API Testi
 resp_macro = client.get("/api/v1/alternative/macro")

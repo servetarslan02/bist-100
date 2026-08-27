@@ -19,9 +19,11 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 @dataclass
 class Prediction:
     """Tahmin kaydı."""
+
     prediction_id: str
     ticker: str
     timestamp: datetime
@@ -42,6 +44,7 @@ class Prediction:
 @dataclass
 class Outcome:
     """Sonuç kaydı."""
+
     prediction_id: str
     ticker: str
     predicted_direction: str
@@ -61,9 +64,7 @@ class IntegratedLearningSystem:
     def __init__(self):
         self._predictions: deque = deque(maxlen=5000)
         self._outcomes: deque = deque(maxlen=5000)
-        self._regime_accuracy: dict[str, dict] = defaultdict(
-            lambda: {"correct": 0, "total": 0}
-        )
+        self._regime_accuracy: dict[str, dict] = defaultdict(lambda: {"correct": 0, "total": 0})
         self._feature_importance: dict[str, float] = {}
         self._model_versions: list[str] = ["v1"]
         self._feedback_buffer: deque = deque(maxlen=1000)
@@ -100,14 +101,15 @@ class IntegratedLearningSystem:
         if len(self._predictions) > 5000:
             self._predictions = self._predictions[-5000:]
 
-        logger.debug("Prediction recorded",
-            ticker=ticker, direction=predicted_direction,
-            confidence=confidence, regime=regime)
+        logger.debug(
+            "Prediction recorded", ticker=ticker, direction=predicted_direction, confidence=confidence, regime=regime
+        )
 
         # PREDICTION_CREATED event
         try:
             from services.core.event_bus import publish_event
             from services.core.event_schema import CanonicalEvent, EventType
+
             pred_event = CanonicalEvent(
                 event_type=EventType.PREDICTION_CREATED,
                 payload={
@@ -138,10 +140,7 @@ class IntegratedLearningSystem:
         Bu method outcome_tracker tarafından çağrılır.
         """
         # İlgili tahmini bul
-        matching_preds = [
-            p for p in self._predictions
-            if p.ticker == ticker and p.outcome is None
-        ]
+        matching_preds = [p for p in self._predictions if p.ticker == ticker and p.outcome is None]
 
         if not matching_preds:
             logger.warning("No matching prediction found", ticker=ticker)
@@ -203,17 +202,20 @@ class IntegratedLearningSystem:
                 if isinstance(feat_val, (int, float)) and feat_val == feat_val:  # NaN check
                     self._feature_importance[feat_name] = self._feature_importance.get(feat_name, 0) + weight
 
-        logger.info("Outcome recorded",
+        logger.info(
+            "Outcome recorded",
             ticker=ticker,
             predicted=pred.predicted_direction,
             actual=actual_direction,
             correct=correct,
-            return_pct=round(actual_return, 2))
+            return_pct=round(actual_return, 2),
+        )
 
         # OUTCOME_CREATED event
         try:
             from services.core.event_bus import publish_event
             from services.core.event_schema import CanonicalEvent, EventType
+
             out_event = CanonicalEvent(
                 event_type=EventType.OUTCOME_CREATED,
                 payload={
@@ -266,13 +268,9 @@ class IntegratedLearningSystem:
         regime: str,
     ) -> str:
         """Karar kaydet."""
-        decision_id = hashlib.sha256(
-            f"{ticker}:{action}:{datetime.now(UTC).isoformat()}".encode()
-        ).hexdigest()[:16]
+        decision_id = hashlib.sha256(f"{ticker}:{action}:{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:16]
 
-        logger.debug("Decision recorded",
-            ticker=ticker, action=action,
-            direction=direction, confidence=confidence)
+        logger.debug("Decision recorded", ticker=ticker, action=action, direction=direction, confidence=confidence)
 
         return decision_id
 
@@ -284,13 +282,15 @@ class IntegratedLearningSystem:
         actual_outcome: str,
     ):
         """Manuel feedback kaydet."""
-        self._feedback_buffer.append({
-            "ticker": ticker,
-            "prediction_id": prediction_id,
-            "feedback": feedback,
-            "actual_outcome": actual_outcome,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._feedback_buffer.append(
+            {
+                "ticker": ticker,
+                "prediction_id": prediction_id,
+                "feedback": feedback,
+                "actual_outcome": actual_outcome,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._feedback_buffer) > 1000:
             self._feedback_buffer = self._feedback_buffer[-1000:]
 
@@ -396,16 +396,27 @@ class IntegratedLearningSystem:
         """Learning state'i dosyaya kaydet."""
         data = {
             "predictions": [
-                {"prediction_id": p.prediction_id, "ticker": p.ticker,
-                 "timestamp": p.timestamp.isoformat(), "regime": p.regime,
-                 "predicted_direction": p.predicted_direction, "confidence": p.confidence,
-                 "horizon": p.horizon, "model_version": p.model_version}
+                {
+                    "prediction_id": p.prediction_id,
+                    "ticker": p.ticker,
+                    "timestamp": p.timestamp.isoformat(),
+                    "regime": p.regime,
+                    "predicted_direction": p.predicted_direction,
+                    "confidence": p.confidence,
+                    "horizon": p.horizon,
+                    "model_version": p.model_version,
+                }
                 for p in self._predictions
             ],
             "outcomes": [
-                {"prediction_id": o.prediction_id, "actual_return": o.actual_return,
-                 "actual_direction": o.actual_direction, "correct": o.correct,
-                 "regime": o.regime, "timestamp": o.timestamp.isoformat()}
+                {
+                    "prediction_id": o.prediction_id,
+                    "actual_return": o.actual_return,
+                    "actual_direction": o.actual_direction,
+                    "correct": o.correct,
+                    "regime": o.regime,
+                    "timestamp": o.timestamp.isoformat(),
+                }
                 for o in self._outcomes
             ],
             "regime_accuracy": dict(self._regime_accuracy),
@@ -414,7 +425,9 @@ class IntegratedLearningSystem:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
-        logger.info("Integrated learning saved", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes))
+        logger.info(
+            "Integrated learning saved", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes)
+        )
 
     def load(self, path: str = "data/integrated_learning.json"):
         """Learning state'i dosyadan yükle."""
@@ -433,9 +446,15 @@ class IntegratedLearningSystem:
                 self._regime_accuracy[regime] = acc
             if data.get("model_versions"):
                 self._model_versions = data["model_versions"]
-            logger.info("Integrated learning loaded", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes))
+            logger.info(
+                "Integrated learning loaded",
+                path=path,
+                predictions=len(self._predictions),
+                outcomes=len(self._outcomes),
+            )
         except Exception as e:
             logger.warning("Failed to load integrated learning", path=path, error=str(e))
+
 
 # Singleton
 learning_system = IntegratedLearningSystem()

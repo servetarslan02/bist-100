@@ -159,7 +159,7 @@ def test_walk_forward_run():
     predictions = np.random.randn(n_days, n_stocks)
     actuals = np.random.randn(n_days, n_stocks)
     tickers = [f"STOCK_{i}" for i in range(n_stocks)]
-    dates = [f"2024-{(i//30)+1:02d}-{(i%30)+1:02d}" for i in range(n_days)]
+    dates = [f"2024-{(i // 30) + 1:02d}-{(i % 30) + 1:02d}" for i in range(n_days)]
 
     result = engine.run(predictions, actuals, tickers, dates)
 
@@ -231,6 +231,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

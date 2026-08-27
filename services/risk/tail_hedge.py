@@ -24,20 +24,22 @@ logger = structlog.get_logger()
 @dataclass
 class HedgeRecommendation:
     """Hedge önerisi."""
+
     strategy: str
-    hedge_ratio: float           # 0.0-1.0 (portföyün ne kadarı hedge edilmeli)
-    estimated_cost_pct: float    # Maliyet (portföyün %'si)
-    estimated_cost_amount: float # Maliyet (TL)
-    protection_level: str        # LOW, MEDIUM, HIGH
+    hedge_ratio: float  # 0.0-1.0 (portföyün ne kadarı hedge edilmeli)
+    estimated_cost_pct: float  # Maliyet (portföyün %'si)
+    estimated_cost_amount: float  # Maliyet (TL)
+    protection_level: str  # LOW, MEDIUM, HIGH
     description: str
-    instruments: list[str]       # Önerilen enstrümanlar
+    instruments: list[str]  # Önerilen enstrümanlar
 
 
 @dataclass
 class CrisisAlphaSignal:
     """Crisis alpha sinyali."""
-    signal_strength: float   # 0.0-1.0
-    regime: str              # NORMAL, ELEVATED, CRISIS
+
+    signal_strength: float  # 0.0-1.0
+    regime: str  # NORMAL, ELEVATED, CRISIS
     vix_level: float
     correlation_breakdown: bool
     recommended_action: str
@@ -120,9 +122,7 @@ class TailRiskHedger:
         risk_level = self._assess_risk_level(vix_level, current_drawdown_pct, regime)
 
         # Hedge ratio hesapla
-        hedge_ratio = self._calculate_hedge_ratio(
-            risk_level, portfolio_beta, correlation_to_market, vix_level
-        )
+        hedge_ratio = self._calculate_hedge_ratio(risk_level, portfolio_beta, correlation_to_market, vix_level)
 
         # Strateji seç
         strategy = self._select_strategy(risk_level, vix_level, hedge_ratio)
@@ -244,7 +244,8 @@ class TailRiskHedger:
             "net_savings_pct": round(savings / portfolio_value * 100, 2),
             "worth_hedging": savings > 0,
             "breakeven_loss_pct": round(hedge_cost_pct / (1 - max_loss_with_hedge_pct / max_loss_without_hedge_pct), 2)
-            if max_loss_without_hedge_pct > max_loss_with_hedge_pct else 0,
+            if max_loss_without_hedge_pct > max_loss_with_hedge_pct
+            else 0,
         }
 
     def _assess_risk_level(

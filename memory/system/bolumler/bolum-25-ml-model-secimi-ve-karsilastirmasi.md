@@ -90,6 +90,7 @@ Transformer + RL     → Transformer analiz, RL aksiyon
 import xgboost as xgb
 from sklearn.model_selection import TimeSeriesSplit
 
+
 def train_xgboost(X_train, y_train, X_val, y_val):
     model = xgb.XGBClassifier(
         n_estimators=500,
@@ -102,13 +103,14 @@ def train_xgboost(X_train, y_train, X_val, y_val):
         eval_metric="logloss",
         early_stopping_rounds=50,
     )
-    
+
     model.fit(
-        X_train, y_train,
+        X_train,
+        y_train,
         eval_set=[(X_val, y_val)],
         verbose=False,
     )
-    
+
     return model
 ```
 
@@ -117,6 +119,7 @@ def train_xgboost(X_train, y_train, X_val, y_val):
 ```python
 # services/ml/lightgbm_model.py
 import lightgbm as lgb
+
 
 def train_lightgbm(X_train, y_train, X_val, y_val):
     model = lgb.LGBMClassifier(
@@ -130,13 +133,14 @@ def train_lightgbm(X_train, y_train, X_val, y_val):
         reg_lambda=1.0,
         min_child_samples=20,
     )
-    
+
     model.fit(
-        X_train, y_train,
+        X_train,
+        y_train,
         eval_set=[(X_val, y_val)],
         callbacks=[lgb.early_stopping(50)],
     )
-    
+
     return model
 ```
 
@@ -161,13 +165,13 @@ def train_lightgbm(X_train, y_train, X_val, y_val):
 import torch
 import torch.nn as nn
 
+
 class StockLSTM(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=2):
         super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
-                           batch_first=True, dropout=0.2)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=0.2)
         self.fc = nn.Linear(hidden_size, 3)  # BUY, HOLD, SELL
-    
+
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         out = self.fc(lstm_out[:, -1, :])
@@ -195,6 +199,7 @@ class StockLSTM(nn.Module):
 import torch
 import torch.nn as nn
 
+
 class StockTransformer(nn.Module):
     def __init__(self, input_size, d_model=64, nhead=4, num_layers=2):
         super().__init__()
@@ -202,7 +207,7 @@ class StockTransformer(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.fc = nn.Linear(d_model, 3)
-    
+
     def forward(self, x):
         x = self.embedding(x)
         x = self.transformer(x)
@@ -281,15 +286,13 @@ Gelecek:         Transformer (veri arttığında)
 # services/ml/ensemble.py
 def ensemble_predict(models, weights, X):
     predictions = {}
-    
+
     for name, model in models.items():
         predictions[name] = model.predict_proba(X)[:, 1]
-    
+
     # Ağırlıklı ortalama
-    ensemble_proba = sum(
-        predictions[name] * weights[name] for name in models
-    )
-    
+    ensemble_proba = sum(predictions[name] * weights[name] for name in models)
+
     return ensemble_proba
 ```
 

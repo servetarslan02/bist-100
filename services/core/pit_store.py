@@ -23,13 +23,14 @@ logger = structlog.get_logger()
 @dataclass
 class PITRecord:
     """Point-in-Time kayıt."""
+
     ticker: str
-    field_name: str       # price, revenue, pe_ratio, vb.
+    field_name: str  # price, revenue, pe_ratio, vb.
     value: Any
     valid_from: datetime  # Bu tarihten itibaren biliniyor
     valid_until: datetime | None = None  # Bu tarihte düzeltildi
     source: str = ""
-    revision: int = 0     # Kaçıncı revizyon
+    revision: int = 0  # Kaçıncı revizyon
 
 
 class PointInTimeStore:
@@ -119,13 +120,15 @@ class PointInTimeStore:
                 continue
             if to_date and r.valid_from > to_date:
                 continue
-            result.append({
-                "value": r.value,
-                "valid_from": r.valid_from.isoformat(),
-                "valid_until": r.valid_until.isoformat() if r.valid_until else None,
-                "source": r.source,
-                "revision": r.revision,
-            })
+            result.append(
+                {
+                    "value": r.value,
+                    "valid_from": r.valid_from.isoformat(),
+                    "valid_until": r.valid_until.isoformat() if r.valid_until else None,
+                    "source": r.source,
+                    "revision": r.revision,
+                }
+            )
 
         return result
 
@@ -146,11 +149,7 @@ class PointInTimeStore:
 
     def get_stats(self) -> dict:
         """İstatistikler."""
-        total_records = sum(
-            len(records)
-            for fields in self._store.values()
-            for records in fields.values()
-        )
+        total_records = sum(len(records) for fields in self._store.values() for records in fields.values())
         return {
             "tickers": len(self._store),
             "total_records": total_records,

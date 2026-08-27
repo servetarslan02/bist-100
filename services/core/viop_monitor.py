@@ -21,7 +21,7 @@ class MarginStatus:
     required: float = 0.0
     available: float = 0.0
     surplus: float = 0.0
-    action: str = ""       # "OK", "MARGIN_CALL", "LIQUIDATE"
+    action: str = ""  # "OK", "MARGIN_CALL", "LIQUIDATE"
     details: dict[str, Any] = None
 
     def __post_init__(self):
@@ -42,8 +42,8 @@ class VIOPMonitor:
     """VIOP teminat takibi."""
 
     # SPAN teminat oranları (yaklaşık)
-    DEFAULT_MARGIN_RATE = 0.15    # %15 başlangıç teminatı
-    MAINTENANCE_MARGIN = 0.12     # %12 sürdürme teminatı
+    DEFAULT_MARGIN_RATE = 0.15  # %15 başlangıç teminatı
+    MAINTENANCE_MARGIN = 0.12  # %12 sürdürme teminatı
     MARGIN_CALL_THRESHOLD = 0.13  # %13 margin call eşiği
 
     def __init__(self):

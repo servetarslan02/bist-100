@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class Forecast:
     """Tahmin sonucu."""
+
     ticker: str
     horizon_days: int
     predicted_return: float
@@ -99,7 +100,14 @@ class EnsembleForecasting:
     ) -> Forecast:
         """Çoklu tahminleri birleştir."""
         if not forecasts:
-            return Forecast(ticker="", horizon_days=0, predicted_return=0, probability_positive=0.5, confidence=0, model_source="ensemble")
+            return Forecast(
+                ticker="",
+                horizon_days=0,
+                predicted_return=0,
+                probability_positive=0.5,
+                confidence=0,
+                model_source="ensemble",
+            )
 
         if weights is None:
             weights = {f.model_source: 1.0 for f in forecasts}
@@ -132,8 +140,6 @@ class EnsembleForecasting:
         )
 
 
-
 # Singletons
 forecasting_engine = ForecastingEngine()
 ensemble_forecasting = EnsembleForecasting()
-

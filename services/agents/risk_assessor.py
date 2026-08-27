@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class RiskAssessment:
     """Risk değerlendirme sonucu."""
+
     approved: bool
     risk_level: str  # LOW, MEDIUM, HIGH, CRITICAL
     risk_score: float  # 0-100
@@ -167,9 +168,7 @@ class RiskAssessor:
         # LLM risk değerlendirmesi (varsa)
         llm_reasoning = ""
         if llm_client:
-            llm_result = await self._llm_risk_assessment(
-                ticker, agent_results, features, portfolio_info, llm_client
-            )
+            llm_result = await self._llm_risk_assessment(ticker, agent_results, features, portfolio_info, llm_client)
             if llm_result:
                 llm_reasoning = llm_result.get("reasoning", "")
                 # LLM veto kontrolü
@@ -243,8 +242,7 @@ class RiskAssessor:
             for role, result in agent_results.items():
                 if result.success:
                     agent_text.append(
-                        f"{role.value}: {result.output.get('direction')} "
-                        f"(güven: {result.confidence:.2f})"
+                        f"{role.value}: {result.output.get('direction')} (güven: {result.confidence:.2f})"
                     )
 
             system_prompt, user_prompt = PromptFactory.get_prompts(
@@ -262,6 +260,7 @@ class RiskAssessor:
 
             if response.success:
                 from .llm_client import parse_llm_json
+
                 return parse_llm_json(response.content)
 
         except Exception as e:

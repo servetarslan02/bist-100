@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class TradeAttribution:
     """İşlem atfedilmesi."""
+
     ticker: str
     entry_date: datetime
     exit_date: datetime
@@ -75,32 +76,22 @@ class AttributionEngine:
         prediction_error = actual_return - expected_return
 
         # 1. Macro contribution
-        macro = self._calc_macro_contribution(
-            market_state_at_entry, market_state_at_exit
-        )
+        macro = self._calc_macro_contribution(market_state_at_entry, market_state_at_exit)
 
         # 2. Flow contribution
-        flow = self._calc_flow_contribution(
-            features_at_entry, features_at_exit
-        )
+        flow = self._calc_flow_contribution(features_at_entry, features_at_exit)
 
         # 3. Momentum contribution
-        momentum = self._calc_momentum_contribution(
-            features_at_entry, features_at_exit
-        )
+        momentum = self._calc_momentum_contribution(features_at_entry, features_at_exit)
 
         # 4. Event contribution
         event = self._calc_event_contribution(events_during_trade, actual_return)
 
         # 5. Regime contribution
-        regime = self._calc_regime_contribution(
-            market_state_at_entry, market_state_at_exit
-        )
+        regime = self._calc_regime_contribution(market_state_at_entry, market_state_at_exit)
 
         # 6. Technical contribution
-        technical = self._calc_technical_contribution(
-            features_at_entry, features_at_exit
-        )
+        technical = self._calc_technical_contribution(features_at_entry, features_at_exit)
 
         # 7. Residual
         attributed = macro + flow + momentum + event + regime + technical
@@ -229,9 +220,9 @@ class AttributionEngine:
     def generate_report(self, attribution: TradeAttribution) -> str:
         """Attribution raporu üret."""
         lines = []
-        lines.append(f"{'='*50}")
+        lines.append(f"{'=' * 50}")
         lines.append(f"📊 {attribution.ticker} — İŞLEM ATFEDİLMESİ")
-        lines.append(f"{'='*50}")
+        lines.append(f"{'=' * 50}")
         lines.append("")
         lines.append(f"Giriş: ₺{attribution.entry_price:.2f} ({attribution.entry_date.strftime('%Y-%m-%d')})")
         lines.append(f"Çıkış: ₺{attribution.exit_price:.2f} ({attribution.exit_date.strftime('%Y-%m-%d')})")

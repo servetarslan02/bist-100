@@ -3,6 +3,7 @@
 Performans tracking, prediction drift, model decay detection,
 auto-retrain trigger, dashboard data, alerting system.
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -16,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class MonitorReport:
     """Monitoring raporu."""
+
     model_id: str
     metric_name: str
     current_value: float
@@ -31,6 +33,7 @@ class MonitorReport:
 @dataclass
 class Alert:
     """Alert kaydı."""
+
     timestamp: str
     model_id: str
     alert_type: str  # DECAY, DRIFT, RETRAIN, PERFORMANCE
@@ -80,14 +83,16 @@ class ModelMonitor:
         """Performans metriği kaydet."""
         if metric_name not in self._metric_history:
             self._metric_history[metric_name] = []
-        self._metric_history[metric_name].append((
-            datetime.now(UTC).isoformat(),
-            value,
-        ))
+        self._metric_history[metric_name].append(
+            (
+                datetime.now(UTC).isoformat(),
+                value,
+            )
+        )
 
         # Son N tut
         if len(self._metric_history[metric_name]) > self.window_size * 3:
-            self._metric_history[metric_name] = self._metric_history[metric_name][-self.window_size * 2:]
+            self._metric_history[metric_name] = self._metric_history[metric_name][-self.window_size * 2 :]
 
         # Decay check
         report = self.check_decay(metric_name, model_id)
@@ -96,13 +101,17 @@ class ModelMonitor:
 
     def record_prediction(self, prediction: float, actual: float | None = None, ticker: str = ""):
         """Tahmin kaydet."""
-        self._prediction_history.append({
-            "prediction": prediction,
-            "actual": actual,
-            "ticker": ticker,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "correct": (prediction > 0.5 and actual > 0) or (prediction <= 0.5 and actual <= 0) if actual is not None else None,
-        })
+        self._prediction_history.append(
+            {
+                "prediction": prediction,
+                "actual": actual,
+                "ticker": ticker,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "correct": (prediction > 0.5 and actual > 0) or (prediction <= 0.5 and actual <= 0)
+                if actual is not None
+                else None,
+            }
+        )
         if len(self._prediction_history) > 5000:
             self._prediction_history = self._prediction_history[-5000:]
 
@@ -128,8 +137,8 @@ class ModelMonitor:
             )
 
         # Son periyot vs tarihsel
-        recent = values[-min(self.window_size, len(values) // 2):]
-        historical = values[:-len(recent)] if len(recent) < len(values) else values
+        recent = values[-min(self.window_size, len(values) // 2) :]
+        historical = values[: -len(recent)] if len(recent) < len(values) else values
 
         current_value = float(np.mean(recent))
         hist_mean = float(np.mean(historical))
@@ -171,10 +180,11 @@ class ModelMonitor:
             return {"drift_detected": False, "reason": "insufficient_data"}
 
         preds = [p["prediction"] for p in self._prediction_history]
-        recent = preds[-self.window_size:]
-        historical = preds[:-len(recent)]
+        recent = preds[-self.window_size :]
+        historical = preds[: -len(recent)]
 
         from scipy import stats
+
         ks_stat, p_value = stats.ks_2samp(historical, recent)
 
         return {
@@ -375,7 +385,15 @@ class ModelMonitor:
             self._alerts = self._alerts[-500:]
         self._last_alert[alert_key] = now
 
-        logger.warning("model_alert", **{"model_id": model_id, "severity": report.alert_level, "metric": report.metric_name, "z_score": report.z_score})
+        logger.warning(
+            "model_alert",
+            **{
+                "model_id": model_id,
+                "severity": report.alert_level,
+                "metric": report.metric_name,
+                "z_score": report.z_score,
+            },
+        )
 
         # Auto-retrain callback
         if report.retrain_recommended and self._retrain_callbacks:

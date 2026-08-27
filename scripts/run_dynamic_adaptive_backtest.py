@@ -19,22 +19,42 @@ import warnings
 import numpy as np
 import polars as pl
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.intelligence.candle_patterns import candle_engine
 from services.intelligence.dynamic_candle_matrix import dynamic_candle_matrix
 from services.intelligence.trend_rider import trend_rider
 
 BIST_CORE_STOCKS = [
-    "THYAO.IS", "GARAN.IS", "AKBNK.IS", "ISCTR.IS", "YKBNK.IS",
-    "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS", "SISE.IS",
-    "ARCLK.IS", "FROTO.IS", "TOASO.IS", "ENKAI.IS", "PETKM.IS",
-    "CCOLA.IS", "AEFES.IS", "TCELL.IS", "VAKBN.IS", "HALKB.IS",
-    "BIMAS.IS", "ASELS.IS", "PGSUS.IS", "TTKOM.IS", "MGROS.IS"
+    "THYAO.IS",
+    "GARAN.IS",
+    "AKBNK.IS",
+    "ISCTR.IS",
+    "YKBNK.IS",
+    "KCHOL.IS",
+    "SAHOL.IS",
+    "TUPRS.IS",
+    "EREGL.IS",
+    "SISE.IS",
+    "ARCLK.IS",
+    "FROTO.IS",
+    "TOASO.IS",
+    "ENKAI.IS",
+    "PETKM.IS",
+    "CCOLA.IS",
+    "AEFES.IS",
+    "TCELL.IS",
+    "VAKBN.IS",
+    "HALKB.IS",
+    "BIMAS.IS",
+    "ASELS.IS",
+    "PGSUS.IS",
+    "TTKOM.IS",
+    "MGROS.IS",
 ]
 
 BENCHMARK_TICKER = "XU100.IS"
@@ -51,7 +71,9 @@ def load_bist_historical_data():
 
     bm_df, stock_dict = historical_warehouse.load_30y_data()
 
-    print(f"✓ BIST-100: {len(bm_df)} seans günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})")
+    print(
+        f"✓ BIST-100: {len(bm_df)} seans günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})"
+    )
     print(f"✓ {len(stock_dict)} hissenin 30 yıllık eksiksiz verisi hazırlandı.")
 
     print("  • Mum formasyonları hafızaya önbellekleniyor (Mikrosaniye hızlı simülasyon)...")
@@ -62,7 +84,14 @@ def load_bist_historical_data():
     return bm_df, stock_dict
 
 
-def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame], initial_capital: float = 100000.0):
+def run_stage_simulation(
+    stage_name: str,
+    start_year: int,
+    end_year: int,
+    bm_df: pl.DataFrame,
+    stock_dict: dict[str, pl.DataFrame],
+    initial_capital: float = 100000.0,
+):
     """Belirli bir zaman dilimi için Next-Bar Open icralı dinamik simülasyon koşturur."""
     print(f"\n>> {stage_name} ({start_year} - {end_year}) SİMÜLASYONU BAŞLATILIYOR...")
 
@@ -100,11 +129,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
             year_ret = ((capital - year_start_equity) / year_start_equity) * 100
             bm_curr_p = float(bm_df["Close"].loc[current_date])
             bm_ret = ((bm_curr_p - year_start_bm) / year_start_bm) * 100
-            yearly_stats[current_year] = {
-                "engine_ret": year_ret,
-                "bm_ret": bm_ret,
-                "alpha": year_ret - bm_ret
-            }
+            yearly_stats[current_year] = {"engine_ret": year_ret, "bm_ret": bm_ret, "alpha": year_ret - bm_ret}
             current_year = year
             year_start_equity = capital
             year_start_bm = bm_curr_p
@@ -129,13 +154,15 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                     capital += (exit_p * pos["shares"]) - (exit_p * pos["shares"] * COMMISSION_RATE)
 
                     ret_pct = ((exit_p - pos["entry_price"]) / pos["entry_price"]) * 100
-                    trade_logs.append({
-                        "ticker": t,
-                        "pnl": net_pnl,
-                        "ret_pct": ret_pct,
-                        "reason": sell_ord["reason"],
-                        "date": current_date
-                    })
+                    trade_logs.append(
+                        {
+                            "ticker": t,
+                            "pnl": net_pnl,
+                            "ret_pct": ret_pct,
+                            "reason": sell_ord["reason"],
+                            "date": current_date,
+                        }
+                    )
                     positions.pop(t, None)
         pending_sell_orders = []
 
@@ -160,7 +187,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                             "entry_price": entry_p,
                             "peak_price": entry_p,
                             "stop_loss": entry_p * 0.93,
-                            "entry_date": current_date
+                            "entry_date": current_date,
                         }
         pending_buy_orders = []
 
@@ -169,7 +196,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
         # =============================================================
 
         # Rejim Kontrolü (XU100 50-SMA ve 200-SMA)
-        bm_closes_sub = bm_df["Close"].iloc[max(0, global_day_idx-200):global_day_idx+1].values
+        bm_closes_sub = bm_df["Close"].iloc[max(0, global_day_idx - 200) : global_day_idx + 1].values
         bm_now = float(bm_closes_sub[-1])
         bm_sma50 = float(np.mean(bm_closes_sub[-50:])) if len(bm_closes_sub) >= 50 else bm_now
         bm_sma200 = float(np.mean(bm_closes_sub[-200:])) if len(bm_closes_sub) >= 200 else bm_sma50
@@ -185,16 +212,11 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
             s_candle = s_df.loc[current_date]
             s_hist = s_df.loc[:current_date]
 
-            should_exit, _, exit_reason = trend_rider.evaluate_position_exit(
-                pos, s_candle, s_hist, is_bear_crash
-            )
+            should_exit, _, exit_reason = trend_rider.evaluate_position_exit(pos, s_candle, s_hist, is_bear_crash)
 
             if should_exit:
                 # Yarın sabah açılışta satılmak üzere emir kuyruğuna ekle
-                pending_sell_orders.append({
-                    "ticker": ticker,
-                    "reason": exit_reason
-                })
+                pending_sell_orders.append({"ticker": ticker, "reason": exit_reason})
 
         # 2. Dinamik Kayan Mum Matrisi ile Yeni Alım Sinyalleri Taraması
         max_positions = 10 if is_bull_regime else 3
@@ -233,10 +255,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
 
                 # Alım Kriteri: Dinamik olarak kazandıran mumlar ve alıcı baskısı
                 if total_dyn_score >= 70.0 and c_res.buyer_pressure_pct >= 52:
-                    candidates.append({
-                        "ticker": ticker,
-                        "score": total_dyn_score
-                    })
+                    candidates.append({"ticker": ticker, "score": total_dyn_score})
 
             # Skoruna göre sırala ve yarın sabah alım emri hazırla
             candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -246,10 +265,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                 alloc_ratio = 0.10 if is_bull_regime else 0.05
                 invest_amount = min(capital * 0.90, total_port * alloc_ratio)
                 if invest_amount > 100:
-                    pending_buy_orders.append({
-                        "ticker": cand["ticker"],
-                        "amount": invest_amount
-                    })
+                    pending_buy_orders.append({"ticker": cand["ticker"], "amount": invest_amount})
 
         # Portföy anlık değeri
         pos_val = 0.0
@@ -313,7 +329,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
         "win_rate": win_rate,
         "pf": pf,
         "trades": total_trades,
-        "mega_trends": len(mega_winners)
+        "mega_trends": len(mega_winners),
     }
 
 
@@ -331,7 +347,9 @@ def main():
     r2 = run_stage_simulation("AŞAMA 2: OUT-OF-SAMPLE 1 (VALİDASYON)", 2019, 2023, bm_df, stock_dict, 100000.0)
 
     # 3. Aşama: Out-of-Sample 2 (2024 - 2026 / 2.5 Yıl Bağımsız Kör Seanslar)
-    r3 = run_stage_simulation("AŞAMA 3: OUT-OF-SAMPLE 2 (BAĞIMSIZ KÖR CANLI DÖNEM)", 2024, 2026, bm_df, stock_dict, 100000.0)
+    r3 = run_stage_simulation(
+        "AŞAMA 3: OUT-OF-SAMPLE 2 (BAĞIMSIZ KÖR CANLI DÖNEM)", 2024, 2026, bm_df, stock_dict, 100000.0
+    )
 
     print("\n" + "=" * 90)
     print("📈 3 AŞAMALI KURUMSAL DOĞRULAMA ÖZETİ")
@@ -340,7 +358,9 @@ def main():
     print("-" * 90)
     for r in [r1, r2, r3]:
         if r:
-            print(f"{r['stage']:<42} | %{r['engine_ret']:>+11.1f} | %{r['bm_ret']:>+9.1f} | %{r['alpha']:>+9.1f} | %{r['max_dd_engine']:>.2f}")
+            print(
+                f"{r['stage']:<42} | %{r['engine_ret']:>+11.1f} | %{r['bm_ret']:>+9.1f} | %{r['alpha']:>+9.1f} | %{r['max_dd_engine']:>.2f}"
+            )
     print("=" * 90)
 
 

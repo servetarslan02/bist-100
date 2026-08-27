@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class ResearchRecord:
     """Araştırma kaydı."""
+
     record_id: str
     ticker: str
     date: str
@@ -39,6 +40,7 @@ class ResearchRecord:
 @dataclass
 class LineageNode:
     """Lineage düğümü."""
+
     node_type: str  # raw_data, feature, model, prediction, decision, order, fill
     node_id: str
     timestamp: str
@@ -148,10 +150,18 @@ class ResearchMemory:
         """Memory'yi dosyaya kaydet."""
         data = {
             "records": [
-                {"record_id": r.record_id, "ticker": r.ticker, "date": r.date,
-                 "thesis": r.thesis, "evidence": r.evidence, "risks": r.risks,
-                 "prediction": r.prediction, "outcome": r.outcome,
-                 "model_version": r.model_version, "confidence": r.confidence}
+                {
+                    "record_id": r.record_id,
+                    "ticker": r.ticker,
+                    "date": r.date,
+                    "thesis": r.thesis,
+                    "evidence": r.evidence,
+                    "risks": r.risks,
+                    "prediction": r.prediction,
+                    "outcome": r.outcome,
+                    "model_version": r.model_version,
+                    "confidence": r.confidence,
+                }
                 for r in self._records
             ],
         }
@@ -181,7 +191,9 @@ class ResearchMemory:
 class ResearchContextEngine:
     """AI'ya ilgili context oluşturma."""
 
-    def build_context(self, ticker: str, features: dict, market_state: dict, news: list, kap: list, signals: list, predictions: list) -> dict[str, Any]:
+    def build_context(
+        self, ticker: str, features: dict, market_state: dict, news: list, kap: list, signals: list, predictions: list
+    ) -> dict[str, Any]:
         """Her analiz için ilgili veriyi topla."""
         return {
             "ticker": ticker,
@@ -233,12 +245,14 @@ class DataLineage:
         if not node:
             return []
 
-        result = [{
-            "type": node.node_type,
-            "id": node.node_id,
-            "timestamp": node.timestamp,
-            "metadata": node.metadata,
-        }]
+        result = [
+            {
+                "type": node.node_type,
+                "id": node.node_id,
+                "timestamp": node.timestamp,
+                "metadata": node.metadata,
+            }
+        ]
 
         # Children (O(1) lookup ile iterasyon)
         child_keys = self._children_index.get(key, [])
@@ -255,12 +269,14 @@ class DataLineage:
         if not node:
             return []
 
-        result = [{
-            "type": node.node_type,
-            "id": node.node_id,
-            "timestamp": node.timestamp,
-            "metadata": node.metadata,
-        }]
+        result = [
+            {
+                "type": node.node_type,
+                "id": node.node_id,
+                "timestamp": node.timestamp,
+                "metadata": node.metadata,
+            }
+        ]
 
         for parent_id in node.parent_ids:
             parent_type, parent_node_id = parent_id.split(":", 1) if ":" in parent_id else ("unknown", parent_id)

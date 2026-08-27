@@ -4,6 +4,7 @@ ALPHA BIST - Metrics Math Library
 Centralized mathematical and financial metrics for Backtest and Learning modules.
 Avoids DRY violations and ensures consistency across the platform.
 """
+
 import numpy as np
 
 
@@ -17,6 +18,7 @@ def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.0, per
         return 0.0
     return float(np.mean(excess_returns) / std_dev * np.sqrt(periods_per_year))
 
+
 def calculate_sortino_ratio(returns: np.ndarray, risk_free_rate: float = 0.0, periods_per_year: int = 252) -> float:
     """Yıllıklandırılmış Sortino Oranı (sadece negatif sapma)."""
     if len(returns) == 0:
@@ -28,6 +30,7 @@ def calculate_sortino_ratio(returns: np.ndarray, risk_free_rate: float = 0.0, pe
         return 0.0
     return float(np.mean(excess_returns) / downside_std * np.sqrt(periods_per_year))
 
+
 def calculate_max_drawdown(returns: np.ndarray) -> float:
     """Maksimum Drawdown (yüzdesel)."""
     if len(returns) == 0:
@@ -37,12 +40,14 @@ def calculate_max_drawdown(returns: np.ndarray) -> float:
     drawdown = (cum_returns - peak) / peak
     return float(np.min(drawdown))
 
+
 def calculate_win_rate(returns: np.ndarray) -> float:
     """Kazanma Oranı (Win Rate)."""
     if len(returns) == 0:
         return 0.0
     wins = np.sum(returns > 0)
     return float(wins / len(returns))
+
 
 def calculate_ic(scores: np.ndarray, actuals: np.ndarray) -> float:
     """Information Coefficient (IC) - Tahmin ve gerçekleşme korelasyonu."""

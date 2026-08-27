@@ -12,6 +12,7 @@ from datetime import UTC
 # 1. Market session — timezone
 # ────────────────────────────────────────────────────────────
 
+
 def test_market_session_timezone():
     """Market session Istanbul timezone kullanmalı."""
     from services.scheduler.unified_scheduler import MarketSessionManager
@@ -32,6 +33,7 @@ def test_market_session_timezone():
 # ────────────────────────────────────────────────────────────
 # 2. Market session — weekend detection
 # ────────────────────────────────────────────────────────────
+
 
 def test_market_session_weekend():
     """Hafta sonu piyasa kapalı olmalı."""
@@ -70,6 +72,7 @@ def test_market_session_weekend():
 # 3. Market session — holiday detection
 # ────────────────────────────────────────────────────────────
 
+
 def test_market_session_holiday():
     """Tatil günlerinde piyasa kapalı olmalı."""
     from datetime import datetime, timedelta, timezone
@@ -97,6 +100,7 @@ def test_market_session_holiday():
 # 4. Market session — market open/close phases
 # ────────────────────────────────────────────────────────────
 
+
 def test_market_session_phases():
     """Market phase'leri doğru ayrılmalı."""
     from datetime import datetime, timedelta, timezone
@@ -112,6 +116,7 @@ def test_market_session_phases():
         def __init__(self, dt):
             super().__init__()
             self._dt = dt
+
         def now_istanbul(self):
             return self._dt
 
@@ -179,6 +184,7 @@ def test_market_session_phases():
 # 5. Unified Scheduler — handler registration
 # ────────────────────────────────────────────────────────────
 
+
 def test_scheduler_handler_registration():
     """Scheduler handler kaydı yapabilmeli."""
     from services.scheduler.unified_scheduler import UnifiedScheduler
@@ -203,6 +209,7 @@ def test_scheduler_handler_registration():
 # ────────────────────────────────────────────────────────────
 # 6. Unified Scheduler — market closed skips trading jobs
 # ────────────────────────────────────────────────────────────
+
 
 def test_scheduler_market_closed():
     """Market kapalıyken trading job'ları çalışmamalı."""
@@ -240,6 +247,7 @@ def test_scheduler_market_closed():
 # 7. Unified Scheduler — priority ordering
 # ────────────────────────────────────────────────────────────
 
+
 def test_priority_ordering():
     """Priority'ye göre job sıralaması doğru olmalı."""
     from services.scheduler.unified_scheduler import UnifiedScheduler
@@ -266,6 +274,7 @@ def test_priority_ordering():
 # 8. Unified Scheduler — trigger
 # ────────────────────────────────────────────────────────────
 
+
 def test_trigger_job():
     """Manuel tetikleme çalışmalı."""
     from services.scheduler.unified_scheduler import JobConfig, UnifiedScheduler
@@ -286,9 +295,7 @@ def test_trigger_job():
         return "ok"
 
     scheduler.register_handler("test_trigger", dummy)
-    scheduler._configs["test_trigger"] = JobConfig(
-        job_type="test_trigger", interval_seconds=60
-    )
+    scheduler._configs["test_trigger"] = JobConfig(job_type="test_trigger", interval_seconds=60)
     result = asyncio.run(scheduler.trigger_job("test_trigger"))
     assert result["status"] == "QUEUED"
     print("  ✓ Trigger with handler: QUEUED")
@@ -300,6 +307,7 @@ def test_trigger_job():
 # ────────────────────────────────────────────────────────────
 # 9. Holiday Provider — dynamic
 # ────────────────────────────────────────────────────────────
+
 
 def test_holiday_provider():
     """Tatil takvimi dinamik olmalı."""
@@ -338,6 +346,7 @@ def test_holiday_provider():
 # 10. DB Job Tracker — memory fallback
 # ────────────────────────────────────────────────────────────
 
+
 def test_db_job_tracker():
     """DB yoksa memory fallback çalışmalı."""
     from datetime import datetime
@@ -349,10 +358,7 @@ def test_db_job_tracker():
 
     tracker = DBJobTracker()
 
-    result = JobResult(
-        job_type="test", status="SUCCESS",
-        duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
-    )
+    result = JobResult(job_type="test", status="SUCCESS", duration_ms=100.0, timestamp=datetime.now(UTC).isoformat())
     success = asyncio.run(tracker.record_job(result))
     assert success is True
     assert len(tracker._memory_history) == 1
@@ -371,6 +377,7 @@ def test_db_job_tracker():
 # ────────────────────────────────────────────────────────────
 # 11. Worker — job execution
 # ────────────────────────────────────────────────────────────
+
 
 def test_worker_job_execution():
     """Worker job çalıştırabilmeli."""
@@ -412,6 +419,7 @@ def test_worker_job_execution():
 # 12. Worker — idempotency
 # ────────────────────────────────────────────────────────────
 
+
 def test_idempotency_key_generation():
     """Aynı payload aynı key üretmeli."""
     from services.core.worker import JobWorker
@@ -437,6 +445,7 @@ def test_idempotency_key_generation():
 # ────────────────────────────────────────────────────────────
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
+
 
 def run_all():
     tests = [
@@ -471,6 +480,7 @@ def run_all():
                 print(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
+
             print(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1

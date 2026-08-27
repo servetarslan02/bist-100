@@ -78,9 +78,7 @@ class DataIntegrityValidator:
         results["checks"]["feature_completeness"] = feat_result
         if feat_result["incomplete_tickers"]:
             results["has_issues"] = True
-            results["issues"].append(
-                f"Feature eksik: {len(feat_result['incomplete_tickers'])} ticker"
-            )
+            results["issues"].append(f"Feature eksik: {len(feat_result['incomplete_tickers'])} ticker")
 
         # 4. Redis cache durumu
         redis_result = await self._check_redis_health(redis_client)
@@ -91,9 +89,7 @@ class DataIntegrityValidator:
         results["checks"]["data_freshness"] = freshness_result
         if freshness_result["stale_tickers"]:
             results["has_issues"] = True
-            results["issues"].append(
-                f"Stale data: {len(freshness_result['stale_tickers'])} ticker"
-            )
+            results["issues"].append(f"Stale data: {len(freshness_result['stale_tickers'])} ticker")
 
         duration = time.time() - start_time
         results["duration_seconds"] = round(duration, 2)
@@ -104,12 +100,9 @@ class DataIntegrityValidator:
             self._validation_history = self._validation_history[-100:]
 
         if results["has_issues"]:
-            logger.warning("Data integrity issues found",
-                          issues=len(results["issues"]),
-                          duration=round(duration, 2))
+            logger.warning("Data integrity issues found", issues=len(results["issues"]), duration=round(duration, 2))
         else:
-            logger.info("Data integrity validation passed",
-                       duration=round(duration, 2))
+            logger.info("Data integrity validation passed", duration=round(duration, 2))
 
         return results
 
@@ -156,6 +149,7 @@ class DataIntegrityValidator:
 
             # Her ticker için son 30 günde eksik iş günlerini kontrol et
             from datetime import date
+
             today = date.today()
             for ticker, dates in ticker_dates.items():
                 expected_dates = set()
@@ -169,11 +163,13 @@ class DataIntegrityValidator:
                 if missing:
                     result["has_gaps"] = True
                     result["gap_count"] += len(missing)
-                    result["gaps"].append({
-                        "ticker": ticker,
-                        "missing_dates": [d.isoformat() for d in sorted(missing)[-5:]],
-                        "total_missing": len(missing),
-                    })
+                    result["gaps"].append(
+                        {
+                            "ticker": ticker,
+                            "missing_dates": [d.isoformat() for d in sorted(missing)[-5:]],
+                            "total_missing": len(missing),
+                        }
+                    )
 
         except Exception as e:
             result["status"] = "error"
@@ -197,15 +193,17 @@ class DataIntegrityValidator:
             async with pg_pool.acquire() as conn:
                 # Tablo varlık kontrolü
                 tables = [
-                    "instruments", "companies", "sectors",
-                    "market_data", "signals", "portfolios",
+                    "instruments",
+                    "companies",
+                    "sectors",
+                    "market_data",
+                    "signals",
+                    "portfolios",
                 ]
 
                 for table in tables:
                     try:
-                        row = await conn.fetchrow(
-                            f"SELECT COUNT(*) as cnt FROM {table}"
-                        )
+                        row = await conn.fetchrow(f"SELECT COUNT(*) as cnt FROM {table}")
                         result["tables_checked"] += 1
                         result[f"{table}_count"] = row["cnt"]
                     except Exception as e:
@@ -214,9 +212,7 @@ class DataIntegrityValidator:
 
                 # Instruments tablosunda NULL ticker kontrolü
                 try:
-                    null_count = await conn.fetchval(
-                        "SELECT COUNT(*) FROM instruments WHERE symbol IS NULL"
-                    )
+                    null_count = await conn.fetchval("SELECT COUNT(*) FROM instruments WHERE symbol IS NULL")
                     if null_count > 0:
                         result["has_issues"] = True
                         result["issues"].append(f"{null_count} instruments with NULL symbol")
@@ -255,10 +251,12 @@ class DataIntegrityValidator:
 
                 for row in rows:
                     if row["last_computed"] and row["last_computed"] < cutoff:
-                        result["incomplete_tickers"].append({
-                            "ticker": row["ticker"],
-                            "last_computed": row["last_computed"].isoformat(),
-                        })
+                        result["incomplete_tickers"].append(
+                            {
+                                "ticker": row["ticker"],
+                                "last_computed": row["last_computed"].isoformat(),
+                            }
+                        )
                     else:
                         result["complete_tickers"] += 1
 
@@ -297,9 +295,7 @@ class DataIntegrityValidator:
 
         return result
 
-    async def _check_data_freshness(
-        self, clickhouse_client=None, pg_pool=None
-    ) -> dict[str, Any]:
+    async def _check_data_freshness(self, clickhouse_client=None, pg_pool=None) -> dict[str, Any]:
         """Veri tazelik kontrolü — son veri ne kadar eski?"""
         result = {
             "stale_tickers": [],
@@ -322,13 +318,13 @@ class DataIntegrityValidator:
                     result["total_checked"] = len(rows)
                     for row in rows:
                         if row["last_ts"] and row["last_ts"] < stale_threshold:
-                            result["stale_tickers"].append({
-                                "ticker": row["ticker"],
-                                "last_update": row["last_ts"].isoformat(),
-                                "age_hours": round(
-                                    (datetime.now(UTC) - row["last_ts"]).total_seconds() / 3600, 1
-                                ),
-                            })
+                            result["stale_tickers"].append(
+                                {
+                                    "ticker": row["ticker"],
+                                    "last_update": row["last_ts"].isoformat(),
+                                    "age_hours": round((datetime.now(UTC) - row["last_ts"]).total_seconds() / 3600, 1),
+                                }
+                            )
                         else:
                             result["fresh_tickers"] += 1
 
@@ -345,10 +341,10 @@ class DataIntegrityValidator:
         # ClickHouse gap'leri için backfill tetikle
         ch_gaps = validation_results["checks"].get("clickhouse_gaps", {})
         if ch_gaps.get("has_gaps"):
-            logger.info("Triggering backfill for ClickHouse gaps",
-                       gap_count=ch_gaps["gap_count"])
+            logger.info("Triggering backfill for ClickHouse gaps", gap_count=ch_gaps["gap_count"])
             try:
                 from ..ingestion.backfill import backfill_manager
+
                 gaps = await backfill_manager.detect_all_gaps()
                 await backfill_manager.backfill_all(gaps)
             except Exception as e:
@@ -357,15 +353,14 @@ class DataIntegrityValidator:
         # Stale data için yenileme tetikle
         freshness = validation_results["checks"].get("data_freshness", {})
         if freshness.get("stale_tickers"):
-            logger.info("Triggering data refresh for stale tickers",
-                       count=len(freshness["stale_tickers"]))
+            logger.info("Triggering data refresh for stale tickers", count=len(freshness["stale_tickers"]))
 
     def get_status(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
-            "last_validation": datetime.fromtimestamp(
-                self._last_validation, tz=UTC
-            ).isoformat() if self._last_validation else None,
+            "last_validation": datetime.fromtimestamp(self._last_validation, tz=UTC).isoformat()
+            if self._last_validation
+            else None,
             "validation_count": len(self._validation_history),
         }
 

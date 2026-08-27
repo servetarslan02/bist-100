@@ -30,6 +30,7 @@ logger = structlog.get_logger()
 @dataclass
 class PITConfig:
     """Point-in-time yapılandırması."""
+
     data_type: str
     delay: timedelta
     description: str
@@ -161,10 +162,7 @@ class PointInTimeValidator:
                 continue
 
         if removed_count > 0:
-            logger.debug("PIT filtered",
-                        data_type=data_type,
-                        removed=removed_count,
-                        kept=len(filtered))
+            logger.debug("PIT filtered", data_type=data_type, removed=removed_count, kept=len(filtered))
 
         return filtered
 
@@ -196,12 +194,14 @@ class PointInTimeValidator:
                 data_ts = ts_str if isinstance(ts_str, datetime) else datetime.fromisoformat(str(ts_str))
 
                 if not self.is_available_at(data_type, data_ts, query_timestamp):
-                    violations.append({
-                        "index": i,
-                        "data_timestamp": data_ts.isoformat(),
-                        "query_timestamp": query_timestamp.isoformat(),
-                        "data_type": data_type,
-                    })
+                    violations.append(
+                        {
+                            "index": i,
+                            "data_timestamp": data_ts.isoformat(),
+                            "query_timestamp": query_timestamp.isoformat(),
+                            "data_type": data_type,
+                        }
+                    )
             except (ValueError, TypeError):
                 continue
 
@@ -224,9 +224,7 @@ class PointInTimeValidator:
             delay=delay,
             description=description or f"Custom delay: {delay}",
         )
-        logger.info("Custom PIT delay set",
-                    data_type=data_type,
-                    delay_seconds=delay.total_seconds())
+        logger.info("Custom PIT delay set", data_type=data_type, delay_seconds=delay.total_seconds())
 
 
 # Singleton

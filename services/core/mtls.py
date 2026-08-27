@@ -38,6 +38,7 @@ logger = structlog.get_logger()
 # Konfigürasyon
 # =====================================================
 
+
 @dataclass
 class MTLSConfig:
     """mTLS yapılandırması. Ortam değişkenlerinden okunur."""
@@ -81,8 +82,7 @@ class MTLSConfig:
 
         # Sertifikalar yoksa devre dışı bırak
         if not Path(self.ca_cert).exists():
-            logger.warning("mTLS CA certificate not found, disabling mTLS",
-                         path=self.ca_cert)
+            logger.warning("mTLS CA certificate not found, disabling mTLS", path=self.ca_cert)
             self.enabled = False
 
     def validate(self) -> bool:
@@ -115,6 +115,7 @@ class MTLSConfig:
 # Sertifika Yönetimi
 # =====================================================
 
+
 class CertificateManager:
     """Sertifika yaşam döngüsü yönetimi."""
 
@@ -125,9 +126,12 @@ class CertificateManager:
         """Sertifika son kullanma tarihini kontrol et."""
         try:
             import subprocess
+
             result = subprocess.run(
                 ["openssl", "x509", "-in", cert_path, "-noout", "-enddate"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 # notAfter=Aug 25 12:00:00 2027 GMT
@@ -145,8 +149,7 @@ class CertificateManager:
 
         days_left = (expiry - datetime.utcnow()).days
         if days_left <= self.config.renew_before_days:
-            logger.warning("Certificate expiring soon",
-                         path=cert_path, days_left=days_left)
+            logger.warning("Certificate expiring soon", path=cert_path, days_left=days_left)
             return True
 
         return False
@@ -155,10 +158,12 @@ class CertificateManager:
         """Sertifika bilgilerini al."""
         try:
             import subprocess
+
             result = subprocess.run(
-                ["openssl", "x509", "-in", cert_path, "-noout",
-                 "-subject", "-issuer", "-dates", "-fingerprint"],
-                capture_output=True, text=True, timeout=5,
+                ["openssl", "x509", "-in", cert_path, "-noout", "-subject", "-issuer", "-dates", "-fingerprint"],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 info = {}
@@ -201,6 +206,7 @@ class CertificateManager:
 # SSL Context Factory
 # =====================================================
 
+
 class MTLSContext:
     """mTLS SSL context oluşturucu.
 
@@ -241,16 +247,16 @@ class MTLSContext:
             ctx.verify_mode = self.config.verify_mode
 
             # Güvenli cipher suite
-            ctx.set_ciphers(
-                "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS"
-            )
+            ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS")
 
             # DH parametreleri (varsa)
             if self.config.dhparam and Path(self.config.dhparam).exists():
                 ctx.load_dh_params(self.config.dhparam)
 
-            logger.info("mTLS server context created",
-                       verify_mode="REQUIRED" if self.config.verify_mode == ssl.CERT_REQUIRED else "OPTIONAL")
+            logger.info(
+                "mTLS server context created",
+                verify_mode="REQUIRED" if self.config.verify_mode == ssl.CERT_REQUIRED else "OPTIONAL",
+            )
             return ctx
 
         except Exception as e:
@@ -286,9 +292,7 @@ class MTLSContext:
             ctx.check_hostname = self.config.check_hostname
 
             # Güvenli cipher suite
-            ctx.set_ciphers(
-                "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS"
-            )
+            ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS")
 
             logger.info("mTLS client context created")
             return ctx
@@ -425,6 +429,7 @@ def get_mtls_status() -> dict[str, Any]:
 # FastAPI Middleware
 # =====================================================
 
+
 class MTLSMiddleware:
     """FastAPI mTLS middleware.
 
@@ -460,6 +465,7 @@ class MTLSMiddleware:
                 elif self.required:
                     # mTLS zorunlu ama sertifika yok
                     from starlette.responses import JSONResponse
+
                     response = JSONResponse(
                         {"error": "Client certificate required"},
                         status_code=401,
@@ -468,6 +474,7 @@ class MTLSMiddleware:
                     return
             elif self.required:
                 from starlette.responses import JSONResponse
+
                 response = JSONResponse(
                     {"error": "mTLS required but no SSL context"},
                     status_code=401,
@@ -481,6 +488,7 @@ class MTLSMiddleware:
 # =====================================================
 # Health Check Endpoint
 # =====================================================
+
 
 def create_mtls_health_endpoint():
     """mTLS sağlık kontrolü endpoint'i.
@@ -524,9 +532,10 @@ def create_mtls_health_endpoint():
             "healthy": healthy,
             "mtls_enabled": status["enabled"],
             "certificates_ok": all(
-                c.get("exists", False) and not c.get("needs_renewal", True)
-                for c in status["certificates"].values()
-            ) if status["enabled"] else None,
+                c.get("exists", False) and not c.get("needs_renewal", True) for c in status["certificates"].values()
+            )
+            if status["enabled"]
+            else None,
         }
 
     return router

@@ -4,7 +4,6 @@ ALPHA BIST — Intelligence Module Tests
 HMM Regime, Parallel Pipeline, Ensemble Forecast, Confidence Calibrator, Advanced MC.
 """
 
-
 import numpy as np
 import pytest
 
@@ -19,6 +18,7 @@ from services.intelligence.hmm_regime import HMMRegimeDetector
 # =====================================================
 # HMM Regime Detection Tests
 # =====================================================
+
 
 class TestHMMRegimeDetector:
     """HMM rejim tespit testleri."""
@@ -42,7 +42,7 @@ class TestHMMRegimeDetector:
         """Pozitif getiri → BULL."""
         detector = HMMRegimeDetector()
         returns = np.array([0.005] * 30)  # Pozitif
-        vol = np.array([0.01] * 30)       # Düşük vol
+        vol = np.array([0.01] * 30)  # Düşük vol
         result = detector.predict_regime(returns, vol)
         assert result.regime == "BULL"
 
@@ -50,7 +50,7 @@ class TestHMMRegimeDetector:
         """Negatif getiri → BEAR."""
         detector = HMMRegimeDetector()
         returns = np.array([-0.005] * 30)  # Negatif
-        vol = np.array([0.01] * 30)        # Düşük vol
+        vol = np.array([0.01] * 30)  # Düşük vol
         result = detector.predict_regime(returns, vol)
         assert result.regime == "BEAR"
 
@@ -111,6 +111,7 @@ class TestHMMRegimeDetector:
 # =====================================================
 # Ensemble Forecast Tests
 # =====================================================
+
 
 class TestEnsembleForecaster:
     """Ensemble forecast testleri."""
@@ -202,6 +203,7 @@ class TestEnsembleForecaster:
 # =====================================================
 # Confidence Calibrator Tests
 # =====================================================
+
 
 class TestConfidenceCalibrator:
     """Confidence calibrator testleri."""
@@ -299,6 +301,7 @@ class TestConfidenceCalibrator:
 # Advanced Monte Carlo Tests
 # =====================================================
 
+
 class TestAdvancedMonteCarlo:
     """Gelişmiş Monte Carlo testleri."""
 
@@ -328,9 +331,16 @@ class TestAdvancedMonteCarlo:
         """Jump-diffusion temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.jump_diffusion_sim(
-            "TEST", 100, 0.15, 0.25,
-            jump_intensity=0.1, jump_mean=-0.02, jump_std=0.05,
-            horizon_days=20, n_sims=1000, seed=42,
+            "TEST",
+            100,
+            0.15,
+            0.25,
+            jump_intensity=0.1,
+            jump_mean=-0.02,
+            jump_std=0.05,
+            horizon_days=20,
+            n_sims=1000,
+            seed=42,
         )
         assert result.model_type == "jump_diffusion"
         assert result.jump_intensity == 0.1
@@ -340,9 +350,16 @@ class TestAdvancedMonteCarlo:
         mc = AdvancedMonteCarloEngine()
         gbm = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
         jump = mc.jump_diffusion_sim(
-            "TEST", 100, 0.15, 0.25,
-            jump_intensity=0.5, jump_mean=-0.05, jump_std=0.1,
-            horizon_days=20, n_sims=5000, seed=42,
+            "TEST",
+            100,
+            0.15,
+            0.25,
+            jump_intensity=0.5,
+            jump_mean=-0.05,
+            jump_std=0.1,
+            horizon_days=20,
+            n_sims=5000,
+            seed=42,
         )
         # Jump-diffusion daha yüksek kurtosis (daha kalın kuyruk)
         assert abs(jump.kurtosis) >= abs(gbm.kurtosis) * 0.5
@@ -366,9 +383,15 @@ class TestAdvancedMonteCarlo:
         """Heston-lite temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.heston_lite_sim(
-            "TEST", 100, 0.15, 0.25,
-            vol_of_vol=0.3, mean_reversion=2.0,
-            horizon_days=20, n_sims=1000, seed=42,
+            "TEST",
+            100,
+            0.15,
+            0.25,
+            vol_of_vol=0.3,
+            mean_reversion=2.0,
+            horizon_days=20,
+            n_sims=1000,
+            seed=42,
         )
         assert result.model_type == "heston"
         assert result.p50 > 0
@@ -378,9 +401,15 @@ class TestAdvancedMonteCarlo:
         mc = AdvancedMonteCarloEngine()
         gbm = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=60, n_sims=5000, seed=42)
         heston = mc.heston_lite_sim(
-            "TEST", 100, 0.15, 0.25,
-            vol_of_vol=0.5, mean_reversion=3.0,
-            horizon_days=60, n_sims=5000, seed=42,
+            "TEST",
+            100,
+            0.15,
+            0.25,
+            vol_of_vol=0.5,
+            mean_reversion=3.0,
+            horizon_days=60,
+            n_sims=5000,
+            seed=42,
         )
         # Farklı volatilite
         assert abs(gbm.volatility - heston.volatility) > 0.01
@@ -410,8 +439,14 @@ class TestAdvancedMonteCarlo:
         """20 günlük ufuk, başlangıçtan sonra tam 20 günlük adım içermeli."""
         mc = AdvancedMonteCarloEngine()
         result = mc.jump_diffusion_sim(
-            "TEST", 100, mu=0.252, sigma=0,
-            jump_intensity=0, horizon_days=20, n_sims=10, seed=42,
+            "TEST",
+            100,
+            mu=0.252,
+            sigma=0,
+            jump_intensity=0,
+            horizon_days=20,
+            n_sims=10,
+            seed=42,
         )
         expected = 100 * np.exp(0.252 * 20 / 252)
         assert abs(result.p50 - expected) < 0.01

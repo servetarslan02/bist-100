@@ -17,7 +17,8 @@ async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate
     """Piyasa rejimi ve oynaklık durumu (Bull, Bear, Sideways, Volatile)."""
     try:
         from ...intelligence.regime import regime_detector
-        regime = regime_detector.detect_regime() if hasattr(regime_detector, 'detect_regime') else None
+
+        regime = regime_detector.detect_regime() if hasattr(regime_detector, "detect_regime") else None
         if not regime:
             return {
                 "regime": "BULL_MOMENTUM",
@@ -32,6 +33,7 @@ async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate
     except Exception:
         try:
             from ...intelligence.regime import regime_engine
+
             result = regime_engine.detect_regime({})
             return {
                 "regime": getattr(result, "regime", "UNKNOWN"),
@@ -60,7 +62,8 @@ async def get_decisions(
     """Yapay zeka çoklu model füzyonu ile üretilen güncel kararlar."""
     try:
         from ...scanner.alpha_engine import alpha_engine
-        results = alpha_engine.get_latest_results(limit=limit) if hasattr(alpha_engine, 'get_latest_results') else []
+
+        results = alpha_engine.get_latest_results(limit=limit) if hasattr(alpha_engine, "get_latest_results") else []
         return {
             "decisions": results if results else [],
             "count": len(results) if results else 0,
@@ -81,14 +84,24 @@ async def simulation(
     """Monte Carlo simülasyonu — Advanced Monte Carlo Engine."""
     try:
         from ...intelligence.advanced_monte_carlo import AdvancedMonteCarloEngine
+
         mc = AdvancedMonteCarloEngine()
         # Canlı fiyat al
         from ...core.redis_helper import get_cached
+
         live_price = get_cached(f"price:{ticker}")
         current_price = float(live_price.get("price", 0)) if live_price else 0
         if current_price <= 0:
             return {"error": f"{ticker} için canlı fiyat bulunamadı", "ticker": ticker}
-        res = mc.gbm_sim(ticker=ticker, current_price=current_price, mu=0.25, sigma=0.30, horizon_days=horizon_days, n_sims=n_sims, seed=42)
+        res = mc.gbm_sim(
+            ticker=ticker,
+            current_price=current_price,
+            mu=0.25,
+            sigma=0.30,
+            horizon_days=horizon_days,
+            n_sims=n_sims,
+            seed=42,
+        )
         return {
             "ticker": ticker,
             "horizon_days": horizon_days,
@@ -130,6 +143,7 @@ async def ask_gemini_endpoint(
     prompt = body.get("prompt", "Borsa İstanbul piyasa durumu hakkında özet ver.")
     try:
         from ...intelligence.gemini_service import call_gemini
+
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(None, call_gemini, prompt)
         return {"response": response, "model": "gemini-3.7-flash", "status": "ok"}
@@ -153,6 +167,7 @@ async def gemini_report(
     """Belirli bir hisse için canlı Gemini 3.7 araştırma raporu."""
     try:
         from ...intelligence.gemini_service import analyze_company_gemini
+
         loop = asyncio.get_event_loop()
         report = await loop.run_in_executor(
             None,
@@ -165,7 +180,7 @@ async def gemini_report(
                 pb=pb,
                 support=support,
                 resistance=resistance,
-            )
+            ),
         )
         return {"ticker": ticker, "report": report, "model": "gemini-3.7-flash", "status": "ok"}
     except Exception as e:

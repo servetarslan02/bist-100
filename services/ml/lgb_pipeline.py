@@ -10,6 +10,7 @@ from services.ml.feature_engine import compute_universe_features
 
 logger = structlog.get_logger()
 
+
 class LightGBMPipeline:
     def __init__(self):
         self.model = None
@@ -24,7 +25,7 @@ class LightGBMPipeline:
             "feature_fraction": 0.8,
             "min_data_in_leaf": 20,
             "verbose": -1,
-            "random_state": 42
+            "random_state": 42,
         }
 
     def generate_samples(
@@ -35,7 +36,7 @@ class LightGBMPipeline:
         train_start: pl.Series,
         train_end: pl.Series,
         snapshot_offsets: list[int] = None,
-        forward_days: int = 20
+        forward_days: int = 20,
     ):
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
@@ -45,7 +46,7 @@ class LightGBMPipeline:
 
         for offset in snapshot_offsets:
             t_snap = train_end - datetime.timedelta(days=int(offset))
-            t_fwd  = t_snap + datetime.timedelta(days=int(forward_days))
+            t_fwd = t_snap + datetime.timedelta(days=int(forward_days))
 
             if t_snap < train_start:
                 continue
@@ -66,7 +67,9 @@ class LightGBMPipeline:
                 if not feats:
                     continue
 
-                df_fwd = market_data[ticker][(market_data[ticker].index >= t_snap) & (market_data[ticker].index <= t_fwd)]
+                df_fwd = market_data[ticker][
+                    (market_data[ticker].index >= t_snap) & (market_data[ticker].index <= t_fwd)
+                ]
                 bm_fwd = bm_df[(bm_df.index >= t_snap) & (bm_df.index <= t_fwd)]
 
                 if len(df_fwd) < 2 or len(bm_fwd) < 2:
@@ -104,11 +107,9 @@ class LightGBMPipeline:
         bm_df: pl.DataFrame,
         sector_map: dict[str, str],
         train_start: pl.Series,
-        train_end: pl.Series
+        train_end: pl.Series,
     ):
-        X, y, feature_names = self.generate_samples(
-            market_data, bm_df, sector_map, train_start, train_end
-        )
+        X, y, feature_names = self.generate_samples(market_data, bm_df, sector_map, train_start, train_end)
 
         if len(X) == 0:
             logger.warning("No training samples generated")
@@ -124,7 +125,7 @@ class LightGBMPipeline:
         market_data: dict[str, pl.DataFrame],
         bm_df: pl.DataFrame,
         sector_map: dict[str, str],
-        target_date: pl.Series
+        target_date: pl.Series,
     ) -> list[dict[str, Any]]:
         if not self.model:
             return []
@@ -149,13 +150,8 @@ class LightGBMPipeline:
             score = self.model.predict(x_vec)[0]
 
             # Additional logic to extract important variables for confidence/ranking if needed
-            predictions.append({
-                "ticker": ticker,
-                "score": float(score),
-                "features": feats
-            })
+            predictions.append({"ticker": ticker, "score": float(score), "features": feats})
 
         # Sort by score descending
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
-

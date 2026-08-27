@@ -125,9 +125,7 @@ def test_significance_cross_sectional(
     }
 
 
-def bonferroni_correction(
-    p_values: list[float], alpha: float = 0.05
-) -> dict[str, any]:
+def bonferroni_correction(p_values: list[float], alpha: float = 0.05) -> dict[str, any]:
     """Bonferroni multiple testing düzeltmesi.
 
     Birden fazla hipotez testi yapıldığında Type I error'ı kontrol eder.
@@ -157,9 +155,7 @@ def bonferroni_correction(
     }
 
 
-def benjamini_hochberg_correction(
-    p_values: list[float], alpha: float = 0.05
-) -> dict[str, any]:
+def benjamini_hochberg_correction(p_values: list[float], alpha: float = 0.05) -> dict[str, any]:
     """Benjamini-Hochberg FDR düzeltmesi (Bonferroni'den daha az muhafazakâr).
 
     Args:

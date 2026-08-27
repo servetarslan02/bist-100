@@ -4,7 +4,6 @@ ALPHA BIST — Ingestion Faz 0 Tests
 Circuit Breaker, Rate Limiter, Retry Policy, Provider Manager testleri.
 """
 
-
 # Import modules
 import time
 
@@ -28,6 +27,7 @@ from services.ingestion.retry_policy import (
 # =====================================================
 # Circuit Breaker Tests
 # =====================================================
+
 
 class TestCircuitBreaker:
     """Circuit breaker testleri."""
@@ -197,6 +197,7 @@ class TestCircuitBreakerManager:
 # Rate Limiter Tests
 # =====================================================
 
+
 class TestRateLimiter:
     """Rate limiter testleri."""
 
@@ -272,6 +273,7 @@ class TestDefaultRateLimiter:
 # Retry Policy Tests
 # =====================================================
 
+
 class TestRetryPolicy:
     """Retry policy testleri."""
 
@@ -284,9 +286,9 @@ class TestRetryPolicy:
     def test_calculate_delay(self):
         """Gecikme hesaplama."""
         policy = RetryPolicy(base_delay_s=1.0, backoff_factor=2.0, jitter=False)
-        assert policy._calculate_delay(1) == 1.0   # 1s
-        assert policy._calculate_delay(2) == 2.0   # 2s
-        assert policy._calculate_delay(3) == 4.0   # 4s
+        assert policy._calculate_delay(1) == 1.0  # 1s
+        assert policy._calculate_delay(2) == 2.0  # 2s
+        assert policy._calculate_delay(3) == 4.0  # 4s
 
     def test_calculate_delay_with_max(self):
         """Max delay sınırı."""
@@ -414,6 +416,7 @@ class TestBISTRetryPolicies:
 # =====================================================
 # Provider Manager Tests
 # =====================================================
+
 
 @pytest.mark.asyncio
 class TestProviderManager:

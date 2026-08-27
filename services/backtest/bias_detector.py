@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class BiasViolation:
     """Tek bir bias ihlali kaydı."""
+
     violation_type: str  # look_ahead | label_leakage | feature_leakage | fold_leakage
     severity: str  # critical | warning | info
     timestamp: datetime
@@ -47,6 +48,7 @@ class BiasViolation:
 @dataclass
 class BiasReport:
     """Bias tespit raporu."""
+
     total_checks: int = 0
     violations: list[BiasViolation] = field(default_factory=list)
     critical_count: int = 0
@@ -107,13 +109,15 @@ class LookAheadBiasDetector:
         report = BiasReport()
 
         if timestamp_col not in feature_df.columns:
-            report.add_violation(BiasViolation(
-                violation_type="look_ahead",
-                severity="critical",
-                timestamp=decision_timestamp,
-                feature_name=feature_name,
-                description=f"Timestamp column '{timestamp_col}' not found in feature data",
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="look_ahead",
+                    severity="critical",
+                    timestamp=decision_timestamp,
+                    feature_name=feature_name,
+                    description=f"Timestamp column '{timestamp_col}' not found in feature data",
+                )
+            )
             return report
 
         # Gelecekteki verileri kontrol et
@@ -121,15 +125,17 @@ class LookAheadBiasDetector:
         report.total_checks = len(feature_df)
 
         if len(future_data) > 0:
-            report.add_violation(BiasViolation(
-                violation_type="look_ahead",
-                severity="critical",
-                timestamp=decision_timestamp,
-                feature_name=feature_name,
-                description=f"Feature contains {len(future_data)} data points after decision time. "
-                           f"Max future timestamp: {future_data[timestamp_col].max()}",
-                data_point={"future_rows": len(future_data)},
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="look_ahead",
+                    severity="critical",
+                    timestamp=decision_timestamp,
+                    feature_name=feature_name,
+                    description=f"Feature contains {len(future_data)} data points after decision time. "
+                    f"Max future timestamp: {future_data[timestamp_col].max()}",
+                    data_point={"future_rows": len(future_data)},
+                )
+            )
 
         return report
 
@@ -158,7 +164,7 @@ class LookAheadBiasDetector:
         for i in range(window_size, len(data)):
             # Bu noktanın window'u data[i-window_size:i] olmalı
             # Eğer data[i-window_size:i+1] kullanılmışsa → leakage
-            window_values = data[value_col][i - window_size:i]
+            window_values = data[value_col][i - window_size : i]
             data[value_col][i]
 
             # Rolling mean hesapla (sadece geçmiş veri ile)
@@ -170,14 +176,16 @@ class LookAheadBiasDetector:
                 if not np.isnan(actual_mean) and not np.isnan(expected_mean):
                     diff = abs(actual_mean - expected_mean)
                     if diff > 1e-10:
-                        report.add_violation(BiasViolation(
-                            violation_type="look_ahead",
-                            severity="critical",
-                            timestamp=data[timestamp_col][i],
-                            feature_name=feature_name,
-                            description=f"Rolling window at index {i} uses future data. "
-                                       f"Expected: {expected_mean:.4f}, Got: {actual_mean:.4f}",
-                        ))
+                        report.add_violation(
+                            BiasViolation(
+                                violation_type="look_ahead",
+                                severity="critical",
+                                timestamp=data[timestamp_col][i],
+                                feature_name=feature_name,
+                                description=f"Rolling window at index {i} uses future data. "
+                                f"Expected: {expected_mean:.4f}, Got: {actual_mean:.4f}",
+                            )
+                        )
 
         return report
 
@@ -201,17 +209,18 @@ class LookAheadBiasDetector:
 
         min_purge = label_horizon_days
         if purge_days < min_purge:
-            report.add_violation(BiasViolation(
-                violation_type="label_leakage",
-                severity="critical",
-                timestamp=datetime.now(UTC),
-                feature_name="purge_validation",
-                description=f"Purge days ({purge_days}) < label horizon ({label_horizon_days}). "
-                           f"Minimum purge should be {min_purge} days to prevent label leakage.",
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="label_leakage",
+                    severity="critical",
+                    timestamp=datetime.now(UTC),
+                    feature_name="purge_validation",
+                    description=f"Purge days ({purge_days}) < label horizon ({label_horizon_days}). "
+                    f"Minimum purge should be {min_purge} days to prevent label leakage.",
+                )
+            )
         else:
-            logger.info("Label-feature alignment OK",
-                       purge=purge_days, horizon=label_horizon_days)
+            logger.info("Label-feature alignment OK", purge=purge_days, horizon=label_horizon_days)
 
         return report
 
@@ -237,43 +246,47 @@ class LookAheadBiasDetector:
 
         # 1. Test starts after train ends
         if test_start <= train_end:
-            report.add_violation(BiasViolation(
-                violation_type="fold_leakage",
-                severity="critical",
-                timestamp=train_end,
-                feature_name="fold_boundary",
-                description=f"Test start ({test_start}) <= train end ({train_end}). "
-                           f"Test must start after training period.",
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="fold_leakage",
+                    severity="critical",
+                    timestamp=train_end,
+                    feature_name="fold_boundary",
+                    description=f"Test start ({test_start}) <= train end ({train_end}). "
+                    f"Test must start after training period.",
+                )
+            )
 
         # 2. Purge gap exists
         actual_gap = (test_start - train_end).days
         if actual_gap < purge_days:
-            report.add_violation(BiasViolation(
-                violation_type="fold_leakage",
-                severity="critical",
-                timestamp=train_end,
-                feature_name="purge_gap",
-                description=f"Actual gap ({actual_gap} days) < required purge ({purge_days} days). "
-                           f"Purge gap insufficient to prevent label leakage.",
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="fold_leakage",
+                    severity="critical",
+                    timestamp=train_end,
+                    feature_name="purge_gap",
+                    description=f"Actual gap ({actual_gap} days) < required purge ({purge_days} days). "
+                    f"Purge gap insufficient to prevent label leakage.",
+                )
+            )
 
         # 3. Purge covers label horizon
         if actual_gap < label_horizon_days:
-            report.add_violation(BiasViolation(
-                violation_type="fold_leakage",
-                severity="critical",
-                timestamp=train_end,
-                feature_name="purge_vs_horizon",
-                description=f"Purge gap ({actual_gap} days) < label horizon ({label_horizon_days} days). "
-                           f"Label from training period may leak into test period.",
-            ))
+            report.add_violation(
+                BiasViolation(
+                    violation_type="fold_leakage",
+                    severity="critical",
+                    timestamp=train_end,
+                    feature_name="purge_vs_horizon",
+                    description=f"Purge gap ({actual_gap} days) < label horizon ({label_horizon_days} days). "
+                    f"Label from training period may leak into test period.",
+                )
+            )
 
         # 4. Embargo check (informational)
         if embargo_days > 0:
-            logger.info("Embargo period configured",
-                       embargo_days=embargo_days,
-                       test_start=test_start.isoformat())
+            logger.info("Embargo period configured", embargo_days=embargo_days, test_start=test_start.isoformat())
 
         return report
 
@@ -301,15 +314,17 @@ class LookAheadBiasDetector:
             # Birden fazla revizyon varsa, sadece ilki kullanılmalı
             for name, group in data.group_by(report_date_col):
                 if len(group) > 1:
-                    report.add_violation(BiasViolation(
-                        violation_type="look_ahead",
-                        severity="warning",
-                        timestamp=datetime.now(UTC),
-                        feature_name="data_revision",
-                        description=f"Multiple revisions found for report date {name}. "
-                                   f"Only the first (as-reported) version should be used in backtest.",
-                        data_point={"report_date": str(name), "revisions": len(group)},
-                    ))
+                    report.add_violation(
+                        BiasViolation(
+                            violation_type="look_ahead",
+                            severity="warning",
+                            timestamp=datetime.now(UTC),
+                            feature_name="data_revision",
+                            description=f"Multiple revisions found for report date {name}. "
+                            f"Only the first (as-reported) version should be used in backtest.",
+                            data_point={"report_date": str(name), "revisions": len(group)},
+                        )
+                    )
 
         return report
 
@@ -366,9 +381,7 @@ class BiasDetectorMiddleware:
         # 1. Timestamp validation
         for col in available_data.columns:
             if col.endswith("_score") or col.endswith("_feature"):
-                report = self.detector.validate_feature_timestamps(
-                    available_data, col, decision_timestamp
-                )
+                report = self.detector.validate_feature_timestamps(available_data, col, decision_timestamp)
                 combined_report.total_checks += report.total_checks
                 for v in report.violations:
                     combined_report.add_violation(v)
@@ -384,8 +397,7 @@ class BiasDetectorMiddleware:
         is_safe = not (self.strict_mode and combined_report.critical_count > 0)
 
         if not is_safe:
-            logger.error("Bias check FAILED - blocking scan",
-                        critical=combined_report.critical_count)
+            logger.error("Bias check FAILED - blocking scan", critical=combined_report.critical_count)
 
         return is_safe, combined_report
 

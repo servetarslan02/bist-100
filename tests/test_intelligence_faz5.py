@@ -4,7 +4,6 @@ ALPHA BIST — Intelligence Faz 2+5 Tests
 ML Signal Fusion + Prediction Layer + Integration.
 """
 
-
 import numpy as np
 import pytest
 
@@ -23,6 +22,7 @@ from services.intelligence.prediction_layer import (
 # =====================================================
 # ML Signal Fusion Tests
 # =====================================================
+
 
 class TestMLSignalFusion:
     """ML sinyal birleştirme testleri."""
@@ -127,6 +127,7 @@ class TestMLSignalFusion:
 # Prediction Layer Tests
 # =====================================================
 
+
 class TestPredictionLayer:
     """Prediction layer testleri."""
 
@@ -169,7 +170,9 @@ class TestPredictionLayer:
 
     def test_multi_horizon_basic(self):
         """Multi-horizon prediction."""
-        result = compute_multi_horizon_predictions("THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2})
+        result = compute_multi_horizon_predictions(
+            "THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2}
+        )
         assert isinstance(result, MultiHorizonPrediction)
         assert 1 in result.predictions
         assert 5 in result.predictions
@@ -178,13 +181,17 @@ class TestPredictionLayer:
 
     def test_multi_horizon_consensus(self):
         """Multi-horizon consensus."""
-        result = compute_multi_horizon_predictions("THYAO", {"momentum_20d": 5, "rsi_14": 60, "volatility_20d": 20, "atr_pct": 2})
+        result = compute_multi_horizon_predictions(
+            "THYAO", {"momentum_20d": 5, "rsi_14": 60, "volatility_20d": 20, "atr_pct": 2}
+        )
         assert result.consensus_direction in ["UP", "DOWN", "NEUTRAL"]
         assert 0 <= result.consensus_confidence <= 1
 
     def test_multi_horizon_best_horizon(self):
         """En iyi horizon seçilir."""
-        result = compute_multi_horizon_predictions("THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2})
+        result = compute_multi_horizon_predictions(
+            "THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2}
+        )
         assert result.best_horizon in [1, 5, 20, 60]
 
     def test_multi_horizon_with_ensemble(self):
@@ -218,6 +225,7 @@ class TestPredictionLayer:
 # =====================================================
 # Integration Tests
 # =====================================================
+
 
 class TestIntelligenceIntegration:
     """Tüm modüllerin entegrasyon testleri."""

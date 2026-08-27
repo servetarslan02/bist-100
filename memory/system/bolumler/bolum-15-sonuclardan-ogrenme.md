@@ -38,9 +38,12 @@ Neden Yanıldı? → Model Performansı → Calibration → Memory → Gelecek K
 # services/learning/integrated_learning.py
 from services.learning.integrated_learning import integrated_learning
 
-integrated_learning.record_decision("THYAO",
+integrated_learning.record_decision(
+    "THYAO",
     {"direction": "LONG", "action": "BUY", "composite_score": 70},
-    {"momentum_20d": 5, "rsi_14": 60, "price": 305.25}, "BULL")
+    {"momentum_20d": 5, "rsi_14": 60, "price": 305.25},
+    "BULL",
+)
 # prediction_id: "THYAO-20260816120000"
 # feature_snapshot: {"price": 305.25, "momentum_20d": 5, ...}
 ```

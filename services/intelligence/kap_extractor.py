@@ -22,15 +22,16 @@ logger = structlog.get_logger()
 @dataclass
 class KAPExtractedEvent:
     """Yapılandırılmış KAP olayı."""
+
     ticker: str
     kap_id: str
-    event_type: str           # DIVIDEND, BONUS, INVESTMENT, CONTRACT, etc.
-    event_subtype: str        # Alt tür
-    financial_impact: float   # -1 ile +1 arası
-    impact_magnitude: float   # 0-1 (ne kadar büyük etki)
-    surprise_score: float     # 0-1 (beklenmediklik)
-    uncertainty: float        # 0-1 (bilgi eksikliği)
-    time_horizon: str         # IMMEDIATE, SHORT, MEDIUM, LONG
+    event_type: str  # DIVIDEND, BONUS, INVESTMENT, CONTRACT, etc.
+    event_subtype: str  # Alt tür
+    financial_impact: float  # -1 ile +1 arası
+    impact_magnitude: float  # 0-1 (ne kadar büyük etki)
+    surprise_score: float  # 0-1 (beklenmediklik)
+    uncertainty: float  # 0-1 (bilgi eksikliği)
+    time_horizon: str  # IMMEDIATE, SHORT, MEDIUM, LONG
     affected_sectors: list[str]
     description: str
     raw_title: str
@@ -157,9 +158,19 @@ class KAPExtractor:
 
     def _build_empty(self, ticker: str, kap_id: str) -> KAPExtractedEvent:
         return KAPExtractedEvent(
-            ticker=ticker, kap_id=kap_id, event_type="UNKNOWN", event_subtype="",
-            financial_impact=0.0, impact_magnitude=0.0, surprise_score=0.0, uncertainty=0.0,
-            time_horizon="MEDIUM", affected_sectors=["ALL"], description="", raw_title="", raw_summary=""
+            ticker=ticker,
+            kap_id=kap_id,
+            event_type="UNKNOWN",
+            event_subtype="",
+            financial_impact=0.0,
+            impact_magnitude=0.0,
+            surprise_score=0.0,
+            uncertainty=0.0,
+            time_horizon="MEDIUM",
+            affected_sectors=["ALL"],
+            description="",
+            raw_title="",
+            raw_summary="",
         )
 
     def _classify_event(self, text: str) -> str:
@@ -211,12 +222,14 @@ class SectorChainImpact:
 
         for target_sector, chain_info in chains.items():
             chain_impact = chain_info["impact"] * (1 if impact_direction > 0 else -1)
-            results.append({
-                "source_sector": source_sector,
-                "target_sector": target_sector,
-                "impact": round(chain_impact, 4),
-                "reason": chain_info["reason"],
-            })
+            results.append(
+                {
+                    "source_sector": source_sector,
+                    "target_sector": target_sector,
+                    "impact": round(chain_impact, 4),
+                    "reason": chain_info["reason"],
+                }
+            )
 
         return results
 

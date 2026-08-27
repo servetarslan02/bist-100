@@ -33,6 +33,7 @@ logger = structlog.get_logger()
 # ENUMS
 # =====================================================
 
+
 class AlertSeverity(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
@@ -70,9 +71,11 @@ ESCALATION_TIMEOUT_S = {
 # ALERT DATA
 # =====================================================
 
+
 @dataclass
 class Alert:
     """Tek bir alert kaydı (lifecycle ile)."""
+
     alert_type: str
     severity: str
     message: str
@@ -145,31 +148,35 @@ class Alert:
     def to_slack_payload(self) -> dict[str, Any]:
         color = {"INFO": "#36a64f", "WARNING": "#ff9900", "CRITICAL": "#ff0000"}.get(self.severity, "#999")
         return {
-            "attachments": [{
-                "color": color,
-                "title": f"[{self.severity}] {self.alert_type}",
-                "text": self.message,
-                "fields": [
-                    {"title": "Status", "value": self.status, "short": True},
-                    {"title": "Escalations", "value": str(self.escalation_count), "short": True},
-                ],
-                "ts": int(self.timestamp),
-            }]
+            "attachments": [
+                {
+                    "color": color,
+                    "title": f"[{self.severity}] {self.alert_type}",
+                    "text": self.message,
+                    "fields": [
+                        {"title": "Status", "value": self.status, "short": True},
+                        {"title": "Escalations", "value": str(self.escalation_count), "short": True},
+                    ],
+                    "ts": int(self.timestamp),
+                }
+            ]
         }
 
     def to_discord_payload(self) -> dict[str, Any]:
         color = {"INFO": 0x36A64F, "WARNING": 0xFF9900, "CRITICAL": 0xFF0000}.get(self.severity, 0x999999)
         return {
-            "embeds": [{
-                "title": f"[{self.severity}] {self.alert_type}",
-                "description": self.message,
-                "color": color,
-                "fields": [
-                    {"name": "Status", "value": self.status, "inline": True},
-                    {"name": "Escalations", "value": str(self.escalation_count), "inline": True},
-                ],
-                "timestamp": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
-            }]
+            "embeds": [
+                {
+                    "title": f"[{self.severity}] {self.alert_type}",
+                    "description": self.message,
+                    "color": color,
+                    "fields": [
+                        {"name": "Status", "value": self.status, "inline": True},
+                        {"name": "Escalations", "value": str(self.escalation_count), "inline": True},
+                    ],
+                    "timestamp": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
+                }
+            ]
         }
 
     def to_pagerduty_payload(self, routing_key: str = "") -> dict[str, Any]:
@@ -194,6 +201,7 @@ class Alert:
 # NOTIFICATION PROVIDERS
 # =====================================================
 
+
 class NotificationProvider(Protocol):
     async def send(self, alert: Alert) -> bool: ...
     def name(self) -> str: ...
@@ -203,11 +211,17 @@ class NotificationProvider(Protocol):
 @dataclass
 class LogProvider:
     _name: str = "log"
-    def name(self) -> str: return self._name
-    def min_severity(self) -> str: return "INFO"
+
+    def name(self) -> str:
+        return self._name
+
+    def min_severity(self) -> str:
+        return "INFO"
+
     async def send(self, alert: Alert) -> bool:
-        logger.warning("ALERT", type=alert.alert_type, severity=alert.severity,
-                      status=alert.status, message=alert.message)
+        logger.warning(
+            "ALERT", type=alert.alert_type, severity=alert.severity, status=alert.status, message=alert.message
+        )
         return True
 
 
@@ -216,16 +230,26 @@ class WebhookProvider:
     url: str
     headers: dict[str, str] = field(default_factory=dict)
     timeout: float = 10.0
-    def name(self) -> str: return f"webhook:{self.url[:50]}"
-    def min_severity(self) -> str: return "WARNING"
+
+    def name(self) -> str:
+        return f"webhook:{self.url[:50]}"
+
+    def min_severity(self) -> str:
+        return "WARNING"
+
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                self.url, json=alert.to_webhook_payload(),
-                headers={"Content-Type": "application/json", **self.headers},
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    self.url,
+                    json=alert.to_webhook_payload(),
+                    headers={"Content-Type": "application/json", **self.headers},
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                ) as resp,
+            ):
                 return resp.status < 400
         except Exception as e:
             logger.error("Webhook error", url=self.url, error=str(e))
@@ -236,15 +260,25 @@ class WebhookProvider:
 class SlackProvider:
     webhook_url: str
     timeout: float = 10.0
-    def name(self) -> str: return "slack"
-    def min_severity(self) -> str: return "CRITICAL"
+
+    def name(self) -> str:
+        return "slack"
+
+    def min_severity(self) -> str:
+        return "CRITICAL"
+
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                self.webhook_url, json=alert.to_slack_payload(),
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    self.webhook_url,
+                    json=alert.to_slack_payload(),
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                ) as resp,
+            ):
                 return resp.status < 400
         except Exception as e:
             logger.error("Slack error", error=str(e))
@@ -255,15 +289,25 @@ class SlackProvider:
 class DiscordProvider:
     webhook_url: str
     timeout: float = 10.0
-    def name(self) -> str: return "discord"
-    def min_severity(self) -> str: return "CRITICAL"
+
+    def name(self) -> str:
+        return "discord"
+
+    def min_severity(self) -> str:
+        return "CRITICAL"
+
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                self.webhook_url, json=alert.to_discord_payload(),
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    self.webhook_url,
+                    json=alert.to_discord_payload(),
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                ) as resp,
+            ):
                 return resp.status < 400
         except Exception as e:
             logger.error("Discord error", error=str(e))
@@ -274,16 +318,25 @@ class DiscordProvider:
 class PagerDutyProvider:
     routing_key: str
     timeout: float = 10.0
-    def name(self) -> str: return "pagerduty"
-    def min_severity(self) -> str: return "CRITICAL"
+
+    def name(self) -> str:
+        return "pagerduty"
+
+    def min_severity(self) -> str:
+        return "CRITICAL"
+
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.post(
-                "https://events.pagerduty.com/v2/enqueue",
-                json=alert.to_pagerduty_payload(self.routing_key),
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    "https://events.pagerduty.com/v2/enqueue",
+                    json=alert.to_pagerduty_payload(self.routing_key),
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                ) as resp,
+            ):
                 return resp.status < 400
         except Exception as e:
             logger.error("PagerDuty error", error=str(e))
@@ -298,11 +351,17 @@ class EmailProvider:
     smtp_port: int = field(default_factory=lambda: int(os.environ.get("SMTP_PORT", "587")))
     username: str = field(default_factory=lambda: os.environ.get("SMTP_USERNAME", ""))
     password: str = field(default_factory=lambda: os.environ.get("SMTP_PASSWORD", ""))
-    def name(self) -> str: return f"email:{','.join(self.to_addresses[:3])}"
-    def min_severity(self) -> str: return "CRITICAL"
+
+    def name(self) -> str:
+        return f"email:{','.join(self.to_addresses[:3])}"
+
+    def min_severity(self) -> str:
+        return "CRITICAL"
+
     async def send(self, alert: Alert) -> bool:
         try:
             from email.mime.text import MIMEText
+
             msg = MIMEText(
                 f"Alert: {alert.alert_type}\nSeverity: {alert.severity}\n"
                 f"Status: {alert.status}\nMessage: {alert.message}\n"
@@ -317,16 +376,21 @@ class EmailProvider:
         except Exception as e:
             logger.error("Email error", error=str(e))
             return False
+
     def _send_smtp(self, msg):
         import smtplib
+
         with smtplib.SMTP(self.smtp_host, self.smtp_port) as s:
-            if self.username: s.starttls(); s.login(self.username, self.password)
+            if self.username:
+                s.starttls()
+                s.login(self.username, self.password)
             s.send_message(msg)
 
 
 # =====================================================
 # NOTIFICATION ROUTER
 # =====================================================
+
 
 class NotificationRouter:
     """Notification routing: severity'ye göre provider seçimi.
@@ -349,10 +413,7 @@ class NotificationRouter:
         """Severity'ye göre uygun provider'ları döndür."""
         severity_order = {"INFO": 0, "WARNING": 1, "CRITICAL": 2}
         target_level = severity_order.get(severity, 0)
-        return [
-            p for p in self._providers
-            if severity_order.get(p.min_severity(), 999) <= target_level
-        ]
+        return [p for p in self._providers if severity_order.get(p.min_severity(), 999) <= target_level]
 
     def get_all_providers(self) -> list[str]:
         return [p.name() for p in self._providers]
@@ -361,6 +422,7 @@ class NotificationRouter:
 # =====================================================
 # RETRY
 # =====================================================
+
 
 @dataclass
 class RetryConfig:
@@ -379,19 +441,31 @@ class NotificationResult:
         self.last_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"provider": self.provider_name, "fingerprint": self.alert_fingerprint,
-                "attempts": self.attempts, "success": self.success, "last_error": self.last_error}
+        return {
+            "provider": self.provider_name,
+            "fingerprint": self.alert_fingerprint,
+            "attempts": self.attempts,
+            "success": self.success,
+            "last_error": self.last_error,
+        }
 
 
 # =====================================================
 # ALERTING SYSTEM
 # =====================================================
 
+
 class AlertingSystem:
     """v3.0 — Lifecycle, escalation, DB persistence, notification routing."""
 
-    def __init__(self, max_alerts: int = 1000, dedup_window_s: float = 300.0,
-                 db=None, dialect: str = "postgresql", policy: AlertPolicy = None):
+    def __init__(
+        self,
+        max_alerts: int = 1000,
+        dedup_window_s: float = 300.0,
+        db=None,
+        dialect: str = "postgresql",
+        policy: AlertPolicy = None,
+    ):
         self._alerts: list[Alert] = []
         self._max_alerts = max_alerts
         self._dedup_window_s = dedup_window_s
@@ -460,8 +534,12 @@ class AlertingSystem:
 
             if now - alert.timestamp > timeout and alert.severity != "CRITICAL":
                 alert.escalate("CRITICAL")
-                logger.warning("Alert escalated", fingerprint=alert.fingerprint,
-                             type=alert_type, escalation_count=alert.escalation_count)
+                logger.warning(
+                    "Alert escalated",
+                    fingerprint=alert.fingerprint,
+                    type=alert_type,
+                    escalation_count=alert.escalation_count,
+                )
                 try:
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
@@ -475,8 +553,7 @@ class AlertingSystem:
 
     def add_provider(self, provider):
         self._router.add_provider(provider)
-        logger.info("Provider added", name=provider.name(),
-                   min_severity=provider.min_severity())
+        logger.info("Provider added", name=provider.name(), min_severity=provider.min_severity())
 
     def get_providers(self) -> list[str]:
         return self._router.get_all_providers()
@@ -489,61 +566,86 @@ class AlertingSystem:
         current_status = health_report.get("status", "UNKNOWN")
         if self._last_health_status and self._last_health_status != current_status:
             if current_status in ("DEGRADED", "UNHEALTHY"):
-                self._add_alert(Alert(
-                    alert_type=AlertType.HEALTH_CHANGE,
-                    severity="CRITICAL" if current_status == "UNHEALTHY" else "WARNING",
-                    message=f"Health: {self._last_health_status} → {current_status}",
-                    details={"previous": self._last_health_status, "current": current_status,
-                             "issues": health_report.get("issues", [])},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.HEALTH_CHANGE,
+                        severity="CRITICAL" if current_status == "UNHEALTHY" else "WARNING",
+                        message=f"Health: {self._last_health_status} → {current_status}",
+                        details={
+                            "previous": self._last_health_status,
+                            "current": current_status,
+                            "issues": health_report.get("issues", []),
+                        },
+                    )
+                )
             elif current_status == "HEALTHY" and self._last_health_status in ("DEGRADED", "UNHEALTHY"):
-                self._add_alert(Alert(
-                    alert_type=AlertType.HEALTH_CHANGE, severity="INFO",
-                    message=f"Health düzeldi: {self._last_health_status} → HEALTHY",
-                    details={"previous": self._last_health_status},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.HEALTH_CHANGE,
+                        severity="INFO",
+                        message=f"Health düzeldi: {self._last_health_status} → HEALTHY",
+                        details={"previous": self._last_health_status},
+                    )
+                )
         self._last_health_status = current_status
 
     def check_invariant(self, invariant_ok: bool, details: dict[str, Any] = None):
         if not invariant_ok:
             self._invariant_failure_count += 1
-            self._add_alert(Alert(
-                alert_type=AlertType.INVARIANT_FAILURE, severity="CRITICAL",
-                message=f"Portfolio invariant ihlali! (toplam: {self._invariant_failure_count})",
-                details=details or {},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.INVARIANT_FAILURE,
+                    severity="CRITICAL",
+                    message=f"Portfolio invariant ihlali! (toplam: {self._invariant_failure_count})",
+                    details=details or {},
+                )
+            )
 
     def check_negative_cash(self, cash: float):
         if cash < 0:
-            self._add_alert(Alert(
-                alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL",
-                message=f"Negatif cash: {cash:.2f}", details={"cash": cash},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.CASH_NEGATIVE,
+                    severity="CRITICAL",
+                    message=f"Negatif cash: {cash:.2f}",
+                    details={"cash": cash},
+                )
+            )
 
     def check_drawdown(self, drawdown_pct: float, threshold_pct: float = 15.0):
         if drawdown_pct > threshold_pct:
-            self._add_alert(Alert(
-                alert_type=AlertType.DRAWDOWN_BREACH, severity="CRITICAL",
-                message=f"Drawdown %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
-                details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.DRAWDOWN_BREACH,
+                    severity="CRITICAL",
+                    message=f"Drawdown %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
+                    details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
+                )
+            )
 
     def check_lock_metrics(self, lock_metrics: dict[str, Any]):
         for key, metrics in lock_metrics.items():
             dc = metrics.get("total_deadlocks_detected", 0)
             tc = metrics.get("total_timeouts", 0)
             if dc > self._last_lock_deadlock_count:
-                self._add_alert(Alert(
-                    alert_type=AlertType.LOCK_DEADLOCK, severity="WARNING",
-                    message=f"Lock deadlock: {key}", details={"lock_key": key, "total": dc},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.LOCK_DEADLOCK,
+                        severity="WARNING",
+                        message=f"Lock deadlock: {key}",
+                        details={"lock_key": key, "total": dc},
+                    )
+                )
                 self._last_lock_deadlock_count = dc
             if tc > self._last_lock_timeout_count + 2:
-                self._add_alert(Alert(
-                    alert_type=AlertType.LOCK_TIMEOUT_SPIKE, severity="WARNING",
-                    message=f"Lock timeout artışı: {key} (toplam: {tc})",
-                    details={"lock_key": key, "total": tc},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.LOCK_TIMEOUT_SPIKE,
+                        severity="WARNING",
+                        message=f"Lock timeout artışı: {key} (toplam: {tc})",
+                        details={"lock_key": key, "total": tc},
+                    )
+                )
                 self._last_lock_timeout_count = tc
 
     # =====================================================
@@ -587,23 +689,32 @@ class AlertingSystem:
     # SILENCE MANAGEMENT
     # =====================================================
 
-    def add_silence(self, alert_type: str = None, fingerprint: str = None,
-                    duration_s: float = 3600, reason: str = "",
-                    created_by: str = "system") -> dict[str, Any]:
+    def add_silence(
+        self,
+        alert_type: str = None,
+        fingerprint: str = None,
+        duration_s: float = 3600,
+        reason: str = "",
+        created_by: str = "system",
+    ) -> dict[str, Any]:
         """Alert susturma ekle (DB persist ile)."""
         rule = self._policy.add_silence(
-            alert_type=alert_type, fingerprint=fingerprint,
-            duration_s=duration_s, reason=reason, created_by=created_by,
+            alert_type=alert_type,
+            fingerprint=fingerprint,
+            duration_s=duration_s,
+            reason=reason,
+            created_by=created_by,
             db=self._db,
         )
         return rule.to_dict()
 
-    def remove_silence(self, fingerprint: str = None, alert_type: str = None,
-                       actor: str = "api") -> int:
+    def remove_silence(self, fingerprint: str = None, alert_type: str = None, actor: str = "api") -> int:
         """Alert susturma kaldır."""
         return self._policy.remove_silence(
-            fingerprint=fingerprint, alert_type=alert_type,
-            actor=actor, db=self._db,
+            fingerprint=fingerprint,
+            alert_type=alert_type,
+            actor=actor,
+            db=self._db,
         )
 
     def get_active_silences(self) -> list[dict[str, Any]]:
@@ -629,14 +740,14 @@ class AlertingSystem:
         """Policy'yi yeniden yükle."""
         return self._policy.reload_if_changed()
 
-    def update_policy(self, new_config: dict[str, Any], actor: str = "api",
-                      expected_version: int = 0) -> dict[str, Any]:
+    def update_policy(
+        self, new_config: dict[str, Any], actor: str = "api", expected_version: int = 0
+    ) -> dict[str, Any]:
         """Policy güncelle (optimistic locking ile)."""
         try:
             return self._policy.update(new_config, actor, expected_version)
         except VersionConflictError as e:
-            return {"success": False, "error": str(e), "conflict": True,
-                    "current_version": self._policy._version}
+            return {"success": False, "error": str(e), "conflict": True, "current_version": self._policy._version}
 
     def rollback_policy(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
         """Policy rollback."""
@@ -650,13 +761,11 @@ class AlertingSystem:
         """Policy audit log."""
         return self._policy.get_audit_log(limit)
 
-    def batch_add_silences(self, rules: list[dict[str, Any]],
-                           created_by: str = "system") -> list[dict[str, Any]]:
+    def batch_add_silences(self, rules: list[dict[str, Any]], created_by: str = "system") -> list[dict[str, Any]]:
         """Toplu susturma ekle (transaction)."""
         return self._policy.batch_add_silences(rules, created_by, self._db)
 
-    def batch_remove_silences(self, filters: list[dict[str, str]],
-                               actor: str = "api") -> dict[str, int]:
+    def batch_remove_silences(self, filters: list[dict[str, str]], actor: str = "api") -> dict[str, int]:
         """Toplu susturma kaldır (transaction)."""
         return self._policy.batch_remove_silences(filters, actor, self._db)
 
@@ -731,11 +840,21 @@ class AlertingSystem:
                 "timestamp, acknowledged_at, escalated_at, resolved_at, "
                 "escalation_count, notification_status, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (alert.fingerprint, str(alert.alert_type), str(alert.severity),
-                 alert.status.value if hasattr(alert.status, "value") else str(alert.status), alert.message, orjson.dumps(alert.details).decode(),
-                 alert.timestamp, alert.acknowledged_at, alert.escalated_at,
-                 alert.resolved_at, alert.escalation_count,
-                 alert.notification_status, time.time())
+                (
+                    alert.fingerprint,
+                    str(alert.alert_type),
+                    str(alert.severity),
+                    alert.status.value if hasattr(alert.status, "value") else str(alert.status),
+                    alert.message,
+                    orjson.dumps(alert.details).decode(),
+                    alert.timestamp,
+                    alert.acknowledged_at,
+                    alert.escalated_at,
+                    alert.resolved_at,
+                    alert.escalation_count,
+                    alert.notification_status,
+                    time.time(),
+                ),
             )
             self._db.commit()
         except Exception as e:
@@ -747,8 +866,7 @@ class AlertingSystem:
             return
         try:
             rows = self._db.execute(
-                "SELECT * FROM alerts_state WHERE status IN (?, ?, ?)",
-                ("CREATED", "ACKNOWLEDGED", "ESCALATED")
+                "SELECT * FROM alerts_state WHERE status IN (?, ?, ?)", ("CREATED", "ACKNOWLEDGED", "ESCALATED")
             ).fetchall()
             for row in rows:
                 alert = Alert(
@@ -792,8 +910,7 @@ class AlertingSystem:
         self._trim_alerts()
         self._dedup_cache[alert.fingerprint] = time.time()
 
-        logger.warning("Alert created", type=alert.alert_type,
-                      severity=alert.severity, fp=alert.fingerprint)
+        logger.warning("Alert created", type=alert.alert_type, severity=alert.severity, fp=alert.fingerprint)
 
         # Policy reload check
         self._policy.reload_if_changed()
@@ -822,7 +939,7 @@ class AlertingSystem:
 
     def _trim_alerts(self):
         if len(self._alerts) > self._max_alerts:
-            self._alerts = self._alerts[-self._max_alerts:]
+            self._alerts = self._alerts[-self._max_alerts :]
 
     async def _notify_all(self, alert: Alert):
         # Policy-based routing
@@ -856,8 +973,8 @@ class AlertingSystem:
                 result.last_error = str(e)
             if attempt < self._retry_config.max_retries - 1:
                 delay = min(
-                    self._retry_config.base_delay_s * (self._retry_config.backoff_factor ** attempt),
-                    self._retry_config.max_delay_s
+                    self._retry_config.base_delay_s * (self._retry_config.backoff_factor**attempt),
+                    self._retry_config.max_delay_s,
                 )
                 await asyncio.sleep(delay)
         return result

@@ -3,6 +3,7 @@
 Finansal manipülasyon tespiti — 8 değişken, orijinal Beneish (1999) katsayıları.
 Gerçek veriden hesaplama + raw index input desteği.
 """
+
 from typing import Any
 
 import structlog
@@ -24,8 +25,8 @@ COEFFICIENTS = {
 
 # Eşik değerleri
 THRESHOLDS = {
-    "high_risk": -1.78,    # M-Score > -1.78 → manipülasyon olası
-    "moderate_risk": -2.22, # M-Score > -2.22 → şüpheli
+    "high_risk": -1.78,  # M-Score > -1.78 → manipülasyon olası
+    "moderate_risk": -2.22,  # M-Score > -2.22 → şüpheli
 }
 
 

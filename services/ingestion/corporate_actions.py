@@ -18,37 +18,38 @@ logger = structlog.get_logger()
 
 
 class ActionType(StrEnum):
-    DIVIDEND = "DIVIDEND"              # Temettü
-    STOCK_SPLIT = "STOCK_SPLIT"        # Bölünme
-    BONUS_SHARE = "BONUS_SHARE"        # Bedelsiz sermaye artırımı
-    RIGHTS_ISSUE = "RIGHTS_ISSUE"      # Bedelli sermaye artırımı
-    MERGER = "MERGER"                  # Birleşme
-    ACQUISITION = "ACQUISITION"        # Devralma
-    DELISTING = "DELISTING"            # Borsadan çıkış
-    NAME_CHANGE = "NAME_CHANGE"        # İsim değişikliği
+    DIVIDEND = "DIVIDEND"  # Temettü
+    STOCK_SPLIT = "STOCK_SPLIT"  # Bölünme
+    BONUS_SHARE = "BONUS_SHARE"  # Bedelsiz sermaye artırımı
+    RIGHTS_ISSUE = "RIGHTS_ISSUE"  # Bedelli sermaye artırımı
+    MERGER = "MERGER"  # Birleşme
+    ACQUISITION = "ACQUISITION"  # Devralma
+    DELISTING = "DELISTING"  # Borsadan çıkış
+    NAME_CHANGE = "NAME_CHANGE"  # İsim değişikliği
 
 
 @dataclass
 class CorporateAction:
     """Şirket olayı."""
+
     action_id: str
     ticker: str
     action_type: ActionType
-    ex_date: date               # Eski tarih (fiyat düzeltmesi bu tarihte yapılır)
+    ex_date: date  # Eski tarih (fiyat düzeltmesi bu tarihte yapılır)
     record_date: date | None = None  # Kayıt tarihi
-    payment_date: date | None = None # Ödeme tarihi
+    payment_date: date | None = None  # Ödeme tarihi
 
     # Temettü
     dividend_per_share: float = 0.0
     dividend_currency: str = "TRY"
 
     # Bölünme / Bedelsiz
-    split_ratio: float = 1.0    # ör: 2.0 = 1'e 2 bölünme, 10.0 = 1'e 10
-    bonus_ratio: float = 0.0    # ör: 0.5 = her 1 hisseye 0.5 bedelsiz
+    split_ratio: float = 1.0  # ör: 2.0 = 1'e 2 bölünme, 10.0 = 1'e 10
+    bonus_ratio: float = 0.0  # ör: 0.5 = her 1 hisseye 0.5 bedelsiz
 
     # Bedelli
-    rights_ratio: float = 0.0   # ör: 0.2 = her 5 hisseye 1 yeni
-    rights_price: float = 0.0   # Bedelli fiyat
+    rights_ratio: float = 0.0  # ör: 0.2 = her 5 hisseye 1 yeni
+    rights_price: float = 0.0  # Bedelli fiyat
 
     # Meta
     description: str = ""
@@ -74,12 +75,16 @@ class CorporateActionsHandler:
         if action.ticker not in self._actions:
             self._actions[action.ticker] = []
         self._actions[action.ticker].append(action)
-        logger.info("Corporate action added",
-                    ticker=action.ticker,
-                    type=action.action_type.value,
-                    ex_date=action.ex_date.isoformat())
+        logger.info(
+            "Corporate action added",
+            ticker=action.ticker,
+            type=action.action_type.value,
+            ex_date=action.ex_date.isoformat(),
+        )
 
-    def get_actions(self, ticker: str, start_date: date | None = None, end_date: date | None = None) -> list[CorporateAction]:
+    def get_actions(
+        self, ticker: str, start_date: date | None = None, end_date: date | None = None
+    ) -> list[CorporateAction]:
         """Şirket olaylarını getir."""
         actions = self._actions.get(ticker, [])
 
@@ -290,13 +295,14 @@ class CorporateActionsHandler:
     def _extract_dividend_amount(self, event: dict) -> float:
         """Temettü miktarını KAP açıklamasından çıkar."""
         import re
+
         text = event.get("title", "") + " " + event.get("summary", "")
 
         # "hisseye 5,25 TL" veya "5.25 TL/hisse" gibi pattern'ler
         patterns = [
-            r'hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)',
-            r'(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse',
-            r'kar\s+payı\s+(\d+[.,]\d+)',
+            r"hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)",
+            r"(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse",
+            r"kar\s+payı\s+(\d+[.,]\d+)",
         ]
 
         for pattern in patterns:
@@ -313,6 +319,7 @@ class CorporateActionsHandler:
     def _extract_split_ratio(self, event: dict) -> float:
         """Bölünme oranını KAP açıklamasından çıkar."""
         import re
+
         text = event.get("title", "") + " " + event.get("summary", "")
 
         # "1'e 10" veya "10:1" gibi pattern'ler
@@ -339,7 +346,7 @@ class CorporateActionsHandler:
 
         for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%dT%H:%M:%S"]:
             try:
-                return datetime.strptime(date_str[:10], fmt[:len(date_str[:10])]).date()
+                return datetime.strptime(date_str[:10], fmt[: len(date_str[:10])]).date()
             except ValueError:
                 continue
 

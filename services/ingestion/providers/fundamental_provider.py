@@ -151,6 +151,7 @@ class FundamentalProvider:
         """KAP'tan finansal veri çek (async)."""
         try:
             from .kap_provider import kap_provider
+
             return await kap_provider.fetch_financial_data(ticker)
         except Exception as e:
             logger.debug("KAP fundamental fetch failed", ticker=ticker, error=str(e))

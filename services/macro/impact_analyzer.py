@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class ShockEvent:
     """Şok olayı kaydı."""
+
     shock_type: str
     magnitude: float
     timestamp: str
@@ -34,6 +35,7 @@ class ShockEvent:
 @dataclass
 class ImpactResult:
     """Etki sonucu."""
+
     ticker: str
     sector: str
     shock_type: str
@@ -85,9 +87,9 @@ class MacroImpactAnalyzer:
         if len(self._shock_history) > 1000:
             self._shock_history = self._shock_history[-1000:]
 
-        logger.warning("Macro shock recorded",
-                      shock_type=shock_type, magnitude=magnitude,
-                      indicator=indicator, half_life=half_life)
+        logger.warning(
+            "Macro shock recorded", shock_type=shock_type, magnitude=magnitude, indicator=indicator, half_life=half_life
+        )
 
     def compute_impact(
         self,
@@ -179,11 +181,13 @@ class MacroImpactAnalyzer:
         for day in range(max_days + 1):
             decay = 0.5 ** (day / half_life)
             remaining = magnitude * decay
-            curve.append({
-                "day": day,
-                "decay_factor": round(decay, 4),
-                "remaining_impact": round(remaining, 4),
-            })
+            curve.append(
+                {
+                    "day": day,
+                    "decay_factor": round(decay, 4),
+                    "remaining_impact": round(remaining, 4),
+                }
+            )
 
         return curve
 

@@ -24,19 +24,20 @@ import pytest
 # FIXTURES
 # =====================================================
 
+
 def _make_ohlcv(n_days: int = 300, base_price: float = 100.0, seed: int = 42) -> pl.DataFrame:
     """Sentetik OHLCV veri üret."""
     rng = np.random.RandomState(seed)
-    pl.date_range(date(2023, 1, 1), date(2023, 1, 1) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
+    pl.date_range(date(2023, 1, 1), date(2023, 1, 1) + timedelta(days=n_days * 2), timedelta(days=1), eager=True).head(
+        n_days
+    )
     returns = rng.normal(0.0003, 0.02, n_days)
     close = base_price * np.cumprod(1 + returns)
     high = close * (1 + rng.uniform(0, 0.02, n_days))
     low = close * (1 - rng.uniform(0, 0.02, n_days))
     open_ = close * (1 + rng.normal(0, 0.005, n_days))
     volume = rng.randint(100_000, 10_000_000, n_days).astype(float)
-    df = pl.DataFrame({
-        "Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume
-    })
+    df = pl.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume})
     return df
 
 
@@ -44,13 +45,13 @@ def _make_market_data(tickers=None, n_days=300):
     """Birden fazla hisse için market data üret."""
     if tickers is None:
         tickers = ["THYAO", "GARAN", "AKBNK", "ASELS", "EREGL"]
-    return {t: _make_ohlcv(n_days, base_price=100 + i * 10, seed=42 + i)
-            for i, t in enumerate(tickers)}
+    return {t: _make_ohlcv(n_days, base_price=100 + i * 10, seed=42 + i) for i, t in enumerate(tickers)}
 
 
 # =====================================================
 # TEST 1: PortfolioSimulator + TransactionCostEngine
 # =====================================================
+
 
 class TestPortfolioTransactionCosts:
     """TransactionCostEngine entegrasyonu testleri."""
@@ -60,15 +61,16 @@ class TestPortfolioTransactionCosts:
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
         # Legacy
-        sim_legacy = PortfolioSimulatorV3(
-            initial_capital=1_000_000, use_realistic_costs=False, slippage_rate=0.001
-        )
+        sim_legacy = PortfolioSimulatorV3(initial_capital=1_000_000, use_realistic_costs=False, slippage_rate=0.001)
         sim_legacy.execute_buy("THYAO", 100.0, "2024-01-15", quantity=1000)
 
         # Realistic
         sim_realistic = PortfolioSimulatorV3(
-            initial_capital=1_000_000, use_realistic_costs=True, slippage_rate=0.001,
-            avg_daily_volume=500_000_000, volatility_ratio=1.0
+            initial_capital=1_000_000,
+            use_realistic_costs=True,
+            slippage_rate=0.001,
+            avg_daily_volume=500_000_000,
+            volatility_ratio=1.0,
         )
         sim_realistic.execute_buy("THYAO", 100.0, "2024-01-15", quantity=1000)
 
@@ -94,8 +96,11 @@ class TestPortfolioTransactionCosts:
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
         sim = PortfolioSimulatorV3(
-            initial_capital=1_000_000, use_realistic_costs=True, slippage_rate=0.001,
-            avg_daily_volume=200_000_000, volatility_ratio=1.2
+            initial_capital=1_000_000,
+            use_realistic_costs=True,
+            slippage_rate=0.001,
+            avg_daily_volume=200_000_000,
+            volatility_ratio=1.2,
         )
         sim.execute_buy("GARAN", 50.0, "2024-01-15", quantity=2000)
         sim.execute_sell("GARAN", 52.0, "2024-02-15")
@@ -110,9 +115,7 @@ class TestPortfolioTransactionCosts:
         """BUY ve SELL maliyetleri simetrik olmalı (komisyon açısından)."""
         from services.backtest.transaction_costs import bist_transaction_cost
 
-        buy_cost = bist_transaction_cost.calculate_total_cost(
-            "BUY", 100.0, 1000, "THYAO", avg_daily_volume=500_000_000
-        )
+        buy_cost = bist_transaction_cost.calculate_total_cost("BUY", 100.0, 1000, "THYAO", avg_daily_volume=500_000_000)
         sell_cost = bist_transaction_cost.calculate_total_cost(
             "SELL", 100.0, 1000, "THYAO", avg_daily_volume=500_000_000
         )
@@ -124,6 +127,7 @@ class TestPortfolioTransactionCosts:
 # =====================================================
 # TEST 2: VaR/CVaR/MaxDD Duration
 # =====================================================
+
 
 class TestAdvancedMetrics:
     """Gelişmiş metrik testleri."""
@@ -146,12 +150,10 @@ class TestAdvancedMetrics:
         assert "var_95" in metrics, "VaR 95% should be in metrics"
         assert "cvar_95" in metrics, "CVaR 95% should be in metrics"
         # VaR negatif olmalı (kayıp)
-        assert metrics["var_95"] <= 0 or metrics["var_95"] == 0, \
-            "VaR should be <= 0 (represents loss)"
+        assert metrics["var_95"] <= 0 or metrics["var_95"] == 0, "VaR should be <= 0 (represents loss)"
         # CVaR <= VaR olmalı
         if metrics["var_95"] < 0:
-            assert metrics["cvar_95"] <= metrics["var_95"], \
-                "CVaR should be <= VaR (more extreme losses)"
+            assert metrics["cvar_95"] <= metrics["var_95"], "CVaR should be <= VaR (more extreme losses)"
 
     def test_max_dd_duration_tracked(self):
         """Max drawdown duration izlenmeli."""
@@ -179,7 +181,7 @@ class TestAdvancedMetrics:
         # 25 equity noktası oluştur
         for i in range(25):
             price = 100 + np.sin(i * 0.3) * 10  # Dalgalı
-            sim.update_equity({"X": price}, f"2024-01-{i+2:02d}")
+            sim.update_equity({"X": price}, f"2024-01-{i + 2:02d}")
 
         metrics = sim.compute_metrics()
         # Sortino > Sharpe olmalı (pozitif getirileri hariç tutuyor)
@@ -190,6 +192,7 @@ class TestAdvancedMetrics:
 # =====================================================
 # TEST 3: BUY/SELL Eşik Asimetrisi
 # =====================================================
+
 
 class TestBuySellAsymmetry:
     """BUY/SELL eşik asimetrisi doğrulaması."""
@@ -204,11 +207,9 @@ class TestBuySellAsymmetry:
         # BUY: score >= 60 + 10 = 70
         buy_threshold = cfg.signal_threshold + 10
 
-        assert buy_threshold > sell_threshold, \
-            f"BUY threshold ({buy_threshold}) should be > SELL ({sell_threshold})"
+        assert buy_threshold > sell_threshold, f"BUY threshold ({buy_threshold}) should be > SELL ({sell_threshold})"
         # Gap en az 10 puan olmalı
-        assert buy_threshold - sell_threshold >= 10, \
-            "Hysteresis gap should be >= 10 points"
+        assert buy_threshold - sell_threshold >= 10, "Hysteresis gap should be >= 10 points"
 
     def test_score_clipping_bounds(self):
         """Score 0-100 arasında clip'lenmeli."""
@@ -240,6 +241,7 @@ class TestBuySellAsymmetry:
 # TEST 4: Walk-Forward Leakage Guard
 # =====================================================
 
+
 class TestWalkForwardLeakage:
     """Walk-forward leakage koruması testleri."""
 
@@ -247,15 +249,15 @@ class TestWalkForwardLeakage:
         """Fold sınırları purge gap'i korumalı."""
         from services.backtest.walk_forward import WalkForwardEngine
 
-        engine = WalkForwardEngine(
-            purge_days=5, embargo_days=5, train_days=100, test_days=30, step_days=21
+        engine = WalkForwardEngine(purge_days=5, embargo_days=5, train_days=100, test_days=30, step_days=21)
+        dates = (
+            [f"2023-01-{d:02d}" for d in range(1, 32)]
+            + [f"2023-02-{d:02d}" for d in range(1, 29)]
+            + [f"2023-03-{d:02d}" for d in range(1, 32)]
+            + [f"2023-04-{d:02d}" for d in range(1, 31)]
+            + [f"2023-05-{d:02d}" for d in range(1, 32)]
+            + [f"2023-06-{d:02d}" for d in range(1, 31)]
         )
-        dates = [f"2023-01-{d:02d}" for d in range(1, 32)] + \
-                [f"2023-02-{d:02d}" for d in range(1, 29)] + \
-                [f"2023-03-{d:02d}" for d in range(1, 32)] + \
-                [f"2023-04-{d:02d}" for d in range(1, 31)] + \
-                [f"2023-05-{d:02d}" for d in range(1, 32)] + \
-                [f"2023-06-{d:02d}" for d in range(1, 31)]
 
         folds = engine.create_folds(dates)
         for fold in folds:
@@ -263,16 +265,13 @@ class TestWalkForwardLeakage:
             train_end_idx = dates.index(fold["train_end"])
             test_start_idx = dates.index(fold["test_start"])
             gap = test_start_idx - train_end_idx - 1
-            assert gap >= engine.purge_days, \
-                f"Purge gap ({gap}) < required ({engine.purge_days})"
+            assert gap >= engine.purge_days, f"Purge gap ({gap}) < required ({engine.purge_days})"
 
     def test_purge_embargo_split(self):
         """Purge/embargo split doğru olmalı."""
         from services.backtest.enhanced_walk_forward import PurgeEmbargoWalkForward
 
-        engine = PurgeEmbargoWalkForward(
-            purge_days=5, embargo_days=5, train_days=100, test_days=30, step_days=21
-        )
+        engine = PurgeEmbargoWalkForward(purge_days=5, embargo_days=5, train_days=100, test_days=30, step_days=21)
         folds = engine.split(500)
         assert len(folds) > 0
 
@@ -286,6 +285,7 @@ class TestWalkForwardLeakage:
 # =====================================================
 # TEST 5: Engine V4 Legacy vs Fast Parity
 # =====================================================
+
 
 class TestEngineParity:
     """Legacy vs fast yol parity testi."""
@@ -310,6 +310,7 @@ class TestEngineParity:
 # =====================================================
 # TEST 6: Deflated Sharpe Ratio
 # =====================================================
+
 
 class TestDeflatedSharpe:
     """Deflated Sharpe Ratio doğruluğu."""
@@ -365,6 +366,7 @@ class TestDeflatedSharpe:
 # TEST 7: Benchmark Comparison
 # =====================================================
 
+
 class TestBenchmark:
     """Benchmark karşılaştırma testleri."""
 
@@ -376,9 +378,7 @@ class TestBenchmark:
         strategy_returns = rng.normal(0.001, 0.01, 252)
         benchmark_returns = rng.normal(0.0005, 0.015, 252)
 
-        result = BenchmarkComparator.compare(
-            strategy_returns, benchmark_returns, "BIST100"
-        )
+        result = BenchmarkComparator.compare(strategy_returns, benchmark_returns, "BIST100")
 
         assert result.benchmark_name == "BIST100"
         assert isinstance(result.alpha_pct, float)
@@ -391,6 +391,7 @@ class TestBenchmark:
 # =====================================================
 # TEST 8: Transaction Cost Model
 # =====================================================
+
 
 class TestTransactionCosts:
     """İşlem maliyeti modeli testleri."""
@@ -431,9 +432,7 @@ class TestTransactionCosts:
         """Round-trip maliyet pozitif olmalı."""
         from services.backtest.transaction_costs import bist_transaction_cost
 
-        rt = bist_transaction_cost.estimate_round_trip_cost(
-            "THYAO", 100.0, 1000, avg_daily_volume=500_000_000
-        )
+        rt = bist_transaction_cost.estimate_round_trip_cost("THYAO", 100.0, 1000, avg_daily_volume=500_000_000)
 
         assert rt["round_trip_cost"] > 0
         assert rt["round_trip_cost_pct"] > 0
@@ -444,6 +443,7 @@ class TestTransactionCosts:
 # TEST 9: Survivorship Bias
 # =====================================================
 
+
 class TestSurvivorship:
     """Survivorship bias testleri."""
 
@@ -452,11 +452,13 @@ class TestSurvivorship:
         from services.backtest.survivorship import DelistingEvent, SurvivorshipBiasHandler
 
         handler = SurvivorshipBiasHandler()
-        handler.register_delisting(DelistingEvent(
-            ticker="DELISTED",
-            delisting_date=datetime(2023, 6, 1),
-            reason="bankruptcy",
-        ))
+        handler.register_delisting(
+            DelistingEvent(
+                ticker="DELISTED",
+                delisting_date=datetime(2023, 6, 1),
+                reason="bankruptcy",
+            )
+        )
 
         all_tickers = {"THYAO", "GARAN", "DELISTED"}
 
@@ -473,6 +475,7 @@ class TestSurvivorship:
 # =====================================================
 # TEST 10: Deterministic Recovery
 # =====================================================
+
 
 class TestDeterministicRecovery:
     """Deterministik recovery testleri."""
@@ -518,6 +521,7 @@ class TestDeterministicRecovery:
 # TEST 11: Bias Detector
 # =====================================================
 
+
 class TestBiasDetector:
     """Bias detection testleri."""
 
@@ -547,6 +551,7 @@ class TestBiasDetector:
 # =====================================================
 # TEST 12: Scanner Parity
 # =====================================================
+
 
 class TestScannerParity:
     """Scanner parity testleri."""

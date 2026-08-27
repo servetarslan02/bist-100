@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class CandleMetrics:
     """Tek bir mumun anatomik ölçümleri."""
+
     open: float
     high: float
     low: float
@@ -55,15 +56,16 @@ class CandleMetrics:
 @dataclass
 class CandlePatternResult:
     """Mum analizi sonucu."""
+
     ticker: str
     patterns_detected: list[str] = field(default_factory=list)
     primary_pattern: str | None = None
     direction: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
     candle_score: float = 50.0  # 0 - 100
     buyer_pressure_pct: float = 50.0  # Alıcı gücü %
-    seller_pressure_pct: float = 50.0 # Satıcı gücü %
+    seller_pressure_pct: float = 50.0  # Satıcı gücü %
     has_fvg: bool = False
-    fvg_type: str | None = None   # BULLISH_FVG, BEARISH_FVG
+    fvg_type: str | None = None  # BULLISH_FVG, BEARISH_FVG
     fvg_gap_range: tuple[float, float] = (0.0, 0.0)
     support_level: float = 0.0
     resistance_level: float = 0.0
@@ -77,20 +79,31 @@ class CandlePatternEngine:
 
     def __init__(self):
         # Mum formasyonları ve eşikleri
-        self.min_body_ratio = 0.6        # Doji için max gövde/arası oran
-        self.hammer_shadow_ratio = 2.0   # Çekiç için alt gölge/gövde oranı
+        self.min_body_ratio = 0.6  # Doji için max gövde/arası oran
+        self.hammer_shadow_ratio = 2.0  # Çekiç için alt gölge/gövde oranı
         self.engulfing_threshold = 0.01  # Yutan formasyonu min gövde farkı
-        self.star_gap_ratio = 0.005      # Sabah/Akşam yıldızı min boşluk
-        self.three_soldier_body = 0.5    # Üç asker min gövde boyu
-        self.harami_ratio = 0.5          # Harami max gövde oranı
-        self.trend_window = 20           # Trend penceresi (gün)
+        self.star_gap_ratio = 0.005  # Sabah/Akşam yıldızı min boşluk
+        self.three_soldier_body = 0.5  # Üç asker min gövde boyu
+        self.harami_ratio = 0.5  # Harami max gövde oranı
+        self.trend_window = 20  # Trend penceresi (gün)
         self.support_resistance_window = 50  # Destek/direnç penceresi
         self._pattern_registry = [
-            "doji", "hammer", "inverted_hammer", "bullish_engulfing",
-            "bearish_engulfing", "morning_star", "evening_star",
-            "three_white_soldiers", "three_black_crows", "harami",
-            "piercing_line", "dark_cloud_cover", "shooting_star",
-            "hanging_man", "spinning_top", "marubozu",
+            "doji",
+            "hammer",
+            "inverted_hammer",
+            "bullish_engulfing",
+            "bearish_engulfing",
+            "morning_star",
+            "evening_star",
+            "three_white_soldiers",
+            "three_black_crows",
+            "harami",
+            "piercing_line",
+            "dark_cloud_cover",
+            "shooting_star",
+            "hanging_man",
+            "spinning_top",
+            "marubozu",
         ]
 
     def analyze_dataframe(self, df: pl.DataFrame, ticker: str = "ASSET") -> CandlePatternResult:
@@ -219,7 +232,9 @@ class CandlePatternEngine:
                 result.fvg_gap_range = (float(c2.high), float(c0.low))
                 detected.append("BULLISH_FVG")
                 score += 18
-                evidence.append(f"Boğa FVG Dengesizlik Alanı: {c2.high:.2f}₺ - {c0.low:.2f}₺ arasında kurumsal alım boşluğu.")
+                evidence.append(
+                    f"Boğa FVG Dengesizlik Alanı: {c2.high:.2f}₺ - {c0.low:.2f}₺ arasında kurumsal alım boşluğu."
+                )
 
             # Ayı FVG: 3. mumun Low'u ile 1. mumun High'ı arasında boşluk kalması
             elif c0.high < c2.low:
@@ -228,7 +243,9 @@ class CandlePatternEngine:
                 result.fvg_gap_range = (float(c0.high), float(c2.low))
                 detected.append("BEARISH_FVG")
                 score -= 18
-                evidence.append(f"Ayı FVG Dengesizlik Alanı: {c0.high:.2f}₺ - {c2.low:.2f}₺ arasında kurumsal satış boşluğu.")
+                evidence.append(
+                    f"Ayı FVG Dengesizlik Alanı: {c0.high:.2f}₺ - {c2.low:.2f}₺ arasında kurumsal satış boşluğu."
+                )
 
         # -------------------------------------------------------------
         # 4. Destek, Direnç ve Dinamik Stop/Hedef Hesabı
@@ -238,7 +255,10 @@ class CandlePatternEngine:
         resistance = float(np.max(highs[-20:])) if n >= 20 else float(c0.high * 1.05)
 
         # ATR bazlı stop ve hedef
-        tr_list = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1], strict=False)]
+        tr_list = [
+            max(h - l, abs(h - c_prev), abs(l - c_prev))
+            for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1], strict=False)
+        ]
         atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (p_now * 0.03)
 
         # Skora göre yön belirleme

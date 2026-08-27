@@ -21,12 +21,13 @@ logger = structlog.get_logger()
 @dataclass
 class ScanResultRecord:
     """Tarama sonucu kaydı."""
+
     scan_id: str
-    scan_type: str          # batch, live, event, manual
+    scan_type: str  # batch, live, event, manual
     ticker: str
     score: float
-    signal: str             # MOMENTUM, BREAKOUT, VOLUME_ANOMALY, vb.
-    direction: str          # LONG, SHORT, NEUTRAL
+    signal: str  # MOMENTUM, BREAKOUT, VOLUME_ANOMALY, vb.
+    direction: str  # LONG, SHORT, NEUTRAL
     confidence: float
     tier: int
     regime: str
@@ -69,6 +70,7 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
@@ -128,36 +130,39 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO scan_results
                 (scan_id, scan_type, ticker, score, signal, direction,
                  confidence, tier, regime, price, volume, features_json, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                record.scan_id,
-                record.scan_type,
-                record.ticker,
-                record.score,
-                record.signal,
-                record.direction,
-                record.confidence,
-                record.tier,
-                record.regime,
-                record.price,
-                record.volume,
-                orjson.dumps(record.features or {}).decode(),
-                record.timestamp,
-            ))
+            """,
+                (
+                    record.scan_id,
+                    record.scan_type,
+                    record.ticker,
+                    record.score,
+                    record.signal,
+                    record.direction,
+                    record.confidence,
+                    record.tier,
+                    record.regime,
+                    record.price,
+                    record.volume,
+                    orjson.dumps(record.features or {}).decode(),
+                    record.timestamp,
+                ),
+            )
 
             conn.commit()
             conn.close()
 
         except Exception as e:
-            logger.error("Failed to save scan result",
-                        ticker=record.ticker, error=str(e))
+            logger.error("Failed to save scan result", ticker=record.ticker, error=str(e))
 
     def save_batch_results(
         self,
@@ -193,10 +198,7 @@ class ScanPersistence:
             )
             self.save_scan_result(record)
 
-        logger.info("Batch scan results saved",
-                    scan_type=scan_type,
-                    count=len(results),
-                    scan_id=scan_id)
+        logger.info("Batch scan results saved", scan_type=scan_type, count=len(results), scan_id=scan_id)
 
     def get_scan_history(
         self,
@@ -218,17 +220,21 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT * FROM scan_results
                 WHERE ticker = ? AND timestamp > ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (ticker, cutoff, limit))
+            """,
+                (ticker, cutoff, limit),
+            )
 
             rows = cursor.fetchall()
             conn.close()
@@ -236,8 +242,7 @@ class ScanPersistence:
             return [dict(row) for row in rows]
 
         except Exception as e:
-            logger.error("Failed to get scan history",
-                        ticker=ticker, error=str(e))
+            logger.error("Failed to get scan history", ticker=ticker, error=str(e))
             return []
 
     def get_scan_stats(
@@ -258,13 +263,15 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             if scan_type:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COUNT(*) as total,
                            COUNT(DISTINCT ticker) as unique_tickers,
                            AVG(score) as avg_score,
@@ -272,9 +279,12 @@ class ScanPersistence:
                            COUNT(CASE WHEN signal != '' THEN 1 END) as signals
                     FROM scan_results
                     WHERE scan_type = ? AND timestamp > ?
-                """, (scan_type, cutoff))
+                """,
+                    (scan_type, cutoff),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COUNT(*) as total,
                            COUNT(DISTINCT ticker) as unique_tickers,
                            AVG(score) as avg_score,
@@ -282,7 +292,9 @@ class ScanPersistence:
                            COUNT(CASE WHEN signal != '' THEN 1 END) as signals
                     FROM scan_results
                     WHERE timestamp > ?
-                """, (cutoff,))
+                """,
+                    (cutoff,),
+                )
 
             row = cursor.fetchone()
             conn.close()
@@ -321,6 +333,7 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
@@ -328,19 +341,25 @@ class ScanPersistence:
 
             # Yüksek skorlu sinyaller
             if scan_type:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT ticker, score, signal, direction, timestamp
                     FROM scan_results
                     WHERE scan_type = ? AND timestamp > ? AND score >= ?
                     ORDER BY timestamp DESC
-                """, (scan_type, cutoff, min_score))
+                """,
+                    (scan_type, cutoff, min_score),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT ticker, score, signal, direction, timestamp
                     FROM scan_results
                     WHERE timestamp > ? AND score >= ?
                     ORDER BY timestamp DESC
-                """, (cutoff, min_score))
+                """,
+                    (cutoff, min_score),
+                )
 
             high_score_signals = cursor.fetchall()
 
@@ -388,12 +407,14 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT ticker,
                        COUNT(*) as scan_count,
                        AVG(score) as avg_score,
@@ -404,18 +425,23 @@ class ScanPersistence:
                 GROUP BY ticker
                 ORDER BY scan_count DESC
                 LIMIT ?
-            """, (cutoff, limit))
+            """,
+                (cutoff, limit),
+            )
 
             rows = cursor.fetchall()
             conn.close()
 
-            return [{
-                "ticker": row[0],
-                "scan_count": row[1],
-                "avg_score": round(row[2], 2),
-                "max_score": round(row[3], 2),
-                "signal_count": row[4],
-            } for row in rows]
+            return [
+                {
+                    "ticker": row[0],
+                    "scan_count": row[1],
+                    "avg_score": round(row[2], 2),
+                    "max_score": round(row[3], 2),
+                    "signal_count": row[4],
+                }
+                for row in rows
+            ]
 
         except Exception as e:
             logger.error("Failed to get top scanned tickers", error=str(e))
@@ -431,6 +457,7 @@ class ScanPersistence:
 
         try:
             import duckdb
+
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
@@ -442,8 +469,7 @@ class ScanPersistence:
             conn.commit()
             conn.close()
 
-            logger.info("Old scan records cleaned up",
-                       deleted=deleted, older_than_days=days)
+            logger.info("Old scan records cleaned up", deleted=deleted, older_than_days=days)
 
         except Exception as e:
             logger.error("Failed to cleanup old records", error=str(e))

@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class ProcessedNews:
     """İşlenmiş haber."""
+
     news_id: str
     timestamp: datetime
     source: str
@@ -119,9 +120,7 @@ class NewsPipeline:
             title="",
         )
 
-    def _compute_world_delta(
-        self, event_type: str, sentiment: float, importance: float
-    ) -> dict[str, float]:
+    def _compute_world_delta(self, event_type: str, sentiment: float, importance: float) -> dict[str, float]:
         """World state değişimini hesapla."""
         delta = {}
 
@@ -137,6 +136,7 @@ class NewsPipeline:
             delta["global_risk_appetite"] = -0.15 * importance
 
         return delta
+
 
 # Singleton
 news_pipeline = NewsPipeline()

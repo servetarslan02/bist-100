@@ -10,11 +10,12 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 print("=" * 85)
 print("ALPHA BIST — TÜM ALTERNATİF VERİ, HABER, SOSYAL MEDYA VE MAKRO AKIŞI KANITI")
 print("=" * 85)
+
 
 async def test_all_streams():
     # -------------------------------------------------------------
@@ -22,6 +23,7 @@ async def test_all_streams():
     # -------------------------------------------------------------
     print("\n[1. KAYNAK] Canlı KAP Bildirimleri ve Finans Haber Akışı (RSS & NLP)...")
     from services.ingestion.providers.news_provider import NewsProvider
+
     news_prov = NewsProvider()
 
     # 5 popüler hisse için haber taraması
@@ -40,6 +42,7 @@ async def test_all_streams():
     # -------------------------------------------------------------
     print("\n[2. KAYNAK] Canlı Sosyal Medya & Topluluk İlgisi (StockTwits & Ekşi & X)...")
     from services.ingestion.providers.social_provider import SocialProvider
+
     social_prov = SocialProvider()
 
     # StockTwits THYAO & ASELS
@@ -48,9 +51,11 @@ async def test_all_streams():
         if msgs:
             bullish = sum(1 for m in msgs if m.get("sentiment", 0) > 0)
             bearish = sum(1 for m in msgs if m.get("sentiment", 0) < 0)
-            print(f"  ✓ {tk:<6} -> Sosyal Mesaj Sayısı: {len(msgs)} | Boğa (Bullish): {bullish} | Ayı (Bearish): {bearish}")
+            print(
+                f"  ✓ {tk:<6} -> Sosyal Mesaj Sayısı: {len(msgs)} | Boğa (Bullish): {bullish} | Ayı (Bearish): {bearish}"
+            )
             if msgs:
-                print(f"         └─ Son Mesaj: \"{msgs[0].get('content', '')[:65]}...\"")
+                print(f'         └─ Son Mesaj: "{msgs[0].get("content", "")[:65]}..."')
         else:
             print(f"  ✓ {tk:<6} -> Sosyal Akış Aktif (Doğrulandı)")
 
@@ -67,13 +72,16 @@ async def test_all_streams():
         pe_ratio = getattr(info, "pe_ratio", None) or 7.8
         mcap = getattr(info, "market_cap", None) or 400_000_000_000
         clean_sym = sym.replace(".IS", "")
-        print(f"  ✓ {clean_sym:<6} -> Piyasa Değeri: ₺{mcap/1e9:,.1f} Milyar | F/K Proxy: {pe_ratio:.1f} | 52H Yüksek: ₺{info.year_high:.2f} | 52H Düşük: ₺{info.year_low:.2f}")
+        print(
+            f"  ✓ {clean_sym:<6} -> Piyasa Değeri: ₺{mcap / 1e9:,.1f} Milyar | F/K Proxy: {pe_ratio:.1f} | 52H Yüksek: ₺{info.year_high:.2f} | 52H Düşük: ₺{info.year_low:.2f}"
+        )
 
     # -------------------------------------------------------------
     # 4. KÜRESEL MAKRO & TCMB EVDS VERİLERİ (MACRO PROVIDER)
     # -------------------------------------------------------------
     print("\n[4. KAYNAK] Küresel Makro Veriler & TCMB Para Politikası Göstergeleri...")
     from services.ingestion.providers.macro_provider import MacroProvider
+
     macro_prov = MacroProvider()
     macro_data = await macro_prov.fetch_yahoo_macro()
 
@@ -109,6 +117,7 @@ async def test_all_streams():
     print("\n" + "=" * 85)
     print("TÜM VERİ AKIŞLARI (KAP, HABER, SOSYAL MEDYA, BİLANÇO, MAKRO) AKTİF VE BAĞLIDIR.")
     print("=" * 85)
+
 
 if __name__ == "__main__":
     asyncio.run(test_all_streams())

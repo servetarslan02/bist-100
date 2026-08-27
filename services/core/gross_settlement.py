@@ -18,8 +18,8 @@ logger = structlog.get_logger()
 @dataclass
 class GrossSettlementStatus:
     is_gross: bool
-    effect: str = ""        # "NO_SHORT_SELL", "T_PLUS_0", "NONE"
-    impact: str = ""        # Etki açıklaması
+    effect: str = ""  # "NO_SHORT_SELL", "T_PLUS_0", "NONE"
+    impact: str = ""  # Etki açıklaması
     details: dict[str, Any] = None
 
     def __post_init__(self):

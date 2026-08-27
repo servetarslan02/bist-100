@@ -47,18 +47,18 @@ class ModelPersistence:
             return None
 
         # Model metadata çıkar
-        feature_names = getattr(model_obj, 'feature_names', [])
-        cs_features = getattr(model_obj, 'cs_features', [])
-        validation_metrics = getattr(model_obj, 'validation_metrics', {})
-        confidence_score = getattr(model_obj, 'confidence_score', 0)
-        confidence_details = getattr(model_obj, 'confidence_details', {})
-        target_horizon = getattr(model_obj, 'target_horizon', 5)
-        train_samples = getattr(model_obj, 'train_samples', 0)
-        getattr(model_obj, 'train_date_range', ('', ''))
-        getattr(model_obj, 'scaler_mean', None)
-        getattr(model_obj, 'scaler_std', None)
-        getattr(model_obj, 'impute_values', {})
-        getattr(model_obj, 'feature_importance', {})
+        feature_names = getattr(model_obj, "feature_names", [])
+        cs_features = getattr(model_obj, "cs_features", [])
+        validation_metrics = getattr(model_obj, "validation_metrics", {})
+        confidence_score = getattr(model_obj, "confidence_score", 0)
+        confidence_details = getattr(model_obj, "confidence_details", {})
+        target_horizon = getattr(model_obj, "target_horizon", 5)
+        train_samples = getattr(model_obj, "train_samples", 0)
+        getattr(model_obj, "train_date_range", ("", ""))
+        getattr(model_obj, "scaler_mean", None)
+        getattr(model_obj, "scaler_std", None)
+        getattr(model_obj, "impute_values", {})
+        getattr(model_obj, "feature_importance", {})
 
         # Feature contract hash
         contract_hash = hashlib.sha256(
@@ -67,15 +67,14 @@ class ModelPersistence:
 
         try:
             # Model kaydı var mı?
-            model_id = await pg_fetchval(
-                "SELECT id FROM models WHERE name = $1", model_name
-            )
+            model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", model_name)
             if model_id is None:
                 model_id = await pg_fetchval(
                     """INSERT INTO models (name, model_type, framework, features, status)
                        VALUES ($1, 'lightgbm_ranking', 'lightgbm', $2, 'ACTIVE')
                        RETURNING id""",
-                    model_name, orjson.dumps(feature_names).decode()
+                    model_name,
+                    orjson.dumps(feature_names).decode(),
                 )
 
             # Version kaydet (upsert)
@@ -92,19 +91,28 @@ class ModelPersistence:
                     confidence_details = EXCLUDED.confidence_details,
                     artifact_path = EXCLUDED.artifact_path
                    RETURNING id""",
-                model_id, version,
-                training_data_start, training_data_end,
+                model_id,
+                version,
+                training_data_start,
+                training_data_end,
                 target_horizon,
-                orjson.dumps(feature_names), orjson.dumps(cs_features).decode(),
-                confidence_score, orjson.dumps(confidence_details).decode(),
+                orjson.dumps(feature_names),
+                orjson.dumps(cs_features).decode(),
+                confidence_score,
+                orjson.dumps(confidence_details).decode(),
                 orjson.dumps(validation_metrics, default=str).decode(),
-                artifact_path
+                artifact_path,
             )
 
-            logger.info("Model metadata saved",
-                       model=model_name, version=version,
-                       horizon=target_horizon, samples=train_samples,
-                       confidence=confidence_score, contract=contract_hash)
+            logger.info(
+                "Model metadata saved",
+                model=model_name,
+                version=version,
+                horizon=target_horizon,
+                samples=train_samples,
+                confidence=confidence_score,
+                contract=contract_hash,
+            )
 
             return version_id
 
@@ -127,7 +135,7 @@ class ModelPersistence:
                    JOIN models m ON m.id = mv.model_id
                    WHERE m.name = $1 AND mv.status = 'CHAMPION'
                    ORDER BY mv.created_at DESC LIMIT 1""",
-                model_name
+                model_name,
             )
             if row:
                 return dict(row)
@@ -145,9 +153,7 @@ class ModelPersistence:
             return False
 
         try:
-            model_id = await pg_fetchval(
-                "SELECT id FROM models WHERE name = $1", model_name
-            )
+            model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", model_name)
             if model_id is None:
                 return False
 
@@ -155,14 +161,15 @@ class ModelPersistence:
             await pg_execute(
                 """UPDATE model_versions SET status = 'CANDIDATE'
                    WHERE model_id = $1 AND status = 'CHAMPION'""",
-                model_id
+                model_id,
             )
 
             # Yeni champion
             await pg_execute(
                 """UPDATE model_versions SET status = 'CHAMPION', champion_since = NOW()
                    WHERE model_id = $1 AND version = $2""",
-                model_id, version
+                model_id,
+                version,
             )
 
             logger.info("Model promoted to champion", model=model_name, version=version)
@@ -189,7 +196,8 @@ class ModelPersistence:
                    WHERE m.name = $1
                    ORDER BY mv.created_at DESC
                    LIMIT $2""",
-                model_name, limit
+                model_name,
+                limit,
             )
             return [dict(r) for r in rows]
         except Exception as e:

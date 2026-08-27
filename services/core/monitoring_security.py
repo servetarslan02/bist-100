@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class AuthConfig:
     """Authentication yapılandırması."""
+
     metrics_token: str = ""
     admin_token: str = ""
     enabled: bool = True
@@ -43,13 +44,9 @@ class MonitoringAuth:
 
         # Token'ları environment'dan yükle
         if not self._config.metrics_token:
-            self._config.metrics_token = os.environ.get(
-                "ALPHA_METRICS_TOKEN", "alpha_metrics_default_2026"
-            )
+            self._config.metrics_token = os.environ.get("ALPHA_METRICS_TOKEN", "alpha_metrics_default_2026")
         if not self._config.admin_token:
-            self._config.admin_token = os.environ.get(
-                "ALPHA_ADMIN_TOKEN", "alpha_admin_default_2026"
-            )
+            self._config.admin_token = os.environ.get("ALPHA_ADMIN_TOKEN", "alpha_admin_default_2026")
 
         # Default token uyarısı
         if self._config.metrics_token == "alpha_metrics_default_2026":
@@ -78,9 +75,7 @@ class MonitoringAuth:
             self._rate_limiter[client_ip] = []
 
         # Eski istekleri temizle
-        self._rate_limiter[client_ip] = [
-            t for t in self._rate_limiter[client_ip] if t > window_start
-        ]
+        self._rate_limiter[client_ip] = [t for t in self._rate_limiter[client_ip] if t > window_start]
 
         if len(self._rate_limiter[client_ip]) >= self._config.rate_limit_per_minute:
             logger.warning("Rate limit exceeded", client_ip=client_ip)
@@ -93,9 +88,7 @@ class MonitoringAuth:
         """Başarısız girişimi kaydet."""
         self._failed_attempts[client_ip] = self._failed_attempts.get(client_ip, 0) + 1
         if self._failed_attempts[client_ip] > 10:
-            logger.warning("Multiple failed auth attempts",
-                         client_ip=client_ip,
-                         count=self._failed_attempts[client_ip])
+            logger.warning("Multiple failed auth attempts", client_ip=client_ip, count=self._failed_attempts[client_ip])
 
     def get_auth_status(self) -> dict[str, Any]:
         """Authentication durumu."""
@@ -136,6 +129,7 @@ def extract_api_key(headers: dict) -> str | None:
 # EXTENSIBLE AUTH INTERFACE
 # =====================================================
 
+
 class AuthProvider:
     """Extensible auth provider interface.
 
@@ -157,6 +151,7 @@ class AuthProvider:
 @dataclass
 class AuthResult:
     """Auth sonucu."""
+
     authenticated: bool
     user_id: str = ""
     roles: list[str] = field(default_factory=list)
@@ -198,10 +193,16 @@ class JWTProvider(AuthProvider):
     - Role extraction
     """
 
-    def __init__(self, secret: str = "", algorithm: str = "HS256",
-                 issuer: str = "", audience: str = "",
-                 role_claim: str = "roles",
-                 jwks_url: str = "", jwks_cache_ttl_s: int = 3600):
+    def __init__(
+        self,
+        secret: str = "",
+        algorithm: str = "HS256",
+        issuer: str = "",
+        audience: str = "",
+        role_claim: str = "roles",
+        jwks_url: str = "",
+        jwks_cache_ttl_s: int = 3600,
+    ):
         self._secret = secret
         self._algorithm = algorithm
         self._issuer = issuer
@@ -229,7 +230,8 @@ class JWTProvider(AuthProvider):
             key = await self._get_key(token, pyjwt)
 
             payload = pyjwt.decode(
-                token, key,
+                token,
+                key,
                 algorithms=[self._algorithm],
                 issuer=self._issuer if self._issuer else None,
                 audience=self._audience if self._audience else None,
@@ -280,10 +282,14 @@ class JWTProvider(AuthProvider):
 
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session, session.get(
-                self._jwks_url,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
+
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    self._jwks_url,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp,
+            ):
                 if resp.status == 200:
                     jwks = await resp.json()
                     for key in jwks.get("keys", []):
@@ -302,16 +308,19 @@ class OAuthProvider(AuthProvider):
     JWT validation + role-based authorization.
     """
 
-    def __init__(self, issuer: str = "", audience: str = "",
-                 jwks_url: str = "", secret: str = "",
-                 role_claim: str = "roles"):
+    def __init__(
+        self, issuer: str = "", audience: str = "", jwks_url: str = "", secret: str = "", role_claim: str = "roles"
+    ):
         self._issuer = issuer
         self._audience = audience
         self._jwks_url = jwks_url
         self._secret = secret
         self._role_claim = role_claim
         self._jwt_provider = JWTProvider(
-            secret=secret, issuer=issuer, audience=audience, role_claim=role_claim,
+            secret=secret,
+            issuer=issuer,
+            audience=audience,
+            role_claim=role_claim,
         )
 
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
@@ -359,9 +368,12 @@ class AuthManager:
             if permission in perms or "admin" in perms:
                 return result
 
-        return AuthResult(authenticated=True, user_id=result.user_id,
-                         roles=result.roles,
-                         error=f"Permission denied: {permission} (roles: {result.roles})")
+        return AuthResult(
+            authenticated=True,
+            user_id=result.user_id,
+            roles=result.roles,
+            error=f"Permission denied: {permission} (roles: {result.roles})",
+        )
 
     def get_providers(self) -> list[str]:
         return [p.name() for p in self._providers]

@@ -17,6 +17,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 class CrossSectionalFeatures:
     """Cross-sectional feature hesaplama."""
 
@@ -147,6 +148,7 @@ class CrossSectionalFeatures:
             "peer_correlation_dispersion": round(np.std(correlations), 4),
         }
 
+
 class TemporalFeatures:
     """Temporal (zaman serisi) feature'lar."""
 
@@ -205,8 +207,16 @@ class TemporalFeatures:
         recent_returns = returns[-window:]
 
         return {
-            "return_skewness": round(float(np.mean((recent_returns - np.mean(recent_returns))**3) / np.std(recent_returns)**3), 4) if np.std(recent_returns) > 0 else 0,
-            "return_kurtosis": round(float(np.mean((recent_returns - np.mean(recent_returns))**4) / np.std(recent_returns)**4), 4) if np.std(recent_returns) > 0 else 0,
+            "return_skewness": round(
+                float(np.mean((recent_returns - np.mean(recent_returns)) ** 3) / np.std(recent_returns) ** 3), 4
+            )
+            if np.std(recent_returns) > 0
+            else 0,
+            "return_kurtosis": round(
+                float(np.mean((recent_returns - np.mean(recent_returns)) ** 4) / np.std(recent_returns) ** 4), 4
+            )
+            if np.std(recent_returns) > 0
+            else 0,
             "max_consecutive_up": self._max_consecutive(returns[-window:] > 0),
             "max_consecutive_down": self._max_consecutive(returns[-window:] < 0),
         }
@@ -222,6 +232,7 @@ class TemporalFeatures:
             else:
                 current = 0
         return max_count
+
 
 # Singleton
 cross_sectional_features = CrossSectionalFeatures()

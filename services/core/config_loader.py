@@ -148,7 +148,7 @@ class ConfigLoader:
                 continue
 
             # ALPHA_APP_PORT → app.port
-            config_key = key[len(self._env_prefix):].lower().replace("_", ".")
+            config_key = key[len(self._env_prefix) :].lower().replace("_", ".")
 
             # Tip dönüşümü
             converted = self._convert_value(value)

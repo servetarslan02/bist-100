@@ -29,13 +29,14 @@ logger = structlog.get_logger()
 @dataclass
 class PITRecord:
     """Point-in-time veri kaydı."""
+
     data_id: str
     ticker: str
-    report_date: datetime      # Rapor dönemi (örn: 2024-Q3)
-    publish_date: datetime     # Gerçek yayın tarihi
-    data_type: str             # fundamental | price | news | macro
+    report_date: datetime  # Rapor dönemi (örn: 2024-Q3)
+    publish_date: datetime  # Gerçek yayın tarihi
+    data_type: str  # fundamental | price | news | macro
     revision_version: int = 1  # Revizyon numarası
-    is_original: bool = True   # İlk yayınlanan mı?
+    is_original: bool = True  # İlk yayınlanan mı?
 
     @property
     def lag_days(self) -> int:
@@ -58,6 +59,7 @@ class PITRecord:
 @dataclass
 class PITViolation:
     """PIT ihlali."""
+
     violation_type: str  # future_data | revision_leakage | timing_error
     severity: str  # critical | warning | info
     description: str
@@ -76,6 +78,7 @@ class PITViolation:
 @dataclass
 class PITValidationReport:
     """PIT doğrulama raporu."""
+
     total_records: int = 0
     violations: list[PITViolation] = field(default_factory=list)
     critical_count: int = 0
@@ -161,13 +164,15 @@ class PointInTimeValidator:
         details: dict[str, Any],
     ):
         """Kurumsal işlem (temettü, bölünme vb.) kaydı oluştur."""
-        self._corporate_actions.append({
-            "ticker": ticker,
-            "action_type": action_type,
-            "ex_date": ex_date,
-            "record_date": record_date,
-            "details": details,
-        })
+        self._corporate_actions.append(
+            {
+                "ticker": ticker,
+                "action_type": action_type,
+                "ex_date": ex_date,
+                "record_date": record_date,
+                "details": details,
+            }
+        )
         if len(self._corporate_actions) > 500:
             self._corporate_actions = self._corporate_actions[-500:]
 
@@ -204,9 +209,7 @@ class PointInTimeValidator:
 
         Revizyon varsa, o ana kadar yayınlanmış en güncel revizyonu döndürür.
         """
-        fundamentals = self.get_available_data_at(
-            ticker, decision_time, "fundamental"
-        )
+        fundamentals = self.get_available_data_at(ticker, decision_time, "fundamental")
 
         if not fundamentals:
             return None
@@ -239,9 +242,7 @@ class PointInTimeValidator:
         # İlgili kaydı bul
         target = None
         for r in records:
-            if (r.report_date == report_date and
-                r.revision_version == revision_version and
-                r.data_type == "fundamental"):
+            if r.report_date == report_date and r.revision_version == revision_version and r.data_type == "fundamental":
                 target = r
                 break
 
@@ -259,7 +260,7 @@ class PointInTimeValidator:
                 violation_type="future_data",
                 severity="critical",
                 description=f"Accessing unpublished data: {ticker} {report_date} v{revision_version}. "
-                           f"Published: {target.publish_date}, Decision: {decision_time}",
+                f"Published: {target.publish_date}, Decision: {decision_time}",
                 record=target,
                 decision_time=decision_time,
             )
@@ -268,9 +269,7 @@ class PointInTimeValidator:
         if revision_version > 1:
             original = None
             for r in records:
-                if (r.report_date == report_date and
-                    r.revision_version == 1 and
-                    r.data_type == "fundamental"):
+                if r.report_date == report_date and r.revision_version == 1 and r.data_type == "fundamental":
                     original = r
                     break
 
@@ -279,7 +278,7 @@ class PointInTimeValidator:
                     violation_type="revision_leakage",
                     severity="critical",
                     description=f"Original data not yet published at decision time. "
-                               f"Cannot use revision v{revision_version} before original.",
+                    f"Cannot use revision v{revision_version} before original.",
                     record=target,
                     decision_time=decision_time,
                 )
@@ -310,11 +309,13 @@ class PointInTimeValidator:
         report = PITValidationReport()
 
         if timestamp_col not in feature_df.columns:
-            report.add_violation(PITViolation(
-                violation_type="timing_error",
-                severity="critical",
-                description=f"Timestamp column '{timestamp_col}' not found",
-            ))
+            report.add_violation(
+                PITViolation(
+                    violation_type="timing_error",
+                    severity="critical",
+                    description=f"Timestamp column '{timestamp_col}' not found",
+                )
+            )
             return report
 
         # Gelecek veri kontrolü
@@ -323,14 +324,16 @@ class PointInTimeValidator:
 
         if future_mask.any():
             future_count = future_mask.sum()
-            report.add_violation(PITViolation(
-                violation_type="future_data",
-                severity="critical",
-                description=f"Feature set contains {future_count} rows with future data. "
-                           f"Decision time: {decision_time}, "
-                           f"Max timestamp: {feature_df[timestamp_col].max()}",
-                decision_time=decision_time,
-            ))
+            report.add_violation(
+                PITViolation(
+                    violation_type="future_data",
+                    severity="critical",
+                    description=f"Feature set contains {future_count} rows with future data. "
+                    f"Decision time: {decision_time}, "
+                    f"Max timestamp: {feature_df[timestamp_col].max()}",
+                    decision_time=decision_time,
+                )
+            )
 
         # NaN pattern kontrolü (gelecekteki feature'lar NaN olmalı)
         for col in feature_cols:
@@ -340,12 +343,14 @@ class PointInTimeValidator:
                 if len(recent) > 0:
                     nan_ratio = recent[col].isna().mean()
                     if nan_ratio > 0.5:
-                        report.add_violation(PITViolation(
-                            violation_type="timing_error",
-                            severity="warning",
-                            description=f"Feature '{col}' has {nan_ratio:.0%} NaN in recent data. "
-                                       f"May indicate data availability issue.",
-                        ))
+                        report.add_violation(
+                            PITViolation(
+                                violation_type="timing_error",
+                                severity="warning",
+                                description=f"Feature '{col}' has {nan_ratio:.0%} NaN in recent data. "
+                                f"May indicate data availability issue.",
+                            )
+                        )
 
         return report
 
@@ -372,9 +377,9 @@ class PointInTimeValidator:
                 violation_type="timing_error",
                 severity="critical",
                 description=f"Label generated too early. "
-                           f"Gap: {actual_gap.days} days, "
-                           f"Required: {min_gap.days} days "
-                           f"(purge={purge_days} + horizon={label_horizon_days})",
+                f"Gap: {actual_gap.days} days, "
+                f"Required: {min_gap.days} days "
+                f"(purge={purge_days} + horizon={label_horizon_days})",
             )
 
         return True, None
@@ -412,13 +417,15 @@ class PITDataAdapter:
         """Temel veri DataFrame'ini PIT kayıtlarına dönüştür."""
         records = []
         for _, row in df.iterrows():
-            records.append(PITRecord(
-                data_id=f"{row[ticker_col]}_{row[report_date_col]}",
-                ticker=row[ticker_col],
-                report_date=pl.Series(row[report_date_col]),
-                publish_date=pl.Series(row.get(publish_date_col, row[report_date_col])),
-                data_type="fundamental",
-            ))
+            records.append(
+                PITRecord(
+                    data_id=f"{row[ticker_col]}_{row[report_date_col]}",
+                    ticker=row[ticker_col],
+                    report_date=pl.Series(row[report_date_col]),
+                    publish_date=pl.Series(row.get(publish_date_col, row[report_date_col])),
+                    data_type="fundamental",
+                )
+            )
         return records
 
     @staticmethod
@@ -432,13 +439,15 @@ class PITDataAdapter:
         for _, row in df.iterrows():
             # Fiyat verisi genellikle aynı gün bilinebilir
             date = pl.Series(row[date_col])
-            records.append(PITRecord(
-                data_id=f"{row[ticker_col]}_price_{date.strftime('%Y%m%d')}",
-                ticker=row[ticker_col],
-                report_date=date,
-                publish_date=date,  # Fiyat aynı gün bilinir
-                data_type="price",
-            ))
+            records.append(
+                PITRecord(
+                    data_id=f"{row[ticker_col]}_price_{date.strftime('%Y%m%d')}",
+                    ticker=row[ticker_col],
+                    report_date=date,
+                    publish_date=date,  # Fiyat aynı gün bilinir
+                    data_type="price",
+                )
+            )
         return records
 
 

@@ -20,7 +20,7 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     if yf_df is None or len(yf_df) == 0:
         return pl.DataFrame()
     df = yf_df.reset_index()
-    if isinstance(df.columns, __import__('pandas').MultiIndex):
+    if isinstance(df.columns, __import__("pandas").MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return pl.from_pandas(df)
 
@@ -29,6 +29,7 @@ def _detect_gpu_cuda():
     """Detect NVIDIA GPU CUDA capability."""
     try:
         import torch
+
         if torch.cuda.is_available():
             return True, torch.cuda.get_device_name(0)
     except Exception:
@@ -42,24 +43,30 @@ class AlphaEngine:
         self.has_gpu = has_gpu
         self.gpu_device_name = dev_name
         self.params = {
-            "objective": "regression", "metric": "rmse",
-            "n_estimators": 100, "learning_rate": 0.05,
-            "max_depth": 3, "num_leaves": 7, "verbose": -1, "n_jobs": -1,
+            "objective": "regression",
+            "metric": "rmse",
+            "n_estimators": 100,
+            "learning_rate": 0.05,
+            "max_depth": 3,
+            "num_leaves": 7,
+            "verbose": -1,
+            "n_jobs": -1,
         }
         if self.has_gpu:
             logger.info("AlphaEngine configured with GPU acceleration", device=self.gpu_device_name)
         self.model = None
         self.features = []
 
-        default_bad_features = [
-            'momentum_accel', 'roc_120d', 'dist_sma200',
-            'cs_zscore_ret_1d', 'roc_5d'
-        ]
+        default_bad_features = ["momentum_accel", "roc_120d", "dist_sma200", "cs_zscore_ret_1d", "roc_5d"]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
     def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None):
         if tickers is None:
-            tickers = bist_universe.BIST_100_TICKERS if hasattr(bist_universe, 'BIST_100_TICKERS') and bist_universe.BIST_100_TICKERS else bist_universe.BIST_ALL_TICKERS[:100]
+            tickers = (
+                bist_universe.BIST_100_TICKERS
+                if hasattr(bist_universe, "BIST_100_TICKERS") and bist_universe.BIST_100_TICKERS
+                else bist_universe.BIST_ALL_TICKERS[:100]
+            )
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
 
         market_data: dict[str, pl.DataFrame] = {}
@@ -67,14 +74,18 @@ class AlphaEngine:
         try:
             raw = yf.download(
                 tickers=" ".join(download_tickers),
-                start=start_date, end=end_date,
-                group_by="ticker", auto_adjust=True, progress=False, threads=True,
+                start=start_date,
+                end=end_date,
+                group_by="ticker",
+                auto_adjust=True,
+                progress=False,
+                threads=True,
             )
             if raw is not None and len(raw) > 0:
                 for t in tickers:
                     tick_sym = f"{t}.IS"
                     try:
-                        if isinstance(raw.columns, __import__('pandas').MultiIndex):
+                        if isinstance(raw.columns, __import__("pandas").MultiIndex):
                             if tick_sym in raw.columns.levels[0]:
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if len(df_t) >= 10:
@@ -124,16 +135,12 @@ class AlphaEngine:
             snap_md = {}
             for t, df in market_data.items():
                 if "Date" in df.columns:
-                    sub_df = df.filter(
-                        (pl.col("Date") >= train_start) & (pl.col("Date") <= t_snap)
-                    )
+                    sub_df = df.filter((pl.col("Date") >= train_start) & (pl.col("Date") <= t_snap))
                     if len(sub_df) >= 120:
                         snap_md[t] = sub_df
 
             if "Date" in bm_df.columns:
-                snap_bm = bm_df.filter(
-                    (pl.col("Date") >= train_start) & (pl.col("Date") <= t_snap)
-                )
+                snap_bm = bm_df.filter((pl.col("Date") >= train_start) & (pl.col("Date") <= t_snap))
             else:
                 snap_bm = bm_df
             if len(snap_bm) < 120:
@@ -151,16 +158,12 @@ class AlphaEngine:
 
                 df_t = market_data[ticker]
                 if "Date" in df_t.columns:
-                    df_fwd = df_t.filter(
-                        (pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd)
-                    )
+                    df_fwd = df_t.filter((pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd))
                 else:
                     df_fwd = df_t
 
                 if "Date" in bm_df.columns:
-                    bm_fwd = bm_df.filter(
-                        (pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd)
-                    )
+                    bm_fwd = bm_df.filter((pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd))
                 else:
                     bm_fwd = bm_df
 
@@ -193,8 +196,8 @@ class AlphaEngine:
         return X, y, all_keys
 
     def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True):
-        t_start = datetime.datetime.strptime(train_start_str, '%Y-%m-%d')
-        t_end = datetime.datetime.strptime(train_end_str, '%Y-%m-%d')
+        t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
+        t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
 
         if len(X) == 0:
@@ -205,10 +208,13 @@ class AlphaEngine:
 
         if optimize:
             from services.ml.hyper_optimizer import HyperOptimizer
+
             optimizer = HyperOptimizer(n_trials=20)
             best_params = optimizer.optimize(X, y, feature_names)
             self.params.update(best_params)
-            logger.info(f"Optuna params: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}")
+            logger.info(
+                f"Optuna params: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}"
+            )
 
         train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         train_params = dict(self.params)
@@ -227,22 +233,18 @@ class AlphaEngine:
         if not self.model:
             raise ValueError("Model not trained")
 
-        target_date = datetime.datetime.strptime(target_date_str, '%Y-%m-%d')
+        target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d")
         start_date_dt = target_date - datetime.timedelta(days=400)
 
         snap_md = {}
         for t, df in market_data.items():
             if "Date" in df.columns:
-                sub_df = df.filter(
-                    (pl.col("Date") >= start_date_dt) & (pl.col("Date") <= target_date)
-                )
+                sub_df = df.filter((pl.col("Date") >= start_date_dt) & (pl.col("Date") <= target_date))
                 if len(sub_df) >= 120:
                     snap_md[t] = sub_df
 
         if "Date" in bm_df.columns:
-            snap_bm = bm_df.filter(
-                (pl.col("Date") >= start_date_dt) & (pl.col("Date") <= target_date)
-            )
+            snap_bm = bm_df.filter((pl.col("Date") >= start_date_dt) & (pl.col("Date") <= target_date))
         else:
             snap_bm = bm_df
         if len(snap_bm) < 120:
@@ -273,8 +275,10 @@ class AlphaEngine:
         try:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
             payload = {
-                "model": self.model, "features": self.features,
-                "params": self.params, "exclude_features": self.exclude_features,
+                "model": self.model,
+                "features": self.features,
+                "params": self.params,
+                "exclude_features": self.exclude_features,
                 "trained_at": datetime.datetime.now(datetime.UTC).isoformat(),
                 "feature_hash": hashlib.sha256("|".join(sorted(self.features)).encode()).hexdigest()[:16],
             }
@@ -309,20 +313,20 @@ class AlphaEngine:
             return False
 
     def run_daily_pipeline(self, date: str):
-        end_date_dt = datetime.datetime.strptime(date, '%Y-%m-%d')
+        end_date_dt = datetime.datetime.strptime(date, "%Y-%m-%d")
         start_date_dt = end_date_dt - datetime.timedelta(days=400)
 
         if self._load_model():
             logger.info("Using cached AlphaEngine model")
         else:
             market_data, bm_df, sector_map = self.fetch_data(
-                start_date_dt.strftime('%Y-%m-%d'), end_date_dt.strftime('%Y-%m-%d')
+                start_date_dt.strftime("%Y-%m-%d"), end_date_dt.strftime("%Y-%m-%d")
             )
-            success = self.train(market_data, bm_df, sector_map, start_date_dt.strftime('%Y-%m-%d'), date)
+            success = self.train(market_data, bm_df, sector_map, start_date_dt.strftime("%Y-%m-%d"), date)
             if not success:
                 return None
 
         market_data, bm_df, sector_map = self.fetch_data(
-            start_date_dt.strftime('%Y-%m-%d'), end_date_dt.strftime('%Y-%m-%d')
+            start_date_dt.strftime("%Y-%m-%d"), end_date_dt.strftime("%Y-%m-%d")
         )
         return self.predict(market_data, bm_df, sector_map, date)

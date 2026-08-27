@@ -26,13 +26,17 @@ import numpy as np
 
 try:
     from scipy.stats import norm
+
     _norm_cdf = norm.cdf
     _norm_pdf = norm.pdf
 except (ImportError, Exception):
+
     def _norm_cdf(x):
         return 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
+
     def _norm_pdf(x):
         return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * float(x) * float(x))
+
 
 import structlog
 
@@ -43,8 +47,8 @@ logger = structlog.get_logger()
 # 1. BLACK-SCHOLES PRICING
 # =====================================================
 
-def black_scholes(S: float, K: float, T: float, r: float, sigma: float,
-                  option_type: str = "call") -> float:
+
+def black_scholes(S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call") -> float:
     """Black-Scholes opsiyon fiyatlaması.
 
     Args:
@@ -92,8 +96,10 @@ def black_scholes(S: float, K: float, T: float, r: float, sigma: float,
 # 2. GREEKS
 # =====================================================
 
-def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
-                     option_type: str = "call") -> dict[str, float]:
+
+def calculate_greeks(
+    S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call"
+) -> dict[str, float]:
     """Opsiyon Greeks hesaplama.
 
     Returns:
@@ -118,13 +124,11 @@ def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
 
     if option_type == "call":
         delta = _norm_cdf(d1)
-        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T))
-                 - r * K * np.exp(-r * T) * _norm_cdf(d2)) / 365
+        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * _norm_cdf(d2)) / 365
         rho = K * T * np.exp(-r * T) * _norm_cdf(d2) / 100  # /100: %1 faiz değişimi etkisi
     else:
         delta = _norm_cdf(d1) - 1
-        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T))
-                 + r * K * np.exp(-r * T) * _norm_cdf(-d2)) / 365
+        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * _norm_cdf(-d2)) / 365
         rho = -K * T * np.exp(-r * T) * _norm_cdf(-d2) / 100  # /100: %1 faiz değişimi etkisi
 
     return {
@@ -139,6 +143,7 @@ def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
 # =====================================================
 # 3. IMPLIED VOLATILITY
 # =====================================================
+
 
 class ImpliedVolatility:
     """Implied volatility hesaplama (Newton-Raphson).
@@ -214,8 +219,17 @@ class ImpliedVolatility:
         # Bisection fallback (her zaman konverjan)
         return self._bisection(market_price, S, K, T, r, option_type, tolerance, max_iterations)
 
-    def _bisection(self, target_price: float, S: float, K: float, T: float,
-                   r: float, option_type: str, tolerance: float, max_iter: int) -> float:
+    def _bisection(
+        self,
+        target_price: float,
+        S: float,
+        K: float,
+        T: float,
+        r: float,
+        option_type: str,
+        tolerance: float,
+        max_iter: int,
+    ) -> float:
         """Bisection yöntemi — garantili konverjans."""
         sigma_low, sigma_high = 0.001, 5.0
 
@@ -260,12 +274,14 @@ class ImpliedVolatility:
                 r=r,
                 option_type=opt.get("option_type", "call"),
             )
-            results.append({
-                "strike": opt.get("K"),
-                "option_type": opt.get("option_type"),
-                "market_price": opt.get("market_price"),
-                "implied_vol": iv,
-            })
+            results.append(
+                {
+                    "strike": opt.get("K"),
+                    "option_type": opt.get("option_type"),
+                    "market_price": opt.get("market_price"),
+                    "implied_vol": iv,
+                }
+            )
         return results
 
 
@@ -273,9 +289,11 @@ class ImpliedVolatility:
 # 4. OPTIONS CHAIN
 # =====================================================
 
+
 @dataclass
 class OptionQuote:
     """Tek bir opsiyon kotasyonu."""
+
     strike: float
     expiry: date
     option_type: str  # "call" / "put"
@@ -337,7 +355,7 @@ class OptionsChain:
     def get_strikes(self, expiry: date | None = None) -> list[float]:
         """Mevcut strike'ları sıralı döndür."""
         strikes = set()
-        for (strike, exp, _) in self._quotes:
+        for strike, exp, _ in self._quotes:
             if expiry is None or exp == expiry:
                 strikes.add(strike)
         return sorted(strikes)
@@ -345,7 +363,7 @@ class OptionsChain:
     def get_expiries(self) -> list[date]:
         """Mevcut vadeleri sıralı döndür."""
         expiries = set()
-        for (_, exp, _) in self._quotes:
+        for _, exp, _ in self._quotes:
             expiries.add(exp)
         return sorted(expiries)
 
@@ -357,7 +375,7 @@ class OptionsChain:
         """
         calls = []
         puts = []
-        for (strike, exp, opt_type) in sorted(self._quotes.keys()):
+        for strike, exp, opt_type in sorted(self._quotes.keys()):
             if exp == expiry:
                 quote = self._quotes[(strike, exp, opt_type)]
                 if opt_type == "call":
@@ -378,13 +396,11 @@ class OptionsChain:
 
             # Fiyat yoksa BS ile hesapla
             if quote.last <= 0 and quote.mid <= 0:
-                price = black_scholes(self.spot_price, quote.strike, T,
-                                      self.risk_free_rate, vol, quote.option_type)
+                price = black_scholes(self.spot_price, quote.strike, T, self.risk_free_rate, vol, quote.option_type)
                 quote.last = round(price, 2)
 
             # Greeks hesapla
-            greeks = calculate_greeks(self.spot_price, quote.strike, T,
-                                      self.risk_free_rate, vol, quote.option_type)
+            greeks = calculate_greeks(self.spot_price, quote.strike, T, self.risk_free_rate, vol, quote.option_type)
             quote.delta = greeks["delta"]
             quote.gamma = greeks["gamma"]
             quote.theta = greeks["theta"]
@@ -408,11 +424,13 @@ class OptionsChain:
             call = self.get_quote(strike, expiry, "call")
             put = self.get_quote(strike, expiry, "put")
             if call and put:
-                pairs.append({
-                    "strike": strike,
-                    "call": call,
-                    "put": put,
-                })
+                pairs.append(
+                    {
+                        "strike": strike,
+                        "call": call,
+                        "put": put,
+                    }
+                )
         return pairs
 
 
@@ -420,9 +438,11 @@ class OptionsChain:
 # 5. PORTFOLIO GREEKS
 # =====================================================
 
+
 @dataclass
 class PortfolioGreeksResult:
     """Portföy Greeks sonucu."""
+
     total_delta: float
     total_gamma: float
     total_theta: float
@@ -500,16 +520,18 @@ class PortfolioGreeks:
             total_vega += pos_vega
             total_rho += pos_rho
 
-            details.append({
-                "option_type": option_type,
-                "strike": K,
-                "side": side,
-                "quantity": quantity,
-                "delta": round(pos_delta, 6),
-                "gamma": round(pos_gamma, 8),
-                "theta": round(pos_theta, 4),
-                "vega": round(pos_vega, 4),
-            })
+            details.append(
+                {
+                    "option_type": option_type,
+                    "strike": K,
+                    "side": side,
+                    "quantity": quantity,
+                    "delta": round(pos_delta, 6),
+                    "gamma": round(pos_gamma, 8),
+                    "theta": round(pos_theta, 4),
+                    "vega": round(pos_vega, 4),
+                }
+            )
 
         return PortfolioGreeksResult(
             total_delta=round(total_delta, 6),
@@ -527,9 +549,11 @@ class PortfolioGreeks:
 # 6. OPTIONS STRATEGIES
 # =====================================================
 
+
 @dataclass
 class StrategyResult:
     """Strateji sonucu."""
+
     strategy: str
     max_profit: float
     max_loss: float
@@ -676,8 +700,9 @@ class OptionsStrategies:
         4 bacak: short put spread + short call spread.
         Max profit = net credit. Max loss = spread width - net credit.
         """
-        net_credit = ((put_sell_premium - put_buy_premium) +
-                      (call_sell_premium - call_buy_premium)) * contracts * multiplier
+        net_credit = (
+            ((put_sell_premium - put_buy_premium) + (call_sell_premium - call_buy_premium)) * contracts * multiplier
+        )
 
         put_spread_width = (put_sell_strike - put_buy_strike) * contracts * multiplier
         call_spread_width = (call_buy_strike - call_sell_strike) * contracts * multiplier
@@ -860,7 +885,13 @@ class OptionsStrategies:
             description="Dar aralık beklentisi → düşük risk, sınırlı ödül",
             legs=[
                 {"action": "LONG", "instrument": "CALL", "strike": lower_strike, "premium": lower_premium},
-                {"action": "SHORT", "instrument": "CALL", "strike": middle_strike, "premium": middle_premium, "quantity": 2},
+                {
+                    "action": "SHORT",
+                    "instrument": "CALL",
+                    "strike": middle_strike,
+                    "premium": middle_premium,
+                    "quantity": 2,
+                },
                 {"action": "LONG", "instrument": "CALL", "strike": upper_strike, "premium": upper_premium},
             ],
         )
@@ -870,9 +901,11 @@ class OptionsStrategies:
 # 7. DYNAMIC DELTA HEDGING
 # =====================================================
 
+
 @dataclass
 class DeltaHedgeResult:
     """Delta hedge sonucu."""
+
     current_delta: float
     target_delta: float
     delta_gap: float
@@ -975,7 +1008,7 @@ class DeltaHedger:
         """
         delta_s = spot_price * price_move_pct / 100.0
         # Gamma P&L = 0.5 × Γ × (ΔS)²
-        gamma_pnl = 0.5 * portfolio_gamma * (delta_s ** 2)
+        gamma_pnl = 0.5 * portfolio_gamma * (delta_s**2)
 
         return {
             "gamma_pnl": round(gamma_pnl, 2),
@@ -989,6 +1022,7 @@ class DeltaHedger:
 # 8. SPAN MARGIN CALCULATOR
 # =====================================================
 
+
 class SPANMarginCalculator:
     """SPAN teminat hesaplama (16 senaryo).
 
@@ -999,22 +1033,22 @@ class SPANMarginCalculator:
 
     # 16 SPAN senaryosu (fiyat değişimi, volatilite değişimi)
     SCENARIOS = [
-        {"price_change": 0.0, "vol_change": 0.0},       # 1: Base
-        {"price_change": 0.03, "vol_change": 0.0},       # 2: +3%
-        {"price_change": -0.03, "vol_change": 0.0},      # 3: -3%
-        {"price_change": 0.03, "vol_change": 0.02},      # 4: +3% + vol up
-        {"price_change": -0.03, "vol_change": 0.02},     # 5: -3% + vol up
-        {"price_change": 0.06, "vol_change": 0.0},       # 6: +6%
-        {"price_change": -0.06, "vol_change": 0.0},      # 7: -6%
-        {"price_change": 0.06, "vol_change": 0.04},      # 8: +6% + vol up
-        {"price_change": -0.06, "vol_change": 0.04},     # 9: -6% + vol up
-        {"price_change": 0.10, "vol_change": 0.0},       # 10: +10%
-        {"price_change": -0.10, "vol_change": 0.0},      # 11: -10%
-        {"price_change": 0.10, "vol_change": 0.06},      # 12: +10% + vol up
-        {"price_change": -0.10, "vol_change": 0.06},     # 13: -10% + vol up
-        {"price_change": 0.15, "vol_change": 0.0},       # 14: +15%
-        {"price_change": -0.15, "vol_change": 0.0},      # 15: -15%
-        {"price_change": 0.0, "vol_change": 0.08},       # 16: Vol up only
+        {"price_change": 0.0, "vol_change": 0.0},  # 1: Base
+        {"price_change": 0.03, "vol_change": 0.0},  # 2: +3%
+        {"price_change": -0.03, "vol_change": 0.0},  # 3: -3%
+        {"price_change": 0.03, "vol_change": 0.02},  # 4: +3% + vol up
+        {"price_change": -0.03, "vol_change": 0.02},  # 5: -3% + vol up
+        {"price_change": 0.06, "vol_change": 0.0},  # 6: +6%
+        {"price_change": -0.06, "vol_change": 0.0},  # 7: -6%
+        {"price_change": 0.06, "vol_change": 0.04},  # 8: +6% + vol up
+        {"price_change": -0.06, "vol_change": 0.04},  # 9: -6% + vol up
+        {"price_change": 0.10, "vol_change": 0.0},  # 10: +10%
+        {"price_change": -0.10, "vol_change": 0.0},  # 11: -10%
+        {"price_change": 0.10, "vol_change": 0.06},  # 12: +10% + vol up
+        {"price_change": -0.10, "vol_change": 0.06},  # 13: -10% + vol up
+        {"price_change": 0.15, "vol_change": 0.0},  # 14: +15%
+        {"price_change": -0.15, "vol_change": 0.0},  # 15: -15%
+        {"price_change": 0.0, "vol_change": 0.08},  # 16: Vol up only
     ]
 
     def calculate(self, positions: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1048,12 +1082,14 @@ class SPANMarginCalculator:
             margin = abs(worst_loss)
             total_margin += margin
 
-            position_margins.append({
-                "ticker": pos.get("ticker", ""),
-                "margin": round(margin, 2),
-                "worst_scenario_loss": round(worst_loss, 2),
-                "scenario_pnls": scenario_pnls,
-            })
+            position_margins.append(
+                {
+                    "ticker": pos.get("ticker", ""),
+                    "margin": round(margin, 2),
+                    "worst_scenario_loss": round(worst_loss, 2),
+                    "scenario_pnls": scenario_pnls,
+                }
+            )
 
         return {
             "total_margin": round(total_margin, 2),
@@ -1079,7 +1115,7 @@ class SPANMarginCalculator:
 
         # Gamma P&L: 0.5 × Γ × (ΔS)²
         delta_s = spot_price * scenario["price_change"]
-        gamma_pnl = 0.5 * gamma * (delta_s ** 2)
+        gamma_pnl = 0.5 * gamma * (delta_s**2)
 
         # Vega P&L: vega zaten "per 1% vol" cinsinden (calculate_greeks'te /100)
         # vol_change=0.02 demek %2 vol artışı demek
@@ -1094,9 +1130,11 @@ class SPANMarginCalculator:
 # 9. FUTURES-SPOT ARBITRAGE
 # =====================================================
 
+
 @dataclass
 class ArbitrageResult:
     """Arbitrage sonucu."""
+
     spot_price: float
     futures_price: float
     theoretical_futures: float
@@ -1192,6 +1230,7 @@ class FuturesSpotArbitrage:
 # 10. PUT-CALL PARITY
 # =====================================================
 
+
 def check_put_call_parity(
     call_price: float,
     put_price: float,
@@ -1229,14 +1268,18 @@ def check_put_call_parity(
         "arbitrage_opportunity": bool(abs(deviation) > arbitrage_threshold),
         "theoretical_diff": round(theoretical_diff, 4),
         "actual_diff": round(actual_diff, 4),
-        "strategy": "BUY_PUT_SELL_CALL" if deviation > arbitrage_threshold else
-                    "BUY_CALL_SELL_PUT" if deviation < -arbitrage_threshold else "NONE",
+        "strategy": "BUY_PUT_SELL_CALL"
+        if deviation > arbitrage_threshold
+        else "BUY_CALL_SELL_PUT"
+        if deviation < -arbitrage_threshold
+        else "NONE",
     }
 
 
 # =====================================================
 # 11. VIOP RISK INTEGRATION
 # =====================================================
+
 
 class VIOPRiskCalculator:
     """VIOP pozisyonları için risk hesaplama.
@@ -1303,15 +1346,17 @@ class VIOPRiskCalculator:
             vega_exposure = quantity * vega * multiplier * direction
             total_vega_exposure += vega_exposure
 
-            position_risks.append({
-                "ticker": ticker,
-                "type": pos_type,
-                "side": side,
-                "quantity": quantity,
-                "notional": round(notional, 2),
-                "pnl": round(pnl, 2),
-                "delta_exposure": round(delta_exposure, 2),
-            })
+            position_risks.append(
+                {
+                    "ticker": ticker,
+                    "type": pos_type,
+                    "side": side,
+                    "quantity": quantity,
+                    "notional": round(notional, 2),
+                    "pnl": round(pnl, 2),
+                    "delta_exposure": round(delta_exposure, 2),
+                }
+            )
 
         # Portföy bazlı risk metrikleri
         delta_pct = (total_delta_exposure / portfolio_value * 100) if portfolio_value > 0 else 0
@@ -1330,8 +1375,7 @@ class VIOPRiskCalculator:
             "risk_flags": self._generate_risk_flags(delta_pct, notional_pct, total_gamma_exposure),
         }
 
-    def _generate_risk_flags(self, delta_pct: float, notional_pct: float,
-                              gamma_exposure: float) -> list[str]:
+    def _generate_risk_flags(self, delta_pct: float, notional_pct: float, gamma_exposure: float) -> list[str]:
         """Risk bayrakları üret."""
         flags = []
 
@@ -1363,14 +1407,16 @@ class VIOPRiskCalculator:
             multiplier = pos.get("contract_multiplier", 100)
             notional = pos.get("quantity", 0) * pos.get("current_price", 0) * multiplier
 
-            span_positions.append({
-                "ticker": pos.get("ticker", ""),
-                "value": notional,
-                "delta": pos.get("delta", 1.0),
-                "gamma": pos.get("gamma", 0),
-                "vega": pos.get("vega", 0),
-                "spot_price": pos.get("current_price", 0),
-            })
+            span_positions.append(
+                {
+                    "ticker": pos.get("ticker", ""),
+                    "value": notional,
+                    "delta": pos.get("delta", 1.0),
+                    "gamma": pos.get("gamma", 0),
+                    "vega": pos.get("vega", 0),
+                    "spot_price": pos.get("current_price", 0),
+                }
+            )
 
         return margin_calc.calculate(span_positions)
 
@@ -1379,9 +1425,11 @@ class VIOPRiskCalculator:
 # 12. OPTIONS BACKTEST ENGINE
 # =====================================================
 
+
 @dataclass
 class BacktestTrade:
     """Tek backtest işlemi."""
+
     entry_date: date
     exit_date: date | None
     strategy: str
@@ -1397,6 +1445,7 @@ class BacktestTrade:
 @dataclass
 class BacktestResult:
     """Backtest sonucu."""
+
     total_trades: int
     winning_trades: int
     losing_trades: int
@@ -1479,17 +1528,19 @@ class OptionsBacktestEngine:
             total_pnl = stock_pnl + call_pnl
             pnl_pct = (total_pnl / entry_price) * 100
 
-            trades.append(BacktestTrade(
-                entry_date=entry_date,
-                exit_date=exit_date,
-                strategy="COVERED_CALL",
-                spot_price=entry_price,
-                entry_premium=premium,
-                exit_premium=0,
-                pnl=round(total_pnl, 2),
-                pnl_pct=round(pnl_pct, 2),
-                holding_days=(exit_date - entry_date).days if isinstance(exit_date, date) else holding_days,
-            ))
+            trades.append(
+                BacktestTrade(
+                    entry_date=entry_date,
+                    exit_date=exit_date,
+                    strategy="COVERED_CALL",
+                    spot_price=entry_price,
+                    entry_premium=premium,
+                    exit_premium=0,
+                    pnl=round(total_pnl, 2),
+                    pnl_pct=round(pnl_pct, 2),
+                    holding_days=(exit_date - entry_date).days if isinstance(exit_date, date) else holding_days,
+                )
+            )
 
             i = exit_idx + 1
 
@@ -1555,16 +1606,18 @@ class OptionsBacktestEngine:
 
             pnl_pct = (pnl / entry_price) * 100
 
-            trades.append(BacktestTrade(
-                entry_date=entry_date,
-                exit_date=exit_date,
-                strategy="IRON_CONDOR",
-                spot_price=entry_price,
-                entry_premium=net_credit,
-                pnl=round(pnl, 2),
-                pnl_pct=round(pnl_pct, 2),
-                holding_days=(exit_date - entry_date).days if isinstance(exit_date, date) else holding_days,
-            ))
+            trades.append(
+                BacktestTrade(
+                    entry_date=entry_date,
+                    exit_date=exit_date,
+                    strategy="IRON_CONDOR",
+                    spot_price=entry_price,
+                    entry_premium=net_credit,
+                    pnl=round(pnl, 2),
+                    pnl_pct=round(pnl_pct, 2),
+                    holding_days=(exit_date - entry_date).days if isinstance(exit_date, date) else holding_days,
+                )
+            )
 
             i = exit_idx + 1
 
@@ -1574,10 +1627,17 @@ class OptionsBacktestEngine:
         """İşlemleri özetle (vektörize)."""
         if not trades:
             return BacktestResult(
-                total_trades=0, winning_trades=0, losing_trades=0,
-                win_rate=0, total_pnl=0, avg_pnl=0,
-                max_profit=0, max_loss=0, avg_holding_days=0,
-                profit_factor=0, trades=[],
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                win_rate=0,
+                total_pnl=0,
+                avg_pnl=0,
+                max_profit=0,
+                max_loss=0,
+                avg_holding_days=0,
+                profit_factor=0,
+                trades=[],
             )
 
         pnls = np.array([t.pnl for t in trades])

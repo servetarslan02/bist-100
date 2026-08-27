@@ -3,6 +3,7 @@
 Microsoft Qlib ile BIST verisi entegrasyonu.
 Feature store, data handler, model integration.
 """
+
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class QlibConfig:
     """Qlib konfigürasyonu."""
+
     data_dir: str = "data/qlib"
     provider: str = "csv"  # csv, yfinance, qlib
     cache_dir: str = "data/qlib_cache"
@@ -155,10 +157,12 @@ class QlibBIST:
                 dataset[split]["X"] = np.array([])
                 dataset[split]["y"] = np.array([])
 
-        logger.info("qlib_dataset_created",
-                     train_samples=len(dataset["train"]["X"]),
-                     valid_samples=len(dataset["valid"]["X"]),
-                     test_samples=len(dataset["test"]["X"]))
+        logger.info(
+            "qlib_dataset_created",
+            train_samples=len(dataset["train"]["X"]),
+            valid_samples=len(dataset["valid"]["X"]),
+            test_samples=len(dataset["test"]["X"]),
+        )
 
         return dataset
 

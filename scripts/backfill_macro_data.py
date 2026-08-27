@@ -96,8 +96,7 @@ def backfill_from_tcmb(years: int = 5):
 def main():
     parser = argparse.ArgumentParser(description="Macro Data Backfill")
     parser.add_argument("--years", type=int, default=5, help="Kaç yıllık veri")
-    parser.add_argument("--indicators", type=str, default="all",
-                       help="İndikatörler (virgülle ayrılmış veya 'all')")
+    parser.add_argument("--indicators", type=str, default="all", help="İndikatörler (virgülle ayrılmış veya 'all')")
     args = parser.parse_args()
 
     print(f"=== Macro Data Backfill ({args.years} yıl) ===\n")
@@ -110,6 +109,7 @@ def main():
 
     # Rapor
     from services.macro.historical_store import macro_historical_store
+
     report = macro_historical_store.get_report()
     print("\n=== Backfill Tamamlandı ===")
     print(f"Toplam gösterge: {report['indicators']}")

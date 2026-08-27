@@ -2,6 +2,7 @@
 
 Orijinal Altman (1968) + Türkiye'ye özgü düzeltme (enflasyon, kur, sektör).
 """
+
 from typing import Any
 
 import structlog
@@ -16,9 +17,16 @@ TURKEY_ADJUSTMENTS = {
     "inflation": 0.85,
     "fx": 0.90,
     "sector": {
-        "BANKA": 1.10, "SANAYI": 0.95, "TEKNOLOJI": 1.05, "ENERJI": 0.90,
-        "GIDA": 0.95, "ULASIM": 0.92, "INSAAT": 0.88, "METAL": 0.93,
-        "TEKSTIL": 0.90, "TELEKOM": 1.00,
+        "BANKA": 1.10,
+        "SANAYI": 0.95,
+        "TEKNOLOJI": 1.05,
+        "ENERJI": 0.90,
+        "GIDA": 0.95,
+        "ULASIM": 0.92,
+        "INSAAT": 0.88,
+        "METAL": 0.93,
+        "TEKSTIL": 0.90,
+        "TELEKOM": 1.00,
     },
 }
 

@@ -3,6 +3,7 @@
 Ağırlıklı ortalama + stacking ensemble desteği.
 Eski weighted average korunurken, stacking_ensemble.py ile entegrasyon eklendi.
 """
+
 from collections.abc import Callable
 from typing import Any
 
@@ -102,7 +103,7 @@ class EnsembleModel:
         Returns:
             Meta-learner tahminleri
         """
-        if not hasattr(stacking_ensemble, 'is_fitted') or not stacking_ensemble.is_fitted:
+        if not hasattr(stacking_ensemble, "is_fitted") or not stacking_ensemble.is_fitted:
             logger.warning("stacking_not_fitted")
             return np.full(len(X), 0.5)
 

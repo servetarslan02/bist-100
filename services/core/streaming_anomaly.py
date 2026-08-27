@@ -22,10 +22,11 @@ logger = structlog.get_logger()
 @dataclass
 class AnomalyResult:
     """Anomali tespit sonucu."""
+
     is_anomaly: bool
-    anomaly_type: str       # price, volume, spread, source
-    severity: str           # LOW, MEDIUM, HIGH, CRITICAL
-    score: float            # 0-1
+    anomaly_type: str  # price, volume, spread, source
+    severity: str  # LOW, MEDIUM, HIGH, CRITICAL
+    score: float  # 0-1
     details: str
     zscore: float
 
@@ -38,7 +39,7 @@ class StreamingAnomalyDetector:
 
     def __init__(self, window_size: int = 100):
         self._window_size = window_size
-        self._price_history: dict[str, deque] = {}   # ticker → deque of prices
+        self._price_history: dict[str, deque] = {}  # ticker → deque of prices
         self._volume_history: dict[str, deque] = {}
         self._spread_history: dict[str, deque] = {}
 
@@ -133,8 +134,12 @@ class StreamingAnomalyDetector:
         """Spread anomalisi kontrolü."""
         if bid <= 0 or ask <= 0:
             return AnomalyResult(
-                is_anomaly=False, anomaly_type="spread",
-                severity="LOW", score=0, details="No bid/ask", zscore=0,
+                is_anomaly=False,
+                anomaly_type="spread",
+                severity="LOW",
+                score=0,
+                details="No bid/ask",
+                zscore=0,
             )
 
         mid = (bid + ask) / 2

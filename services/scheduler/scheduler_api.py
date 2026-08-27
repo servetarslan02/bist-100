@@ -31,6 +31,7 @@ logger = structlog.get_logger()
 # Rate Limiter (Trigger endpoint için)
 # =====================================================
 
+
 class _RateLimiter:
     """Basit token bucket rate limiter.
 
@@ -38,7 +39,7 @@ class _RateLimiter:
     Varsayılan: dakikada 10 tetikleme.
     """
 
-    def __init__(self, max_tokens: int = 10, refill_rate: float = 10/60):
+    def __init__(self, max_tokens: int = 10, refill_rate: float = 10 / 60):
         self._max_tokens = max_tokens
         self._tokens = float(max_tokens)
         self._refill_rate = refill_rate  # saniyede kaç token
@@ -69,6 +70,7 @@ class _RateLimiter:
 # Scheduler API
 # =====================================================
 
+
 class SchedulerAPI:
     """Scheduler API endpoint'leri.
 
@@ -88,7 +90,7 @@ class SchedulerAPI:
         self._learning = learning_scheduler
 
         # Rate limiter — trigger endpoint'i için
-        self._trigger_limiter = _RateLimiter(max_tokens=10, refill_rate=10/60)
+        self._trigger_limiter = _RateLimiter(max_tokens=10, refill_rate=10 / 60)
 
     def get_status(self) -> dict[str, Any]:
         """Scheduler durumu.
@@ -228,8 +230,7 @@ class SchedulerAPI:
         """
         # Rate limit kontrolü
         if not self._trigger_limiter.allow():
-            logger.warning("Trigger rate limited", job_type=job_type,
-                         remaining=self._trigger_limiter.remaining)
+            logger.warning("Trigger rate limited", job_type=job_type, remaining=self._trigger_limiter.remaining)
             return {
                 "status": "RATE_LIMITED",
                 "message": "Too many triggers. Max 10/minute.",
@@ -239,9 +240,7 @@ class SchedulerAPI:
         try:
             result = await self._scheduler.trigger_job(job_type)
 
-            logger.info("Job triggered via API",
-                       job_type=job_type,
-                       status=result.get("status"))
+            logger.info("Job triggered via API", job_type=job_type, status=result.get("status"))
 
             return {
                 "timestamp": datetime.now(UTC).isoformat(),

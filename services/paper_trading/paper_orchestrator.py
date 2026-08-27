@@ -52,12 +52,14 @@ class PaperTradingOrchestrator:
         # State store'dan yükle
         self.portfolio.load_from_store()
 
-        logger.info("PaperTradingOrchestrator initialized",
-                    champion=self._champion_version,
-                    initial_capital=initial_capital,
-                    require_next_open=require_next_open,
-                    strict_t2=strict_t2,
-                    scenario=self.scenario)
+        logger.info(
+            "PaperTradingOrchestrator initialized",
+            champion=self._champion_version,
+            initial_capital=initial_capital,
+            require_next_open=require_next_open,
+            strict_t2=strict_t2,
+            scenario=self.scenario,
+        )
 
     def recover_from_downtime(
         self,
@@ -95,31 +97,33 @@ class PaperTradingOrchestrator:
             logger.warning("Gap too large, capping at 30 days", gap=gap_days)
             gap_days = 30
 
-        logger.info("Recovering from downtime",
-                   last_date=last_date,
-                   current_date=current_date,
-                   gap_days=gap_days)
+        logger.info("Recovering from downtime", last_date=last_date, current_date=current_date, gap_days=gap_days)
 
         # 1. T+2 Takas: Her gün için valör kaydır
         for i in range(gap_days):
             self.portfolio.roll_settlement_day()
-        logger.info("T+2 settlement rolled", times=gap_days,
-                   settled=self.portfolio.settled_cash,
-                   t1=self.portfolio.unsettled_cash_t1,
-                   t2=self.portfolio.unsettled_cash_t2)
+        logger.info(
+            "T+2 settlement rolled",
+            times=gap_days,
+            settled=self.portfolio.settled_cash,
+            t1=self.portfolio.unsettled_cash_t1,
+            t2=self.portfolio.unsettled_cash_t2,
+        )
 
         # 2. Equity curve: Boş günleri son bilinen değerle doldur
         if self.portfolio._equity_curve:
             last_equity = self.portfolio._equity_curve[-1]
             for i in range(1, gap_days):
                 fill_date = (last_dt + timedelta(days=i)).strftime("%Y-%m-%d")
-                self.portfolio._equity_curve.append({
-                    "date": fill_date,
-                    "equity": last_equity["equity"],
-                    "cash": last_equity.get("cash", self.portfolio.cash),
-                    "settled_cash": last_equity.get("settled_cash", self.portfolio.settled_cash),
-                    "invested": last_equity.get("invested", 0),
-                })
+                self.portfolio._equity_curve.append(
+                    {
+                        "date": fill_date,
+                        "equity": last_equity["equity"],
+                        "cash": last_equity.get("cash", self.portfolio.cash),
+                        "settled_cash": last_equity.get("settled_cash", self.portfolio.settled_cash),
+                        "invested": last_equity.get("invested", 0),
+                    }
+                )
             logger.info("Equity curve gaps filled", fill_days=gap_days - 1)
 
         # 3. Kill switch: Yeni günde otomatik reset
@@ -297,6 +301,7 @@ class PaperTradingOrchestrator:
             for ticker, df in market_data.items():
                 if hasattr(df, "loc"):
                     try:
+
                         def _get_val(r, *keys, default=0.0):
                             for k in keys:
                                 if k in r:
@@ -305,7 +310,7 @@ class PaperTradingOrchestrator:
 
                         dt_lookup = pl.Series(date)
                         df_idx = df.index
-                        if getattr(df_idx, 'tz', None) is not None:
+                        if getattr(df_idx, "tz", None) is not None:
                             df_idx = df_idx.tz_convert(None)
 
                         if dt_lookup in df_idx:
@@ -348,9 +353,15 @@ class PaperTradingOrchestrator:
                                 high_p = high_c
                                 low_p = low_c
 
-                            highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
-                            lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
-                            vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+                            highs_list = [
+                                float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
+                            lows_list = [
+                                float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
+                            vols_list = [
+                                float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
                         else:
                             # EOD / Backtest Replay: T anı kapanışı bilinir, T+1 açılışı sonraki satırdan alınır
                             high_c = float(_get_val(row, "high", "High", default=0.0))
@@ -366,13 +377,21 @@ class PaperTradingOrchestrator:
                             start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
                             hist_slice = df[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
 
-                            highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
-                            lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
-                            vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+                            highs_list = [
+                                float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
+                            lows_list = [
+                                float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
+                            vols_list = [
+                                float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()
+                            ]
 
                             if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
                                 next_row = df[curr_idx + 1]
-                                next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
+                                next_open_dict[ticker] = float(
+                                    _get_val(next_row, "open", "Open", "close", "Close", default=0.0)
+                                )
 
                         if not hasattr(self, "_history_cache"):
                             self._history_cache = {}
@@ -436,7 +455,11 @@ class PaperTradingOrchestrator:
         if report.get("status") == "COMPLETED":
             self.store.clear_pending_signals()
         else:
-            logger.warning("Morning execution incomplete; keeping pending signals for retry", date=date, status=report.get("status"))
+            logger.warning(
+                "Morning execution incomplete; keeping pending signals for retry",
+                date=date,
+                status=report.get("status"),
+            )
         return report
 
     def mark_to_market_cycle(self, prices: dict[str, float], date: str) -> dict[str, Any]:

@@ -63,7 +63,11 @@ class MarketSessionManager:
 
     def is_post_market(self) -> bool:
         phase = bist_session_fsm.get_phase()
-        return phase in (BISTMarketPhase.CLOSING_AUCTION_COLLECTION, BISTMarketPhase.CLOSING_AUCTION_DETERMINATION, BISTMarketPhase.CLOSING_PRICE_TRADING)
+        return phase in (
+            BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+            BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
+            BISTMarketPhase.CLOSING_PRICE_TRADING,
+        )
 
     def is_closed(self) -> bool:
         return bist_session_fsm.is_closed()
@@ -88,9 +92,7 @@ class MarketSessionManager:
         if ticker == "BIST-100":
             event = auto_circuit_breaker.update_bist100_price(current_price)
         else:
-            event = auto_circuit_breaker.check_pay_circuit_breaker(
-                ticker, current_price, reference_price, market_type
-            )
+            event = auto_circuit_breaker.check_pay_circuit_breaker(ticker, current_price, reference_price, market_type)
         return {
             "ticker": ticker,
             "event": event.to_dict() if event else None,

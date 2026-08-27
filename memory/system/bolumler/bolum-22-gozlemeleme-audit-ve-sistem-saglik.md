@@ -50,6 +50,7 @@ Anomaly Detection → Health Score → Alert → Audit
 ```python
 # services/core/observability.py
 import structlog
+
 logger = structlog.get_logger()
 
 logger.info("Decision made", ticker="THYAO", action="BUY", confidence=0.8)

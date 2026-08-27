@@ -33,6 +33,7 @@ logger = structlog.get_logger()
 @dataclass
 class SectorExposure:
     """Sektör maruziyet limiti."""
+
     sector_name: str
     max_weight_pct: float = 25.0  # Maksimum %25 tek sektör
     current_weight_pct: float = 0.0
@@ -44,18 +45,19 @@ class SectorExposure:
 @dataclass
 class MultiAssetConfig:
     """Multi-asset backtest konfigürasyonu."""
+
     initial_capital: float = 1_000_000.0
     max_positions: int = 20
     max_position_pct: float = 10.0  # Tek pozisyon max %10
-    max_sector_pct: float = 25.0    # Tek sektör max %25
-    max_correlation: float = 0.7    # Yüksek korelasyon eşiği
-    min_cash_pct: float = 5.0       # Minimum nakit %5
+    max_sector_pct: float = 25.0  # Tek sektör max %25
+    max_correlation: float = 0.7  # Yüksek korelasyon eşiği
+    min_cash_pct: float = 5.0  # Minimum nakit %5
     rebalance_frequency_days: int = 1  # Günlük rebalance
 
     # Risk limitleri
     max_portfolio_volatility: float = 0.20  # Yıllık %20 volatilite
-    max_drawdown_pct: float = 15.0          # Max drawdown %15
-    drawdown_reduction_trigger: float = 10.0 # %10 drawdown'da risk azalt
+    max_drawdown_pct: float = 15.0  # Max drawdown %15
+    drawdown_reduction_trigger: float = 10.0  # %10 drawdown'da risk azalt
 
     # Likidite kısıtı: bir günlük hacmin bu yüzdesinden fazlası tek emirde
     # alınamaz/satılamaz (gerçek piyasada büyük emir günü aşan market impact
@@ -79,17 +81,19 @@ class MultiAssetConfig:
 @dataclass
 class AssetAllocation:
     """Tek bir varlık tahsisi."""
+
     ticker: str
-    target_weight: float    # Hedef ağırlık (0-1)
-    current_weight: float   # Mevcut ağırlık
-    signal_score: float     # Sinyal skoru
-    sector: str             # Sektör
-    reason: str             # Tahsis nedeni
+    target_weight: float  # Hedef ağırlık (0-1)
+    current_weight: float  # Mevcut ağırlık
+    signal_score: float  # Sinyal skoru
+    sector: str  # Sektör
+    reason: str  # Tahsis nedeni
 
 
 @dataclass
 class MultiAssetResult:
     """Multi-asset backtest sonucu."""
+
     run_id: str
     start_date: str
     end_date: str
@@ -196,14 +200,15 @@ class MultiAssetBacktestEngine:
             )
 
         import hashlib
-        run_id = hashlib.md5(
-            f"multi_{datetime.now(UTC).isoformat()}".encode()
-        ).hexdigest()[:12]
 
-        logger.info("Starting multi-asset backtest",
-                    run_id=run_id,
-                    tickers=market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
-                    date_range=f"{market_data['date'].min()} - {market_data['date'].max()}")
+        run_id = hashlib.md5(f"multi_{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12]
+
+        logger.info(
+            "Starting multi-asset backtest",
+            run_id=run_id,
+            tickers=market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
+            date_range=f"{market_data['date'].min()} - {market_data['date'].max()}",
+        )
 
         # Config
         cfg = self.config
@@ -227,9 +232,7 @@ class MultiAssetBacktestEngine:
         # Aynı günün kapanışıyla hem sinyal üretip hem işlem yapmak,
         # gerçek hayatta imkansız bir öngörü (look-ahead bias) varsayar
         # (bkz. documentation/14 — kod incelemesiyle tespit edilen bug).
-        next_date_map: dict[Any, Any] = {
-            dates[i]: dates[i + 1] for i in range(len(dates) - 1)
-        }
+        next_date_map: dict[Any, Any] = {dates[i]: dates[i + 1] for i in range(len(dates) - 1)}
         open_price_map: dict[tuple[Any, str], float] = {}
         if "open" in market_data.columns:
             for row in market_data[["date", "ticker", "open"]].itertuples(index=False):
@@ -279,8 +282,8 @@ class MultiAssetBacktestEngine:
 
         for date in dates:
             # Current day data
-            day_market = market_data.filter(pl.col('date') == date)
-            day_signals = signal_data.filter(pl.col('date') == date) if signal_data is not None else pl.DataFrame()
+            day_market = market_data.filter(pl.col("date") == date)
+            day_signals = signal_data.filter(pl.col("date") == date) if signal_data is not None else pl.DataFrame()
 
             if day_market.empty:
                 continue
@@ -299,15 +302,15 @@ class MultiAssetBacktestEngine:
             if portfolio_value > peak_equity:
                 peak_equity = portfolio_value
                 if drawdown_start:
-                    current_dd_duration = (date - drawdown_start).days if hasattr(date, 'days') else 0
+                    current_dd_duration = (date - drawdown_start).days if hasattr(date, "days") else 0
                     max_dd_duration = max(max_dd_duration, current_dd_duration)
                     drawdown_start = None
 
             current_dd = (peak_equity - portfolio_value) / peak_equity * 100
             if current_dd > cfg.max_drawdown_pct:
-                logger.warning("Max drawdown exceeded",
-                              current_dd=round(current_dd, 2),
-                              max_allowed=cfg.max_drawdown_pct)
+                logger.warning(
+                    "Max drawdown exceeded", current_dd=round(current_dd, 2), max_allowed=cfg.max_drawdown_pct
+                )
 
             if current_dd > 0 and drawdown_start is None:
                 drawdown_start = date
@@ -322,14 +325,16 @@ class MultiAssetBacktestEngine:
                 gross_loss += abs(daily_return)
 
             # Record daily metrics
-            daily_metrics.append({
-                "date": str(date),
-                "equity": round(portfolio_value, 2),
-                "cash": round(cash, 2),
-                "positions": len(positions),
-                "daily_return_pct": round(daily_return * 100, 4),
-                "drawdown_pct": round(current_dd, 2),
-            })
+            daily_metrics.append(
+                {
+                    "date": str(date),
+                    "equity": round(portfolio_value, 2),
+                    "cash": round(cash, 2),
+                    "positions": len(positions),
+                    "daily_return_pct": round(daily_return * 100, 4),
+                    "drawdown_pct": round(current_dd, 2),
+                }
+            )
 
             equity_curve.append((str(date), round(portfolio_value, 2)))
             prev_equity = portfolio_value
@@ -339,7 +344,7 @@ class MultiAssetBacktestEngine:
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
             next_date = next_date_map.get(date)
             if not day_signals.empty and next_date is not None:
-                sell_signals = day_signals.filter(pl.col('score') < 0)  # Düşük skor = sat
+                sell_signals = day_signals.filter(pl.col("score") < 0)  # Düşük skor = sat
                 for _, sig in sell_signals.iterrows():
                     ticker = sig["ticker"]
                     if ticker in positions:
@@ -370,8 +375,7 @@ class MultiAssetBacktestEngine:
                         # Transaction cost
                         if cfg.use_realistic_costs:
                             cost = self.cost_engine.calculate_total_cost(
-                                "SELL", sell_price, sell_qty, ticker,
-                                day_volume
+                                "SELL", sell_price, sell_qty, ticker, day_volume
                             )
                             commission = cost["costs"]["commission"]
                             slippage = cost["costs"]["slippage"]
@@ -396,17 +400,19 @@ class MultiAssetBacktestEngine:
                             sell_qty * sell_price / portfolio_value * 100
                         )
 
-                        trade_log.append({
-                            "date": str(next_date),
-                            "signal_date": str(date),
-                            "ticker": ticker,
-                            "side": "SELL",
-                            "quantity": sell_qty,
-                            "price": round(exec_price, 4),
-                            "pnl": round(pnl, 2),
-                            "commission": round(commission, 2),
-                            "reason": "signal" if sell_qty == pos["quantity"] else "signal_partial_liquidity",
-                        })
+                        trade_log.append(
+                            {
+                                "date": str(next_date),
+                                "signal_date": str(date),
+                                "ticker": ticker,
+                                "side": "SELL",
+                                "quantity": sell_qty,
+                                "price": round(exec_price, 4),
+                                "pnl": round(pnl, 2),
+                                "commission": round(commission, 2),
+                                "reason": "signal" if sell_qty == pos["quantity"] else "signal_partial_liquidity",
+                            }
+                        )
 
                         if sell_qty >= pos["quantity"]:
                             del positions[ticker]
@@ -418,8 +424,8 @@ class MultiAssetBacktestEngine:
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
             if not day_signals.empty and len(positions) < cfg.max_positions and next_date is not None:
                 buy_signals = day_signals[
-                    (day_signals["score"] >= 70) &  # Yüksek skor = al
-                    (~day_signals["ticker"].isin(positions.keys()))
+                    (day_signals["score"] >= 70)  # Yüksek skor = al
+                    & (~day_signals["ticker"].isin(positions.keys()))
                 ].sort("score", ascending=False)
 
                 for _, sig in buy_signals.iterrows():
@@ -474,10 +480,7 @@ class MultiAssetBacktestEngine:
 
                     # Transaction cost
                     if cfg.use_realistic_costs:
-                        cost = self.cost_engine.calculate_total_cost(
-                            "BUY", buy_price, quantity, ticker,
-                            day_volume
-                        )
+                        cost = self.cost_engine.calculate_total_cost("BUY", buy_price, quantity, ticker, day_volume)
                         commission = cost["costs"]["commission"]
                         slippage = cost["costs"]["slippage"]
                         exec_price = cost["execution_price"]
@@ -509,16 +512,18 @@ class MultiAssetBacktestEngine:
                         quantity * buy_price / portfolio_value * 100
                     )
 
-                    trade_log.append({
-                        "date": str(next_date),
-                        "signal_date": str(date),
-                        "ticker": ticker,
-                        "side": "BUY",
-                        "quantity": quantity,
-                        "price": round(exec_price, 4),
-                        "commission": round(commission, 2),
-                        "score": sig["score"],
-                    })
+                    trade_log.append(
+                        {
+                            "date": str(next_date),
+                            "signal_date": str(date),
+                            "ticker": ticker,
+                            "side": "BUY",
+                            "quantity": quantity,
+                            "price": round(exec_price, 4),
+                            "commission": round(commission, 2),
+                            "score": sig["score"],
+                        }
+                    )
 
         # Final metrics
         final_equity = equity_curve[-1][1] if equity_curve else capital
@@ -553,7 +558,7 @@ class MultiAssetBacktestEngine:
         win_rate = winning_days / total_days * 100 if total_days > 0 else 0
 
         # Profit factor
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         # Average positions
         avg_positions = np.mean(position_count_per_day) if position_count_per_day else 0
@@ -583,10 +588,12 @@ class MultiAssetBacktestEngine:
             daily_metrics=daily_metrics,
         )
 
-        logger.info("Multi-asset backtest complete",
-                    run_id=run_id,
-                    total_return=f"{total_return:.2f}%",
-                    sharpe=round(sharpe, 3),
-                    max_dd=f"{max_dd:.2f}%")
+        logger.info(
+            "Multi-asset backtest complete",
+            run_id=run_id,
+            total_return=f"{total_return:.2f}%",
+            sharpe=round(sharpe, 3),
+            max_dd=f"{max_dd:.2f}%",
+        )
 
         return result

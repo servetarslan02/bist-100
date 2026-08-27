@@ -15,11 +15,13 @@ import sys
 # EVIDENCE ENGINE TESTS
 # =====================================================
 
+
 async def test_evidence_claim_extraction():
     """Claim extraction çalışmalı."""
     issues = []
 
     from services.intelligence.evidence_engine import EvidenceVerificationEngine
+
     engine = EvidenceVerificationEngine()
 
     text = "THYAO karı %30 arttı. hisse fiyatı yükselecek."
@@ -40,6 +42,7 @@ async def test_evidence_source_reliability():
     issues = []
 
     from services.intelligence.evidence_engine import EvidenceVerificationEngine, SourceReliability
+
     engine = EvidenceVerificationEngine()
 
     test_cases = [
@@ -62,6 +65,7 @@ async def test_evidence_claim_classification():
     issues = []
 
     from services.intelligence.evidence_engine import ClaimType, EvidenceVerificationEngine
+
     engine = EvidenceVerificationEngine()
 
     # FACT: doğrudan veri
@@ -82,12 +86,12 @@ async def test_evidence_hallucination_detection():
     issues = []
 
     from services.intelligence.evidence_engine import EvidenceVerificationEngine
+
     engine = EvidenceVerificationEngine()
 
     # Uydurma veri
     claims = engine.extract_claims(
-        "THYAO bugün %500 kazandı, tüm zamanların rekorunu kırdı",
-        ticker="THYAO", source="social"
+        "THYAO bugün %500 kazandı, tüm zamanların rekorunu kırdı", ticker="THYAO", source="social"
     )
 
     if claims:
@@ -105,6 +109,7 @@ async def test_evidence_contradiction():
     issues = []
 
     from services.intelligence.evidence_engine import EvidenceVerificationEngine
+
     engine = EvidenceVerificationEngine()
 
     # İki zıt iddia
@@ -125,6 +130,7 @@ async def test_evidence_contradiction():
 # =====================================================
 # CONTINUOUS LEARNING TESTS
 # =====================================================
+
 
 async def test_learning_report():
     """Learning report döndürülmeli."""
@@ -180,6 +186,7 @@ async def test_learning_drift_detection():
 # SUPER INTELLIGENCE TESTS
 # =====================================================
 
+
 async def test_super_intelligence_health():
     """Health status döndürülmeli."""
     issues = []
@@ -188,9 +195,9 @@ async def test_super_intelligence_health():
 
     health = super_intelligence.get_health_status()
 
-    if not hasattr(health, 'overall_status'):
+    if not hasattr(health, "overall_status"):
         issues.append("overall_status yok")
-    if not hasattr(health, 'uptime_hours'):
+    if not hasattr(health, "uptime_hours"):
         issues.append("uptime_hours yok")
 
     return "Super Intelligence Health", len(issues) == 0, issues
@@ -250,6 +257,7 @@ async def test_super_intelligence_performance_recording():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

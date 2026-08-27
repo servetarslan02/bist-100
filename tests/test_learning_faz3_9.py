@@ -15,9 +15,11 @@ from datetime import UTC
 
 # ===================== FAZ 3: RETRAIN ENGINE =====================
 
+
 def test_retrain_engine_init():
     """Retrain engine başlatılıyor mu?"""
     from services.learning.retrain_engine import retrain_engine
+
     assert retrain_engine is not None
     report = retrain_engine.get_retrain_report()
     assert report["status"] == "No retrain data"
@@ -27,6 +29,7 @@ def test_retrain_engine_init():
 def test_retrain_engine_version_id():
     """Version ID üretiliyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
+
     engine = RetrainEngine()
     vid = engine._generate_version_id()
     assert vid.startswith("retrain_")
@@ -36,9 +39,11 @@ def test_retrain_engine_version_id():
 
 # ===================== FAZ 4: FEATURE TRACKER =====================
 
+
 def test_feature_tracker_init():
     """Feature tracker başlatılıyor mu?"""
     from services.learning.feature_tracker import feature_importance_tracker
+
     assert feature_importance_tracker is not None
     report = feature_importance_tracker.get_report()
     assert report["status"] == "OK"
@@ -52,13 +57,21 @@ def test_feature_tracker_trends():
     tracker = FeatureImportanceTracker()
     # Manuel veri ekle
     from datetime import datetime, timedelta
+
     for i in range(10):
         date = (datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d")
         tracker._history.append(
-            type('Record', (), {
-                'date': date, 'feature': 'rsi_14', 'importance': 0.1 + i*0.01,
-                'regime': 'BULL', 'model_version': 'v1'
-            })()
+            type(
+                "Record",
+                (),
+                {
+                    "date": date,
+                    "feature": "rsi_14",
+                    "importance": 0.1 + i * 0.01,
+                    "regime": "BULL",
+                    "model_version": "v1",
+                },
+            )()
         )
 
     trends = tracker.get_trends(top_n=5)
@@ -79,9 +92,11 @@ def test_feature_tracker_report():
 
 # ===================== FAZ 5: SHADOW MODE =====================
 
+
 def test_shadow_manager_init():
     """Shadow manager başlatılıyor mu?"""
     from services.learning.shadow_manager import shadow_manager
+
     assert shadow_manager is not None
     status = shadow_manager.get_status()
     assert status["active"] is False
@@ -133,6 +148,7 @@ def test_shadow_evaluate_insufficient():
 def test_champion_challenger_init():
     """Champion-challenger başlatılıyor mu?"""
     from services.learning.champion_challenger import champion_challenger
+
     assert champion_challenger is not None
     report = champion_challenger.get_report()
     assert report["current_champion"] is None
@@ -180,9 +196,11 @@ def test_champion_challenger_rollback():
 
 # ===================== FAZ 6: MODEL REGISTRY =====================
 
+
 def test_model_registry_init():
     """Model registry başlatılıyor mu?"""
     from services.learning.model_registry import model_registry
+
     assert model_registry is not None
     report = model_registry.get_report()
     assert report["total_versions"] == 0
@@ -254,9 +272,11 @@ def test_model_registry_versions():
 
 # ===================== FAZ 7: META LEARNER =====================
 
+
 def test_meta_learner_init():
     """Meta learner başlatılıyor mu?"""
     from services.learning.meta_learner import meta_learner
+
     assert meta_learner is not None
     report = meta_learner.get_report()
     assert report["total_records"] == 0
@@ -309,9 +329,7 @@ def test_meta_learner_decay_prediction():
     learner = MetaLearner()
     # Azalan performans
     for i in range(40):
-        learner.record_performance("model_v1", "BULL", {
-            "sharpe": 1.5 - i*0.03, "win_rate": 0.6, "ic": 0.05
-        })
+        learner.record_performance("model_v1", "BULL", {"sharpe": 1.5 - i * 0.03, "win_rate": 0.6, "ic": 0.05})
 
     result = learner.predict_decay("model_v1")
     print(f"✅ Decay prediction: {result}")
@@ -333,9 +351,11 @@ def test_meta_learner_regime_summary():
 
 # ===================== FAZ 8: HEALTH MONITOR =====================
 
+
 def test_health_monitor_init():
     """Health monitor başlatılıyor mu?"""
     from services.learning.health_monitor import learning_health_monitor
+
     assert learning_health_monitor is not None
     report = learning_health_monitor.get_report()
     assert report["status"] == "OK"
@@ -382,6 +402,7 @@ def test_health_error_recording():
 
 
 # ===================== MAIN =====================
+
 
 def run_all_tests():
     """Tüm testleri çalıştır."""
@@ -435,9 +456,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 3-9 TEST SONUÇLARI")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class DedupStats:
     """Deduplication istatistikleri."""
+
     total_checked: int = 0
     total_duplicates: int = 0
     total_unique: int = 0
@@ -80,9 +81,7 @@ class EventDeduplicator:
 
         if event_hash in self._seen:
             self._stats.total_duplicates += 1
-            logger.debug("Duplicate event detected",
-                        event_hash=event_hash[:8],
-                        event_type=event_data.get("event_type"))
+            logger.debug("Duplicate event detected", event_hash=event_hash[:8], event_type=event_data.get("event_type"))
             return True
 
         return False
@@ -114,29 +113,19 @@ class EventDeduplicator:
 
         cutoff = time.time() - self._window_seconds
         old_count = len(self._seen)
-        self._seen = {
-            h: ts for h, ts in self._seen.items()
-            if ts > cutoff
-        }
+        self._seen = {h: ts for h, ts in self._seen.items() if ts > cutoff}
         cleaned = old_count - len(self._seen)
         if cleaned > 0:
             self._stats.window_cleanups += 1
-            logger.debug("Dedup cleanup",
-                        cleaned=cleaned,
-                        remaining=len(self._seen))
+            logger.debug("Dedup cleanup", cleaned=cleaned, remaining=len(self._seen))
 
     def cleanup(self):
         """Manuel temizleme."""
         cutoff = time.time() - self._window_seconds
         old_count = len(self._seen)
-        self._seen = {
-            h: ts for h, ts in self._seen.items()
-            if ts > cutoff
-        }
+        self._seen = {h: ts for h, ts in self._seen.items() if ts > cutoff}
         cleaned = old_count - len(self._seen)
-        logger.info("Manual dedup cleanup",
-                   cleaned=cleaned,
-                   remaining=len(self._seen))
+        logger.info("Manual dedup cleanup", cleaned=cleaned, remaining=len(self._seen))
 
     def get_stats(self) -> dict:
         """İstatistikler."""
@@ -144,9 +133,7 @@ class EventDeduplicator:
             "total_checked": self._stats.total_checked,
             "total_duplicates": self._stats.total_duplicates,
             "total_unique": self._stats.total_unique,
-            "duplicate_rate": round(
-                self._stats.total_duplicates / max(self._stats.total_checked, 1) * 100, 1
-            ),
+            "duplicate_rate": round(self._stats.total_duplicates / max(self._stats.total_checked, 1) * 100, 1),
             "window_size_hours": self._window_seconds / 3600,
             "current_entries": len(self._seen),
             "window_cleanups": self._stats.window_cleanups,

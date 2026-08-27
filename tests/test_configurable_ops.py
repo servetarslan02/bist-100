@@ -33,17 +33,22 @@ from services.core.monitoring_security import JWTProvider
 # POLICY CONFIG TESTS
 # =====================================================
 
+
 async def test_policy_load_from_file():
     """Config dosyasından policy yüklenmeli."""
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        f.write(orjson.dumps({
-            "version": 1,
-            "escalation_timeouts": {"cash_negative": 60, "health_change": 600},
-            "notification_routing": {"WARNING": ["log"], "CRITICAL": ["log", "webhook"]},
-            "severity_thresholds": {"drawdown_warning_pct": 8.0},
-        }).decode())
+        f.write(
+            orjson.dumps(
+                {
+                    "version": 1,
+                    "escalation_timeouts": {"cash_negative": 60, "health_change": 600},
+                    "notification_routing": {"WARNING": ["log"], "CRITICAL": ["log", "webhook"]},
+                    "severity_thresholds": {"drawdown_warning_pct": 8.0},
+                }
+            ).decode()
+        )
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)
@@ -192,6 +197,7 @@ async def test_policy_default_config():
 # SILENCE TESTS
 # =====================================================
 
+
 async def test_silence_add_and_check():
     """Susturma eklenebilmeli ve kontrol edilebilmeli."""
     issues = []
@@ -270,6 +276,7 @@ async def test_silence_remove():
 async def test_silence_persistence():
     """Susturma durumu DB'ye kaydedilebilmeli ve yüklenebilmeli."""
     import duckdb
+
     issues = []
 
     db = duckdb.connect(":memory:")
@@ -346,6 +353,7 @@ async def test_silence_active_list():
 # JWKS TESTS
 # =====================================================
 
+
 async def test_jwt_hs256_still_works():
     """HS256 JWT doğrulama JWKS ile uyumlu olmalı."""
     issues = []
@@ -358,8 +366,7 @@ async def test_jwt_hs256_still_works():
     secret = "test_secret"
     provider = JWTProvider(secret=secret, algorithm="HS256")
 
-    token = pyjwt.encode({"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 100},
-                          secret, algorithm="HS256")
+    token = pyjwt.encode({"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 100}, secret, algorithm="HS256")
 
     result = await provider.verify(token)
     if not result.authenticated:
@@ -396,10 +403,7 @@ async def test_jwt_jwks_cache():
     """JWKS cache TTL doğru çalışmalı."""
     issues = []
 
-    provider = JWTProvider(
-        algorithm="RS256", jwks_url="https://example.com/.well-known/jwks.json",
-        jwks_cache_ttl_s=60
-    )
+    provider = JWTProvider(algorithm="RS256", jwks_url="https://example.com/.well-known/jwks.json", jwks_cache_ttl_s=60)
 
     # Cache boş
     if provider._jwks_cache:
@@ -427,8 +431,7 @@ async def test_jwt_expiration():
     secret = "test"
     provider = JWTProvider(secret=secret)
 
-    expired = pyjwt.encode({"sub": "u", "roles": [], "exp": int(time.time()) - 100},
-                             secret, algorithm="HS256")
+    expired = pyjwt.encode({"sub": "u", "roles": [], "exp": int(time.time()) - 100}, secret, algorithm="HS256")
     result = await provider.verify(expired)
     if result.authenticated:
         issues.append("Expired token kabul edildi")
@@ -441,6 +444,7 @@ async def test_jwt_expiration():
 # =====================================================
 # POLICY-BASED ALERTING TESTS
 # =====================================================
+
 
 async def test_policy_based_escalation():
     """Policy'deki timeout'a göre escalation yapılmalı."""
@@ -498,6 +502,7 @@ async def test_policy_notification_routing():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

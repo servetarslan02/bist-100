@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 # Enums
 # =====================================================
 
+
 class Direction(StrEnum):
     LONG = "LONG"
     SHORT = "SHORT"
@@ -55,8 +56,10 @@ class TimeHorizon(StrEnum):
 # Market Data Models
 # =====================================================
 
+
 class MarketTick(BaseModel):
     """P0-8: Invariant validation eklendi."""
+
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -116,12 +119,14 @@ class OrderBookSnapshot(BaseModel):
 # Asset State Models
 # =====================================================
 
+
 class AssetState(BaseModel):
     """Complete state of a single asset.
 
     P0-8: Invariant validation eklendi.
     Missing != 0 != NaN != Invalid ayrımı korunmalı.
     """
+
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -204,6 +209,7 @@ class AssetState(BaseModel):
 
 class MarketState(BaseModel):
     """Overall market state."""
+
     timestamp: datetime
     regime: MarketRegime = MarketRegime.RANGE
     regime_confidence: float = 0.0
@@ -225,6 +231,7 @@ class WorldState(BaseModel):
     P0-8: VIX ayrı normalize edilmeli (0-1 state'lerle karışmamalı).
     0-1 arası state'ler invariant validation ile korunmalı.
     """
+
     timestamp: datetime
     geopolitical_risk: float = 0.0
     global_risk_appetite: float = 0.5
@@ -239,9 +246,15 @@ class WorldState(BaseModel):
     emerging_market_risk: float = 0.5
 
     @field_validator(
-        "geopolitical_risk", "global_risk_appetite", "usd_strength",
-        "us_rate_pressure", "commodity_pressure", "oil_pressure",
-        "turkey_macro_risk", "vix_normalized", "emerging_market_risk",
+        "geopolitical_risk",
+        "global_risk_appetite",
+        "usd_strength",
+        "us_rate_pressure",
+        "commodity_pressure",
+        "oil_pressure",
+        "turkey_macro_risk",
+        "vix_normalized",
+        "emerging_market_risk",
     )
     @classmethod
     def _validate_01_range(cls, v: float, info) -> float:
@@ -255,8 +268,10 @@ class WorldState(BaseModel):
 # Signal Models
 # =====================================================
 
+
 class EdgeDecomposition(BaseModel):
     """Breakdown of why a signal was generated."""
+
     flow_anomaly: float = 0.0
     relative_strength: float = 0.0
     regime_compatibility: float = 0.0
@@ -275,6 +290,7 @@ class Signal(BaseModel):
     - score, confidence ∈ [0,1] aralığında olmalı
     - Timestamp timezone-aware
     """
+
     id: int | None = None
     instrument_id: int
     ticker: str
@@ -313,6 +329,7 @@ class Signal(BaseModel):
 # Portfolio Models
 # =====================================================
 
+
 class Position(BaseModel):
     instrument_id: int
     ticker: str
@@ -343,6 +360,7 @@ class Portfolio(BaseModel):
 # Prediction & Outcome Models
 # =====================================================
 
+
 class Prediction(BaseModel):
     id: int | None = None
     model_version_id: int
@@ -372,6 +390,7 @@ class Outcome(BaseModel):
 # Simulation Models
 # =====================================================
 
+
 class ScenarioResult(BaseModel):
     scenario_name: str
     market_change_pct: float
@@ -395,6 +414,7 @@ class SimulationResult(BaseModel):
 # =====================================================
 # Alert Models
 # =====================================================
+
 
 class Alert(BaseModel):
     id: int | None = None

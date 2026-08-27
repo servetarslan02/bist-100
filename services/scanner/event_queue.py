@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class EventTask:
     """Event görevi."""
+
     event_type: str
     event_data: dict
     ticker: str
@@ -63,8 +64,7 @@ class EventPriorityQueue:
         self._workers.clear()
         logger.info("Event queue stopped", processed=self._processed_count)
 
-    async def submit(self, event_type: str, event_data: dict,
-                     affected_tickers: list[str]):
+    async def submit(self, event_type: str, event_data: dict, affected_tickers: list[str]):
         """
         Event'i kuyruğa ekle.
         Her etkilenen hisse için ayrı task oluşturulur.
@@ -84,8 +84,7 @@ class EventPriorityQueue:
             )
             await self._queue.put((priority, task))
 
-        logger.info("Events queued", event_type=event_type,
-                    tickers=len(affected_tickers), priority=priority)
+        logger.info("Events queued", event_type=event_type, tickers=len(affected_tickers), priority=priority)
 
     def _calculate_priority(self, event_type: str, importance: float) -> int:
         """Öncelik hesapla (1=en yüksek)."""
@@ -104,9 +103,7 @@ class EventPriorityQueue:
         """Worker — kuyruktan task alıp işler."""
         while self._running:
             try:
-                priority, task = await asyncio.wait_for(
-                    self._queue.get(), timeout=1.0
-                )
+                priority, task = await asyncio.wait_for(self._queue.get(), timeout=1.0)
 
                 if self._handler:
                     try:
@@ -116,9 +113,7 @@ class EventPriorityQueue:
                             self._handler(task)
                         self._processed_count += 1
                     except Exception as e:
-                        logger.error("Event handler error",
-                                   worker=name, ticker=task.ticker,
-                                   error=str(e))
+                        logger.error("Event handler error", worker=name, ticker=task.ticker, error=str(e))
 
             except TimeoutError:
                 continue

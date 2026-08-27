@@ -33,6 +33,7 @@ class EventPriority(StrEnum):
 @dataclass
 class CatalystEvent:
     """Yaklaşan olay."""
+
     catalyst_id: str
     ticker: str
     catalyst_type: str  # earnings, dividend, assembly, contract, regulatory, central_bank, macro
@@ -92,14 +93,16 @@ class CatalystEngine:
                     cat_date = cat_date.replace(tzinfo=UTC)
                 days_until = (cat_date - now).days
                 if 0 <= days_until <= days:
-                    upcoming.append({
-                        "ticker": c.ticker,
-                        "type": c.catalyst_type,
-                        "date": c.date,
-                        "days_until": days_until,
-                        "importance": c.importance,
-                        "expected_impact": c.expected_impact,
-                    })
+                    upcoming.append(
+                        {
+                            "ticker": c.ticker,
+                            "type": c.catalyst_type,
+                            "date": c.date,
+                            "days_until": days_until,
+                            "importance": c.importance,
+                            "expected_impact": c.expected_impact,
+                        }
+                    )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="infrastructure.py:100")
 
@@ -158,25 +161,34 @@ class AlertEngine:
         """Drawdown kontrolü."""
         threshold = self._thresholds["max_drawdown_pct"]
         if current_drawdown > threshold:
-            self._notifications.notify("RISK", "Drawdown Alert",
+            self._notifications.notify(
+                "RISK",
+                "Drawdown Alert",
                 f"Portfolio drawdown {current_drawdown:.1f}% exceeds threshold {threshold}%",
-                severity="CRITICAL")
+                severity="CRITICAL",
+            )
 
     def check_daily_loss(self, daily_loss_pct: float):
         """Günlük zarar kontrolü."""
         threshold = self._thresholds["daily_loss_pct"]
         if abs(daily_loss_pct) > threshold:
-            self._notifications.notify("RISK", "Daily Loss Alert",
+            self._notifications.notify(
+                "RISK",
+                "Daily Loss Alert",
                 f"Daily loss {daily_loss_pct:.1f}% exceeds threshold {threshold}%",
-                severity="HIGH")
+                severity="HIGH",
+            )
 
     def check_position_limit(self, ticker: str, position_pct: float):
         """Pozisyon limiti kontrolü."""
         threshold = self._thresholds["position_limit_pct"]
         if position_pct > threshold:
-            self._notifications.notify("RISK", "Position Limit Alert",
+            self._notifications.notify(
+                "RISK",
+                "Position Limit Alert",
                 f"{ticker} position {position_pct:.1f}% exceeds limit {threshold}%",
-                severity="HIGH")
+                severity="HIGH",
+            )
 
 
 class SnapshotSystem:

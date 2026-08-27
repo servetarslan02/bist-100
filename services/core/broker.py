@@ -87,7 +87,11 @@ class PaperBroker(BrokerInterface):
         order.status = OrderStatus.SUBMITTED.value
 
         # Fill simülasyonu — slippage dahil
-        slippage_mult = 1.0 + (self._slippage_bps / 10_000) if order.side == OrderSide.BUY.value else 1.0 - (self._slippage_bps / 10_000)
+        slippage_mult = (
+            1.0 + (self._slippage_bps / 10_000)
+            if order.side == OrderSide.BUY.value
+            else 1.0 - (self._slippage_bps / 10_000)
+        )
         fill_price = round(order.price * slippage_mult, 4)
 
         if order.side == OrderSide.BUY.value:
@@ -124,8 +128,14 @@ class PaperBroker(BrokerInterface):
         if order.idempotency_key:
             self._idempotency_keys[order.idempotency_key] = order.order_id
 
-        logger.info("Paper order", order_id=order.order_id, status=order.status,
-                    ticker=order.ticker, side=order.side, qty=order.quantity)
+        logger.info(
+            "Paper order",
+            order_id=order.order_id,
+            status=order.status,
+            ticker=order.ticker,
+            side=order.side,
+            qty=order.quantity,
+        )
         return order
 
     def cancel_order(self, order_id: str) -> bool:

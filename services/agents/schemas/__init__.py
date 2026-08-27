@@ -34,6 +34,7 @@ def _normalize_confidence(v):
 
 class AgentOutputSchema(BaseModel):
     """Standart agent çıktı şeması."""
+
     direction: Direction = Direction.NEUTRAL
     confidence: float = Field(default=0.5)
     score: float = Field(default=50.0, ge=0.0, le=100.0)
@@ -50,6 +51,7 @@ class AgentOutputSchema(BaseModel):
 
 class TechnicalOutputSchema(AgentOutputSchema):
     """Teknik analiz agent çıktısı."""
+
     support_levels: list[float] = Field(default_factory=list)
     resistance_levels: list[float] = Field(default_factory=list)
     patterns: list[str] = Field(default_factory=list)
@@ -59,6 +61,7 @@ class TechnicalOutputSchema(AgentOutputSchema):
 
 class FundamentalOutputSchema(AgentOutputSchema):
     """Fundamental analiz agent çıktısı."""
+
     valuation: str = "FAIR"  # UNDERVALUED, OVERVALUED, FAIR
     quality_score: float = Field(default=50.0, ge=0.0, le=100.0)
     growth_score: float = Field(default=50.0, ge=0.0, le=100.0)
@@ -67,6 +70,7 @@ class FundamentalOutputSchema(AgentOutputSchema):
 
 class NewsOutputSchema(AgentOutputSchema):
     """Haber/KAP analiz agent çıktısı."""
+
     sentiment_score: float = Field(default=0.0, ge=-1.0, le=1.0)
     event_count: int = 0
     key_events: list[str] = Field(default_factory=list)
@@ -75,6 +79,7 @@ class NewsOutputSchema(AgentOutputSchema):
 
 class MacroOutputSchema(AgentOutputSchema):
     """Makro analiz agent çıktısı."""
+
     regime: str = "UNKNOWN"  # RISK_ON, RISK_OFF, NEUTRAL, TRANSITION
     macro_score: float = Field(default=50.0, ge=0.0, le=100.0)
     key_factors: list[str] = Field(default_factory=list)
@@ -83,6 +88,7 @@ class MacroOutputSchema(AgentOutputSchema):
 
 class DebateArgumentSchema(BaseModel):
     """Tartışma argüman şeması."""
+
     position: Direction
     confidence: float = Field(default=0.5)
     main_argument: str = ""
@@ -99,6 +105,7 @@ class DebateArgumentSchema(BaseModel):
 
 class RiskAssessmentSchema(BaseModel):
     """Risk değerlendirme şeması."""
+
     risk_level: RiskLevel = RiskLevel.MEDIUM
     risk_score: float = Field(default=50.0, ge=0.0, le=100.0)
     approved: bool = True
@@ -110,6 +117,7 @@ class RiskAssessmentSchema(BaseModel):
 
 class SynthesisResultSchema(BaseModel):
     """Sentez sonuç şeması."""
+
     ticker: str
     final_direction: Direction = Direction.NEUTRAL
     final_confidence: float = Field(default=0.0)
@@ -131,6 +139,7 @@ class SynthesisResultSchema(BaseModel):
 
 class AgentMessageSchema(BaseModel):
     """Agent iletişim mesaj şeması."""
+
     sender: str
     receiver: str
     task_id: str

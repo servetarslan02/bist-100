@@ -134,6 +134,7 @@ class LearningService:
 
                     # Evaluate
                     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
                     y_pred = model.predict(X_val)
 
                     metrics = {
@@ -148,6 +149,7 @@ class LearningService:
 
                     # Save model
                     import os
+
                     model_dir = f"ml/saved_models/{model_name}"
                     os.makedirs(model_dir, exist_ok=True)
                     model.save(f"{model_dir}/{config.version}.pkl")
@@ -182,7 +184,9 @@ class LearningService:
                 return None
 
             # Pivot features
-            df = pl.DataFrame(result.result_rows, schema=["instrument_id", "timestamp", "feature_name", "feature_value"])
+            df = pl.DataFrame(
+                result.result_rows, schema=["instrument_id", "timestamp", "feature_name", "feature_value"]
+            )
 
             # This is simplified - in production, you'd do proper pivoting
             # and join with actual return outcomes
@@ -217,7 +221,8 @@ class LearningService:
 
                 if actual is not None:
                     # Store outcome
-                    await pg_execute("""
+                    await pg_execute(
+                        """
                         INSERT INTO model_outcomes (prediction_id, actual_return_pct, actual_direction, prediction_error, is_correct, outcome_date)
                         VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
                     """,
@@ -234,7 +239,8 @@ class LearningService:
     async def _get_actual_return(self, instrument_id: int, start_date, days: int) -> dict | None:
         """Get actual return for a prediction."""
         try:
-            result = ch_execute("""
+            result = ch_execute(
+                """
                 SELECT
                     argMin(close, timestamp) as start_price,
                     argMax(close, timestamp) as end_price
@@ -243,7 +249,9 @@ class LearningService:
                 AND timeframe = '1d'
                 AND timestamp >= %(start)s
                 AND timestamp <= %(start)s + INTERVAL %(days)s DAY
-            """, parameters={"id": instrument_id, "start": start_date, "days": days})
+            """,
+                parameters={"id": instrument_id, "start": start_date, "days": days},
+            )
 
             if result.result_rows and len(result.result_rows) > 0:
                 row = result.result_rows[0]
@@ -270,25 +278,39 @@ class LearningService:
 
     async def _register_model(self, name: str, config, metrics: dict):
         """Register model in database."""
-        await pg_execute("""
+        await pg_execute(
+            """
             INSERT INTO models (name, description, model_type, framework, target_variable, features, hyperparameters, status)
             VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE')
             ON CONFLICT (name) DO UPDATE SET
                 features = $6, hyperparameters = $7, updated_at = NOW()
-        """, name, config.description, config.model_type, "lightgbm", config.target,
-            orjson.dumps(config.features), orjson.dumps(config.hyperparams)).decode()
+        """,
+            name,
+            config.description,
+            config.model_type,
+            "lightgbm",
+            config.target,
+            orjson.dumps(config.features),
+            orjson.dumps(config.hyperparams),
+        ).decode()
 
         model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", name)
 
-        await pg_execute("""
+        await pg_execute(
+            """
             INSERT INTO model_versions (model_id, version, metrics, status, created_at)
             VALUES ($1, $2, $3, 'CANDIDATE', NOW())
-        """, model_id, config.version, orjson.dumps(metrics).decode())
+        """,
+            model_id,
+            config.version,
+            orjson.dumps(metrics).decode(),
+        )
 
 
 # =====================================================
 # Health Check HTTP Server
 # =====================================================
+
 
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
@@ -298,10 +320,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "learning"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -309,6 +331,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the learning service."""
@@ -332,6 +355,7 @@ def get_learning_systems() -> dict[str, Any]:
     result = {}
     try:
         from .outcome_tracker import OutcomeTracker
+
         result["outcome_tracker"] = OutcomeTracker()
     except ImportError:
         logger.debug("Optional import not available in get_learning_systems", exc_info=True)
@@ -339,6 +363,7 @@ def get_learning_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="OutcomeTracker", error=str(e))
     try:
         from .attribution import AttributionEngine
+
         result["attribution"] = AttributionEngine()
     except ImportError:
         logger.debug("Optional import not available in get_learning_systems", exc_info=True)
@@ -346,6 +371,7 @@ def get_learning_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="AttributionEngine", error=str(e))
     try:
         from .learning_loop import LearningLoop
+
         result["learning_loop"] = LearningLoop()
     except ImportError:
         logger.debug("Optional import not available in get_learning_systems", exc_info=True)
@@ -353,6 +379,7 @@ def get_learning_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="LearningLoop", error=str(e))
     try:
         from .continuous_learning import ContinuousLearning
+
         result["continuous_learning"] = ContinuousLearning()
     except ImportError:
         logger.debug("Optional import not available in get_learning_systems", exc_info=True)
@@ -360,6 +387,7 @@ def get_learning_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="ContinuousLearning", error=str(e))
     try:
         from .super_intelligence import SuperIntelligence
+
         result["super_intelligence"] = SuperIntelligence()
     except ImportError:
         logger.debug("Optional import not available in get_learning_systems", exc_info=True)

@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class FactorContribution:
     """Faktör katkısı."""
+
     factor: str
     contribution: float
     contribution_pct: float
@@ -32,6 +33,7 @@ class FactorContribution:
 @dataclass
 class DecompositionResult:
     """Ayrıştırma sonucu."""
+
     ticker: str
     sector: str
     total_return: float
@@ -59,16 +61,96 @@ class MacroFactorDecomposition:
 
     # Sektör hassasiyet matrisi
     SECTOR_SENSITIVITY = {
-        "BANK": {"usdtry": -0.3, "interest_rate": 0.9, "inflation": -0.7, "oil": -0.1, "gold": 0.1, "global_market": 0.5, "vix": -0.4},
-        "AVIATION": {"usdtry": -0.8, "interest_rate": -0.5, "inflation": -0.4, "oil": -0.9, "gold": 0.0, "global_market": 0.6, "vix": -0.5},
-        "ENERGY": {"usdtry": 0.5, "interest_rate": -0.4, "inflation": 0.3, "oil": 0.9, "gold": 0.1, "global_market": 0.7, "vix": -0.3},
-        "TECH": {"usdtry": 0.4, "interest_rate": -0.6, "inflation": -0.3, "oil": -0.1, "gold": 0.0, "global_market": 0.8, "vix": -0.6},
-        "RETAIL": {"usdtry": -0.6, "interest_rate": -0.5, "inflation": -0.8, "oil": -0.3, "gold": 0.0, "global_market": 0.3, "vix": -0.3},
-        "METAL": {"usdtry": 0.4, "interest_rate": -0.3, "inflation": 0.3, "oil": -0.5, "gold": 0.7, "global_market": 0.8, "vix": -0.4},
-        "CONSTR": {"usdtry": -0.6, "interest_rate": -0.8, "inflation": -0.7, "oil": -0.4, "gold": 0.1, "global_market": 0.3, "vix": -0.4},
-        "FOOD": {"usdtry": -0.5, "interest_rate": -0.4, "inflation": -0.6, "oil": -0.3, "gold": 0.0, "global_market": 0.3, "vix": -0.3},
-        "HOLDING": {"usdtry": -0.4, "interest_rate": -0.5, "inflation": -0.4, "oil": -0.2, "gold": 0.1, "global_market": 0.5, "vix": -0.4},
-        "OTHER": {"usdtry": -0.4, "interest_rate": -0.4, "inflation": -0.4, "oil": -0.2, "gold": 0.1, "global_market": 0.4, "vix": -0.3},
+        "BANK": {
+            "usdtry": -0.3,
+            "interest_rate": 0.9,
+            "inflation": -0.7,
+            "oil": -0.1,
+            "gold": 0.1,
+            "global_market": 0.5,
+            "vix": -0.4,
+        },
+        "AVIATION": {
+            "usdtry": -0.8,
+            "interest_rate": -0.5,
+            "inflation": -0.4,
+            "oil": -0.9,
+            "gold": 0.0,
+            "global_market": 0.6,
+            "vix": -0.5,
+        },
+        "ENERGY": {
+            "usdtry": 0.5,
+            "interest_rate": -0.4,
+            "inflation": 0.3,
+            "oil": 0.9,
+            "gold": 0.1,
+            "global_market": 0.7,
+            "vix": -0.3,
+        },
+        "TECH": {
+            "usdtry": 0.4,
+            "interest_rate": -0.6,
+            "inflation": -0.3,
+            "oil": -0.1,
+            "gold": 0.0,
+            "global_market": 0.8,
+            "vix": -0.6,
+        },
+        "RETAIL": {
+            "usdtry": -0.6,
+            "interest_rate": -0.5,
+            "inflation": -0.8,
+            "oil": -0.3,
+            "gold": 0.0,
+            "global_market": 0.3,
+            "vix": -0.3,
+        },
+        "METAL": {
+            "usdtry": 0.4,
+            "interest_rate": -0.3,
+            "inflation": 0.3,
+            "oil": -0.5,
+            "gold": 0.7,
+            "global_market": 0.8,
+            "vix": -0.4,
+        },
+        "CONSTR": {
+            "usdtry": -0.6,
+            "interest_rate": -0.8,
+            "inflation": -0.7,
+            "oil": -0.4,
+            "gold": 0.1,
+            "global_market": 0.3,
+            "vix": -0.4,
+        },
+        "FOOD": {
+            "usdtry": -0.5,
+            "interest_rate": -0.4,
+            "inflation": -0.6,
+            "oil": -0.3,
+            "gold": 0.0,
+            "global_market": 0.3,
+            "vix": -0.3,
+        },
+        "HOLDING": {
+            "usdtry": -0.4,
+            "interest_rate": -0.5,
+            "inflation": -0.4,
+            "oil": -0.2,
+            "gold": 0.1,
+            "global_market": 0.5,
+            "vix": -0.4,
+        },
+        "OTHER": {
+            "usdtry": -0.4,
+            "interest_rate": -0.4,
+            "inflation": -0.4,
+            "oil": -0.2,
+            "gold": 0.1,
+            "global_market": 0.4,
+            "vix": -0.3,
+        },
     }
 
     def decompose(
@@ -122,13 +204,15 @@ class MacroFactorDecomposition:
             else:
                 significance = "LOW"
 
-            contributions.append(FactorContribution(
-                factor=factor,
-                contribution=round(contribution, 4),
-                contribution_pct=round(contribution * 100, 2),
-                direction=direction,
-                significance=significance,
-            ))
+            contributions.append(
+                FactorContribution(
+                    factor=factor,
+                    contribution=round(contribution, 4),
+                    contribution_pct=round(contribution * 100, 2),
+                    direction=direction,
+                    significance=significance,
+                )
+            )
 
             total_explained += contribution
 

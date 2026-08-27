@@ -29,6 +29,7 @@ def test_init():
 def test_singleton():
     """Singleton doğru mu?"""
     from services.learning.health_monitor import learning_health_monitor
+
     assert learning_health_monitor is not None
     print("✅ Singleton")
 
@@ -54,8 +55,12 @@ def test_check_health_modules():
     report = m.check_health()
 
     expected_modules = [
-        "prediction_tracking", "outcome_tracking", "calibration",
-        "drift_detection", "model_performance", "feature_pipeline",
+        "prediction_tracking",
+        "outcome_tracking",
+        "calibration",
+        "drift_detection",
+        "model_performance",
+        "feature_pipeline",
     ]
     for mod in expected_modules:
         assert mod in report.modules, f"Missing module: {mod}"
@@ -98,9 +103,12 @@ def test_overall_status_warning():
     m = LearningHealthMonitor()
     # Manuel warning ekle
     m._module_status["test"] = ModuleHealth(
-        module="test", status="WARNING",
+        module="test",
+        status="WARNING",
         last_check=datetime.now(UTC).isoformat(),
-        error_count=0, last_error=None, uptime_hours=0,
+        error_count=0,
+        last_error=None,
+        uptime_hours=0,
     )
 
     report = m.check_health()
@@ -187,9 +195,12 @@ def test_error_updates_module_status():
     m = LearningHealthMonitor()
     # Manuel modül status ekle
     m._module_status["test"] = ModuleHealth(
-        module="test", status="HEALTHY",
+        module="test",
+        status="HEALTHY",
         last_check=datetime.now(UTC).isoformat(),
-        error_count=0, last_error=None, uptime_hours=0,
+        error_count=0,
+        last_error=None,
+        uptime_hours=0,
     )
 
     m.record_error("test", "New error")
@@ -261,16 +272,17 @@ def test_module_health_fields():
     report = m.check_health()
 
     for _name, health in report.modules.items():
-        assert hasattr(health, 'module')
-        assert hasattr(health, 'status')
-        assert hasattr(health, 'last_check')
-        assert hasattr(health, 'error_count')
-        assert hasattr(health, 'last_error')
-        assert hasattr(health, 'uptime_hours')
+        assert hasattr(health, "module")
+        assert hasattr(health, "status")
+        assert hasattr(health, "last_check")
+        assert hasattr(health, "error_count")
+        assert hasattr(health, "last_error")
+        assert hasattr(health, "uptime_hours")
     print("✅ Module health fields")
 
 
 # ===================== MAIN =====================
+
 
 def run_all_tests():
     tests = [
@@ -307,9 +319,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 8 TEST SONUÇLARI (Health Monitor)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

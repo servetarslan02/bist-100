@@ -25,7 +25,7 @@ def _get_system_resources() -> dict[str, Any]:
         if psutil:
             vm = psutil.virtual_memory()
             cpu = psutil.cpu_percent(interval=None)
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
             return {
                 "cpu_pct": round(cpu, 1),
@@ -67,6 +67,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     # PostgreSQL
     try:
         from ...core.database import pg_fetchval
+
         time.time()
         ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if ok else "unhealthy"
@@ -77,6 +78,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     # Redis
     try:
         from ...core.database import get_redis
+
         r = await get_redis()
         ok = await r.ping()
         services["redis"] = "healthy" if ok else "unhealthy"
@@ -87,6 +89,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     # ClickHouse
     try:
         from ...core.database import ch_execute
+
         # NOT: ch_execute senkron/blocking bir HTTP cagrisi yapiyor. Dogrudan
         # await edilmeden (yani ana event loop'u bloke ederek) cagrilirsa
         # ClickHouse'un yanit suresi boyunca TUM API (diger tum kullanicilar
@@ -121,7 +124,10 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
     pipeline_stats = [
         {"label": "Aktif CPU Kullanımı", "value": f"%{resources['cpu_pct']:.1f}"},
-        {"label": "Aktif Bellek (RAM)", "value": f"{resources['memory_used_mb']:,} MB / {resources['memory_total_mb']:,} MB (%{resources['memory_pct']:.1f})"},
+        {
+            "label": "Aktif Bellek (RAM)",
+            "value": f"{resources['memory_used_mb']:,} MB / {resources['memory_total_mb']:,} MB (%{resources['memory_pct']:.1f})",
+        },
         {"label": "İç Gecikme (Latency)", "value": "1.2 ms (Sub-5ms Ultra Low Latency)"},
         {"label": "Düşen Paket (Drop Rate)", "value": "0 Paket (%0.00)"},
         {"label": "Veri Kaynakları", "value": "Borsa İstanbul, Yahoo Finance, TCMB EVDS, KAP"},
@@ -147,14 +153,16 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     ch_tables = []
     try:
         from ...core.database import ch_execute
+
         # NOT: ch_execute blocking oldugu icin run_in_executor'a alindi — yoksa
         # bu iki sorgu suresince (network+ClickHouse round-trip) ana event loop
         # bloklanir ve TUM diger API istekleri (dolayisiyla siteye tiklamalar) donar.
         loop = asyncio.get_event_loop()
         t0 = time.time()
         res = await loop.run_in_executor(
-            None, ch_execute,
-            "SELECT formatReadableSize(sum(data_compressed_bytes)), sum(rows) FROM system.parts WHERE active"
+            None,
+            ch_execute,
+            "SELECT formatReadableSize(sum(data_compressed_bytes)), sum(rows) FROM system.parts WHERE active",
         )
         ch_lat = round((time.time() - t0) * 1000, 1)
         if res.result_rows and res.result_rows[0][0]:
@@ -163,8 +171,9 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
             ch_rows = f"{total_r / 1_000_000:.1f}M Satır" if total_r > 1_000_000 else f"{total_r:,} Satır"
 
         t_res = await loop.run_in_executor(
-            None, ch_execute,
-            "SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) FROM system.parts WHERE active GROUP BY table"
+            None,
+            ch_execute,
+            "SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) FROM system.parts WHERE active GROUP BY table",
         )
         for row in t_res.result_rows:
             ch_tables.append({"name": str(row[0]), "rows": f"{row[1]:,} Satır", "size": str(row[2])})
@@ -185,6 +194,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     pg_total_rows = 0
     try:
         from ...core.database import pg_fetch, pg_fetchval
+
         t0 = time.time()
         res_pg = await pg_fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))")
         pg_lat = round((time.time() - t0) * 1000, 1)
@@ -218,6 +228,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     redis_tables = []
     try:
         from ...core.database import get_redis
+
         r = await get_redis()
         t0 = time.time()
         await r.ping()
@@ -295,6 +306,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
 _ALERTS_CACHE = None
 _ALERTS_CACHE_TIME = 0.0
 
+
 @router.get("/db-performance")
 async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Veritabanı Performans Metrikleri — Cache hit ratio, bağlantı istatistikleri, yavaş sorgular."""
@@ -361,6 +373,7 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
 _ALERTS_CACHE = None
 _ALERTS_CACHE_TIME = 0.0
 
+
 @router.get("/alerts")
 async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları (Hızlı Önbellekli)."""
@@ -375,8 +388,11 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     # 1. ML Ensemble Fırsat Alarmları
     try:
         from ...core.redis_helper import get_cached
+
         radar = get_cached("radar:data") or []
-        top_stocks = sorted([x for x in radar if x.get("score", 0) >= 70], key=lambda x: x.get("score", 0), reverse=True)[:4]
+        top_stocks = sorted(
+            [x for x in radar if x.get("score", 0) >= 70], key=lambda x: x.get("score", 0), reverse=True
+        )[:4]
         for idx, sig in enumerate(top_stocks):
             ticker = sig.get("symbol", "BIST")
             score = sig.get("score", 80)
@@ -384,53 +400,61 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             sig_type = "GÜÇLÜ AL" if score >= 80 else "AL"
             target_p = round(price * 1.12, 2)
             stop_p = round(price * 0.94, 2)
-            alerts.append({
-                "id": f"alt-ml-{ticker}-{idx}",
-                "title": f"ML Model Sinyali: {ticker} ({sig_type})",
-                "message": f"{ticker} için {score} güvenilirlik skoruyla {sig_type} tespit edildi. Güncel Fiyat: ₺{price:.2f}, Hedef: ₺{target_p:.2f}, Stop: ₺{stop_p:.2f}.",
-                "severity": "CRITICAL" if score >= 85 else "INFO",
-                "category": "SIGNAL",
-                "ticker": ticker,
-                "timestamp": now.strftime("%H:%M:%S"),
-                "read": False,
-            })
+            alerts.append(
+                {
+                    "id": f"alt-ml-{ticker}-{idx}",
+                    "title": f"ML Model Sinyali: {ticker} ({sig_type})",
+                    "message": f"{ticker} için {score} güvenilirlik skoruyla {sig_type} tespit edildi. Güncel Fiyat: ₺{price:.2f}, Hedef: ₺{target_p:.2f}, Stop: ₺{stop_p:.2f}.",
+                    "severity": "CRITICAL" if score >= 85 else "INFO",
+                    "category": "SIGNAL",
+                    "ticker": ticker,
+                    "timestamp": now.strftime("%H:%M:%S"),
+                    "read": False,
+                }
+            )
     except Exception as e:
         logger.debug("bist_ml_scanner_alerts_failed", error=str(e))
 
     # 2. Risk Parity & Portföy Isı Alarmı
     try:
-        alerts.append({
-            "id": "alt-risk-heat",
-            "title": "Portföy Risk Isısı Güvenli Sınırda",
-            "message": "Toplam Portföy Isısı (Portfolio Heat): %3.8 (Maksimum Kurumsal Sınır: %5.0). Risk Parity kuralı aktif.",
-            "severity": "INFO",
-            "category": "RISK",
-            "timestamp": now.strftime("%H:%M:%S"),
-            "read": False,
-        })
-        alerts.append({
-            "id": "alt-crisis-defense",
-            "title": "3-Günlük Kriz Teyit Filtresi Aktif",
-            "message": "BIST-100 SMA50/SMA200 rejim takibi devrede. Whipsaw önleyici 3 seanslık teyit mekanizması devrede.",
-            "severity": "INFO",
-            "category": "SYSTEM",
-            "timestamp": now.strftime("%H:%M:%S"),
-            "read": True,
-        })
+        alerts.append(
+            {
+                "id": "alt-risk-heat",
+                "title": "Portföy Risk Isısı Güvenli Sınırda",
+                "message": "Toplam Portföy Isısı (Portfolio Heat): %3.8 (Maksimum Kurumsal Sınır: %5.0). Risk Parity kuralı aktif.",
+                "severity": "INFO",
+                "category": "RISK",
+                "timestamp": now.strftime("%H:%M:%S"),
+                "read": False,
+            }
+        )
+        alerts.append(
+            {
+                "id": "alt-crisis-defense",
+                "title": "3-Günlük Kriz Teyit Filtresi Aktif",
+                "message": "BIST-100 SMA50/SMA200 rejim takibi devrede. Whipsaw önleyici 3 seanslık teyit mekanizması devrede.",
+                "severity": "INFO",
+                "category": "SYSTEM",
+                "timestamp": now.strftime("%H:%M:%S"),
+                "read": True,
+            }
+        )
     except Exception as e:
         logger.debug("risk_alerts_failed", error=str(e))
 
     # 3. Makro / Rejim Alarmı
     try:
-        alerts.append({
-            "id": "alt-cds-status",
-            "title": "Türkiye 5Y CDS: 268 bps",
-            "message": "Ülke risk primi 268 bps seviyesinde. Risk iştahı pozitif seyrediyor.",
-            "severity": "INFO",
-            "category": "VOLATILITY",
-            "timestamp": now.strftime("%H:%M:%S"),
-            "read": True,
-        })
+        alerts.append(
+            {
+                "id": "alt-cds-status",
+                "title": "Türkiye 5Y CDS: 268 bps",
+                "message": "Ülke risk primi 268 bps seviyesinde. Risk iştahı pozitif seyrediyor.",
+                "severity": "INFO",
+                "category": "VOLATILITY",
+                "timestamp": now.strftime("%H:%M:%S"),
+                "read": True,
+            }
+        )
     except Exception as e:
         logger.debug("macro_alerts_failed", error=str(e))
 
@@ -451,6 +475,7 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         # ClickHouse merge
         try:
             from ...core.database import ch_execute
+
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, ch_execute, "OPTIMIZE TABLE system.parts FINAL")
         except Exception:

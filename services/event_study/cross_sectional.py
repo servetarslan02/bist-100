@@ -4,6 +4,7 @@ Birden fazla hisse için event study — ortalama CAR, t-test,
 event type breakdown, sector breakdown, regression analysis.
 MacKinlay (1997) metodolojisi.
 """
+
 from typing import Any
 
 import numpy as np
@@ -196,9 +197,7 @@ class CrossSectionalEventStudy:
             logger.error("cross_sectional_regression_error", error=str(e))
             return {"error": str(e)}
 
-    def _group_breakdown(
-        self, event_cars: list[dict[str, Any]], group_key: str
-    ) -> dict[str, dict[str, Any]]:
+    def _group_breakdown(self, event_cars: list[dict[str, Any]], group_key: str) -> dict[str, dict[str, Any]]:
         """Grup bazlı breakdown."""
         groups = {}
         for e in event_cars:

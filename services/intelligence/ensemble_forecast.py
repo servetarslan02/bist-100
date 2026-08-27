@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class ModelForecast:
     """Tek model tahmini."""
+
     model_name: str
     predicted_return: float
     confidence: float
@@ -37,11 +38,12 @@ class ModelForecast:
 @dataclass
 class EnsembleResult:
     """Ensemble sonucu."""
+
     ticker: str
     horizon_days: int
     ensemble_prediction: float
     ensemble_confidence: float
-    model_agreement: float        # 0-1, yüksek = modeller hemfikir
+    model_agreement: float  # 0-1, yüksek = modeller hemfikir
     model_predictions: dict[str, float]
     model_confidences: dict[str, float]
     regime: str
@@ -62,7 +64,13 @@ class EnsembleForecaster:
     REGIME_WEIGHTS = {
         "BULL": {"lightgbm": 0.30, "xgboost": 0.25, "heuristic": 0.20, "statistical": 0.15, "momentum": 0.10},
         "BEAR": {"lightgbm": 0.20, "xgboost": 0.20, "heuristic": 0.25, "statistical": 0.25, "momentum": 0.10},
-        "HIGH_VOLATILITY": {"lightgbm": 0.20, "xgboost": 0.20, "heuristic": 0.30, "statistical": 0.20, "momentum": 0.10},
+        "HIGH_VOLATILITY": {
+            "lightgbm": 0.20,
+            "xgboost": 0.20,
+            "heuristic": 0.30,
+            "statistical": 0.20,
+            "momentum": 0.10,
+        },
         "LOW_VOLATILITY": {"lightgbm": 0.30, "xgboost": 0.25, "heuristic": 0.15, "statistical": 0.20, "momentum": 0.10},
         "SIDEWAYS": {"lightgbm": 0.25, "xgboost": 0.25, "heuristic": 0.20, "statistical": 0.20, "momentum": 0.10},
         "RISK_ON": {"lightgbm": 0.25, "xgboost": 0.25, "heuristic": 0.20, "statistical": 0.15, "momentum": 0.15},
@@ -129,25 +137,16 @@ class EnsembleForecaster:
 
         # Rejime göre ağırlıklar
         weights = self.REGIME_WEIGHTS.get(regime, self.REGIME_WEIGHTS["UNKNOWN"])
-        active_weights = {
-            name: weights.get(name, 1.0 / len(forecasts))
-            for name in forecasts
-        }
+        active_weights = {name: weights.get(name, 1.0 / len(forecasts)) for name in forecasts}
         # Normalize
         total_w = sum(active_weights.values())
         active_weights = {k: v / total_w for k, v in active_weights.items()}
 
         # Ağırlıklı ensemble
-        ensemble_pred = sum(
-            forecasts[name] * active_weights.get(name, 0)
-            for name in forecasts
-        )
+        ensemble_pred = sum(forecasts[name] * active_weights.get(name, 0) for name in forecasts)
 
         # Ağırlıklı confidence
-        ensemble_conf = sum(
-            confidences[name] * active_weights.get(name, 0)
-            for name in forecasts
-        )
+        ensemble_conf = sum(confidences[name] * active_weights.get(name, 0) for name in forecasts)
 
         # Model agreement
         preds = list(forecasts.values())

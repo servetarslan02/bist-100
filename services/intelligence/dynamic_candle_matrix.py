@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class DynamicPatternMetrics:
     """Bir formasyonun anlık dinamik karnesi."""
+
     pattern_name: str
     sample_count: int = 0
     rolling_win_rate: float = 50.0
@@ -43,27 +44,19 @@ class DynamicCandleMatrix:
         events = []
 
         for i in range(15, n - forward_days):
-            sub_slice = df[max(0, i-20):i+1]
+            sub_slice = df[max(0, i - 20) : i + 1]
             c_res = candle_engine.analyze_dataframe(sub_slice, ticker)
             p_entry = float(closes[i])
             p_exit = float(closes[i + forward_days])
             ret_pct = (p_exit - p_entry) / p_entry * 100
 
             for pat in c_res.patterns_detected:
-                events.append({
-                    "day_idx": i,
-                    "pattern": pat,
-                    "ret_pct": ret_pct
-                })
+                events.append({"day_idx": i, "pattern": pat, "ret_pct": ret_pct})
 
         self._cache_events[ticker] = events
 
     def evaluate_rolling_edge(
-        self,
-        ticker: str,
-        current_date_idx: int,
-        df_history: pl.DataFrame | None = None,
-        forward_days: int = 5
+        self, ticker: str, current_date_idx: int, df_history: pl.DataFrame | None = None, forward_days: int = 5
     ) -> dict[str, DynamicPatternMetrics]:
         """
         Son 252 günlük penceredeki olayları önbellekten anında süzerek
@@ -120,7 +113,7 @@ class DynamicCandleMatrix:
                 rolling_expectancy=round(expectancy, 2),
                 rolling_profit_factor=round(pf, 2),
                 dynamic_weight=dyn_weight,
-                is_favorable=is_fav
+                is_favorable=is_fav,
             )
 
         return results

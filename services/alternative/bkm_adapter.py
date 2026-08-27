@@ -79,11 +79,14 @@ class BKMAdapter(BaseAdapter):
                 "Accept-Language": "tr-TR,tr;q=0.9",
             }
 
-            async with aiohttp.ClientSession() as session, session.get(
-                self.BKM_URL,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    self.BKM_URL,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp,
+            ):
                 if resp.status != 200:
                     logger.warning("BKM page returned non-200", status=resp.status)
                     return None
@@ -121,46 +124,35 @@ class BKMAdapter(BaseAdapter):
 
             # Toplam işlem tutarı (milyar TL)
             spend_match = re.search(
-                r'(?:toplam|tutar|har[cç]ama)[\s:]*(\d[\d.,]*)\s*(?:milyar|milyon|tl|₺)',
-                text, re.IGNORECASE
+                r"(?:toplam|tutar|har[cç]ama)[\s:]*(\d[\d.,]*)\s*(?:milyar|milyon|tl|₺)", text, re.IGNORECASE
             )
             if spend_match:
                 value = self._parse_turkish_number(spend_match.group(1))
-                if "milyar" in text[spend_match.start():spend_match.end() + 20].lower():
+                if "milyar" in text[spend_match.start() : spend_match.end() + 20].lower():
                     value *= 1_000_000_000
-                elif "milyon" in text[spend_match.start():spend_match.end() + 20].lower():
+                elif "milyon" in text[spend_match.start() : spend_match.end() + 20].lower():
                     value *= 1_000_000
                 result["total_spend"] = value
 
             # Toplam işlem adedi
             count_match = re.search(
-                r'(?:i[sş]lem\s+adedi|i[sş]lem\s+say[iı]s[iı])[\s:]*(\d[\d.,]*)',
-                text, re.IGNORECASE
+                r"(?:i[sş]lem\s+adedi|i[sş]lem\s+say[iı]s[iı])[\s:]*(\d[\d.,]*)", text, re.IGNORECASE
             )
             if count_match:
                 result["transaction_count"] = self._parse_turkish_number(count_match.group(1))
 
             # Online oran
-            online_match = re.search(
-                r'(?:online)[\s:]*(\d[\d.,]*)\s*%',
-                text, re.IGNORECASE
-            )
+            online_match = re.search(r"(?:online)[\s:]*(\d[\d.,]*)\s*%", text, re.IGNORECASE)
             if online_match:
                 result["online_ratio"] = self._parse_turkish_number(online_match.group(1)) / 100
 
             # Temassız oran
-            contactless_match = re.search(
-                r'(?:temass[iı]z)[\s:]*(\d[\d.,]*)\s*%',
-                text, re.IGNORECASE
-            )
+            contactless_match = re.search(r"(?:temass[iı]z)[\s:]*(\d[\d.,]*)\s*%", text, re.IGNORECASE)
             if contactless_match:
                 result["contactless_ratio"] = self._parse_turkish_number(contactless_match.group(1)) / 100
 
             # Yıllık büyüme
-            growth_match = re.search(
-                r'(?:b[üu]y[üu]me|art[iı][sş])[\s:]*%?\s*(\d[\d.,]*)',
-                text, re.IGNORECASE
-            )
+            growth_match = re.search(r"(?:b[üu]y[üu]me|art[iı][sş])[\s:]*%?\s*(\d[\d.,]*)", text, re.IGNORECASE)
             if growth_match:
                 result["growth_yoy"] = self._parse_turkish_number(growth_match.group(1)) / 100
 

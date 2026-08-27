@@ -14,6 +14,7 @@ import orjson
 # 1. Production config validation
 # ────────────────────────────────────────────────────────────
 
+
 def test_config_production_validation():
     """Production'da insecure config reddedilmeli."""
     from services.core.config import Settings
@@ -29,8 +30,13 @@ def test_config_production_validation():
 
     # Production modu — insecure key reddedilmeli
     try:
-        s = Settings(APP_ENV="production", SECRET_KEY="change-this", JWT_SECRET="change-this",
-                     POSTGRES_PASSWORD="test", APP_DEBUG=False)
+        s = Settings(
+            APP_ENV="production",
+            SECRET_KEY="change-this",
+            JWT_SECRET="change-this",
+            POSTGRES_PASSWORD="test",
+            APP_DEBUG=False,
+        )
         # Bu satıra ulaşmamalı (sys.exit)
         print("  ✗ Production should reject insecure keys")
         failed += 1
@@ -40,8 +46,13 @@ def test_config_production_validation():
 
     # Production modu — debug=True reddedilmeli
     try:
-        s = Settings(APP_ENV="production", SECRET_KEY="a" * 20, JWT_SECRET="b" * 20,
-                     POSTGRES_PASSWORD="secure_password_123", APP_DEBUG=True)
+        s = Settings(
+            APP_ENV="production",
+            SECRET_KEY="a" * 20,
+            JWT_SECRET="b" * 20,
+            POSTGRES_PASSWORD="secure_password_123",
+            APP_DEBUG=True,
+        )
         print("  ✗ Production should reject debug=True")
         failed += 1
     except SystemExit:
@@ -55,6 +66,7 @@ def test_config_production_validation():
 # 2. Missing secret detection
 # ────────────────────────────────────────────────────────────
 
+
 def test_missing_secret_detection():
     """Eksik secret'lar tespit edilmeli."""
     from services.core.config import Settings
@@ -64,8 +76,13 @@ def test_missing_secret_detection():
 
     # Production + boş secret
     try:
-        Settings(APP_ENV="production", SECRET_KEY="", JWT_SECRET="a" * 20,
-                     POSTGRES_PASSWORD="secure_pw_123456", APP_DEBUG=False)
+        Settings(
+            APP_ENV="production",
+            SECRET_KEY="",
+            JWT_SECRET="a" * 20,
+            POSTGRES_PASSWORD="secure_pw_123456",
+            APP_DEBUG=False,
+        )
         print("  ✗ Should reject empty SECRET_KEY")
         failed += 1
     except SystemExit:
@@ -78,6 +95,7 @@ def test_missing_secret_detection():
 # ────────────────────────────────────────────────────────────
 # 3. Dev/test config isolation
 # ────────────────────────────────────────────────────────────
+
 
 def test_dev_config_isolation():
     """Development config production kurallarından muaf olmalı."""
@@ -104,6 +122,7 @@ def test_dev_config_isolation():
 # 4. Config fields completeness
 # ────────────────────────────────────────────────────────────
 
+
 def test_config_fields():
     """Tüm production gerekli alanlar config'de tanımlı olmalı."""
     from services.core.config import Settings
@@ -114,27 +133,27 @@ def test_config_fields():
     s = Settings()
 
     # Temel alanlar
-    assert hasattr(s, 'postgres_host')
-    assert hasattr(s, 'postgres_port')
-    assert hasattr(s, 'postgres_db')
-    assert hasattr(s, 'postgres_user')
-    assert hasattr(s, 'postgres_password')
-    assert hasattr(s, 'clickhouse_host')
-    assert hasattr(s, 'redis_host')
-    assert hasattr(s, 'secret_key')
-    assert hasattr(s, 'jwt_secret')
+    assert hasattr(s, "postgres_host")
+    assert hasattr(s, "postgres_port")
+    assert hasattr(s, "postgres_db")
+    assert hasattr(s, "postgres_user")
+    assert hasattr(s, "postgres_password")
+    assert hasattr(s, "clickhouse_host")
+    assert hasattr(s, "redis_host")
+    assert hasattr(s, "secret_key")
+    assert hasattr(s, "jwt_secret")
 
     # FAZ 5.1 eklenen alanlar
-    assert hasattr(s, 'broker_type')
-    assert hasattr(s, 'broker_api_key')
-    assert hasattr(s, 'broker_api_secret')
-    assert hasattr(s, 'broker_account_id')
-    assert hasattr(s, 'kap_api_key')
+    assert hasattr(s, "broker_type")
+    assert hasattr(s, "broker_api_key")
+    assert hasattr(s, "broker_api_secret")
+    assert hasattr(s, "broker_account_id")
+    assert hasattr(s, "kap_api_key")
 
     # Properties
-    assert hasattr(s, 'is_production')
-    assert hasattr(s, 'postgres_url')
-    assert hasattr(s, 'redis_url')
+    assert hasattr(s, "is_production")
+    assert hasattr(s, "postgres_url")
+    assert hasattr(s, "redis_url")
 
     print("  ✓ Config fields: all present (broker, KAP, security, DB)")
     passed += 1
@@ -146,12 +165,13 @@ def test_config_fields():
 # 5. .env.example doesn't contain real secrets
 # ────────────────────────────────────────────────────────────
 
+
 def test_env_example_no_secrets():
     """.env.example gerçek secret içermemeli."""
     passed = 0
     failed = 0
 
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.example')
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.example")
     if not os.path.exists(env_path):
         print("  ⚠ .env.example not found, skip")
         return 0, 0
@@ -182,6 +202,7 @@ def test_env_example_no_secrets():
 # 6. DB health check
 # ────────────────────────────────────────────────────────────
 
+
 def test_db_health_check():
     """DB health check fonksiyonu mevcut olmalı ve graceful çalışmalı."""
     from services.core.database import check_db_health
@@ -191,6 +212,7 @@ def test_db_health_check():
 
     # DB çalışmıyor olsa bile crash olmamalı
     import asyncio
+
     try:
         health = asyncio.get_event_loop().run_until_complete(check_db_health())
         assert isinstance(health, dict)
@@ -211,6 +233,7 @@ def test_db_health_check():
 # 7. DB connection graceful failure
 # ────────────────────────────────────────────────────────────
 
+
 def test_db_graceful_failure():
     """DB erişilemezse sistem crash olmamalı."""
     from services.core.database import init_databases
@@ -219,6 +242,7 @@ def test_db_graceful_failure():
     failed = 0
 
     import asyncio
+
     try:
         asyncio.get_event_loop().run_until_complete(init_databases())
         print("  ✓ DB init: no crash (DB may be unavailable)")
@@ -233,6 +257,7 @@ def test_db_graceful_failure():
 # ────────────────────────────────────────────────────────────
 # 8. Model persistence serialization
 # ────────────────────────────────────────────────────────────
+
 
 def test_model_persistence_serialization():
     """Model metadata serialization/deserialization çalışmalı."""
@@ -263,9 +288,10 @@ def test_model_persistence_serialization():
     ).hexdigest()[:16]
 
     assert len(contract_hash) == 16
-    assert contract_hash == hashlib.sha256(
-        orjson.dumps(["f1", "f2", "f3"], option=orjson.OPT_SORT_KEYS).decode()
-    ).hexdigest()[:16]
+    assert (
+        contract_hash
+        == hashlib.sha256(orjson.dumps(["f1", "f2", "f3"], option=orjson.OPT_SORT_KEYS).decode()).hexdigest()[:16]
+    )
 
     # Metadata dict
     meta = {
@@ -294,14 +320,15 @@ def test_model_persistence_serialization():
 # 9. Migration consistency
 # ────────────────────────────────────────────────────────────
 
+
 def test_migration_consistency():
     """Migration dosyaları tutarlı olmalı."""
     passed = 0
     failed = 0
 
     import glob
-    migration_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                  "services", "core", "migrations")
+
+    migration_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "services", "core", "migrations")
     migrations = sorted(glob.glob(os.path.join(migration_dir, "v*.sql")))
 
     assert len(migrations) >= 4, f"Expected at least 4 migrations, got {len(migrations)}"
@@ -337,6 +364,7 @@ def test_migration_consistency():
 # 10. Startup health check
 # ────────────────────────────────────────────────────────────
 
+
 def test_startup_health():
     """Startup'ta config ve DB sağlık kontrolü yapılmalı."""
     from services.core.config import settings
@@ -356,6 +384,7 @@ def test_startup_health():
 # ────────────────────────────────────────────────────────────
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
+
 
 def run_all():
     tests = [
@@ -388,6 +417,7 @@ def run_all():
                 print(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
+
             print(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1

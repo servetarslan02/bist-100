@@ -18,12 +18,13 @@ class FundamentalSnapshot:
 
     PIT kuralı: available_at <= backtest_date
     """
+
     ticker: str
-    period_end: str            # Dönem sonu (YYYY-MM-DD) — örn: 2025-06-30
-    available_at: str          # Açıklanma tarihi (YYYY-MM-DD) — örn: 2025-08-14
-    values: dict[str, Any]     # Fundamental değerler
+    period_end: str  # Dönem sonu (YYYY-MM-DD) — örn: 2025-06-30
+    available_at: str  # Açıklanma tarihi (YYYY-MM-DD) — örn: 2025-08-14
+    values: dict[str, Any]  # Fundamental değerler
     source: str = "unknown"
-    status: str = "FRESH"      # FRESH / STALE / MISSING / UNKNOWN
+    status: str = "FRESH"  # FRESH / STALE / MISSING / UNKNOWN
 
 
 @dataclass
@@ -32,14 +33,15 @@ class EventSnapshot:
 
     PIT kuralı: published_at <= backtest_date
     """
+
     event_id: str
     ticker: str
-    published_at: str          # Yayın tarihi (ISO-8601)
-    event_type: str            # KAP category / news type
+    published_at: str  # Yayın tarihi (ISO-8601)
+    event_type: str  # KAP category / news type
     title: str = ""
     sentiment: float = 0.0
     importance: float = 0.5
-    source: str = "unknown"    # kap / news / rss
+    source: str = "unknown"  # kap / news / rss
     content: str = ""
 
 
@@ -50,11 +52,12 @@ class CatalystSnapshot:
     PIT kuralı: announcement_date <= backtest_date
     Event'in kendisi gelecekte olabilir ama announcement bilgisi bilinmeli.
     """
+
     event_id: str
     ticker: str
-    announcement_date: str     # Açıklandığı tarih
-    event_date: str            # Gerçekleşeceği/gerçekleştiği tarih
-    catalyst_type: str         # EARNINGS, DIVIDEND, etc.
+    announcement_date: str  # Açıklandığı tarih
+    event_date: str  # Gerçekleşeceği/gerçekleştiği tarih
+    catalyst_type: str  # EARNINGS, DIVIDEND, etc.
     importance: float = 0.5
     source: str = "unknown"
 
@@ -142,33 +145,34 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
         self._catalysts: list[CatalystSnapshot] = []
 
     def get_fundamental_snapshots(
-        self, ticker: str, as_of_date: str,
+        self,
+        ticker: str,
+        as_of_date: str,
     ) -> list[FundamentalSnapshot]:
         return sorted(
-            [s for s in self._fundamentals
-             if s.ticker == ticker and s.available_at <= as_of_date],
+            [s for s in self._fundamentals if s.ticker == ticker and s.available_at <= as_of_date],
             key=lambda s: s.available_at,
             reverse=True,
         )
 
     def get_event_snapshots(
-        self, ticker: str, as_of_date: str,
+        self,
+        ticker: str,
+        as_of_date: str,
         event_types: list[str] | None = None,
     ) -> list[EventSnapshot]:
-        events = [
-            s for s in self._events
-            if s.ticker == ticker and s.published_at[:10] <= as_of_date
-        ]
+        events = [s for s in self._events if s.ticker == ticker and s.published_at[:10] <= as_of_date]
         if event_types:
             events = [e for e in events if e.event_type in event_types]
         return sorted(events, key=lambda s: s.published_at, reverse=True)
 
     def get_catalyst_snapshots(
-        self, ticker: str, as_of_date: str,
+        self,
+        ticker: str,
+        as_of_date: str,
     ) -> list[CatalystSnapshot]:
         return sorted(
-            [s for s in self._catalysts
-             if s.ticker == ticker and s.announcement_date <= as_of_date],
+            [s for s in self._catalysts if s.ticker == ticker and s.announcement_date <= as_of_date],
             key=lambda s: s.announcement_date,
             reverse=True,
         )

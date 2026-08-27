@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class MLFusedSignal:
     """ML-optimized birleştirilmiş sinyal."""
+
     ticker: str
     regime: str
 
@@ -209,10 +210,7 @@ class MLSignalFusion:
             from sklearn.ensemble import GradientBoostingRegressor
 
             # Feature matrix
-            X = np.array([
-                [s.get(comp, 50) for comp in self.COMPONENTS]
-                for s in historical_signals
-            ])
+            X = np.array([[s.get(comp, 50) for comp in self.COMPONENTS] for s in historical_signals])
             y = np.array(historical_outcomes)
 
             # NaN temizle
@@ -230,6 +228,7 @@ class MLSignalFusion:
             # Feature importance (SHAP yoksa built-in importance)
             try:
                 import shap
+
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(X)
                 importance = np.abs(shap_values).mean(axis=0)
@@ -239,28 +238,26 @@ class MLSignalFusion:
             # Normalize
             total = importance.sum()
             if total > 0:
-                weights = {
-                    comp: float(imp / total)
-                    for comp, imp in zip(self.COMPONENTS, importance, strict=False)
-                }
+                weights = {comp: float(imp / total) for comp, imp in zip(self.COMPONENTS, importance, strict=False)}
             else:
                 return None
 
             # Cache
             self._optimized_weights[regime] = weights
-            self._weight_history.append({
-                "regime": regime,
-                "weights": weights,
-                "n_samples": len(X),
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            self._weight_history.append(
+                {
+                    "regime": regime,
+                    "weights": weights,
+                    "n_samples": len(X),
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
             if len(self._weight_history) > 1000:
                 self._weight_history = self._weight_history[-1000:]
 
-            logger.info("SHAP weights optimized",
-                       regime=regime,
-                       n_samples=len(X),
-                       top_component=max(weights, key=weights.get))
+            logger.info(
+                "SHAP weights optimized", regime=regime, n_samples=len(X), top_component=max(weights, key=weights.get)
+            )
 
             return weights
 
@@ -297,10 +294,7 @@ class MLSignalFusion:
             warnings.append("Confidence çok yüksek (>0.9) — şüpheli")
 
         # Tüm bileşenler nötr ama yüksek skor
-        all_neutral = all(
-            result.component_directions.get(c, "NEUTRAL") == "NEUTRAL"
-            for c in self.COMPONENTS
-        )
+        all_neutral = all(result.component_directions.get(c, "NEUTRAL") == "NEUTRAL" for c in self.COMPONENTS)
         if all_neutral and result.fused_score > 70:
             warnings.append("Tüm bileşenler nötr ama yüksek skor")
 

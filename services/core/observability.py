@@ -44,8 +44,7 @@ class PrometheusMetrics:
         key = self._make_key(name, labels)
         self._gauges[key] = value
 
-    def observe(self, name: str, value: float, labels: dict[str, str] = None,
-                buckets: tuple = None):
+    def observe(self, name: str, value: float, labels: dict[str, str] = None, buckets: tuple = None):
         """Histogram gözlem (bucket desteği ile)."""
         key = self._make_key(name, labels)
         self._histograms[key].append(value)
@@ -56,6 +55,7 @@ class PrometheusMetrics:
     def timed(self, name: str, labels: dict[str, str] = None, buckets: tuple = None):
         """Context manager — işlem süresini ölçer."""
         import time as _time
+
         class _Timer:
             def __init__(self, metrics, n, l, b):
                 self._metrics = metrics
@@ -63,12 +63,15 @@ class PrometheusMetrics:
                 self._labels = l
                 self._buckets = b
                 self._start = None
+
             def __enter__(self):
                 self._start = _time.monotonic()
                 return self
+
             def __exit__(self, *args):
                 elapsed = _time.monotonic() - self._start
                 self._metrics.observe(self._name, elapsed, self._labels, self._buckets)
+
         return _Timer(self, name, labels, buckets)
 
     def get_metrics(self) -> dict[str, Any]:
@@ -135,12 +138,14 @@ class DistributedTracing:
     def start_trace(self, operation: str) -> str:
         """Yeni trace başlat."""
         trace_id = str(uuid.uuid4())[:16]
-        self._traces[trace_id] = [{
-            "trace_id": trace_id,
-            "operation": operation,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "status": "started",
-        }]
+        self._traces[trace_id] = [
+            {
+                "trace_id": trace_id,
+                "operation": operation,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "status": "started",
+            }
+        ]
         return trace_id
 
     def add_span(self, trace_id: str, operation: str, duration_ms: float = 0, status: str = "completed"):
@@ -148,13 +153,15 @@ class DistributedTracing:
         if trace_id not in self._traces:
             self._traces[trace_id] = []
 
-        self._traces[trace_id].append({
-            "trace_id": trace_id,
-            "operation": operation,
-            "duration_ms": round(duration_ms, 2),
-            "status": status,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._traces[trace_id].append(
+            {
+                "trace_id": trace_id,
+                "operation": operation,
+                "duration_ms": round(duration_ms, 2),
+                "status": status,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
     def get_trace(self, trace_id: str) -> list[dict]:
         """Trace getir."""
@@ -165,13 +172,15 @@ class DistributedTracing:
         all_traces = []
         for trace_id, spans in self._traces.items():
             if spans:
-                all_traces.append({
-                    "trace_id": trace_id,
-                    "operation": spans[0].get("operation", ""),
-                    "span_count": len(spans),
-                    "total_ms": sum(s.get("duration_ms", 0) for s in spans),
-                    "timestamp": spans[0].get("timestamp", ""),
-                })
+                all_traces.append(
+                    {
+                        "trace_id": trace_id,
+                        "operation": spans[0].get("operation", ""),
+                        "span_count": len(spans),
+                        "total_ms": sum(s.get("duration_ms", 0) for s in spans),
+                        "timestamp": spans[0].get("timestamp", ""),
+                    }
+                )
         return sorted(all_traces, key=lambda x: x["timestamp"], reverse=True)[:limit]
 
 
@@ -254,13 +263,15 @@ class ResourceMonitor:
 
     def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0):
         """Kaynak kullanımı snapshot."""
-        self._snapshots.append({
-            "cpu_pct": cpu_pct,
-            "memory_mb": memory_mb,
-            "gpu_pct": gpu_pct,
-            "disk_mb": disk_mb,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._snapshots.append(
+            {
+                "cpu_pct": cpu_pct,
+                "memory_mb": memory_mb,
+                "gpu_pct": gpu_pct,
+                "disk_mb": disk_mb,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._snapshots) > 1000:
             self._snapshots = self._snapshots[-1000:]
         self._snapshots = self._snapshots[-1000]
@@ -298,14 +309,16 @@ class ConfigManager:
         old_value = self._config.get(key)
         self._config[key] = value
 
-        self._versions.append({
-            "key": key,
-            "old": str(old_value),
-            "new": str(value),
-            "actor": actor,
-            "reason": reason,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._versions.append(
+            {
+                "key": key,
+                "old": str(old_value),
+                "new": str(value),
+                "actor": actor,
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._versions) > 500:
             self._versions = self._versions[-500:]
 

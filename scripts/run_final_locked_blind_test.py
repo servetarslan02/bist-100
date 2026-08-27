@@ -59,12 +59,22 @@ def main():
     sharpe_pass = oos_res.sharpe_ratio >= 0.70
     cagr_pass = oos_res.cagr > 0.0
 
-    print(f"  1. Kâr Faktörü (Hedef: > 1.20)     : {oos_res.profit_factor:.2f}  --> {'✅ GEÇTİ' if pf_pass else '❌ GEÇMEDİ'}")
-    print(f"  2. Max Drawdown (Hedef: < %25.0)   : %{oos_res.max_drawdown:.2f} --> {'✅ GEÇTİ' if dd_pass else '❌ GEÇMEDİ'}")
-    print(f"  3. Sharpe Oranı (Hedef: > 0.70)    : {oos_res.sharpe_ratio:.2f}  --> {'✅ GEÇTİ' if sharpe_pass else '❌ GEÇMEDİ'}")
-    print(f"  4. Yıllık Getiri (Hedef: > %0.0)   : %{oos_res.cagr:.2f}  --> {'✅ GEÇTİ' if cagr_pass else '❌ GEÇMEDİ'}")
+    print(
+        f"  1. Kâr Faktörü (Hedef: > 1.20)     : {oos_res.profit_factor:.2f}  --> {'✅ GEÇTİ' if pf_pass else '❌ GEÇMEDİ'}"
+    )
+    print(
+        f"  2. Max Drawdown (Hedef: < %25.0)   : %{oos_res.max_drawdown:.2f} --> {'✅ GEÇTİ' if dd_pass else '❌ GEÇMEDİ'}"
+    )
+    print(
+        f"  3. Sharpe Oranı (Hedef: > 0.70)    : {oos_res.sharpe_ratio:.2f}  --> {'✅ GEÇTİ' if sharpe_pass else '❌ GEÇMEDİ'}"
+    )
+    print(
+        f"  4. Yıllık Getiri (Hedef: > %0.0)   : %{oos_res.cagr:.2f}  --> {'✅ GEÇTİ' if cagr_pass else '❌ GEÇMEDİ'}"
+    )
     print(f"  • Kümülatif 2024-2026 Getirisi     : %{oos_res.total_return_pct:+.1f}")
-    print(f"  • Toplam İşlem Sayısı              : {oos_res.total_trades} Adet (Kazanma Oranı: %{oos_res.win_rate:.1f})")
+    print(
+        f"  • Toplam İşlem Sayısı              : {oos_res.total_trades} Adet (Kazanma Oranı: %{oos_res.win_rate:.1f})"
+    )
 
     # ---------------------------------------------------------------------------------------------
     # BÖLÜM 2: 1997 - 2026 YIL BAZINDA PERFORMANS & KRİZ TABLOSU
@@ -72,18 +82,26 @@ def main():
     print("\n" + "=" * 105)
     print("📅 1997 - 2026 YIL BAZINDA PERFORMANS VE ALFA TABLOSU:")
     print("=" * 105)
-    print(f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'MAX DD':<12} | {'PF':<6} | {'DÖNEM'}")
+    print(
+        f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'MAX DD':<12} | {'PF':<6} | {'DÖNEM'}"
+    )
     print("-" * 105)
 
     years = sorted(list(set(d.year for d in bm_df.index)))
     for y in years:
         res = engine.simulate(params, start_year=y, end_year=y)
         bm_y = bm_df[bm_df.index.year == y]
-        bm_y_ret = ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0 if len(bm_y) > 10 else 0.0
+        bm_y_ret = (
+            ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0
+            if len(bm_y) > 10
+            else 0.0
+        )
         diff = res.total_return_pct - bm_y_ret
         kriz_tag = " ⚠️ KRİZ" if y in [2000, 2001, 2008, 2018] else ""
         period_lbl = "KÖR HOLDOUT" if y >= 2024 else "IN-SAMPLE"
-        print(f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>9.2f} | {res.profit_factor:>4.2f} | {period_lbl}{kriz_tag}")
+        print(
+            f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>9.2f} | {res.profit_factor:>4.2f} | {period_lbl}{kriz_tag}"
+        )
     print("=" * 105)
 
 

@@ -4,6 +4,7 @@ Confidence calibration — Brier score, calibration curve,
 Platt scaling, isotonic regression, regime-specific calibration,
 overconfidence detection, calibration monitoring.
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class CalibrationResult:
     """Kalibrasyon sonucu."""
+
     is_calibrated: bool
     brier_score: float
     calibration_curve: list[dict[str, float]]
@@ -32,6 +34,7 @@ class CalibrationResult:
 @dataclass
 class RegimeCalibrationResult:
     """Regime-specific kalibrasyon sonucu."""
+
     regime: str
     result: CalibrationResult
     n_samples: int
@@ -88,16 +91,16 @@ class ModelCalibration:
 
         # Calibration curve
         try:
-            fraction_pos, mean_predicted = calibration_curve(
-                y_true, y_prob, n_bins=self.n_bins, strategy="uniform"
-            )
+            fraction_pos, mean_predicted = calibration_curve(y_true, y_prob, n_bins=self.n_bins, strategy="uniform")
             curve = []
             for frac, mean_pred in zip(fraction_pos, mean_predicted, strict=False):
-                curve.append({
-                    "mean_predicted": round(float(mean_pred), 4),
-                    "fraction_positive": round(float(frac), 4),
-                    "gap": round(abs(float(mean_pred) - float(frac)), 4),
-                })
+                curve.append(
+                    {
+                        "mean_predicted": round(float(mean_pred), 4),
+                        "fraction_positive": round(float(frac), 4),
+                        "gap": round(abs(float(mean_pred) - float(frac)), 4),
+                    }
+                )
         except Exception:
             curve = []
 
@@ -136,13 +139,15 @@ class ModelCalibration:
         )
 
         # History
-        self._calibration_history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "brier_score": brier,
-            "ece": ece,
-            "miscalibration": miscalibration,
-            "n_samples": len(y_true),
-        })
+        self._calibration_history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "brier_score": brier,
+                "ece": ece,
+                "miscalibration": miscalibration,
+                "n_samples": len(y_true),
+            }
+        )
         if len(self._calibration_history) > 1000:
             self._calibration_history = self._calibration_history[-1000:]
 

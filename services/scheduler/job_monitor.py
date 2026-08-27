@@ -36,6 +36,7 @@ class JobStatus(StrEnum):
 @dataclass
 class JobRecord:
     """Job kayıt kaydı."""
+
     job_type: str
     status: JobStatus
     duration_ms: float
@@ -49,10 +50,11 @@ class JobRecord:
 @dataclass
 class JobAlert:
     """Job alert."""
-    alert_type: str      # FAILURE, SLOW, HIGH_FAILURE_RATE, CONSECUTIVE_FAILURE
+
+    alert_type: str  # FAILURE, SLOW, HIGH_FAILURE_RATE, CONSECUTIVE_FAILURE
     job_type: str
     message: str
-    severity: str        # INFO, WARNING, CRITICAL
+    severity: str  # INFO, WARNING, CRITICAL
     timestamp: str
 
 
@@ -116,34 +118,37 @@ class JobMonitor:
 
         # Limit
         if len(self._records) > self._max_history:
-            self._records = self._records[-self._max_history:]
+            self._records = self._records[-self._max_history :]
 
         # Consecutive failure tracking
         if status == "FAILED":
-            self._consecutive_failures[job_type] = \
-                self._consecutive_failures.get(job_type, 0) + 1
+            self._consecutive_failures[job_type] = self._consecutive_failures.get(job_type, 0) + 1
 
             # 3 ardışık failure → alert
             if self._consecutive_failures[job_type] >= 3:
-                self._fire_alert(JobAlert(
-                    alert_type="CONSECUTIVE_FAILURE",
-                    job_type=job_type,
-                    message=f"{job_type}: {self._consecutive_failures[job_type]} ardışık failure!",
-                    severity="CRITICAL",
-                    timestamp=datetime.now(UTC).isoformat(),
-                ))
+                self._fire_alert(
+                    JobAlert(
+                        alert_type="CONSECUTIVE_FAILURE",
+                        job_type=job_type,
+                        message=f"{job_type}: {self._consecutive_failures[job_type]} ardışık failure!",
+                        severity="CRITICAL",
+                        timestamp=datetime.now(UTC).isoformat(),
+                    )
+                )
         else:
             self._consecutive_failures[job_type] = 0
 
         # Slow job alert
         if duration_ms > self._slow_threshold:
-            self._fire_alert(JobAlert(
-                alert_type="SLOW_JOB",
-                job_type=job_type,
-                message=f"{job_type}: {duration_ms:.0f}ms (eşik: {self._slow_threshold:.0f}ms)",
-                severity="WARNING",
-                timestamp=datetime.now(UTC).isoformat(),
-            ))
+            self._fire_alert(
+                JobAlert(
+                    alert_type="SLOW_JOB",
+                    job_type=job_type,
+                    message=f"{job_type}: {duration_ms:.0f}ms (eşik: {self._slow_threshold:.0f}ms)",
+                    severity="WARNING",
+                    timestamp=datetime.now(UTC).isoformat(),
+                )
+            )
 
     def get_stats(self, job_type: str = None) -> dict[str, Any]:
         """Job istatistikleri.
@@ -262,10 +267,7 @@ class JobMonitor:
         if len(self._alerts) > 500:
             self._alerts = self._alerts[-500:]
 
-        logger.warning("Job alert",
-                      alert_type=alert.alert_type,
-                      job_type=alert.job_type,
-                      severity=alert.severity)
+        logger.warning("Job alert", alert_type=alert.alert_type, job_type=alert.job_type, severity=alert.severity)
 
         for cb in self._callbacks:
             try:
@@ -286,9 +288,7 @@ class JobMonitor:
             "total_alerts": len(self._alerts),
             "job_types": job_types,
             "overall_stats": self.get_stats(),
-            "per_job_stats": {
-                jt: self.get_stats(jt) for jt in job_types
-            },
+            "per_job_stats": {jt: self.get_stats(jt) for jt in job_types},
         }
 
     def clear(self):

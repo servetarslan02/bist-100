@@ -49,8 +49,7 @@ class DataSourceManager:
             "bist": BISTSource(),
         }
 
-        logger.info("DataSourceManager initialized",
-                   cache_dir=cache_dir, use_cache=use_cache)
+        logger.info("DataSourceManager initialized", cache_dir=cache_dir, use_cache=use_cache)
 
     def get_stock_data(
         self,
@@ -80,8 +79,8 @@ class DataSourceManager:
         if self.use_cache:
             cached = self._load_from_cache(ticker, interval)
             if cached is not None and not cached.empty:
-                cache_min_date = cached.index.min().strftime('%Y-%m-%d')
-                cache_max_date = cached.index.max().strftime('%Y-%m-%d')
+                cache_min_date = cached.index.min().strftime("%Y-%m-%d")
+                cache_max_date = cached.index.max().strftime("%Y-%m-%d")
 
                 cache_is_valid = True
                 if start_date and start_date < cache_min_date:
@@ -110,7 +109,7 @@ class DataSourceManager:
                     # NaN ve 0 fiyatlı geçersiz satırları temizle
                     if "Close" in df.columns:
                         df = df.dropna(subset=["Close"])
-                        df = df.filter(pl.col('Close') > 0)
+                        df = df.filter(pl.col("Close") > 0)
                     if df.empty:
                         continue
 
@@ -118,13 +117,11 @@ class DataSourceManager:
                     if self.use_cache:
                         self._save_to_cache(ticker, df, interval)
 
-                    logger.info("Data loaded from source",
-                              ticker=ticker, source=source_name, rows=len(df))
+                    logger.info("Data loaded from source", ticker=ticker, source=source_name, rows=len(df))
                     return df
 
             except Exception as e:
-                logger.warning("Source failed",
-                             ticker=ticker, source=source_name, error=str(e))
+                logger.warning("Source failed", ticker=ticker, source=source_name, error=str(e))
                 continue
 
         logger.error("All sources failed", ticker=ticker)
@@ -147,10 +144,7 @@ class DataSourceManager:
 
         results = {}
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            future_to_ticker = {
-                pool.submit(self.get_stock_data, ticker, **kwargs): ticker
-                for ticker in tickers
-            }
+            future_to_ticker = {pool.submit(self.get_stock_data, ticker, **kwargs): ticker for ticker in tickers}
             for future in as_completed(future_to_ticker):
                 ticker = future_to_ticker[future]
                 try:
@@ -163,7 +157,11 @@ class DataSourceManager:
 
     def get_bist100_universe(self) -> list[str]:
         """BIST 100 hisse listesini getir."""
-        cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "bist_universe_cache.json")
+        cache_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "data",
+            "bist_universe_cache.json",
+        )
         try:
             with open(cache_path) as f:
                 cache = orjson.loads(f.read())
@@ -175,10 +173,26 @@ class DataSourceManager:
         # Fallback — cache yoksa BIST-30 alt kümesi (geçici, cache yüklenene kadar)
         # Gerçek liste UniverseAutoUpdater tarafından güncellenir
         return [
-            "THYAO.IS", "GARAN.IS", "ISCTR.IS", "AKBNK.IS", "YKBNK.IS",
-            "BIMAS.IS", "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS",
-            "ASELS.IS", "SISE.IS", "TOASO.IS", "ARCLK.IS", "KRDMD.IS",
-            "PETKM.IS", "PGSUS.IS", "TAVHL.IS", "TKFEN.IS", "VAKBN.IS",
+            "THYAO.IS",
+            "GARAN.IS",
+            "ISCTR.IS",
+            "AKBNK.IS",
+            "YKBNK.IS",
+            "BIMAS.IS",
+            "KCHOL.IS",
+            "SAHOL.IS",
+            "TUPRS.IS",
+            "EREGL.IS",
+            "ASELS.IS",
+            "SISE.IS",
+            "TOASO.IS",
+            "ARCLK.IS",
+            "KRDMD.IS",
+            "PETKM.IS",
+            "PGSUS.IS",
+            "TAVHL.IS",
+            "TKFEN.IS",
+            "VAKBN.IS",
         ]
 
     def get_benchmark_data(
@@ -212,7 +226,7 @@ class DataSourceManager:
                 df = pl.read_csv(cache_file, index_col=0, parse_dates=True)
             if df is not None and not df.empty and "Close" in df.columns:
                 df = df.dropna(subset=["Close"])
-                df = df.filter(pl.col('Close') > 0)
+                df = df.filter(pl.col("Close") > 0)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
         except Exception as e:
@@ -281,7 +295,9 @@ class YahooFinanceSource:
                 return None
 
             # Kolon isimlerini düzelt
-            df.columns = [c.replace("Stock Splits", "StockSplits").replace("Capital Gains", "CapitalGains") for c in df.columns]
+            df.columns = [
+                c.replace("Stock Splits", "StockSplits").replace("Capital Gains", "CapitalGains") for c in df.columns
+            ]
             df.columns = [c[0].upper() + c[1:].lower() if c else c for c in df.columns]
 
             return df
@@ -302,11 +318,13 @@ class BISTSource:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json, text/html, */*",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json, text/html, */*",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            }
+        )
         self.timeout = 15
 
     def fetch(
@@ -355,9 +373,9 @@ class BISTSource:
 
         params = {}
         if start_date:
-            params = params.with_columns(pl.lit(start_date).alias('from'))
+            params = params.with_columns(pl.lit(start_date).alias("from"))
         if end_date:
-            params = params.with_columns(pl.lit(end_date).alias('to'))
+            params = params.with_columns(pl.lit(end_date).alias("to"))
 
         resp = self.session.get(url, params=params, timeout=self.timeout)
         if resp.status_code != 200:
@@ -369,14 +387,16 @@ class BISTSource:
 
         rows = []
         for item in data.get("data", []):
-            rows.append({
-                "Date": pl.Series(item.get("date", "")),
-                "Open": float(item.get("open", 0)),
-                "High": float(item.get("high", 0)),
-                "Low": float(item.get("low", 0)),
-                "Close": float(item.get("close", 0)),
-                "Volume": int(item.get("volume", 0)),
-            })
+            rows.append(
+                {
+                    "Date": pl.Series(item.get("date", "")),
+                    "Open": float(item.get("open", 0)),
+                    "High": float(item.get("high", 0)),
+                    "Low": float(item.get("low", 0)),
+                    "Close": float(item.get("close", 0)),
+                    "Volume": int(item.get("volume", 0)),
+                }
+            )
 
         if not rows:
             return None
@@ -427,7 +447,7 @@ class BISTSource:
         volume = 0
         vol_patterns = [
             r'class="[^"]*volume[^"]*"[^>]*>([0-9.,]+)<',
-            r'Hacim[\s:]*</[^>]*>\s*<[^>]*>([0-9.,]+)<',
+            r"Hacim[\s:]*</[^>]*>\s*<[^>]*>([0-9.,]+)<",
         ]
         for pattern in vol_patterns:
             match = re.search(pattern, html, re.IGNORECASE)
@@ -443,7 +463,7 @@ class BISTSource:
         change = 0
         change_patterns = [
             r'class="[^"]*change[^"]*"[^>]*>([+-]?[0-9.,]+)<',
-            r'Degisim[\s:]*</[^>]*>\s*<[^>]*>([+-]?[0-9.,]+)<',
+            r"Degisim[\s:]*</[^>]*>\s*<[^>]*>([+-]?[0-9.,]+)<",
         ]
         for pattern in change_patterns:
             match = re.search(pattern, html, re.IGNORECASE)
@@ -460,14 +480,16 @@ class BISTSource:
 
         # Tek gunluk DataFrame olustur
         today = pl.Series("Date", [pl.Series.now().normalize()])
-        df = pl.DataFrame({
-            "Date": today,
-            "Open": [prev_close],
-            "High": [max(close, prev_close)],
-            "Low": [min(close, prev_close)],
-            "Close": [close],
-            "Volume": [volume],
-        })
+        df = pl.DataFrame(
+            {
+                "Date": today,
+                "Open": [prev_close],
+                "High": [max(close, prev_close)],
+                "Low": [min(close, prev_close)],
+                "Close": [close],
+                "Volume": [volume],
+            }
+        )
 
         return df
 
@@ -481,14 +503,16 @@ class BISTSource:
                 data = resp.json()
                 if data:
                     today = pl.Series("Date", [pl.Series.now().normalize()])
-                    df = pl.DataFrame({
-                        "Date": today,
-                        "Open": [float(data.get("open", 0))],
-                        "High": [float(data.get("high", 0))],
-                        "Low": [float(data.get("low", 0))],
-                        "Close": [float(data.get("lastPrice", 0))],
-                        "Volume": [int(data.get("volume", 0))],
-                    })
+                    df = pl.DataFrame(
+                        {
+                            "Date": today,
+                            "Open": [float(data.get("open", 0))],
+                            "High": [float(data.get("high", 0))],
+                            "Low": [float(data.get("low", 0))],
+                            "Close": [float(data.get("lastPrice", 0))],
+                            "Volume": [int(data.get("volume", 0))],
+                        }
+                    )
                     return df
         except Exception as e:
             logger.debug("BIST index fetch failed", error=str(e))
@@ -548,6 +572,7 @@ class WarehouseSource:
         if not self.db_path.exists():
             return None
         import duckdb
+
         sym = ticker.upper().replace(".IS", "").strip()
         try:
             conn = duckdb.connect(str(self.db_path))

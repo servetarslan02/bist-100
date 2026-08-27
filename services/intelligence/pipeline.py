@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class IntelligenceOutput:
     """Intelligence pipeline çıktısı."""
+
     ticker: str
     timestamp: str
     fused_direction: str = "NEUTRAL"
@@ -146,6 +147,7 @@ class IntelligencePipeline:
         """Async pipeline — paralel phase'ler ile."""
         try:
             from .parallel_pipeline import parallel_pipeline
+
             result = await parallel_pipeline.run(ticker, features, market_data, regime)
 
             # ParallelPipelineResult → IntelligenceOutput
@@ -153,9 +155,7 @@ class IntelligencePipeline:
             for phase_name, phase_result in result.phases.items():
                 output.phase_durations_ms[phase_name] = phase_result.elapsed_ms
                 output.modules_used.extend(phase_result.modules.keys())
-                output.modules_failed.extend(
-                    [f"{k}:{v}" for k, v in phase_result.errors.items()]
-                )
+                output.modules_failed.extend([f"{k}:{v}" for k, v in phase_result.errors.items()])
             output.total_elapsed_ms = result.total_elapsed_ms
             return output
 
@@ -344,7 +344,7 @@ class IntelligencePipeline:
             mod = self._modules["knowledge_graph"]
             kg = mod.KnowledgeGraph()
             # Mevcut entity'leri ara
-            kg.search_entities(ticker) if hasattr(kg, 'search_entities') else []
+            kg.search_entities(ticker) if hasattr(kg, "search_entities") else []
             output.modules_used.append("knowledge_graph")
         except Exception as e:
             output.modules_failed.append(f"knowledge_graph:{str(e)[:80]}")
@@ -431,9 +431,7 @@ class IntelligencePipeline:
         try:
             mod = self._modules["scenario"]
             se = mod.ScenarioEngine()
-            scenario_input = mod.ScenarioInput(
-                name="base", description="Base case"
-            )
+            scenario_input = mod.ScenarioInput(name="base", description="Base case")
             result = se.run_scenario(scenario=scenario_input, positions=[])
             if result:
                 output.modules_used.append("scenario")
@@ -447,15 +445,18 @@ intelligence_pipeline = IntelligencePipeline()
 # =====================================================
 # Intelligence Modül Bağlantıları
 # =====================================================
-def run_full_intelligence(ticker: str, features: dict, market_state: dict = None,
-                          fundamentals: dict = None, news: list = None) -> dict[str, Any]:
+def run_full_intelligence(
+    ticker: str, features: dict, market_state: dict = None, fundamentals: dict = None, news: list = None
+) -> dict[str, Any]:
     """Tüm intelligence modüllerini çalıştır."""
     result = {"ticker": ticker}
-    if market_state is None: market_state = {}
+    if market_state is None:
+        market_state = {}
 
     # 1. World State
     try:
         from .world_state import WorldStateManager
+
         ws = WorldStateManager()
         result["world_state"] = ws.get_state_dict() if hasattr(ws, "get_state_dict") else {}
     except Exception as e:
@@ -465,6 +466,7 @@ def run_full_intelligence(ticker: str, features: dict, market_state: dict = None
     # 2. Regime
     try:
         from .regime import regime_engine
+
         r = regime_engine.detect_regime(features)
         result["regime"] = r.regime if hasattr(r, "regime") else str(r)
     except Exception as e:
@@ -474,6 +476,7 @@ def run_full_intelligence(ticker: str, features: dict, market_state: dict = None
     # 3. SPEC
     try:
         from .spec_engine import spec_engine
+
         s = spec_engine.compute_spec(ticker, features, market_state)
         result["spec"] = s.__dict__ if hasattr(s, "__dict__") else {}
     except Exception as e:
@@ -511,9 +514,13 @@ def run_full_intelligence(ticker: str, features: dict, market_state: dict = None
     # 8. Signal Fusion
     try:
         from .signal_fusion import SignalFusionEngine
+
         sf = SignalFusionEngine()
         signals = {
-            "technical": {"direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT", "score": features.get("rsi_14", 50)},
+            "technical": {
+                "direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT",
+                "score": features.get("rsi_14", 50),
+            },
             "momentum": {"direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT", "score": 50},
             "macro": {"direction": "NEUTRAL", "score": 50},
             "valuation": {"direction": "NEUTRAL", "score": 50},
@@ -528,6 +535,7 @@ def run_full_intelligence(ticker: str, features: dict, market_state: dict = None
     # 9. Knowledge Graph
     try:
         from .knowledge_graph import KnowledgeGraph
+
         KnowledgeGraph()
         result["knowledge_graph"] = {"loaded": True}
     except Exception as e:
@@ -551,6 +559,7 @@ def run_full_intelligence(ticker: str, features: dict, market_state: dict = None
     # 12. Factors (B30)
     try:
         from .factor_engine import compute_financial_scores
+
         if fundamentals:
             result["factors"] = compute_financial_scores(fundamentals)
     except Exception as e:

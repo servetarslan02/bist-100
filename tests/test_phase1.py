@@ -123,7 +123,7 @@ def test_market_calendar():
 
     # Test 11: trading_days_between
     start = prev_monday  # Pazartesi
-    end = saturday    # Cumartesi
+    end = saturday  # Cumartesi
     days = cal.trading_days_between(start, end)
     if days == 5:
         print("  ✓ 5 işlem günü (Pzt-Cuma)")
@@ -134,6 +134,7 @@ def test_market_calendar():
 
     # Test 12: Devre kesici
     from datetime import time as t
+
     cal.add_halt(monday, t(11, 0), t(11, 30))
     dt = datetime(monday.year, monday.month, monday.day, 11, 15)
     if cal.get_status(dt) == MarketStatus.HALT:
@@ -155,13 +156,15 @@ def test_corporate_actions():
     failed = 0
 
     # Test 1: Temettü fiyat düzeltmesi
-    handler.add_action(CorporateAction(
-        action_id="DIV-001",
-        ticker="THYAO",
-        action_type=ActionType.DIVIDEND,
-        ex_date=date(2026, 6, 1),
-        dividend_per_share=5.25,
-    ))
+    handler.add_action(
+        CorporateAction(
+            action_id="DIV-001",
+            ticker="THYAO",
+            action_type=ActionType.DIVIDEND,
+            ex_date=date(2026, 6, 1),
+            dividend_per_share=5.25,
+        )
+    )
 
     # Ex-date'ten önceki fiyat düzeltilmeli
     adjusted = handler.adjust_price("THYAO", 300.0, date(2026, 6, 2))
@@ -182,13 +185,15 @@ def test_corporate_actions():
         failed += 1
 
     # Test 2: Bölünme fiyat düzeltmesi
-    handler.add_action(CorporateAction(
-        action_id="SPLIT-001",
-        ticker="ASELS",
-        action_type=ActionType.STOCK_SPLIT,
-        ex_date=date(2026, 7, 1),
-        split_ratio=10.0,
-    ))
+    handler.add_action(
+        CorporateAction(
+            action_id="SPLIT-001",
+            ticker="ASELS",
+            action_type=ActionType.STOCK_SPLIT,
+            ex_date=date(2026, 7, 1),
+            split_ratio=10.0,
+        )
+    )
 
     adjusted = handler.adjust_price("ASELS", 500.0, date(2026, 7, 2))
     if abs(adjusted - 50.0) < 0.01:
@@ -199,13 +204,17 @@ def test_corporate_actions():
         failed += 1
 
     # Test 3: Bölünme pozisyon düzeltmesi
-    new_qty = handler.adjust_position("ASELS", 100, CorporateAction(
-        action_id="SPLIT-001",
-        ticker="ASELS",
-        action_type=ActionType.STOCK_SPLIT,
-        ex_date=date(2026, 7, 1),
-        split_ratio=10.0,
-    ))
+    new_qty = handler.adjust_position(
+        "ASELS",
+        100,
+        CorporateAction(
+            action_id="SPLIT-001",
+            ticker="ASELS",
+            action_type=ActionType.STOCK_SPLIT,
+            ex_date=date(2026, 7, 1),
+            split_ratio=10.0,
+        ),
+    )
     if new_qty == 1000:
         print(f"  ✓ Bölünme pozisyon: 100 → {new_qty}")
         passed += 1
@@ -214,13 +223,17 @@ def test_corporate_actions():
         failed += 1
 
     # Test 4: Bedelsiz pozisyon düzeltmesi
-    new_qty = handler.adjust_position("THYAO", 100, CorporateAction(
-        action_id="BONUS-001",
-        ticker="THYAO",
-        action_type=ActionType.BONUS_SHARE,
-        ex_date=date(2026, 7, 1),
-        bonus_ratio=0.5,
-    ))
+    new_qty = handler.adjust_position(
+        "THYAO",
+        100,
+        CorporateAction(
+            action_id="BONUS-001",
+            ticker="THYAO",
+            action_type=ActionType.BONUS_SHARE,
+            ex_date=date(2026, 7, 1),
+            bonus_ratio=0.5,
+        ),
+    )
     if new_qty == 150:
         print(f"  ✓ Bedelsiz pozisyon: 100 → {new_qty}")
         passed += 1
@@ -229,13 +242,17 @@ def test_corporate_actions():
         failed += 1
 
     # Test 5: Temettü geliri
-    income = handler.compute_dividend_income("THYAO", 100, CorporateAction(
-        action_id="DIV-001",
-        ticker="THYAO",
-        action_type=ActionType.DIVIDEND,
-        ex_date=date(2026, 6, 1),
-        dividend_per_share=5.25,
-    ))
+    income = handler.compute_dividend_income(
+        "THYAO",
+        100,
+        CorporateAction(
+            action_id="DIV-001",
+            ticker="THYAO",
+            action_type=ActionType.DIVIDEND,
+            ex_date=date(2026, 6, 1),
+            dividend_per_share=5.25,
+        ),
+    )
     if abs(income - 525.0) < 0.01:
         print(f"  ✓ Temettü geliri: {income}")
         passed += 1
@@ -244,14 +261,16 @@ def test_corporate_actions():
         failed += 1
 
     # Test 6: Bedelli fiyat düzeltmesi
-    handler.add_action(CorporateAction(
-        action_id="RIGHTS-001",
-        ticker="GARAN",
-        action_type=ActionType.RIGHTS_ISSUE,
-        ex_date=date(2026, 8, 1),
-        rights_ratio=0.2,   # her 5 hisseye 1 yeni
-        rights_price=20.0,  # 20 TL'den
-    ))
+    handler.add_action(
+        CorporateAction(
+            action_id="RIGHTS-001",
+            ticker="GARAN",
+            action_type=ActionType.RIGHTS_ISSUE,
+            ex_date=date(2026, 8, 1),
+            rights_ratio=0.2,  # her 5 hisseye 1 yeni
+            rights_price=20.0,  # 20 TL'den
+        )
+    )
 
     adjusted = handler.adjust_price("GARAN", 100.0, date(2026, 8, 2))
     # (100 + 20×0.2) / (1+0.2) = (100+4)/1.2 = 86.67
@@ -465,6 +484,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

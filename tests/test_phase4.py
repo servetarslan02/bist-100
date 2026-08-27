@@ -21,9 +21,7 @@ def test_valuation_engine():
         "pb": {"median": 1.8, "avg": 2.0},
         "ev_ebitda": {"median": 7.0, "avg": 7.5},
     }
-    multiples = valuation_engine.compute_multiples_valuation(
-        "THYAO", 305.25, company, sector
-    )
+    multiples = valuation_engine.compute_multiples_valuation("THYAO", 305.25, company, sector)
     assert len(multiples) == 3
     pe_result = [m for m in multiples if m.metric == "PE"][0]
     assert pe_result.company_value == 8.5
@@ -41,7 +39,7 @@ def test_valuation_engine():
         capex_forecast=[2e9, 2.5e9, 3e9, 3.5e9, 4e9],
         wc_change_forecast=[0.5e9, 0.5e9, 0.5e9, 0.5e9, 0.5e9],
         shares_outstanding=1_373_278_203,
-        total_debt=5e9,   # Daha düşük borç
+        total_debt=5e9,  # Daha düşük borç
         total_cash=10e9,  # Yüksek nakit
     )
     assert dcf.implied_price > 0
@@ -57,7 +55,13 @@ def test_valuation_engine():
     scenarios = valuation_engine.compute_valuation_scenarios(
         ticker="THYAO",
         current_price=305.25,
-        base_assumptions={"revenue_growth": 0.10, "margin": 0.12, "wacc": 0.20, "terminal_growth": 0.03, "base_revenue": 60e9},
+        base_assumptions={
+            "revenue_growth": 0.10,
+            "margin": 0.12,
+            "wacc": 0.20,
+            "terminal_growth": 0.03,
+            "base_revenue": 60e9,
+        },
         bear_adjustments={"revenue_growth": -0.05, "margin": -0.03, "wacc": 0.03},
         bull_adjustments={"revenue_growth": 0.05, "margin": 0.03, "wacc": -0.02},
         shares_outstanding=1_373_278_203,
@@ -73,7 +77,9 @@ def test_valuation_engine():
     assert base.probability == 0.50
     assert bull.probability == 0.25
     passed += 1
-    print(f"  ✓ Scenarios (Bear: {bear.implied_price:.0f}, Base: {base.implied_price:.0f}, Bull: {bull.implied_price:.0f})")
+    print(
+        f"  ✓ Scenarios (Bear: {bear.implied_price:.0f}, Base: {base.implied_price:.0f}, Bull: {bull.implied_price:.0f})"
+    )
 
     # 4. Expected value
     ev = valuation_engine.compute_expected_value(scenarios)
@@ -83,9 +89,7 @@ def test_valuation_engine():
     print(f"  ✓ Expected value: {ev:.2f}")
 
     # 5. Valuation summary
-    summary = valuation_engine.compute_valuation_summary(
-        "THYAO", 305.25, multiples, dcf, scenarios
-    )
+    summary = valuation_engine.compute_valuation_summary("THYAO", 305.25, multiples, dcf, scenarios)
     assert summary.ticker == "THYAO"
     assert summary.current_price == 305.25
     assert summary.overall_view in ["UNDERVALUED", "FAIR", "OVERVALUED"]
@@ -95,11 +99,15 @@ def test_valuation_engine():
 
     # 6. Negative DCF (wacc < terminal_growth → edge case)
     dcf2 = valuation_engine.compute_dcf(
-        ticker="TEST", current_price=100,
-        revenue_forecast=[100e6], margin_forecast=[0.10],
-        capex_forecast=[0], wc_change_forecast=[0],
+        ticker="TEST",
+        current_price=100,
+        revenue_forecast=[100e6],
+        margin_forecast=[0.10],
+        capex_forecast=[0],
+        wc_change_forecast=[0],
         shares_outstanding=1000000,
-        wacc=0.02, terminal_growth=0.05,  # wacc < tg
+        wacc=0.02,
+        terminal_growth=0.05,  # wacc < tg
     )
     assert dcf2.terminal_value == 0  # Edge case: wacc < tg
     passed += 1
@@ -152,7 +160,13 @@ def test_fundamental_integration():
         scenarios = valuation_engine.compute_valuation_scenarios(
             ticker="THYAO",
             current_price=price,
-            base_assumptions={"revenue_growth": 0.15, "margin": 0.10, "wacc": 0.20, "terminal_growth": 0.03, "base_revenue": 6e9},
+            base_assumptions={
+                "revenue_growth": 0.15,
+                "margin": 0.10,
+                "wacc": 0.20,
+                "terminal_growth": 0.03,
+                "base_revenue": 6e9,
+            },
             bear_adjustments={"revenue_growth": -0.05, "margin": -0.03, "wacc": 0.03},
             bull_adjustments={"revenue_growth": 0.05, "margin": 0.03, "wacc": -0.02},
             shares_outstanding=fund.get("shares_outstanding", 1_373_278_203) or 1_373_278_203,
@@ -161,7 +175,9 @@ def test_fundamental_integration():
         )
         assert len(scenarios) == 3
         passed += 1
-        print(f"  ✓ THYAO scenarios: Bear={scenarios[0].implied_price:.0f}, Base={scenarios[1].implied_price:.0f}, Bull={scenarios[2].implied_price:.0f}")
+        print(
+            f"  ✓ THYAO scenarios: Bear={scenarios[0].implied_price:.0f}, Base={scenarios[1].implied_price:.0f}, Bull={scenarios[2].implied_price:.0f}"
+        )
     else:
         failed += 2
         print("  ✗ THYAO fundamental data not available")
@@ -191,6 +207,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

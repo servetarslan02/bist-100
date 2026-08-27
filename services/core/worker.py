@@ -114,9 +114,13 @@ class JobWorker:
 
         # Async çalıştır
         task = asyncio.create_task(
-            self._execute_job(job_id, handler, payload or {},
-                              timeout or self._default_timeout,
-                              max_retries or self._default_max_retries)
+            self._execute_job(
+                job_id,
+                handler,
+                payload or {},
+                timeout or self._default_timeout,
+                max_retries or self._default_max_retries,
+            )
         )
         self._active_jobs[str(job_id)] = task
 
@@ -127,9 +131,8 @@ class JobWorker:
         """Job durumunu sorgula."""
         try:
             from .database import pg_fetchrow
-            row = await pg_fetchrow(
-                "SELECT * FROM system_jobs WHERE id = $1", job_id
-            )
+
+            row = await pg_fetchrow("SELECT * FROM system_jobs WHERE id = $1", job_id)
             return dict(row) if row else None
         except Exception:
             return None
@@ -138,9 +141,10 @@ class JobWorker:
         """Job iptal et."""
         try:
             from .database import pg_execute
+
             await pg_execute(
                 "UPDATE system_jobs SET status = 'CANCELLED', updated_at = NOW() WHERE id = $1 AND status IN ('PENDING', 'RUNNING')",
-                job_id
+                job_id,
             )
             task = self._active_jobs.get(str(job_id))
             if task and not task.done():
@@ -155,9 +159,7 @@ class JobWorker:
         self._running = False
 
         if self._active_jobs:
-            done, pending = await asyncio.wait(
-                self._active_jobs.values(), timeout=timeout
-            )
+            done, pending = await asyncio.wait(self._active_jobs.values(), timeout=timeout)
             for task in pending:
                 task.cancel()
                 logger.warning("Job cancelled on shutdown", task=task.get_name())
@@ -204,12 +206,11 @@ class JobWorker:
 
             except Exception as e:
                 last_error = str(e)
-                logger.warning("Job failed", job_id=job_id, attempt=attempt + 1,
-                             error=last_error)
+                logger.warning("Job failed", job_id=job_id, attempt=attempt + 1, error=last_error)
 
             # Retry delay (exponential backoff)
             if attempt < max_retries:
-                delay = self._retry_base_delay * (2 ** attempt)
+                delay = self._retry_base_delay * (2**attempt)
                 logger.info("Retrying job", job_id=job_id, delay=delay)
                 await asyncio.sleep(delay)
 
@@ -229,35 +230,42 @@ class JobWorker:
             return None
         try:
             from .database import pg_fetchval
+
             return await asyncio.wait_for(
                 pg_fetchval(
                     """SELECT id FROM system_jobs
                        WHERE idempotency_key = $1
                        AND status IN ('RUNNING', 'COMPLETED')
                        ORDER BY created_at DESC LIMIT 1""",
-                    idempotency_key
+                    idempotency_key,
                 ),
-                timeout=3.0
+                timeout=3.0,
             )
         except Exception:
             return None
 
-    async def _create_job(self, job_type: str, payload: dict, priority: int,
-                          max_retries: int, idempotency_key: str) -> int | None:
+    async def _create_job(
+        self, job_type: str, payload: dict, priority: int, max_retries: int, idempotency_key: str
+    ) -> int | None:
         """DB'ye job kaydet."""
         if not self._db_available():
             return None
         try:
             from .database import pg_fetchval
+
             return await asyncio.wait_for(
                 pg_fetchval(
                     """INSERT INTO system_jobs
                        (job_type, status, priority, payload, max_retries, idempotency_key)
                        VALUES ($1, 'PENDING', $2, $3, $4, $5)
                        RETURNING id""",
-                    job_type, priority, orjson.dumps(payload).decode(), max_retries, idempotency_key
+                    job_type,
+                    priority,
+                    orjson.dumps(payload).decode(),
+                    max_retries,
+                    idempotency_key,
                 ),
-                timeout=3.0
+                timeout=3.0,
             )
         except Exception as e:
             logger.warning("Failed to create job in DB (DB unavailable)", error=str(e)[:100])
@@ -275,6 +283,7 @@ class JobWorker:
             import socket
 
             from .config import settings
+
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
             result = s.connect_ex((settings.postgres_host, settings.postgres_port))
@@ -289,24 +298,25 @@ class JobWorker:
 
     _db_cache_result: bool = False
 
-    async def _update_job_status(self, job_id: int, status: JobStatus,
-                                 retry_count: int | None = None):
+    async def _update_job_status(self, job_id: int, status: JobStatus, retry_count: int | None = None):
         """Job durumunu güncelle."""
         if not self._db_available():
             return
         try:
             from .database import pg_execute
+
             if retry_count is not None:
                 await pg_execute(
                     """UPDATE system_jobs SET status = $1, retry_count = $2,
                        started_at = COALESCE(started_at, NOW()), updated_at = NOW()
                        WHERE id = $3""",
-                    status.value, retry_count, job_id
+                    status.value,
+                    retry_count,
+                    job_id,
                 )
             else:
                 await pg_execute(
-                    "UPDATE system_jobs SET status = $1, updated_at = NOW() WHERE id = $2",
-                    status.value, job_id
+                    "UPDATE system_jobs SET status = $1, updated_at = NOW() WHERE id = $2", status.value, job_id
                 )
         except Exception as e:
             logger.error("Failed to update job status", job_id=job_id, error=str(e))
@@ -317,11 +327,13 @@ class JobWorker:
             return
         try:
             from .database import pg_execute
-            result_json = orjson.dumps(result, default=str).decode() if result else '{}'
+
+            result_json = orjson.dumps(result, default=str).decode() if result else "{}"
             await pg_execute(
                 """UPDATE system_jobs SET status = 'COMPLETED', result = $1,
                    completed_at = NOW(), updated_at = NOW() WHERE id = $2""",
-                result_json, job_id
+                result_json,
+                job_id,
             )
         except Exception as e:
             logger.error("Failed to complete job", job_id=job_id, error=str(e))
@@ -332,10 +344,12 @@ class JobWorker:
             return
         try:
             from .database import pg_execute
+
             await pg_execute(
                 """UPDATE system_jobs SET status = 'FAILED', error_message = $1,
                    completed_at = NOW(), updated_at = NOW() WHERE id = $2""",
-                error_message, job_id
+                error_message,
+                job_id,
             )
         except Exception as e:
             logger.error("Failed to mark job as failed", job_id=job_id, error=str(e))

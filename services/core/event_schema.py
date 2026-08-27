@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 
 class EventType(IntEnum):
     """Olay tipleri — Protobuf enum ile uyumlu."""
+
     TICK = 0
     OHLCV = 1
     SIGNAL = 2
@@ -50,6 +51,7 @@ class EventType(IntEnum):
 @dataclass
 class CanonicalEvent:
     """Standart olay formatı — tüm servisler bunu kullanır."""
+
     type: EventType
     ticker: str = ""
     data: dict[str, Any] = field(default_factory=dict)
@@ -64,15 +66,18 @@ class CanonicalEvent:
 
     def to_json(self) -> str:
         """JSON formatına çevir."""
-        return orjson.dumps({
-            "type": self.type.value,
-            "ticker": self.ticker,
-            "data": self.data,
-            "timestamp": self.timestamp,
-            "source": self.source,
-            "confidence": self.confidence,
-            "sequence": self.sequence,
-        }, default=str)
+        return orjson.dumps(
+            {
+                "type": self.type.value,
+                "ticker": self.ticker,
+                "data": self.data,
+                "timestamp": self.timestamp,
+                "source": self.source,
+                "confidence": self.confidence,
+                "sequence": self.sequence,
+            },
+            default=str,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Dict formatına çevir."""
@@ -88,27 +93,22 @@ class CanonicalEvent:
 
     def to_binary(self) -> bytes:
         """Binary formatına çevir — Protobuf uyumlu."""
-        ticker_bytes = self.ticker.encode('utf-8')[:10].ljust(10, b'\x00')
+        ticker_bytes = self.ticker.encode("utf-8")[:10].ljust(10, b"\x00")
         data_json = orjson.dumps(self.data, default=str)[:256]
         data_len = len(data_json)
 
         # Format: type(1) + ticker(10) + timestamp(8) + confidence(4) + source_len(1) + source + data_len(2) + data
-        source_bytes = self.source.encode('utf-8')[:20]
+        source_bytes = self.source.encode("utf-8")[:20]
         source_len = len(source_bytes)
 
-        header = struct.pack('!B10sdfBB',
-            self.type.value,
-            ticker_bytes,
-            self.timestamp,
-            self.confidence,
-            source_len,
-            data_len
+        header = struct.pack(
+            "!B10sdfBB", self.type.value, ticker_bytes, self.timestamp, self.confidence, source_len, data_len
         )
 
         return header + source_bytes + data_json
 
     @classmethod
-    def from_json(cls, json_str: str) -> 'CanonicalEvent':
+    def from_json(cls, json_str: str) -> "CanonicalEvent":
         """JSON'dan oluştur."""
         data = orjson.loads(json_str)
         return cls(
@@ -122,17 +122,19 @@ class CanonicalEvent:
         )
 
     @classmethod
-    def from_binary(cls, binary: bytes) -> 'CanonicalEvent':
+    def from_binary(cls, binary: bytes) -> "CanonicalEvent":
         """Binary'den oluştur."""
         if len(binary) < 26:
             return cls(type=EventType.HEARTBEAT)
 
         try:
-            type_val, ticker_bytes, timestamp, confidence, source_len, data_len = struct.unpack('!B10sdfBB', binary[:26])
-            ticker = ticker_bytes.rstrip(b'\x00').decode('utf-8')
+            type_val, ticker_bytes, timestamp, confidence, source_len, data_len = struct.unpack(
+                "!B10sdfBB", binary[:26]
+            )
+            ticker = ticker_bytes.rstrip(b"\x00").decode("utf-8")
 
-            source = binary[26:26+source_len].decode('utf-8') if source_len > 0 else ""
-            data_json = binary[26+source_len:26+source_len+data_len].decode('utf-8')
+            source = binary[26 : 26 + source_len].decode("utf-8") if source_len > 0 else ""
+            data_json = binary[26 + source_len : 26 + source_len + data_len].decode("utf-8")
             data = orjson.loads(data_json) if data_json else {}
 
             return cls(
@@ -152,7 +154,10 @@ class CanonicalEvent:
 # Hızlı Olay Oluşturucular
 # =====================================================
 
-def create_tick_event(ticker: str, price: float, change: float, volume: int, source: str = "ingestion") -> CanonicalEvent:
+
+def create_tick_event(
+    ticker: str, price: float, change: float, volume: int, source: str = "ingestion"
+) -> CanonicalEvent:
     """Fiyat olayı oluştur."""
     return CanonicalEvent(
         type=EventType.TICK,
@@ -161,7 +166,10 @@ def create_tick_event(ticker: str, price: float, change: float, volume: int, sou
         source=source,
     )
 
-def create_signal_event(ticker: str, direction: str, confidence: float, target: float, stop_loss: float, reason: str = "") -> CanonicalEvent:
+
+def create_signal_event(
+    ticker: str, direction: str, confidence: float, target: float, stop_loss: float, reason: str = ""
+) -> CanonicalEvent:
     """Sinyal olayı oluştur."""
     return CanonicalEvent(
         type=EventType.SIGNAL,
@@ -171,14 +179,24 @@ def create_signal_event(ticker: str, direction: str, confidence: float, target: 
         source="intelligence",
     )
 
-def create_alert_event(ticker: str, alert_type: str, message: str, severity: str = "INFO", value: float = 0, threshold: float = 0) -> CanonicalEvent:
+
+def create_alert_event(
+    ticker: str, alert_type: str, message: str, severity: str = "INFO", value: float = 0, threshold: float = 0
+) -> CanonicalEvent:
     """Alarm olayı oluştur."""
     return CanonicalEvent(
         type=EventType.ALERT,
         ticker=ticker,
-        data={"alert_type": alert_type, "message": message, "severity": severity, "value": value, "threshold": threshold},
+        data={
+            "alert_type": alert_type,
+            "message": message,
+            "severity": severity,
+            "value": value,
+            "threshold": threshold,
+        },
         source="alerting",
     )
+
 
 def create_regime_event(regime: str, confidence: float, vix: float = 0, breadth: float = 0) -> CanonicalEvent:
     """Piyasa rejimi olayı oluştur."""

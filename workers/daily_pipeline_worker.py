@@ -36,6 +36,7 @@ class DailyPipelineWorker:
             # 1. Inference (BIST-100)
             try:
                 from services.pipeline.run_daily_inference import run_alpha_engine_sync
+
                 run_alpha_engine_sync()
                 result["steps"]["inference"] = "ok"
             except Exception as e:
@@ -45,6 +46,7 @@ class DailyPipelineWorker:
             # 3. Sağlık kontrolü
             try:
                 from workers.health_check_worker import health_check_worker
+
                 health = health_check_worker.run_full_check()
                 result["steps"]["health_check"] = health["overall"]
             except Exception as e:

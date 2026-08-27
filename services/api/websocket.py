@@ -57,9 +57,7 @@ class WebSocketServer:
     CHANNELS = ["market", "opportunities", "portfolio", "risk", "system"]
 
     def __init__(self):
-        self._connections: dict[str, list[WebSocketConnection]] = {
-            ch: [] for ch in self.CHANNELS
-        }
+        self._connections: dict[str, list[WebSocketConnection]] = {ch: [] for ch in self.CHANNELS}
         self._running = False
         self._message_queue: asyncio.Queue = asyncio.Queue()
 
@@ -67,6 +65,7 @@ class WebSocketServer:
         """WebSocket sunucusunu başlat."""
         try:
             import websockets
+
             self._running = True
             logger.info("WebSocket server starting", host=host, port=port)
 
@@ -101,12 +100,14 @@ class WebSocketServer:
 
         try:
             # Hoşgeldin mesajı
-            await conn.send({
-                "type": "connected",
-                "channel": channel,
-                "client_id": client_id,
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            await conn.send(
+                {
+                    "type": "connected",
+                    "channel": channel,
+                    "client_id": client_id,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
 
             # Bağlantıyı açık tut
             async for message in ws:
@@ -147,9 +148,7 @@ class WebSocketServer:
         """Mesaj kuyruğunu işleyip ilgili bağlantılara gönder."""
         while self._running:
             try:
-                channel, data = await asyncio.wait_for(
-                    self._message_queue.get(), timeout=1.0
-                )
+                channel, data = await asyncio.wait_for(self._message_queue.get(), timeout=1.0)
 
                 connections = self._connections.get(channel, [])
                 dead = []
@@ -172,55 +171,70 @@ class WebSocketServer:
 
     async def broadcast_market(self, ticker: str, price: float, change_pct: float, volume: int):
         """Piyasa verisi yayınla."""
-        await self.broadcast("market", {
-            "type": "tick",
-            "ticker": ticker,
-            "price": price,
-            "change_pct": change_pct,
-            "volume": volume,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await self.broadcast(
+            "market",
+            {
+                "type": "tick",
+                "ticker": ticker,
+                "price": price,
+                "change_pct": change_pct,
+                "volume": volume,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
     async def broadcast_opportunity(self, ticker: str, score: float, signal: str, direction: str):
         """Fırsat yayını."""
-        await self.broadcast("opportunities", {
-            "type": "opportunity",
-            "ticker": ticker,
-            "score": score,
-            "signal": signal,
-            "direction": direction,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await self.broadcast(
+            "opportunities",
+            {
+                "type": "opportunity",
+                "ticker": ticker,
+                "score": score,
+                "signal": signal,
+                "direction": direction,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
     async def broadcast_portfolio(self, equity: float, pnl: float, pnl_pct: float):
         """Portföy yayını."""
-        await self.broadcast("portfolio", {
-            "type": "portfolio_update",
-            "equity": equity,
-            "pnl": pnl,
-            "pnl_pct": pnl_pct,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await self.broadcast(
+            "portfolio",
+            {
+                "type": "portfolio_update",
+                "equity": equity,
+                "pnl": pnl,
+                "pnl_pct": pnl_pct,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
     async def broadcast_risk(self, alert_type: str, message: str, severity: str):
         """Risk alerti yayını."""
-        await self.broadcast("risk", {
-            "type": "risk_alert",
-            "alert_type": alert_type,
-            "message": message,
-            "severity": severity,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await self.broadcast(
+            "risk",
+            {
+                "type": "risk_alert",
+                "alert_type": alert_type,
+                "message": message,
+                "severity": severity,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
     async def broadcast_system(self, component: str, status: str, details: str = ""):
         """Sistem durumu yayını."""
-        await self.broadcast("system", {
-            "type": "system_status",
-            "component": component,
-            "status": status,
-            "details": details,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await self.broadcast(
+            "system",
+            {
+                "type": "system_status",
+                "component": component,
+                "status": status,
+                "details": details,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
     def get_stats(self) -> dict[str, Any]:
         """Bağlantı istatistikleri."""

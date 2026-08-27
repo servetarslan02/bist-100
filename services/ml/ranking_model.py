@@ -51,56 +51,112 @@ class RankingModel:
         self._is_trained = False
         self._feature_names = [
             # Motor 1: Relatif Güç
-            "rs_vs_bist_1d", "rs_vs_bist_5d", "rs_vs_bist_20d", "rs_vs_bist_60d",
-            "rs_vs_sector_5d", "rs_vs_peers_5d", "rs_trend", "rs_peer_rank",
+            "rs_vs_bist_1d",
+            "rs_vs_bist_5d",
+            "rs_vs_bist_20d",
+            "rs_vs_bist_60d",
+            "rs_vs_sector_5d",
+            "rs_vs_peers_5d",
+            "rs_trend",
+            "rs_peer_rank",
             # Motor 2: Momentum + Trend
-            "roc_5d", "roc_20d", "roc_60d", "momentum_20d",
-            "trend_slope_20d", "trend_r2_20d", "momentum_acceleration",
-            "momentum_accel_trend", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200",
-            "near_20d_high", "near_60d_high", "near_120d_high",
-            "breakout_failure", "drawdown_20d", "recovery_strength",
+            "roc_5d",
+            "roc_20d",
+            "roc_60d",
+            "momentum_20d",
+            "trend_slope_20d",
+            "trend_r2_20d",
+            "momentum_acceleration",
+            "momentum_accel_trend",
+            "price_vs_sma20",
+            "price_vs_sma50",
+            "price_vs_sma200",
+            "near_20d_high",
+            "near_60d_high",
+            "near_120d_high",
+            "breakout_failure",
+            "drawdown_20d",
+            "recovery_strength",
             # Motor 3: Hacim + Mikroyapı
-            "volume_percentile", "volume_zscore", "volume_trend",
-            "volume_up_down_ratio", "tick_rule", "vwap_deviation",
-            "avg_volume_5d", "obv",
+            "volume_percentile",
+            "volume_zscore",
+            "volume_trend",
+            "volume_up_down_ratio",
+            "tick_rule",
+            "vwap_deviation",
+            "avg_volume_5d",
+            "obv",
             # Motor 4: Fundamental
-            "sector_norm_pe_ratio", "sector_norm_pb_ratio", "fcf_yield_pct",
-            "fcf_margin", "balance_sheet_quality", "profit_margin_pct",
-            "roe", "roa",
+            "sector_norm_pe_ratio",
+            "sector_norm_pb_ratio",
+            "fcf_yield_pct",
+            "fcf_margin",
+            "balance_sheet_quality",
+            "profit_margin_pct",
+            "roe",
+            "roa",
             # Motor 5: KAP + Haber
-            "kap_sentiment_avg", "kap_sentiment_latest", "news_sentiment_weighted",
-            "sentiment_momentum", "kap_avg_importance",
+            "kap_sentiment_avg",
+            "kap_sentiment_latest",
+            "news_sentiment_weighted",
+            "sentiment_momentum",
+            "kap_avg_importance",
             # Motor 6: Katalizör
-            "catalyst_count", "catalyst_importance", "catalyst_days_nearest",
+            "catalyst_count",
+            "catalyst_importance",
+            "catalyst_days_nearest",
             # Motor 7: Neden Düşüyor?
-            "falling_is_temporary", "fall_market_selloff", "fall_sector_selloff",
+            "falling_is_temporary",
+            "fall_market_selloff",
+            "fall_sector_selloff",
             # Cross-Sectional
-            "rank_return_5d", "rank_return_20d", "rank_volume_zscore", "rank_rsi_14",
-            "sector_rel_return_5d", "sector_zscore_momentum_20d",
-            "cs_zscore_roc_5d", "cs_zscore_roc_20d",
+            "rank_return_5d",
+            "rank_return_20d",
+            "rank_volume_zscore",
+            "rank_rsi_14",
+            "sector_rel_return_5d",
+            "sector_zscore_momentum_20d",
+            "cs_zscore_roc_5d",
+            "cs_zscore_roc_20d",
             # Risk
-            "atr_pct", "volatility_20d", "realized_vol_20d",
+            "atr_pct",
+            "volatility_20d",
+            "realized_vol_20d",
             # Market Breadth
-            "market_breadth", "market_ad_ratio",
+            "market_breadth",
+            "market_ad_ratio",
         ]
 
         # Rejim bazlı feature ağırlıkları
         self._regime_feature_weights = {
             "BULL": {
-                "momentum_20d": 1.5, "roc_5d": 1.3, "trend_slope_20d": 1.2,
-                "volume_zscore": 1.1, "rs_vs_bist_5d": 1.2,
-                "breakout_failure": 0.5, "drawdown_20d": 0.5,
+                "momentum_20d": 1.5,
+                "roc_5d": 1.3,
+                "trend_slope_20d": 1.2,
+                "volume_zscore": 1.1,
+                "rs_vs_bist_5d": 1.2,
+                "breakout_failure": 0.5,
+                "drawdown_20d": 0.5,
             },
             "BEAR": {
-                "momentum_20d": 0.5, "roc_5d": 0.6, "trend_slope_20d": 0.5,
-                "volume_zscore": 1.2, "rs_vs_bist_5d": 0.8,
-                "breakout_failure": 1.5, "drawdown_20d": 1.3,
-                "falling_is_temporary": 1.2, "balance_sheet_quality": 1.3,
+                "momentum_20d": 0.5,
+                "roc_5d": 0.6,
+                "trend_slope_20d": 0.5,
+                "volume_zscore": 1.2,
+                "rs_vs_bist_5d": 0.8,
+                "breakout_failure": 1.5,
+                "drawdown_20d": 1.3,
+                "falling_is_temporary": 1.2,
+                "balance_sheet_quality": 1.3,
             },
             "SIDEWAYS": {
-                "momentum_20d": 0.8, "roc_5d": 0.8, "bb_position": 1.3,
-                "volume_zscore": 1.0, "rs_vs_bist_5d": 1.0,
-                "sector_norm_pe_ratio": 1.2, "fcf_yield_pct": 1.2,
+                "momentum_20d": 0.8,
+                "roc_5d": 0.8,
+                "bb_position": 1.3,
+                "volume_zscore": 1.0,
+                "rs_vs_bist_5d": 1.0,
+                "sector_norm_pe_ratio": 1.2,
+                "fcf_yield_pct": 1.2,
             },
             "UNKNOWN": {},
         }
@@ -117,8 +173,8 @@ class RankingModel:
     def train(
         self,
         features_map: dict[str, dict],  # {ticker: {feature: value}}
-        returns: dict[str, float],      # {ticker: future_return}
-        date_groups: dict[str, str],    # {ticker: date}
+        returns: dict[str, float],  # {ticker: future_return}
+        date_groups: dict[str, str],  # {ticker: date}
         regime: str = "UNKNOWN",
     ) -> dict[str, Any]:
         """Model eğit — LambdaRank + Adjusted-MSE."""
@@ -148,8 +204,7 @@ class RankingModel:
         group_sizes = groups.tolist()
 
         # LightGBM Dataset
-        train_data = lgb.Dataset(X_weighted, label=y_rank, group=group_sizes,
-                                 feature_name=self._feature_names)
+        train_data = lgb.Dataset(X_weighted, label=y_rank, group=group_sizes, feature_name=self._feature_names)
 
         # LambdaRank parametreleri
         params = {
@@ -171,31 +226,29 @@ class RankingModel:
         # Feature importance
         importance = self._lgbm_model.feature_importance(importance_type="gain")
         self._feature_importance = {
-            name: float(imp)
-            for name, imp in zip(self._feature_names, importance, strict=False)
+            name: float(imp) for name, imp in zip(self._feature_names, importance, strict=False)
         }
-        self._feature_importance_history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "regime": regime,
-            "importance": dict(self._feature_importance),
-        })
+        self._feature_importance_history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "regime": regime,
+                "importance": dict(self._feature_importance),
+            }
+        )
         if len(self._feature_importance_history) > 1000:
             self._feature_importance_history = self._feature_importance_history[-1000:]
 
         # SHAP values (eğer mümkünse)
         shap_importance = self._compute_shap_importance(X_weighted)
 
-        logger.info("LambdaRank model trained",
-                   samples=len(X), groups=len(group_sizes), regime=regime)
+        logger.info("LambdaRank model trained", samples=len(X), groups=len(group_sizes), regime=regime)
 
         return {
             "success": True,
             "samples": len(X),
             "groups": len(group_sizes),
             "regime": regime,
-            "feature_importance": dict(sorted(
-                self._feature_importance.items(), key=lambda x: x[1], reverse=True
-            )[:15]),
+            "feature_importance": dict(sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True)[:15]),
             "shap_importance": shap_importance,
         }
 
@@ -242,8 +295,7 @@ class RankingModel:
                 lgbm_norm = self._normalize_score(lgbm)
                 normalized_scores[ticker] = (lgbm_norm, rule_norm)
                 ensemble_scores[ticker] = (
-                    self._ensemble_weights["lgbm"] * lgbm_norm +
-                    self._ensemble_weights["rule_based"] * rule_norm
+                    self._ensemble_weights["lgbm"] * lgbm_norm + self._ensemble_weights["rule_based"] * rule_norm
                 )
             else:
                 normalized_scores[ticker] = (0, rule_norm)
@@ -287,8 +339,10 @@ class RankingModel:
                 features=features,
                 model_contribution={
                     "lgbm": round(float(self._ensemble_weights["lgbm"] * lgbm_norm), 4) if ticker in lgbm_scores else 0,
-                    "rule_based": round(float(self._ensemble_weights["rule_based"] * rule_norm), 4) if ticker in rule_scores else 0,
-                }
+                    "rule_based": round(float(self._ensemble_weights["rule_based"] * rule_norm), 4)
+                    if ticker in rule_scores
+                    else 0,
+                },
             )
             scores.append(opp)
 
@@ -298,9 +352,9 @@ class RankingModel:
         return RankingResult(
             scores=scores,
             top_k=top_k,
-            feature_importance=dict(sorted(
-                self._feature_importance.items(), key=lambda x: x[1], reverse=True
-            )) if self._feature_importance else {},
+            feature_importance=dict(sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True))
+            if self._feature_importance
+            else {},
             regime_weights=self._regime_feature_weights.get(regime, {}),
             ensemble_weights=self._ensemble_weights,
         )
@@ -318,8 +372,7 @@ class RankingModel:
 
         # Tarih sırasına göre sırala (group_sizes ile uyumlu)
         sorted_tickers = sorted(
-            [t for t in features_map if t in returns and t in date_groups],
-            key=lambda t: date_groups[t]
+            [t for t in features_map if t in returns and t in date_groups], key=lambda t: date_groups[t]
         )
 
         current_date = None
@@ -478,21 +531,21 @@ class RankingModel:
         """SHAP importance hesapla."""
         try:
             import shap
+
             explainer = shap.TreeExplainer(self._lgbm_model)
             shap_values = explainer.shap_values(X)
             importance = np.mean(np.abs(shap_values), axis=0)
-            return {
-                name: float(imp)
-                for name, imp in zip(self._feature_names, importance, strict=False)
-            }
+            return {name: float(imp) for name, imp in zip(self._feature_names, importance, strict=False)}
         except Exception as e:
             logger.warning("SHAP computation failed", error=str(e))
             return {}
 
     def get_feature_importance(self) -> dict[str, float]:
-        return dict(sorted(
-            self._feature_importance.items(), key=lambda x: x[1], reverse=True
-        )) if self._feature_importance else {}
+        return (
+            dict(sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True))
+            if self._feature_importance
+            else {}
+        )
 
     def get_top_opportunities(
         self,
@@ -526,6 +579,7 @@ def get_ml_ensemble() -> dict[str, Any]:
     models = {}
     try:
         from .xgboost_model import xgboost_model
+
         models["xgboost"] = xgboost_model
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -533,6 +587,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .lstm_model import lstm_model
+
         models["lstm"] = lstm_model
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -540,6 +595,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .transformer_model import transformer_model
+
         models["transformer"] = transformer_model
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -547,6 +603,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .ensemble import ensemble_model
+
         models["ensemble"] = ensemble_model
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -554,6 +611,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .model_comparator import model_comparator
+
         models["comparator"] = model_comparator
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -561,6 +619,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .finrl_bist import finrl_env
+
         models["finrl"] = finrl_env
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -568,6 +627,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .fingpt import fingpt_sentiment
+
         models["fingpt"] = fingpt_sentiment
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -575,6 +635,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .hybrid_model import hybrid_predict
+
         models["hybrid"] = hybrid_predict
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -582,6 +643,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .rl_agent import train_rl_agent
+
         models["rl_agent"] = train_rl_agent
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)
@@ -589,6 +651,7 @@ def get_ml_ensemble() -> dict[str, Any]:
         logger.warning("Caught Exception in get_ml_ensemble", exc_info=True)
     try:
         from .walk_forward import WalkForwardEngine
+
         models["walk_forward"] = WalkForwardEngine
     except ImportError:
         logger.debug("Optional import not available in get_ml_ensemble", exc_info=True)

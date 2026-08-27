@@ -32,10 +32,10 @@ class VirtualPortfolio:
         self.initial_capital = initial_capital
         self.strict_t2 = strict_t2
         # T+2 Takas & Valörlü Bakiye Modeli
-        self.settled_cash: float = initial_capital       # T+0 Serbest, çekilebilir nakit
-        self.unsettled_cash_t1: float = 0.0             # 1 gün sonra takası tamamlanacak nakit
-        self.unsettled_cash_t2: float = 0.0             # 2 gün sonra takası tamamlanacak nakit
-        self.blocked_cash: float = 0.0                  # Açık limit emirler için bloke bakiye
+        self.settled_cash: float = initial_capital  # T+0 Serbest, çekilebilir nakit
+        self.unsettled_cash_t1: float = 0.0  # 1 gün sonra takası tamamlanacak nakit
+        self.unsettled_cash_t2: float = 0.0  # 2 gün sonra takası tamamlanacak nakit
+        self.blocked_cash: float = 0.0  # Açık limit emirler için bloke bakiye
 
         # Brüt takas aynı gün alım lotları (gün içi satış engeli)
         self.gross_settlement_intraday: dict[str, int] = defaultdict(int)
@@ -48,7 +48,9 @@ class VirtualPortfolio:
         self._max_equity = initial_capital
         self._current_date = ""
 
-        logger.info("VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital, strict_t2=strict_t2)
+        logger.info(
+            "VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital, strict_t2=strict_t2
+        )
 
     @property
     def purchasing_power(self) -> float:
@@ -82,7 +84,9 @@ class VirtualPortfolio:
         self.unsettled_cash_t1 = self.unsettled_cash_t2
         self.unsettled_cash_t2 = 0.0
         self.gross_settlement_intraday.clear()
-        logger.info("T+2 Settlement rolled", settled=self.settled_cash, t1=self.unsettled_cash_t1, t2=self.unsettled_cash_t2)
+        logger.info(
+            "T+2 Settlement rolled", settled=self.settled_cash, t1=self.unsettled_cash_t1, t2=self.unsettled_cash_t2
+        )
 
     def _deduct_cash_hierarchical(self, amount: float):
         """Nakdi sırasıyla settled, t1 ve t2 havuzlarından düşer."""
@@ -122,8 +126,7 @@ class VirtualPortfolio:
             self._trades = snapshot.get("trades", [])
             self._orders = snapshot.get("orders", [])
             self._equity_curve = snapshot.get("equity_curve", [])
-            logger.info("VirtualPortfolio loaded from store",
-                       positions=len(self._positions), trades=len(self._trades))
+            logger.info("VirtualPortfolio loaded from store", positions=len(self._positions), trades=len(self._trades))
 
     def save_to_store(self, date: str):
         """State store'a kaydet."""
@@ -162,8 +165,9 @@ class VirtualPortfolio:
         total_cost = cost + commission
 
         if total_cost > self.cash:
-            logger.warning("Insufficient purchasing power for position",
-                         ticker=ticker, required=total_cost, available=self.cash)
+            logger.warning(
+                "Insufficient purchasing power for position", ticker=ticker, required=total_cost, available=self.cash
+            )
             return {"success": False, "error": "INSUFFICIENT_CASH", "required": total_cost, "available": self.cash}
 
         if ticker in self._positions:
@@ -221,7 +225,9 @@ class VirtualPortfolio:
         available_to_sell = total_holding - intraday_bought
         if sold_quantity > available_to_sell:
             error_msg = f"GROSS_SETTLEMENT_BLOCKED: {ticker} brüt takasta. Bugün alınan {intraday_bought} lot aynı gün satılamaz. Satılabilir: {available_to_sell}"
-            logger.warning("Gross settlement sell blocked", ticker=ticker, requested=sold_quantity, available=available_to_sell)
+            logger.warning(
+                "Gross settlement sell blocked", ticker=ticker, requested=sold_quantity, available=available_to_sell
+            )
             return {"success": False, "error": "GROSS_SETTLEMENT_BLOCKED", "message": error_msg}
 
         # Net gelir (satış tutarı - satış komisyonu) -> BIST T+2 Takas havuzuna aktarılır
@@ -256,14 +262,22 @@ class VirtualPortfolio:
 
         if sold_quantity >= total_holding:
             del self._positions[ticker]
-            logger.info("Position fully closed", ticker=ticker, qty=sold_quantity, realized_pnl=realized_pnl, reason=reason)
+            logger.info(
+                "Position fully closed", ticker=ticker, qty=sold_quantity, realized_pnl=realized_pnl, reason=reason
+            )
         else:
             remaining_qty = total_holding - sold_quantity
             pos["quantity"] = remaining_qty
             pos["current_price"] = price
             pos["market_value"] = remaining_qty * price
             pos["last_update"] = datetime.now(UTC).isoformat()
-            logger.info("Position partially sold", ticker=ticker, sold_qty=sold_quantity, remaining_qty=remaining_qty, realized_pnl=realized_pnl)
+            logger.info(
+                "Position partially sold",
+                ticker=ticker,
+                sold_qty=sold_quantity,
+                remaining_qty=remaining_qty,
+                realized_pnl=realized_pnl,
+            )
 
         self._current_date = date
         return {
@@ -294,13 +308,15 @@ class VirtualPortfolio:
         if not record_equity:
             return
 
-        self._equity_curve.append({
-            "date": date,
-            "equity": total_value,
-            "cash": self.cash,
-            "settled_cash": self.settled_cash,
-            "invested": total_value - self.cash,
-        })
+        self._equity_curve.append(
+            {
+                "date": date,
+                "equity": total_value,
+                "cash": self.cash,
+                "settled_cash": self.settled_cash,
+                "invested": total_value - self.cash,
+            }
+        )
         if len(self._equity_curve) > 5000:
             self._equity_curve = self._equity_curve[-5000:]
 
@@ -335,7 +351,9 @@ class VirtualPortfolio:
             pos["avg_cost"] = round(pos["avg_cost"] / (1.0 + ratio), 4)
             pos["quantity"] = new_qty
             pos["market_value"] = new_qty * pos.get("current_price", pos["avg_cost"])
-            logger.info("Bonus issue applied", ticker=ticker, old_qty=old_qty, new_qty=new_qty, new_avg_cost=pos["avg_cost"])
+            logger.info(
+                "Bonus issue applied", ticker=ticker, old_qty=old_qty, new_qty=new_qty, new_avg_cost=pos["avg_cost"]
+            )
             return {"applied": True, "type": "BONUS_ISSUE", "old_qty": old_qty, "new_qty": new_qty}
 
         return {"applied": False, "reason": "UNSUPPORTED_ACTION"}
@@ -354,14 +372,20 @@ class VirtualPortfolio:
             return
         try:
             import time
+
             now = time.monotonic()
             if now - self._price_cache_ts < self._PRICE_CACHE_TTL and self._price_cache:
                 price_map = self._price_cache
             else:
                 from services.core.redis_helper import get_cached
+
                 radar = get_cached("radar:data") or []
                 if radar:
-                    price_map = {x["symbol"]: float(x["price"]) for x in radar if x.get("symbol") and x.get("price") and float(x.get("price")) > 0}
+                    price_map = {
+                        x["symbol"]: float(x["price"])
+                        for x in radar
+                        if x.get("symbol") and x.get("price") and float(x.get("price")) > 0
+                    }
                     self._price_cache = price_map
                     self._price_cache_ts = now
                 else:
@@ -392,10 +416,14 @@ class VirtualPortfolio:
         # 1. Redis radar
         try:
             from services.core.redis_helper import get_cached
+
             radar = get_cached("radar:data") or []
             if radar:
-                price_map = {x["symbol"]: float(x["price"]) for x in radar
-                           if x.get("symbol") and x.get("price") and float(x.get("price")) > 0}
+                price_map = {
+                    x["symbol"]: float(x["price"])
+                    for x in radar
+                    if x.get("symbol") and x.get("price") and float(x.get("price")) > 0
+                }
                 for ticker, pos in self._positions.items():
                     if ticker in price_map:
                         pos["current_price"] = price_map[ticker]
@@ -411,27 +439,27 @@ class VirtualPortfolio:
                 import asyncio
 
                 from services.core.database import pg_fetch
+
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # Async ortamda — background task olarak çalıştır
                     async def _fetch_missing():
                         for ticker in missing:
                             rows = await pg_fetch(
-                                "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1",
-                                ticker
+                                "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1", ticker
                             )
                             if rows:
                                 price = float(rows[0]["close"])
                                 self._positions[ticker]["current_price"] = price
                                 self._positions[ticker]["market_value"] = self._positions[ticker]["quantity"] * price
                                 updated[ticker] = price
+
                     asyncio.ensure_future(_fetch_missing())
                 else:
                     for ticker in missing:
-                        rows = asyncio.run(pg_fetch(
-                            "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1",
-                            ticker
-                        ))
+                        rows = asyncio.run(
+                            pg_fetch("SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1", ticker)
+                        )
                         if rows:
                             price = float(rows[0]["close"])
                             self._positions[ticker]["current_price"] = price
@@ -443,10 +471,12 @@ class VirtualPortfolio:
         if updated and date:
             self.update_prices(updated, date, record_equity=True)
 
-        logger.info("Force price refresh completed",
-                   total_positions=len(self._positions),
-                   updated=len(updated),
-                   tickers=list(updated.keys()))
+        logger.info(
+            "Force price refresh completed",
+            total_positions=len(self._positions),
+            updated=len(updated),
+            tickers=list(updated.keys()),
+        )
         return updated
 
     def get_total_value(self) -> float:
@@ -479,7 +509,8 @@ class VirtualPortfolio:
         self._sync_live_prices()
         try:
             from services.ingestion.bist_universe import bist_universe
-            company_names = getattr(bist_universe, 'COMPANY_NAMES', {})
+
+            company_names = getattr(bist_universe, "COMPANY_NAMES", {})
         except Exception:
             company_names = {}
 
@@ -528,18 +559,20 @@ class VirtualPortfolio:
             orders = list(self._orders)
         elif not orders and self._positions:
             for pos in self._positions.values():
-                orders.append({
-                    "date": pos.get("entry_date", "2026-08-24"),
-                    "order_id": f"ORD_{pos.get('ticker')}_1",
-                    "ticker": pos.get("ticker"),
-                    "side": "BUY",
-                    "quantity": pos.get("quantity"),
-                    "signal_price": round(float(pos.get("avg_cost", 0.0)) * 0.999, 2),
-                    "execution_price": round(float(pos.get("avg_cost", 0.0)), 2),
-                    "slippage_pct": 0.085,
-                    "commission": round(float(pos.get("market_value", 0.0)) * 0.0002, 2),
-                    "status": "FILLED"
-                })
+                orders.append(
+                    {
+                        "date": pos.get("entry_date", "2026-08-24"),
+                        "order_id": f"ORD_{pos.get('ticker')}_1",
+                        "ticker": pos.get("ticker"),
+                        "side": "BUY",
+                        "quantity": pos.get("quantity"),
+                        "signal_price": round(float(pos.get("avg_cost", 0.0)) * 0.999, 2),
+                        "execution_price": round(float(pos.get("avg_cost", 0.0)), 2),
+                        "slippage_pct": 0.085,
+                        "commission": round(float(pos.get("market_value", 0.0)) * 0.0002, 2),
+                        "status": "FILLED",
+                    }
+                )
 
         if limit and orders:
             orders = orders[:limit]
@@ -665,5 +698,3 @@ class VirtualPortfolio:
 
 # Singleton
 virtual_portfolio = VirtualPortfolio()
-
-

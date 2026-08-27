@@ -50,7 +50,7 @@ def run_full_audit():
         atr_trailing_bull_mult=8.50,
         atr_trailing_bear_mult=2.00,
         position_alloc_bull=0.18,
-        crisis_exit_buffer=0.96
+        crisis_exit_buffer=0.96,
     )
 
     # ---------------------------------------------------------------------------------------------
@@ -59,7 +59,9 @@ def run_full_audit():
     print("\n" + "=" * 105)
     print("📅 1. YIL BAZINDA NET GETİRİ, BIST-100 ENDEKS KIYASI VE MAKSİMUM DÜŞÜŞ (1997 - 2026)")
     print("=" * 105)
-    print(f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'SİSTEM MAX DD':<14} | {'DÖNEM TİPİ'}")
+    print(
+        f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'SİSTEM MAX DD':<14} | {'DÖNEM TİPİ'}"
+    )
     print("-" * 105)
 
     years = sorted(list(set(d.year for d in bm_df.index)))
@@ -75,16 +77,28 @@ def run_full_audit():
             bm_ret = 0.0
 
         diff = res.total_return_pct - bm_ret
-        period_type = "KÖR HOLDOUT (OOS)" if y >= 2024 else ("KRİZ DÖNEMİ" if y in [2000, 2001, 2008, 2018, 2020] else "IN-SAMPLE")
+        period_type = (
+            "KÖR HOLDOUT (OOS)"
+            if y >= 2024
+            else ("KRİZ DÖNEMİ" if y in [2000, 2001, 2008, 2018, 2020] else "IN-SAMPLE")
+        )
 
         # Özel kriz vurgusu
         kriz_tag = " ⚠️ KRİZ" if y in [2001, 2008, 2018] else ""
-        print(f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>11.2f} | {period_type}{kriz_tag}")
+        print(
+            f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>11.2f} | {period_type}{kriz_tag}"
+        )
 
-        yearly_stats.append({
-            "year": y, "sys_ret": res.total_return_pct, "bm_ret": bm_ret,
-            "max_dd": res.max_drawdown, "pf": res.profit_factor, "trades": res.total_trades
-        })
+        yearly_stats.append(
+            {
+                "year": y,
+                "sys_ret": res.total_return_pct,
+                "bm_ret": bm_ret,
+                "max_dd": res.max_drawdown,
+                "pf": res.profit_factor,
+                "trades": res.total_trades,
+            }
+        )
 
     # ---------------------------------------------------------------------------------------------
     # BÖLÜM 2: IN-SAMPLE (1997-2023) vs OOS (2024-2026) KAPSAMLI METRİK TABLOSU
@@ -119,14 +133,16 @@ def run_full_audit():
     print("\n" + "=" * 105)
     print("💰 3. IN-SAMPLE VE OOS İÇİN AYRI AYRI MALİYET STRES TESTİ")
     print("=" * 105)
-    print(f"{'MALİYET SEVİYESİ':<25} | {'IN-SAMPLE GETİRİ':<18} | {'IN-SAMPLE PF':<14} | {'OOS GETİRİ':<16} | {'OOS PF'}")
+    print(
+        f"{'MALİYET SEVİYESİ':<25} | {'IN-SAMPLE GETİRİ':<18} | {'IN-SAMPLE PF':<14} | {'OOS GETİRİ':<16} | {'OOS PF'}"
+    )
     print("-" * 105)
 
     stress_factors = [
         ("%0.25 (Standart)", 1.0, 1.0),
         ("%0.50 (Yüksek Komisyon)", 0.98, 0.95),
         ("%1.00 (Zorlu Likidite)", 0.94, 0.88),
-        ("%1.50 (Aşırı Kayma & Stres)", 0.90, 0.82)
+        ("%1.50 (Aşırı Kayma & Stres)", 0.90, 0.82),
     ]
     for label, is_f, oos_f in stress_factors:
         is_ret_adj = is_res.total_return_pct * is_f
@@ -143,7 +159,9 @@ def run_full_audit():
     print("🔄 4. EXPANDING WINDOW WALK-FORWARD DOĞRULAMA (AŞIRI UYUM VE VERİ SIZINTISI İSPATI)")
     print("   * Model geçmiş döneme kilitlenir, hiç görmediği sonraki 3 yılı kör test eder.")
     print("=" * 105)
-    print(f"{'EĞİTİM DÖNEMİ (TRAIN)':<24} | {'KÖR DÖNEM (OOS TEST)':<22} | {'OOS SİSTEM GETİRİSİ':<20} | {'OOS BIST-100':<14} | {'OOS PF'}")
+    print(
+        f"{'EĞİTİM DÖNEMİ (TRAIN)':<24} | {'KÖR DÖNEM (OOS TEST)':<22} | {'OOS SİSTEM GETİRİSİ':<20} | {'OOS BIST-100':<14} | {'OOS PF'}"
+    )
     print("-" * 105)
 
     wf_splits = [
@@ -151,18 +169,24 @@ def run_full_audit():
         ((1997, 2015), (2016, 2018)),
         ((1997, 2018), (2019, 2021)),
         ((1997, 2021), (2022, 2023)),
-        ((1997, 2023), (2024, 2026))
+        ((1997, 2023), (2024, 2026)),
     ]
 
     wf_oos_returns = []
     for (tr_s, tr_e), (ts_s, ts_e) in wf_splits:
         wf_res = optimizer.simulate_fast(best_params, start_year=ts_s, end_year=ts_e)
         bm_slice = bm_df[(bm_df.index.year >= ts_s) & (bm_df.index.year <= ts_e)]
-        bm_slice_ret = ((bm_slice["Close"].iloc[-1] - bm_slice["Close"].iloc[0]) / bm_slice["Close"].iloc[0]) * 100.0 if len(bm_slice) > 10 else 0.0
+        bm_slice_ret = (
+            ((bm_slice["Close"].iloc[-1] - bm_slice["Close"].iloc[0]) / bm_slice["Close"].iloc[0]) * 100.0
+            if len(bm_slice) > 10
+            else 0.0
+        )
 
         train_lbl = f"{tr_s} - {tr_e} (Eğitim)"
         test_lbl = f"{ts_s} - {ts_e} (Kör OOS)"
-        print(f"{train_lbl:<24} | {test_lbl:<22} | %{wf_res.total_return_pct:>17,.1f} | %{bm_slice_ret:>11,.1f} | {wf_res.profit_factor:>6.2f}")
+        print(
+            f"{train_lbl:<24} | {test_lbl:<22} | %{wf_res.total_return_pct:>17,.1f} | %{bm_slice_ret:>11,.1f} | {wf_res.profit_factor:>6.2f}"
+        )
         wf_oos_returns.append(wf_res.total_return_pct)
 
     print("-" * 105)

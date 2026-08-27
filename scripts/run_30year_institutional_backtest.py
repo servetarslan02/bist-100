@@ -18,11 +18,11 @@ import numpy as np
 import polars as pl
 import yfinance as yf
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 import structlog
 
@@ -32,11 +32,31 @@ logger = structlog.get_logger(__name__)
 
 # 30 Yıllık Tarihçesi Olan Temel BIST Lokomotif Hisseleri
 BIST_30Y_CORE_TICKERS = [
-    "THYAO.IS", "GARAN.IS", "AKBNK.IS", "ISCTR.IS", "YKBNK.IS",
-    "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS", "SISE.IS",
-    "ARCLK.IS", "FROTO.IS", "TOASO.IS", "ENKAI.IS", "PETKM.IS",
-    "CCOLA.IS", "AEFES.IS", "TCELL.IS", "VAKBN.IS", "HALKB.IS",
-    "BIMAS.IS", "ASELS.IS", "PGSUS.IS", "TTKOM.IS", "MGROS.IS"
+    "THYAO.IS",
+    "GARAN.IS",
+    "AKBNK.IS",
+    "ISCTR.IS",
+    "YKBNK.IS",
+    "KCHOL.IS",
+    "SAHOL.IS",
+    "TUPRS.IS",
+    "EREGL.IS",
+    "SISE.IS",
+    "ARCLK.IS",
+    "FROTO.IS",
+    "TOASO.IS",
+    "ENKAI.IS",
+    "PETKM.IS",
+    "CCOLA.IS",
+    "AEFES.IS",
+    "TCELL.IS",
+    "VAKBN.IS",
+    "HALKB.IS",
+    "BIMAS.IS",
+    "ASELS.IS",
+    "PGSUS.IS",
+    "TTKOM.IS",
+    "MGROS.IS",
 ]
 
 BENCHMARK_TICKER = "XU100.IS"
@@ -59,7 +79,9 @@ def download_30y_data():
     if isinstance(bm_df.columns, list):
         bm_df.columns = [c[0] for c in bm_df.columns]
 
-    print(f"    ✓ BIST-100: {len(bm_df)} işlem günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})")
+    print(
+        f"    ✓ BIST-100: {len(bm_df)} işlem günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})"
+    )
 
     print(f"  • {len(BIST_30Y_CORE_TICKERS)} Öncü BIST Hissesi indiriliyor...")
     stocks_raw = yf.download(BIST_30Y_CORE_TICKERS, start=start_date, end=end_date, progress=False, group_by="ticker")
@@ -125,7 +147,7 @@ def run_30year_backtest():
         # Yıl geçişi kontrolü
         if year != current_year:
             year_ret_pct = ((capital - year_start_equity) / year_start_equity) * 100
-            bm_year_price = float(bm_df["Close"].iloc[day_idx-1])
+            bm_year_price = float(bm_df["Close"].iloc[day_idx - 1])
             bm_ret_pct = ((bm_year_price - year_start_bm) / year_start_bm) * 100
             alpha_pct = year_ret_pct - bm_ret_pct
 
@@ -133,7 +155,7 @@ def run_30year_backtest():
                 "engine_ret": year_ret_pct,
                 "bm_ret": bm_ret_pct,
                 "alpha": alpha_pct,
-                "ending_equity": capital
+                "ending_equity": capital,
             }
             current_year = year
             year_start_equity = capital
@@ -142,7 +164,7 @@ def run_30year_backtest():
         # -------------------------------------------------------------
         # A) Piyasa Rejim Kontrolü (XU100 SMA50 & SMA200)
         # -------------------------------------------------------------
-        bm_closes_window = bm_df["Close"].iloc[max(0, day_idx-200):day_idx+1].values
+        bm_closes_window = bm_df["Close"].iloc[max(0, day_idx - 200) : day_idx + 1].values
         bm_current_close = float(bm_closes_window[-1])
         bm_sma50 = float(np.mean(bm_closes_window[-50:])) if len(bm_closes_window) >= 50 else bm_current_close
         bm_sma200 = float(np.mean(bm_closes_window[-200:])) if len(bm_closes_window) >= 200 else bm_sma50
@@ -183,13 +205,15 @@ def run_30year_backtest():
                     capital += (exit_price * pos["shares"]) - (exit_price * pos["shares"] * COMMISSION_RATE)
 
                     ret_pct = ((exit_price - pos["entry_price"]) / pos["entry_price"]) * 100
-                    trade_logs.append({
-                        "ticker": ticker,
-                        "pnl": net_pnl,
-                        "ret_pct": ret_pct,
-                        "type": "TRAILING_STOP" if ret_pct > 0 else "STOP_LOSS",
-                        "date": current_date
-                    })
+                    trade_logs.append(
+                        {
+                            "ticker": ticker,
+                            "pnl": net_pnl,
+                            "ret_pct": ret_pct,
+                            "type": "TRAILING_STOP" if ret_pct > 0 else "STOP_LOSS",
+                            "date": current_date,
+                        }
+                    )
                     closed_tickers.append(ticker)
 
             except Exception:
@@ -227,21 +251,27 @@ def run_30year_backtest():
                         continue
 
                     # 10/10 Sinyal Filtresi
-                    has_bull = any(p in {"BULLISH_ENGULFING", "HAMMER_PINBAR", "MORNING_STAR", "THREE_WHITE_SOLDIERS", "BULLISH_FVG"} for p in c_res.patterns_detected)
+                    has_bull = any(
+                        p
+                        in {"BULLISH_ENGULFING", "HAMMER_PINBAR", "MORNING_STAR", "THREE_WHITE_SOLDIERS", "BULLISH_FVG"}
+                        for p in c_res.patterns_detected
+                    )
                     if (has_bull or c_res.candle_score >= 65) and c_res.buyer_pressure_pct >= 52:
-                        candidates.append({
-                            "ticker": ticker,
-                            "price": p_now,
-                            "score": c_res.candle_score,
-                            "stop_pct": 0.07,  # %7 başlangıç stop-loss
-                            "patterns": c_res.patterns_detected
-                        })
+                        candidates.append(
+                            {
+                                "ticker": ticker,
+                                "price": p_now,
+                                "score": c_res.candle_score,
+                                "stop_pct": 0.07,  # %7 başlangıç stop-loss
+                                "patterns": c_res.patterns_detected,
+                            }
+                        )
                 except Exception:
                     continue
 
             # Skoruna göre sırala ve al
             candidates.sort(key=lambda x: x["score"], reverse=True)
-            for cand in candidates[:max_positions - len(positions)]:
+            for cand in candidates[: max_positions - len(positions)]:
                 # Fractional Kelly Sizing (Her pozisyona toplam portföyün %10'u)
                 total_portfolio_now = capital + sum(p["shares"] * p["entry_price"] for p in positions.values())
                 invest_amount = min(capital * 0.90, total_portfolio_now * (0.10 if is_bull_regime else 0.05))
@@ -258,7 +288,7 @@ def run_30year_backtest():
                             "entry_price": entry_p,
                             "peak_price": entry_p,
                             "stop_loss": entry_p * (1 - cand["stop_pct"]),
-                            "entry_date": current_date
+                            "entry_date": current_date,
                         }
 
         # Portföy anlık değerini kaydet
@@ -289,7 +319,7 @@ def run_30year_backtest():
             "engine_ret": year_ret_pct,
             "bm_ret": bm_ret_pct,
             "alpha": year_ret_pct - bm_ret_pct,
-            "ending_equity": capital
+            "ending_equity": capital,
         }
 
     # -------------------------------------------------------------
@@ -338,7 +368,9 @@ def run_30year_backtest():
     print(f"{'Başlangıç Sermayesi':<36} | {'100.000 ₺':<20} | {'100.000 ₺':<20}")
     print(f"{'Nihai Portföy Değeri':<36} | {f'{final_bm_equity:,.0f} ₺':<20} | {f'{final_equity:,.0f} ₺':<20}")
     print(f"{'Kümülatif Toplam Getiri':<36} | %{total_bm_return:<19,.1f} | %{total_engine_return:<19,.1f}")
-    print(f"{'Bileşik Yıllık Getiri (CAGR)':<36} | %{cagr_bm:<19.2f} | %{cagr_engine:<19.2f} (Net +%{cagr_engine - cagr_bm:.2f}/yıl)")
+    print(
+        f"{'Bileşik Yıllık Getiri (CAGR)':<36} | %{cagr_bm:<19.2f} | %{cagr_engine:<19.2f} (Net +%{cagr_engine - cagr_bm:.2f}/yıl)"
+    )
     print(f"{'Sharpe Oranı (Risk Ayarlı)':<36} | {sharpe_bm:<20.2f} | {sharpe_engine:<20.2f}")
     print(f"{'Maksimum Düşüş (Max Drawdown)':<36} | %{max_dd_bm:<19.2f} | %{max_dd_engine:<19.2f} (Kriz Korumalı)")
     print(f"{'Toplam İşlem Sayısı':<36} | {'1 İşlem':<20} | {f'{total_trades} İşlem':<20}")
@@ -349,7 +381,9 @@ def run_30year_backtest():
     print("\n" + "=" * 80)
     print("📅 YILLARA GÖRE DETAYLI PERFORMANS & KRİZ DÖNEMLERİ ANALİZİ")
     print("=" * 80)
-    print(f"{'YIL':<6} | {'MOTOR GETİRİSİ':<16} | {'BIST-100 GETİRİSİ':<18} | {'NET ALFA (Üstünlük)':<20} | {'DÖNEM NOTU'}")
+    print(
+        f"{'YIL':<6} | {'MOTOR GETİRİSİ':<16} | {'BIST-100 GETİRİSİ':<18} | {'NET ALFA (Üstünlük)':<20} | {'DÖNEM NOTU'}"
+    )
     print("-" * 80)
 
     for y, data in sorted(yearly_stats.items()):
@@ -358,19 +392,27 @@ def run_30year_backtest():
         alpha = data["alpha"]
 
         note = ""
-        if y == 2001: note = "🔥 2001 Bankacılık Krizi"
-        elif y == 2008: note = "📉 2008 Küresel Finans Çöküşü"
-        elif y == 2018: note = "⚡ 2018 Kur Şoku"
-        elif y == 2020: note = "🦠 2020 Covid Çöküşü & V-Dönüş"
-        elif y in (2022, 2023): note = "🚀 Büyük Enflasyon Rallisi"
-        elif y == 2024: note = "📈 Faiz Normalleşme Dönemi"
-        elif y in (2025, 2026): note = "📊 Güncel Piyasa Sezonu"
+        if y == 2001:
+            note = "🔥 2001 Bankacılık Krizi"
+        elif y == 2008:
+            note = "📉 2008 Küresel Finans Çöküşü"
+        elif y == 2018:
+            note = "⚡ 2018 Kur Şoku"
+        elif y == 2020:
+            note = "🦠 2020 Covid Çöküşü & V-Dönüş"
+        elif y in (2022, 2023):
+            note = "🚀 Büyük Enflasyon Rallisi"
+        elif y == 2024:
+            note = "📈 Faiz Normalleşme Dönemi"
+        elif y in (2025, 2026):
+            note = "📊 Güncel Piyasa Sezonu"
 
         print(f"{y:<6} | %{eng_ret:>+13.1f} | %{b_ret:>+15.1f} | %{alpha:>+17.1f} | {note}")
 
     print("=" * 80)
     print("✅ 30 YILLIK GERÇEK VERİ TESTİ TAMAMLANDI VE MOTORUN ÜSTÜNLÜĞÜ İSPATLANDI!")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     run_30year_backtest()

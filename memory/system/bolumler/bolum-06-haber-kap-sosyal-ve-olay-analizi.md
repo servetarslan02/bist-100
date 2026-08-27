@@ -41,8 +41,7 @@ Sentiment Analizi → Etki Analizi → Catalyst/Risk Tespiti →
 # services/intelligence/kap_extractor.py
 from services.intelligence.kap_extractor import kap_extractor
 
-result = kap_extractor.extract("THYAO", "K001",
-    "Şirketimiz yeni büyük sözleşme imzaladı. Tutar: 500M TL")
+result = kap_extractor.extract("THYAO", "K001", "Şirketimiz yeni büyük sözleşme imzaladı. Tutar: 500M TL")
 # event_type: CONTRACT
 # financial_impact: +0.3
 # surprise_score: 0.6
@@ -54,6 +53,7 @@ result = kap_extractor.extract("THYAO", "K001",
 
 ```python
 from services.intelligence.kap_extractor import sector_chain
+
 impacts = sector_chain.compute_chain_impact("ENERGY", 0.5)
 # Enerji → Havacılık: -0.60 (yakıt maliyeti)
 ```
@@ -69,10 +69,15 @@ impacts = sector_chain.compute_chain_impact("ENERGY", 0.5)
 from services.features.sentiment import SentimentFeatureEngine
 
 engine = SentimentFeatureEngine()
-engine.add_news_event("THYAO", {
-    "sentiment": 0.8, "importance": 0.7, "credibility": 0.9,
-    "timestamp": datetime.now(timezone.utc).isoformat(),
-})
+engine.add_news_event(
+    "THYAO",
+    {
+        "sentiment": 0.8,
+        "importance": 0.7,
+        "credibility": 0.9,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    },
+)
 features = engine.compute_all_sentiment_features("THYAO")
 # news_sentiment: 0.8, composite_sentiment: 0.7
 ```
@@ -123,7 +128,7 @@ Her bilginin kaynağını ve güvenilirliğini doğrular.
 # services/ingestion/providers/news_provider.py
 np = NewsProvider()
 credibility = np.compute_credibility("Bloomberg")  # 0.95
-credibility = np.compute_credibility("twitter")    # 0.40
+credibility = np.compute_credibility("twitter")  # 0.40
 ```
 
 ---

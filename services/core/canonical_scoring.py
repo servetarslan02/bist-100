@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 # SCORE VECTOR
 # =====================================================
 
+
 @dataclass
 class ScoreVector:
     """Çok boyutlu skor vektörü — her boyut 0-100 arası.
@@ -38,20 +39,20 @@ class ScoreVector:
     """
 
     # Motor bazlı boyutlar
-    technical: float = 0.0          # Calculator + Motor2 (trend, momentum, RSI, MACD)
-    momentum: float = 0.0           # Motor2 (roc, acceleration, breakout)
+    technical: float = 0.0  # Calculator + Motor2 (trend, momentum, RSI, MACD)
+    momentum: float = 0.0  # Motor2 (roc, acceleration, breakout)
     relative_strength: float = 0.0  # Motor1 (vs BIST, vs sector, vs peers)
-    volume: float = 0.0             # Motor3 (z-score, trend, tick rule)
-    fundamental: float = 0.0        # Motor4 (value, quality, growth)
-    news_sentiment: float = 0.0     # Motor5 (KAP + news + combined)
-    catalyst: float = 0.0           # Motor6 (upcoming events, time decay)
-    mean_reversion: float = 0.0     # Motor8 (BB, RSI oversold/overbought)
-    seasonality: float = 0.0        # Motor9 (monthly, quarterly patterns)
-    market_regime: float = 0.0      # Regime detector (BULL/BEAR/SIDEWAYS fit)
+    volume: float = 0.0  # Motor3 (z-score, trend, tick rule)
+    fundamental: float = 0.0  # Motor4 (value, quality, growth)
+    news_sentiment: float = 0.0  # Motor5 (KAP + news + combined)
+    catalyst: float = 0.0  # Motor6 (upcoming events, time decay)
+    mean_reversion: float = 0.0  # Motor8 (BB, RSI oversold/overbought)
+    seasonality: float = 0.0  # Motor9 (monthly, quarterly patterns)
+    market_regime: float = 0.0  # Regime detector (BULL/BEAR/SIDEWAYS fit)
 
     # Risk boyutları (ayrı tutulmalı)
-    risk: float = 0.0               # Volatilite, drawdown, ATR, correlation
-    data_quality: float = 0.0       # Feature availability, freshness, completeness
+    risk: float = 0.0  # Volatilite, drawdown, ATR, correlation
+    data_quality: float = 0.0  # Feature availability, freshness, completeness
 
     # Meta
     ticker: str = ""
@@ -77,8 +78,7 @@ class ScoreVector:
 
     def get_opportunity_dimensions(self) -> dict[str, float]:
         """Fırsat boyutlarını döndür (risk ve data_quality hariç)."""
-        return {k: v for k, v in self.to_dict().items()
-                if k not in ("risk", "data_quality")}
+        return {k: v for k, v in self.to_dict().items() if k not in ("risk", "data_quality")}
 
     def get_nonzero_count(self) -> int:
         """Sıfır olmayan boyut sayısı."""
@@ -93,12 +93,12 @@ class CanonicalScore:
     vector: ScoreVector = field(default_factory=ScoreVector)
 
     # Nihai skorlar (tek sayı)
-    opportunity_score: float = 0.0   # "Ne kadar cazip?" (0-100)
-    risk_score: float = 0.0          # "Ne kadar tehlikeli?" (0-100, yüksek = güvenli)
-    confidence: float = 0.0          # "Buna ne kadar güveniyoruz?" (0-1)
+    opportunity_score: float = 0.0  # "Ne kadar cazip?" (0-100)
+    risk_score: float = 0.0  # "Ne kadar tehlikeli?" (0-100, yüksek = güvenli)
+    confidence: float = 0.0  # "Buna ne kadar güveniyoruz?" (0-1)
 
     # Yön
-    direction: str = "NEUTRAL"       # LONG / SHORT / NEUTRAL
+    direction: str = "NEUTRAL"  # LONG / SHORT / NEUTRAL
 
     # Decomposition
     decomposition: dict[str, float] = field(default_factory=dict)
@@ -111,14 +111,15 @@ class CanonicalScore:
     nonzero_dimensions: int = 0
 
     # ML model bilgisi
-    ml_score: float | None = None    # ML prediction (0-100)
-    ml_confidence: float = 0.0          # ML güven skoru (0-1)
-    rule_score: float = 0.0             # Rule-based skor (ML blend öncesi)
+    ml_score: float | None = None  # ML prediction (0-100)
+    ml_confidence: float = 0.0  # ML güven skoru (0-1)
+    rule_score: float = 0.0  # Rule-based skor (ML blend öncesi)
 
 
 # =====================================================
 # CANONICAL SCORING PIPELINE
 # =====================================================
+
 
 class CanonicalScoringPipeline:
     """Tek canonical scoring pipeline.
@@ -261,14 +262,8 @@ class CanonicalScoringPipeline:
 
         # Ağırlıklı fırsat skoru (risk hariç)
         opportunity_dims = vector.get_opportunity_dimensions()
-        weighted_sum = sum(
-            opportunity_dims[dim] * weights.get(dim, 0)
-            for dim in opportunity_dims
-        )
-        total_weight = sum(
-            weights.get(dim, 0)
-            for dim in opportunity_dims
-        )
+        weighted_sum = sum(opportunity_dims[dim] * weights.get(dim, 0) for dim in opportunity_dims)
+        total_weight = sum(weights.get(dim, 0) for dim in opportunity_dims)
         rule_score = weighted_sum / total_weight if total_weight > 0 else 50.0
 
         # ML prediction (varsa)
@@ -281,6 +276,7 @@ class CanonicalScoringPipeline:
                 ml_confidence = min(1.0, abs(ml_pred) / 2.0)
             except Exception as e:
                 import structlog
+
                 structlog.get_logger().warning("ML prediction failed, falling back to rule-based", error=str(e))
 
         # Ensemble: ML varsa %70 ML + %30 rule-based
@@ -296,10 +292,7 @@ class CanonicalScoringPipeline:
         direction = self._determine_direction(vector, opportunity_score, regime)
 
         # Decomposition
-        decomposition = {
-            dim: round(vector.to_dict()[dim] * weights.get(dim, 0), 2)
-            for dim in opportunity_dims
-        }
+        decomposition = {dim: round(vector.to_dict()[dim] * weights.get(dim, 0), 2) for dim in opportunity_dims}
 
         return CanonicalScore(
             vector=vector,
@@ -459,8 +452,7 @@ class CanonicalScoringPipeline:
         """Haber sentiment skoru."""
         score = 50.0
 
-        kap_sent = self._s(f.get("kap_sentiment_weighted",
-                          f.get("kap_sentiment_avg", 0)))
+        kap_sent = self._s(f.get("kap_sentiment_weighted", f.get("kap_sentiment_avg", 0)))
         news_sent = self._s(f.get("news_sentiment_weighted", 0))
 
         # Ağırlıklı kombinasyon (Motor5 ile aynı: 0.6 KAP + 0.4 news)
@@ -597,16 +589,18 @@ class CanonicalScoringPipeline:
 
         # Temel feature'lar var mı?
         critical_features = [
-            "rsi_14", "momentum_20d", "volume_zscore", "atr_pct",
-            "rs_vs_bist_5d", "kap_sentiment_avg",
+            "rsi_14",
+            "momentum_20d",
+            "volume_zscore",
+            "atr_pct",
+            "rs_vs_bist_5d",
+            "kap_sentiment_avg",
         ]
-        missing_critical = sum(1 for feat in critical_features
-                              if f.get(feat) is None)
+        missing_critical = sum(1 for feat in critical_features if f.get(feat) is None)
         score -= missing_critical * 10
 
         # STALE/MISSING oranı
-        stale_count = sum(1 for k, v in f.items()
-                         if isinstance(v, str) and v in ("STALE", "MISSING", "UNKNOWN"))
+        stale_count = sum(1 for k, v in f.items() if isinstance(v, str) and v in ("STALE", "MISSING", "UNKNOWN"))
         total_features = len(f)
         if total_features > 0:
             stale_pct = stale_count / total_features
@@ -622,9 +616,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _determine_direction(
-        self, vector: ScoreVector, opportunity_score: float, regime: str
-    ) -> str:
+    def _determine_direction(self, vector: ScoreVector, opportunity_score: float, regime: str) -> str:
         """Yön belirle."""
         mom = vector.momentum
         technical = vector.technical
@@ -662,46 +654,94 @@ class CanonicalScoringPipeline:
 # Kural: Yeni feature eklendiğinde BURAYA da ekle.
 CANONICAL_FEATURE_REGISTRY: list[str] = [
     # Motor 1: Relatif Güç
-    "rs_vs_bist_1d", "rs_vs_bist_5d", "rs_vs_bist_20d", "rs_vs_bist_60d",
-    "rs_vs_sector_5d", "rs_vs_peers_5d", "rs_trend", "rs_peer_rank",
+    "rs_vs_bist_1d",
+    "rs_vs_bist_5d",
+    "rs_vs_bist_20d",
+    "rs_vs_bist_60d",
+    "rs_vs_sector_5d",
+    "rs_vs_peers_5d",
+    "rs_trend",
+    "rs_peer_rank",
     # Motor 2: Momentum + Trend
-    "roc_5d", "roc_20d", "roc_60d", "momentum_20d",
-    "trend_slope_20d", "trend_r2_20d", "momentum_acceleration",
-    "momentum_accel_trend", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200",
-    "near_20d_high", "near_60d_high", "near_120d_high",
-    "breakout_failure", "drawdown_20d", "recovery_strength",
+    "roc_5d",
+    "roc_20d",
+    "roc_60d",
+    "momentum_20d",
+    "trend_slope_20d",
+    "trend_r2_20d",
+    "momentum_acceleration",
+    "momentum_accel_trend",
+    "price_vs_sma20",
+    "price_vs_sma50",
+    "price_vs_sma200",
+    "near_20d_high",
+    "near_60d_high",
+    "near_120d_high",
+    "breakout_failure",
+    "drawdown_20d",
+    "recovery_strength",
     # Motor 3: Hacim + Mikroyapı
-    "volume_percentile", "volume_zscore", "volume_trend",
-    "volume_up_down_ratio", "tick_rule", "vwap_deviation",
-    "avg_volume_5d", "obv",
+    "volume_percentile",
+    "volume_zscore",
+    "volume_trend",
+    "volume_up_down_ratio",
+    "tick_rule",
+    "vwap_deviation",
+    "avg_volume_5d",
+    "obv",
     # Motor 4: Fundamental
-    "sector_norm_pe_ratio", "sector_norm_pb_ratio", "fcf_yield_pct",
-    "fcf_margin", "balance_sheet_quality", "profit_margin_pct",
-    "roe", "roa",
+    "sector_norm_pe_ratio",
+    "sector_norm_pb_ratio",
+    "fcf_yield_pct",
+    "fcf_margin",
+    "balance_sheet_quality",
+    "profit_margin_pct",
+    "roe",
+    "roa",
     # Motor 5: KAP + Haber
-    "kap_sentiment_avg", "kap_sentiment_latest", "news_sentiment_weighted",
-    "sentiment_momentum", "kap_avg_importance",
+    "kap_sentiment_avg",
+    "kap_sentiment_latest",
+    "news_sentiment_weighted",
+    "sentiment_momentum",
+    "kap_avg_importance",
     # Motor 6: Katalizör
-    "catalyst_count", "catalyst_importance", "catalyst_days_nearest",
+    "catalyst_count",
+    "catalyst_importance",
+    "catalyst_days_nearest",
     # Motor 7: Neden Düşüyor?
-    "falling_is_temporary", "fall_market_selloff", "fall_sector_selloff",
+    "falling_is_temporary",
+    "fall_market_selloff",
+    "fall_sector_selloff",
     # Teknik (canonical scoring)
-    "rsi_14", "macd_hist", "bb_position", "adx",
-    "bb_zscore_20d", "mean_reversion_signal",
+    "rsi_14",
+    "macd_hist",
+    "bb_position",
+    "adx",
+    "bb_zscore_20d",
+    "mean_reversion_signal",
     # Mevsimsellik
-    "seasonality_current_month_avg", "seasonality_current_month_win_rate",
+    "seasonality_current_month_avg",
+    "seasonality_current_month_win_rate",
     "seasonality_current_quarter_avg",
     # Katalizör detay
     "catalyst_time_decay_score",
     # Risk
-    "atr_pct", "volatility_20d", "realized_vol_20d",
+    "atr_pct",
+    "volatility_20d",
+    "realized_vol_20d",
     "catch_falling_knife_risk",
     # Cross-Sectional (canonical scoring)
-    "rank_return_5d", "rank_return_20d", "rank_volume_zscore", "rank_rsi_14",
-    "sector_rel_return_5d", "sector_zscore_momentum_20d",
-    "cs_zscore_roc_5d", "cs_zscore_roc_20d",
+    "rank_return_5d",
+    "rank_return_20d",
+    "rank_volume_zscore",
+    "rank_rsi_14",
+    "sector_rel_return_5d",
+    "sector_zscore_momentum_20d",
+    "cs_zscore_roc_5d",
+    "cs_zscore_roc_20d",
     # Market Breadth
-    "market_breadth", "market_ad_ratio",
+    "market_breadth",
+    "market_ad_ratio",
 ]
 
 # Unique, order preserved
@@ -729,19 +769,19 @@ def validate_model_feature_contract(
         registry = CANONICAL_FEATURE_REGISTRY
 
     warnings = []
-    model_features = getattr(model, 'feature_names', [])
-    model_cs = getattr(model, 'cs_features', [])
+    model_features = getattr(model, "feature_names", [])
+    model_cs = getattr(model, "cs_features", [])
 
     # Model feature_names'de registry'de olmayanlar
     registry_set = set(registry)
     for fname in model_features:
-        base = fname.replace('_cs_zscore', '').replace('_cs_rank', '')
-        if base not in registry_set and not fname.endswith(('_cs_zscore', '_cs_rank')):
+        base = fname.replace("_cs_zscore", "").replace("_cs_rank", "")
+        if base not in registry_set and not fname.endswith(("_cs_zscore", "_cs_rank")):
             warnings.append(f"Model feature '{fname}' not in canonical registry")
 
     # CS feature'ların base feature'ları registry'de olmalı
     for fname in model_cs:
-        base = fname.replace('_cs_zscore', '').replace('_cs_rank', '')
+        base = fname.replace("_cs_zscore", "").replace("_cs_rank", "")
         if base not in registry_set:
             warnings.append(f"CS base feature '{base}' not in canonical registry")
 

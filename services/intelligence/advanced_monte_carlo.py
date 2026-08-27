@@ -17,20 +17,33 @@ import numpy as np
 try:
     from numba import jit
 except ImportError:
+
     def jit(*args, **kwargs):
         def decorator(func):
             return func
+
         return decorator
+
+
 from dataclasses import dataclass
 
 import structlog
 
 logger = structlog.get_logger()
 
+
 @jit(nopython=True)
 def _run_jump_diffusion(
-    current_price: float, mu: float, sigma: float, lambda_t: float, compensator: float,
-    jump_mean: float, jump_std: float, horizon_days: int, n_sims: int, dt: float
+    current_price: float,
+    mu: float,
+    sigma: float,
+    lambda_t: float,
+    compensator: float,
+    jump_mean: float,
+    jump_std: float,
+    horizon_days: int,
+    n_sims: int,
+    dt: float,
 ) -> np.ndarray:
     drift = (mu - 0.5 * sigma**2 - compensator) * dt
     diffusion = sigma * np.sqrt(dt)
@@ -51,14 +64,23 @@ def _run_jump_diffusion(
                     jump_size += np.random.normal(jump_mean, jump_std)
 
             total_return = log_return + jump_size
-            prices[i, t] = prices[i, t-1] * np.exp(total_return)
+            prices[i, t] = prices[i, t - 1] * np.exp(total_return)
 
     return prices
 
+
 @jit(nopython=True)
 def _run_heston_lite(
-    current_price: float, mu: float, sigma: float, kappa: float, theta: float,
-    xi: float, rho: float, dt: float, horizon_days: int, n_sims: int
+    current_price: float,
+    mu: float,
+    sigma: float,
+    kappa: float,
+    theta: float,
+    xi: float,
+    rho: float,
+    dt: float,
+    horizon_days: int,
+    n_sims: int,
 ) -> np.ndarray:
     prices = np.zeros((n_sims, horizon_days + 1))
     vols = np.zeros((n_sims, horizon_days + 1))
@@ -72,7 +94,7 @@ def _run_heston_lite(
             Z2 = np.random.standard_normal()
             Z2 = rho * Z1 + np.sqrt(1 - rho**2) * Z2
 
-            v_t = vols[i, t-1]**2
+            v_t = vols[i, t - 1] ** 2
             v_t = max(v_t, 0.0001)
             dv = kappa * (theta - v_t) * dt + xi * np.sqrt(v_t * dt) * Z2
             v_new = max(v_t + dv, 0.0001)
@@ -80,7 +102,7 @@ def _run_heston_lite(
 
             drift = (mu - 0.5 * v_new) * dt
             diffusion = np.sqrt(v_new * dt) * Z1
-            prices[i, t] = prices[i, t-1] * np.exp(drift + diffusion)
+            prices[i, t] = prices[i, t - 1] * np.exp(drift + diffusion)
 
     return prices
 
@@ -88,8 +110,9 @@ def _run_heston_lite(
 @dataclass
 class AdvancedMCResult:
     """Gelişmiş Monte Carlo sonucu."""
+
     ticker: str
-    model_type: str              # "gbm", "jump_diffusion", "student_t", "heston"
+    model_type: str  # "gbm", "jump_diffusion", "student_t", "heston"
     current_price: float
     horizon_days: int
     num_simulations: int
@@ -178,22 +201,20 @@ class AdvancedMonteCarloEngine:
         compensator = jump_intensity * (np.exp(jump_mean + 0.5 * jump_std**2) - 1)
 
         prices = _run_jump_diffusion(
-            current_price, mu, sigma, lambda_t, compensator,
-            jump_mean, jump_std, horizon_days, n_sims, dt
+            current_price, mu, sigma, lambda_t, compensator, jump_mean, jump_std, horizon_days, n_sims, dt
         )
 
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
 
-        result = self._build_result(ticker, "jump_diffusion", current_price, horizon_days, n_sims, prices, final, returns, sigma)
+        result = self._build_result(
+            ticker, "jump_diffusion", current_price, horizon_days, n_sims, prices, final, returns, sigma
+        )
         result.jump_intensity = jump_intensity
         result.jump_mean = jump_mean
         result.jump_std = jump_std
 
-        logger.info("Jump-diffusion simulation",
-                   ticker=ticker,
-                   jump_intensity=jump_intensity,
-                   skewness=result.skewness)
+        logger.info("Jump-diffusion simulation", ticker=ticker, jump_intensity=jump_intensity, skewness=result.skewness)
 
         return result
 
@@ -228,12 +249,11 @@ class AdvancedMonteCarloEngine:
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
 
-        result = self._build_result(ticker, "student_t", current_price, horizon_days, n_sims, prices, final, returns, sigma)
+        result = self._build_result(
+            ticker, "student_t", current_price, horizon_days, n_sims, prices, final, returns, sigma
+        )
 
-        logger.info("Student-t simulation",
-                   ticker=ticker,
-                   df=degrees_of_freedom,
-                   kurtosis=result.kurtosis)
+        logger.info("Student-t simulation", ticker=ticker, df=degrees_of_freedom, kurtosis=result.kurtosis)
 
         return result
 
@@ -258,19 +278,16 @@ class AdvancedMonteCarloEngine:
         xi = vol_of_vol
         rho = -0.7
 
-        prices = _run_heston_lite(
-            current_price, mu, sigma, kappa, theta, xi, rho, dt, horizon_days, n_sims
-        )
+        prices = _run_heston_lite(current_price, mu, sigma, kappa, theta, xi, rho, dt, horizon_days, n_sims)
 
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
 
-        result = self._build_result(ticker, "heston", current_price, horizon_days, n_sims, prices, final, returns, sigma)
+        result = self._build_result(
+            ticker, "heston", current_price, horizon_days, n_sims, prices, final, returns, sigma
+        )
 
-        logger.info("Heston-lite simulation",
-                   ticker=ticker,
-                   vol_of_vol=vol_of_vol,
-                   mean_reversion=mean_reversion)
+        logger.info("Heston-lite simulation", ticker=ticker, vol_of_vol=vol_of_vol, mean_reversion=mean_reversion)
 
         return result
 
@@ -314,8 +331,8 @@ class AdvancedMonteCarloEngine:
         max_dd = float(np.mean(max_dds)) * 100 if max_dds else 0
 
         # Skewness ve kurtosis
-        skewness = float(np.mean(((returns - np.mean(returns)) / max(np.std(returns), 0.001))**3))
-        kurtosis = float(np.mean(((returns - np.mean(returns)) / max(np.std(returns), 0.001))**4) - 3)
+        skewness = float(np.mean(((returns - np.mean(returns)) / max(np.std(returns), 0.001)) ** 3))
+        kurtosis = float(np.mean(((returns - np.mean(returns)) / max(np.std(returns), 0.001)) ** 4) - 3)
 
         return AdvancedMCResult(
             ticker=ticker,

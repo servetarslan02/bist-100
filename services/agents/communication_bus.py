@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 @dataclass
 class AgentMessage:
     """Agent mesaj formatı."""
+
     sender: AgentRole
     receiver: AgentRole
     task_id: str
@@ -33,6 +34,7 @@ class AgentMessage:
 @dataclass
 class Resolution:
     """Çözüm sonucu."""
+
     direction: str
     confidence: float
     method: str  # majority_vote, confidence_tiebreak, debate_consensus, risk_veto
@@ -63,9 +65,7 @@ class AgentCommunicationBus:
     """
 
     def __init__(self):
-        self._message_queue: dict[AgentRole, list[AgentMessage]] = {
-            role: [] for role in AgentRole
-        }
+        self._message_queue: dict[AgentRole, list[AgentMessage]] = {role: [] for role in AgentRole}
         self._message_log: list[AgentMessage] = []
 
     def send(self, message: AgentMessage):
@@ -95,14 +95,16 @@ class AgentCommunicationBus:
         """Tüm agent'lara gönder."""
         for role in AgentRole:
             if role != sender:
-                self.send(AgentMessage(
-                    sender=sender,
-                    receiver=role,
-                    task_id="broadcast",
-                    message_type=message_type,
-                    payload=payload,
-                    priority=priority,
-                ))
+                self.send(
+                    AgentMessage(
+                        sender=sender,
+                        receiver=role,
+                        task_id="broadcast",
+                        message_type=message_type,
+                        payload=payload,
+                        priority=priority,
+                    )
+                )
 
     def get_context_enrichment(self, role: AgentRole) -> dict[str, Any]:
         """Bu agent için diğer agent'lardan gelen bağlamı topla."""
@@ -114,21 +116,24 @@ class AgentCommunicationBus:
                     "type": m.message_type,
                     "data": m.payload,
                 }
-                for m in messages if m.message_type == "CONTEXT"
+                for m in messages
+                if m.message_type == "CONTEXT"
             ],
             "alerts": [
                 {
                     "from": m.sender.value,
                     "data": m.payload,
                 }
-                for m in messages if m.message_type == "ALERT"
+                for m in messages
+                if m.message_type == "ALERT"
             ],
             "debate_messages": [
                 {
                     "from": m.sender.value,
                     "data": m.payload,
                 }
-                for m in messages if m.message_type == "DEBATE"
+                for m in messages
+                if m.message_type == "DEBATE"
             ],
         }
 
@@ -206,7 +211,8 @@ class ConflictResolver:
 
         # Geçerli sonuçları filtrele
         valid = {
-            r: res for r, res in results.items()
+            r: res
+            for r, res in results.items()
             if res.success and r not in [AgentRole.SYNTHESIS, AgentRole.RISK, AgentRole.BULL, AgentRole.BEAR]
         }
 
@@ -265,10 +271,7 @@ class ConflictResolver:
             method = "confidence_tiebreak"
 
         # Agent listelerini oluştur
-        agents = {
-            d: [r.value for r, _ in group]
-            for d, group in direction_groups.items()
-        }
+        agents = {d: [r.value for r, _ in group] for d, group in direction_groups.items()}
 
         return Resolution(
             direction=final,

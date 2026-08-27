@@ -11,6 +11,7 @@ Nature (2026) metodolojisi: Ridge meta-learner.
 - Online weight adaptation
 - Regime-specific meta-learner
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -24,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class StackingConfig:
     """Stacking ensemble konfigürasyonu."""
+
     meta_learner_type: str = "ridge"  # ridge, logistic, linear, elastic_net
     cv_folds: int = 5
     use_proba: bool = True
@@ -105,6 +107,7 @@ class StackingEnsemble:
             for model_idx, (name, model) in enumerate(self._base_models.items()):
                 try:
                     import copy
+
                     fold_model = copy.deepcopy(model)
 
                     if hasattr(fold_model, "fit"):
@@ -151,12 +154,14 @@ class StackingEnsemble:
         metrics = self._compute_validation_metrics(X_val, y_val)
 
         # Training history
-        self._training_history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "metrics": metrics,
-            "n_base_models": len(self._base_models),
-            "diversity_scores": self._diversity_scores,
-        })
+        self._training_history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "metrics": metrics,
+                "n_base_models": len(self._base_models),
+                "diversity_scores": self._diversity_scores,
+            }
+        )
         if len(self._training_history) > 1000:
             self._training_history = self._training_history[-1000:]
 
@@ -288,7 +293,9 @@ class StackingEnsemble:
             "model_weights": self.get_model_weights(regime),
             "regime": regime or "UNKNOWN",
             "agreement_score": round(agreement, 4),
-            "diversity_score": round(float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4),
+            "diversity_score": round(
+                float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4
+            ),
         }
 
     def get_model_weights(self, regime: str | None = None) -> dict[str, float]:
@@ -453,14 +460,10 @@ class StackingEnsemble:
                 total = sum(regime_scores.values())
                 if total > 0:
                     self._regime_weights[regime] = {
-                        name: round(score / total, 4)
-                        for name, score in regime_scores.items()
+                        name: round(score / total, 4) for name, score in regime_scores.items()
                     }
                 else:
-                    self._regime_weights[regime] = {
-                        name: 1.0 / len(self._base_models)
-                        for name in self._base_models
-                    }
+                    self._regime_weights[regime] = {name: 1.0 / len(self._base_models) for name in self._base_models}
 
             except Exception as e:
                 logger.warning("regime_weight_computation_failed", regime=regime, error=str(e))
@@ -470,6 +473,7 @@ class StackingEnsemble:
         val_pred = self.predict(X_val)
 
         from sklearn.metrics import roc_auc_score
+
         try:
             auc = float(roc_auc_score(y_val, val_pred))
         except Exception:
@@ -495,7 +499,9 @@ class StackingEnsemble:
             "val_auc": round(auc, 4),
             "val_ic": round(ic, 4),
             "val_directional_accuracy": round(directional_accuracy, 4),
-            "diversity_score": round(float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4),
+            "diversity_score": round(
+                float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4
+            ),
             "n_regime_meta_learners": len(self._regime_meta_learners),
             "n_regime_weights": len(self._regime_weights),
         }

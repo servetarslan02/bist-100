@@ -16,9 +16,12 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 class ReportGenerator:
     """Otomatik rapor üretici."""
 
-    def generate_daily_report(self, date: str | None = None,
-                              market_summary: dict[str, Any] | None = None,
-                              signals: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    def generate_daily_report(
+        self,
+        date: str | None = None,
+        market_summary: dict[str, Any] | None = None,
+        signals: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Günlük rapor üret."""
         target_date = date or datetime.now(_TZ_ISTANBUL).strftime("%Y-%m-%d")
         result = {"date": target_date, "timestamp": datetime.now(_TZ_ISTANBUL).isoformat(), "type": "daily"}

@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class LearningJobConfig:
     """Learning job konfigürasyonu."""
+
     job_type: str
     interval_hours: int
     enabled: bool = True
@@ -95,8 +96,7 @@ class LearningScheduler:
 
         # Async doğrulama
         if not inspect.iscoroutinefunction(handler):
-            logger.warning("Handler is not async, wrapping in coroutine",
-                         job_type=job_type)
+            logger.warning("Handler is not async, wrapping in coroutine", job_type=job_type)
             original = handler
 
             async def _async_wrapper():
@@ -156,17 +156,14 @@ class LearningScheduler:
                         "result": result,
                     }
 
-                    logger.info("Learning job completed",
-                               job_type=job_type,
-                               duration=f"{duration:.1f}s")
+                    logger.info("Learning job completed", job_type=job_type, duration=f"{duration:.1f}s")
 
                 except Exception as e:
                     results[job_type] = {
                         "status": "FAILED",
                         "error": str(e),
                     }
-                    logger.error("Learning job failed",
-                               job_type=job_type, error=str(e))
+                    logger.error("Learning job failed", job_type=job_type, error=str(e))
 
         return results
 
@@ -220,12 +217,14 @@ class LearningScheduler:
         pending = []
         for job_type, config in self._jobs.items():
             if config.enabled and config.handler is not None and self._should_run(config):
-                pending.append({
-                    "job_type": job_type,
-                    "interval_hours": config.interval_hours,
-                    "last_run": config.last_run,
-                    "description": config.description,
-                })
+                pending.append(
+                    {
+                        "job_type": job_type,
+                        "interval_hours": config.interval_hours,
+                        "last_run": config.last_run,
+                        "description": config.description,
+                    }
+                )
         return pending
 
 

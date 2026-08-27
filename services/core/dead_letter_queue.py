@@ -17,6 +17,7 @@ try:
 
     class DeadLetterQueue(PersistentDeadLetterQueue):
         """Backward-compatible wrapper — PersistentDeadLetterQueue kullanır."""
+
         pass
 
     dead_letter_queue = DeadLetterQueue()
@@ -78,6 +79,7 @@ except Exception as e:
 
     class InMemoryDeadLetterQueue:
         """Fallback in-memory DLQ."""
+
         def __init__(self, max_entries=10000):
             self._entries: dict[str, DLQEntry] = {}
             self._max_entries = max_entries
@@ -95,10 +97,14 @@ except Exception as e:
                 oldest_id = min(self._entries.keys(), key=lambda k: self._entries[k].created_at)
                 del self._entries[oldest_id]
             entry_id = hashlib.md5(f"dlq_{event_id}_{time.time()}".encode()).hexdigest()[:12]
-            backoff = 5 * (2 ** retry_count)
+            backoff = 5 * (2**retry_count)
             entry = DLQEntry(
-                entry_id=entry_id, event_id=event_id, event_type=event_type,
-                payload=payload, error=error, retry_count=retry_count,
+                entry_id=entry_id,
+                event_id=event_id,
+                event_type=event_type,
+                payload=payload,
+                error=error,
+                retry_count=retry_count,
                 max_retries=max_retries,
                 next_retry_at=datetime.now(UTC) + timedelta(seconds=backoff),
             )

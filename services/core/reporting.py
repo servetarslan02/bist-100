@@ -1,10 +1,12 @@
 """ALPHA BIST — Daily Report Generator."""
+
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 
 logger = structlog.get_logger()
+
 
 def generate_daily_report(portfolio: dict, trades: list[dict], risk_metrics: dict) -> dict[str, Any]:
     """Günlük rapor oluştur."""

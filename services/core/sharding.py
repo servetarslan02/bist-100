@@ -65,9 +65,9 @@ class ShardRouter:
         if not ticker:
             return 0
         first = ticker[0].upper()
-        if first <= 'F':
+        if first <= "F":
             return 0
-        elif first <= 'M':
+        elif first <= "M":
             return 1
         else:
             return 2
@@ -88,7 +88,7 @@ class ShardRouter:
 
     async def init(self):
         """Shard pool'larını başlat. Sharding devre dışıysa primary'ye düş."""
-        if not getattr(settings, 'sharding_enabled', False):
+        if not getattr(settings, "sharding_enabled", False):
             logger.info("Sharding disabled, using single database")
             return
 
@@ -108,11 +108,9 @@ class ShardRouter:
                     max_size=10,
                 )
                 self._pools[shard_id] = pool
-                logger.info("Shard pool created",
-                          shard_id=shard_id, db=shard_info["db"])
+                logger.info("Shard pool created", shard_id=shard_id, db=shard_info["db"])
             except Exception as e:
-                logger.warning("Shard pool creation failed",
-                             shard_id=shard_id, error=str(e))
+                logger.warning("Shard pool creation failed", shard_id=shard_id, error=str(e))
 
         if self._pools:
             self._enabled = True
@@ -133,12 +131,14 @@ class ShardRouter:
         """Ticker için doğru pool'u döndür."""
         if not self._enabled:
             from .database import get_pg_pool
+
             return await get_pg_pool()
 
         shard_id = self._get_shard_id(ticker)
         pool = self._pools.get(shard_id)
         if not pool:
             from .database import get_pg_pool
+
             return await get_pg_pool()
         return pool
 
@@ -175,8 +175,7 @@ class ShardRouter:
                     rows = await conn.fetch(query, *args)
                     results[shard_id] = rows
             except Exception as e:
-                logger.error("Shard query failed",
-                           shard_id=shard_id, error=str(e))
+                logger.error("Shard query failed", shard_id=shard_id, error=str(e))
                 results[shard_id] = []
         return results
 
@@ -201,12 +200,14 @@ class ShardRouter:
     def get_all_tickers_for_shard(self, shard_id: int) -> list[str]:
         """Shard'daki tüm ticker'ları döndür."""
         from ..ingestion.bist_universe import get_bist_universe
+
         universe = get_bist_universe()
         return [t for t in universe if self._get_shard_id(t) == shard_id]
 
     def get_shard_stats(self) -> dict[str, Any]:
         """Shard istatistikleri."""
         from ..ingestion.bist_universe import get_bist_universe
+
         universe = get_bist_universe()
 
         stats = {}

@@ -27,10 +27,10 @@ from ..core.logging import setup_logging
 logger = structlog.get_logger()
 
 
-
 async def _db_fetchrow(query, *args):
     """Fetch single row from PostgreSQL."""
     return await pg_fetchrow(query, *args)
+
 
 async def _db_fetchval(query, *args):
     """Fetch single value from PostgreSQL."""
@@ -90,6 +90,7 @@ class RiskEngine:
         }
         try:
             from ..core.database import pg_execute, pg_fetch
+
             # Ensure system_config exists
             try:
                 await pg_execute("""
@@ -118,11 +119,16 @@ class RiskEngine:
                 # Seed default risk limits into PostgreSQL
                 for k, v in default_limits.items():
                     try:
-                        await pg_execute("""
+                        await pg_execute(
+                            """
                             INSERT INTO system_config (config_key, config_value, description)
                             VALUES ($1, $2::jsonb, $3)
                             ON CONFLICT (config_key) DO NOTHING
-                        """, f"risk.{k}", orjson.dumps(v).decode(), f"Risk limit {k}")
+                        """,
+                            f"risk.{k}",
+                            orjson.dumps(v).decode(),
+                            f"Risk limit {k}",
+                        )
                     except Exception:
                         logger.warning("Caught Exception in _load_risk_limits", exc_info=True)
                 try:
@@ -170,14 +176,14 @@ class RiskEngine:
             portfolio_id = event.data.get("portfolio_id")
 
             if not ticker or not portfolio_id:
-                logger.warning("Decision event missing ticker or portfolio_id",
-                             ticker=ticker, portfolio_id=portfolio_id)
+                logger.warning(
+                    "Decision event missing ticker or portfolio_id", ticker=ticker, portfolio_id=portfolio_id
+                )
                 return
 
             # P0-6: FAIL CLOSED — risk limits yüklenmemişse tüm işlemler BLOCKED
             if not self._risk_limits_loaded:
-                logger.critical("Risk limits not loaded — BLOCKING ALL TRADES",
-                              ticker=ticker, action=action)
+                logger.critical("Risk limits not loaded — BLOCKING ALL TRADES", ticker=ticker, action=action)
                 alert_event = CanonicalEvent(
                     event_type=EventType.RISK_ALERT,
                     source="risk-engine",
@@ -215,39 +221,51 @@ class RiskEngine:
             # 5. Drawdown response system check
             try:
                 from .drawdown_response import drawdown_system
-                portfolio = await _db_fetchrow("""
+
+                portfolio = await _db_fetchrow(
+                    """
                     SELECT current_capital FROM portfolios WHERE id = $1
-                """, portfolio_id)
+                """,
+                    portfolio_id,
+                )
                 if portfolio:
                     dd_state = drawdown_system.update_equity(float(portfolio["current_capital"]))
                     if not drawdown_system.is_trading_allowed():
-                        checks.append({
-                            "name": "drawdown_response",
-                            "passed": False,
-                            "severity": "BLOCK",
-                            "details": f"Drawdown response: {dd_state.description} (DD: {dd_state.current_drawdown_pct:.1f}%)",
-                        })
+                        checks.append(
+                            {
+                                "name": "drawdown_response",
+                                "passed": False,
+                                "severity": "BLOCK",
+                                "details": f"Drawdown response: {dd_state.description} (DD: {dd_state.current_drawdown_pct:.1f}%)",
+                            }
+                        )
             except Exception as e:
                 logger.debug("Drawdown response check skipped", error=str(e))
 
             # 6. Dynamic limits check (volatilite bazlı)
             try:
                 from .dynamic_limits import dynamic_limits
+
                 dynamic = dynamic_limits.get_limits(regime="SIDEWAYS")
                 # Dinamik pozisyon limiti kontrolü
-                portfolio = await _db_fetchrow("""
+                portfolio = await _db_fetchrow(
+                    """
                     SELECT current_capital FROM portfolios WHERE id = $1
-                """, portfolio_id)
+                """,
+                    portfolio_id,
+                )
                 if portfolio:
                     portfolio_value = float(portfolio["current_capital"])
                     position_pct = (amount / portfolio_value * 100) if portfolio_value > 0 else 0
                     if position_pct > dynamic.max_position_pct:
-                        checks.append({
-                            "name": "dynamic_position_limit",
-                            "passed": False,
-                            "severity": "BLOCK",
-                            "details": f"Dynamic limit: {position_pct:.1f}% > {dynamic.max_position_pct:.1f}%",
-                        })
+                        checks.append(
+                            {
+                                "name": "dynamic_position_limit",
+                                "passed": False,
+                                "severity": "BLOCK",
+                                "details": f"Dynamic limit: {position_pct:.1f}% > {dynamic.max_position_pct:.1f}%",
+                            }
+                        )
             except Exception as e:
                 logger.debug("Dynamic limits check skipped", error=str(e))
 
@@ -323,19 +341,30 @@ class RiskEngine:
         Unknown data = BLOCK (WARN değil).
         """
         if not self._risk_limits_loaded:
-            return {"name": "position_limit", "passed": False, "severity": "BLOCK",
-                    "details": "Risk limits not loaded — FAIL CLOSED"}
+            return {
+                "name": "position_limit",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Risk limits not loaded — FAIL CLOSED",
+            }
 
         limit = self._risk_limits.get("max_position_pct", 10.0)
 
-        portfolio = await _db_fetchrow("""
+        portfolio = await _db_fetchrow(
+            """
             SELECT current_capital FROM portfolios WHERE id = $1
-        """, portfolio_id)
+        """,
+            portfolio_id,
+        )
 
         if not portfolio:
             # P0-6: Unknown data → BLOCK, not WARN
-            return {"name": "position_limit", "passed": False, "severity": "BLOCK",
-                    "details": "Portfolio not found — BLOCKED"}
+            return {
+                "name": "position_limit",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Portfolio not found — BLOCKED",
+            }
 
         portfolio_value = float(portfolio["current_capital"])
         position_pct = (amount / portfolio_value * 100) if portfolio_value > 0 else 0
@@ -355,36 +384,54 @@ class RiskEngine:
         P0-6: Unknown sector → BLOCK (WARN değil).
         """
         if not self._risk_limits_loaded:
-            return {"name": "sector_concentration", "passed": False, "severity": "BLOCK",
-                    "details": "Risk limits not loaded — FAIL CLOSED"}
+            return {
+                "name": "sector_concentration",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Risk limits not loaded — FAIL CLOSED",
+            }
 
         limit = self._risk_limits.get("max_sector_pct", 30.0)
 
-        sector = await _db_fetchval("""
+        sector = await _db_fetchval(
+            """
             SELECT s.code FROM instruments i
             JOIN companies c ON i.company_id = c.id
             JOIN sectors s ON c.sector_id = s.id
             WHERE i.symbol = $1
-        """, ticker)
+        """,
+            ticker,
+        )
 
         if not sector:
             # P0-6: Unknown sector → BLOCK
-            return {"name": "sector_concentration", "passed": False, "severity": "BLOCK",
-                    "details": f"Unknown sector for {ticker} — BLOCKED"}
+            return {
+                "name": "sector_concentration",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": f"Unknown sector for {ticker} — BLOCKED",
+            }
 
         # Get sector exposure
-        sector_exposure = await _db_fetchval("""
+        sector_exposure = await _db_fetchval(
+            """
             SELECT COALESCE(SUM(p.market_value), 0)
             FROM positions p
             JOIN instruments i ON p.instrument_id = i.id
             JOIN companies c ON i.company_id = c.id
             JOIN sectors s ON c.sector_id = s.id
             WHERE p.portfolio_id = $1 AND s.code = $2 AND p.status = 'OPEN'
-        """, portfolio_id, sector)
+        """,
+            portfolio_id,
+            sector,
+        )
 
-        portfolio_value = await _db_fetchval("""
+        portfolio_value = await _db_fetchval(
+            """
             SELECT current_capital FROM portfolios WHERE id = $1
-        """, portfolio_id)
+        """,
+            portfolio_id,
+        )
 
         if not portfolio_value:
             return {"name": "sector_concentration", "passed": True, "severity": "WARN"}
@@ -402,23 +449,33 @@ class RiskEngine:
     async def _check_daily_loss(self, portfolio_id: int) -> dict[str, Any]:
         """Check daily loss limit."""
         if not self._risk_limits_loaded:
-            return {"name": "daily_loss", "passed": False, "severity": "BLOCK",
-                    "details": "Risk limits not loaded — FAIL CLOSED"}
+            return {
+                "name": "daily_loss",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Risk limits not loaded — FAIL CLOSED",
+            }
 
         limit = self._risk_limits.get("daily_loss_limit_pct", 5.0)
 
         # Get today's P&L
-        daily_pnl = await _db_fetchval("""
+        daily_pnl = await _db_fetchval(
+            """
             SELECT COALESCE(SUM(filled_quantity * avg_fill_price * CASE WHEN side = 'SELL' THEN 1 ELSE -1 END), 0)
             FROM orders
             WHERE portfolio_id = $1
             AND status = 'FILLED'
             AND DATE(filled_at) = CURRENT_DATE
-        """, portfolio_id)
+        """,
+            portfolio_id,
+        )
 
-        portfolio_value = await _db_fetchval("""
+        portfolio_value = await _db_fetchval(
+            """
             SELECT current_capital FROM portfolios WHERE id = $1
-        """, portfolio_id)
+        """,
+            portfolio_id,
+        )
 
         if not portfolio_value:
             return {"name": "daily_loss", "passed": True, "severity": "WARN"}
@@ -440,19 +497,30 @@ class RiskEngine:
         Portfolio bulunamazsa BLOCK.
         """
         if not self._risk_limits_loaded:
-            return {"name": "drawdown", "passed": False, "severity": "BLOCK",
-                    "details": "Risk limits not loaded — FAIL CLOSED"}
+            return {
+                "name": "drawdown",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Risk limits not loaded — FAIL CLOSED",
+            }
 
         limit = self._risk_limits.get("max_drawdown_pct", 15.0)
 
-        portfolio = await _db_fetchrow("""
+        portfolio = await _db_fetchrow(
+            """
             SELECT initial_capital, current_capital, peak_equity FROM portfolios WHERE id = $1
-        """, portfolio_id)
+        """,
+            portfolio_id,
+        )
 
         if not portfolio:
             # P0-6: Unknown → BLOCK
-            return {"name": "drawdown", "passed": False, "severity": "BLOCK",
-                    "details": "Portfolio not found — BLOCKED"}
+            return {
+                "name": "drawdown",
+                "passed": False,
+                "severity": "BLOCK",
+                "details": "Portfolio not found — BLOCKED",
+            }
 
         initial = float(portfolio["initial_capital"])
         current = float(portfolio["current_capital"])
@@ -476,6 +544,7 @@ class RiskEngine:
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -484,10 +553,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "risk"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -495,6 +564,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the risk engine."""
@@ -542,6 +612,7 @@ def assess_portfolio_risk(
     if returns_history is not None and len(returns_history) > 20:
         try:
             from .var_cvar import var_calculator
+
             portfolio_value = portfolio.get("total_value", 100000)
             var_report = var_calculator.calculate_full_var_report(
                 returns=returns_history,
@@ -561,6 +632,7 @@ def assess_portfolio_risk(
     # 2. Dynamic Limits
     try:
         from .dynamic_limits import dynamic_limits
+
         volatility = float(np.std(returns_history or [0]) * np.sqrt(252)) if returns_history is not None else 0.20
         current_dd = portfolio.get("current_drawdown_pct", 0)
         limits = dynamic_limits.get_limits(
@@ -581,6 +653,7 @@ def assess_portfolio_risk(
     # 3. Concentration Risk
     try:
         from .enhanced_risk import concentration_risk
+
         weights = portfolio.get("weights", {})
         if weights:
             hhi = concentration_risk.compute_hhi(weights)
@@ -596,6 +669,7 @@ def assess_portfolio_risk(
     # 4. Drawdown Response
     try:
         from .drawdown_response import drawdown_system
+
         current_equity = portfolio.get("total_value", 0)
         if current_equity > 0:
             dd_state = drawdown_system.update_equity(current_equity)
@@ -613,11 +687,14 @@ def assess_portfolio_risk(
     if returns_history is not None and len(returns_history) > 20:
         try:
             from .stress_test import stress_test_engine
+
             stress_report = stress_test_engine.run_all_scenarios(portfolio)
             result["stress_test"] = {
                 "risk_score": stress_report.risk_score,
                 "worst_scenario": stress_report.worst_scenario.scenario_name if stress_report.worst_scenario else "N/A",
-                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct if stress_report.worst_scenario else 0,
+                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct
+                if stress_report.worst_scenario
+                else 0,
                 "recommendations": stress_report.recommendations,
             }
         except Exception as e:
@@ -626,6 +703,7 @@ def assess_portfolio_risk(
     # 6. Tail Hedge
     try:
         from .tail_hedge import tail_hedger
+
         portfolio_value = portfolio.get("total_value", 100000)
         hedge = tail_hedger.analyze(
             portfolio_value=portfolio_value,
@@ -675,9 +753,7 @@ def assess_viop_risk(
     try:
         from ..viop.enhanced_options import viop_risk
 
-        risk_result = viop_risk.calculate_portfolio_viop_risk(
-            viop_positions, portfolio_value
-        )
+        risk_result = viop_risk.calculate_portfolio_viop_risk(viop_positions, portfolio_value)
 
         margin_result = viop_risk.calculate_margin_requirement(viop_positions)
 
@@ -688,9 +764,9 @@ def assess_viop_risk(
             "margin": margin_result,
             "margin_adequate": margin_adequate,
             "margin_surplus": round(portfolio_value - margin_result["total_margin"], 2),
-            "margin_utilization_pct": round(
-                margin_result["total_margin"] / portfolio_value * 100, 2
-            ) if portfolio_value > 0 else 0,
+            "margin_utilization_pct": round(margin_result["total_margin"] / portfolio_value * 100, 2)
+            if portfolio_value > 0
+            else 0,
         }
     except Exception as e:
         logger.error(f"VIOP risk assessment failed: {e}")

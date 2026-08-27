@@ -62,10 +62,38 @@ def test_prediction_to_outcome_matching(temp_db):
 def test_performance_metrics_and_transaction_costs():
     """BIST işlem maliyetli metrikler, Sharpe, Brier ve Rank IC testi."""
     mock_data = [
-        {"predicted_direction": "UP", "actual_direction": "UP", "confidence": 0.80, "actual_return": 4.0, "position_value": 10000.0, "market_regime": "BULL"},
-        {"predicted_direction": "UP", "actual_direction": "UP", "confidence": 0.70, "actual_return": 3.0, "position_value": 10000.0, "market_regime": "BULL"},
-        {"predicted_direction": "DOWN", "actual_direction": "DOWN", "confidence": 0.65, "actual_return": -2.5, "position_value": 10000.0, "market_regime": "BEAR"},
-        {"predicted_direction": "UP", "actual_direction": "DOWN", "confidence": 0.60, "actual_return": -1.5, "position_value": 10000.0, "market_regime": "VOLATILE"},
+        {
+            "predicted_direction": "UP",
+            "actual_direction": "UP",
+            "confidence": 0.80,
+            "actual_return": 4.0,
+            "position_value": 10000.0,
+            "market_regime": "BULL",
+        },
+        {
+            "predicted_direction": "UP",
+            "actual_direction": "UP",
+            "confidence": 0.70,
+            "actual_return": 3.0,
+            "position_value": 10000.0,
+            "market_regime": "BULL",
+        },
+        {
+            "predicted_direction": "DOWN",
+            "actual_direction": "DOWN",
+            "confidence": 0.65,
+            "actual_return": -2.5,
+            "position_value": 10000.0,
+            "market_regime": "BEAR",
+        },
+        {
+            "predicted_direction": "UP",
+            "actual_direction": "DOWN",
+            "confidence": 0.60,
+            "actual_return": -1.5,
+            "position_value": 10000.0,
+            "market_regime": "VOLATILE",
+        },
     ]
 
     metrics = ModelPerformanceEngine.calculate_metrics(
@@ -90,27 +118,57 @@ def test_dynamic_trust_score_and_shrinkage():
 
     # Düşük örneklemli model (N=3) -> Shrinkage prior'a yaklaştırır
     low_sample_metrics = PerformanceMetrics(
-        model_id="LowSampleModel", model_version="v1", total_samples=3, evaluated_samples=3,
-        direction_accuracy=1.0, hit_rate_pct=100.0, precision=1.0, recall=1.0, f1_score=1.0,
-        mean_return_pct=5.0, cumulative_return_pct=15.0, gross_pnl=1500.0, transaction_costs=22.2,
-        net_pnl=1477.8, annualized_sharpe=3.0, max_drawdown_pct=0.0, brier_score=0.05,
-        information_coefficient=0.8, rank_ic=0.8, win_loss_ratio=10.0,
+        model_id="LowSampleModel",
+        model_version="v1",
+        total_samples=3,
+        evaluated_samples=3,
+        direction_accuracy=1.0,
+        hit_rate_pct=100.0,
+        precision=1.0,
+        recall=1.0,
+        f1_score=1.0,
+        mean_return_pct=5.0,
+        cumulative_return_pct=15.0,
+        gross_pnl=1500.0,
+        transaction_costs=22.2,
+        net_pnl=1477.8,
+        annualized_sharpe=3.0,
+        max_drawdown_pct=0.0,
+        brier_score=0.05,
+        information_coefficient=0.8,
+        rank_ic=0.8,
+        win_loss_ratio=10.0,
     )
     low_trust = engine.compute_trust_score(low_sample_metrics)
     assert low_trust.confidence_shrinkage < 0.20  # Örneklem az olduğu için güven cezası
-    assert low_trust.reliability_score < 0.70     # 3 işlemle %100 olsa bile abartılı güven verilmez
+    assert low_trust.reliability_score < 0.70  # 3 işlemle %100 olsa bile abartılı güven verilmez
 
     # Yüksek örneklemli başarılı model (N=150)
     high_sample_metrics = PerformanceMetrics(
-        model_id="HighSampleModel", model_version="v1", total_samples=150, evaluated_samples=150,
-        direction_accuracy=0.72, hit_rate_pct=72.0, precision=0.74, recall=0.70, f1_score=0.72,
-        mean_return_pct=2.5, cumulative_return_pct=180.0, gross_pnl=18000.0, transaction_costs=1110.0,
-        net_pnl=16890.0, annualized_sharpe=2.4, max_drawdown_pct=4.2, brier_score=0.12,
-        information_coefficient=0.25, rank_ic=0.22, win_loss_ratio=2.1,
+        model_id="HighSampleModel",
+        model_version="v1",
+        total_samples=150,
+        evaluated_samples=150,
+        direction_accuracy=0.72,
+        hit_rate_pct=72.0,
+        precision=0.74,
+        recall=0.70,
+        f1_score=0.72,
+        mean_return_pct=2.5,
+        cumulative_return_pct=180.0,
+        gross_pnl=18000.0,
+        transaction_costs=1110.0,
+        net_pnl=16890.0,
+        annualized_sharpe=2.4,
+        max_drawdown_pct=4.2,
+        brier_score=0.12,
+        information_coefficient=0.25,
+        rank_ic=0.22,
+        win_loss_ratio=2.1,
     )
     high_trust = engine.compute_trust_score(high_sample_metrics)
     assert high_trust.confidence_shrinkage > 0.95  # Yüksek istatistiksel güven
-    assert high_trust.reliability_score > 0.70     # Gerçek yüksek güven skoru
+    assert high_trust.reliability_score > 0.70  # Gerçek yüksek güven skoru
 
 
 def test_signal_fusion_adaptive_weights_and_bounds():
@@ -149,14 +207,21 @@ def test_full_learning_pipeline_end_to_end(temp_db):
 
     # 1. 6 model için 30'ar adet simüle edilmiş tahmin ve sonuç oluştur
     np.random.seed(42)
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "SPEC_Anomaly_Detector", "LSTM_Sequential", "Cross_Sectional_Momentum", "KAP_NLP_Sentiment"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+        "Cross_Sectional_Momentum",
+        "KAP_NLP_Sentiment",
+    ]
 
     for i in range(25):
         for m_id in models:
             # Her modelin kendine has doğruluk olasılığı (LightGBM %75, LSTM %55)
             true_acc = 0.75 if "LightGBM" in m_id or "SPEC" in m_id else 0.58
             pred_dir = "UP" if np.random.rand() > 0.4 else "DOWN"
-            is_win = (np.random.rand() < true_acc)
+            is_win = np.random.rand() < true_acc
             act_dir = pred_dir if is_win else ("DOWN" if pred_dir == "UP" else "UP")
 
             entry_p = 100.0 + np.random.randn() * 10.0

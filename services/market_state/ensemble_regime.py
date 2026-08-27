@@ -31,10 +31,11 @@ logger = structlog.get_logger()
 @dataclass
 class EnsembleResult:
     """Ensemble rejim tespiti sonucu."""
+
     regime: str
     confidence: float
-    consensus: bool                          # Tüm yöntemler aynı sonuca mı vardı?
-    method_count: int                        # Kaç yöntem çalıştı
+    consensus: bool  # Tüm yöntemler aynı sonuca mı vardı?
+    method_count: int  # Kaç yöntem çalıştı
     regime_scores: dict[str, float] = field(default_factory=dict)  # Her rejim için ağırlıklı skor
     method_details: dict[str, dict] = field(default_factory=dict)  # Her yöntemin detayı
     hmm_probabilities: dict[str, float] = field(default_factory=dict)
@@ -91,15 +92,15 @@ class EnsembleRegimeDetector:
 
         try:
             from services.intelligence.regime import RegimeEngine
+
             self._score_engine = RegimeEngine()
         except Exception as e:
             logger.warning("Failed to init RegimeEngine", error=str(e))
 
         try:
             from services.intelligence.hmm_regime import HMMRegimeDetector
-            self._hmm_detector = HMMRegimeDetector(
-                n_regimes=4, rolling_window=self._rolling_window
-            )
+
+            self._hmm_detector = HMMRegimeDetector(n_regimes=4, rolling_window=self._rolling_window)
         except Exception as e:
             logger.warning("Failed to init HMMRegimeDetector", error=str(e))
 
@@ -157,8 +158,8 @@ class EnsembleRegimeDetector:
         # zaman sabit kalıyordu).
         adapted_weights = (
             self.get_regime_adapted_weights(preliminary_regime)
-            if preliminary_regime else
-            {"score": self._score_weight, "hmm": self._hmm_weight, "gmm": self._gmm_weight}
+            if preliminary_regime
+            else {"score": self._score_weight, "hmm": self._hmm_weight, "gmm": self._gmm_weight}
         )
         if "score" in results:
             results["score"]["weight"] = adapted_weights["score"]
@@ -222,9 +223,9 @@ class EnsembleRegimeDetector:
 
         # Feature matrix
         if volatility is not None and len(volatility) == len(returns):
-            X = np.column_stack([returns[-self._rolling_window:], volatility[-self._rolling_window:]])
+            X = np.column_stack([returns[-self._rolling_window :], volatility[-self._rolling_window :]])
         else:
-            X = returns[-self._rolling_window:].reshape(-1, 1)
+            X = returns[-self._rolling_window :].reshape(-1, 1)
 
         # NaN/inf temizle
         mask = np.isfinite(X).all(axis=1)
@@ -256,10 +257,7 @@ class EnsembleRegimeDetector:
         return {
             "regime": regime,
             "confidence": round(confidence, 4),
-            "probabilities": {
-                name: round(float(probs[i]), 4)
-                for i, name in enumerate(regime_names)
-            },
+            "probabilities": {name: round(float(probs[i]), 4) for i, name in enumerate(regime_names)},
         }
 
     def _assign_gmm_regime_names(self, gmm, X: np.ndarray) -> list[str]:
@@ -437,11 +435,13 @@ class EnsembleRegimeDetector:
             "gmm": round(gmm_acc / total_acc, 4),
         }
 
-        logger.info("ensemble_weights_optimized",
-                     score_acc=round(score_acc, 3),
-                     hmm_acc=round(hmm_acc, 3),
-                     gmm_acc=round(gmm_acc, 3),
-                     optimized_weights=optimized)
+        logger.info(
+            "ensemble_weights_optimized",
+            score_acc=round(score_acc, 3),
+            hmm_acc=round(hmm_acc, 3),
+            gmm_acc=round(gmm_acc, 3),
+            optimized_weights=optimized,
+        )
 
         return optimized
 

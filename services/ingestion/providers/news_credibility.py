@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class NewsSource:
     """Haber kaynağı bilgisi."""
+
     name: str
     credibility: float  # 0-1
     category: str  # official, reliable, general, social
@@ -32,7 +33,6 @@ NEWS_SOURCES: dict[str, NewsSource] = {
     "bist": NewsSource("BIST", 1.00, "official"),
     "tcmb": NewsSource("TCMB", 1.00, "official"),
     "spk": NewsSource("SPK", 1.00, "official"),
-
     # Güvenilir haber (0.80)
     "aa": NewsSource("Anadolu Ajansı", 0.85, "reliable"),
     "reuters": NewsSource("Reuters", 0.90, "reliable"),
@@ -41,12 +41,10 @@ NEWS_SOURCES: dict[str, NewsSource] = {
     "paraanaliz": NewsSource("ParaAnaliz", 0.75, "reliable"),
     "borsagundem": NewsSource("Borsa Gündem", 0.70, "reliable"),
     "investing": NewsSource("Investing.com", 0.70, "reliable"),
-
     # Genel haber (0.50)
     "google_news": NewsSource("Google News", 0.50, "general"),
     "yahoo": NewsSource("Yahoo Finance", 0.60, "general"),
     "cnbc": NewsSource("CNBC", 0.70, "general"),
-
     # Sosyal medya (0.20-0.50)
     "x": NewsSource("X (Twitter)", 0.30, "social"),
     "reddit": NewsSource("Reddit", 0.25, "social"),
@@ -83,9 +81,7 @@ class NewsCredibility:
                 return src.category
         return "unknown"
 
-    def weighted_importance(
-        self, raw_importance: float, source: str
-    ) -> float:
+    def weighted_importance(self, raw_importance: float, source: str) -> float:
         """
         Ağırlıklandırılmış önem skoru.
 

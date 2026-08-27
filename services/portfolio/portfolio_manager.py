@@ -35,13 +35,15 @@ MAX_DAILY_PNL = 1000
 # DATA CLASSES (v1.0 uyumlu + yeni扩展)
 # ====================================================================
 
+
 @dataclass
 class Position:
     """Pozisyon kaydı (v1.0 uyumlu)."""
+
     ticker: str
     direction: str  # LONG, SHORT
     quantity: int
-    entry_price: float          # Komisyonsuz birim fiyat
+    entry_price: float  # Komisyonsuz birim fiyat
     entry_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     current_price: float = 0.0
     stop_price: float = 0.0
@@ -91,6 +93,7 @@ class Position:
 @dataclass
 class Trade:
     """Tamamlanmış trade kaydı (v1.0 uyumlu +扩展)."""
+
     trade_id: str
     ticker: str
     direction: str
@@ -142,10 +145,11 @@ class Trade:
 @dataclass
 class CashLedgerEntry:
     """Nakit hareket kaydı."""
+
     timestamp: datetime
     amount: float
     balance_after: float
-    entry_type: str   # DEPOSIT, WITHDRAWAL, BUY, SELL, COMMISSION, DIVIDEND, PNL
+    entry_type: str  # DEPOSIT, WITHDRAWAL, BUY, SELL, COMMISSION, DIVIDEND, PNL
     description: str
     ticker: str = ""
     reference_id: str = ""
@@ -165,7 +169,8 @@ class CashLedgerEntry:
 @dataclass
 class EquitySnapshot:
     """Günlük equity anlık görüntüsü."""
-    date: str                          # YYYY-MM-DD
+
+    date: str  # YYYY-MM-DD
     timestamp: datetime
     total_equity: float
     cash: float
@@ -175,7 +180,7 @@ class EquitySnapshot:
     commission_today: float
     positions_count: int
     high_water_mark: float
-    drawdown_from_hwm: float           # HWM'den düşüş (%)
+    drawdown_from_hwm: float  # HWM'den düşüş (%)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -196,9 +201,10 @@ class EquitySnapshot:
 @dataclass
 class PositionHistoryEntry:
     """Pozisyon değişiklik audit trail."""
+
     timestamp: datetime
     ticker: str
-    action: str          # OPEN, ADD, REDUCE, CLOSE, STOP_LOSS, TAKE_PROFIT
+    action: str  # OPEN, ADD, REDUCE, CLOSE, STOP_LOSS, TAKE_PROFIT
     direction: str
     quantity: int
     price: float
@@ -232,6 +238,7 @@ class PositionHistoryEntry:
 # COMMISSION MODEL — BIST Türkiye
 # ====================================================================
 
+
 class CommissionModel:
     """BIST komisyon modeli — fee_calculator entegre."""
 
@@ -249,6 +256,7 @@ class CommissionModel:
         # fee_calculator entegrasyonu
         try:
             from services.core.fee_calculator import FeeCalculator
+
             self._fee_calc = FeeCalculator(broker_rate=broker_rate)
         except ImportError:
             self._fee_calc = None
@@ -280,6 +288,7 @@ class CommissionModel:
 # PORTFOLIO MANAGER v2.0
 # ====================================================================
 
+
 class PortfolioManager:
     """Kurumsal seviye portföy yöneticisi."""
 
@@ -287,7 +296,7 @@ class PortfolioManager:
     def _trim_list(lst: list, max_size: int):
         """Liste boyutunu sınırla (eski kayıtları sil)."""
         if len(lst) > max_size:
-            del lst[:len(lst) - max_size]
+            del lst[: len(lst) - max_size]
 
     def __init__(self, initial_capital: float = 10000000.0):
         # v1.0 mevcut alanlar
@@ -413,18 +422,18 @@ class PortfolioManager:
 
     def _record_equity(self):
         """Equity curve + günlük snapshot."""
-        total_equity = self._cash + sum(
-            pos.market_value for pos in self._positions.values()
-        )
+        total_equity = self._cash + sum(pos.market_value for pos in self._positions.values())
 
         # v1.0 uyumlu equity curve
         self._trim_list(self._equity_curve, MAX_EQUITY_CURVE)
-        self._equity_curve.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "equity": total_equity,
-            "cash": self._cash,
-            "invested": total_equity - self._cash,
-        })
+        self._equity_curve.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "equity": total_equity,
+                "cash": self._cash,
+                "invested": total_equity - self._cash,
+            }
+        )
         if len(self._equity_curve) > 5000:
             self._equity_curve = self._equity_curve[-5000:]
 
@@ -442,7 +451,9 @@ class PortfolioManager:
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         if today != self._last_snapshot_date:
             unrealized = sum(p.unrealized_pnl for p in self._positions.values())
-            dd_pct = (self._high_water_mark - total_equity) / self._high_water_mark if self._high_water_mark > 0 else 0.0
+            dd_pct = (
+                (self._high_water_mark - total_equity) / self._high_water_mark if self._high_water_mark > 0 else 0.0
+            )
 
             snapshot = EquitySnapshot(
                 date=today,
@@ -511,8 +522,7 @@ class PortfolioManager:
         total_cost = cost + commission
 
         if total_cost > self._cash:
-            logger.warning("Insufficient cash",
-                ticker=ticker, required=total_cost, available=self._cash)
+            logger.warning("Insufficient cash", ticker=ticker, required=total_cost, available=self._cash)
             return {"success": False, "error": "Yetersiz nakit"}
 
         avg_cost_before = 0.0
@@ -573,14 +583,21 @@ class PortfolioManager:
 
         # Cash ledger
         self._record_cash(
-            -total_cost, self._cash, "BUY",
+            -total_cost,
+            self._cash,
+            "BUY",
             f"{action} {quantity} {ticker} @ {price:.4f} (komisyon: {commission:.2f})",
             ticker=ticker,
         )
 
-        logger.info("Position opened",
-            ticker=ticker, direction=direction,
-            quantity=quantity, price=price, commission=round(commission, 2))
+        logger.info(
+            "Position opened",
+            ticker=ticker,
+            direction=direction,
+            quantity=quantity,
+            price=price,
+            commission=round(commission, 2),
+        )
 
         return {
             "success": True,
@@ -607,8 +624,11 @@ class PortfolioManager:
             commission = self.calculate_commission(revenue)
 
         # Realized P&L = brüt kar/zarar - toplam komisyonlar
-        gross_pnl = (revenue - pos.quantity * pos.entry_price) if pos.direction == "LONG" \
+        gross_pnl = (
+            (revenue - pos.quantity * pos.entry_price)
+            if pos.direction == "LONG"
             else (pos.quantity * pos.entry_price - revenue)
+        )
         total_commission = pos.entry_commission + commission
         realized_pnl = gross_pnl - total_commission
 
@@ -636,7 +656,7 @@ class PortfolioManager:
             self._cash += net_revenue
         else:
             # SHORT kapatma: geri alış maliyeti + komisyon
-            self._cash -= (pos.quantity * price + commission)
+            self._cash -= pos.quantity * price + commission
 
         # Sayaçlar
         self._realized_pnl_total += realized_pnl
@@ -662,7 +682,9 @@ class PortfolioManager:
 
         # Cash ledger
         self._record_cash(
-            net_revenue, self._cash, "SELL",
+            net_revenue,
+            self._cash,
+            "SELL",
             f"CLOSE {pos.quantity} {ticker} @ {price:.4f} (P&L: {realized_pnl:.2f}, komisyon: {commission:.2f})",
             ticker=ticker,
             reference_id=trade.trade_id,
@@ -673,11 +695,14 @@ class PortfolioManager:
         # Equity snapshot güncelle
         self._record_equity()
 
-        logger.info("Position closed",
-            ticker=ticker, pnl=round(trade.pnl, 2),
+        logger.info(
+            "Position closed",
+            ticker=ticker,
+            pnl=round(trade.pnl, 2),
             pnl_pct=round(trade.pnl_pct, 2),
             realized_pnl=round(realized_pnl, 2),
-            commission=round(commission, 2))
+            commission=round(commission, 2),
+        )
 
         return {
             "success": True,
@@ -708,8 +733,11 @@ class PortfolioManager:
             commission = self.calculate_commission(revenue)
 
         # Realized P&L (kısmi) — komisyon oransal
-        gross_pnl = (revenue - pos.entry_price * close_qty) if pos.direction == "LONG" \
+        gross_pnl = (
+            (revenue - pos.entry_price * close_qty)
+            if pos.direction == "LONG"
             else (pos.entry_price * close_qty - revenue)
+        )
         entry_comm_portion = pos.entry_commission * (close_qty / pos.quantity)
         realized_pnl = gross_pnl - entry_comm_portion - commission
         # Kalan pozisyondan düş
@@ -758,7 +786,7 @@ class PortfolioManager:
             self._cash += net_revenue
         else:
             # SHORT kısmi kapatma: geri alış maliyeti + komisyon
-            self._cash -= (close_qty * price + commission)
+            self._cash -= close_qty * price + commission
 
         # Sayaçlar
         self._realized_pnl_total += realized_pnl
@@ -768,7 +796,9 @@ class PortfolioManager:
 
         # Cash ledger
         self._record_cash(
-            net_revenue, self._cash, "SELL",
+            net_revenue,
+            self._cash,
+            "SELL",
             f"REDUCE {close_qty} {ticker} @ {price:.4f} (P&L: {realized_pnl:.2f})",
             ticker=ticker,
             reference_id=trade.trade_id,
@@ -809,7 +839,9 @@ class PortfolioManager:
             "invested_value": round(total_value - self._cash, 2),
             "total_value": round(total_value, 2),
             "unrealized_pnl": round(total_unrealized, 2),
-            "unrealized_pnl_pct": round((total_unrealized / self._initial_capital) * 100, 2) if self._initial_capital else 0,
+            "unrealized_pnl_pct": round((total_unrealized / self._initial_capital) * 100, 2)
+            if self._initial_capital
+            else 0,
             "realized_pnl_total": round(self._realized_pnl_total, 2),
             "commission_total": round(self._commission_total, 2),
             "positions_count": len(self._positions),
@@ -880,7 +912,7 @@ class PortfolioManager:
         # Profit factor
         gross_profit = sum(t.pnl for t in self._trades if t.pnl > 0)
         gross_loss = abs(sum(t.pnl for t in self._trades if t.pnl < 0))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         return {
             "total_return_pct": round(total_return, 2),
@@ -894,7 +926,9 @@ class PortfolioManager:
             "losing_trades": len(self._trades) - len(winning_trades),
             "avg_trade_pnl": round(sum(t.pnl for t in self._trades) / len(self._trades), 2) if self._trades else 0,
             "profit_factor": round(profit_factor, 2),
-            "avg_holding_days": round(sum(t.holding_days for t in self._trades) / len(self._trades), 1) if self._trades else 0,
+            "avg_holding_days": round(sum(t.holding_days for t in self._trades) / len(self._trades), 1)
+            if self._trades
+            else 0,
             "total_commission": round(self._commission_total, 2),
             "total_realized_pnl": round(self._realized_pnl_total, 2),
         }
@@ -922,9 +956,7 @@ class PortfolioManager:
             }
 
         # Position concentration
-        max_position_pct = max(
-            (p.get("market_value", 0) / total_value * 100) for p in positions
-        ) if total_value else 0
+        max_position_pct = max((p.get("market_value", 0) / total_value * 100) for p in positions) if total_value else 0
 
         # Sector concentration
         sector_values = defaultdict(float)
@@ -932,13 +964,11 @@ class PortfolioManager:
             sector = p.get("sector", "Unknown")
             sector_values[sector] += p.get("market_value", 0)
 
-        max_sector_pct = max(
-            (v / total_value * 100) for v in sector_values.values()
-        ) if total_value else 0
+        max_sector_pct = max((v / total_value * 100) for v in sector_values.values()) if total_value else 0
 
         # HHI (Herfindahl-Hirschman Index)
         weights = {p["ticker"]: p.get("market_value", 0) / total_value for p in positions if total_value > 0}
-        hhi = sum(w ** 2 for w in weights.values())
+        hhi = sum(w**2 for w in weights.values())
 
         # Rolling correlation (equity curve'den)
         rolling_corr = 0.0
@@ -949,7 +979,7 @@ class PortfolioManager:
                 # 20 günlük rolling window ile korelasyon
                 window = min(20, len(returns) // 2)
                 recent = returns[-window:]
-                prev = returns[-2 * window:-window]
+                prev = returns[-2 * window : -window]
                 if len(recent) == len(prev) and len(recent) > 2:
                     rolling_corr = float(np.corrcoef(recent, prev)[0, 1])
 
@@ -961,6 +991,7 @@ class PortfolioManager:
             returns = np.array([(equities[i] / equities[i - 1] - 1) for i in range(1, len(equities))])
             try:
                 from ..risk.var_cvar import var_calculator
+
                 var_95 = var_calculator.calculate_historical_var(returns, 0.95, total_value)
                 cvar_95 = var_calculator.calculate_historical_cvar(returns, 0.95, total_value)
             except Exception:
@@ -971,7 +1002,7 @@ class PortfolioManager:
                 # A positive left-tail quantile is not a loss.  Keeping abs()
                 # here would report risk for a strictly positive return series.
                 var_95 = max(0.0, -threshold) * total_value
-                tail = sorted_returns[:idx + 1]
+                tail = sorted_returns[: idx + 1]
                 cvar_95 = max(0.0, -float(np.mean(tail))) * total_value if len(tail) > 0 else var_95
 
         # Risk level
@@ -1095,7 +1126,6 @@ class PortfolioManager:
             "drawdown_pct": round(self.get_drawdown() * 100, 4),
         }
 
-
     # ===================== REBALANCING v2.0 =====================
 
     def check_rebalance(
@@ -1193,14 +1223,16 @@ class PortfolioManager:
             order_value = diff * total_value
             action = "BUY" if diff > 0 else "SELL"
 
-            orders.append({
-                "ticker": ticker,
-                "action": action,
-                "value": round(abs(order_value), 2),
-                "weight_change_pct": round(diff * 100, 2),
-                "current_weight": round(current, 4),
-                "target_weight": round(target, 4),
-            })
+            orders.append(
+                {
+                    "ticker": ticker,
+                    "action": action,
+                    "value": round(abs(order_value), 2),
+                    "weight_change_pct": round(diff * 100, 2),
+                    "current_weight": round(current, 4),
+                    "target_weight": round(target, 4),
+                }
+            )
 
         # Turnover limit kontrolü
         total_turnover = sum(abs(o["weight_change_pct"]) for o in orders) / 100
@@ -1266,16 +1298,18 @@ class PortfolioManager:
                 sector=sig.get("sector", "BIST"),
             )
             if res.get("success"):
-                executed.append({
-                    "ticker": ticker,
-                    "quantity": quantity,
-                    "price": price,
-                    "score": score,
-                    "allocated_tl": round(quantity * price, 2),
-                    "stop_loss": sig.get("stop_loss"),
-                    "target": sig.get("target"),
-                    "sector": sig.get("sector"),
-                })
+                executed.append(
+                    {
+                        "ticker": ticker,
+                        "quantity": quantity,
+                        "price": price,
+                        "score": score,
+                        "allocated_tl": round(quantity * price, 2),
+                        "stop_loss": sig.get("stop_loss"),
+                        "target": sig.get("target"),
+                        "sector": sig.get("sector"),
+                    }
+                )
 
         return {
             "success": True,
@@ -1289,5 +1323,3 @@ class PortfolioManager:
 
 # Singleton
 portfolio_manager = PortfolioManager()
-
-

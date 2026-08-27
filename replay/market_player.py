@@ -39,9 +39,12 @@ class TickData:
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
-            "open": round(self.open, 4), "high": round(self.high, 4),
-            "low": round(self.low, 4), "close": round(self.close, 4),
-            "volume": self.volume, "phase": self.phase,
+            "open": round(self.open, 4),
+            "high": round(self.high, 4),
+            "low": round(self.low, 4),
+            "close": round(self.close, 4),
+            "volume": self.volume,
+            "phase": self.phase,
         }
 
 
@@ -85,8 +88,12 @@ class MarketPlayer:
 
                 raw = yf.download(
                     tickers=" ".join(download_tickers),
-                    start=start_date, end=end_date,
-                    group_by="ticker", auto_adjust=True, progress=False, threads=True,
+                    start=start_date,
+                    end=end_date,
+                    group_by="ticker",
+                    auto_adjust=True,
+                    progress=False,
+                    threads=True,
                 )
 
                 if not raw.empty:
@@ -94,11 +101,14 @@ class MarketPlayer:
                     for t in tickers:
                         tick_sym = f"{t}.IS"
                         try:
-                            if isinstance(raw.columns, __import__('pandas').MultiIndex) and tick_sym in raw.columns.levels[0]:
+                            if (
+                                isinstance(raw.columns, __import__("pandas").MultiIndex)
+                                and tick_sym in raw.columns.levels[0]
+                            ):
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if not df_t.empty:
                                     df_t = df_t.copy()
-                                    df_t = df_t.with_columns(pl.lit(t).alias('ticker'))
+                                    df_t = df_t.with_columns(pl.lit(t).alias("ticker"))
                                     frames.append(df_t)
                         except Exception:
                             continue
@@ -106,16 +116,16 @@ class MarketPlayer:
                     if frames:
                         self._data = pl.concat(frames).sort_index()
                         self._total_ticks = len(self._data)
-                        result = result.with_columns(pl.lit("ok").alias('status'))
-                        result = result.with_columns(pl.lit(len(frames)).alias('tickers_loaded'))
-                        result = result.with_columns(pl.lit(self._total_ticks).alias('total_ticks'))
+                        result = result.with_columns(pl.lit("ok").alias("status"))
+                        result = result.with_columns(pl.lit(len(frames)).alias("tickers_loaded"))
+                        result = result.with_columns(pl.lit(self._total_ticks).alias("total_ticks"))
                     else:
-                        result = result.with_columns(pl.lit("empty").alias('status'))
+                        result = result.with_columns(pl.lit("empty").alias("status"))
                 else:
-                    result = result.with_columns(pl.lit("empty").alias('status'))
+                    result = result.with_columns(pl.lit("empty").alias("status"))
         except Exception as e:
-            result = result.with_columns(pl.lit("failed").alias('status'))
-            result = result.with_columns(pl.lit(str(e)).alias('error'))
+            result = result.with_columns(pl.lit("failed").alias("status"))
+            result = result.with_columns(pl.lit(str(e)).alias("error"))
 
         return result
 
@@ -140,29 +150,41 @@ class MarketPlayer:
                 if not self._is_playing:
                     break
                 while self._is_paused:
-                    import time; time.sleep(0.1)
+                    import time
+
+                    time.sleep(0.1)
                     if not self._is_playing:
                         break
 
                 row = self._data[idx]
                 ticker = row.get("ticker", "UNKNOWN")
                 ts = self._data.index[idx]
-                if hasattr(ts, 'to_pydatetime'):
+                if hasattr(ts, "to_pydatetime"):
                     ts = ts.to_pydatetime()
 
                 from datetime import time as dt_time
-                t = ts.time() if hasattr(ts, 'time') else ts
-                if t < dt_time(9, 40): phase = "CLOSED"
-                elif t < dt_time(10, 0): phase = "OPENING_AUCTION"
-                elif t < dt_time(18, 0): phase = "CONTINUOUS"
-                elif t < dt_time(18, 10): phase = "CLOSING_AUCTION"
-                else: phase = "CLOSED"
+
+                t = ts.time() if hasattr(ts, "time") else ts
+                if t < dt_time(9, 40):
+                    phase = "CLOSED"
+                elif t < dt_time(10, 0):
+                    phase = "OPENING_AUCTION"
+                elif t < dt_time(18, 0):
+                    phase = "CONTINUOUS"
+                elif t < dt_time(18, 10):
+                    phase = "CLOSING_AUCTION"
+                else:
+                    phase = "CLOSED"
 
                 tick = TickData(
-                    timestamp=ts, ticker=ticker,
-                    open=float(row.get("Open", 0)), high=float(row.get("High", 0)),
-                    low=float(row.get("Low", 0)), close=float(row.get("Close", 0)),
-                    volume=int(row.get("Volume", 0)), phase=phase,
+                    timestamp=ts,
+                    ticker=ticker,
+                    open=float(row.get("Open", 0)),
+                    high=float(row.get("High", 0)),
+                    low=float(row.get("Low", 0)),
+                    close=float(row.get("Close", 0)),
+                    volume=int(row.get("Volume", 0)),
+                    phase=phase,
                 )
 
                 self._current_index = idx
@@ -181,16 +203,26 @@ class MarketPlayer:
         finally:
             self._is_playing = False
 
-    def pause(self): self._is_paused = True
-    def resume(self): self._is_paused = False
-    def stop(self): self._is_playing = False; self._is_paused = False
+    def pause(self):
+        self._is_paused = True
+
+    def resume(self):
+        self._is_paused = False
+
+    def stop(self):
+        self._is_playing = False
+        self._is_paused = False
 
     def get_status(self) -> dict[str, Any]:
         return {
-            "is_playing": self._is_playing, "is_paused": self._is_paused,
-            "current_index": self._current_index, "total_ticks": self._total_ticks,
-            "ticks_processed": self._ticks_processed, "speed": self._speed.value,
-            "data_loaded": self._data is not None, "tickers": len(self._tickers),
+            "is_playing": self._is_playing,
+            "is_paused": self._is_paused,
+            "current_index": self._current_index,
+            "total_ticks": self._total_ticks,
+            "ticks_processed": self._ticks_processed,
+            "speed": self._speed.value,
+            "data_loaded": self._data is not None,
+            "tickers": len(self._tickers),
         }
 
 

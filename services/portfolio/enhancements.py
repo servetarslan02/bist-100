@@ -28,14 +28,14 @@ class TaxModel:
     """
 
     # Stopaj oranları (2026)
-    STOCK_DIVIDEND_TAX = 0.15      # %15 temettü stopajı
+    STOCK_DIVIDEND_TAX = 0.15  # %15 temettü stopajı
     STOCK_CAPITAL_GAINS_TAX = 0.0  # Hisse sermaye kazancı (şu an 0)
-    BSMV_RATE = 0.05               # BSMV (komisyon üzerinden)
-    KKDF_RATE = 0.0                # KKDF (şu an 0)
-    WASH_SALE_WINDOW_DAYS = 30     # Wash sale kuralı penceresi
+    BSMV_RATE = 0.05  # BSMV (komisyon üzerinden)
+    KKDF_RATE = 0.0  # KKDF (şu an 0)
+    WASH_SALE_WINDOW_DAYS = 30  # Wash sale kuralı penceresi
 
     # Holding period eşikleri
-    SHORT_TERM_DAYS = 365          # Kısa vadeli < 1 yıl
+    SHORT_TERM_DAYS = 365  # Kısa vadeli < 1 yıl
 
     def compute_dividend_tax(self, gross_dividend: float) -> dict[str, float]:
         """Temettü vergisi hesapla."""
@@ -60,8 +60,13 @@ class TaxModel:
             holding_days: Tutma süresi (gün)
         """
         if realized_gain <= 0:
-            return {"gain": round(realized_gain, 2), "tax": 0, "net": round(realized_gain, 2),
-                    "holding_period": "N/A", "tax_rate": 0}
+            return {
+                "gain": round(realized_gain, 2),
+                "tax": 0,
+                "net": round(realized_gain, 2),
+                "holding_period": "N/A",
+                "tax_rate": 0,
+            }
 
         # Holding period belirle
         is_short_term = holding_days < self.SHORT_TERM_DAYS
@@ -248,7 +253,9 @@ class BenchmarkEngine:
         up_mask = b > 0
         down_mask = b < 0
         up_capture = np.mean(p[up_mask]) / np.mean(b[up_mask]) if up_mask.any() and np.mean(b[up_mask]) != 0 else 1.0
-        down_capture = np.mean(p[down_mask]) / np.mean(b[down_mask]) if down_mask.any() and np.mean(b[down_mask]) != 0 else 1.0
+        down_capture = (
+            np.mean(p[down_mask]) / np.mean(b[down_mask]) if down_mask.any() and np.mean(b[down_mask]) != 0 else 1.0
+        )
 
         return {
             "alpha_annual": round(float(alpha * 252), 4),
@@ -313,16 +320,16 @@ class PerformanceAttribution:
     ) -> dict[str, Any]:
         """Faktör bazlı performans attribüsyonu.
 
-        Faktörler: value, momentum, quality, size, volatility
-        Beta × faktör getirisi = faktör katkısı
-        Residual = alpha (açıklanamayan kısım)
+                Faktörler: value, momentum, quality, size, volatility
+                Beta × faktör getirisi = faktör katkısı
+                Residual = alpha (açıklanamayan kısım)
 
-        Args:
-            portfolio_returns: Portföy getiri dizisi
-n            factor_returns: {"factor_name": getiri dizisi}
+                Args:
+                    portfolio_returns: Portföy getiri dizisi
+        n            factor_returns: {"factor_name": getiri dizisi}
 
-        Returns:
-            Faktör attribüsyonu
+                Returns:
+                    Faktör attribüsyonu
         """
         p = np.array(portfolio_returns)
         if len(p) < 10:
@@ -500,7 +507,7 @@ class TransactionCostAnalyzer:
         impact_cost = 0.0
         if daily_volume > 0:
             participation = order_value / daily_volume
-            impact_pct = 0.1 * participation ** 0.5
+            impact_pct = 0.1 * participation**0.5
             impact_cost = order_value * impact_pct / 100
 
         total_cost = commission + spread_cost + slippage_cost + impact_cost

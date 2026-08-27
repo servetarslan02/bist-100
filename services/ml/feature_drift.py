@@ -4,6 +4,7 @@ SHAP history tracking, PSI (Population Stability Index),
 feature importance trend analizi, multi-metric drift detection,
 auto-remediation suggestions, drift alerting.
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class DriftReport:
     """Drift tespit raporu."""
+
     feature_name: str
     psi: float
     drift_detected: bool
@@ -31,6 +33,7 @@ class DriftReport:
 @dataclass
 class DriftSummary:
     """Genel drift özeti."""
+
     total_features: int
     drifted_features: int
     alert_features: int
@@ -72,10 +75,12 @@ class FeatureDriftDetector:
 
     def record_shap(self, shap_values: dict[str, float]):
         """SHAP importance kaydet."""
-        self._shap_history.append({
-            **shap_values,
-            "_timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._shap_history.append(
+            {
+                **shap_values,
+                "_timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._shap_history) > 1000:
             self._shap_history = self._shap_history[-1000:]
 
@@ -124,29 +129,33 @@ class FeatureDriftDetector:
             # Remediation
             remediation = self._suggest_remediation(feature, psi, trend, severity)
 
-            reports.append(DriftReport(
-                feature_name=feature,
-                psi=round(float(psi), 4),
-                drift_detected=psi > self.psi_threshold,
-                importance_trend=trend,
-                current_importance=round(float(current_imp), 4),
-                historical_importance=round(hist_mean, 4),
-                alert=alert,
-                severity=severity,
-                remediation=remediation,
-            ))
+            reports.append(
+                DriftReport(
+                    feature_name=feature,
+                    psi=round(float(psi), 4),
+                    drift_detected=psi > self.psi_threshold,
+                    importance_trend=trend,
+                    current_importance=round(float(current_imp), 4),
+                    historical_importance=round(hist_mean, 4),
+                    alert=alert,
+                    severity=severity,
+                    remediation=remediation,
+                )
+            )
 
         # PSI-based drift (distribution shift)
         if len(self._feature_distributions) >= 2:
             self._check_distribution_drift(reports)
 
         # Drift history
-        self._drift_history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "n_drifted": sum(1 for r in reports if r.drift_detected),
-            "n_alerts": sum(1 for r in reports if r.alert),
-            "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
-        })
+        self._drift_history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "n_drifted": sum(1 for r in reports if r.drift_detected),
+                "n_alerts": sum(1 for r in reports if r.alert),
+                "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
+            }
+        )
         if len(self._drift_history) > 1000:
             self._drift_history = self._drift_history[-1000:]
 
@@ -158,8 +167,12 @@ class FeatureDriftDetector:
 
         if not reports:
             return DriftSummary(
-                total_features=0, drifted_features=0, alert_features=0,
-                critical_features=0, overall_drift_score=0.0, recommendations=[],
+                total_features=0,
+                drifted_features=0,
+                alert_features=0,
+                critical_features=0,
+                overall_drift_score=0.0,
+                recommendations=[],
             )
 
         drifted = [r for r in reports if r.drift_detected]
@@ -175,7 +188,7 @@ class FeatureDriftDetector:
         if critical:
             recommendations.append(f"CRITICAL: {len(critical)} feature'da ciddi drift var — model retrain gerekebilir")
         if len(drifted) > len(reports) * 0.3:
-            recommendations.append(f"WARNING: Feature'ların %{int(len(drifted)/len(reports)*100)}'ünde drift var")
+            recommendations.append(f"WARNING: Feature'ların %{int(len(drifted) / len(reports) * 100)}'ünde drift var")
         if overall_score > self.psi_threshold:
             recommendations.append("Genel drift skoru yüksek — feature set'i gözden geçirin")
 
@@ -285,9 +298,7 @@ class FeatureDriftDetector:
                 return 0.0
 
             # Quantile sınırları (10 eşit parçaya böl)
-            quantile_boundaries = [
-                ref_sorted[int(n * i / self.n_bins)] for i in range(1, self.n_bins)
-            ]
+            quantile_boundaries = [ref_sorted[int(n * i / self.n_bins)] for i in range(1, self.n_bins)]
             quantile_boundaries = [-np.inf] + list(quantile_boundaries) + [np.inf]
 
             # Her iki dağılımı bu sınırlara göre histogram'la

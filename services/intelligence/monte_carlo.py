@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class MonteCarloResult:
     """Tek hisse Monte Carlo sonucu."""
+
     ticker: str
     current_price: float
     horizon_days: int
@@ -31,23 +32,23 @@ class MonteCarloResult:
     volatility: float
 
     # Percentile'ler
-    p10: float   # %10 olasılıkla bu fiyatın altında
+    p10: float  # %10 olasılıkla bu fiyatın altında
     p25: float
-    p50: float   # Medyan
+    p50: float  # Medyan
     p75: float
     p90: float
 
     # Olasılıklar
-    prob_positive: float       # P(getiri > 0)
-    prob_plus_5pct: float      # P(getiri > %5)
-    prob_plus_10pct: float     # P(getiri > %10)
-    prob_minus_5pct: float     # P(getiri < -%5)
-    prob_minus_10pct: float    # P(getiri < -%10)
+    prob_positive: float  # P(getiri > 0)
+    prob_plus_5pct: float  # P(getiri > %5)
+    prob_plus_10pct: float  # P(getiri > %10)
+    prob_minus_5pct: float  # P(getiri < -%5)
+    prob_minus_10pct: float  # P(getiri < -%10)
 
     # Risk
-    var_95: float              # Value at Risk %95
-    cvar_95: float             # Conditional VaR (Expected Shortfall)
-    max_drawdown_sim: float    # Simülasyondaki max drawdown
+    var_95: float  # Value at Risk %95
+    cvar_95: float  # Conditional VaR (Expected Shortfall)
+    max_drawdown_sim: float  # Simülasyondaki max drawdown
 
     # Paths (opsiyonel, son 100 yol)
     sample_paths: np.ndarray | None = None
@@ -56,6 +57,7 @@ class MonteCarloResult:
 @dataclass
 class PortfolioMonteCarloResult:
     """Portföy Monte Carlo sonucu."""
+
     portfolio_value: float
     horizon_days: int
     num_simulations: int
@@ -107,7 +109,7 @@ class MonteCarloEngine:
 
         # Simülasyon
         # GBM: S(t+1) = S(t) * exp((mu - sigma^2/2)*dt + sigma*sqrt(dt)*Z)
-        drift = (expected_return_annual - 0.5 * volatility_annual ** 2) * dt
+        drift = (expected_return_annual - 0.5 * volatility_annual**2) * dt
         diffusion = sigma_daily
 
         # Rastgele sayılar
@@ -203,11 +205,19 @@ class MonteCarloEngine:
         n = len(positions)
         if n == 0:
             return PortfolioMonteCarloResult(
-                portfolio_value=0, horizon_days=horizon_days,
+                portfolio_value=0,
+                horizon_days=horizon_days,
                 num_simulations=num_simulations,
-                p10=0, p25=0, p50=0, p75=0, p90=0,
-                var_95=0, cvar_95=0, prob_loss=0,
-                expected_return=0, expected_drawdown=0,
+                p10=0,
+                p25=0,
+                p50=0,
+                p75=0,
+                p90=0,
+                var_95=0,
+                cvar_95=0,
+                prob_loss=0,
+                expected_return=0,
+                expected_drawdown=0,
             )
 
         # Pozisyon değerleri ve parametreler
@@ -236,10 +246,10 @@ class MonteCarloEngine:
 
         # Her gün için portföy getirisi (vektörize)
         # stock_returns shape: (n_sims, horizon_days, n_assets)
-        drift = (returns_annual - 0.5 * vols_annual ** 2) * dt  # (n_assets,)
+        drift = (returns_annual - 0.5 * vols_annual**2) * dt  # (n_assets,)
         stock_returns = drift + correlated_Z  # broadcasting: (n_sims, horizon_days, n)
         # Ağırlıklı portföy getirisi
-        daily_returns = np.einsum('ijk,k->ij', stock_returns, weights)  # (n_sims, horizon_days)
+        daily_returns = np.einsum("ijk,k->ij", stock_returns, weights)  # (n_sims, horizon_days)
 
         # Kümülatif getiri
         cumulative_returns = np.cumprod(1 + daily_returns, axis=1)

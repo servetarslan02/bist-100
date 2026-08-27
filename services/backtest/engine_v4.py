@@ -36,9 +36,11 @@ logger = structlog.get_logger()
 # DATA CLASSES
 # =====================================================
 
+
 @dataclass
 class BacktestConfig:
     """Backtest konfigürasyonu."""
+
     initial_capital: float = 100_000.0
     lookback_days: int = 120
     signal_threshold: float = 60.0
@@ -68,6 +70,7 @@ class BacktestConfig:
 @dataclass
 class BacktestMetrics:
     """Backtest performans metrikleri."""
+
     total_return_pct: float = 0.0
     cagr_pct: float = 0.0
     sharpe_ratio: float = 0.0
@@ -86,13 +89,13 @@ class BacktestMetrics:
     max_drawdown_duration_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: round(v, 4) if isinstance(v, float) else v
-                for k, v in self.__dict__.items()}
+        return {k: round(v, 4) if isinstance(v, float) else v for k, v in self.__dict__.items()}
 
 
 @dataclass
 class BacktestResultV4:
     """Backtest sonucu."""
+
     run_id: str
     start_date: str
     end_date: str
@@ -133,6 +136,7 @@ class BacktestResultV4:
 # =====================================================
 # FEATURE CACHE (v2.0 ile aynı)
 # =====================================================
+
 
 class FeatureCache:
     """Ticker bazında feature cache."""
@@ -186,6 +190,7 @@ class QualityCache:
 # BACKTEST ENGINE v4.0
 # =====================================================
 
+
 class BacktestEngineV4:
     """Kurumsal seviye backtest motoru.
 
@@ -229,6 +234,7 @@ class BacktestEngineV4:
         if self._calc is None:
             try:
                 from ..features.calculator import feature_calculator
+
                 self._calc = feature_calculator
             except ImportError:
                 self._calc = _FallbackCalculator()
@@ -236,6 +242,7 @@ class BacktestEngineV4:
         if self._tm is None:
             try:
                 from ..core.tradability_mask import TradabilityMask
+
                 self._tm = TradabilityMask()
             except ImportError:
                 self._tm = _FallbackMask()
@@ -243,6 +250,7 @@ class BacktestEngineV4:
         if self._dq is None:
             try:
                 from ..core.data_quality import DataQualityChecker as DataQualityV2
+
                 self._dq = DataQualityV2()
             except ImportError:
                 self._dq = _FallbackQuality()
@@ -250,6 +258,7 @@ class BacktestEngineV4:
         if self._panel_engine is None:
             try:
                 from ..features.panel_engine import PanelFeatureEngine
+
                 self._panel_engine = PanelFeatureEngine(tradability_mask=self._tm)
             except ImportError:
                 self._panel_engine = None
@@ -279,12 +288,22 @@ class BacktestEngineV4:
         """
         if self._use_panel:
             return self._run_fast(
-                market_data, universe_at_date, benchmark_data,
-                run_id, persist, trade_start, trade_end,
+                market_data,
+                universe_at_date,
+                benchmark_data,
+                run_id,
+                persist,
+                trade_start,
+                trade_end,
             )
         return self._run_legacy(
-            market_data, universe_at_date, benchmark_data,
-            run_id, persist, trade_start, trade_end,
+            market_data,
+            universe_at_date,
+            benchmark_data,
+            run_id,
+            persist,
+            trade_start,
+            trade_end,
         )
 
     def _run_legacy(
@@ -332,8 +351,7 @@ class BacktestEngineV4:
         effective_lookback = max(cfg.lookback_days, 60)
 
         if len(sorted_dates) < effective_lookback + 10:
-            logger.warning("Insufficient data", dates=len(sorted_dates),
-                         needed=effective_lookback + 10)
+            logger.warning("Insufficient data", dates=len(sorted_dates), needed=effective_lookback + 10)
             return self._empty_result(run_id, sorted_dates, cfg, start_time)
 
         # Benchmark prices (XU100)
@@ -341,10 +359,10 @@ class BacktestEngineV4:
         benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
-                date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
-            if 'Close' in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
+                date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)
+                benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
+            if "Close" in benchmark_data.columns:
+                benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
 
         # Pre-compute quality cache
         for ticker, df in market_data.items():
@@ -365,8 +383,8 @@ class BacktestEngineV4:
         for i in range(effective_lookback, len(sorted_dates) - 1):
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
-            date_str = str(current_date.date()) if hasattr(current_date, 'date') else str(current_date)
-            next_date_str = str(next_date.date()) if hasattr(next_date, 'date') else str(next_date)
+            date_str = str(current_date.date()) if hasattr(current_date, "date") else str(current_date)
+            next_date_str = str(next_date.date()) if hasattr(next_date, "date") else str(next_date)
 
             # Walk-forward trade penceresi (varsayılan: kısıt yok)
             if trade_start is not None and date_str < trade_start:
@@ -384,6 +402,7 @@ class BacktestEngineV4:
                 hist_adapter = None
                 if cfg.historical_repository is not None:
                     from ..data.historical_adapter import HistoricalDataAdapter
+
                     hist_adapter = HistoricalDataAdapter(cfg.historical_repository)
 
                 for t, tdf in market_data.items():
@@ -396,8 +415,12 @@ class BacktestEngineV4:
                 if len(day_features) >= 5:
                     for t in list(day_features.keys()):
                         day_features[t] = self._enrich_features_for_canonical(
-                            t, day_features[t], date_str,
-                            day_features, market_data, current_date,
+                            t,
+                            day_features[t],
+                            date_str,
+                            day_features,
+                            market_data,
+                            current_date,
                             benchmark_close=benchmark_close_arr,
                             historical_adapter=hist_adapter,
                         )
@@ -425,7 +448,7 @@ class BacktestEngineV4:
                 total_scans += 1
                 score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
-                    price = float(df.loc[next_date, 'Open'])
+                    price = float(df.loc[next_date, "Open"])
                     sim.execute_sell(ticker, price, date_str)
                     signals_count += 1
 
@@ -444,7 +467,9 @@ class BacktestEngineV4:
                     if quality_info and quality_info[1] < cfg.min_quality_score:
                         continue
                     total_scans += 1
-                    score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
+                    score = self._compute_score(
+                        features, ticker=ticker, all_day_features=day_features, date_str=date_str
+                    )
                     if score >= cfg.signal_threshold + 10:
                         buy_candidates.append((ticker, score))
             else:
@@ -473,7 +498,9 @@ class BacktestEngineV4:
 
                 for ticker, features in day_features.items():
                     total_scans += 1
-                    score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
+                    score = self._compute_score(
+                        features, ticker=ticker, all_day_features=day_features, date_str=date_str
+                    )
                     if score >= cfg.signal_threshold + 10:
                         buy_candidates.append((ticker, score))
 
@@ -485,10 +512,10 @@ class BacktestEngineV4:
                 df = market_data[ticker]
                 if next_date not in df.index:
                     continue
-                price = float(df.loc[next_date, 'Open'])
+                price = float(df.loc[next_date, "Open"])
                 atr = 2.0
-                if 'day_features' in locals() and ticker in locals().get('day_features', {}):
-                    atr = day_features[ticker].get('atr_pct', 2.0)
+                if "day_features" in locals() and ticker in locals().get("day_features", {}):
+                    atr = day_features[ticker].get("atr_pct", 2.0)
                 vol_ratio = max(0.5, float(atr) / 2.5)
                 sim.execute_buy(ticker, price, date_str, volatility_ratio=vol_ratio)
                 signals_count += 1
@@ -497,14 +524,23 @@ class BacktestEngineV4:
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = float(market_data[ticker].loc[current_date, 'Close'])
+                    prices[ticker] = float(market_data[ticker].loc[current_date, "Close"])
             sim.update_equity(prices, date_str, bench_price)
 
         elapsed = _time.time() - start_time
         return self._finalize_run(
-            run_id, sorted_dates, effective_lookback, cfg, sim,
-            total_scans, signals_count, look_ahead_violations,
-            survivorship_violations, data_quality_issues, elapsed, persist,
+            run_id,
+            sorted_dates,
+            effective_lookback,
+            cfg,
+            sim,
+            total_scans,
+            signals_count,
+            look_ahead_violations,
+            survivorship_violations,
+            data_quality_issues,
+            elapsed,
+            persist,
         )
 
     # ===================== FAST PATH (PANEL) =====================
@@ -565,8 +601,7 @@ class BacktestEngineV4:
         effective_lookback = max(cfg.lookback_days, 60)
 
         if len(sorted_dates) < effective_lookback + 10:
-            logger.warning("Insufficient data", dates=len(sorted_dates),
-                         needed=effective_lookback + 10)
+            logger.warning("Insufficient data", dates=len(sorted_dates), needed=effective_lookback + 10)
             return self._empty_result(run_id, sorted_dates, cfg, start_time)
 
         # Benchmark prices (legacy ile aynı)
@@ -574,10 +609,10 @@ class BacktestEngineV4:
         benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
-                date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
-            if 'Close' in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
+                date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)
+                benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
+            if "Close" in benchmark_data.columns:
+                benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
 
         # Pre-compute quality cache (legacy ile aynı)
         for ticker, df in market_data.items():
@@ -614,7 +649,7 @@ class BacktestEngineV4:
         for i in range(effective_lookback, len(sorted_dates) - 1):
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
-            date_str = str(current_date.date()) if hasattr(current_date, 'date') else str(current_date)
+            date_str = str(current_date.date()) if hasattr(current_date, "date") else str(current_date)
 
             # Walk-forward trade penceresi
             if trade_start is not None and date_str < trade_start:
@@ -634,9 +669,7 @@ class BacktestEngineV4:
                 _pos = _idx_arr.searchsorted(current_date, side="right") - 1
                 if _pos < effective_lookback - 1:
                     continue
-                _feats = self._features_fast(
-                    _t, date_str, _pos, panels, market_data, effective_lookback, cfg
-                )
+                _feats = self._features_fast(_t, date_str, _pos, panels, market_data, effective_lookback, cfg)
                 if _feats:
                     day_features_fast[_t] = _feats
 
@@ -655,14 +688,14 @@ class BacktestEngineV4:
                 if pos < effective_lookback - 1:
                     continue
 
-                features = self._features_fast(
-                    ticker, date_str, pos, panels, market_data, effective_lookback, cfg
-                )
+                features = self._features_fast(ticker, date_str, pos, panels, market_data, effective_lookback, cfg)
                 if not features:
                     continue
 
                 total_scans += 1
-                score = self._compute_score(features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str)
+                score = self._compute_score(
+                    features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str
+                )
                 if score <= (100 - cfg.signal_threshold):
                     price = float(open_arr[loc])
                     sim.execute_sell(ticker, price, date_str)
@@ -699,14 +732,14 @@ class BacktestEngineV4:
                 if pos < effective_lookback - 1:
                     continue
 
-                features = self._features_fast(
-                    ticker, date_str, pos, panels, market_data, effective_lookback, cfg
-                )
+                features = self._features_fast(ticker, date_str, pos, panels, market_data, effective_lookback, cfg)
                 if not features:
                     continue
 
                 total_scans += 1
-                score = self._compute_score(features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str)
+                score = self._compute_score(
+                    features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str
+                )
                 day_scores[ticker] = (score, pos)
                 if score >= cfg.signal_threshold + 10:
                     buy_candidates.append((ticker, score))
@@ -725,8 +758,13 @@ class BacktestEngineV4:
                 tie_members = self._find_tie_members(buy_candidates)
                 if tie_members:
                     buy_candidates = self._rescore_tie_members_scalar(
-                        buy_candidates, tie_members, day_scores, date_str,
-                        market_data, effective_lookback, cfg,
+                        buy_candidates,
+                        tie_members,
+                        day_scores,
+                        date_str,
+                        market_data,
+                        effective_lookback,
+                        cfg,
                         all_day_features=day_features_fast,
                     )
 
@@ -742,8 +780,8 @@ class BacktestEngineV4:
                     continue
                 price = float(open_arr[loc])
                 atr = 2.0
-                if 'day_features_fast' in locals() and ticker in locals().get('day_features_fast', {}):
-                    atr = day_features_fast[ticker].get('atr_pct', 2.0)
+                if "day_features_fast" in locals() and ticker in locals().get("day_features_fast", {}):
+                    atr = day_features_fast[ticker].get("atr_pct", 2.0)
                 vol_ratio = max(0.5, float(atr) / 2.5)
                 sim.execute_buy(ticker, price, date_str, volatility_ratio=vol_ratio)
                 signals_count += 1
@@ -762,9 +800,18 @@ class BacktestEngineV4:
 
         elapsed = _time.time() - start_time
         return self._finalize_run(
-            run_id, sorted_dates, effective_lookback, cfg, sim,
-            total_scans, signals_count, look_ahead_violations,
-            survivorship_violations, data_quality_issues, elapsed, persist,
+            run_id,
+            sorted_dates,
+            effective_lookback,
+            cfg,
+            sim,
+            total_scans,
+            signals_count,
+            look_ahead_violations,
+            survivorship_violations,
+            data_quality_issues,
+            elapsed,
+            persist,
         )
 
     def _features_fast(
@@ -851,7 +898,9 @@ class BacktestEngineV4:
             df_until = market_data[ticker][: pos + 1]
             feats = self._get_features(ticker, date_str, df_until, lookback, cfg)
             if feats:
-                rescored[ticker] = self._compute_score(feats, ticker=ticker, all_day_features=all_day_features, date_str=date_str)
+                rescored[ticker] = self._compute_score(
+                    feats, ticker=ticker, all_day_features=all_day_features, date_str=date_str
+                )
         merged = [(t, rescored.get(t, s)) for t, s in buy_candidates]
         merged.sort(key=lambda x: x[1], reverse=True)
         return merged
@@ -873,8 +922,9 @@ class BacktestEngineV4:
     ) -> BacktestResultV4:
         """Metrik + persistence (legacy ile aynı)."""
         metrics_dict = sim.compute_metrics()
-        metrics = BacktestMetrics(**{k: v for k, v in metrics_dict.items()
-                                     if k in BacktestMetrics.__dataclass_fields__})
+        metrics = BacktestMetrics(
+            **{k: v for k, v in metrics_dict.items() if k in BacktestMetrics.__dataclass_fields__}
+        )
 
         start_date = str(sorted_dates[effective_lookback].date()) if sorted_dates else ""
         end_date = str(sorted_dates[-1].date()) if sorted_dates else ""
@@ -918,11 +968,13 @@ class BacktestEngineV4:
             except Exception as e:
                 logger.error("Persistence failed", error=str(e))
 
-        logger.info("Backtest completed",
-                   run_id=run_id,
-                   trades=result.trades_executed,
-                   return_pct=metrics.total_return_pct,
-                   elapsed=f"{elapsed:.1f}s")
+        logger.info(
+            "Backtest completed",
+            run_id=run_id,
+            trades=result.trades_executed,
+            return_pct=metrics.total_return_pct,
+            elapsed=f"{elapsed:.1f}s",
+        )
 
         return result
 
@@ -946,16 +998,14 @@ class BacktestEngineV4:
         try:
             mask = self._tm.compute_mask(
                 ticker,
-                df_lookback['Open'].to_numpy(),
-                df_lookback['High'].to_numpy(),
-                df_lookback['Low'].to_numpy(),
-                df_lookback['Close'].to_numpy(),
-                df_lookback['Volume'].to_numpy(),
+                df_lookback["Open"].to_numpy(),
+                df_lookback["High"].to_numpy(),
+                df_lookback["Low"].to_numpy(),
+                df_lookback["Close"].to_numpy(),
+                df_lookback["Volume"].to_numpy(),
             )
-            mask_arr = mask.mask if hasattr(mask, 'mask') else mask
-            features = self._calc.compute_all_features(
-                df_lookback, mask=mask_arr, ticker=ticker
-            )
+            mask_arr = mask.mask if hasattr(mask, "mask") else mask
+            features = self._calc.compute_all_features(df_lookback, mask=mask_arr, ticker=ticker)
             self._last_feature_seconds += _time.perf_counter() - _t0
             if features:
                 self._feature_cache.set(ticker, date_str, features)
@@ -964,10 +1014,13 @@ class BacktestEngineV4:
             self._last_feature_seconds += _time.perf_counter() - _t0
             return None
 
-    def _compute_score(self, features: dict[str, Any],
-                       ticker: str = "",
-                       all_day_features: dict[str, dict[str, Any]] | None = None,
-                       date_str: str = "") -> float:
+    def _compute_score(
+        self,
+        features: dict[str, Any],
+        ticker: str = "",
+        all_day_features: dict[str, dict[str, Any]] | None = None,
+        date_str: str = "",
+    ) -> float:
         """Feature'lardan skor hesapla.
 
         use_canonical_scoring=True ise CanonicalScoringPipeline kullanır.
@@ -988,16 +1041,18 @@ class BacktestEngineV4:
 
         Skor aralığı: ~25-75 (normal), 0-100 (aşırı durumlar)
         """
+
         def _s(v):
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
+
         score = 50.0
 
         # RSI: 40-60 arası nötr, dışı ±10 puan
         rsi = _s(features.get("rsi_14", 50))
         if rsi > 60:
-            score += min((rsi - 60) * 0.25, 10)   # 60→+0, 100→+10
+            score += min((rsi - 60) * 0.25, 10)  # 60→+0, 100→+10
         elif rsi < 40:
-            score -= min((40 - rsi) * 0.25, 10)   # 40→-0, 0→-10
+            score -= min((40 - rsi) * 0.25, 10)  # 40→-0, 0→-10
 
         # Momentum 20d (ondalık): ×200 → ±10 puan
         mom20 = _s(features.get("momentum_20d", 0))
@@ -1013,10 +1068,13 @@ class BacktestEngineV4:
 
         return max(0, min(100, score))
 
-    def _compute_score_canonical(self, features: dict[str, Any],
-                                ticker: str = "",
-                                all_day_features: dict[str, dict[str, Any]] | None = None,
-                                date_str: str = "") -> float:
+    def _compute_score_canonical(
+        self,
+        features: dict[str, Any],
+        ticker: str = "",
+        all_day_features: dict[str, dict[str, Any]] | None = None,
+        date_str: str = "",
+    ) -> float:
         """Canonical scoring pipeline ile skor.
 
         FAZ 4.7: prepare_features_for_inference() ile parity-safe.
@@ -1024,6 +1082,7 @@ class BacktestEngineV4:
         """
         try:
             from .canonical_adapter import backtest_canonical_adapter
+
             return backtest_canonical_adapter.compute_score(
                 features=features,
                 regime=self._config.regime,
@@ -1096,16 +1155,15 @@ class BacktestEngineV4:
         if benchmark_close is not None and len(benchmark_close) > 20:
             try:
                 from services.features.seven_motors import RelativeStrengthMotor
+
                 df = market_data.get(ticker)
                 if df is not None:
                     mask_arr = df.index <= current_date
-                    stock_close = df['Close'].to_numpy()[mask_arr]
-                    bench_slice = benchmark_close[:len(stock_close)]
+                    stock_close = df["Close"].to_numpy()[mask_arr]
+                    bench_slice = benchmark_close[: len(stock_close)]
                     if len(stock_close) > 20 and len(bench_slice) == len(stock_close):
                         rs_motor = RelativeStrengthMotor()
-                        rs_feats = rs_motor.compute(
-                            ticker, stock_close, bench_slice
-                        )
+                        rs_feats = rs_motor.compute(ticker, stock_close, bench_slice)
                         enriched.update(rs_feats)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1130")
@@ -1113,13 +1171,10 @@ class BacktestEngineV4:
         # === CROSS-SECTIONAL FEATURES (PIT-safe) ===
         if len(all_day_features) >= 5:
             from services.features.cross_sectional import cross_sectional_engine
-            rank_feats = cross_sectional_engine.compute_rank_features(
-                ticker, features, all_day_features
-            )
+
+            rank_feats = cross_sectional_engine.compute_rank_features(ticker, features, all_day_features)
             enriched.update(rank_feats)
-            breadth = cross_sectional_engine.compute_market_breadth_features(
-                all_day_features
-            )
+            breadth = cross_sectional_engine.compute_market_breadth_features(all_day_features)
             enriched.update(breadth)
 
         # === SEASONALITY (PIT-safe) ===
@@ -1128,24 +1183,22 @@ class BacktestEngineV4:
             df = market_data.get(ticker)
             if df is not None:
                 mask_arr = df.index <= current_date
-                dates_list = [str(d.date()) if hasattr(d, 'date') else str(d)
-                             for d in df.index[mask_arr]]
+                dates_list = [str(d.date()) if hasattr(d, "date") else str(d) for d in df.index[mask_arr]]
             if len(dates_list) >= 252:
-                close_arr = df['Close'].to_numpy()[mask_arr] if df is not None else None
+                close_arr = df["Close"].to_numpy()[mask_arr] if df is not None else None
                 if close_arr is not None and len(close_arr) >= 252:
                     from services.features.seven_motors import SeasonalityMotor
+
                     season_motor = SeasonalityMotor()
-                    season_feats = season_motor.compute(
-                        ticker, close_arr, dates_list
-                    )
+                    season_feats = season_motor.compute(ticker, close_arr, dates_list)
                     enriched.update(season_feats)
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="engine_v4.py:1162")
 
         # === CANONICAL ALIASES ===
         for period in [1, 5, 20, 60]:
-            roc_key = f'roc_{period}d'
-            ret_key = f'return_{period}d'
+            roc_key = f"roc_{period}d"
+            ret_key = f"return_{period}d"
             if roc_key in enriched and ret_key not in enriched:
                 enriched[ret_key] = enriched[roc_key]
 
@@ -1187,19 +1240,24 @@ class BacktestEngineV4:
 # FALLBACK (test ortamında import hatası önlemek için)
 # =====================================================
 
+
 class _FallbackCalculator:
     def compute_all_features(self, df, mask=None, ticker=""):
         return {"rsi_14": 50, "momentum_20d": 0, "roc_5d": 0, "volume_zscore": 0}
+
 
 class _FallbackMask:
     def compute_mask(self, *args, **kwargs):
         class _M:
             mask = None
+
         return _M()
+
 
 class _FallbackQuality:
     def full_quality_check(self, df, ticker=""):
         class _Q:
             passed = True
             quality_score = 80.0
+
         return _Q()

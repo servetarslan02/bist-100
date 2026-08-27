@@ -14,6 +14,7 @@ import numpy as np
 
 # ===================== CONFIG TESTS =====================
 
+
 def test_config_load():
     """Config yükleniyor mu?"""
     from services.learning.config.learning_config import LearningSettings, learning_settings
@@ -111,6 +112,7 @@ def test_config_model_registry():
 
 # ===================== STATISTICAL TESTS =====================
 
+
 def test_psi_stable():
     """PSI stabil dağılım için düşük değer vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
@@ -182,10 +184,7 @@ def test_zscore_normal():
     """Z-score normal değer için düşük vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
-    result = StatisticalTests.zscore_test(
-        baseline_mean=100.0, baseline_std=10.0,
-        current_value=105.0
-    )
+    result = StatisticalTests.zscore_test(baseline_mean=100.0, baseline_std=10.0, current_value=105.0)
     assert result["z_score"] < 2.5
     assert result["severity"] == "NORMAL"
     assert result["drift_detected"] is False
@@ -196,10 +195,7 @@ def test_zscore_critical():
     """Z-score aşırı değer için yüksek vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
-    result = StatisticalTests.zscore_test(
-        baseline_mean=100.0, baseline_std=10.0,
-        current_value=140.0
-    )
+    result = StatisticalTests.zscore_test(baseline_mean=100.0, baseline_std=10.0, current_value=140.0)
     assert result["z_score"] > 3.5
     assert result["severity"] == "CRITICAL"
     assert result["drift_detected"] is True
@@ -347,6 +343,7 @@ def test_deflated_sharpe():
 
 # ===================== REFACTOR TESTS =====================
 
+
 def test_super_intelligence_uses_config():
     """SuperIntelligenceEngine config'den değerleri okuyor mu?"""
     from services.learning.super_intelligence import SuperIntelligenceEngine
@@ -418,6 +415,7 @@ def test_fallback_importance():
 
 # ===================== MAIN =====================
 
+
 def run_all_tests():
     """Tüm testleri çalıştır."""
     tests = [
@@ -469,9 +467,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 0 TEST SONUÇLARI")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

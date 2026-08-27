@@ -27,25 +27,27 @@ logger = structlog.get_logger()
 @dataclass
 class SampleMeta:
     """Tek bir training sample'ın metadata'sı."""
-    sample_key: str       # "TICKER::YYYY-MM-DD"
+
+    sample_key: str  # "TICKER::YYYY-MM-DD"
     ticker: str
-    feature_date: str     # T
-    target_date: str      # T+5
-    forward_return: float # target
+    feature_date: str  # T
+    target_date: str  # T+5
+    forward_return: float  # target
 
 
 @dataclass
 class DataQualityReport:
     """Veri kalite kontrol raporu."""
+
     total_samples: int = 0
     valid_samples: int = 0
     dropped_samples: int = 0
     drop_reasons: dict[str, int] = field(default_factory=dict)
 
     # NaN/inf analizi
-    nan_features: dict[str, int] = field(default_factory=dict)    # feature_name → NaN count
-    inf_features: dict[str, int] = field(default_factory=dict)    # feature_name → inf count
-    outlier_features: dict[str, int] = field(default_factory=dict) # feature_name → outlier count
+    nan_features: dict[str, int] = field(default_factory=dict)  # feature_name → NaN count
+    inf_features: dict[str, int] = field(default_factory=dict)  # feature_name → inf count
+    outlier_features: dict[str, int] = field(default_factory=dict)  # feature_name → outlier count
 
     # Target analizi
     target_mean: float = 0.0
@@ -78,6 +80,7 @@ class DataQualityReport:
 @dataclass
 class ValidationMetrics:
     """Model validation metrikleri."""
+
     mae: float = 0.0
     rmse: float = 0.0
     r_squared: float = 0.0
@@ -102,7 +105,7 @@ class TrainingDatasetValidator:
 
     # Minimum kalite eşikleri
     MIN_VALID_SAMPLE_RATIO = 0.8  # En az %80 sample geçerli olmalı
-    MIN_SAMPLES_PER_DATE = 2      # Her tarihte en az 2 hisse (cross-sectional için)
+    MIN_SAMPLES_PER_DATE = 2  # Her tarihte en az 2 hisse (cross-sectional için)
     MAX_NAN_RATIO_PER_FEATURE = 0.3  # Tek feature'da %30'dan fazla NaN = uyarı
 
     def validate_dataset(
@@ -287,7 +290,7 @@ class TrainingDatasetValidator:
         n = len(features_map)
         for fname, count in nan_counts.items():
             if n > 0 and count / n > self.MAX_NAN_RATIO_PER_FEATURE:
-                report.warnings.append(f"Feature '{fname}' has {count}/{n} NaN ({count/n:.0%})")
+                report.warnings.append(f"Feature '{fname}' has {count}/{n} NaN ({count / n:.0%})")
 
         for fname, count in inf_counts.items():
             if count > 0:
@@ -334,9 +337,7 @@ class TrainingDatasetValidator:
 
         # Uyarılar
         if report.target_positive_pct < 0.3 or report.target_positive_pct > 0.7:
-            report.warnings.append(
-                f"Target dengesizliği: %{report.target_positive_pct:.0f} pozitif"
-            )
+            report.warnings.append(f"Target dengesizliği: %{report.target_positive_pct:.0f} pozitif")
 
         if report.target_std < 0.1:
             report.warnings.append(f"Target std çok düşük: {report.target_std:.4f}")
@@ -366,9 +367,7 @@ class TrainingDatasetValidator:
         # Her tarihte yeterli hisse var mı?
         sparse_dates = {d: c for d, c in samples_per_date.items() if c < self.MIN_SAMPLES_PER_DATE}
         if sparse_dates:
-            report.warnings.append(
-                f"{len(sparse_dates)} dates have <{self.MIN_SAMPLES_PER_DATE} samples"
-            )
+            report.warnings.append(f"{len(sparse_dates)} dates have <{self.MIN_SAMPLES_PER_DATE} samples")
 
     def _validate_leakage(
         self,
@@ -383,9 +382,7 @@ class TrainingDatasetValidator:
         if overlap:
             report.train_test_overlap = True
             report.overlap_details = sorted(overlap)
-            report.errors.append(
-                f"LEAKAGE: {len(overlap)} train dates overlap with test dates"
-            )
+            report.errors.append(f"LEAKAGE: {len(overlap)} train dates overlap with test dates")
 
     def _compute_quality_score(self, report: DataQualityReport):
         """Genel kalite skoru hesapla (0-1)."""
@@ -458,6 +455,7 @@ class TrainingDatasetValidator:
         # IC (Spearman rank correlation)
         try:
             from scipy.stats import spearmanr
+
             # Constant array kontrolü
             if np.std(yt) > 0 and np.std(yp) > 0:
                 ic, _ = spearmanr(yt, yp)
@@ -590,6 +588,7 @@ training_validator = TrainingDatasetValidator()
 # =====================================================
 # CROSS-SECTIONAL NORMALIZATION (PIT-safe)
 # =====================================================
+
 
 class CrossSectionalNormalizer:
     """PIT-safe cross-sectional normalization.
@@ -738,6 +737,7 @@ cross_sectional_normalizer = CrossSectionalNormalizer()
 # LIVE INFERENCE FEATURE PARITY
 # =====================================================
 
+
 def prepare_features_for_inference(
     ticker: str,
     raw_features: dict[str, Any],
@@ -777,7 +777,7 @@ def prepare_features_for_inference(
         date_groups_map[key] = date_str
 
     # CS normalization uygula (sadece temel feature'lar uzerinden)
-    base_features = [f for f in feature_names if not f.endswith('_cs_zscore') and not f.endswith('_cs_rank')]
+    base_features = [f for f in feature_names if not f.endswith("_cs_zscore") and not f.endswith("_cs_rank")]
     if len(all_date_features) >= 2:
         normalized_map = cross_sectional_normalizer.normalize_zscore_by_date(
             date_features_map, date_groups_map, base_features

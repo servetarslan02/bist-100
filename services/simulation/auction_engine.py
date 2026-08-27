@@ -23,9 +23,9 @@ logger = structlog.get_logger()
 class AuctionOrder:
     order_id: str
     ticker: str
-    side: str          # "BUY" | "SELL"
+    side: str  # "BUY" | "SELL"
     quantity: int
-    price: float       # 0.0 veya float('inf') for Market orders
+    price: float  # 0.0 veya float('inf') for Market orders
     is_market: bool = False
     timestamp: float = 0.0
 
@@ -79,15 +79,9 @@ class CallAuctionEngine:
 
         for p in sorted_prices:
             # Alış hacmi: Fiyatı >= p olan limit alışlar + piyasa alışları
-            cum_buy = sum(
-                o.quantity for o in orders
-                if o.side == "BUY" and (o.is_market or o.price >= p)
-            )
+            cum_buy = sum(o.quantity for o in orders if o.side == "BUY" and (o.is_market or o.price >= p))
             # Satış hacmi: Fiyatı <= p olan limit satışlar + piyasa satışları
-            cum_sell = sum(
-                o.quantity for o in orders
-                if o.side == "SELL" and (o.is_market or o.price <= p)
-            )
+            cum_sell = sum(o.quantity for o in orders if o.side == "SELL" and (o.is_market or o.price <= p))
 
             executable = min(cum_buy, cum_sell)
             imbalance = abs(cum_buy - cum_sell)
@@ -117,11 +111,11 @@ class CallAuctionEngine:
         # 3. Eşleşmeleri Tek Fiyat Üzerinden Gerçekleştir (FIFO / Zaman Önceliği)
         buys = sorted(
             [o for o in orders if o.side == "BUY" and (o.is_market or o.price >= eq_price)],
-            key=lambda x: (0 if x.is_market else -x.price, x.timestamp)
+            key=lambda x: (0 if x.is_market else -x.price, x.timestamp),
         )
         sells = sorted(
             [o for o in orders if o.side == "SELL" and (o.is_market or o.price <= eq_price)],
-            key=lambda x: (0 if x.is_market else x.price, x.timestamp)
+            key=lambda x: (0 if x.is_market else x.price, x.timestamp),
         )
 
         matched_trades = []
@@ -132,13 +126,15 @@ class CallAuctionEngine:
         while buy_idx < len(buys) and sell_idx < len(sells):
             fill_qty = min(rem_buy_qty, rem_sell_qty)
             if fill_qty > 0:
-                matched_trades.append({
-                    "buy_order_id": buys[buy_idx].order_id,
-                    "sell_order_id": sells[sell_idx].order_id,
-                    "ticker": buys[buy_idx].ticker,
-                    "price": eq_price,
-                    "quantity": fill_qty,
-                })
+                matched_trades.append(
+                    {
+                        "buy_order_id": buys[buy_idx].order_id,
+                        "sell_order_id": sells[sell_idx].order_id,
+                        "ticker": buys[buy_idx].ticker,
+                        "price": eq_price,
+                        "quantity": fill_qty,
+                    }
+                )
                 rem_buy_qty -= fill_qty
                 rem_sell_qty -= fill_qty
 
@@ -153,7 +149,11 @@ class CallAuctionEngine:
 
         total_matched = sum(t["quantity"] for t in matched_trades)
         imbalance_qty = abs(sum(b.quantity for b in buys) - sum(s.quantity for s in sells))
-        imb_side = "BUY" if sum(b.quantity for b in buys) > sum(s.quantity for s in sells) else ("SELL" if sum(s.quantity for s in sells) > sum(b.quantity for b in buys) else "NONE")
+        imb_side = (
+            "BUY"
+            if sum(b.quantity for b in buys) > sum(s.quantity for s in sells)
+            else ("SELL" if sum(s.quantity for s in sells) > sum(b.quantity for b in buys) else "NONE")
+        )
 
         return AuctionResult(
             equilibrium_price=eq_price,

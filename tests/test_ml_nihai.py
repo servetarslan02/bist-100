@@ -1,13 +1,16 @@
 """ML Nihai Sistem Testleri — 6 Faz, 65+ Test."""
+
 import numpy as np
 import pytest
 
 # ─── Faz 1: CatBoost + XGBoost ───
 
+
 class TestCatBoost:
     def test_train_predict(self):
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostConfig, CatBoostModel
+
         config = CatBoostConfig(iterations=10, verbose=0)
         model = CatBoostModel(config)
         X = np.random.randn(100, 5)
@@ -20,6 +23,7 @@ class TestCatBoost:
     def test_feature_importance(self):
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
+
         model = CatBoostModel()
         X = np.random.randn(100, 5)
         y = np.random.randint(0, 2, 100)
@@ -31,6 +35,7 @@ class TestCatBoost:
     def test_untrained(self):
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
+
         model = CatBoostModel()
         assert not model.is_trained
         assert model.predict(np.random.randn(10, 5)).sum() == 0
@@ -39,6 +44,7 @@ class TestCatBoost:
     def test_save_load(self, tmp_path):
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
+
         model = CatBoostModel()
         X = np.random.randn(100, 5)
         y = np.random.randint(0, 2, 100)
@@ -54,6 +60,7 @@ class TestXGBoost:
     def test_train_predict(self):
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
+
         config = XGBoostConfig(n_estimators=10, verbose=0)
         model = XGBoostModel(config)
         X = np.random.randn(100, 5)
@@ -66,6 +73,7 @@ class TestXGBoost:
     def test_feature_importance(self):
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostModel
+
         model = XGBoostModel()
         X = np.random.randn(100, 5)
         y = np.random.randint(0, 2, 100)
@@ -77,6 +85,7 @@ class TestXGBoost:
     def test_shap_values(self):
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostModel
+
         model = XGBoostModel()
         X = np.random.randn(100, 5)
         y = np.random.randint(0, 2, 100)
@@ -88,12 +97,14 @@ class TestXGBoost:
 
 # ─── Faz 2: Stacking Ensemble ───
 
+
 class TestStackingEnsemble:
     def test_stacking(self):
         from sklearn.ensemble import RandomForestRegressor
         from sklearn.linear_model import Ridge
 
         from services.ml.stacking_ensemble import StackingEnsemble
+
         ensemble = StackingEnsemble()
         ensemble.add_model("ridge", Ridge(alpha=1.0))
         ensemble.add_model("rf", RandomForestRegressor(n_estimators=10, random_state=42))
@@ -109,6 +120,7 @@ class TestStackingEnsemble:
         from sklearn.linear_model import Ridge
 
         from services.ml.stacking_ensemble import StackingEnsemble
+
         ensemble = StackingEnsemble()
         ensemble.add_model("a", Ridge())
         ensemble.add_model("b", Ridge())
@@ -121,17 +133,22 @@ class TestStackingEnsemble:
 
     def test_insufficient_models(self):
         from services.ml.stacking_ensemble import StackingEnsemble
+
         ensemble = StackingEnsemble()
         ensemble.add_model("only_one", None)
-        result = ensemble.fit(np.random.randn(100, 3), np.random.randn(100), np.random.randn(20, 3), np.random.randn(20))
+        result = ensemble.fit(
+            np.random.randn(100, 3), np.random.randn(100), np.random.randn(20, 3), np.random.randn(20)
+        )
         assert "error" in result
 
 
 # ─── Faz 3: Model Registry + Champion-Challenger ───
 
+
 class TestModelRegistry:
     def test_register_and_list(self, tmp_path):
         from services.ml.model_registry import ModelRegistry
+
         registry = ModelRegistry(str(tmp_path / "registry"))
         registry.register("lgbm", "v1", {"model": "dummy"}, "lightgbm", {"ic": 0.05})
         registry.register("lgbm", "v2", {"model": "dummy2"}, "lightgbm", {"ic": 0.06})
@@ -140,6 +157,7 @@ class TestModelRegistry:
 
     def test_promote(self, tmp_path):
         from services.ml.model_registry import ModelRegistry
+
         registry = ModelRegistry(str(tmp_path / "registry"))
         registry.register("lgbm", "v1", {"model": "dummy"}, "lightgbm", {"ic": 0.05})
         registry.register("lgbm", "v2", {"model": "dummy2"}, "lightgbm", {"ic": 0.06})
@@ -152,6 +170,7 @@ class TestModelRegistry:
 
     def test_compare_versions(self, tmp_path):
         from services.ml.model_registry import ModelRegistry
+
         registry = ModelRegistry(str(tmp_path / "registry"))
         registry.register("lgbm", "v1", None, "lightgbm", {"ic": 0.05, "sharpe": 1.2})
         registry.register("lgbm", "v2", None, "lightgbm", {"ic": 0.06, "sharpe": 1.5})
@@ -160,6 +179,7 @@ class TestModelRegistry:
 
     def test_reject(self, tmp_path):
         from services.ml.model_registry import ModelRegistry
+
         registry = ModelRegistry(str(tmp_path / "registry"))
         registry.register("lgbm", "v1", None, "lightgbm", {"ic": 0.01})
         registry.reject("lgbm", "v1")
@@ -170,6 +190,7 @@ class TestModelRegistry:
 class TestChampionChallenger:
     def test_ab_test(self):
         from services.ml.champion_challenger import ChampionChallenger
+
         cc = ChampionChallenger(min_samples=5)
         for _ in range(10):
             cc.record_champion_result(np.random.normal(0.05, 0.02))
@@ -179,6 +200,7 @@ class TestChampionChallenger:
 
     def test_insufficient_data(self):
         from services.ml.champion_challenger import ChampionChallenger
+
         cc = ChampionChallenger(min_samples=30)
         cc.record_champion_result(0.05)
         result = cc.run_ab_test("challenger")
@@ -186,6 +208,7 @@ class TestChampionChallenger:
 
     def test_shadow_summary(self):
         from services.ml.champion_challenger import ChampionChallenger
+
         cc = ChampionChallenger()
         cc.record_shadow_result("m1", 0.05)
         cc.record_shadow_result("m1", 0.06)
@@ -195,9 +218,11 @@ class TestChampionChallenger:
 
 # ─── Faz 4: Hyperparameter Tuning + Calibration ───
 
+
 class TestHyperparameterTuner:
     def test_tune_lightgbm(self):
         from services.ml.hyperparameter_tuner import HyperparameterTuner
+
         tuner = HyperparameterTuner(n_trials=3, timeout_seconds=30)
         X = np.random.randn(100, 5)
         y = np.random.randn(100)
@@ -206,6 +231,7 @@ class TestHyperparameterTuner:
 
     def test_tune_xgboost(self):
         from services.ml.hyperparameter_tuner import HyperparameterTuner
+
         tuner = HyperparameterTuner(n_trials=3, timeout_seconds=30)
         X = np.random.randn(100, 5)
         y = np.random.randn(100)
@@ -216,6 +242,7 @@ class TestHyperparameterTuner:
 class TestCalibration:
     def test_calibration_check(self):
         from services.ml.calibration import ModelCalibration
+
         cal = ModelCalibration()
         y_true = np.array([0, 0, 1, 1, 0, 1, 1, 0, 1, 0])
         y_prob = np.array([0.1, 0.2, 0.8, 0.9, 0.3, 0.7, 0.85, 0.15, 0.75, 0.25])
@@ -225,6 +252,7 @@ class TestCalibration:
 
     def test_platt_scaling(self):
         from services.ml.calibration import ModelCalibration
+
         cal = ModelCalibration()
         y_true = np.array([0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1])
         y_prob = np.array([0.1, 0.2, 0.8, 0.9, 0.3, 0.7, 0.85, 0.15, 0.75, 0.25, 0.8, 0.9, 0.2, 0.3, 0.7])
@@ -233,6 +261,7 @@ class TestCalibration:
 
     def test_isotonic(self):
         from services.ml.calibration import ModelCalibration
+
         cal = ModelCalibration()
         y_true = np.array([0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1])
         y_prob = np.array([0.1, 0.2, 0.8, 0.9, 0.3, 0.7, 0.85, 0.15, 0.75, 0.25, 0.8, 0.9, 0.2, 0.3, 0.7])
@@ -242,9 +271,11 @@ class TestCalibration:
 
 # ─── Faz 5: Feature Drift + Model Monitoring ───
 
+
 class TestFeatureDrift:
     def test_shap_history(self):
         from services.ml.feature_drift import FeatureDriftDetector
+
         det = FeatureDriftDetector()
         det.record_shap({"f1": 0.3, "f2": 0.5, "f3": 0.2})
         det.record_shap({"f1": 0.2, "f2": 0.6, "f3": 0.2})
@@ -253,6 +284,7 @@ class TestFeatureDrift:
 
     def test_drift_alert(self):
         from services.ml.feature_drift import FeatureDriftDetector
+
         det = FeatureDriftDetector(psi_threshold=0.1)
         for _ in range(10):
             det.record_shap({"f1": 0.3, "f2": 0.5})
@@ -262,6 +294,7 @@ class TestFeatureDrift:
 
     def test_insufficient_history(self):
         from services.ml.feature_drift import FeatureDriftDetector
+
         det = FeatureDriftDetector()
         det.record_shap({"f1": 0.5})
         reports = det.check_drift()
@@ -271,6 +304,7 @@ class TestFeatureDrift:
 class TestModelMonitor:
     def test_metric_recording(self):
         from services.ml.model_monitor import ModelMonitor
+
         mon = ModelMonitor(min_history=3)
         for _i in range(10):
             mon.record_metric("ic", 0.05 + np.random.normal(0, 0.01))
@@ -279,6 +313,7 @@ class TestModelMonitor:
 
     def test_decay_detection(self):
         from services.ml.model_monitor import ModelMonitor
+
         mon = ModelMonitor(min_history=5, decay_z_threshold=-1.5)
         for _ in range(20):
             mon.record_metric("ic", 0.05)
@@ -289,6 +324,7 @@ class TestModelMonitor:
 
     def test_prediction_drift(self):
         from services.ml.model_monitor import ModelMonitor
+
         mon = ModelMonitor(min_history=5)
         for _ in range(20):
             mon.record_prediction(0.7, actual=1)
@@ -299,14 +335,16 @@ class TestModelMonitor:
 
     def test_win_rate(self):
         from services.ml.model_monitor import ModelMonitor
+
         mon = ModelMonitor()
         mon.record_prediction(0.7, actual=1)
         mon.record_prediction(0.3, actual=0)
         mon.record_prediction(0.8, actual=0)  # Wrong
-        assert mon.get_win_rate() == pytest.approx(2/3, abs=0.01)
+        assert mon.get_win_rate() == pytest.approx(2 / 3, abs=0.01)
 
     def test_summary(self):
         from services.ml.model_monitor import ModelMonitor
+
         mon = ModelMonitor(min_history=3)
         for _ in range(5):
             mon.record_metric("ic", 0.05)
@@ -317,6 +355,7 @@ class TestModelMonitor:
 
 
 # ─── Faz 6: Integration ───
+
 
 class TestMLIntegration:
     def test_catboost_to_registry(self, tmp_path):
@@ -355,7 +394,7 @@ class TestMLIntegration:
         shap_vals = model.shap_values(X[:10])
         if shap_vals is not None:
             det = FeatureDriftDetector()
-            mean_shap = {f"f{i+1}": float(np.mean(np.abs(shap_vals[:, i]))) for i in range(5)}
+            mean_shap = {f"f{i + 1}": float(np.mean(np.abs(shap_vals[:, i]))) for i in range(5)}
             det.record_shap(mean_shap)
             det.record_shap({k: v * 2 for k, v in mean_shap.items()})  # Simulated change
             reports = det.check_drift()

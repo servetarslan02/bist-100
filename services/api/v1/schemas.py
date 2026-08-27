@@ -17,8 +17,10 @@ from pydantic import BaseModel, Field
 # BASE RESPONSES
 # =====================================================
 
+
 class BaseResponse(BaseModel):
     """Tüm API response'ları için base model."""
+
     success: bool = True
     message: str | None = None
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
@@ -26,6 +28,7 @@ class BaseResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Hata response modeli."""
+
     success: bool = False
     error: str
     detail: str | None = None
@@ -34,6 +37,7 @@ class ErrorResponse(BaseModel):
 
 class PaginatedResponse(BaseModel):
     """Sayfalı response modeli."""
+
     success: bool = True
     data: list[Any]
     total: int
@@ -45,8 +49,10 @@ class PaginatedResponse(BaseModel):
 # MARKET DATA
 # =====================================================
 
+
 class InstrumentInfo(BaseModel):
     """Hisse bilgisi."""
+
     ticker: str
     name: str | None = None
     sector: str | None = None
@@ -57,6 +63,7 @@ class InstrumentInfo(BaseModel):
 
 class OHLCVData(BaseModel):
     """OHLCV verisi."""
+
     date: str
     open: float
     high: float
@@ -67,6 +74,7 @@ class OHLCVData(BaseModel):
 
 class MarketStateResponse(BaseModel):
     """Piyasa durumu."""
+
     regime: str = "UNKNOWN"
     confidence: float = 0.0
     istanbul_time: str | None = None
@@ -76,6 +84,7 @@ class MarketStateResponse(BaseModel):
 
 class RadarResponse(BaseModel):
     """Piyasa radarı."""
+
     data: list[dict[str, Any]]
     count: int
     errors: int = 0
@@ -88,8 +97,10 @@ class RadarResponse(BaseModel):
 # PORTFOLIO
 # =====================================================
 
+
 class PositionInfo(BaseModel):
     """Pozisyon bilgisi."""
+
     ticker: str
     direction: str
     quantity: int
@@ -102,6 +113,7 @@ class PositionInfo(BaseModel):
 
 class PortfolioSummary(BaseModel):
     """Portföy özeti."""
+
     cash: float
     invested_value: float
     total_value: float
@@ -115,6 +127,7 @@ class PortfolioSummary(BaseModel):
 
 class TradeInfo(BaseModel):
     """Trade bilgisi."""
+
     trade_id: str
     ticker: str
     direction: str
@@ -129,6 +142,7 @@ class TradeInfo(BaseModel):
 
 class PortfolioMetrics(BaseModel):
     """Portföy metrikleri."""
+
     total_return_pct: float
     cagr_pct: float
     max_drawdown_pct: float
@@ -144,8 +158,10 @@ class PortfolioMetrics(BaseModel):
 # RISK
 # =====================================================
 
+
 class RiskOverview(BaseModel):
     """Risk özeti."""
+
     risk_level: str
     max_position_pct: float
     sector_concentration: float
@@ -158,6 +174,7 @@ class RiskOverview(BaseModel):
 
 class VaRResult(BaseModel):
     """VaR sonucu."""
+
     var_95: float
     var_99: float
     cvar_95: float
@@ -171,8 +188,10 @@ class VaRResult(BaseModel):
 # SCANNER
 # =====================================================
 
+
 class OpportunityInfo(BaseModel):
     """Fırsat bilgisi."""
+
     ticker: str
     tier: int
     opportunity_score: float
@@ -188,6 +207,7 @@ class OpportunityInfo(BaseModel):
 
 class ScannerStatus(BaseModel):
     """Scanner durumu."""
+
     total_assets: int
     tier_0_continuous: int
     tier_1_quant: int
@@ -204,8 +224,10 @@ class ScannerStatus(BaseModel):
 # LEARNING
 # =====================================================
 
+
 class LearningStatus(BaseModel):
     """Öğrenme durumu."""
+
     total_cycles: int
     active_version: str | None = None
     champion_version: str | None = None
@@ -215,6 +237,7 @@ class LearningStatus(BaseModel):
 
 class ModelInfo(BaseModel):
     """Model bilgisi."""
+
     model_name: str
     version: str
     trust_score: float
@@ -226,8 +249,10 @@ class ModelInfo(BaseModel):
 # INTELLIGENCE
 # =====================================================
 
+
 class RegimeInfo(BaseModel):
     """Rejim bilgisi."""
+
     regime: str
     confidence: float
     description: str | None = None
@@ -235,6 +260,7 @@ class RegimeInfo(BaseModel):
 
 class SimulationResult(BaseModel):
     """Simülasyon sonucu."""
+
     ticker: str
     expected_return: float
     volatility: float
@@ -252,8 +278,10 @@ class SimulationResult(BaseModel):
 # BACKTEST
 # =====================================================
 
+
 class BacktestResult(BaseModel):
     """Backtest sonucu."""
+
     run_id: str
     start_date: str
     end_date: str
@@ -270,8 +298,10 @@ class BacktestResult(BaseModel):
 # VIOP
 # =====================================================
 
+
 class OptionPrice(BaseModel):
     """Opsiyon fiyatı."""
+
     price: float
     delta: float
     gamma: float
@@ -282,6 +312,7 @@ class OptionPrice(BaseModel):
 
 class GreeksResult(BaseModel):
     """Greeks sonucu."""
+
     total_delta: float
     total_gamma: float
     total_theta: float
@@ -295,8 +326,10 @@ class GreeksResult(BaseModel):
 # SYSTEM
 # =====================================================
 
+
 class SystemStatus(BaseModel):
     """Sistem durumu."""
+
     status: str
     uptime_hours: float
     predictions_today: int
@@ -307,6 +340,7 @@ class SystemStatus(BaseModel):
 
 class HealthCheck(BaseModel):
     """Health check."""
+
     status: str = "ok"
     version: str = "1.0"
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())

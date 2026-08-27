@@ -4,6 +4,7 @@ KAP açıklamaları için detaylı event study.
 Event type mapping, event-specific window sizes, clustering detection.
 MacKinlay (1997) — estimation window ayrı, event window ayrı.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -361,9 +362,7 @@ def _calculate_volume_change(volume_data: np.ndarray | None, n: int) -> float:
     return 0.0
 
 
-def _error_result(
-    ticker: str, event_type: str, event_date: Any, error_msg: str
-) -> dict[str, Any]:
+def _error_result(ticker: str, event_type: str, event_date: Any, error_msg: str) -> dict[str, Any]:
     """Hata sonuç şablonu."""
     return {
         "ticker": ticker,

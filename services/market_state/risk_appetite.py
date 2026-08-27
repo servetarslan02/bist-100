@@ -117,10 +117,7 @@ class RiskAppetiteEngine:
         scores["macro"] = np.clip(macro_score, 0, 1)
 
         # Ağırlıklı toplam
-        risk_appetite = sum(
-            scores[factor] * weight
-            for factor, weight in self._weights.items()
-        )
+        risk_appetite = sum(scores[factor] * weight for factor, weight in self._weights.items())
 
         risk_appetite = float(np.clip(risk_appetite, 0, 1))
 

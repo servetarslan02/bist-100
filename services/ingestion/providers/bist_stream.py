@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class StreamTick:
     """Streaming tick verisi."""
+
     ticker: str
     price: float
     volume: int
@@ -144,10 +145,12 @@ class BISTStreamProvider:
 
             async with websockets.connect(uri) as ws:
                 # Subscribe to BIST stocks
-                subscribe_msg = orjson.dumps({
-                    "_event": "bulk-subscribe",
-                    "message": "pid-list:497,347,1052,..."  # Investing.com BIST IDs
-                }).decode()
+                subscribe_msg = orjson.dumps(
+                    {
+                        "_event": "bulk-subscribe",
+                        "message": "pid-list:497,347,1052,...",  # Investing.com BIST IDs
+                    }
+                ).decode()
                 await ws.send(subscribe_msg)
 
                 while self._running:
@@ -203,17 +206,21 @@ class BISTStreamProvider:
 
             async with websockets.connect(uri) as ws:
                 # Auth
-                auth_msg = orjson.dumps({
-                    "type": "auth",
-                    "api_key": "YOUR_API_KEY",
-                }).decode()
+                auth_msg = orjson.dumps(
+                    {
+                        "type": "auth",
+                        "api_key": "YOUR_API_KEY",
+                    }
+                ).decode()
                 await ws.send(auth_msg)
 
                 # Subscribe
-                subscribe_msg = orjson.dumps({
-                    "type": "subscribe",
-                    "symbols": ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"],
-                }).decode()
+                subscribe_msg = orjson.dumps(
+                    {
+                        "type": "subscribe",
+                        "symbols": ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"],
+                    }
+                ).decode()
                 await ws.send(subscribe_msg)
 
                 while self._running:

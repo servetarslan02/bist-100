@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class LearningState:
     """Öğrenme durumu."""
+
     total_predictions: int = 0
     total_outcomes: int = 0
     correct_predictions: int = 0
@@ -73,12 +74,14 @@ class LearningLoop:
             regime_acc = saved.get("regime_accuracy", "{}")
             if isinstance(regime_acc, str):
                 import orjson
+
                 regime_acc = orjson.loads(regime_acc)
             self._state.regime_accuracy = regime_acc
 
             drifted = saved.get("drifted_features", "[]")
             if isinstance(drifted, str):
                 import orjson
+
                 drifted = orjson.loads(drifted)
             self._state.drifted_features = drifted
 
@@ -87,13 +90,13 @@ class LearningLoop:
             for pred in reversed(recent_preds):
                 self._prediction_history.appendleft(pred)
                 if pred.get("outcome"):
-                    self._accuracy_window.append(
-                        pred["predicted_direction"] == pred["outcome"].get("actual_direction")
-                    )
+                    self._accuracy_window.append(pred["predicted_direction"] == pred["outcome"].get("actual_direction"))
 
-            logger.info("Learning state restored from SQLite",
-                       predictions=self._state.total_predictions,
-                       accuracy=round(self._state.accuracy, 4))
+            logger.info(
+                "Learning state restored from SQLite",
+                predictions=self._state.total_predictions,
+                accuracy=round(self._state.accuracy, 4),
+            )
         except Exception as e:
             logger.warning("Failed to restore learning state", error=str(e))
 
@@ -116,31 +119,35 @@ class LearningLoop:
         except Exception as e:
             logger.warning("Failed to persist learning state", error=str(e))
 
-    def record_prediction(self, ticker: str, predicted_direction: str,
-                         predicted_return: float, confidence: float,
-                         features: dict, regime: str):
+    def record_prediction(
+        self,
+        ticker: str,
+        predicted_direction: str,
+        predicted_return: float,
+        confidence: float,
+        features: dict,
+        regime: str,
+    ):
         """Tahmin kaydet."""
-        self._prediction_history.append({
-            "ticker": ticker,
-            "predicted_direction": predicted_direction,
-            "predicted_return": predicted_return,
-            "confidence": confidence,
-            "features": features.copy(),
-            "regime": regime,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._prediction_history.append(
+            {
+                "ticker": ticker,
+                "predicted_direction": predicted_direction,
+                "predicted_return": predicted_return,
+                "confidence": confidence,
+                "features": features.copy(),
+                "regime": regime,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._prediction_history) > 5000:
             self._prediction_history = self._prediction_history[-5000:]
         self._state.total_predictions += 1
 
         # SQLite'a kaydet
-        state_store.save_prediction(
-            ticker, predicted_direction, predicted_return,
-            confidence, regime, features
-        )
+        state_store.save_prediction(ticker, predicted_direction, predicted_return, confidence, regime, features)
 
-    def record_outcome(self, ticker: str, actual_return: float,
-                       actual_direction: str, timestamp: str):
+    def record_outcome(self, ticker: str, actual_return: float, actual_direction: str, timestamp: str):
         """Sonuç kaydet ve öğren."""
         # Eşleşen tahmini bul
         matching = None
@@ -194,8 +201,13 @@ class LearningLoop:
         state_store.update_prediction_outcome(ticker, matching["outcome"])
         self._persist_state()
 
-        logger.debug("Outcome recorded", ticker=ticker, correct=is_correct,
-                    accuracy=self._state.accuracy, recent_accuracy=self._state.recent_accuracy)
+        logger.debug(
+            "Outcome recorded",
+            ticker=ticker,
+            correct=is_correct,
+            accuracy=self._state.accuracy,
+            recent_accuracy=self._state.recent_accuracy,
+        )
 
     def _check_model_decay(self):
         """Model bozulması kontrolü."""
@@ -206,7 +218,9 @@ class LearningLoop:
         # Son 50 tahminde doğruluk eşik altına düştüyse
         if self._state.recent_accuracy < cfg.winrate_threshold:
             self._state.retrain_needed = True
-            self._state.retrain_reason = f"Recent accuracy dropped to {self._state.recent_accuracy:.2%} (threshold: {cfg.winrate_threshold:.2%})"
+            self._state.retrain_reason = (
+                f"Recent accuracy dropped to {self._state.recent_accuracy:.2%} (threshold: {cfg.winrate_threshold:.2%})"
+            )
 
         # Accuracy trendi negatifse
         if self._state.accuracy_trend < -0.1:

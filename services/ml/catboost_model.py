@@ -4,6 +4,7 @@ CatBoost entegrasyonu — custom loss, multi-horizon prediction,
 advanced kategorik feature handling, walk-forward desteği,
 regime-aware training, SHAP feature importance.
 """
+
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -18,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class CatBoostConfig:
     """CatBoost model konfigürasyonu."""
+
     iterations: int = 500
     depth: int = 6
     learning_rate: float = 0.1
@@ -32,9 +34,9 @@ class CatBoostConfig:
     target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20, 60])
     # Regime-aware
     regime_aware: bool = False
-    regime_weights: dict[str, float] = field(default_factory=lambda: {
-        "BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0
-    })
+    regime_weights: dict[str, float] = field(
+        default_factory=lambda: {"BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0}
+    )
     # Custom loss
     use_adjusted_loss: bool = False
     wrong_direction_penalty: float = 11.0
@@ -323,7 +325,11 @@ class CatBoostModel:
         try:
             stats = {}
             for cat_idx in self._cat_features_detected:
-                cat_name = self._feature_names[cat_idx] if self._feature_names and cat_idx < len(self._feature_names) else f"cat_{cat_idx}"
+                cat_name = (
+                    self._feature_names[cat_idx]
+                    if self._feature_names and cat_idx < len(self._feature_names)
+                    else f"cat_{cat_idx}"
+                )
                 # CatBoost'un kategorik feature'dan öğrendiği bilgi
                 stats[cat_name] = {
                     "index": cat_idx,
@@ -370,11 +376,11 @@ class CatBoostModel:
         for i in range(X.shape[1]):
             col = X[:, i]
             # Object dtype
-            if col.dtype == object or col.dtype.kind in ('U', 'S'):
+            if col.dtype == object or col.dtype.kind in ("U", "S"):
                 cat_indices.append(i)
                 continue
             # Integer ve az unique değer
-            if col.dtype.kind in ('i', 'u'):
+            if col.dtype.kind in ("i", "u"):
                 unique_count = len(np.unique(col[~np.isnan(col.astype(float))]))
                 if unique_count < 20:
                     cat_indices.append(i)
@@ -410,6 +416,7 @@ class CatBoostModel:
 
             if self._is_classifier:
                 from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
+
                 try:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
@@ -418,6 +425,7 @@ class CatBoostModel:
                     logger.debug("Handled exception", error=str(e), context="catboost_model.py:421")
             else:
                 from sklearn.metrics import mean_absolute_error, mean_squared_error
+
                 try:
                     metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val, val_pred))), 6)
                     metrics["val_mae"] = round(float(mean_absolute_error(y_val, val_pred)), 6)
@@ -437,6 +445,7 @@ class CatBoostModel:
         """SHAP values hesapla."""
         try:
             import shap
+
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X[:100])  # İlk 100 sample
             mean_shap = np.mean(np.abs(shap_values), axis=0)
@@ -456,8 +465,16 @@ class CatBoostModel:
             if interactions:
                 result = {}
                 for f1_idx, f2_idx, score in interactions[:10]:
-                    f1 = feature_names[int(f1_idx)] if feature_names and int(f1_idx) < len(feature_names) else f"f{f1_idx}"
-                    f2 = feature_names[int(f2_idx)] if feature_names and int(f2_idx) < len(feature_names) else f"f{f2_idx}"
+                    f1 = (
+                        feature_names[int(f1_idx)]
+                        if feature_names and int(f1_idx) < len(feature_names)
+                        else f"f{f1_idx}"
+                    )
+                    f2 = (
+                        feature_names[int(f2_idx)]
+                        if feature_names and int(f2_idx) < len(feature_names)
+                        else f"f{f2_idx}"
+                    )
                     result[f"{f1}×{f2}"] = round(float(score), 4)
                 self._feature_interactions = result
         except Exception as e:
@@ -479,17 +496,21 @@ class CatBoostModel:
         """Modeli kaydet (tüm horizon'lar, SHA256 hash ile)."""
         try:
             from services.core.safe_pickle import safe_pickle_dump
+
             os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
-            safe_pickle_dump({
-                "models": self._models,
-                "config": self._config,
-                "metrics": self._training_metrics,
-                "feature_names": self._feature_names,
-                "shap_values": self._shap_values,
-                "feature_interactions": self._feature_interactions,
-                "cat_features_detected": self._cat_features_detected,
-                "saved_at": datetime.now(UTC).isoformat(),
-            }, path)
+            safe_pickle_dump(
+                {
+                    "models": self._models,
+                    "config": self._config,
+                    "metrics": self._training_metrics,
+                    "feature_names": self._feature_names,
+                    "shap_values": self._shap_values,
+                    "feature_interactions": self._feature_interactions,
+                    "cat_features_detected": self._cat_features_detected,
+                    "saved_at": datetime.now(UTC).isoformat(),
+                },
+                path,
+            )
             return True
         except Exception as e:
             logger.error("catboost_save_failed", error=str(e))
@@ -499,6 +520,7 @@ class CatBoostModel:
         """Modeli yükle (SHA256 doğrulamalı)."""
         try:
             from services.core.safe_pickle import safe_pickle_load
+
             data = safe_pickle_load(path)
             self._models = data.get("models", {})
             self._config = data.get("config", self._config)

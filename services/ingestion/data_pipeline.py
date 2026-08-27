@@ -132,8 +132,10 @@ class DataPipeline:
             reason = self._get_primary_rejection_reason(quality)
             self._add_audit(ticker, "rejected", reason, quality.quality_score)
             return PipelineResult(
-                ticker=ticker, accepted=False,
-                quality_report=quality, features=None,
+                ticker=ticker,
+                accepted=False,
+                quality_report=quality,
+                features=None,
                 rejection_reason=reason,
                 processing_time_ms=(time.time() - start) * 1000,
             )
@@ -142,8 +144,10 @@ class DataPipeline:
             reason = f"quality_score={quality.quality_score:.0f} < {self._min_quality_score}"
             self._add_audit(ticker, "rejected", reason, quality.quality_score)
             return PipelineResult(
-                ticker=ticker, accepted=False,
-                quality_report=quality, features=None,
+                ticker=ticker,
+                accepted=False,
+                quality_report=quality,
+                features=None,
                 rejection_reason=reason,
                 processing_time_ms=(time.time() - start) * 1000,
             )
@@ -151,32 +155,42 @@ class DataPipeline:
         # 3. Feature hesaplama
         try:
             mask = self._tm.compute_mask(
-                ticker, df['Open'].to_numpy(), df['High'].to_numpy(),
-                df['Low'].to_numpy(), df['Close'].to_numpy(), df['Volume'].to_numpy(),
+                ticker,
+                df["Open"].to_numpy(),
+                df["High"].to_numpy(),
+                df["Low"].to_numpy(),
+                df["Close"].to_numpy(),
+                df["Volume"].to_numpy(),
             )
             features = self._calc.compute_all_features(df, mask=mask.mask, ticker=ticker)
 
             if not features:
                 self._add_audit(ticker, "rejected", "features_empty", quality.quality_score)
                 return PipelineResult(
-                    ticker=ticker, accepted=False,
-                    quality_report=quality, features=None,
+                    ticker=ticker,
+                    accepted=False,
+                    quality_report=quality,
+                    features=None,
                     rejection_reason="features_empty",
                     processing_time_ms=(time.time() - start) * 1000,
                 )
 
             self._add_audit(ticker, "accepted", "", quality.quality_score)
             return PipelineResult(
-                ticker=ticker, accepted=True,
-                quality_report=quality, features=features,
+                ticker=ticker,
+                accepted=True,
+                quality_report=quality,
+                features=features,
                 processing_time_ms=(time.time() - start) * 1000,
             )
 
         except Exception as e:
             self._add_audit(ticker, "error", str(e), quality.quality_score)
             return PipelineResult(
-                ticker=ticker, accepted=False,
-                quality_report=quality, features=None,
+                ticker=ticker,
+                accepted=False,
+                quality_report=quality,
+                features=None,
                 rejection_reason=f"feature_error: {e}",
                 processing_time_ms=(time.time() - start) * 1000,
             )
@@ -193,13 +207,15 @@ class DataPipeline:
 
     def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float):
         """Audit kaydı."""
-        self._audit_log.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "ticker": ticker,
-            "action": action,
-            "reason": reason,
-            "quality_score": round(quality_score, 1),
-        })
+        self._audit_log.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "ticker": ticker,
+                "action": action,
+                "reason": reason,
+                "quality_score": round(quality_score, 1),
+            }
+        )
         if len(self._audit_log) > 1000:
             self._audit_log = self._audit_log[-1000:]
 

@@ -28,7 +28,7 @@ def test_observability():
     prometheus_metrics.inc("events_total")
     prometheus_metrics.inc("events_total", labels={"type": "tick"})
     assert prometheus_metrics._counters["events_total"] == 2
-    assert prometheus_metrics._counters['events_total{type=tick}'] == 1
+    assert prometheus_metrics._counters["events_total{type=tick}"] == 1
     passed += 1
     print(f"  ✓ Counter: {prometheus_metrics._counters}")
 
@@ -204,6 +204,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

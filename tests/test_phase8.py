@@ -16,21 +16,43 @@ def test_opportunity_engine():
 
     # Test features
     features_bull = {
-        "price": 305.25, "return_1d": 1.5, "roc_5d": 5.0, "roc_20d": 12.0,
-        "momentum_20d": 12.0, "price_acceleration": 2.0,
-        "volume_zscore": 3.0, "volume_ratio_20d": 2.5,
-        "rsi_14": 62, "macd_histogram": 0.5, "bb_position": 0.8, "adx": 30,
-        "atr_14_pct": 2.0, "realized_vol_20d": 18, "amihud_illiquidity": 0.001,
-        "correlation_to_index": 0.6, "trend_slope_20d": 1.5,
+        "price": 305.25,
+        "return_1d": 1.5,
+        "roc_5d": 5.0,
+        "roc_20d": 12.0,
+        "momentum_20d": 12.0,
+        "price_acceleration": 2.0,
+        "volume_zscore": 3.0,
+        "volume_ratio_20d": 2.5,
+        "rsi_14": 62,
+        "macd_histogram": 0.5,
+        "bb_position": 0.8,
+        "adx": 30,
+        "atr_14_pct": 2.0,
+        "realized_vol_20d": 18,
+        "amihud_illiquidity": 0.001,
+        "correlation_to_index": 0.6,
+        "trend_slope_20d": 1.5,
     }
 
     features_bear = {
-        "price": 50.0, "return_1d": -2.0, "roc_5d": -5.0, "roc_20d": -10.0,
-        "momentum_20d": -10.0, "price_acceleration": -1.0,
-        "volume_zscore": -0.5, "volume_ratio_20d": 0.8,
-        "rsi_14": 35, "macd_histogram": -0.3, "bb_position": 0.2, "adx": 20,
-        "atr_14_pct": 4.0, "realized_vol_20d": 35, "amihud_illiquidity": 0.005,
-        "correlation_to_index": 0.8, "trend_slope_20d": -2.0,
+        "price": 50.0,
+        "return_1d": -2.0,
+        "roc_5d": -5.0,
+        "roc_20d": -10.0,
+        "momentum_20d": -10.0,
+        "price_acceleration": -1.0,
+        "volume_zscore": -0.5,
+        "volume_ratio_20d": 0.8,
+        "rsi_14": 35,
+        "macd_histogram": -0.3,
+        "bb_position": 0.2,
+        "adx": 20,
+        "atr_14_pct": 4.0,
+        "realized_vol_20d": 35,
+        "amihud_illiquidity": 0.005,
+        "correlation_to_index": 0.8,
+        "trend_slope_20d": -2.0,
     }
 
     # 1. Bull hisse yüksek skor almalı
@@ -100,7 +122,9 @@ def test_opportunity_engine():
     # Aynı features ama farklı rejim → farklı skor
     assert score_bull_regime.opportunity_score != score_bear_regime.opportunity_score
     passed += 1
-    print(f"  ✓ Regime weight changes (BULL={score_bull_regime.opportunity_score:.1f}, BEAR={score_bear_regime.opportunity_score:.1f})")
+    print(
+        f"  ✓ Regime weight changes (BULL={score_bull_regime.opportunity_score:.1f}, BEAR={score_bear_regime.opportunity_score:.1f})"
+    )
 
     # 10. Confidence
     assert 0 <= score_bull.confidence <= 1
@@ -126,6 +150,7 @@ def main():
     except Exception as e:
         print(f"  ✗ Test crashed: {e}")
         import traceback
+
         traceback.print_exc()
         total_failed += 1
 

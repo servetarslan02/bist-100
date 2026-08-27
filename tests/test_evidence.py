@@ -43,6 +43,7 @@ def test_evidence_engine():
 
     # 4. Fact verification (primary source)
     from services.intelligence.evidence_engine import Claim
+
     claim = Claim(
         claim_id="C1",
         text="Şirket yeni sözleşme imzaladı",
@@ -122,6 +123,7 @@ def main():
     except Exception as e:
         print(f"  ✗ Test crashed: {e}")
         import traceback
+
         traceback.print_exc()
         total_failed += 1
 

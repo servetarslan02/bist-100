@@ -32,6 +32,7 @@ logger = structlog.get_logger()
 @dataclass
 class SystemCheckpoint:
     """Sistem checkpoint'i."""
+
     checkpoint_id: str
     timestamp: datetime
     config_snapshot: dict[str, Any]
@@ -55,12 +56,16 @@ class SystemCheckpoint:
 
     def compute_state_hash(self) -> str:
         """Durum hash'i hesapla (deterministik kontrol için)."""
-        content = orjson.dumps({
-            "config": self.config_snapshot,
-            "portfolio": self.portfolio_state,
-            "seed": self.random_seed,
-            "counter": self.execution_counter,
-        }, option=orjson.OPT_SORT_KEYS, default=str)
+        content = orjson.dumps(
+            {
+                "config": self.config_snapshot,
+                "portfolio": self.portfolio_state,
+                "seed": self.random_seed,
+                "counter": self.execution_counter,
+            },
+            option=orjson.OPT_SORT_KEYS,
+            default=str,
+        )
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
@@ -124,9 +129,7 @@ class DeterministicRecovery:
             self._checkpoints = self._checkpoints[-500:]
         self._persist_checkpoint(checkpoint)
 
-        logger.info("Checkpoint created",
-                    checkpoint_id=checkpoint_id,
-                    hash=checkpoint.hash_state)
+        logger.info("Checkpoint created", checkpoint_id=checkpoint_id, hash=checkpoint.hash_state)
 
         return checkpoint
 
@@ -161,10 +164,12 @@ class DeterministicRecovery:
         # Validate hash
         expected_hash = checkpoint.compute_state_hash()
         if checkpoint.hash_state != expected_hash:
-            logger.error("Checkpoint hash mismatch",
-                        checkpoint_id=checkpoint.checkpoint_id,
-                        expected=expected_hash,
-                        actual=checkpoint.hash_state)
+            logger.error(
+                "Checkpoint hash mismatch",
+                checkpoint_id=checkpoint.checkpoint_id,
+                expected=expected_hash,
+                actual=checkpoint.hash_state,
+            )
             raise ValueError("Checkpoint integrity check failed")
 
         # Restore state
@@ -172,9 +177,7 @@ class DeterministicRecovery:
         self._execution_counter = checkpoint.execution_counter
         np.random.seed(self._current_seed)
 
-        logger.info("Checkpoint restored",
-                    checkpoint_id=checkpoint.checkpoint_id,
-                    seed=self._current_seed)
+        logger.info("Checkpoint restored", checkpoint_id=checkpoint.checkpoint_id, seed=self._current_seed)
 
         return (
             checkpoint.config_snapshot,
@@ -224,9 +227,7 @@ class DeterministicRecovery:
             is_det = actual == expected_result
 
         if not is_det:
-            logger.warning("Determinism check failed",
-                          expected=str(expected_result)[:100],
-                          actual=str(actual)[:100])
+            logger.warning("Determinism check failed", expected=str(expected_result)[:100], actual=str(actual)[:100])
 
         return is_det, actual
 
@@ -261,13 +262,15 @@ class DeterministicRecovery:
                 if isinstance(orig, (int, float)) and isinstance(repro, (int, float)):
                     diff = abs(orig - repro)
                     if diff > tolerance:
-                        discrepancies.append({
-                            "metric": key,
-                            "original": round(orig, 6),
-                            "reproduction": round(repro, 6),
-                            "difference": round(diff, 6),
-                            "relative_diff_pct": round(diff / abs(orig) * 100, 4) if orig != 0 else float('inf'),
-                        })
+                        discrepancies.append(
+                            {
+                                "metric": key,
+                                "original": round(orig, 6),
+                                "reproduction": round(repro, 6),
+                                "difference": round(diff, 6),
+                                "relative_diff_pct": round(diff / abs(orig) * 100, 4) if orig != 0 else float("inf"),
+                            }
+                        )
 
         is_reproducible = len(discrepancies) == 0
 
@@ -281,9 +284,7 @@ class DeterministicRecovery:
             "verdict": "PASS" if is_reproducible else "FAIL",
         }
 
-        logger.info("Reproduction report",
-                    verdict=report["verdict"],
-                    discrepancies=len(discrepancies))
+        logger.info("Reproduction report", verdict=report["verdict"], discrepancies=len(discrepancies))
 
         return report
 
@@ -294,9 +295,7 @@ class DeterministicRecovery:
             with open(filepath, "w") as f:
                 f.write(orjson.dumps(checkpoint.to_dict(), option=orjson.OPT_INDENT_2, default=str).decode())
         except Exception as e:
-            logger.warning("Failed to persist checkpoint",
-                          checkpoint_id=checkpoint.checkpoint_id,
-                          error=str(e))
+            logger.warning("Failed to persist checkpoint", checkpoint_id=checkpoint.checkpoint_id, error=str(e))
 
     def _load_checkpoint(self, checkpoint_id: str) -> SystemCheckpoint | None:
         """Checkpoint'i diskten yükle."""
@@ -319,9 +318,7 @@ class DeterministicRecovery:
                 hash_state=data["hash_state"],
             )
         except Exception as e:
-            logger.error("Failed to load checkpoint",
-                        checkpoint_id=checkpoint_id,
-                        error=str(e))
+            logger.error("Failed to load checkpoint", checkpoint_id=checkpoint_id, error=str(e))
             return None
 
     def list_checkpoints(self) -> list[dict[str, Any]]:
@@ -331,11 +328,13 @@ class DeterministicRecovery:
             try:
                 with open(filepath) as f:
                     data = orjson.loads(f.read())
-                checkpoints.append({
-                    "checkpoint_id": data["checkpoint_id"],
-                    "timestamp": data["timestamp"],
-                    "hash": data["hash_state"],
-                })
+                checkpoints.append(
+                    {
+                        "checkpoint_id": data["checkpoint_id"],
+                        "timestamp": data["timestamp"],
+                        "hash": data["hash_state"],
+                    }
+                )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="deterministic.py:338")
         return checkpoints

@@ -23,16 +23,18 @@ logger = structlog.get_logger()
 @dataclass
 class LiquidityProfile:
     """Likidite profili."""
-    avg_daily_volume: int       # Günlük ortalama hacim
-    bid_depth: float = 0.0      # Bid derinliği (TL)
-    ask_depth: float = 0.0      # Ask derinliği (TL)
-    spread_pct: float = 0.1     # Spread %
-    tick_size: float = 0.01     # Minimum fiyat adımı
+
+    avg_daily_volume: int  # Günlük ortalama hacim
+    bid_depth: float = 0.0  # Bid derinliği (TL)
+    ask_depth: float = 0.0  # Ask derinliği (TL)
+    spread_pct: float = 0.1  # Spread %
+    tick_size: float = 0.01  # Minimum fiyat adımı
 
 
 @dataclass
 class MarketImpactResult:
     """Market impact sonucu."""
+
     base_slippage: float
     volume_impact: float
     regime_impact: float
@@ -132,10 +134,10 @@ class EnhancedExecutionSimulator:
     """
 
     # BIST komisyon oranları
-    BROKER_COMMISSION_RATE = 0.0003   # %0.03
-    EXCHANGE_FEE_RATE = 0.000056      # %0.0056
-    BSMV_RATE = 0.05                  # BSMV (%5)
-    MIN_COMMISSION = 1.0              # Minimum 1 TL
+    BROKER_COMMISSION_RATE = 0.0003  # %0.03
+    EXCHANGE_FEE_RATE = 0.000056  # %0.0056
+    BSMV_RATE = 0.05  # BSMV (%5)
+    MIN_COMMISSION = 1.0  # Minimum 1 TL
 
     def __init__(self):
         self._impact_model = SquareRootMarketImpact(eta=0.3)
@@ -175,14 +177,12 @@ class EnhancedExecutionSimulator:
         # 2. Square root market impact
         order_value = order.quantity * market_price
         adv_value = liquidity.avg_daily_volume * market_price
-        volume_impact = self._impact_model.calculate(
-            order_value, adv_value, volatility
-        )
+        volume_impact = self._impact_model.calculate(order_value, adv_value, volatility)
 
         # 3. Regime impact
-        regime_impact = self._regime_slippage.adjust_slippage(
-            base_slippage + volume_impact, regime
-        ) - (base_slippage + volume_impact)
+        regime_impact = self._regime_slippage.adjust_slippage(base_slippage + volume_impact, regime) - (
+            base_slippage + volume_impact
+        )
 
         # 4. Toplam slippage
         total_slippage = base_slippage + volume_impact + regime_impact

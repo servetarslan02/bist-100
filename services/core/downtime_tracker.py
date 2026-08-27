@@ -47,8 +47,8 @@ class DowntimeTracker:
 
     # Catch-up eşikleri
     CATCHUP_THRESHOLDS = {
-        "data_backfill": timedelta(minutes=30),    # 30 dk+ → veri backfill
-        "model_refresh": timedelta(hours=6),        # 6 saat+ → model yenile
+        "data_backfill": timedelta(minutes=30),  # 30 dk+ → veri backfill
+        "model_refresh": timedelta(hours=6),  # 6 saat+ → model yenile
         "full_recalibration": timedelta(hours=24),  # 24 saat+ → tam kalibrasyon
     }
 
@@ -97,10 +97,13 @@ class DowntimeTracker:
         now_iso = datetime.now(UTC).isoformat()
 
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO shutdown_events (shutdown_at, shutdown_timestamp)
                 VALUES (?, ?)
-            """, (now_iso, now))
+            """,
+                (now_iso, now),
+            )
             conn.commit()
 
         # Config'e de kaydet (hızlı erişim için)
@@ -127,23 +130,33 @@ class DowntimeTracker:
             """).fetchone()
 
             if row:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE shutdown_events
                     SET startup_at = ?, startup_timestamp = ?,
                         downtime_seconds = ?, catchup_level = ?
                     WHERE id = ?
-                """, (now_iso, self._startup_time,
-                      self._downtime_seconds, catchup_level, row["id"]))
+                """,
+                    (now_iso, self._startup_time, self._downtime_seconds, catchup_level, row["id"]),
+                )
             else:
                 # Shutdown kaydı yok — ilk çalıştırma veya crash
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO shutdown_events
                     (shutdown_at, shutdown_timestamp, startup_at, startup_timestamp,
                      downtime_seconds, catchup_level)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (now_iso, self._startup_time - self._downtime_seconds,
-                      now_iso, self._startup_time,
-                      self._downtime_seconds, catchup_level))
+                """,
+                    (
+                        now_iso,
+                        self._startup_time - self._downtime_seconds,
+                        now_iso,
+                        self._startup_time,
+                        self._downtime_seconds,
+                        catchup_level,
+                    ),
+                )
 
             conn.commit()
 
@@ -153,13 +166,14 @@ class DowntimeTracker:
         self._set_config("last_downtime_seconds", str(self._downtime_seconds))
 
         if self._downtime_seconds > 60:
-            logger.warning("System was down",
-                          downtime_minutes=round(self._downtime_seconds / 60, 1),
-                          downtime_hours=round(self._downtime_seconds / 3600, 2),
-                          catchup_level=catchup_level)
+            logger.warning(
+                "System was down",
+                downtime_minutes=round(self._downtime_seconds / 60, 1),
+                downtime_hours=round(self._downtime_seconds / 3600, 2),
+                catchup_level=catchup_level,
+            )
         else:
-            logger.info("System startup",
-                       downtime_seconds=round(self._downtime_seconds, 1))
+            logger.info("System startup", downtime_seconds=round(self._downtime_seconds, 1))
 
     def _calculate_downtime(self) -> float:
         """Downtime süresini hesapla."""
@@ -191,18 +205,19 @@ class DowntimeTracker:
     def _set_config(self, key: str, value: str):
         """Config anahtarını ayarla."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO downtime_config (key, value, updated_at)
                 VALUES (?, ?, ?)
-            """, (key, value, datetime.now(UTC).isoformat()))
+            """,
+                (key, value, datetime.now(UTC).isoformat()),
+            )
             conn.commit()
 
     def _get_config(self, key: str) -> str | None:
         """Config anahtarını oku."""
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT value FROM downtime_config WHERE key = ?", (key,)
-            ).fetchone()
+            row = conn.execute("SELECT value FROM downtime_config WHERE key = ?", (key,)).fetchone()
             return row["value"] if row else None
 
     def get_downtime(self) -> timedelta:
@@ -216,10 +231,7 @@ class DowntimeTracker:
     def needs_catchup(self) -> dict[str, bool]:
         """Hangi catch-up'lar gerekli?"""
         downtime = timedelta(seconds=self._downtime_seconds)
-        return {
-            key: downtime >= threshold
-            for key, threshold in self.CATCHUP_THRESHOLDS.items()
-        }
+        return {key: downtime >= threshold for key, threshold in self.CATCHUP_THRESHOLDS.items()}
 
     def get_catchup_level(self) -> str:
         """Catch-up seviyesi."""
@@ -251,11 +263,14 @@ class DowntimeTracker:
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Downtime geçmişini döndür."""
         with self._connect() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM shutdown_events
                 ORDER BY shutdown_timestamp DESC
                 LIMIT ?
-            """, (limit,)).fetchall()
+            """,
+                (limit,),
+            ).fetchall()
             return [dict(r) for r in rows]
 
 

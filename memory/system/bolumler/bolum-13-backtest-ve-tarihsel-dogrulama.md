@@ -44,8 +44,11 @@ Strateji → Point-in-Time Veri → Hisse Seçimi → Pozisyon →
 from services.backtest.enhanced_walk_forward import PurgeEmbargoWalkForward
 
 engine = PurgeEmbargoWalkForward(
-    train_days=252, test_days=63, step_days=21,
-    purge_days=5, embargo_days=5,  # Data leakage koruması
+    train_days=252,
+    test_days=63,
+    step_days=21,
+    purge_days=5,
+    embargo_days=5,  # Data leakage koruması
 )
 
 result = engine.run(predictions, actuals, tickers, dates)
@@ -185,5 +188,5 @@ commission = calculate_commission(amount=305250, broker_rate=0.0003)
 # total: 112.18
 
 # Backtest'e uygula
-capital -= (cost + commission["total"])
+capital -= cost + commission["total"]
 ```

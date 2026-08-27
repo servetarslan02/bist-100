@@ -20,11 +20,13 @@ import pytest
 # VaR/CVaR TESTS
 # =====================================================
 
+
 class TestVaRCalculator:
     """VaR/CVaR hesaplama testleri."""
 
     def setup_method(self):
         from services.risk.var_cvar import VaRCalculator
+
         self.calc = VaRCalculator()
         # 252 günlük getiri verisi (yılda ~%10 getiri, %20 volatilite)
         np.random.seed(42)
@@ -67,15 +69,15 @@ class TestVaRCalculator:
 
     def test_component_var(self):
         weights = np.array([0.3, 0.3, 0.4])
-        cov = np.array([
-            [0.0004, 0.0001, 0.0002],
-            [0.0001, 0.0009, 0.0003],
-            [0.0002, 0.0003, 0.0016],
-        ])
-        tickers = ["THYAO", "GARAN", "ASELS"]
-        results = self.calc.calculate_component_var(
-            weights, cov, 0.95, self.portfolio_value, tickers
+        cov = np.array(
+            [
+                [0.0004, 0.0001, 0.0002],
+                [0.0001, 0.0009, 0.0003],
+                [0.0002, 0.0003, 0.0016],
+            ]
         )
+        tickers = ["THYAO", "GARAN", "ASELS"]
+        results = self.calc.calculate_component_var(weights, cov, 0.95, self.portfolio_value, tickers)
         assert len(results) == 3
         assert all(r.ticker in tickers for r in results)
         # Component VaR'ların toplamı pozitif olmalı
@@ -83,9 +85,7 @@ class TestVaRCalculator:
         assert total > 0
 
     def test_full_var_report(self):
-        report = self.calc.calculate_full_var_report(
-            self.returns, self.portfolio_value, holding_period_days=1
-        )
+        report = self.calc.calculate_full_var_report(self.returns, self.portfolio_value, holding_period_days=1)
         assert "parametric" in report
         assert "historical" in report
         assert "monte_carlo" in report
@@ -127,17 +127,17 @@ class TestVaRCalculator:
 # DYNAMIC RISK LIMITS TESTS
 # =====================================================
 
+
 class TestDynamicRiskLimits:
     """Dinamik risk limitleri testleri."""
 
     def setup_method(self):
         from services.risk.dynamic_limits import DynamicRiskLimits
+
         self.dl = DynamicRiskLimits()
 
     def test_normal_conditions(self):
-        limits = self.dl.get_limits(
-            annualized_volatility=0.20, regime="SIDEWAYS", current_drawdown_pct=0
-        )
+        limits = self.dl.get_limits(annualized_volatility=0.20, regime="SIDEWAYS", current_drawdown_pct=0)
         assert limits.max_position_pct > 0
         assert limits.max_exposure_pct > 0
         assert limits.kelly_fraction > 0
@@ -178,6 +178,7 @@ class TestDynamicRiskLimits:
 
     def test_compare_limits(self):
         from services.risk.dynamic_limits import RiskLimits
+
         static = RiskLimits()
         dynamic = self.dl.get_limits(regime="BEAR")
         comparison = self.dl.compare_limits(static, dynamic)
@@ -188,11 +189,13 @@ class TestDynamicRiskLimits:
 # STRESS TEST TESTS
 # =====================================================
 
+
 class TestStressTestEngine:
     """Stres testi testleri."""
 
     def setup_method(self):
         from services.risk.stress_test import StressTestEngine
+
         self.engine = StressTestEngine()
         self.portfolio = {
             "total_value": 1000000,
@@ -224,9 +227,7 @@ class TestStressTestEngine:
 
     def test_monte_carlo_stress(self):
         returns = np.random.normal(0.0004, 0.0127, 252)
-        result = self.engine.run_monte_carlo_stress(
-            self.portfolio, returns, n_simulations=1000, seed=42
-        )
+        result = self.engine.run_monte_carlo_stress(self.portfolio, returns, n_simulations=1000, seed=42)
         assert result["n_simulations"] == 1000
         assert result["portfolio_value"] == 1000000
         assert "percentiles" in result
@@ -238,7 +239,7 @@ class TestStressTestEngine:
             self.portfolio, np.full(30, 0.001), n_simulations=100, holding_days=5, seed=42
         )
         assert result["prob_loss"] == 0.0
-        expected_pnl = 1000000 * ((1.001 ** 5) - 1)
+        expected_pnl = 1000000 * ((1.001**5) - 1)
         assert abs(result["mean_pnl"] - expected_pnl) < 1e-6
 
     def test_breaking_point(self):
@@ -255,11 +256,13 @@ class TestStressTestEngine:
 # DRAWDOWN RESPONSE TESTS
 # =====================================================
 
+
 class TestDrawdownResponseSystem:
     """Drawdown response testleri."""
 
     def setup_method(self):
         from services.risk.drawdown_response import DrawdownAction, DrawdownResponseSystem
+
         self.dds = DrawdownResponseSystem()
         self.DrawdownAction = DrawdownAction
 
@@ -320,31 +323,26 @@ class TestDrawdownResponseSystem:
 # TAIL HEDGE TESTS
 # =====================================================
 
+
 class TestTailRiskHedger:
     """Tail risk hedging testleri."""
 
     def setup_method(self):
         from services.risk.tail_hedge import TailRiskHedger
+
         self.hedger = TailRiskHedger()
 
     def test_normal_conditions_no_hedge(self):
-        rec = self.hedger.analyze(
-            portfolio_value=1000000, vix_level=15, regime="SIDEWAYS"
-        )
+        rec = self.hedger.analyze(portfolio_value=1000000, vix_level=15, regime="SIDEWAYS")
         assert rec.hedge_ratio < 0.3  # Normal conditions → low hedge
 
     def test_crisis_high_hedge(self):
-        rec = self.hedger.analyze(
-            portfolio_value=1000000, vix_level=40, regime="CRISIS",
-            current_drawdown_pct=15
-        )
+        rec = self.hedger.analyze(portfolio_value=1000000, vix_level=40, regime="CRISIS", current_drawdown_pct=15)
         assert rec.hedge_ratio > 0.5  # Crisis → high hedge
         assert rec.protection_level in ["HIGH", "MEDIUM"]
 
     def test_crisis_alpha_detection(self):
-        signal = self.hedger.detect_crisis_alpha(
-            vix_level=35, market_return_5d=-0.05, gold_return_5d=0.03
-        )
+        signal = self.hedger.detect_crisis_alpha(vix_level=35, market_return_5d=-0.05, gold_return_5d=0.03)
         assert signal.signal_strength > 0.5
         assert signal.regime in ["ELEVATED", "CRISIS"]
 
@@ -367,17 +365,21 @@ class TestTailRiskHedger:
 # RISK PARITY TESTS
 # =====================================================
 
+
 class TestRiskParityOptimizer:
     """Risk parity testleri."""
 
     def setup_method(self):
         from services.risk.risk_parity import RiskParityOptimizer
+
         self.optimizer = RiskParityOptimizer()
-        self.cov = np.array([
-            [0.0004, 0.0001, 0.0002],
-            [0.0001, 0.0009, 0.0003],
-            [0.0002, 0.0003, 0.0016],
-        ])
+        self.cov = np.array(
+            [
+                [0.0004, 0.0001, 0.0002],
+                [0.0001, 0.0009, 0.0003],
+                [0.0002, 0.0003, 0.0016],
+            ]
+        )
         self.tickers = ["THYAO", "GARAN", "ASELS"]
 
     def test_equal_risk_contribution(self):
@@ -396,9 +398,7 @@ class TestRiskParityOptimizer:
 
     def test_custom_risk_budgets(self):
         budgets = {"THYAO": 0.5, "GARAN": 0.3, "ASELS": 0.2}
-        result = self.optimizer.compute_risk_budget_weights(
-            self.cov, self.tickers, budgets
-        )
+        result = self.optimizer.compute_risk_budget_weights(self.cov, self.tickers, budgets)
         assert result.optimization_success
 
     def test_compare_with_equal_weight(self):
@@ -415,11 +415,13 @@ class TestRiskParityOptimizer:
 # MONITORING TESTS
 # =====================================================
 
+
 class TestRiskMonitor:
     """Risk monitoring testleri."""
 
     def setup_method(self):
         from services.risk.monitoring import RiskMetricsSnapshot, RiskMonitor
+
         self.monitor = RiskMonitor()
         self.RiskMetricsSnapshot = RiskMetricsSnapshot
 
@@ -493,6 +495,7 @@ class TestRiskMonitor:
 
     def test_custom_rule(self):
         from services.risk.monitoring import AlertRule, AlertSeverity, AlertType
+
         rule = AlertRule(
             rule_id="custom_test",
             name="Custom Test Rule",
@@ -539,18 +542,18 @@ class TestRiskMonitor:
 # INTEGRATION TESTS
 # =====================================================
 
+
 class TestRiskIntegration:
     """Entegrasyon testleri — modüller arası etkileşim."""
 
     def test_var_informs_position_sizing(self):
         """VaR sonucu position sizing'ı etkilemeli."""
         from services.risk.var_cvar import VaRCalculator
+
         calc = VaRCalculator()
         returns = np.random.normal(0.0004, 0.0127, 252)
 
-        limit = calc.calculate_var_based_position_limit(
-            returns, max_var_pct=5.0, portfolio_value=100000
-        )
+        limit = calc.calculate_var_based_position_limit(returns, max_var_pct=5.0, portfolio_value=100000)
         assert limit > 0
         assert limit <= 100000
 
@@ -579,6 +582,7 @@ class TestRiskIntegration:
     def test_drawdown_affects_position_size(self):
         """Drawdown pozisyon boyutunu etkilemeli."""
         from services.risk.drawdown_response import DrawdownResponseSystem
+
         dds = DrawdownResponseSystem()
 
         dds.update_equity(100000)
@@ -590,16 +594,17 @@ class TestRiskIntegration:
     def test_monitoring_catches_all_alerts(self):
         """Monitoring tüm kritik durumları yakalamalı."""
         from services.risk.monitoring import RiskMetricsSnapshot, RiskMonitor
+
         monitor = RiskMonitor()
 
         # Birden fazla kritik durum
         metrics = RiskMetricsSnapshot(
             timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
-            var_95=6000,      # VaR breach
-            cvar_95=10000,    # CVaR breach
+            var_95=6000,  # VaR breach
+            cvar_95=10000,  # CVaR breach
             portfolio_volatility=0.035,  # High vol
-            current_drawdown_pct=16.0,   # Drawdown critical
+            current_drawdown_pct=16.0,  # Drawdown critical
             max_drawdown_pct=16.0,
             daily_pnl=-6000,  # Daily loss
             daily_pnl_pct=-6.0,
@@ -608,7 +613,7 @@ class TestRiskIntegration:
             sector_concentration={"BANKING": 50},
             correlation_risk=0.8,
             regime="CRISIS",
-            risk_score=85,    # High risk score
+            risk_score=85,  # High risk score
         )
         alerts = monitor.check_metrics(metrics)
         # Birden fazla alert tetiklenmeli

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 class SurpriseConfig(BaseModel):
     """Macro surprise ayarları."""
+
     small_threshold: float = Field(default=0.05, description="Surprise küçük eşik (< %5)")
     medium_threshold: float = Field(default=0.10, description="Surprise orta eşik (%5-10)")
     large_threshold: float = Field(default=0.15, description="Surprise büyük eşik (> %10)")
@@ -22,6 +23,7 @@ class SurpriseConfig(BaseModel):
 
 class RegimeConfig(BaseModel):
     """Macro regime detection ayarları."""
+
     scoring_window_days: int = Field(default=20, description="Rejim skor penceresi (gün)")
     transition_smoothing: int = Field(default=3, description="Rejim geçiş smoothing (gün)")
     min_regime_duration_days: int = Field(default=5, description="Minimum rejim süresi (gün)")
@@ -38,6 +40,7 @@ class RegimeConfig(BaseModel):
 
 class SensitivityConfig(BaseModel):
     """Dynamic sensitivity ayarları."""
+
     rolling_window_days: int = Field(default=60, description="Rolling korelasyon penceresi (gün)")
     min_samples: int = Field(default=20, description="Minimum sample sayısı")
     significance_p_value: float = Field(default=0.05, description="Korelasyon anlamlılık p-value")
@@ -46,42 +49,49 @@ class SensitivityConfig(BaseModel):
 
 class StressTestConfig(BaseModel):
     """Stres testi ayarları."""
+
     max_scenario_shock_pct: float = Field(default=0.50, description="Maksimum senaryo şoku (%)")
     breaking_point_threshold_pct: float = Field(default=-0.10, description="Breaking point eşik (%)")
     custom_scenario_max_shocks: int = Field(default=10, description="Maksimum özel senaryo şoku sayısı")
 
     # Önceden tanımlı senaryolar
-    predefined_scenarios: dict[str, dict[str, float]] = Field(default={
-        "USDTRY_10_PCT": {"usdtry_change": 0.10},
-        "TCMB_RATE_HIKE_500BP": {"interest_rate_change": 0.05},
-        "VIX_SPIKE_50_PCT": {"vix_change": 0.50},
-        "OIL_SHOCK_20_PCT": {"oil_change": 0.20},
-        "GLOBAL_RISK_OFF": {"global_change": -0.10, "usdtry_change": 0.05},
-        "INFLATION_HIGH": {"inflation_change": 0.05},
-        "BIST_CRASH_10_PCT": {"bist_change": -0.10},
-    })
+    predefined_scenarios: dict[str, dict[str, float]] = Field(
+        default={
+            "USDTRY_10_PCT": {"usdtry_change": 0.10},
+            "TCMB_RATE_HIKE_500BP": {"interest_rate_change": 0.05},
+            "VIX_SPIKE_50_PCT": {"vix_change": 0.50},
+            "OIL_SHOCK_20_PCT": {"oil_change": 0.20},
+            "GLOBAL_RISK_OFF": {"global_change": -0.10, "usdtry_change": 0.05},
+            "INFLATION_HIGH": {"inflation_change": 0.05},
+            "BIST_CRASH_10_PCT": {"bist_change": -0.10},
+        }
+    )
 
 
 class CorrelationConfig(BaseModel):
     """Correlation tracking ayarları."""
+
     window_days: int = Field(default=60, description="Korelasyon penceresi (gün)")
     min_samples: int = Field(default=20, description="Minimum sample sayısı")
     breakdown_threshold: float = Field(default=0.3, description="Korelasyon bozulma eşiği")
     update_interval_hours: int = Field(default=24, description="Güncelleme aralığı (saat)")
 
     # Takip edilen korelasyon çiftleri
-    tracked_pairs: list = Field(default=[
-        ("usdtry", "gold"),
-        ("interest_rate", "inflation"),
-        ("vix", "bist100"),
-        ("oil", "energy_sector"),
-        ("sp500", "bist100"),
-        ("cds", "usdtry"),
-    ])
+    tracked_pairs: list = Field(
+        default=[
+            ("usdtry", "gold"),
+            ("interest_rate", "inflation"),
+            ("vix", "bist100"),
+            ("oil", "energy_sector"),
+            ("sp500", "bist100"),
+            ("cds", "usdtry"),
+        ]
+    )
 
 
 class CalendarConfig(BaseModel):
     """Calendar integration ayarları."""
+
     pre_event_alert_days: int = Field(default=3, description="Olay öncesi uyarı (gün)")
     post_event_analysis_hours: int = Field(default=24, description="Olay sonrası analiz (saat)")
     auto_trigger_enabled: bool = Field(default=True, description="Otomatik tetikleme aktif")
@@ -89,21 +99,25 @@ class CalendarConfig(BaseModel):
 
 class DecayConfig(BaseModel):
     """Decay model ayarları."""
+
     default_half_life_days: int = Field(default=5, description="Varsayılan half-life (gün)")
 
     # Şok türüne göre half-life
-    half_life_by_shock_type: dict[str, int] = Field(default={
-        "monetary_policy": 10,      # Para politikası sürprizi
-        "inflation_surprise": 7,    # Enflasyon sürprizi
-        "fx_shock": 5,             # Kur şoku
-        "global_risk_off": 3,       # Global risk-off
-        "commodity_shock": 5,       # Emtia şoku
-        "geopolitical": 14,         # Jeopolitik şok
-    })
+    half_life_by_shock_type: dict[str, int] = Field(
+        default={
+            "monetary_policy": 10,  # Para politikası sürprizi
+            "inflation_surprise": 7,  # Enflasyon sürprizi
+            "fx_shock": 5,  # Kur şoku
+            "global_risk_off": 3,  # Global risk-off
+            "commodity_shock": 5,  # Emtia şoku
+            "geopolitical": 14,  # Jeopolitik şok
+        }
+    )
 
 
 class HistoricalStoreConfig(BaseModel):
     """Historical data store ayarları."""
+
     storage_backend: str = Field(default="json", description="Depolama backend (json/duckdb/postgresql)")
     max_history_days: int = Field(default=1825, description="Maksimum geçmiş (5 yıl)")
     backfill_enabled: bool = Field(default=True, description="Backfill aktif")
@@ -125,10 +139,7 @@ class MacroConfig(BaseModel):
 
     # Genel ayarlar
     log_level: str = Field(default="INFO", description="Log seviyesi")
-    state_persistence_path: str = Field(
-        default="data/macro_state.json",
-        description="Macro state dosya yolu"
-    )
+    state_persistence_path: str = Field(default="data/macro_state.json", description="Macro state dosya yolu")
     enable_event_bus: bool = Field(default=True, description="Event bus aktif mi")
     enable_dynamic_sensitivity: bool = Field(default=True, description="Dynamic sensitivity aktif mi")
 
@@ -139,7 +150,7 @@ class MacroConfig(BaseModel):
         prefix = "MACRO_"
         for key, value in os.environ.items():
             if key.startswith(prefix):
-                parts = key[len(prefix):].lower().split("_")
+                parts = key[len(prefix) :].lower().split("_")
                 if len(parts) >= 2:
                     section = parts[0]
                     field = "_".join(parts[1:])

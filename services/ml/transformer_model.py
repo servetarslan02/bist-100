@@ -3,6 +3,7 @@
 PyTorch Transformer — multi-head attention, positional encoding,
 multi-horizon prediction, proper training loop.
 """
+
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -16,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class TransformerConfig:
     """Transformer konfigürasyonu."""
+
     input_size: int = 65
     d_model: int = 128
     nhead: int = 8
@@ -39,6 +41,7 @@ class PositionalEncoding:
     def __init__(self, d_model: int, max_len: int = 500):
         try:
             import torch
+
             pe = torch.zeros(max_len, d_model)
             position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
             div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
@@ -51,7 +54,7 @@ class PositionalEncoding:
     def __call__(self, x):
         if self.pe is None:
             return x
-        return x + self.pe[:, :x.size(1), :].to(x.device)
+        return x + self.pe[:, : x.size(1), :].to(x.device)
 
 
 class StockTransformer:
@@ -153,7 +156,7 @@ class StockTransformer:
 
             history.append({"epoch": epoch, "train_loss": round(train_loss, 6), "val_loss": round(val_loss, 6)})
 
-        if 'best_state' in locals():
+        if "best_state" in locals():
             self._model.load_state_dict(best_state)
 
         self._is_trained = True
@@ -169,10 +172,15 @@ class StockTransformer:
         if X_val_seq is not None:
             val_pred = self.predict(X_val)
             from sklearn.metrics import mean_squared_error
+
             try:
-                metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val[self._config.sequence_length:], val_pred))), 6)
+                metrics["val_rmse"] = round(
+                    float(np.sqrt(mean_squared_error(y_val[self._config.sequence_length :], val_pred))), 6
+                )
                 if len(np.unique(val_pred)) > 1:
-                    metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val[self._config.sequence_length:])[0, 1]), 4)
+                    metrics["val_ic"] = round(
+                        float(np.corrcoef(val_pred, y_val[self._config.sequence_length :])[0, 1]), 4
+                    )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="transformer_model.py:178")
 
@@ -186,6 +194,7 @@ class StockTransformer:
 
         try:
             import torch
+
             X_seq, _ = self._create_sequences(X, np.zeros(len(X)))
             if len(X_seq) == 0:
                 return np.zeros(len(X))
@@ -207,13 +216,14 @@ class StockTransformer:
         X_seq = []
         y_seq = []
         for i in range(len(X) - self._config.sequence_length):
-            X_seq.append(X[i:i + self._config.sequence_length])
+            X_seq.append(X[i : i + self._config.sequence_length])
             y_seq.append(y[i + self._config.sequence_length])
 
         return np.array(X_seq), np.array(y_seq)
 
     def _build_model(self, torch, nn):
         """PyTorch Transformer model oluştur."""
+
         class TransformerModel(nn.Module):
             def __init__(self_cfg, torch_mod, nn_mod):
                 super().__init__()
@@ -226,7 +236,9 @@ class StockTransformer:
                     dropout=self_cfg.dropout,
                     batch_first=True,
                 )
-                self.transformer_encoder = nn_mod.TransformerEncoder(encoder_layer, num_layers=self_cfg.num_encoder_layers)
+                self.transformer_encoder = nn_mod.TransformerEncoder(
+                    encoder_layer, num_layers=self_cfg.num_encoder_layers
+                )
                 self.fc = nn_mod.Sequential(
                     nn_mod.Linear(self_cfg.d_model, 64),
                     nn_mod.GELU(),
@@ -250,7 +262,15 @@ class StockTransformer:
         try:
             os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
             import torch
-            torch.save({"model_state": self._model.state_dict(), "config": self._config, "training_history": self._training_history}, path)
+
+            torch.save(
+                {
+                    "model_state": self._model.state_dict(),
+                    "config": self._config,
+                    "training_history": self._training_history,
+                },
+                path,
+            )
             return True
         except Exception as e:
             logger.error("transformer_save_failed", error=str(e))
@@ -259,6 +279,7 @@ class StockTransformer:
     def load(self, path: str) -> bool:
         try:
             import torch
+
             data = torch.load(path, map_location=self._config.device)
             self._config = data.get("config", self._config)
             self._training_history = data.get("training_history", [])

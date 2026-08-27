@@ -18,9 +18,16 @@ class EventImpactAssessment:
 
 
 class EventImpactEngine:
-    def assess(self, *, materiality: str, revenue_relevance: str,
-               cashflow_relevance: str, novelty: str,
-               uncertainty: str, horizon: str) -> EventImpactAssessment:
+    def assess(
+        self,
+        *,
+        materiality: str,
+        revenue_relevance: str,
+        cashflow_relevance: str,
+        novelty: str,
+        uncertainty: str,
+        horizon: str,
+    ) -> EventImpactAssessment:
         return EventImpactAssessment(
             materiality=materiality,
             revenue_relevance=revenue_relevance,

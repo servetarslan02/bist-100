@@ -83,14 +83,14 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
     current_prices = {}
     for ticker, df in market_data.items():
         if not df.empty:
-            current_prices[ticker] = float(df['Close'][-1])
+            current_prices[ticker] = float(df["Close"][-1])
 
     # 1. Mevcut portföy Mark-to-Market değerlemesi
     mtm_summary = paper_orchestrator.mark_to_market_cycle(current_prices, today_str)
 
     queued_signals = []
     if needs_rebalance:
-        common_dates = list(sorted([d.strftime('%Y-%m-%d') for d in bm_df.index]))
+        common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
         if len(common_dates) >= 2:
             train_start = common_dates[0]
             train_end = common_dates[-2]
@@ -110,8 +110,12 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                         df = market_data[tick]
                         df_past = df[df.index <= signal_date]
                         if len(df_past) >= 10:
-                            avg_vol = df_past['Volume'].tail(20).mean() if len(df_past) >= 20 else df_past['Volume'].mean()
-                            avg_close = df_past['Close'].tail(20).mean() if len(df_past) >= 20 else df_past['Close'].mean()
+                            avg_vol = (
+                                df_past["Volume"].tail(20).mean() if len(df_past) >= 20 else df_past["Volume"].mean()
+                            )
+                            avg_close = (
+                                df_past["Close"].tail(20).mean() if len(df_past) >= 20 else df_past["Close"].mean()
+                            )
                             if (avg_vol * avg_close) >= MIN_LIQUIDITY_TL:
                                 valid_preds.append(p)
 
@@ -163,7 +167,10 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                 try:
                     await pg_execute(
                         "INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime, is_rebalance) VALUES ($1, $2, $3, $4)",
-                        today_dt, orjson.dumps(top_10_tickers).decode(), False, True
+                        today_dt,
+                        orjson.dumps(top_10_tickers).decode(),
+                        False,
+                        True,
                     )
                 except Exception as e:
                     logger.error("DB Record Error", error=str(e))
@@ -197,7 +204,7 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
 
     bm_ret = 0.0
     if not bm_df.empty and len(bm_df) >= 2:
-        bm_ret = float((bm_df['Close'][-1] / bm_df['Close'][-2] - 1.0) * 100)
+        bm_ret = float((bm_df["Close"][-1] / bm_df["Close"][-2] - 1.0) * 100)
 
     # Bekleyen sinyalleri T+1 açılış fiyatları, KAP kısıtları ve sentetik derinlikle yürüt
     report = paper_orchestrator.execute_pending_signals(
@@ -223,6 +230,5 @@ async def run_unified_daily_cycle() -> dict[str, Any]:
         return await run_eod_signal_cycle()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(run_unified_daily_cycle())
-

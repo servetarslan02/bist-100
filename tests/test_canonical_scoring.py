@@ -18,60 +18,95 @@ import sys
 # HELPERS
 # =====================================================
 
+
 def _make_features():
     """Test feature seti — tüm motorlardan."""
     return {
         # Calculator
-        "rsi_14": 55.0, "rsi_5": 58.0,
-        "momentum_20d": 5.0, "roc_5d": 2.0, "roc_20d": 8.0, "roc_60d": 15.0,
-        "macd_hist": 0.5, "bb_position": 0.6,
-        "adx": 28.0, "atr_pct": 2.5,
-        "volume_zscore": 1.5, "volume_trend": 10.0,
-        "volatility_20d": 20.0, "realized_vol_20d": 18.0,
-        "price_vs_sma20": 2.0, "price_vs_sma50": 5.0,
+        "rsi_14": 55.0,
+        "rsi_5": 58.0,
+        "momentum_20d": 5.0,
+        "roc_5d": 2.0,
+        "roc_20d": 8.0,
+        "roc_60d": 15.0,
+        "macd_hist": 0.5,
+        "bb_position": 0.6,
+        "adx": 28.0,
+        "atr_pct": 2.5,
+        "volume_zscore": 1.5,
+        "volume_trend": 10.0,
+        "volatility_20d": 20.0,
+        "realized_vol_20d": 18.0,
+        "price_vs_sma20": 2.0,
+        "price_vs_sma50": 5.0,
         "obv": 1000000,
         # Motor 1
-        "rs_vs_bist_5d": 3.0, "rs_vs_sector_5d": 2.0, "rs_trend": 0.5,
+        "rs_vs_bist_5d": 3.0,
+        "rs_vs_sector_5d": 2.0,
+        "rs_trend": 0.5,
         "rs_peer_rank_5d": 0.8,
         # Motor 2
-        "trend_slope_20d": 0.3, "trend_r2_20d": 0.6,
-        "momentum_acceleration": 1.5, "momentum_accel_trend": 1.0,
-        "near_20d_high": 1.0, "drawdown_20d": 3.0,
+        "trend_slope_20d": 0.3,
+        "trend_r2_20d": 0.6,
+        "momentum_acceleration": 1.5,
+        "momentum_accel_trend": 1.0,
+        "near_20d_high": 1.0,
+        "drawdown_20d": 3.0,
         "breakout_failure_20d": 0.0,
         "recovery_strength_20d": 0.0,
         # Motor 3
-        "volume_percentile_20d": 0.8, "tick_rule_20d": 0.3,
-        "vwap_deviation_20d": 1.0, "volume_up_down_ratio_20d": 1.5,
+        "volume_percentile_20d": 0.8,
+        "tick_rule_20d": 0.3,
+        "vwap_deviation_20d": 1.0,
+        "volume_up_down_ratio_20d": 1.5,
         "avg_volume_5d": 200000,
         # Motor 4
-        "fcf_yield_pct": 5.0, "fcf_margin": 10.0,
-        "balance_sheet_quality": 75.0, "value_score": 60.0,
-        "quality_score": 55.0, "growth_score": 40.0,
-        "raw_roe": 0.15, "raw_roa": 0.10, "raw_profit_margin": 0.12,
+        "fcf_yield_pct": 5.0,
+        "fcf_margin": 10.0,
+        "balance_sheet_quality": 75.0,
+        "value_score": 60.0,
+        "quality_score": 55.0,
+        "growth_score": 40.0,
+        "raw_roe": 0.15,
+        "raw_roa": 0.10,
+        "raw_profit_margin": 0.12,
         # Motor 5
-        "kap_sentiment_avg": 0.5, "kap_sentiment_weighted": 0.5,
-        "news_sentiment_weighted": 0.3, "combined_sentiment": 0.42,
+        "kap_sentiment_avg": 0.5,
+        "kap_sentiment_weighted": 0.5,
+        "news_sentiment_weighted": 0.3,
+        "combined_sentiment": 0.42,
         "kap_avg_importance": 0.9,
         "sentiment_momentum": 0.2,
         # Motor 6
-        "catalyst_count": 2, "catalyst_importance": 0.9,
-        "catalyst_days_nearest": 5, "catalyst_time_decay_score": 0.7,
+        "catalyst_count": 2,
+        "catalyst_importance": 0.9,
+        "catalyst_days_nearest": 5,
+        "catalyst_time_decay_score": 0.7,
         # Motor 7
-        "is_falling_5d": 0.0, "falling_is_temporary": 0.5,
+        "is_falling_5d": 0.0,
+        "falling_is_temporary": 0.5,
         "catch_falling_knife_risk": 10.0,
         # Motor 8
-        "bb_zscore_20d": 0.5, "mean_reversion_signal": 0.0,
+        "bb_zscore_20d": 0.5,
+        "mean_reversion_signal": 0.0,
         "mean_reversion_strength": 0.0,
         # Motor 9
         "seasonality_current_month_avg": 0.3,
         "seasonality_current_month_win_rate": 0.6,
         "seasonality_current_quarter_avg": 1.5,
         # Aliases
-        "roe": 0.15, "roa": 0.10, "profit_margin_pct": 0.12,
-        "volume_percentile": 0.8, "tick_rule": 0.3, "vwap_deviation": 1.0,
-        "volume_up_down_ratio": 1.5, "rs_peer_rank": 0.8,
-        "recovery_strength": 0.0, "breakout_failure": 0.0,
-        "return_5d": 2.0, "return_20d": 8.0,
+        "roe": 0.15,
+        "roa": 0.10,
+        "profit_margin_pct": 0.12,
+        "volume_percentile": 0.8,
+        "tick_rule": 0.3,
+        "vwap_deviation": 1.0,
+        "volume_up_down_ratio": 1.5,
+        "rs_peer_rank": 0.8,
+        "recovery_strength": 0.0,
+        "breakout_failure": 0.0,
+        "return_5d": 2.0,
+        "return_20d": 8.0,
     }
 
 
@@ -79,9 +114,11 @@ def _make_features():
 # 1. CANONICAL SCORE VECTOR
 # =====================================================
 
+
 def test_score_vector_dimensions():
     """ScoreVector12 boyut üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     features = _make_features()
@@ -89,9 +126,18 @@ def test_score_vector_dimensions():
 
     dims = sv.to_dict()
     expected_dims = [
-        "technical", "momentum", "relative_strength", "volume",
-        "fundamental", "news_sentiment", "catalyst", "mean_reversion",
-        "seasonality", "market_regime", "risk", "data_quality",
+        "technical",
+        "momentum",
+        "relative_strength",
+        "volume",
+        "fundamental",
+        "news_sentiment",
+        "catalyst",
+        "mean_reversion",
+        "seasonality",
+        "market_regime",
+        "risk",
+        "data_quality",
     ]
 
     for dim in expected_dims:
@@ -106,6 +152,7 @@ def test_score_vector_dimensions():
 def test_all_motor_dimensions_nonzero():
     """Tüm motor boyutları gerçekten0'dan farklı değer üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     features = _make_features()
@@ -123,6 +170,7 @@ def test_all_motor_dimensions_nonzero():
 def test_seasonality_used():
     """Seasonality boyutu gerçekten kullanılıyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     # Seasonality feature'ları var
@@ -144,9 +192,11 @@ def test_seasonality_used():
 # 2. MISSING FEATURE HANDLING
 # =====================================================
 
+
 def test_missing_not_zero():
     """Eksik feature otomatik0'a dönüşmemeli."""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     # Boş feature seti
@@ -167,6 +217,7 @@ def test_missing_not_zero():
 def test_data_quality_score():
     """Veri kalitesi skoru feature availability'ye bağlı mı?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     # Tam veri
@@ -185,9 +236,11 @@ def test_data_quality_score():
 # 3. RISK vs OPPORTUNITY SEPARATION
 # =====================================================
 
+
 def test_risk_opportunity_separate():
     """Risk ve opportunity ayrı kavramlar mı?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     # Yüksek fırsat + yüksek risk
@@ -217,10 +270,12 @@ def test_risk_opportunity_separate():
 # 4. DECISION ENGINE — TEK KARAR NOKTASI
 # =====================================================
 
+
 def test_decision_from_canonical():
     """Decision Engine canonical score'dan karar üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
+
     issues = []
 
     features = _make_features()
@@ -247,6 +302,7 @@ def test_decision_is_deterministic():
     """Aynı input → aynı karar (deterministic)."""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
+
     issues = []
 
     features = _make_features()
@@ -271,6 +327,7 @@ def test_decision_blocks_high_risk():
     """Yüksek riskli durumda BUY engelleniyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
+
     issues = []
 
     features = _make_features()
@@ -292,6 +349,7 @@ def test_decision_low_confidence():
     """Düşük confidence ile NO_ACTION üretiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
+
     issues = []
 
     # Çok az feature → düşük confidence
@@ -312,9 +370,11 @@ def test_decision_low_confidence():
 # 5. REGIME EFFECT
 # =====================================================
 
+
 def test_regime_changes_scoring():
     """Rejim değişince skor değişiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
+
     issues = []
 
     features = _make_features()
@@ -338,9 +398,11 @@ def test_regime_changes_scoring():
 # 6. BACKWARD COMPATIBILITY
 # =====================================================
 
+
 def test_existing_ranking_unchanged():
     """Mevcut ranking model hala çalışıyor mu?"""
     from services.ml.ranking_model import ranking_model
+
     issues = []
 
     features_map = {"TEST": _make_features(), "TEST2": _make_features()}
@@ -358,12 +420,15 @@ def test_existing_ranking_unchanged():
 def test_existing_decision_input_still_works():
     """Mevcut DecisionInput API'si hala çalışıyor mu?"""
     from services.core.decision_engine import DecisionEngine, DecisionInput
+
     issues = []
 
     engine = DecisionEngine()
     inp = DecisionInput(
-        ticker="TEST", price=100.0,
-        ml_score=70, ml_confidence=0.8,
+        ticker="TEST",
+        price=100.0,
+        ml_score=70,
+        ml_confidence=0.8,
         features={"momentum_20d": 5, "rsi_14": 55},
     )
 
@@ -380,6 +445,7 @@ def test_existing_decision_input_still_works():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -411,6 +477,7 @@ def run_all():
         except Exception as e:
             name, ok, issues = test_func.__name__, False, [f"Exception: {e}"]
             import traceback
+
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"

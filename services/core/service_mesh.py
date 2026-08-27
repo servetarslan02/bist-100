@@ -49,6 +49,7 @@ class ServiceStatus(Enum):
 @dataclass
 class ServiceInfo:
     """Kayıtlı servis bilgisi."""
+
     name: str
     host: str
     port: int
@@ -129,6 +130,7 @@ class ServiceDiscovery:
 
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"http://{service.address}/health")
                 if resp.status_code == 200:
@@ -196,18 +198,16 @@ class ServiceDiscovery:
     async def start_monitoring(self):
         """Arka planda servis sağlık takibi başlat."""
         self._running = True
-        logger.info("Service discovery monitoring started",
-                    services=len(self._services),
-                    interval=self._health_check_interval)
+        logger.info(
+            "Service discovery monitoring started", services=len(self._services), interval=self._health_check_interval
+        )
 
         while self._running:
             try:
                 results = await self.check_all_health()
-                unhealthy = [k for k, v in results.items()
-                           if v == ServiceStatus.UNHEALTHY]
+                unhealthy = [k for k, v in results.items() if v == ServiceStatus.UNHEALTHY]
                 if unhealthy:
-                    logger.warning("Unhealthy services detected",
-                                 services=unhealthy)
+                    logger.warning("Unhealthy services detected", services=unhealthy)
             except Exception as e:
                 logger.debug("Health check cycle error", error=str(e))
 
@@ -248,10 +248,12 @@ class ServiceDiscovery:
 
             key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-            subject = issuer = x509.Name([
-                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ALPHA BIST"),
-                x509.NameAttribute(NameOID.COMMON_NAME, "ALPHA BIST CA"),
-            ])
+            subject = issuer = x509.Name(
+                [
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ALPHA BIST"),
+                    x509.NameAttribute(NameOID.COMMON_NAME, "ALPHA BIST CA"),
+                ]
+            )
 
             cert = (
                 x509.CertificateBuilder()
@@ -266,11 +268,13 @@ class ServiceDiscovery:
             )
 
             with open(ca_key_path, "wb") as f:
-                f.write(key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.TraditionalOpenSSL,
-                    encryption_algorithm=serialization.NoEncryption(),
-                ))
+                f.write(
+                    key.private_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PrivateFormat.TraditionalOpenSSL,
+                        encryption_algorithm=serialization.NoEncryption(),
+                    )
+                )
 
             with open(ca_cert_path, "wb") as f:
                 f.write(cert.public_bytes(serialization.Encoding.PEM))

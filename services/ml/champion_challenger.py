@@ -3,6 +3,7 @@
 Shadow mode, multi-metric A/B test, auto-promote/reject,
 rollback, multi-metric comparison, detailed reporting.
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class ABTestResult:
     """A/B test sonucu."""
+
     champion_metric: float
     challenger_metric: float
     p_value: float
@@ -32,6 +34,7 @@ class ABTestResult:
 @dataclass
 class MultiMetricResult:
     """Çoklu metrik karşılaştırma sonucu."""
+
     metric_name: str
     champion_value: float
     challenger_value: float
@@ -42,6 +45,7 @@ class MultiMetricResult:
 @dataclass
 class PromotionDecision:
     """Promote/reject kararı."""
+
     should_promote: bool
     reason: str
     ab_results: dict[str, ABTestResult]
@@ -137,14 +141,13 @@ class ChampionChallenger:
         chall_mean = float(np.mean(challenger_metrics))
 
         # Cohen's d (effect size)
-        pooled_std = np.sqrt(
-            (np.std(champion_metrics) ** 2 + np.std(challenger_metrics) ** 2) / 2
-        )
+        pooled_std = np.sqrt((np.std(champion_metrics) ** 2 + np.std(challenger_metrics) ** 2) / 2)
         effect_size = (chall_mean - champ_mean) / max(pooled_std, 1e-8)
 
         # Statistical power (approximation)
         try:
             from scipy.stats import norm
+
             z_alpha = norm.ppf(1 - self.significance_level / 2)
             ncp = abs(effect_size) * np.sqrt(n_champ * n_chall / (n_champ + n_chall))
             power = 1 - norm.cdf(z_alpha - ncp) + norm.cdf(-z_alpha - ncp)
@@ -198,13 +201,15 @@ class ChampionChallenger:
             # Improvement percentage
             improvement = ((chall_mean - champ_mean) / max(abs(champ_mean), 1e-8)) * 100
 
-            results.append(MultiMetricResult(
-                metric_name=metric,
-                champion_value=round(champ_mean, 4),
-                challenger_value=round(chall_mean, 4),
-                winner=winner,
-                improvement_pct=round(improvement, 2),
-            ))
+            results.append(
+                MultiMetricResult(
+                    metric_name=metric,
+                    champion_value=round(champ_mean, 4),
+                    challenger_value=round(chall_mean, 4),
+                    winner=winner,
+                    improvement_pct=round(improvement, 2),
+                )
+            )
 
         return results
 
@@ -241,14 +246,12 @@ class ChampionChallenger:
 
         # Significant improvements
         significant_improvements = sum(
-            1 for metric, ab in ab_results.items()
-            if ab.winner == "challenger" and ab.significant
+            1 for metric, ab in ab_results.items() if ab.winner == "challenger" and ab.significant
         )
 
         # Significant regressions
         significant_regressions = sum(
-            1 for metric, ab in ab_results.items()
-            if ab.winner == "champion" and ab.significant
+            1 for metric, ab in ab_results.items() if ab.winner == "champion" and ab.significant
         )
 
         # Overall winner
@@ -264,9 +267,7 @@ class ChampionChallenger:
 
         # Promote decision
         should_promote = (
-            overall_winner == "challenger"
-            and significant_improvements >= 1
-            and significant_regressions == 0
+            overall_winner == "challenger" and significant_improvements >= 1 and significant_regressions == 0
         )
 
         # Reason
@@ -289,13 +290,15 @@ class ChampionChallenger:
         )
 
         # History
-        self._history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "challenger_key": challenger_key,
-            "decision": decision.should_promote,
-            "reason": decision.reason,
-            "confidence": decision.confidence,
-        })
+        self._history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "challenger_key": challenger_key,
+                "decision": decision.should_promote,
+                "reason": decision.reason,
+                "confidence": decision.confidence,
+            }
+        )
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
 

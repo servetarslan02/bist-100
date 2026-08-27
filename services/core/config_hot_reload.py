@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 @dataclass
 class ConfigChange:
     """Config değişiklik kaydı."""
+
     change_id: str
     timestamp: datetime
     file_path: str
@@ -114,17 +115,14 @@ class ConfigHotReload:
     async def start(self):
         """İzlemeyi başlat."""
         if not self._config_path.exists():
-            logger.warning("Config file not found, creating empty",
-                          path=str(self._config_path))
+            logger.warning("Config file not found, creating empty", path=str(self._config_path))
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
             self._config_path.write_text("{}")
 
         self._running = True
         self._load_config()
 
-        logger.info("Config hot-reload started",
-                    path=str(self._config_path),
-                    interval=self._watch_interval)
+        logger.info("Config hot-reload started", path=str(self._config_path), interval=self._watch_interval)
 
         while self._running:
             try:
@@ -176,9 +174,7 @@ class ConfigHotReload:
                 return
 
             # Change detected
-            logger.info("Config change detected",
-                       old_hash=self._last_hash[:12],
-                       new_hash=current_hash[:12])
+            logger.info("Config change detected", old_hash=self._last_hash[:12], new_hash=current_hash[:12])
 
             old_config = self._current_config.copy()
             old_hash = self._last_hash
@@ -192,10 +188,8 @@ class ConfigHotReload:
             if self._validate_before_apply:
                 is_valid, error = self._validate_config(new_config)
                 if not is_valid:
-                    logger.error("Config validation failed, not applying",
-                               error=error)
-                    self._record_change(old_hash, current_hash, changed_keys,
-                                       applied=False, error=error)
+                    logger.error("Config validation failed, not applying", error=error)
+                    self._record_change(old_hash, current_hash, changed_keys, applied=False, error=error)
                     return
 
             # Apply
@@ -256,9 +250,7 @@ class ConfigHotReload:
                 else:
                     callback(old_config, new_config, changed_keys)
             except Exception as e:
-                logger.error("Config callback error",
-                           callback=callback.__name__,
-                           error=str(e))
+                logger.error("Config callback error", callback=callback.__name__, error=str(e))
 
     def _record_change(
         self,
@@ -270,9 +262,8 @@ class ConfigHotReload:
     ):
         """Değişiklik kaydet."""
         import hashlib as hl
-        change_id = hl.md5(
-            f"{new_hash}_{time.time()}".encode()
-        ).hexdigest()[:12]
+
+        change_id = hl.md5(f"{new_hash}_{time.time()}".encode()).hexdigest()[:12]
 
         change = ConfigChange(
             change_id=change_id,
@@ -287,7 +278,7 @@ class ConfigHotReload:
 
         self._change_history.append(change)
         if len(self._change_history) > self._max_history:
-            self._change_history = self._change_history[-self._max_history:]
+            self._change_history = self._change_history[-self._max_history :]
 
     def get_current_config(self) -> dict[str, Any]:
         """Mevcut config'i döndür."""
@@ -324,12 +315,14 @@ def _create_singleton() -> "ConfigHotReload":
     # Yoksa varsayılan oluştur (start() zamanında yaratılacak)
     return ConfigHotReload("config/runtime.json")
 
+
 config_hot_reload = _create_singleton()
 
 
 # ═══════════════════════════════════════════════════════════
 # Settings Bridge — Pydantic Settings + Hot-Reload Entegrasyonu
 # ═══════════════════════════════════════════════════════════
+
 
 class SettingsBridge:
     """
@@ -359,31 +352,56 @@ class SettingsBridge:
 
     # JSON'dan yüklenebilecek güvenli alanlar (secret olmayan)
     _SAFE_FIELDS = {
-        "app_debug", "app_host", "app_port",
-        "interval_feature_calculation", "interval_live_inference",
-        "interval_health_check", "interval_market_data", "interval_ranking",
-        "breadth_mcclellan_ema_short", "breadth_mcclellan_ema_long",
-        "breadth_thrust_threshold", "breadth_liquidity_volume_min",
-        "regime_hmm_weight", "regime_score_weight", "regime_gmm_weight",
-        "regime_rolling_window", "regime_confidence_min",
+        "app_debug",
+        "app_host",
+        "app_port",
+        "interval_feature_calculation",
+        "interval_live_inference",
+        "interval_health_check",
+        "interval_market_data",
+        "interval_ranking",
+        "breadth_mcclellan_ema_short",
+        "breadth_mcclellan_ema_long",
+        "breadth_thrust_threshold",
+        "breadth_liquidity_volume_min",
+        "regime_hmm_weight",
+        "regime_score_weight",
+        "regime_gmm_weight",
+        "regime_rolling_window",
+        "regime_confidence_min",
         "regime_transition_stability_window",
-        "risk_appetite_breadth_weight", "risk_appetite_momentum_weight",
-        "risk_appetite_volatility_weight", "risk_appetite_rsi_weight",
-        "risk_appetite_sentiment_weight", "risk_appetite_macro_weight",
-        "multi_tf_intraday_interval", "multi_tf_daily_interval",
-        "multi_tf_weekly_interval", "multi_tf_monthly_interval",
-        "liquidity_spread_threshold", "liquidity_volume_participation_min",
-        "sentiment_news_weight", "sentiment_social_weight",
+        "risk_appetite_breadth_weight",
+        "risk_appetite_momentum_weight",
+        "risk_appetite_volatility_weight",
+        "risk_appetite_rsi_weight",
+        "risk_appetite_sentiment_weight",
+        "risk_appetite_macro_weight",
+        "multi_tf_intraday_interval",
+        "multi_tf_daily_interval",
+        "multi_tf_weekly_interval",
+        "multi_tf_monthly_interval",
+        "liquidity_spread_threshold",
+        "liquidity_volume_participation_min",
+        "sentiment_news_weight",
+        "sentiment_social_weight",
         "sentiment_options_weight",
-        "db_pool_min", "db_pool_max", "db_command_timeout",
+        "db_pool_min",
+        "db_pool_max",
+        "db_command_timeout",
     }
 
     # Secret alanlar — ASLA JSON'dan yüklenmez
     _SECRET_FIELDS = {
-        "secret_key", "jwt_secret", "postgres_password",
-        "redis_password", "clickhouse_password",
-        "broker_api_key", "broker_api_secret",
-        "tcmb_evds_api_key", "news_api_key", "alpha_vantage_key",
+        "secret_key",
+        "jwt_secret",
+        "postgres_password",
+        "redis_password",
+        "clickhouse_password",
+        "broker_api_key",
+        "broker_api_secret",
+        "tcmb_evds_api_key",
+        "news_api_key",
+        "alpha_vantage_key",
         "kap_api_key",
     }
 
@@ -429,10 +447,7 @@ class SettingsBridge:
         import services.core.config as config_module
 
         # Sadece güvenli alanları filtrele
-        safe_changes = {
-            k: v for k, v in new_config.items()
-            if k.lower() in self._SAFE_FIELDS
-        }
+        safe_changes = {k: v for k, v in new_config.items() if k.lower() in self._SAFE_FIELDS}
 
         if not safe_changes:
             logger.info("No safe fields to update in Settings")
@@ -457,7 +472,7 @@ class SettingsBridge:
             # Geçmişe kaydet
             self._settings_history.append((datetime.now(UTC), safe_changes))
             if len(self._settings_history) > self._max_history:
-                self._settings_history = self._settings_history[-self._max_history:]
+                self._settings_history = self._settings_history[-self._max_history :]
 
             logger.info(
                 "Settings updated via hot-reload",
@@ -475,10 +490,7 @@ class SettingsBridge:
 
     def get_settings_history(self) -> list[dict[str, Any]]:
         """Settings değişiklik geçmişi."""
-        return [
-            {"timestamp": ts.isoformat(), "changes": changes}
-            for ts, changes in self._settings_history
-        ]
+        return [{"timestamp": ts.isoformat(), "changes": changes} for ts, changes in self._settings_history]
 
     @staticmethod
     def get_safe_fields() -> set:

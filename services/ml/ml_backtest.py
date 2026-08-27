@@ -4,6 +4,7 @@ Model predictions → backtest engine entegrasyonu.
 Ensemble vs single model karşılaştırması, regime-based performans analizi,
 transaction cost dahil backtest.
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class BacktestTrade:
     """Backtest işlem kaydı."""
+
     timestamp: str
     ticker: str
     side: str  # BUY / SELL
@@ -33,6 +35,7 @@ class BacktestTrade:
 @dataclass
 class BacktestResult:
     """Backtest sonucu."""
+
     model_name: str
     total_return: float
     annualized_return: float
@@ -52,6 +55,7 @@ class BacktestResult:
 @dataclass
 class ComparisonResult:
     """Model karşılaştırma sonucu."""
+
     models: list[BacktestResult]
     best_model: str
     ranking_metric: str
@@ -72,10 +76,10 @@ class MLBacktestEngine:
     def __init__(
         self,
         initial_capital: float = 100_000,
-        commission_rate: float = 0.001,   # %0.1
-        slippage_rate: float = 0.0005,    # %0.05
-        max_position_pct: float = 0.10,   # %10
-        risk_free_rate: float = 0.0,      # Risksiz faiz
+        commission_rate: float = 0.001,  # %0.1
+        slippage_rate: float = 0.0005,  # %0.05
+        max_position_pct: float = 0.10,  # %10
+        risk_free_rate: float = 0.0,  # Risksiz faiz
         annualization_factor: int = 252,  # İş günü
     ):
         self.initial_capital = initial_capital
@@ -89,10 +93,10 @@ class MLBacktestEngine:
         self,
         model_name: str,
         predict_fn: Callable,
-        price_data: dict[str, np.ndarray],     # {ticker: prices}
-        feature_data: dict[str, np.ndarray],    # {ticker: features}
-        dates: list[str],                       # Tarih listesi
-        regimes: list[str] | None = None,    # Rejim etiketleri
+        price_data: dict[str, np.ndarray],  # {ticker: prices}
+        feature_data: dict[str, np.ndarray],  # {ticker: features}
+        dates: list[str],  # Tarih listesi
+        regimes: list[str] | None = None,  # Rejim etiketleri
         tickers: list[str] | None = None,
     ) -> BacktestResult:
         """Tek model için backtest çalıştır.
@@ -139,9 +143,9 @@ class MLBacktestEngine:
                     continue
 
                 try:
-                    X = feats[day_idx:day_idx + 1]
+                    X = feats[day_idx : day_idx + 1]
                     pred = predict_fn(X)
-                    scores[ticker] = float(pred[0]) if hasattr(pred, '__len__') else float(pred)
+                    scores[ticker] = float(pred[0]) if hasattr(pred, "__len__") else float(pred)
                 except Exception as e:
                     logger.debug("Handled exception, continuing", error=str(e))
                     continue
@@ -165,18 +169,20 @@ class MLBacktestEngine:
                         pnl = (sell_price - pos["entry_price"]) * pos["qty"] - commission
                         capital += sell_price * pos["qty"] - commission
 
-                        trades.append(BacktestTrade(
-                            timestamp=date,
-                            ticker=ticker,
-                            side="SELL",
-                            price=sell_price,
-                            quantity=pos["qty"],
-                            signal_score=scores[ticker],
-                            model_name=model_name,
-                            commission=commission,
-                            slippage=sell_price * self.slippage_rate * pos["qty"],
-                            pnl=pnl,
-                        ))
+                        trades.append(
+                            BacktestTrade(
+                                timestamp=date,
+                                ticker=ticker,
+                                side="SELL",
+                                price=sell_price,
+                                quantity=pos["qty"],
+                                signal_score=scores[ticker],
+                                model_name=model_name,
+                                commission=commission,
+                                slippage=sell_price * self.slippage_rate * pos["qty"],
+                                pnl=pnl,
+                            )
+                        )
 
                         regime_perf[regime].append(pnl)
                         del positions[ticker]
@@ -221,17 +227,19 @@ class MLBacktestEngine:
                         "entry_date": date,
                     }
 
-                    trades.append(BacktestTrade(
-                        timestamp=date,
-                        ticker=ticker,
-                        side="BUY",
-                        price=buy_price,
-                        quantity=qty,
-                        signal_score=score,
-                        model_name=model_name,
-                        commission=commission,
-                        slippage=buy_price * self.slippage_rate * qty,
-                    ))
+                    trades.append(
+                        BacktestTrade(
+                            timestamp=date,
+                            ticker=ticker,
+                            side="BUY",
+                            price=buy_price,
+                            quantity=qty,
+                            signal_score=score,
+                            model_name=model_name,
+                            commission=commission,
+                            slippage=buy_price * self.slippage_rate * qty,
+                        )
+                    )
 
             # Portfolio değeri
             portfolio_value = capital
@@ -352,7 +360,9 @@ class MLBacktestEngine:
         # Sharpe ratio
         mean_daily = float(np.mean(daily_returns))
         std_daily = float(np.std(daily_returns))
-        sharpe = ((mean_daily - self.risk_free_rate / self.annualization_factor) / max(std_daily, 1e-8)) * np.sqrt(self.annualization_factor)
+        sharpe = ((mean_daily - self.risk_free_rate / self.annualization_factor) / max(std_daily, 1e-8)) * np.sqrt(
+            self.annualization_factor
+        )
 
         # Max drawdown
         running_max = np.maximum.accumulate(values)

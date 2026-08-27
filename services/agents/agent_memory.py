@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class MemoryEntry:
     """Tek hafıza kaydı."""
+
     task_id: str
     agent_role: str
     ticker: str
@@ -63,7 +64,7 @@ class WorkingMemory:
         """Görev ekle."""
         self.items.append(entry)
         if len(self.items) > self.max_items:
-            self.items = self.items[-self.max_items:]
+            self.items = self.items[-self.max_items :]
 
     def get_recent(
         self,
@@ -117,7 +118,7 @@ class EpisodicMemory:
         if entry.confidence > 0.6 or entry.direction == "NO_TRADE":
             self.episodes.append(entry)
             if len(self.episodes) > self.max_items:
-                self.episodes = self.episodes[-self.max_items:]
+                self.episodes = self.episodes[-self.max_items :]
 
     def record_outcome(
         self,
@@ -127,17 +128,12 @@ class EpisodicMemory:
         holding_days: int = 1,
     ):
         """Sonuç kaydet — accuracy tracking."""
-        episode = next(
-            (e for e in self.episodes if e.task_id == task_id), None
-        )
+        episode = next((e for e in self.episodes if e.task_id == task_id), None)
         if not episode:
             return
 
         predicted = episode.direction
-        correct = (
-            (predicted == "LONG" and actual_return > 0) or
-            (predicted == "SHORT" and actual_return < 0)
-        )
+        correct = (predicted == "LONG" and actual_return > 0) or (predicted == "SHORT" and actual_return < 0)
 
         self.outcomes[task_id] = {
             "predicted": predicted,
@@ -213,24 +209,21 @@ class EpisodicMemory:
         calibration = []
 
         for low, high in bins:
-            matching_episodes = [
-                e for e in self.episodes
-                if low <= e.confidence < high
-                and e.task_id in self.outcomes
-            ]
+            matching_episodes = [e for e in self.episodes if low <= e.confidence < high and e.task_id in self.outcomes]
             if matching_episodes:
                 avg_conf = sum(e.confidence for e in matching_episodes) / len(matching_episodes)
-                actual_acc = sum(
-                    1 for e in matching_episodes
-                    if self.outcomes[e.task_id]["correct"]
-                ) / len(matching_episodes)
-                calibration.append({
-                    "bin": f"{low:.1f}-{high:.1f}",
-                    "avg_confidence": round(avg_conf, 4),
-                    "actual_accuracy": round(actual_acc, 4),
-                    "miscalibration": round(abs(avg_conf - actual_acc), 4),
-                    "count": len(matching_episodes),
-                })
+                actual_acc = sum(1 for e in matching_episodes if self.outcomes[e.task_id]["correct"]) / len(
+                    matching_episodes
+                )
+                calibration.append(
+                    {
+                        "bin": f"{low:.1f}-{high:.1f}",
+                        "avg_confidence": round(avg_conf, 4),
+                        "actual_accuracy": round(actual_acc, 4),
+                        "miscalibration": round(abs(avg_conf - actual_acc), 4),
+                        "count": len(matching_episodes),
+                    }
+                )
 
         return {"calibrated": True, "calibration": calibration}
 
@@ -309,10 +302,7 @@ class SemanticMemory:
     def prune_low_accuracy(self, threshold: float = 0.4):
         """Düşük doğruluklu kalıpları temizle."""
         for ticker in list(self.patterns.keys()):
-            self.patterns[ticker] = [
-                p for p in self.patterns[ticker]
-                if p.get("accuracy", 0.5) >= threshold
-            ]
+            self.patterns[ticker] = [p for p in self.patterns[ticker] if p.get("accuracy", 0.5) >= threshold]
 
     def to_dict(self) -> dict:
         return {
@@ -385,12 +375,8 @@ class AgentMemory:
     ) -> dict[str, Any]:
         """Yeni görev için bağlam oluştur."""
         return {
-            "recent_tasks": [
-                e.to_dict() for e in self.working.get_recent(ticker, limit=5)
-            ],
-            "similar_events": [
-                e.to_dict() for e in self.episodic.get_similar(ticker, limit=3)
-            ],
+            "recent_tasks": [e.to_dict() for e in self.working.get_recent(ticker, limit=5)],
+            "similar_events": [e.to_dict() for e in self.episodic.get_similar(ticker, limit=3)],
             "learned_patterns": self.semantic.get_patterns(ticker, regime, limit=3),
             "accuracy": self.episodic.get_accuracy(),
             "accuracy_by_regime": self.episodic.get_accuracy_by_regime(),
@@ -484,10 +470,7 @@ class MemoryConsolidator:
 
         # 1. Düşük güvenli working memory'yi temizle
         old_count = len(memory.working.items)
-        memory.working.items = [
-            e for e in memory.working.items
-            if e.confidence > 0.3
-        ]
+        memory.working.items = [e for e in memory.working.items if e.confidence > 0.3]
         cleaned = old_count - len(memory.working.items)
 
         # 2. Semantic memory'den düşük doğruluklu kalıpları temizle

@@ -23,18 +23,34 @@ from services.backtest.multi_asset_engine import (
 def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1"):
     """D günü sinyal üretilir (score=80 → BUY), D+1 günü execution olur."""
     dates = pl.Series(["2024-01-01", "2024-01-02"])
-    market_data = pl.DataFrame([
-        {"date": dates[0], "ticker": ticker, "open": d0_close * 0.99,
-         "high": d0_close * 1.01, "low": d0_close * 0.98,
-         "close": d0_close, "volume": d0_volume},
-        {"date": dates[1], "ticker": ticker, "open": d1_open,
-         "high": d1_open * 1.01, "low": d1_open * 0.98,
-         "close": d1_open, "volume": d1_volume},
-    ])
-    signal_data = pl.DataFrame([
-        {"date": dates[0], "ticker": ticker, "score": 80.0, "confidence": 0.8},
-        {"date": dates[1], "ticker": ticker, "score": 50.0, "confidence": 0.5},
-    ])
+    market_data = pl.DataFrame(
+        [
+            {
+                "date": dates[0],
+                "ticker": ticker,
+                "open": d0_close * 0.99,
+                "high": d0_close * 1.01,
+                "low": d0_close * 0.98,
+                "close": d0_close,
+                "volume": d0_volume,
+            },
+            {
+                "date": dates[1],
+                "ticker": ticker,
+                "open": d1_open,
+                "high": d1_open * 1.01,
+                "low": d1_open * 0.98,
+                "close": d1_open,
+                "volume": d1_volume,
+            },
+        ]
+    )
+    signal_data = pl.DataFrame(
+        [
+            {"date": dates[0], "ticker": ticker, "score": 80.0, "confidence": 0.8},
+            {"date": dates[1], "ticker": ticker, "score": 50.0, "confidence": 0.5},
+        ]
+    )
     sector_map = {ticker: "test_sector"}
     return market_data, signal_data, sector_map
 
@@ -45,12 +61,15 @@ class TestLiquidityConstraint:
     def test_large_order_capped_by_daily_volume(self):
         """Doğal pozisyon büyüklüğü hacmin %10'unu aşıyorsa, emir kısılmalı."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=500, d1_open=101.0, d1_volume=500,
+            d0_close=100.0,
+            d0_volume=500,
+            d1_open=101.0,
+            d1_volume=500,
         )
         config = MultiAssetConfig(
             initial_capital=1_000_000.0,
             max_positions=5,
-            max_position_pct=10.0,          # naif hedef: ~9,900 TL / 101 ≈ 990 adet
+            max_position_pct=10.0,  # naif hedef: ~9,900 TL / 101 ≈ 990 adet
             max_volume_participation_pct=10.0,  # kısıt: 500 * %10 = 50 adet
             gap_limit_pct=10.0,
             enable_bias_detection=False,
@@ -61,15 +80,17 @@ class TestLiquidityConstraint:
         buys = [t for t in result.trade_log if t["side"] == "BUY"]
         assert len(buys) == 1, "Hacim düşük olsa da likit bir miktar alınabilmeli"
         assert buys[0]["quantity"] <= 50, (
-            f"Likidite kısıtı çalışmıyor: {buys[0]['quantity']} adet, "
-            f"günlük hacmin %10'u olan 50'yi aşmamalı"
+            f"Likidite kısıtı çalışmıyor: {buys[0]['quantity']} adet, günlük hacmin %10'u olan 50'yi aşmamalı"
         )
         assert buys[0]["quantity"] > 0
 
     def test_zero_volume_skips_trade_entirely(self):
         """Hacim verisi 0/yoksa emir hiç gerçekleşmemeli (güvenli taraf)."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=0, d1_open=101.0, d1_volume=0,
+            d0_close=100.0,
+            d0_volume=0,
+            d1_open=101.0,
+            d1_volume=0,
         )
         config = MultiAssetConfig(
             initial_capital=1_000_000.0,
@@ -86,13 +107,16 @@ class TestLiquidityConstraint:
     def test_participation_limit_disabled_when_zero(self):
         """max_volume_participation_pct=0 kısıtı tamamen kapatmalı (geriye dönük uyumluluk)."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=500, d1_open=101.0, d1_volume=500,
+            d0_close=100.0,
+            d0_volume=500,
+            d1_open=101.0,
+            d1_volume=500,
         )
         config = MultiAssetConfig(
             initial_capital=1_000_000.0,
             max_position_pct=10.0,
             max_volume_participation_pct=0.0,  # kısıt kapalı
-            gap_limit_pct=0.0,                 # gap kontrolü de kapalı
+            gap_limit_pct=0.0,  # gap kontrolü de kapalı
             enable_bias_detection=False,
         )
         engine = MultiAssetBacktestEngine(config=config)
@@ -111,7 +135,8 @@ class TestGapRisk:
         """Açılış, önceki kapanışa göre %10'u aşan bir sıçrama yapıyorsa
         emir gerçekleşmemeli (limit kilidi varsayımı)."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=10_000_000,
+            d0_close=100.0,
+            d0_volume=10_000_000,
             d1_open=115.0,  # %15 gap - %10 bandını aşıyor
             d1_volume=10_000_000,
         )
@@ -130,7 +155,8 @@ class TestGapRisk:
     def test_small_gap_allows_trade(self):
         """Bandın içindeki normal bir açılış farkında işlem gerçekleşmeli."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=10_000_000,
+            d0_close=100.0,
+            d0_volume=10_000_000,
             d1_open=103.0,  # %3 gap - bandın içinde
             d1_volume=10_000_000,
         )
@@ -150,7 +176,8 @@ class TestGapRisk:
     def test_gap_check_disabled_when_zero(self):
         """gap_limit_pct=0 kontrolü tamamen kapatmalı."""
         market_data, signal_data, sector_map = _make_two_day_data(
-            d0_close=100.0, d0_volume=10_000_000,
+            d0_close=100.0,
+            d0_volume=10_000_000,
             d1_open=130.0,  # %30 gap - normalde kilitlenirdi
             d1_volume=10_000_000,
         )

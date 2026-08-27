@@ -102,26 +102,30 @@ def get_upcoming_events(days: int = 7) -> list[dict[str, Any]]:
     tcmb_dates = _get_tcmb_dates(year=now.year)
     for date in tcmb_dates:
         if now.date() <= date.date() <= (now + timedelta(days=days)).date():
-            upcoming.append({
-                "event_type": "TCMB_PPK",
-                "date": date.strftime("%Y-%m-%d"),
-                "description": MACRO_EVENTS["TCMB_PPK"]["description"],
-                "impact": MACRO_EVENTS["TCMB_PPK"]["impact"],
-                "days_until": (date.date() - now.date()).days,
-            })
+            upcoming.append(
+                {
+                    "event_type": "TCMB_PPK",
+                    "date": date.strftime("%Y-%m-%d"),
+                    "description": MACRO_EVENTS["TCMB_PPK"]["description"],
+                    "impact": MACRO_EVENTS["TCMB_PPK"]["impact"],
+                    "days_until": (date.date() - now.date()).days,
+                }
+            )
 
     # TÜİK CPI - ayın 10'u
     for month in range(now.month, now.month + 2):
         try:
             cpi_date = datetime(now.year, month, 10)
             if now.date() <= cpi_date.date() <= (now + timedelta(days=days)).date():
-                upcoming.append({
-                    "event_type": "CPI_RELEASE",
-                    "date": cpi_date.strftime("%Y-%m-%d"),
-                    "description": MACRO_EVENTS["CPI_RELEASE"]["description"],
-                    "impact": MACRO_EVENTS["CPI_RELEASE"]["impact"],
-                    "days_until": (cpi_date.date() - now.date()).days,
-                })
+                upcoming.append(
+                    {
+                        "event_type": "CPI_RELEASE",
+                        "date": cpi_date.strftime("%Y-%m-%d"),
+                        "description": MACRO_EVENTS["CPI_RELEASE"]["description"],
+                        "impact": MACRO_EVENTS["CPI_RELEASE"]["impact"],
+                        "days_until": (cpi_date.date() - now.date()).days,
+                    }
+                )
         except ValueError:
             logger.warning("Data error in get_upcoming_events: ValueError", exc_info=True)
 

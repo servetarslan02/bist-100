@@ -122,6 +122,7 @@ if PROMETHEUS_AVAILABLE:
 # Metrics Collector
 # =====================================================
 
+
 class IngestionMetrics:
     """Ingestion metrics toplayıcı.
 

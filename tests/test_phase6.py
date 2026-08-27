@@ -54,7 +54,9 @@ def test_scenario_engine():
     # THYAO (AVIATION) ASELS'ten (TECH) daha çok etkilenmeli
     assert thyao_impact.estimated_impact_pct < asels_impact.estimated_impact_pct
     passed += 1
-    print(f"  ✓ THYAO most affected (THYAO={thyao_impact.estimated_impact_pct:.1f}%, ASELS={asels_impact.estimated_impact_pct:.1f}%)")
+    print(
+        f"  ✓ THYAO most affected (THYAO={thyao_impact.estimated_impact_pct:.1f}%, ASELS={asels_impact.estimated_impact_pct:.1f}%)"
+    )
 
     # 4. Sektör etkileri
     assert "AVIATION" in result.sector_impacts
@@ -63,9 +65,7 @@ def test_scenario_engine():
     print(f"  ✓ Sector impacts: {result.sector_impacts}")
 
     # 5. Stress test
-    stress_results = scenario_engine.run_stress_test(
-        positions, PREDEFINED_SCENARIOS, macro_sensitivity_engine
-    )
+    stress_results = scenario_engine.run_stress_test(positions, PREDEFINED_SCENARIOS, macro_sensitivity_engine)
     assert len(stress_results) == len(PREDEFINED_SCENARIOS)
     worst = min(stress_results, key=lambda r: r.portfolio_loss_pct)
     assert worst.portfolio_loss_pct < 0
@@ -74,7 +74,10 @@ def test_scenario_engine():
 
     # 6. Breaking point
     bp = scenario_engine.find_breaking_point(
-        positions, "usdtry_change", max_change=2.0, loss_threshold_pct=20.0,
+        positions,
+        "usdtry_change",
+        max_change=2.0,
+        loss_threshold_pct=20.0,
         sector_sensitivity=macro_sensitivity_engine,
     )
     assert bp.breaking_value > 0
@@ -83,9 +86,7 @@ def test_scenario_engine():
     print(f"  ✓ Breaking point: {bp.description}")
 
     # 7. Empty positions
-    empty_result = scenario_engine.run_scenario(
-        ScenarioInput(name="Empty"), [], macro_sensitivity_engine
-    )
+    empty_result = scenario_engine.run_scenario(ScenarioInput(name="Empty"), [], macro_sensitivity_engine)
     assert empty_result.portfolio_impact_pct == 0
     passed += 1
     print("  ✓ Empty positions handled")
@@ -109,6 +110,7 @@ def main():
     except Exception as e:
         print(f"  ✗ Test crashed: {e}")
         import traceback
+
         traceback.print_exc()
         total_failed += 1
 

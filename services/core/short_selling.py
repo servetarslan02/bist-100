@@ -48,7 +48,12 @@ class ShortSellingMonitor:
         if self._bist50_cache is None:
             try:
                 from services.ingestion.bist_universe import bist_universe
-                self._bist50_cache = bist_universe.BIST_50_TICKERS if hasattr(bist_universe, 'BIST_50_TICKERS') else bist_universe.BIST_30_TICKERS
+
+                self._bist50_cache = (
+                    bist_universe.BIST_50_TICKERS
+                    if hasattr(bist_universe, "BIST_50_TICKERS")
+                    else bist_universe.BIST_30_TICKERS
+                )
             except ImportError:
                 self._bist50_cache = []
         return self._bist50_cache
@@ -66,6 +71,7 @@ class ShortSellingMonitor:
     def is_quarterly_rebalance_month(self) -> bool:
         """Bu ay BIST-50 yeniden dengeleme ayı mı? (Mart, Haziran, Eylül, Aralık)"""
         from datetime import datetime
+
         return datetime.now(UTC).month in {3, 6, 9, 12}
 
     def auto_refresh_if_needed(self):
@@ -154,7 +160,12 @@ class ShortSellingMonitor:
                     return ShortSellingDecision(
                         allowed=False,
                         reason=f"Uptick Rule AKTİF (BIST-100 %2+ düştü): güncel ({current_price}) < son işlem ({last_trade_price})",
-                        details={**details, "current_price": current_price, "last_trade_price": last_trade_price, "uptick_active": True},
+                        details={
+                            **details,
+                            "current_price": current_price,
+                            "last_trade_price": last_trade_price,
+                            "uptick_active": True,
+                        },
                     )
             # Spread kontrolü: en iyi satış fiyatından da yüksek veya eşit olmalı
             if current_price > 0 and best_ask_price > 0:
@@ -162,7 +173,12 @@ class ShortSellingMonitor:
                     return ShortSellingDecision(
                         allowed=False,
                         reason=f"Uptick Rule AKTİF: güncel ({current_price}) < en iyi satış ({best_ask_price})",
-                        details={**details, "current_price": current_price, "best_ask_price": best_ask_price, "uptick_active": True},
+                        details={
+                            **details,
+                            "current_price": current_price,
+                            "best_ask_price": best_ask_price,
+                            "uptick_active": True,
+                        },
                     )
         else:
             # Uptick rule pasifken de temel fiyat kontrolü

@@ -59,10 +59,12 @@ def setup_telemetry(
         from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
         # Resource oluştur
-        resource = Resource.create({
-            SERVICE_NAME: service_name,
-            "deployment.environment": os.getenv("APP_ENV", "development"),
-        })
+        resource = Resource.create(
+            {
+                SERVICE_NAME: service_name,
+                "deployment.environment": os.getenv("APP_ENV", "development"),
+            }
+        )
 
         # Tracer provider
         _tracer_provider = TracerProvider(resource=resource)
@@ -84,9 +86,7 @@ def setup_telemetry(
         # Tracer
         _tracer = trace.get_tracer(service_name)
 
-        logger.info("OpenTelemetry initialized",
-                    service=service_name,
-                    endpoint=endpoint or "console")
+        logger.info("OpenTelemetry initialized", service=service_name, endpoint=endpoint or "console")
 
     except ImportError:
         logger.warning("OpenTelemetry packages not installed, skipping")
@@ -100,6 +100,7 @@ def get_tracer(name: str = __name__):
     if _tracer is None:
         # Fallback: noop tracer
         from opentelemetry import trace
+
         return trace.get_tracer(name)
     return _tracer
 

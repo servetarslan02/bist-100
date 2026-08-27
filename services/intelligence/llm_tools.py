@@ -223,6 +223,7 @@ TOOL_SCHEMAS = [
 
 # ─── ARAÇ UYGULAMALARI ───────────────────────────────────────────────────────
 
+
 class LLMToolExecutor:
     """
     LLM'in araç çağrılarını gerçek sistem singleton'larına yönlendirir.
@@ -234,16 +235,16 @@ class LLMToolExecutor:
         logger.info("LLM tool call", tool=tool_name, args=list(arguments.keys()))
 
         handlers = {
-            "get_world_state":        self._get_world_state,
-            "get_knowledge_graph":    self._get_knowledge_graph,
-            "get_research_memory":    self._get_research_memory,
-            "get_ticker_features":    self._get_ticker_features,
-            "get_regime":             self._get_regime,
-            "get_ensemble_forecast":  self._get_ensemble_forecast,
-            "get_signal_conflicts":   self._get_signal_conflicts,
-            "get_spec_score":         self._get_spec_score,
-            "override_regime":        self._override_regime,
-            "store_analysis":         self._store_analysis,
+            "get_world_state": self._get_world_state,
+            "get_knowledge_graph": self._get_knowledge_graph,
+            "get_research_memory": self._get_research_memory,
+            "get_ticker_features": self._get_ticker_features,
+            "get_regime": self._get_regime,
+            "get_ensemble_forecast": self._get_ensemble_forecast,
+            "get_signal_conflicts": self._get_signal_conflicts,
+            "get_spec_score": self._get_spec_score,
+            "override_regime": self._override_regime,
+            "store_analysis": self._store_analysis,
         }
 
         handler = handlers.get(tool_name)
@@ -260,6 +261,7 @@ class LLMToolExecutor:
     def _get_world_state(self) -> dict[str, Any]:
         try:
             from services.intelligence.world_state import world_state_manager
+
             state = world_state_manager.get_state_dict()
             return {"status": "ok", "world_state": state}
         except Exception as exc:
@@ -274,15 +276,18 @@ class LLMToolExecutor:
     def _get_knowledge_graph(self, entity_id: str) -> dict[str, Any]:
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
+
             relations = knowledge_graph.get_related_entities(entity_id)
             result = []
             for entity, relation in relations:
-                result.append({
-                    "entity": entity.name,
-                    "entity_type": entity.entity_type,
-                    "relation": relation.relation_type,
-                    "strength": relation.strength,
-                })
+                result.append(
+                    {
+                        "entity": entity.name,
+                        "entity_type": entity.entity_type,
+                        "relation": relation.relation_type,
+                        "strength": relation.strength,
+                    }
+                )
             return {"status": "ok", "entity_id": entity_id, "relations": result}
         except Exception as exc:
             logger.warning("knowledge_graph erişilemedi", error=str(exc))
@@ -297,6 +302,7 @@ class LLMToolExecutor:
     def _get_research_memory(self, ticker: str, limit: int = 5) -> dict[str, Any]:
         try:
             from services.intelligence.research_memory import research_memory
+
             history = research_memory.get_ticker_history(ticker, limit=limit)
             return {"status": "ok", "ticker": ticker, "history": history}
         except Exception as exc:
@@ -320,12 +326,15 @@ class LLMToolExecutor:
     def _get_regime(self) -> dict[str, Any]:
         try:
             from services.intelligence.regime import regime_engine
+
             regime = regime_engine.get_regime()
             return {
                 "status": "ok",
                 "regime": regime.regime if hasattr(regime, "regime") else str(regime),
                 "confidence": getattr(regime, "confidence", 0.7),
-                "duration_days": getattr(regime, "duration_hours", 0) / 24.0 if hasattr(regime, "duration_hours") else 0,
+                "duration_days": getattr(regime, "duration_hours", 0) / 24.0
+                if hasattr(regime, "duration_hours")
+                else 0,
             }
         except Exception as exc:
             logger.warning("regime_engine erişilemedi", error=str(exc))
@@ -340,6 +349,7 @@ class LLMToolExecutor:
     def _get_ensemble_forecast(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.ensemble_forecast import ensemble_forecaster
+
             result = ensemble_forecaster.get_latest(ticker)
             if result:
                 return {
@@ -373,6 +383,7 @@ class LLMToolExecutor:
     def _get_spec_score(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.spec_engine import spec_engine
+
             result = spec_engine.get_latest(ticker)
             if result:
                 return {
@@ -415,8 +426,13 @@ class LLMToolExecutor:
             }
 
         ALLOWED_REGIMES = {
-            "CRISIS", "RISK_OFF", "HIGH_VOLATILITY",
-            "RECOVERY", "BULL", "BEAR", "SIDEWAYS",
+            "CRISIS",
+            "RISK_OFF",
+            "HIGH_VOLATILITY",
+            "RECOVERY",
+            "BULL",
+            "BEAR",
+            "SIDEWAYS",
         }
         if new_regime not in ALLOWED_REGIMES:
             return {
@@ -426,6 +442,7 @@ class LLMToolExecutor:
 
         try:
             from services.intelligence.regime import regime_engine
+
             regime_engine.override_regime(new_regime, reason=reason, confidence=confidence)
             logger.critical(
                 "REGIME OVERRIDDEN BY LLM",
@@ -461,6 +478,7 @@ class LLMToolExecutor:
             import uuid
 
             from services.intelligence.research_memory import ResearchRecord, research_memory
+
             record = ResearchRecord(
                 record_id=str(uuid.uuid4())[:8],
                 ticker=ticker,

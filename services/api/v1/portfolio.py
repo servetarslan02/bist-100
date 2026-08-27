@@ -36,21 +36,25 @@ from ..dependencies import check_rate_limit, get_current_user
 logger = structlog.get_logger()
 router = APIRouter()
 
+
 def _get_pm():
     """Tekil gerceklik kaynagi: paper_orchestrator VirtualPortfolio."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
+
     return paper_orchestrator.portfolio
 
 
 def _get_service():
     """PaperTradingOrchestrator singleton'i al."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
+
     return paper_orchestrator
 
 
 # =====================================================
 # CORE QUERIES (TEKIL VIRTUALPORTFOLIO VE PAPER_STATE_STORE KAYNAGI)
 # =====================================================
+
 
 @router.get("")
 @router.get("/")
@@ -60,6 +64,7 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
     """Portföy özeti — cash, invested, total value, positions count."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
         summary["positions_count"] = summary.get("num_positions", 0)
         summary["positions"] = paper_orchestrator.portfolio.get_all_positions()
@@ -73,6 +78,7 @@ async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit))
     """Açık pozisyonlar — ticker, quantity, entry/current price, P&L."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         pos_list = paper_orchestrator.portfolio.get_all_positions()
         total_val = paper_orchestrator.portfolio.get_total_value()
         return {
@@ -93,6 +99,7 @@ async def trades(
     """İşlem geçmişi — entry/exit, P&L, holding days."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         all_trades = paper_orchestrator.portfolio.get_trades()
         return {
             "trades": all_trades[-limit:],
@@ -107,6 +114,7 @@ async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """K/Z durumu — unrealized + realized + commission."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
         return {
             "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
@@ -129,11 +137,14 @@ async def equity_curve(
     """Equity curve — günlük equity snapshot'ları."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         curve = paper_orchestrator.portfolio.get_equity_curve()
         return {
             "equity_curve": curve[-limit:],
             "snapshots": curve[-limit:],
-            "high_water_mark": max([pt.get("total_value", 0.0) for pt in curve], default=paper_orchestrator.portfolio.initial_capital),
+            "high_water_mark": max(
+                [pt.get("total_value", 0.0) for pt in curve], default=paper_orchestrator.portfolio.initial_capital
+            ),
         }
     except Exception as e:
         raise HTTPException(500, f"Equity curve error: {e}") from e
@@ -143,11 +154,13 @@ async def equity_curve(
 # RISK METRICS
 # =====================================================
 
+
 @router.get("/risk-metrics")
 async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Portföy risk metrikleri — VaR/CVaR + HHI + drawdown."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
         return {
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
@@ -166,6 +179,7 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Portföy drawdown durumu."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
         return {
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
@@ -173,15 +187,19 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         }
     except Exception as e:
         raise HTTPException(500, f"Drawdown error: {e}") from e
+
+
 # =====================================================
 # PERFORMANCE & ACCOUNTING METRICS
 # =====================================================
+
 
 @router.get("/metrics")
 async def performance_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Performans metrikleri — CAGR, Sharpe, Sortino, win rate, profit factor."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         report = paper_orchestrator.get_full_report()
         return report.get("performance_metrics", {})
     except Exception as e:
@@ -193,6 +211,7 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
     """Muhasebe özeti — invariant doğrulama dahil."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
         return {
             "cash": summary.get("cash", 0.0),
@@ -215,12 +234,17 @@ async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(chec
     """Portföydeki tüm pozisyonları kapatır ve nakite çeker."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         paper_orchestrator.portfolio._positions.clear()
         paper_orchestrator.portfolio.settled_cash = paper_orchestrator.portfolio.initial_capital
         paper_orchestrator.portfolio.unsettled_cash_t1 = 0.0
         paper_orchestrator.portfolio.unsettled_cash_t2 = 0.0
         paper_orchestrator.portfolio.save_to_store(datetime.now(UTC).strftime("%Y-%m-%d"))
-        return {"success": True, "cash": paper_orchestrator.portfolio.cash, "message": "Portföy tekil defterde sıfırlandı."}
+        return {
+            "success": True,
+            "cash": paper_orchestrator.portfolio.cash,
+            "message": "Portföy tekil defterde sıfırlandı.",
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -228,6 +252,7 @@ async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(chec
 # =====================================================
 # LEDGER & HISTORY
 # =====================================================
+
 
 @router.get("/cash-ledger")
 async def cash_ledger(
@@ -238,6 +263,7 @@ async def cash_ledger(
     """Nakit hareket geçmişi."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         trades = paper_orchestrator.portfolio.get_trades()
         return {
             "ledger": trades[-limit:],
@@ -258,6 +284,7 @@ async def portfolio_orders_and_trades(
     """Portföy emir ve işlem geçmişi."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         orders = paper_orchestrator.portfolio.get_orders()
         trades = paper_orchestrator.portfolio.get_trades()
         return {
@@ -319,6 +346,7 @@ async def equity_snapshots(
 # ATTRIBUTION & TAX & TCA
 # =====================================================
 
+
 @router.get("/attribution")
 async def attribution(
     portfolio_id: int = Query(1),
@@ -368,10 +396,7 @@ async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limi
         pm = _get_pm()
 
         # Trade'lerden vergi hesapla
-        trades = [
-            {"realized_pnl": t.pnl, "holding_days": t.holding_days}
-            for t in pm._trades
-        ]
+        trades = [{"realized_pnl": t.pnl, "holding_days": t.holding_days} for t in pm._trades]
 
         result = tax_model.compute_total_tax(
             trades=trades,
@@ -404,6 +429,7 @@ async def transaction_cost_analysis(
     """
     try:
         from ...portfolio.enhancements import tca_analyzer
+
         return tca_analyzer.analyze(order_value, daily_volume, volatility)
     except Exception as e:
         raise HTTPException(500, f"TCA error: {e}") from e
@@ -413,9 +439,10 @@ async def transaction_cost_analysis(
 # REBALANCING
 # =====================================================
 
+
 @router.get("/rebalance")
 async def rebalance_analysis(
-    target_weights: str = Query("", description="Hedef ağırlıklar (JSON): {\"THYAO\": 0.3, \"GARAN\": 0.2}"),
+    target_weights: str = Query("", description='Hedef ağırlıklar (JSON): {"THYAO": 0.3, "GARAN": 0.2}'),
     threshold_pct: float = Query(5.0, description="Sapma eşiği (%)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
@@ -486,11 +513,13 @@ async def rebalance_orders(
 # STATUS
 # =====================================================
 
+
 @router.get("/status")
 async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Portföy servis durumu — health + trading enabled + PaperTrading tekil defter özeti."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
+
         summary = paper_orchestrator.portfolio.get_summary()
 
         return {
@@ -516,8 +545,13 @@ async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_ra
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     try:
         from ...pipeline.run_unified_daily import run_eod_signal_cycle
+
         res = await run_eod_signal_cycle()
-        return {"status": "success", "message": "EOD sinyal uretimi ve portfoy MTM degerlemesi tamamlandi.", "details": res}
+        return {
+            "status": "success",
+            "message": "EOD sinyal uretimi ve portfoy MTM degerlemesi tamamlandi.",
+            "details": res,
+        }
     except Exception as e:
         raise HTTPException(500, f"EOD trigger error: {e}") from e
 
@@ -527,6 +561,7 @@ async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(ch
     """09:55 Sabah Acilisi: Bekleyen emirleri gercek T+1 acilis fiyatlari ve sentetik likiditeyle yurutur."""
     try:
         from ...pipeline.run_unified_daily import run_morning_execution_cycle
+
         res = await run_morning_execution_cycle()
         return {"status": "success", "message": "Sabah acilisi mikro-yapi yurutme dongusu tamamlandi.", "details": res}
     except Exception as e:
@@ -538,6 +573,7 @@ async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_l
     """API icinde Phase 18 unified daily dongusunu tetikler."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
+
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified Daily dongusu tetiklendi.", "details": res}
     except Exception as e:
@@ -553,6 +589,7 @@ async def trigger_auto_rebalance(
     """Otonom portfoy yeniden dengeleme artik PaperTradingOrchestrator'a baglandi."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
+
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
     except Exception as e:
@@ -580,9 +617,11 @@ async def deposit_funds(
     except Exception as e:
         raise HTTPException(500, f"Deposit error: {e}") from e
 
+
 # In-memory fast cache
 _ALPHA_SIGNALS_CACHE = None
 _ALPHA_SIGNALS_TIME = 0.0
+
 
 @router.get("/alpha")
 @router.get("/alpha-signals")
@@ -594,6 +633,7 @@ async def alpha_signals(
     """Doğrulanmış Alpha Stratejisi canlı sinyalleri ve portföy dağılımı."""
     global _ALPHA_SIGNALS_CACHE, _ALPHA_SIGNALS_TIME
     import time
+
     now = time.time()
 
     if _ALPHA_SIGNALS_CACHE and (now - _ALPHA_SIGNALS_TIME < 300):
@@ -614,6 +654,7 @@ async def alpha_signals(
     def _compute_alpha_live():
         try:
             from ...core.redis_helper import get_cached
+
             radar = get_cached("radar:data") or []
             if radar:
                 top_items = sorted(radar, key=lambda x: x.get("score", 0), reverse=True)[:5]
@@ -621,13 +662,18 @@ async def alpha_signals(
                     return {
                         "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
                         "active_positions": [
-                            {"ticker": it.get("symbol"), "weight": 0.20, "score": it.get("score", 85.0), "sector": it.get("sector", "SANAYI")}
+                            {
+                                "ticker": it.get("symbol"),
+                                "weight": 0.20,
+                                "score": it.get("score", 85.0),
+                                "sector": it.get("sector", "SANAYI"),
+                            }
                             for it in top_items
                         ],
                         "cash_shield_pct": 0.0,
                         "verified_cagr_pct": 105.4,
                         "verified_sharpe": 2.56,
-                        "status": "active"
+                        "status": "active",
                     }
         except Exception as err:
             logger.warning(f"alpha signals live computation warning: {err}")
@@ -645,7 +691,7 @@ async def alpha_signals(
             "cash_shield_pct": 0.0,
             "verified_cagr_pct": 105.4,
             "verified_sharpe": 2.56,
-            "status": "active"
+            "status": "active",
         }
 
     loop = asyncio.get_event_loop()

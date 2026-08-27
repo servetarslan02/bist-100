@@ -27,22 +27,24 @@ logger = structlog.get_logger()
 @dataclass
 class CalibrationBin:
     """Kalibrasyon bin'i."""
-    bin_range: str           # "0.7-0.8"
-    mean_prediction: float   # Ortalama tahmin
-    mean_actual: float       # Gerçekleşen oran
-    count: int               # Gözlem sayısı
-    miscalibration: float    # |tahmin - gerçek|
+
+    bin_range: str  # "0.7-0.8"
+    mean_prediction: float  # Ortalama tahmin
+    mean_actual: float  # Gerçekleşen oran
+    count: int  # Gözlem sayısı
+    miscalibration: float  # |tahmin - gerçek|
 
 
 @dataclass
 class CalibrationReport:
     """Kalibrasyon raporu."""
+
     brier_score: float
     bins: list[CalibrationBin]
     overconfident: bool
     overconfidence_magnitude: float  # Ne kadar overconfident
     n_samples: int
-    recommended_adjustment: float    # Confidence çarpanı
+    recommended_adjustment: float  # Confidence çarpanı
     regime: str = "ALL"
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -50,8 +52,9 @@ class CalibrationReport:
 @dataclass
 class Observation:
     """Gözlem kaydı."""
+
     predicted_confidence: float
-    actual_outcome: bool      # True = pozitif gerçekleşti
+    actual_outcome: bool  # True = pozitif gerçekleşti
     regime: str = "UNKNOWN"
     ticker: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -78,12 +81,14 @@ class ConfidenceCalibrator:
         ticker: str = "",
     ):
         """Gözlem ekle."""
-        self._observations.append(Observation(
-            predicted_confidence=max(0, min(1, predicted_confidence)),
-            actual_outcome=actual_outcome,
-            regime=regime,
-            ticker=ticker,
-        ))
+        self._observations.append(
+            Observation(
+                predicted_confidence=max(0, min(1, predicted_confidence)),
+                actual_outcome=actual_outcome,
+                regime=regime,
+                ticker=ticker,
+            )
+        )
 
     def add_batch(
         self,
@@ -136,13 +141,15 @@ class ConfidenceCalibrator:
             if mask.sum() > 0:
                 mean_pred = float(np.mean(predictions[mask]))
                 mean_actual = float(np.mean(outcomes[mask]))
-                calibration_bins.append(CalibrationBin(
-                    bin_range=f"{bins[i]:.1f}-{bins[i+1]:.1f}",
-                    mean_prediction=round(mean_pred, 4),
-                    mean_actual=round(mean_actual, 4),
-                    count=int(mask.sum()),
-                    miscalibration=round(abs(mean_pred - mean_actual), 4),
-                ))
+                calibration_bins.append(
+                    CalibrationBin(
+                        bin_range=f"{bins[i]:.1f}-{bins[i + 1]:.1f}",
+                        mean_prediction=round(mean_pred, 4),
+                        mean_actual=round(mean_actual, 4),
+                        count=int(mask.sum()),
+                        miscalibration=round(abs(mean_pred - mean_actual), 4),
+                    )
+                )
 
         # Overconfidence detection
         overconf_bins = [b for b in calibration_bins if b.mean_prediction > b.mean_actual + 0.1]

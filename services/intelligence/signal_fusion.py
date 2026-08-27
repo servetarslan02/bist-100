@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class FusedSignal:
     """Birleştirilmiş sinyal."""
+
     ticker: str
     timestamp: datetime
 
@@ -64,6 +65,7 @@ class FusedSignal:
     self_check_passed: bool = True
     self_check_warnings: list[str] = field(default_factory=list)
 
+
 class SignalFusionEngine:
     """Sinyal birleştirme motoru."""
 
@@ -83,27 +85,27 @@ class SignalFusionEngine:
 
     REGIME_WEIGHT_OVERRIDES = {
         # Boğa: Momentum ve teknik öne çıkar, AI destekleyici rolde
-        "BULL":             {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
-        "BULL_ACCELERATING":{"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
-        "BULL_NORMAL":      {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
-        "TRENDING-UP":      {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "BULL": {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "BULL_ACCELERATING": {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "BULL_NORMAL": {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "TRENDING-UP": {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
         # Ayı: Makro ve teknik öne çıkar, AI negatif sinyalleri ayırt eder
-        "BEAR":             {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
-        "BEAR_NORMAL":      {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
-        "BEAR_CRASH":       {"macro": 0.22, "valuation": 0.14, "ai": 0.18},
-        "TRENDING-DOWN":    {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        "BEAR": {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        "BEAR_NORMAL": {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        "BEAR_CRASH": {"macro": 0.22, "valuation": 0.14, "ai": 0.18},
+        "TRENDING-DOWN": {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
         # Yüksek volatilite: AI bağlamsal analizi kritik
-        "HIGH_VOL":         {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
-        "HIGH-VOLATILITY":  {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
+        "HIGH_VOL": {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
+        "HIGH-VOLATILITY": {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
         # Risk-On/Off: Makro haberler baskın, LLM haberleri yorumlar
-        "RISK-ON":          {"momentum": 0.22, "sentiment": 0.13, "ai": 0.15},
-        "RISK-OFF":         {"macro": 0.18, "valuation": 0.18, "fundamental": 0.16, "ai": 0.20},
+        "RISK-ON": {"momentum": 0.22, "sentiment": 0.13, "ai": 0.15},
+        "RISK-OFF": {"macro": 0.18, "valuation": 0.18, "fundamental": 0.16, "ai": 0.20},
         # Panik/Kriz: LLM en kritik rolde — teknik göstergeler gecikmeli!
-        "PANIC":            {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
-        "CRISIS":           {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
+        "PANIC": {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
+        "CRISIS": {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
         "GEOPOLITICAL_CRISIS": {"macro": 0.15, "valuation": 0.10, "ai": 0.30},
         # Toparlanma: Temel analiz ve AI birlikte
-        "RECOVERY":         {"fundamental": 0.22, "valuation": 0.18, "sentiment": 0.12, "ai": 0.15},
+        "RECOVERY": {"fundamental": 0.22, "valuation": 0.18, "sentiment": 0.12, "ai": 0.15},
     }
 
     def __init__(self):
@@ -114,11 +116,11 @@ class SignalFusionEngine:
         """Restart sonrası ağırlıkları SQLite'dan geri yükle."""
         try:
             from services.core.state_store import state_store
+
             saved = state_store.load_fusion_weights()
             if saved:
                 self._adaptive_weights = saved
-                logger.info("Fusion weights restored from SQLite",
-                           weights=len(saved))
+                logger.info("Fusion weights restored from SQLite", weights=len(saved))
         except Exception as e:
             logger.debug("Fusion weights restore skipped", error=str(e))
 
@@ -126,6 +128,7 @@ class SignalFusionEngine:
         """Ağırlıkları SQLite'a kaydet."""
         try:
             from services.core.state_store import state_store
+
             if self._adaptive_weights:
                 state_store.save_fusion_weights(self._adaptive_weights)
         except Exception:
@@ -166,7 +169,18 @@ class SignalFusionEngine:
         )
 
         # Bileşen yönleri ve skorları
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec", "monte_carlo"]:
+        for component in [
+            "technical",
+            "fundamental",
+            "momentum",
+            "sentiment",
+            "news",
+            "macro",
+            "valuation",
+            "ai",
+            "spec",
+            "monte_carlo",
+        ]:
             comp_data = signals.get(component, {})
             setattr(result, f"{component}_direction", comp_data.get("direction", "NEUTRAL"))
             setattr(result, f"{component}_score", comp_data.get("score", 50))
@@ -233,7 +247,17 @@ class SignalFusionEngine:
         conflicts = []
 
         directions = {}
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "monte_carlo"]:
+        for component in [
+            "technical",
+            "fundamental",
+            "momentum",
+            "sentiment",
+            "news",
+            "macro",
+            "valuation",
+            "ai",
+            "monte_carlo",
+        ]:
             comp_data = signals.get(component, {})
             direction = comp_data.get("direction", "NEUTRAL")
             if direction != "NEUTRAL":
@@ -262,7 +286,18 @@ class SignalFusionEngine:
         """Gerekçe üret."""
         reasons = []
 
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec", "monte_carlo"]:
+        for component in [
+            "technical",
+            "fundamental",
+            "momentum",
+            "sentiment",
+            "news",
+            "macro",
+            "valuation",
+            "ai",
+            "spec",
+            "monte_carlo",
+        ]:
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
             score = getattr(result, f"{component}_score", 50)
 

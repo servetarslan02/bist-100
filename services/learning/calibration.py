@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class CalibrationBin:
     """Tek calibration bin'i."""
+
     bin_lower: float
     bin_upper: float
     avg_predicted: float
@@ -39,6 +40,7 @@ class CalibrationBin:
 @dataclass
 class CalibrationResult:
     """Calibration sonucu."""
+
     timestamp: str
     brier_score: float
     ece: float  # Expected Calibration Error
@@ -55,6 +57,7 @@ class CalibrationResult:
 @dataclass
 class PlattScalingParams:
     """Platt scaling parametreleri."""
+
     a: float  # Sigmoid parametresi
     b: float  # Sigmoid parametresi
     fitted: bool = False
@@ -92,8 +95,7 @@ class ConfidenceCalibrator:
 
         # Minimum sample kontrolü
         if len(filtered) < cfg.min_samples:
-            logger.warning("Insufficient calibration data",
-                         count=len(filtered), min_required=cfg.min_samples)
+            logger.warning("Insufficient calibration data", count=len(filtered), min_required=cfg.min_samples)
             return self._empty_result(len(filtered), regime)
 
         # Confidence ve outcome'ları çıkar
@@ -145,9 +147,13 @@ class ConfidenceCalibrator:
             self._calibration_history = self._calibration_history[-1000:]
         self._last_calibration = result
 
-        logger.info("Calibration completed",
-                   brier=round(brier, 4), ece=round(ece, 4),
-                   overconfident=overconfident, samples=len(filtered))
+        logger.info(
+            "Calibration completed",
+            brier=round(brier, 4),
+            ece=round(ece, 4),
+            overconfident=overconfident,
+            samples=len(filtered),
+        )
 
         return result
 
@@ -218,9 +224,7 @@ class ConfidenceCalibrator:
         n_pos = np.sum(outcomes == 1)
         n_neg = np.sum(outcomes == 0)
 
-        targets = np.where(outcomes == 1,
-                          (n_pos + 1) / (n_pos + 2),
-                          1 / (n_neg + 2))
+        targets = np.where(outcomes == 1, (n_pos + 1) / (n_pos + 2), 1 / (n_neg + 2))
 
         # Sigmoid fit: minimize cross-entropy
         # f = confidence, target = smoothed outcome
@@ -238,7 +242,7 @@ class ConfidenceCalibrator:
             ce = -np.mean(targets * np.log(p) + (1 - targets) * np.log(1 - p))
             return ce
 
-        result = minimize(loss, x0=[-1.0, 0.0], method='Nelder-Mead')
+        result = minimize(loss, x0=[-1.0, 0.0], method="Nelder-Mead")
         a_opt, b_opt = result.x
 
         params = PlattScalingParams(a=round(a_opt, 4), b=round(b_opt, 4), fitted=True)
@@ -247,8 +251,7 @@ class ConfidenceCalibrator:
         key = regime or "global"
         self._platt_params[key] = params
 
-        logger.info("Platt scaling fitted", a=params.a, b=params.b,
-                   regime=regime, samples=len(predictions))
+        logger.info("Platt scaling fitted", a=params.a, b=params.b, regime=regime, samples=len(predictions))
 
         return params
 
@@ -273,10 +276,7 @@ class ConfidenceCalibrator:
             },
             "sample_count": cal.sample_count,
             "confidence": cal.confidence,
-            "platt_params": {
-                k: {"a": v.a, "b": v.b, "fitted": v.fitted}
-                for k, v in self._platt_params.items()
-            },
+            "platt_params": {k: {"a": v.a, "b": v.b, "fitted": v.fitted} for k, v in self._platt_params.items()},
             "history_count": len(self._calibration_history),
         }
 
@@ -314,14 +314,16 @@ class ConfidenceCalibrator:
             avg_actual = float(np.mean(outcomes[mask]))
             miscal = abs(avg_pred - avg_actual)
 
-            bins.append(CalibrationBin(
-                bin_lower=round(lower, 2),
-                bin_upper=round(upper, 2),
-                avg_predicted=round(avg_pred, 4),
-                avg_actual=round(avg_actual, 4),
-                count=count,
-                miscalibration=round(miscal, 4),
-            ))
+            bins.append(
+                CalibrationBin(
+                    bin_lower=round(lower, 2),
+                    bin_upper=round(upper, 2),
+                    avg_predicted=round(avg_pred, 4),
+                    avg_actual=round(avg_actual, 4),
+                    count=count,
+                    miscalibration=round(miscal, 4),
+                )
+            )
 
         return bins
 

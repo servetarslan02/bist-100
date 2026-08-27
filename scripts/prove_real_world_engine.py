@@ -28,11 +28,15 @@ def run_proof():
             if sym_col:
                 cur.execute(f"SELECT COUNT(DISTINCT {sym_col}), COUNT(*), MIN({date_col}), MAX({date_col}) FROM {t}")
                 n_syms, n_rows, min_d, max_d = cur.fetchone()
-                print(f"  [OK] Tablo: {t:<17} | {n_syms} BIST Hissesi | {n_rows:,} Mum Bari | {str(min_d)[:10]} -> {str(max_d)[:10]}")
+                print(
+                    f"  [OK] Tablo: {t:<17} | {n_syms} BIST Hissesi | {n_rows:,} Mum Bari | {str(min_d)[:10]} -> {str(max_d)[:10]}"
+                )
             else:
                 cur.execute(f"SELECT COUNT(*), MIN({date_col}), MAX({date_col}) FROM {t}")
                 n_rows, min_d, max_d = cur.fetchone()
-                print(f"  [OK] Tablo: {t:<17} | Benchmark XU100 | {n_rows:,} Mum Bari | {str(min_d)[:10]} -> {str(max_d)[:10]}")
+                print(
+                    f"  [OK] Tablo: {t:<17} | Benchmark XU100 | {n_rows:,} Mum Bari | {str(min_d)[:10]} -> {str(max_d)[:10]}"
+                )
         conn.close()
     else:
         print("  [--] Warehouse bulunamadi!")
@@ -43,7 +47,7 @@ def run_proof():
         "ml/saved_models/lightgbm_model.pkl",
         "ml/saved_models/catboost_model.pkl",
         "ml/saved_models/xgboost_model.pkl",
-        "ml/saved_models/extratrees_model.pkl"
+        "ml/saved_models/extratrees_model.pkl",
     ]
     for mf in model_files:
         if os.path.exists(mf):
@@ -62,7 +66,9 @@ def run_proof():
             opps = data.get("opportunities", []) if isinstance(data, dict) else data
             print(f"  [OK] Canli ML Tarama Sonucu: {len(opps)} aktif firsat tespit edildi")
             for op in opps[:3]:
-                print(f"    -> [{op.get('ticker')}] Skor: {op.get('score')} | Guven: %{op.get('confidence_pct')} | Rejim: {op.get('regime')} | Gerekce: {op.get('rationale')}")
+                print(
+                    f"    -> [{op.get('ticker')}] Skor: {op.get('score')} | Guven: %{op.get('confidence_pct')} | Rejim: {op.get('regime')} | Gerekce: {op.get('rationale')}"
+                )
     except Exception as e:
         print(f"  [--] API hatasi: {e}")
 
@@ -95,6 +101,7 @@ def run_proof():
     print("  SONUC: SISTEM %100 GERCEK VERILERLE, EGITILMIS MODELLERLE VE")
     print("  BORSA ISTANBUL SEANS KURALLARINA UYGUN OLARAK CALISMAKTADIR.")
     print("=" * 72)
+
 
 if __name__ == "__main__":
     run_proof()

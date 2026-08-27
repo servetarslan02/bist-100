@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class RegimeState:
     """Regim durumu."""
+
     regime: str  # BULL, BEAR, SIDEWAYS, HIGH_VOL, LOW_VOL
     confidence: float
     duration_days: int
@@ -181,7 +182,7 @@ class RegimeDetector:
         correlations = []
         tickers = list(market_data.keys())[:20]
         for i, t1 in enumerate(tickers):
-            for t2 in tickers[i+1:]:
+            for t2 in tickers[i + 1 :]:
                 if t1 in market_data and t2 in market_data:
                     c1 = market_data[t1]["Close"].values[-20:]
                     c2 = market_data[t2]["Close"].values[-20:]
@@ -242,8 +243,11 @@ class RegimeDetector:
             high_vol += 20
 
         scores = {
-            "BULL": bull, "BEAR": bear, "SIDEWAYS": sideways,
-            "HIGH_VOL": high_vol, "LOW_VOL": low_vol,
+            "BULL": bull,
+            "BEAR": bear,
+            "SIDEWAYS": sideways,
+            "HIGH_VOL": high_vol,
+            "LOW_VOL": low_vol,
         }
         regime = max(scores, key=scores.get)
         return regime, scores[regime] / 100
@@ -256,17 +260,18 @@ class RegimeDetector:
         else:
             self._regime_duration += 1
 
-        self._regime_history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "regime": regime,
-            "confidence": confidence,
-            "factors": factors,
-        })
+        self._regime_history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "regime": regime,
+                "confidence": confidence,
+                "factors": factors,
+            }
+        )
         if len(self._regime_history) > 1000:
             self._regime_history = self._regime_history[-1000:]
 
-        logger.info("Regime detected", regime=regime, confidence=round(confidence, 4),
-                   duration=self._regime_duration)
+        logger.info("Regime detected", regime=regime, confidence=round(confidence, 4), duration=self._regime_duration)
 
     def _estimate_transition_probability(self, current_regime: str) -> dict[str, float]:
         """Rejim geçiş olasılıklarını tahmin et."""

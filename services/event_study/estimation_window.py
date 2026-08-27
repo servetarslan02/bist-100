@@ -14,6 +14,7 @@ Calendar day kullanımının sorunları:
 
 Çözüm: Tüm uzunluklar trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
+
 from datetime import datetime
 
 import numpy as np
@@ -25,10 +26,10 @@ logger = structlog.get_logger()
 # Not: Eski calendar day değerleri trading day olarak yeniden yorumlandı
 # 120 calendar gün ≈ 85 trading gün, ama burada doğrudan trading day veriyoruz
 ESTIMATION_WINDOWS = {
-    "FINANCIAL_RESULTS": 120,   # ~6 ay trading data
-    "DIVIDEND": 60,             # ~3 ay
+    "FINANCIAL_RESULTS": 120,  # ~6 ay trading data
+    "DIVIDEND": 60,  # ~3 ay
     "BUYBACK": 60,
-    "CAPITAL_INCREASE": 90,     # ~4.5 ay
+    "CAPITAL_INCREASE": 90,  # ~4.5 ay
     "MERGER": 120,
     "MANAGEMENT_CHANGE": 60,
     "LEGAL": 90,
@@ -53,6 +54,7 @@ GAP_TRADING_DAYS = 6
 def _get_calendar():
     """Trading calendar'ı lazy import et."""
     from .trading_calendar import get_trading_calendar
+
     return get_trading_calendar()
 
 
@@ -66,9 +68,7 @@ class EstimationWindowManager:
     def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS, gap_days: int | None = None):
         self.gap_trading_days = gap_days if gap_days is not None else gap_trading_days
 
-    def get_window(
-        self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> tuple[datetime, datetime]:
+    def get_window(self, event_date: datetime, event_type: str = "DEFAULT") -> tuple[datetime, datetime]:
         """Event type'a göre estimation window döndür (TRADING DAY bazlı).
 
         Args:
@@ -164,10 +164,7 @@ class EstimationWindowManager:
         window_dates = dates[mask]
 
         # Sadece trading günleri filtrele
-        trading_mask = np.array([
-            cal.is_trading_day(d.date() if isinstance(d, datetime) else d)
-            for d in window_dates
-        ])
+        trading_mask = np.array([cal.is_trading_day(d.date() if isinstance(d, datetime) else d) for d in window_dates])
         window_returns = window_returns[trading_mask]
         window_dates = window_dates[trading_mask]
 
@@ -181,9 +178,7 @@ class EstimationWindowManager:
 
         return window_returns, window_dates
 
-    def get_estimation_window_size_calendar_days(
-        self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> int:
+    def get_estimation_window_size_calendar_days(self, event_date: datetime, event_type: str = "DEFAULT") -> int:
         """Estimation window'un takvim günleri cinsinden uzunluğunu döndür.
 
         Bilgi amaçlı — trading day → calendar day dönüşümü.

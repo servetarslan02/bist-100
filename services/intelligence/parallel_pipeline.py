@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class PhaseResult:
     """Faz sonucu."""
+
     phase: str
     modules: dict[str, Any] = field(default_factory=dict)
     errors: dict[str, str] = field(default_factory=dict)
@@ -44,6 +45,7 @@ class PhaseResult:
 @dataclass
 class ParallelPipelineResult:
     """Pipeline sonucu."""
+
     ticker: str
     phases: dict[str, PhaseResult] = field(default_factory=dict)
     total_elapsed_ms: float = 0.0
@@ -98,6 +100,7 @@ class ParallelIntelligencePipeline:
         for name, path in module_map.items():
             try:
                 import importlib
+
                 self._modules[name] = importlib.import_module(path)
             except Exception as e:
                 logger.debug(f"Module {name} not available: {e}")
@@ -137,15 +140,15 @@ class ParallelIntelligencePipeline:
         result.total_elapsed_ms = round((time.time() - start) * 1000, 2)
         for phase_result in result.phases.values():
             result.modules_used.extend(phase_result.modules.keys())
-            result.modules_failed.extend(
-                [f"{k}:{v}" for k, v in phase_result.errors.items()]
-            )
+            result.modules_failed.extend([f"{k}:{v}" for k, v in phase_result.errors.items()])
 
-        logger.info("Parallel pipeline completed",
-                    ticker=ticker,
-                    elapsed_ms=result.total_elapsed_ms,
-                    modules_used=len(result.modules_used),
-                    modules_failed=len(result.modules_failed))
+        logger.info(
+            "Parallel pipeline completed",
+            ticker=ticker,
+            elapsed_ms=result.total_elapsed_ms,
+            modules_used=len(result.modules_used),
+            modules_failed=len(result.modules_failed),
+        )
 
         return result
 
@@ -220,8 +223,12 @@ class ParallelIntelligencePipeline:
         return result
 
     async def _run_phase4(
-        self, ticker: str, features: dict,
-        phase1: PhaseResult, phase2: PhaseResult, phase3: PhaseResult,
+        self,
+        ticker: str,
+        features: dict,
+        phase1: PhaseResult,
+        phase2: PhaseResult,
+        phase3: PhaseResult,
     ) -> PhaseResult:
         """Phase 4: Fusion + SPEC + TradePlan (sıralı)."""
         start = time.time()
@@ -357,11 +364,16 @@ class ParallelIntelligencePipeline:
         if not mod:
             return {}
         ie = mod.ImpactEngine()
-        return ie.propagate(
-            event_type="general", event_data={"ticker": ticker},
-            event_id=f"{ticker}_general", current_world_state={"risk_appetite": 0.5},
-            instrument_states={},
-        ) or {}
+        return (
+            ie.propagate(
+                event_type="general",
+                event_data={"ticker": ticker},
+                event_id=f"{ticker}_general",
+                current_world_state={"risk_appetite": 0.5},
+                instrument_states={},
+            )
+            or {}
+        )
 
     async def _run_kap_extractor(self, ticker: str) -> dict:
         mod = self._modules.get("kap_extractor")
@@ -378,7 +390,11 @@ class ParallelIntelligencePipeline:
         forecasts = fe.compute_forecasts(ticker=ticker, features=features, historical_returns=[])
         if forecasts:
             f = forecasts[0]
-            return {"predicted_return": f.predicted_return, "probability": f.probability_positive, "horizon": f.horizon_days}
+            return {
+                "predicted_return": f.predicted_return,
+                "probability": f.probability_positive,
+                "horizon": f.horizon_days,
+            }
         return {}
 
     async def _run_monte_carlo(self, ticker: str, features: dict) -> dict:
@@ -390,10 +406,16 @@ class ParallelIntelligencePipeline:
         vol = features.get("volatility_20d", 20)
         vol_norm = float(vol) / 100 if vol and float(vol) > 1 else (float(vol) if vol else 0.2)
         result = mc.simulate_price_paths(
-            ticker=ticker, current_price=float(price),
-            expected_return_annual=0.1, volatility_annual=vol_norm,
+            ticker=ticker,
+            current_price=float(price),
+            expected_return_annual=0.1,
+            volatility_annual=vol_norm,
         )
-        return {"expected_return": result.expected_return, "prob_positive": result.prob_positive, "var_95": result.var_95}
+        return {
+            "expected_return": result.expected_return,
+            "prob_positive": result.prob_positive,
+            "var_95": result.var_95,
+        }
 
     async def _run_probability(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("probability")
@@ -410,7 +432,9 @@ class ParallelIntelligencePipeline:
         scenario_input = mod.ScenarioInput(name="base", description="Base case")
         return se.run_scenario(scenario=scenario_input, positions=[]) or {}
 
-    async def _run_signal_fusion(self, ticker: str, features: dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult) -> dict:
+    async def _run_signal_fusion(
+        self, ticker: str, features: dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult
+    ) -> dict:
         mod = self._modules.get("signal_fusion")
         if not mod:
             return {}
@@ -465,10 +489,14 @@ class ParallelIntelligencePipeline:
         if not mod:
             return {}
         engine = mod.SPECEngine()
-        return engine.compute_spec(
-            ticker=ticker, asset_state={"features": features},
-            market_state={"regime": phase1.modules.get("regime", {}).get("regime", "UNKNOWN")},
-        ) or {}
+        return (
+            engine.compute_spec(
+                ticker=ticker,
+                asset_state={"features": features},
+                market_state={"regime": phase1.modules.get("regime", {}).get("regime", "UNKNOWN")},
+            )
+            or {}
+        )
 
     async def _run_trade_planner(self, ticker: str, features: dict, fusion_modules: dict) -> dict:
         mod = self._modules.get("trade_planner")
@@ -476,10 +504,16 @@ class ParallelIntelligencePipeline:
             return {}
         tp = mod.TradePlanner()
         price = features.get("close", 100)
-        return tp.create_plan(
-            ticker=ticker, price=float(price), features=features,
-            spec_score=0.0, spec_category="NEUTRAL",
-        ) or {}
+        return (
+            tp.create_plan(
+                ticker=ticker,
+                price=float(price),
+                features=features,
+                spec_score=0.0,
+                spec_category="NEUTRAL",
+            )
+            or {}
+        )
 
     async def _run_knowledge_graph(self, ticker: str) -> dict:
         mod = self._modules.get("knowledge_graph")

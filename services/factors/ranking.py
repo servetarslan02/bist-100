@@ -2,6 +2,7 @@
 
 Risk-adjusted, sector-neutral, regime-based ranking.
 """
+
 from typing import Any
 
 import numpy as np
@@ -11,8 +12,14 @@ logger = structlog.get_logger()
 
 # Varsayılan faktör ağırlıkları
 DEFAULT_WEIGHTS = {
-    "value": 0.15, "momentum": 0.20, "quality": 0.20, "size": 0.10,
-    "low_vol": 0.10, "dividend": 0.10, "leverage": 0.10, "bist_specific": 0.05,
+    "value": 0.15,
+    "momentum": 0.20,
+    "quality": 0.20,
+    "size": 0.10,
+    "low_vol": 0.10,
+    "dividend": 0.10,
+    "leverage": 0.10,
+    "bist_specific": 0.05,
 }
 
 # Rejime göre ağırlık ayarlamaları
@@ -70,9 +77,7 @@ def rank_stocks(
             all_keys = set()
             for f in factors_list:
                 all_keys.update(f.keys())
-            sector_means[sector] = {
-                k: np.mean([f.get(k, 0) for f in factors_list]) for k in all_keys
-            }
+            sector_means[sector] = {k: np.mean([f.get(k, 0) for f in factors_list]) for k in all_keys}
 
     # Her hisse için skor hesapla
     for stock in universe:
@@ -81,10 +86,7 @@ def rank_stocks(
 
         # Sektör-nötr düzeltme
         if sector_neutral and sector in sector_means:
-            adjusted_factors = {
-                k: factors.get(k, 0) - sector_means[sector].get(k, 0)
-                for k in factors
-            }
+            adjusted_factors = {k: factors.get(k, 0) - sector_means[sector].get(k, 0) for k in factors}
         else:
             adjusted_factors = factors
 
@@ -130,15 +132,11 @@ def rank_stocks(
     return universe
 
 
-def get_top_n(
-    ranked: list[dict[str, Any]], n: int = 10
-) -> list[dict[str, Any]]:
+def get_top_n(ranked: list[dict[str, Any]], n: int = 10) -> list[dict[str, Any]]:
     """İlk N hisseyi döndür."""
     return ranked[:n]
 
 
-def get_bottom_n(
-    ranked: list[dict[str, Any]], n: int = 10
-) -> list[dict[str, Any]]:
+def get_bottom_n(ranked: list[dict[str, Any]], n: int = 10) -> list[dict[str, Any]]:
     """Son N hisseyi döndür."""
     return ranked[-n:]

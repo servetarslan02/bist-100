@@ -109,6 +109,7 @@ def main():
     except Exception as e:
         print(f"  ✗ Test crashed: {e}")
         import traceback
+
         traceback.print_exc()
         total_failed += 1
 

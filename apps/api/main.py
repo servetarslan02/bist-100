@@ -42,6 +42,7 @@ logger = structlog.get_logger()
 # PYDANTIC MODELLER
 # =====================================================
 
+
 class OpportunityResponse(BaseModel):
     ticker: str
     rank: int
@@ -51,12 +52,14 @@ class OpportunityResponse(BaseModel):
     regime: str
     signals: dict
 
+
 class PortfolioResponse(BaseModel):
     date: str
     total_positions: int
     total_weight: float
     positions: list[dict]
     risk_metrics: dict
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -65,9 +68,11 @@ class HealthResponse(BaseModel):
     version: str
     modules: dict[str, str]
 
+
 class PredictRequest(BaseModel):
     ticker: str
     features: dict | None = None
+
 
 class PredictResponse(BaseModel):
     ticker: str
@@ -77,9 +82,11 @@ class PredictResponse(BaseModel):
     confidence: float
     feature_importance: dict[str, float]
 
+
 # =====================================================
 # FASTAPI UYGULAMASI
 # =====================================================
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,6 +94,7 @@ async def lifespan(app: FastAPI):
     logger.info("ALPHA BIST API starting up")
     yield
     logger.info("ALPHA BIST API shutting down")
+
 
 app = FastAPI(
     title="ALPHA BIST API v3.0 (Standalone)",
@@ -109,6 +117,7 @@ app.add_middleware(
 # ENDPOINT'LER
 # =====================================================
 
+
 @app.get("/", tags=["Root"])
 async def root():
     """API bilgisi."""
@@ -120,11 +129,13 @@ async def root():
         "health": "/health",
     }
 
+
 @app.get("/health", tags=["System"])
 async def health_check():
     """Sistem sağlık kontrolü — standart format."""
     try:
         from services.learning.super_intelligence import super_intelligence
+
         health = super_intelligence.get_health_status()
         return {
             "status": health.overall_status,
@@ -142,6 +153,7 @@ async def health_check():
             "error": str(e),
         }
 
+
 @app.get("/regime", tags=["Market"])
 async def get_regime():
     """Mevcut piyasa rejimi."""
@@ -149,6 +161,7 @@ async def get_regime():
         status_code=301,
         detail="This endpoint has moved. Use GET /api/v1/market/regime instead.",
     )
+
 
 @app.get("/opportunities", tags=["Trading"])
 async def get_opportunities(
@@ -162,6 +175,7 @@ async def get_opportunities(
         detail="This endpoint has moved. Use GET /api/v1/scanner/opportunities instead.",
     )
 
+
 @app.get("/opportunities/{ticker}", tags=["Trading"])
 async def get_opportunity_detail(ticker: str):
     """Belirli bir hissenin detaylı analizi."""
@@ -170,6 +184,7 @@ async def get_opportunity_detail(ticker: str):
         detail=f"Detail analysis for {ticker} not yet implemented. Run feature pipeline first.",
     )
 
+
 @app.get("/portfolio", response_model=PortfolioResponse, tags=["Trading"])
 async def get_portfolio_recommendation():
     """Portföy önerisi."""
@@ -177,6 +192,7 @@ async def get_portfolio_recommendation():
         status_code=301,
         detail="This endpoint has moved. Use GET /api/v1/portfolio/summary instead.",
     )
+
 
 @app.get("/backtest", tags=["Analysis"])
 async def get_backtest_results():
@@ -192,6 +208,7 @@ async def get_backtest_results():
         "backtest": report.backtest_summary,
     }
 
+
 @app.get("/learning", tags=["System"])
 async def get_learning_status():
     """Sürekli öğrenme durumu."""
@@ -199,6 +216,7 @@ async def get_learning_status():
         status_code=301,
         detail="This endpoint has moved. Use GET /api/v1/learning/ instead.",
     )
+
 
 @app.get("/features/{ticker}", tags=["Analysis"])
 async def get_features(ticker: str):
@@ -208,6 +226,7 @@ async def get_features(ticker: str):
         detail=f"This endpoint has moved. Use GET /api/v1/intelligence/features/{ticker} instead.",
     )
 
+
 @app.post("/predict", response_model=PredictResponse, tags=["Trading"])
 async def predict(request: PredictRequest):
     """Prediction endpoint — not yet implemented."""
@@ -216,12 +235,14 @@ async def predict(request: PredictRequest):
         detail="Prediction engine not yet connected. Run training pipeline first.",
     )
 
+
 @app.get("/pipeline/stats", tags=["System"])
 async def get_pipeline_stats():
     """Pipeline istatistikleri."""
     from services.core.orchestrator import orchestrator
 
     return orchestrator.get_pipeline_stats()
+
 
 @app.get("/reports/latest", tags=["System"])
 async def get_latest_report():
@@ -244,9 +265,11 @@ async def get_latest_report():
         "alerts": report.alerts,
     }
 
+
 # =====================================================
 # WEBSOCKET
 # =====================================================
+
 
 class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""
@@ -270,7 +293,9 @@ class ConnectionManager:
             except Exception:
                 logger.error("Unexpected error in broadcast", exc_info=True)
 
+
 manager = ConnectionManager()
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -285,6 +310,7 @@ async def websocket_endpoint(websocket: WebSocket):
     # Token doğrulama
     try:
         from services.api.auth import jwt_handler
+
         payload = jwt_handler.verify_token(token)
         if not payload:
             await websocket.close(code=4003, reason="Invalid or expired token")
@@ -296,11 +322,13 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         # İlk bağlantıda mevcut durumu gönder
-        await websocket.send_json({
-            "type": "init",
-            "message": f"Connected as {payload.username}",
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        await websocket.send_json(
+            {
+                "type": "init",
+                "message": f"Connected as {payload.username}",
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         while True:
             data = await websocket.receive_text()
@@ -309,19 +337,24 @@ async def websocket_endpoint(websocket: WebSocket):
             action = message.get("action", "")
 
             if action == "subscribe":
-                await websocket.send_json({
-                    "type": "subscribed",
-                    "channels": message.get("channels", []),
-                })
+                await websocket.send_json(
+                    {
+                        "type": "subscribed",
+                        "channels": message.get("channels", []),
+                    }
+                )
 
             elif action == "get_opportunities":
                 from services.core.orchestrator import orchestrator
+
                 report = orchestrator.get_latest_report()
                 if report:
-                    await websocket.send_json({
-                        "type": "opportunities",
-                        "data": report.top_opportunities[:10],
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "opportunities",
+                            "data": report.top_opportunities[:10],
+                        }
+                    )
 
             elif action == "ping":
                 await websocket.send_json({"type": "pong", "timestamp": datetime.now(UTC).isoformat()})
@@ -332,9 +365,11 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.error("WebSocket error", error=str(e))
         manager.disconnect(websocket)
 
+
 # =====================================================
 # BACKGROUND TASKS
 # =====================================================
+
 
 async def broadcast_updates():
     """Periyodik güncellemeleri broadcast et."""
@@ -342,15 +377,19 @@ async def broadcast_updates():
         await asyncio.sleep(60)  # Her 60 saniye
 
         from services.core.orchestrator import orchestrator
+
         report = orchestrator.get_latest_report()
 
         if report:
-            await manager.broadcast({
-                "type": "update",
-                "timestamp": datetime.now(UTC).isoformat(),
-                "regime": report.regime,
-                "top_opportunity": report.top_opportunities[0] if report.top_opportunities else None,
-            })
+            await manager.broadcast(
+                {
+                    "type": "update",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "regime": report.regime,
+                    "top_opportunity": report.top_opportunities[0] if report.top_opportunities else None,
+                }
+            )
+
 
 # =====================================================
 # MAIN
@@ -358,4 +397,5 @@ async def broadcast_updates():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

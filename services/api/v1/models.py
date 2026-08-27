@@ -11,6 +11,7 @@ logger = structlog.get_logger()
 
 router = APIRouter()
 
+
 @router.get("")
 @router.get("/")
 @router.get("/status")
@@ -23,6 +24,7 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
     """
     try:
         from ...core.model_persistence import ModelRegistry
+
         registry = ModelRegistry()
         models = registry.list_models()
 
@@ -45,15 +47,17 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
         "message": "Henüz model eğitimi tamamlanmadı. Model registry boş.",
     }
 
+
 @router.get("/performance")
 async def model_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     return {
         "performance": {
             "bist30y_ensemble_v1": {"ic": 0.045, "r2": 0.128, "sharpe": 1.01, "cagr": 15.72, "max_dd": -22.83},
-            "2024_2026_oos": {"profit_factor": 1.35, "max_dd": -22.83, "cagr": 9.86, "return_pct": 27.8}
+            "2024_2026_oos": {"profit_factor": 1.35, "max_dd": -22.83, "cagr": 9.86, "return_pct": 27.8},
         },
         "summary": "30 Yıllık Kurumsal BIST Eğitimi (1997-2026): 172.730 seanslık eğitim ve kilitli 2024-2026 kör OOS testi (%-22.83 Max DD, 1.35 PF, %1.0 Risk Parity Sizing, 3G Kriz Teyidi).",
     }
+
 
 @router.get("/champion")
 async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rate_limit)):
@@ -67,9 +71,14 @@ async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rat
         "holding_period_days": 63,
         "status": "LOCKED_IN_PRODUCTION",
         "top_picks": ["AKFYE", "CWENE", "HALKB", "BIOEN", "MGROS", "PETKM", "AEFES", "SISE"],
-        "metrics": {"sharpe": 2.56, "cagr_pct": 105.4, "max_dd_pct": -8.4}
+        "metrics": {"sharpe": 2.56, "cagr_pct": 105.4, "max_dd_pct": -8.4},
     }
+
 
 @router.post("/retrain")
 async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"status": "started", "model": model_name, "message": "Eğitim arka planda Docker container içerisinde çalıştırılır."}
+    return {
+        "status": "started",
+        "model": model_name,
+        "message": "Eğitim arka planda Docker container içerisinde çalıştırılır.",
+    }

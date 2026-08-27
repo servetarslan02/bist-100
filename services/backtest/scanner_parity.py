@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class ParityConfig:
     """Parity konfigürasyonu."""
+
     feature_version: str = "v1.0"
     scoring_version: str = "v1.0"
     risk_version: str = "v1.0"
@@ -44,6 +45,7 @@ class ParityConfig:
 @dataclass
 class ParityCheckResult:
     """Parity kontrol sonucu."""
+
     check_type: str  # feature | signal | risk | cost
     is_parity: bool
     backtest_value: Any
@@ -64,6 +66,7 @@ class ParityCheckResult:
 @dataclass
 class ParityReport:
     """Parity raporu."""
+
     timestamp: str
     config_hash: str
     total_checks: int
@@ -215,14 +218,16 @@ class BacktestScannerParity:
 
         # Feature parity
         for ticker in test_tickers[:5]:  # İlk 5 hisse
-            ticker_data = test_data.filter(pl.col('ticker') == ticker) if "ticker" in test_data.columns else test_data
+            ticker_data = test_data.filter(pl.col("ticker") == ticker) if "ticker" in test_data.columns else test_data
             result = self.verify_feature_parity(ticker_data, ticker, test_timestamp)
             checks.append(result)
 
         # Signal parity
         if self._feature_engine and self._signal_engine:
             for ticker in test_tickers[:5]:
-                ticker_data = test_data.filter(pl.col('ticker') == ticker) if "ticker" in test_data.columns else test_data
+                ticker_data = (
+                    test_data.filter(pl.col("ticker") == ticker) if "ticker" in test_data.columns else test_data
+                )
                 features = self._feature_engine(ticker_data, ticker, test_timestamp)
                 result = self.verify_signal_parity(features, ticker)
                 checks.append(result)
@@ -240,11 +245,9 @@ class BacktestScannerParity:
             checks=checks,
         )
 
-        logger.info("Parity check complete",
-                    total=len(checks),
-                    passed=passed,
-                    failed=failed,
-                    full_parity=report.is_full_parity)
+        logger.info(
+            "Parity check complete", total=len(checks), passed=passed, failed=failed, full_parity=report.is_full_parity
+        )
 
         return report
 
@@ -273,12 +276,12 @@ class FeatureVersionLock:
             "config": computation_config,
             "registered_at": datetime.now(UTC).isoformat(),
             "hash": hashlib.sha256(
-                orjson.dumps({"names": feature_names, "config": computation_config}, option=orjson.OPT_SORT_KEYS).decode()
+                orjson.dumps(
+                    {"names": feature_names, "config": computation_config}, option=orjson.OPT_SORT_KEYS
+                ).decode()
             ).hexdigest()[:16],
         }
-        logger.info("Feature version registered",
-                    version=version,
-                    features=len(feature_names))
+        logger.info("Feature version registered", version=version, features=len(feature_names))
 
     def set_active_version(self, version: str):
         """Aktif versiyonu ayarla."""

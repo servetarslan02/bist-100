@@ -103,9 +103,7 @@ class PaperRiskGate:
 
         blocked = [c for c in checks if c["result"] in ("BLOCK", "NO_TRADE")]
         if blocked:
-            logger.warning("Risk gate BLOCKED",
-                          ticker=ticker, side=side,
-                          reasons=[c["check_name"] for c in blocked])
+            logger.warning("Risk gate BLOCKED", ticker=ticker, side=side, reasons=[c["check_name"] for c in blocked])
         else:
             logger.info("Risk gate PASSED", ticker=ticker, side=side)
 
@@ -154,11 +152,21 @@ class PaperRiskGate:
 
     def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
         if side == "SELL":
-            return {"check_name": "position_size", "result": "PASS", "details": "SELL side — no position size limit", "severity": "INFO"}
+            return {
+                "check_name": "position_size",
+                "result": "PASS",
+                "details": "SELL side — no position size limit",
+                "severity": "INFO",
+            }
 
         total_value = portfolio.get_total_value()
         if total_value <= 0:
-            return {"check_name": "position_size", "result": "BLOCK", "details": "Portfolio value is zero", "severity": "BLOCK"}
+            return {
+                "check_name": "position_size",
+                "result": "BLOCK",
+                "details": "Portfolio value is zero",
+                "severity": "BLOCK",
+            }
 
         new_position_value = quantity * price
         current_position_value = 0.0
@@ -176,15 +184,32 @@ class PaperRiskGate:
                 "details": f"Position {position_pct:.1f}% > limit {self.max_position_pct}%",
                 "severity": "BLOCK",
             }
-        return {"check_name": "position_size", "result": "PASS", "details": f"{position_pct:.1f}% <= {self.max_position_pct}%", "severity": "INFO"}
+        return {
+            "check_name": "position_size",
+            "result": "PASS",
+            "details": f"{position_pct:.1f}% <= {self.max_position_pct}%",
+            "severity": "INFO",
+        }
 
-    def _check_sector_concentration(self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str) -> dict[str, Any]:
+    def _check_sector_concentration(
+        self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str
+    ) -> dict[str, Any]:
         if not sector or side == "SELL":
-            return {"check_name": "sector_concentration", "result": "PASS", "details": "No sector or SELL side", "severity": "INFO"}
+            return {
+                "check_name": "sector_concentration",
+                "result": "PASS",
+                "details": "No sector or SELL side",
+                "severity": "INFO",
+            }
 
         total_value = portfolio.get_total_value()
         if total_value <= 0:
-            return {"check_name": "sector_concentration", "result": "PASS", "details": "Portfolio value is zero", "severity": "INFO"}
+            return {
+                "check_name": "sector_concentration",
+                "result": "PASS",
+                "details": "Portfolio value is zero",
+                "severity": "INFO",
+            }
 
         sector_values = defaultdict(float)
         for pos in portfolio.get_all_positions():
@@ -203,12 +228,24 @@ class PaperRiskGate:
                 "details": f"Sector {sector}: {max_sector_pct:.1f}% > limit {self.max_sector_pct}%",
                 "severity": "BLOCK",
             }
-        return {"check_name": "sector_concentration", "result": "PASS", "details": f"Max sector {max_sector_pct:.1f}% <= {self.max_sector_pct}%", "severity": "INFO"}
+        return {
+            "check_name": "sector_concentration",
+            "result": "PASS",
+            "details": f"Max sector {max_sector_pct:.1f}% <= {self.max_sector_pct}%",
+            "severity": "INFO",
+        }
 
-    def _check_portfolio_exposure(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
+    def _check_portfolio_exposure(
+        self, portfolio, ticker: str, side: str, quantity: int, price: float
+    ) -> dict[str, Any]:
         total_value = portfolio.get_total_value()
         if total_value <= 0:
-            return {"check_name": "portfolio_exposure", "result": "PASS", "details": "Portfolio value is zero", "severity": "INFO"}
+            return {
+                "check_name": "portfolio_exposure",
+                "result": "PASS",
+                "details": "Portfolio value is zero",
+                "severity": "INFO",
+            }
 
         current_exposure = portfolio.get_invested_value()
         if side == "BUY":
@@ -227,7 +264,12 @@ class PaperRiskGate:
                 "details": f"Exposure {exposure_pct:.1f}% > limit {self.max_portfolio_exposure_pct}%",
                 "severity": "BLOCK",
             }
-        return {"check_name": "portfolio_exposure", "result": "PASS", "details": f"{exposure_pct:.1f}% <= {self.max_portfolio_exposure_pct}%", "severity": "INFO"}
+        return {
+            "check_name": "portfolio_exposure",
+            "result": "PASS",
+            "details": f"{exposure_pct:.1f}% <= {self.max_portfolio_exposure_pct}%",
+            "severity": "INFO",
+        }
 
     def _check_drawdown(self, portfolio) -> dict[str, Any]:
         current_dd = portfolio.get_current_drawdown()
@@ -250,7 +292,12 @@ class PaperRiskGate:
                 "severity": "WARN",
             }
 
-        return {"check_name": "drawdown", "result": "PASS", "details": f"{current_dd:.1f}% < {self.max_drawdown_pct}%", "severity": "INFO"}
+        return {
+            "check_name": "drawdown",
+            "result": "PASS",
+            "details": f"{current_dd:.1f}% < {self.max_drawdown_pct}%",
+            "severity": "INFO",
+        }
 
     def _check_daily_loss(self, portfolio) -> dict[str, Any]:
         if len(portfolio._equity_curve) < 2:

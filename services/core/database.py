@@ -50,9 +50,8 @@ async def _retry_async(coro_factory, name: str, max_retries: int = _MAX_RETRIES)
         except Exception as e:
             last_error = e
             if attempt < max_retries:
-                delay = _RETRY_BASE_DELAY * (2 ** attempt)
-                logger.warning(f"{name} attempt {attempt + 1} failed, retrying in {delay}s",
-                             error=str(e))
+                delay = _RETRY_BASE_DELAY * (2**attempt)
+                logger.warning(f"{name} attempt {attempt + 1} failed, retrying in {delay}s", error=str(e))
                 await asyncio.sleep(delay)
     logger.error(f"{name} failed after {max_retries + 1} attempts", error=str(last_error))
     raise last_error
@@ -62,8 +61,8 @@ async def _retry_async(coro_factory, name: str, max_retries: int = _MAX_RETRIES)
 # PostgreSQL (Async) — Primary + Replica
 # =====================================================
 
-_pg_pool = None           # Primary (yazma)
-_pg_replica_pool = None   # Replica (okuma)
+_pg_pool = None  # Primary (yazma)
+_pg_replica_pool = None  # Replica (okuma)
 _pg_healthy = False
 
 
@@ -73,6 +72,7 @@ async def get_pg_pool():
     if asyncpg is None:
         raise RuntimeError("asyncpg not installed. Run: pip install asyncpg")
     if _pg_pool is None:
+
         async def _create():
             return await asyncpg.create_pool(
                 host=settings.postgres_host,
@@ -84,6 +84,7 @@ async def get_pg_pool():
                 max_size=settings.db_pool_max,
                 command_timeout=settings.db_command_timeout,
             )
+
         _pg_pool = await _retry_async(_create, "PostgreSQL primary pool")
         _pg_healthy = True
         logger.info("PostgreSQL primary pool created", host=settings.postgres_host)
@@ -96,13 +97,14 @@ async def get_pg_replica_pool():
     if asyncpg is None:
         raise RuntimeError("asyncpg not installed")
 
-    replica_host = getattr(settings, 'postgres_replica_host', None)
-    replica_port = getattr(settings, 'postgres_replica_port', 5433)
+    replica_host = getattr(settings, "postgres_replica_host", None)
+    replica_port = getattr(settings, "postgres_replica_port", 5433)
 
     if not replica_host:
         return await get_pg_pool()
 
     if _pg_replica_pool is None:
+
         async def _create():
             return await asyncpg.create_pool(
                 host=replica_host,
@@ -114,6 +116,7 @@ async def get_pg_replica_pool():
                 max_size=settings.db_pool_max,
                 command_timeout=settings.db_command_timeout,
             )
+
         try:
             _pg_replica_pool = await _retry_async(_create, "PostgreSQL replica pool")
             logger.info("PostgreSQL replica pool created", host=replica_host)
@@ -169,10 +172,18 @@ async def pg_execute(query: str, *args) -> str:
                 return await conn.execute(query, *args)
         except Exception as e:
             error_str = str(e).lower()
-            is_connection_error = any(kw in error_str for kw in [
-                'connection', 'closed', 'terminated', 'reset', 'broken',
-                'interfaceerror', 'connectiondoesnotexisterror'
-            ])
+            is_connection_error = any(
+                kw in error_str
+                for kw in [
+                    "connection",
+                    "closed",
+                    "terminated",
+                    "reset",
+                    "broken",
+                    "interfaceerror",
+                    "connectiondoesnotexisterror",
+                ]
+            )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_execute connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
@@ -193,10 +204,18 @@ async def pg_fetch(query: str, *args):
                 return await conn.fetch(query, *args)
         except Exception as e:
             error_str = str(e).lower()
-            is_connection_error = any(kw in error_str for kw in [
-                'connection', 'closed', 'terminated', 'reset', 'broken',
-                'interfaceerror', 'connectiondoesnotexisterror'
-            ])
+            is_connection_error = any(
+                kw in error_str
+                for kw in [
+                    "connection",
+                    "closed",
+                    "terminated",
+                    "reset",
+                    "broken",
+                    "interfaceerror",
+                    "connectiondoesnotexisterror",
+                ]
+            )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetch connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
@@ -218,10 +237,18 @@ async def pg_fetchrow(query: str, *args):
                 return await conn.fetchrow(query, *args)
         except Exception as e:
             error_str = str(e).lower()
-            is_connection_error = any(kw in error_str for kw in [
-                'connection', 'closed', 'terminated', 'reset', 'broken',
-                'interfaceerror', 'connectiondoesnotexisterror'
-            ])
+            is_connection_error = any(
+                kw in error_str
+                for kw in [
+                    "connection",
+                    "closed",
+                    "terminated",
+                    "reset",
+                    "broken",
+                    "interfaceerror",
+                    "connectiondoesnotexisterror",
+                ]
+            )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetchrow connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
@@ -243,10 +270,18 @@ async def pg_fetchval(query: str, *args) -> Any:
                 return await conn.fetchval(query, *args)
         except Exception as e:
             error_str = str(e).lower()
-            is_connection_error = any(kw in error_str for kw in [
-                'connection', 'closed', 'terminated', 'reset', 'broken',
-                'interfaceerror', 'connectiondoesnotexisterror'
-            ])
+            is_connection_error = any(
+                kw in error_str
+                for kw in [
+                    "connection",
+                    "closed",
+                    "terminated",
+                    "reset",
+                    "broken",
+                    "interfaceerror",
+                    "connectiondoesnotexisterror",
+                ]
+            )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetchval connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
@@ -317,6 +352,7 @@ def ch_execute(query: str, parameters: dict | None = None) -> Any:
                 _ch_client = None
                 _ch_healthy = False
                 import time
+
                 time.sleep(1 * (attempt + 1))
                 continue
             logger.error("ClickHouse query failed after retries", error=str(e))
@@ -339,6 +375,7 @@ def ch_insert(table: str, data: list[list[Any]], column_names: list[str] | None 
                 _ch_client = None
                 _ch_healthy = False
                 import time
+
                 time.sleep(1 * (attempt + 1))
                 continue
             logger.error("ClickHouse insert failed after retries", error=str(e))
@@ -347,6 +384,7 @@ def ch_insert(table: str, data: list[list[Any]], column_names: list[str] | None 
 
 def ch_query_df(query: str, parameters: dict | None = None):
     import polars as pl
+
     with _ch_lock:
         client = get_ch_client()
         result = client.query_df(query, parameters=parameters)
@@ -369,6 +407,7 @@ async def get_redis():
     if _redis is None:
         try:
             from .redis_sentinel import get_ha_redis
+
             _redis = await get_ha_redis()
         except Exception:
             # Fallback: direct connection
@@ -387,6 +426,7 @@ async def close_redis():
     if _redis:
         try:
             from .redis_sentinel import close_ha_redis
+
             await close_ha_redis()
         except Exception:
             logger.warning("Caught Exception in close_redis", exc_info=True)
@@ -432,6 +472,7 @@ async def redis_publish(channel: str, message: str):
 # =====================================================
 # Health Check
 # =====================================================
+
 
 async def check_db_health() -> dict[str, Any]:
     """Check health of all database connections."""
@@ -479,6 +520,7 @@ async def check_db_health() -> dict[str, Any]:
 # =====================================================
 # Lifecycle
 # =====================================================
+
 
 async def init_databases():
     """Initialize all database connections. Graceful on failure."""

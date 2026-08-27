@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class FilterResult:
     """Filtre sonucu."""
+
     ticker: str
     passed: bool
     filter_name: str
@@ -30,6 +31,7 @@ class FilterResult:
 @dataclass
 class CustomFilter:
     """Özel filtre tanımı."""
+
     name: str
     description: str
     condition: Callable[[dict[str, Any]], bool]  # result → passed?
@@ -59,47 +61,57 @@ class CustomFilterEngine:
         """BIST'e özel hazır filtreler."""
 
         # Filtre 1: Minimum hacim
-        self._filters.append(CustomFilter(
-            name="min_volume",
-            description="Günlük hacim 100K lot altı hariç",
-            condition=lambda r: r.get("volume", 0) >= 100000,
-            action="exclude",
-        ))
+        self._filters.append(
+            CustomFilter(
+                name="min_volume",
+                description="Günlük hacim 100K lot altı hariç",
+                condition=lambda r: r.get("volume", 0) >= 100000,
+                action="exclude",
+            )
+        )
 
         # Filtre 2: Minimum fiyat
-        self._filters.append(CustomFilter(
-            name="min_price",
-            description="Fiyat 1 TL altı hariç",
-            condition=lambda r: r.get("price", 0) >= 1.0,
-            action="exclude",
-        ))
+        self._filters.append(
+            CustomFilter(
+                name="min_price",
+                description="Fiyat 1 TL altı hariç",
+                condition=lambda r: r.get("price", 0) >= 1.0,
+                action="exclude",
+            )
+        )
 
         # Filtre 3: Maksimum spread (likidite)
-        self._filters.append(CustomFilter(
-            name="max_spread",
-            description="Spread %5'ten fazla olan hariç",
-            condition=lambda r: r.get("spread_pct", 0) <= 5.0 or r.get("spread_pct", 0) == 0,
-            action="exclude",
-        ))
+        self._filters.append(
+            CustomFilter(
+                name="max_spread",
+                description="Spread %5'ten fazla olan hariç",
+                condition=lambda r: r.get("spread_pct", 0) <= 5.0 or r.get("spread_pct", 0) == 0,
+                action="exclude",
+            )
+        )
 
         # Filtre 4: Aşırı alım kontrolü
-        self._filters.append(CustomFilter(
-            name="overbought_filter",
-            description="RSI > 80 olanları filtrele",
-            condition=lambda r: r.get("rsi", 50) <= 80,
-            action="exclude",
-            enabled=False,  # Opsiyonel
-        ))
+        self._filters.append(
+            CustomFilter(
+                name="overbought_filter",
+                description="RSI > 80 olanları filtrele",
+                condition=lambda r: r.get("rsi", 50) <= 80,
+                action="exclude",
+                enabled=False,  # Opsiyonel
+            )
+        )
 
         # Filtre 5: Düşük volatilite bonusu
-        self._filters.append(CustomFilter(
-            name="low_vol_bonus",
-            description="Düşük volatilite hisselerine bonus",
-            condition=lambda r: r.get("volatility", 20) < 15,
-            action="adjust_score",
-            score_adjustment=5.0,
-            enabled=False,  # Opsiyonel
-        ))
+        self._filters.append(
+            CustomFilter(
+                name="low_vol_bonus",
+                description="Düşük volatilite hisselerine bonus",
+                condition=lambda r: r.get("volatility", 20) < 15,
+                action="adjust_score",
+                score_adjustment=5.0,
+                enabled=False,  # Opsiyonel
+            )
+        )
 
     def add_filter(self, custom_filter: CustomFilter):
         """Yeni filtre ekle.
@@ -167,14 +179,16 @@ class CustomFilterEngine:
                 if not passed:
                     if f.action == "exclude":
                         passed_all = False
-                        filter_log.append(FilterResult(
-                            ticker=ticker,
-                            passed=False,
-                            filter_name=f.name,
-                            reason=f.description,
-                            original_score=original_score,
-                            adjusted_score=original_score,
-                        ))
+                        filter_log.append(
+                            FilterResult(
+                                ticker=ticker,
+                                passed=False,
+                                filter_name=f.name,
+                                reason=f.description,
+                                original_score=original_score,
+                                adjusted_score=original_score,
+                            )
+                        )
                         break
                 else:
                     # Koşul sağlandı → adjust_score ise skor ayarla
@@ -191,28 +205,31 @@ class CustomFilterEngine:
                 filtered.append(result)
 
                 if score_adjustment != 0:
-                    filter_log.append(FilterResult(
-                        ticker=ticker,
-                        passed=True,
-                        filter_name="score_adjustment",
-                        reason=f"Skor {score_adjustment:+.1f} ayarlandı",
-                        original_score=original_score,
-                        adjusted_score=original_score + score_adjustment,
-                    ))
+                    filter_log.append(
+                        FilterResult(
+                            ticker=ticker,
+                            passed=True,
+                            filter_name="score_adjustment",
+                            reason=f"Skor {score_adjustment:+.1f} ayarlandı",
+                            original_score=original_score,
+                            adjusted_score=original_score + score_adjustment,
+                        )
+                    )
             else:
-                filter_log.append(FilterResult(
-                    ticker=ticker,
-                    passed=False,
-                    filter_name="filtered_out",
-                    reason="Filtre tarafından elendi",
-                    original_score=original_score,
-                    adjusted_score=original_score,
-                ))
+                filter_log.append(
+                    FilterResult(
+                        ticker=ticker,
+                        passed=False,
+                        filter_name="filtered_out",
+                        reason="Filtre tarafından elendi",
+                        original_score=original_score,
+                        adjusted_score=original_score,
+                    )
+                )
 
-        logger.info("Filters applied",
-                    input=len(results),
-                    output=len(filtered),
-                    filtered_out=len(results) - len(filtered))
+        logger.info(
+            "Filters applied", input=len(results), output=len(filtered), filtered_out=len(results) - len(filtered)
+        )
 
         return filtered, filter_log
 
@@ -222,13 +239,16 @@ class CustomFilterEngine:
         Returns:
             Filtre listesi
         """
-        return [{
-            "name": f.name,
-            "description": f.description,
-            "action": f.action,
-            "enabled": f.enabled,
-            "score_adjustment": f.score_adjustment,
-        } for f in self._filters]
+        return [
+            {
+                "name": f.name,
+                "description": f.description,
+                "action": f.action,
+                "enabled": f.enabled,
+                "score_adjustment": f.score_adjustment,
+            }
+            for f in self._filters
+        ]
 
     def get_filter_stats(
         self,

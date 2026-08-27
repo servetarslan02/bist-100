@@ -20,7 +20,20 @@ def seed_history():
         {"id": "LSTM_Sequential", "acc": 0.58, "ret_mean": 1.5, "sharpe_target": 1.1, "brier": 0.22},
     ]
 
-    tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "POLTK", "SDTTR", "KONYA", "REEDR", "FORTE", "ALFAS", "BIMAS"]
+    tickers = [
+        "THYAO",
+        "ASELS",
+        "GARAN",
+        "KCHOL",
+        "TUPRS",
+        "POLTK",
+        "SDTTR",
+        "KONYA",
+        "REEDR",
+        "FORTE",
+        "ALFAS",
+        "BIMAS",
+    ]
     regimes = ["BULL_MOMENTUM", "BEAR_CORRECTION", "RANGE_BOUND", "HIGH_VOLATILITY"]
 
     print("Populating initial 40 historical evaluations per model...")
@@ -31,7 +44,7 @@ def seed_history():
             ticker = tickers[i % len(tickers)]
             regime = regimes[i % len(regimes)]
             pred_dir = "UP" if np.random.rand() > 0.35 else "DOWN"
-            is_correct = (np.random.rand() < true_acc)
+            is_correct = np.random.rand() < true_acc
             act_dir = pred_dir if is_correct else ("DOWN" if pred_dir == "UP" else "UP")
 
             entry_p = 100.0 + (i * 3.5)
@@ -56,7 +69,8 @@ def seed_history():
     print(f"Models Evaluated: {res['models_evaluated']}")
     print("Updated Adaptive Fusion Weights:")
     for k, v in res["fusion_weights"].items():
-        print(f"  - {k}: %{v*100:.1f}")
+        print(f"  - {k}: %{v * 100:.1f}")
+
 
 if __name__ == "__main__":
     seed_history()

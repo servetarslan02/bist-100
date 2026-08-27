@@ -19,8 +19,9 @@ class MarketAnalyst:
     def __init__(self):
         self._cache: dict[str, dict[str, Any]] = {}
 
-    def analyze_ticker(self, ticker: str, features: dict[str, float] | None = None,
-                       model_score: float | None = None) -> dict[str, Any]:
+    def analyze_ticker(
+        self, ticker: str, features: dict[str, float] | None = None, model_score: float | None = None
+    ) -> dict[str, Any]:
         """Tek hisse için analiz üret."""
         result = {
             "ticker": ticker,
@@ -98,14 +99,17 @@ class MarketAnalyst:
         atr = features.get("atr_pct", 0)
         if atr > 3.0:
             risk_factors.append({"factor": "Yüksek volatilite", "level": "HIGH"})
-        return {"risk_factors": risk_factors, "overall_risk": "YÜKSEK" if len(risk_factors) >= 2 else "ORTA" if risk_factors else "DÜŞÜK"}
+        return {
+            "risk_factors": risk_factors,
+            "overall_risk": "YÜKSEK" if len(risk_factors) >= 2 else "ORTA" if risk_factors else "DÜŞÜK",
+        }
 
     def _generate_summary(self, sections: dict[str, Any]) -> str:
         model = sections.get("model", {})
         risk = sections.get("risk", {})
         parts = []
         if model.get("direction") == "YUKARI":
-            parts.append(f"Model yukarı yön işaret ediyor (güven: %{model.get('confidence', 0)*100:.0f})")
+            parts.append(f"Model yukarı yön işaret ediyor (güven: %{model.get('confidence', 0) * 100:.0f})")
         elif model.get("direction") == "AŞAĞI":
             parts.append("Model aşağı yön işaret ediyor")
         else:

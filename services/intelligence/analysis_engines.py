@@ -16,7 +16,6 @@ Ek analiz motorları:
 - Data Confidence Engine
 """
 
-
 import numpy as np
 import structlog
 
@@ -26,7 +25,9 @@ logger = structlog.get_logger()
 class PriceActionEngine:
     """Price Action analiz motoru."""
 
-    def detect_patterns(self, open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray) -> dict[str, float]:
+    def detect_patterns(
+        self, open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray
+    ) -> dict[str, float]:
         """Fiyat paternlerini tespit et."""
         n = len(close)
         if n < 5:
@@ -76,7 +77,9 @@ class PriceActionEngine:
 class SupportResistanceEngine:
     """Support/Resistance seviye tespiti."""
 
-    def compute_levels(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 20) -> dict[str, float]:
+    def compute_levels(
+        self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 20
+    ) -> dict[str, float]:
         """Destek ve direnç seviyeleri."""
         n = len(close)
         if n < period:
@@ -86,9 +89,9 @@ class SupportResistanceEngine:
         swing_highs = []
         swing_lows = []
         for i in range(2, min(period, n - 2)):
-            if high[-i] > high[-i-1] and high[-i] > high[-i+1]:
+            if high[-i] > high[-i - 1] and high[-i] > high[-i + 1]:
                 swing_highs.append(float(high[-i]))
-            if low[-i] < low[-i-1] and low[-i] < low[-i+1]:
+            if low[-i] < low[-i - 1] and low[-i] < low[-i + 1]:
                 swing_lows.append(float(low[-i]))
 
         # En güçlü seviyeler
@@ -97,9 +100,9 @@ class SupportResistanceEngine:
 
         features = {}
         for i, r in enumerate(resistance):
-            features[f"resistance_{i+1}"] = round(r, 2)
+            features[f"resistance_{i + 1}"] = round(r, 2)
         for i, s in enumerate(support):
-            features[f"support_{i+1}"] = round(s, 2)
+            features[f"support_{i + 1}"] = round(s, 2)
 
         # Mevcut fiyatın konumu
         price = close[-1]
@@ -125,9 +128,9 @@ class VolumeEngine:
         # OBV (On Balance Volume)
         obv = 0
         for i in range(1, min(n, 20)):
-            if close[-i] > close[-i-1]:
+            if close[-i] > close[-i - 1]:
                 obv += volume[-i]
-            elif close[-i] < close[-i-1]:
+            elif close[-i] < close[-i - 1]:
                 obv -= volume[-i]
         features["obv_20d"] = float(obv)
 
@@ -239,7 +242,9 @@ class DrawdownEngine:
 class PositionRiskEngine:
     """Pozisyon risk motoru."""
 
-    def compute(self, position_value: float, portfolio_value: float, volatility: float, correlation: float) -> dict[str, float]:
+    def compute(
+        self, position_value: float, portfolio_value: float, volatility: float, correlation: float
+    ) -> dict[str, float]:
         """Pozisyon risk metrikleri."""
         if portfolio_value <= 0:
             return {}
@@ -287,15 +292,12 @@ class ModelRiskEngine:
 class DataConfidenceEngine:
     """Veri güvenilirliği motoru."""
 
-    def compute(self, data_quality: float, model_reliability: float, source_reliability: float, agreement: float) -> dict[str, float]:
+    def compute(
+        self, data_quality: float, model_reliability: float, source_reliability: float, agreement: float
+    ) -> dict[str, float]:
         """Genel güvenilirlik skoru."""
         # Weighted average
-        confidence = (
-            data_quality * 0.30 +
-            model_reliability * 0.30 +
-            source_reliability * 0.20 +
-            agreement * 0.20
-        )
+        confidence = data_quality * 0.30 + model_reliability * 0.30 + source_reliability * 0.20 + agreement * 0.20
 
         return {
             "data_confidence": round(confidence, 4),
@@ -309,7 +311,9 @@ class DataConfidenceEngine:
 class PortfolioOptimization:
     """Portföy optimizasyon motoru."""
 
-    def compute_optimal_weights(self, expected_returns: np.ndarray, cov_matrix: np.ndarray, method: str = "min_volatility") -> np.ndarray:
+    def compute_optimal_weights(
+        self, expected_returns: np.ndarray, cov_matrix: np.ndarray, method: str = "min_volatility"
+    ) -> np.ndarray:
         """Optimal ağırlıkları hesapla."""
         n = len(expected_returns)
         if n == 0:

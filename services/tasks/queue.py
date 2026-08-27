@@ -20,6 +20,7 @@ import structlog
 
 try:
     from celery import Celery
+
     HAS_CELERY = True
 except ImportError:
     HAS_CELERY = False
@@ -30,6 +31,7 @@ logger = structlog.get_logger()
 # =====================================================
 # Celery App
 # =====================================================
+
 
 def _get_broker_url() -> str:
     """Redis broker URL'ini oluştur."""
@@ -74,6 +76,7 @@ if HAS_CELERY:
         """Backtest görevi — arka planda çalışır."""
         try:
             from services.backtest.engine import BacktestEngine
+
             engine = BacktestEngine()
             result = engine.run_walk_forward(ticker=ticker, lookback_days=days)
             return {"status": "completed", "ticker": ticker, "result": result}
@@ -86,6 +89,7 @@ if HAS_CELERY:
         """Model eğitim görevi — GPU gerektirir."""
         try:
             from services.ml.train_all_models import train_all
+
             result = train_all(model_type=model_type)
             return {"status": "completed", "model_type": model_type, "result": result}
         except Exception as e:
@@ -97,6 +101,7 @@ if HAS_CELERY:
         """Veri backfill görevi — eksik günleri tamamla."""
         try:
             from scripts.backfill_data import backfill
+
             result = backfill(days=days)
             return {"status": "completed", "days": days, "result": result}
         except Exception as e:
@@ -108,6 +113,7 @@ if HAS_CELERY:
         """Rapor oluşturma görevi."""
         try:
             from services.core.reporting import generate_report
+
             generate_report(report_type=report_type)
             return {"status": "completed", "report_type": report_type}
         except Exception as e:
@@ -119,6 +125,7 @@ if HAS_CELERY:
         """Stres testi görevi — Monte Carlo simülasyonu."""
         try:
             from services.risk.stress_test import StressTestEngine
+
             engine = StressTestEngine()
             portfolio = {"total_value": portfolio_value, "positions": {}}
             report = engine.run_all_scenarios(portfolio)
@@ -136,6 +143,7 @@ else:
 # =====================================================
 # Convenience Functions (sync wrapper)
 # =====================================================
+
 
 def submit_task(task_name: str, *args, **kwargs) -> str | None:
     """Görevi kuyruğa al. Task ID döndürür."""

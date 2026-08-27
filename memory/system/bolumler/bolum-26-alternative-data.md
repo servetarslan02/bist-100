@@ -74,23 +74,19 @@ Geleneksel verilerle birleştirme → Model input → Tahmin
 # services/alternative/credit_card.py
 def compute_cc_features(cc_data, ticker):
     features = {}
-    
+
     # Aylık harcama trendi
     features["cc_spend_growth"] = cc_data[ticker]["spend_growth_mom"]
     features["cc_spend_growth_yoy"] = cc_data[ticker]["spend_growth_yoy"]
-    
+
     # Sektör karşılaştırması
-    features["cc_vs_sector"] = (
-        cc_data[ticker]["spend_growth"] - 
-        cc_data[cc_data[ticker]["sector"]]["avg_spend_growth"]
-    )
-    
+    features["cc_vs_sector"] = cc_data[ticker]["spend_growth"] - cc_data[cc_data[ticker]["sector"]]["avg_spend_growth"]
+
     # Mevsimsellik
     features["cc_seasonal_deviation"] = (
-        cc_data[ticker]["spend"] - 
-        cc_data[ticker]["spend_3y_avg_same_month"]
+        cc_data[ticker]["spend"] - cc_data[ticker]["spend_3y_avg_same_month"]
     ) / cc_data[ticker]["spend_3y_avg_same_month"]
-    
+
     return features
 ```
 
@@ -164,18 +160,17 @@ def compute_web_features(scraped_data, ticker):
 # services/alternative/satellite.py
 def compute_satellite_features(sat_data, ticker):
     features = {}
-    
+
     # Fabrika trafiği
     features["factory_traffic_change"] = sat_data[ticker]["vehicle_count_change"]
     features["factory_traffic_vs_baseline"] = (
-        sat_data[ticker]["vehicle_count"] / 
-        sat_data[ticker]["vehicle_count_1y_avg"]
+        sat_data[ticker]["vehicle_count"] / sat_data[ticker]["vehicle_count_1y_avg"]
     )
-    
+
     # Mağaza trafiği (perakende)
     if sat_data[ticker].get("store_parking"):
         features["store_traffic_change"] = sat_data[ticker]["parking_fill_change"]
-    
+
     return features
 ```
 

@@ -30,10 +30,15 @@ async def setup_portfolio():
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
 
     svc = PortfolioService(initial_capital=100000)
     await svc.start()
@@ -222,8 +227,6 @@ async def test_metrics_sync():
     return "Metrics Sync", len(issues) == 0, issues
 
 
-
-
 async def test_monitor_without_service():
     """Service bağlanmadan monitor çağırmak hata vermemeli."""
     monitor = PortfolioMonitor()
@@ -267,6 +270,7 @@ async def test_lock_health_degraded():
 # ============================================================
 # RUN
 # ============================================================
+
 
 async def run_all():
     print("=" * 60)

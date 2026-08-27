@@ -42,11 +42,16 @@ class MLModelLoader:
                 hash_file = model_file.parent / "model.pkl.sha256"
                 if hash_file.exists():
                     import hashlib
+
                     expected_hash = hash_file.read_text().strip()
                     actual_hash = hashlib.sha256(model_file.read_bytes()).hexdigest()
                     if actual_hash != expected_hash:
-                        logger.error("Model hash MISMATCH — possible tampering",
-                                   name=model_name, expected=expected_hash[:16], actual=actual_hash[:16])
+                        logger.error(
+                            "Model hash MISMATCH — possible tampering",
+                            name=model_name,
+                            expected=expected_hash[:16],
+                            actual=actual_hash[:16],
+                        )
                         continue
 
                 with open(model_file, "rb") as f:
@@ -167,12 +172,18 @@ class MLModelLoader:
         rsi = features.get("rsi_14", 50)
 
         score = 50
-        if mom > 5: score += min(mom * 2, 20)
-        elif mom < -5: score += max(mom * 2, -20)
-        if vol_z > 2: score += min(vol_z * 5, 15)
-        if 30 < rsi < 70: score += 5
-        elif rsi < 25: score += 10
-        elif rsi > 75: score -= 10
+        if mom > 5:
+            score += min(mom * 2, 20)
+        elif mom < -5:
+            score += max(mom * 2, -20)
+        if vol_z > 2:
+            score += min(vol_z * 5, 15)
+        if 30 < rsi < 70:
+            score += 5
+        elif rsi < 25:
+            score += 10
+        elif rsi > 75:
+            score -= 10
 
         prediction = (score - 50) / 10  # -5 ile +5 arası
 

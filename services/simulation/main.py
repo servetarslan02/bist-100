@@ -82,10 +82,16 @@ class SimulationEngine:
                 result = {"error": f"Unknown simulation type: {sim_type}"}
 
             # Store result
-            await pg_execute("""
+            await pg_execute(
+                """
                 INSERT INTO simulations (name, simulation_type, parameters, results, status, completed_at)
                 VALUES ($1, $2, $3, $4, 'COMPLETED', NOW())
-            """, f"sim_{ticker}_{sim_type}", sim_type, orjson.dumps(event.data).decode(), orjson.dumps(result))
+            """,
+                f"sim_{ticker}_{sim_type}",
+                sim_type,
+                orjson.dumps(event.data).decode(),
+                orjson.dumps(result),
+            )
 
             # Publish result
             result_event = CanonicalEvent(
@@ -132,6 +138,7 @@ class SimulationEngine:
 
         # Fat tails: Student-t dağılımı (df=5)
         from scipy import stats
+
         t_dist = stats.t(df=5)
 
         # F-020: Seed artık parametre olarak alınabilir (reproducibility)
@@ -147,7 +154,7 @@ class SimulationEngine:
         # GARCH recursion is for variance, not volatility.  Calibrating
         # omega as sigma²(1-alpha-beta) preserves daily_vol as the
         # unconditional volatility; daily_vol * 0.05 inflated it sharply.
-        omega = daily_vol ** 2 * max(1.0 - alpha - beta, 0.0)
+        omega = daily_vol**2 * max(1.0 - alpha - beta, 0.0)
 
         for day in range(1, horizon_days + 1):
             # Fat-tailed random returns
@@ -159,15 +166,13 @@ class SimulationEngine:
             shock_size = rng.choice([-0.05, -0.03, 0.03, 0.05], size=num_simulations)
             random_returns = np.where(shock_mask, random_returns + shock_size, random_returns)
 
-            simulations[:, day] = simulations[:, day-1] * (1 + random_returns)
+            simulations[:, day] = simulations[:, day - 1] * (1 + random_returns)
 
             # Volatility clustering update must use squared innovations.
             # Squaring the cross-simulation mean cancels shocks out and
             # effectively disables the ARCH term as the scenario count grows.
             innovations = random_returns - adjusted_return
-            current_vol = np.sqrt(
-                omega + alpha * np.mean(innovations ** 2) + beta * current_vol ** 2
-            )
+            current_vol = np.sqrt(omega + alpha * np.mean(innovations**2) + beta * current_vol**2)
 
         # Calculate statistics
         final_prices = simulations[:, -1]
@@ -246,7 +251,8 @@ class SimulationEngine:
 
         results = []
         for scenario in scenarios:
-            positions = await pg_fetch("""
+            positions = await pg_fetch(
+                """
                 SELECT p.quantity, p.avg_cost, i.symbol,
                        COALESCE(c.beta, 1.0) as beta,
                        COALESCE(s.code, 'OTHER') as sector
@@ -255,7 +261,9 @@ class SimulationEngine:
                 LEFT JOIN companies c ON i.company_id = c.id
                 LEFT JOIN sectors s ON c.sector_id = s.id
                 WHERE p.portfolio_id = $1 AND p.status = 'OPEN'
-            """, portfolio_id)
+            """,
+                portfolio_id,
+            )
 
             portfolio_impact = 0
             position_details = []
@@ -283,32 +291,34 @@ class SimulationEngine:
                 impact = position_value * total_effect / 100
                 portfolio_impact += impact
 
-                position_details.append({
-                    "ticker": pos["symbol"],
-                    "quantity": qty,
-                    "beta": beta,
-                    "sector": sector,
-                    "market_effect_pct": round(market_effect, 2),
-                    "sector_effect_pct": round(sector_effect, 2),
-                    "usd_effect_pct": round(usd_effect, 2),
-                    "total_effect_pct": round(total_effect, 2),
-                    "impact": round(impact, 2),
-                })
+                position_details.append(
+                    {
+                        "ticker": pos["symbol"],
+                        "quantity": qty,
+                        "beta": beta,
+                        "sector": sector,
+                        "market_effect_pct": round(market_effect, 2),
+                        "sector_effect_pct": round(sector_effect, 2),
+                        "usd_effect_pct": round(usd_effect, 2),
+                        "total_effect_pct": round(total_effect, 2),
+                        "impact": round(impact, 2),
+                    }
+                )
 
-            results.append({
-                "scenario": scenario["name"],
-                "market_change_pct": scenario["market_change"],
-                "probability": scenario["probability"],
-                "portfolio_impact": round(portfolio_impact, 2),
-                "positions": position_details,
-            })
+            results.append(
+                {
+                    "scenario": scenario["name"],
+                    "market_change_pct": scenario["market_change"],
+                    "probability": scenario["probability"],
+                    "portfolio_impact": round(portfolio_impact, 2),
+                    "positions": position_details,
+                }
+            )
 
         return {
             "ticker": ticker,
             "scenarios": results,
-            "expected_impact": round(
-                sum(r["portfolio_impact"] * r["probability"] for r in results), 2
-            ),
+            "expected_impact": round(sum(r["portfolio_impact"] * r["probability"] for r in results), 2),
             "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
             "best_case": max(r["portfolio_impact"] for r in results) if results else 0,
             "timestamp": datetime.now(UTC).isoformat(),
@@ -347,21 +357,25 @@ class SimulationEngine:
                 pos_loss = pos.get("value", 0) * total_pos_impact
                 total_impact += pos_loss
 
-                position_impacts.append({
-                    "ticker": pos.get("ticker", ""),
-                    "market_impact": round(market_impact * 100, 2),
-                    "usd_impact": round(usd_impact * 100, 2),
-                    "total_impact": round(total_pos_impact * 100, 2),
-                    "loss": round(pos_loss, 2),
-                })
+                position_impacts.append(
+                    {
+                        "ticker": pos.get("ticker", ""),
+                        "market_impact": round(market_impact * 100, 2),
+                        "usd_impact": round(usd_impact * 100, 2),
+                        "total_impact": round(total_pos_impact * 100, 2),
+                        "loss": round(pos_loss, 2),
+                    }
+                )
 
-            results.append({
-                "scenario": scenario["name"],
-                "assumptions": scenario,
-                "portfolio_impact": round(total_impact, 2),
-                "portfolio_impact_pct": round(total_impact / 100000 * 100, 2) if total_impact else 0,
-                "positions": position_impacts,
-            })
+            results.append(
+                {
+                    "scenario": scenario["name"],
+                    "assumptions": scenario,
+                    "portfolio_impact": round(total_impact, 2),
+                    "portfolio_impact_pct": round(total_impact / 100000 * 100, 2) if total_impact else 0,
+                    "positions": position_impacts,
+                }
+            )
 
         return {
             "stress_tests": results,
@@ -372,7 +386,8 @@ class SimulationEngine:
     async def _get_historical_volatility(self, ticker: str) -> dict[str, Any] | None:
         """Get historical volatility from ClickHouse."""
         try:
-            result = ch_execute("""
+            result = ch_execute(
+                """
                 SELECT
                     stddevSamp(log(close / lagInFrame(close) OVER (ORDER BY timestamp))) as daily_vol,
                     avg(close / lagInFrame(close) OVER (ORDER BY timestamp) - 1) as daily_ret,
@@ -381,7 +396,9 @@ class SimulationEngine:
                 WHERE instrument_id = (SELECT id FROM instruments WHERE symbol = %(ticker)s)
                 AND timeframe = '1d'
                 AND timestamp >= now() - INTERVAL 60 DAY
-            """, parameters={"ticker": ticker})
+            """,
+                parameters={"ticker": ticker},
+            )
 
             if result.result_rows and len(result.result_rows) > 0:
                 row = result.result_rows[0]
@@ -402,6 +419,7 @@ class SimulationEngine:
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -410,10 +428,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "simulation"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -421,6 +439,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the simulation engine."""

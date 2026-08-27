@@ -3,84 +3,78 @@
 # source: market.proto
 # Protobuf Python Version: 7.35.1
 """Generated protocol buffer code."""
+
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC,
-    7,
-    35,
-    1,
-    '',
-    'market.proto'
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 7, 35, 1, "", "market.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cmarket.proto\x12\nalpha_bist\"\x8c\x01\n\nMarketTick\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\r\n\x05price\x18\x02 \x01(\x01\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x01\x12\x12\n\nchange_pct\x18\x04 \x01(\x01\x12\x0e\n\x06volume\x18\x05 \x01(\x03\x12\x0b\n\x03\x62id\x18\x06 \x01(\x01\x12\x0b\n\x03\x61sk\x18\x07 \x01(\x01\x12\x11\n\ttimestamp\x18\x08 \x01(\x03\"\x85\x01\n\x05OHLCV\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\x12\x0c\n\x04open\x18\x03 \x01(\x01\x12\x0c\n\x04high\x18\x04 \x01(\x01\x12\x0b\n\x03low\x18\x05 \x01(\x01\x12\r\n\x05\x63lose\x18\x06 \x01(\x01\x12\x0e\n\x06volume\x18\x07 \x01(\x03\x12\x11\n\ttimeframe\x18\x08 \x01(\t\"\xd3\x01\n\x06Signal\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12/\n\tdirection\x18\x02 \x01(\x0e\x32\x1c.alpha_bist.Signal.Direction\x12\x12\n\nconfidence\x18\x03 \x01(\x01\x12\x14\n\x0ctarget_price\x18\x04 \x01(\x01\x12\x11\n\tstop_loss\x18\x05 \x01(\x01\x12\x0e\n\x06reason\x18\x06 \x01(\t\x12\x11\n\ttimestamp\x18\x07 \x01(\x03\"(\n\tDirection\x12\x07\n\x03\x42UY\x10\x00\x12\x08\n\x04SELL\x10\x01\x12\x08\n\x04HOLD\x10\x02\"\x84\x01\n\x08Position\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\x12\x11\n\tavg_price\x18\x03 \x01(\x01\x12\x15\n\rcurrent_price\x18\x04 \x01(\x01\x12\x0b\n\x03pnl\x18\x05 \x01(\x01\x12\x0f\n\x07pnl_pct\x18\x06 \x01(\x01\x12\x0e\n\x06weight\x18\x07 \x01(\x01\"\x99\x01\n\x0ePortfolioState\x12\x13\n\x0btotal_value\x18\x01 \x01(\x01\x12\x0c\n\x04\x63\x61sh\x18\x02 \x01(\x01\x12\x11\n\tdaily_pnl\x18\x03 \x01(\x01\x12\x15\n\rdaily_pnl_pct\x18\x04 \x01(\x01\x12\'\n\tpositions\x18\x05 \x03(\x0b\x32\x14.alpha_bist.Position\x12\x11\n\ttimestamp\x18\x06 \x01(\x03\"\x89\x01\n\x0bRiskMetrics\x12\x0e\n\x06var_95\x18\x01 \x01(\x01\x12\x0f\n\x07\x63var_95\x18\x02 \x01(\x01\x12\x0e\n\x06sharpe\x18\x03 \x01(\x01\x12\x14\n\x0cmax_drawdown\x18\x04 \x01(\x01\x12\x12\n\nvolatility\x18\x05 \x01(\x01\x12\x0c\n\x04\x62\x65ta\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03\"\xe5\x01\n\x0cMarketRegime\x12\x33\n\x06regime\x18\x01 \x01(\x0e\x32#.alpha_bist.MarketRegime.RegimeType\x12\x12\n\nconfidence\x18\x02 \x01(\x01\x12\x0b\n\x03vix\x18\x03 \x01(\x01\x12\x0f\n\x07\x62readth\x18\x04 \x01(\x01\x12\x11\n\ttimestamp\x18\x05 \x01(\x03\"[\n\nRegimeType\x12\x0e\n\nBULL_TREND\x10\x00\x12\x0e\n\nBEAR_TREND\x10\x01\x12\x0c\n\x08SIDEWAYS\x10\x02\x12\x13\n\x0fHIGH_VOLATILITY\x10\x03\x12\n\n\x06\x43RISIS\x10\x04\"\x97\x02\n\x0bMarketEvent\x12/\n\x04type\x18\x01 \x01(\x0e\x32!.alpha_bist.MarketEvent.EventType\x12\x0e\n\x06ticker\x18\x02 \x01(\t\x12\r\n\x05title\x18\x03 \x01(\t\x12\x0f\n\x07summary\x18\x04 \x01(\t\x12\x11\n\tsentiment\x18\x05 \x01(\x01\x12\x14\n\x0cimpact_score\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03\"k\n\tEventType\x12\x14\n\x10KAP_ANNOUNCEMENT\x10\x00\x12\x08\n\x04NEWS\x10\x01\x12\x0e\n\nMACRO_DATA\x10\x02\x12\x0c\n\x08\x45\x41RNINGS\x10\x03\x12\x0c\n\x08\x44IVIDEND\x10\x04\x12\x12\n\x0e\x41NALYST_RATING\x10\x05\"\xae\x02\n\x05\x41lert\x12)\n\x04type\x18\x01 \x01(\x0e\x32\x1b.alpha_bist.Alert.AlertType\x12\x0e\n\x06ticker\x18\x02 \x01(\t\x12\x0f\n\x07message\x18\x03 \x01(\t\x12,\n\x08severity\x18\x04 \x01(\x0e\x32\x1a.alpha_bist.Alert.Severity\x12\r\n\x05value\x18\x05 \x01(\x01\x12\x11\n\tthreshold\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03\"E\n\tAlertType\x12\t\n\x05PRICE\x10\x00\x12\n\n\x06VOLUME\x10\x01\x12\x0b\n\x07\x41NOMALY\x10\x02\x12\x08\n\x04RISK\x10\x03\x12\n\n\x06SIGNAL\x10\x04\"/\n\x08Severity\x12\x08\n\x04INFO\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\x0c\n\x08\x43RITICAL\x10\x02\"\xb4\x04\n\rStreamMessage\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.alpha_bist.StreamMessage.MessageType\x12\x10\n\x08sequence\x18\x02 \x01(\x03\x12\x11\n\ttimestamp\x18\x03 \x01(\x03\x12&\n\x04tick\x18\x04 \x01(\x0b\x32\x16.alpha_bist.MarketTickH\x00\x12\"\n\x05ohlcv\x18\x05 \x01(\x0b\x32\x11.alpha_bist.OHLCVH\x00\x12$\n\x06signal\x18\x06 \x01(\x0b\x32\x12.alpha_bist.SignalH\x00\x12/\n\tportfolio\x18\x07 \x01(\x0b\x32\x1a.alpha_bist.PortfolioStateH\x00\x12\'\n\x04risk\x18\x08 \x01(\x0b\x32\x17.alpha_bist.RiskMetricsH\x00\x12*\n\x06regime\x18\t \x01(\x0b\x32\x18.alpha_bist.MarketRegimeH\x00\x12(\n\x05\x65vent\x18\n \x01(\x0b\x32\x17.alpha_bist.MarketEventH\x00\x12\"\n\x05\x61lert\x18\x0b \x01(\x0b\x32\x11.alpha_bist.AlertH\x00\"x\n\x0bMessageType\x12\x08\n\x04TICK\x10\x00\x12\t\n\x05OHLCV\x10\x01\x12\n\n\x06SIGNAL\x10\x02\x12\r\n\tPORTFOLIO\x10\x03\x12\x08\n\x04RISK\x10\x04\x12\n\n\x06REGIME\x10\x05\x12\t\n\x05\x45VENT\x10\x06\x12\t\n\x05\x41LERT\x10\x07\x12\r\n\tHEARTBEAT\x10\x08\x42\t\n\x07payload\"\x1e\n\x0bTickRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t\"X\n\x0cOHLCVRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t\x12\x11\n\ttimeframe\x18\x02 \x01(\t\x12\x12\n\nstart_time\x18\x03 \x01(\x03\x12\x10\n\x08\x65nd_time\x18\x04 \x01(\x03\"8\n\rSignalRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t\x12\x16\n\x0emin_confidence\x18\x02 \x01(\x01\"1\n\nSignalList\x12#\n\x07signals\x18\x01 \x03(\x0b\x32\x12.alpha_bist.Signal\"(\n\x10PortfolioRequest\x12\x14\n\x0cportfolio_id\x18\x01 \x01(\t\"#\n\x0bRiskRequest\x12\x14\n\x0cportfolio_id\x18\x01 \x01(\t2\xcb\x01\n\rMarketService\x12@\n\x0bStreamTicks\x12\x17.alpha_bist.TickRequest\x1a\x16.alpha_bist.MarketTick0\x01\x12<\n\x0bStreamOHLCV\x12\x18.alpha_bist.OHLCVRequest\x1a\x11.alpha_bist.OHLCV0\x01\x12:\n\x07GetTick\x12\x17.alpha_bist.TickRequest\x1a\x16.alpha_bist.MarketTick2\x98\x01\n\rSignalService\x12@\n\rStreamSignals\x12\x19.alpha_bist.SignalRequest\x1a\x12.alpha_bist.Signal0\x01\x12\x45\n\x10GetRecentSignals\x12\x19.alpha_bist.SignalRequest\x1a\x16.alpha_bist.SignalList2\xab\x01\n\x10PortfolioService\x12M\n\x0fStreamPortfolio\x12\x1c.alpha_bist.PortfolioRequest\x1a\x1a.alpha_bist.PortfolioState0\x01\x12H\n\x0cGetPortfolio\x12\x1c.alpha_bist.PortfolioRequest\x1a\x1a.alpha_bist.PortfolioState2\x8c\x01\n\x0bRiskService\x12@\n\nStreamRisk\x12\x17.alpha_bist.RiskRequest\x1a\x17.alpha_bist.RiskMetrics0\x01\x12;\n\x07GetRisk\x12\x17.alpha_bist.RiskRequest\x1a\x17.alpha_bist.RiskMetricsb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x0cmarket.proto\x12\nalpha_bist"\x8c\x01\n\nMarketTick\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\r\n\x05price\x18\x02 \x01(\x01\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x01\x12\x12\n\nchange_pct\x18\x04 \x01(\x01\x12\x0e\n\x06volume\x18\x05 \x01(\x03\x12\x0b\n\x03\x62id\x18\x06 \x01(\x01\x12\x0b\n\x03\x61sk\x18\x07 \x01(\x01\x12\x11\n\ttimestamp\x18\x08 \x01(\x03"\x85\x01\n\x05OHLCV\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\x12\x0c\n\x04open\x18\x03 \x01(\x01\x12\x0c\n\x04high\x18\x04 \x01(\x01\x12\x0b\n\x03low\x18\x05 \x01(\x01\x12\r\n\x05\x63lose\x18\x06 \x01(\x01\x12\x0e\n\x06volume\x18\x07 \x01(\x03\x12\x11\n\ttimeframe\x18\x08 \x01(\t"\xd3\x01\n\x06Signal\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12/\n\tdirection\x18\x02 \x01(\x0e\x32\x1c.alpha_bist.Signal.Direction\x12\x12\n\nconfidence\x18\x03 \x01(\x01\x12\x14\n\x0ctarget_price\x18\x04 \x01(\x01\x12\x11\n\tstop_loss\x18\x05 \x01(\x01\x12\x0e\n\x06reason\x18\x06 \x01(\t\x12\x11\n\ttimestamp\x18\x07 \x01(\x03"(\n\tDirection\x12\x07\n\x03\x42UY\x10\x00\x12\x08\n\x04SELL\x10\x01\x12\x08\n\x04HOLD\x10\x02"\x84\x01\n\x08Position\x12\x0e\n\x06ticker\x18\x01 \x01(\t\x12\x10\n\x08quantity\x18\x02 \x01(\x05\x12\x11\n\tavg_price\x18\x03 \x01(\x01\x12\x15\n\rcurrent_price\x18\x04 \x01(\x01\x12\x0b\n\x03pnl\x18\x05 \x01(\x01\x12\x0f\n\x07pnl_pct\x18\x06 \x01(\x01\x12\x0e\n\x06weight\x18\x07 \x01(\x01"\x99\x01\n\x0ePortfolioState\x12\x13\n\x0btotal_value\x18\x01 \x01(\x01\x12\x0c\n\x04\x63\x61sh\x18\x02 \x01(\x01\x12\x11\n\tdaily_pnl\x18\x03 \x01(\x01\x12\x15\n\rdaily_pnl_pct\x18\x04 \x01(\x01\x12\'\n\tpositions\x18\x05 \x03(\x0b\x32\x14.alpha_bist.Position\x12\x11\n\ttimestamp\x18\x06 \x01(\x03"\x89\x01\n\x0bRiskMetrics\x12\x0e\n\x06var_95\x18\x01 \x01(\x01\x12\x0f\n\x07\x63var_95\x18\x02 \x01(\x01\x12\x0e\n\x06sharpe\x18\x03 \x01(\x01\x12\x14\n\x0cmax_drawdown\x18\x04 \x01(\x01\x12\x12\n\nvolatility\x18\x05 \x01(\x01\x12\x0c\n\x04\x62\x65ta\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03"\xe5\x01\n\x0cMarketRegime\x12\x33\n\x06regime\x18\x01 \x01(\x0e\x32#.alpha_bist.MarketRegime.RegimeType\x12\x12\n\nconfidence\x18\x02 \x01(\x01\x12\x0b\n\x03vix\x18\x03 \x01(\x01\x12\x0f\n\x07\x62readth\x18\x04 \x01(\x01\x12\x11\n\ttimestamp\x18\x05 \x01(\x03"[\n\nRegimeType\x12\x0e\n\nBULL_TREND\x10\x00\x12\x0e\n\nBEAR_TREND\x10\x01\x12\x0c\n\x08SIDEWAYS\x10\x02\x12\x13\n\x0fHIGH_VOLATILITY\x10\x03\x12\n\n\x06\x43RISIS\x10\x04"\x97\x02\n\x0bMarketEvent\x12/\n\x04type\x18\x01 \x01(\x0e\x32!.alpha_bist.MarketEvent.EventType\x12\x0e\n\x06ticker\x18\x02 \x01(\t\x12\r\n\x05title\x18\x03 \x01(\t\x12\x0f\n\x07summary\x18\x04 \x01(\t\x12\x11\n\tsentiment\x18\x05 \x01(\x01\x12\x14\n\x0cimpact_score\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03"k\n\tEventType\x12\x14\n\x10KAP_ANNOUNCEMENT\x10\x00\x12\x08\n\x04NEWS\x10\x01\x12\x0e\n\nMACRO_DATA\x10\x02\x12\x0c\n\x08\x45\x41RNINGS\x10\x03\x12\x0c\n\x08\x44IVIDEND\x10\x04\x12\x12\n\x0e\x41NALYST_RATING\x10\x05"\xae\x02\n\x05\x41lert\x12)\n\x04type\x18\x01 \x01(\x0e\x32\x1b.alpha_bist.Alert.AlertType\x12\x0e\n\x06ticker\x18\x02 \x01(\t\x12\x0f\n\x07message\x18\x03 \x01(\t\x12,\n\x08severity\x18\x04 \x01(\x0e\x32\x1a.alpha_bist.Alert.Severity\x12\r\n\x05value\x18\x05 \x01(\x01\x12\x11\n\tthreshold\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x03"E\n\tAlertType\x12\t\n\x05PRICE\x10\x00\x12\n\n\x06VOLUME\x10\x01\x12\x0b\n\x07\x41NOMALY\x10\x02\x12\x08\n\x04RISK\x10\x03\x12\n\n\x06SIGNAL\x10\x04"/\n\x08Severity\x12\x08\n\x04INFO\x10\x00\x12\x0b\n\x07WARNING\x10\x01\x12\x0c\n\x08\x43RITICAL\x10\x02"\xb4\x04\n\rStreamMessage\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.alpha_bist.StreamMessage.MessageType\x12\x10\n\x08sequence\x18\x02 \x01(\x03\x12\x11\n\ttimestamp\x18\x03 \x01(\x03\x12&\n\x04tick\x18\x04 \x01(\x0b\x32\x16.alpha_bist.MarketTickH\x00\x12"\n\x05ohlcv\x18\x05 \x01(\x0b\x32\x11.alpha_bist.OHLCVH\x00\x12$\n\x06signal\x18\x06 \x01(\x0b\x32\x12.alpha_bist.SignalH\x00\x12/\n\tportfolio\x18\x07 \x01(\x0b\x32\x1a.alpha_bist.PortfolioStateH\x00\x12\'\n\x04risk\x18\x08 \x01(\x0b\x32\x17.alpha_bist.RiskMetricsH\x00\x12*\n\x06regime\x18\t \x01(\x0b\x32\x18.alpha_bist.MarketRegimeH\x00\x12(\n\x05\x65vent\x18\n \x01(\x0b\x32\x17.alpha_bist.MarketEventH\x00\x12"\n\x05\x61lert\x18\x0b \x01(\x0b\x32\x11.alpha_bist.AlertH\x00"x\n\x0bMessageType\x12\x08\n\x04TICK\x10\x00\x12\t\n\x05OHLCV\x10\x01\x12\n\n\x06SIGNAL\x10\x02\x12\r\n\tPORTFOLIO\x10\x03\x12\x08\n\x04RISK\x10\x04\x12\n\n\x06REGIME\x10\x05\x12\t\n\x05\x45VENT\x10\x06\x12\t\n\x05\x41LERT\x10\x07\x12\r\n\tHEARTBEAT\x10\x08\x42\t\n\x07payload"\x1e\n\x0bTickRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t"X\n\x0cOHLCVRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t\x12\x11\n\ttimeframe\x18\x02 \x01(\t\x12\x12\n\nstart_time\x18\x03 \x01(\x03\x12\x10\n\x08\x65nd_time\x18\x04 \x01(\x03"8\n\rSignalRequest\x12\x0f\n\x07tickers\x18\x01 \x03(\t\x12\x16\n\x0emin_confidence\x18\x02 \x01(\x01"1\n\nSignalList\x12#\n\x07signals\x18\x01 \x03(\x0b\x32\x12.alpha_bist.Signal"(\n\x10PortfolioRequest\x12\x14\n\x0cportfolio_id\x18\x01 \x01(\t"#\n\x0bRiskRequest\x12\x14\n\x0cportfolio_id\x18\x01 \x01(\t2\xcb\x01\n\rMarketService\x12@\n\x0bStreamTicks\x12\x17.alpha_bist.TickRequest\x1a\x16.alpha_bist.MarketTick0\x01\x12<\n\x0bStreamOHLCV\x12\x18.alpha_bist.OHLCVRequest\x1a\x11.alpha_bist.OHLCV0\x01\x12:\n\x07GetTick\x12\x17.alpha_bist.TickRequest\x1a\x16.alpha_bist.MarketTick2\x98\x01\n\rSignalService\x12@\n\rStreamSignals\x12\x19.alpha_bist.SignalRequest\x1a\x12.alpha_bist.Signal0\x01\x12\x45\n\x10GetRecentSignals\x12\x19.alpha_bist.SignalRequest\x1a\x16.alpha_bist.SignalList2\xab\x01\n\x10PortfolioService\x12M\n\x0fStreamPortfolio\x12\x1c.alpha_bist.PortfolioRequest\x1a\x1a.alpha_bist.PortfolioState0\x01\x12H\n\x0cGetPortfolio\x12\x1c.alpha_bist.PortfolioRequest\x1a\x1a.alpha_bist.PortfolioState2\x8c\x01\n\x0bRiskService\x12@\n\nStreamRisk\x12\x17.alpha_bist.RiskRequest\x1a\x17.alpha_bist.RiskMetrics0\x01\x12;\n\x07GetRisk\x12\x17.alpha_bist.RiskRequest\x1a\x17.alpha_bist.RiskMetricsb\x06proto3'
+)
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'market_pb2', _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "market_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  DESCRIPTOR._loaded_options = None
-  _globals['_MARKETTICK']._serialized_start=29
-  _globals['_MARKETTICK']._serialized_end=169
-  _globals['_OHLCV']._serialized_start=172
-  _globals['_OHLCV']._serialized_end=305
-  _globals['_SIGNAL']._serialized_start=308
-  _globals['_SIGNAL']._serialized_end=519
-  _globals['_SIGNAL_DIRECTION']._serialized_start=479
-  _globals['_SIGNAL_DIRECTION']._serialized_end=519
-  _globals['_POSITION']._serialized_start=522
-  _globals['_POSITION']._serialized_end=654
-  _globals['_PORTFOLIOSTATE']._serialized_start=657
-  _globals['_PORTFOLIOSTATE']._serialized_end=810
-  _globals['_RISKMETRICS']._serialized_start=813
-  _globals['_RISKMETRICS']._serialized_end=950
-  _globals['_MARKETREGIME']._serialized_start=953
-  _globals['_MARKETREGIME']._serialized_end=1182
-  _globals['_MARKETREGIME_REGIMETYPE']._serialized_start=1091
-  _globals['_MARKETREGIME_REGIMETYPE']._serialized_end=1182
-  _globals['_MARKETEVENT']._serialized_start=1185
-  _globals['_MARKETEVENT']._serialized_end=1464
-  _globals['_MARKETEVENT_EVENTTYPE']._serialized_start=1357
-  _globals['_MARKETEVENT_EVENTTYPE']._serialized_end=1464
-  _globals['_ALERT']._serialized_start=1467
-  _globals['_ALERT']._serialized_end=1769
-  _globals['_ALERT_ALERTTYPE']._serialized_start=1651
-  _globals['_ALERT_ALERTTYPE']._serialized_end=1720
-  _globals['_ALERT_SEVERITY']._serialized_start=1722
-  _globals['_ALERT_SEVERITY']._serialized_end=1769
-  _globals['_STREAMMESSAGE']._serialized_start=1772
-  _globals['_STREAMMESSAGE']._serialized_end=2336
-  _globals['_STREAMMESSAGE_MESSAGETYPE']._serialized_start=2205
-  _globals['_STREAMMESSAGE_MESSAGETYPE']._serialized_end=2325
-  _globals['_TICKREQUEST']._serialized_start=2338
-  _globals['_TICKREQUEST']._serialized_end=2368
-  _globals['_OHLCVREQUEST']._serialized_start=2370
-  _globals['_OHLCVREQUEST']._serialized_end=2458
-  _globals['_SIGNALREQUEST']._serialized_start=2460
-  _globals['_SIGNALREQUEST']._serialized_end=2516
-  _globals['_SIGNALLIST']._serialized_start=2518
-  _globals['_SIGNALLIST']._serialized_end=2567
-  _globals['_PORTFOLIOREQUEST']._serialized_start=2569
-  _globals['_PORTFOLIOREQUEST']._serialized_end=2609
-  _globals['_RISKREQUEST']._serialized_start=2611
-  _globals['_RISKREQUEST']._serialized_end=2646
-  _globals['_MARKETSERVICE']._serialized_start=2649
-  _globals['_MARKETSERVICE']._serialized_end=2852
-  _globals['_SIGNALSERVICE']._serialized_start=2855
-  _globals['_SIGNALSERVICE']._serialized_end=3007
-  _globals['_PORTFOLIOSERVICE']._serialized_start=3010
-  _globals['_PORTFOLIOSERVICE']._serialized_end=3181
-  _globals['_RISKSERVICE']._serialized_start=3184
-  _globals['_RISKSERVICE']._serialized_end=3324
+    DESCRIPTOR._loaded_options = None
+    _globals["_MARKETTICK"]._serialized_start = 29
+    _globals["_MARKETTICK"]._serialized_end = 169
+    _globals["_OHLCV"]._serialized_start = 172
+    _globals["_OHLCV"]._serialized_end = 305
+    _globals["_SIGNAL"]._serialized_start = 308
+    _globals["_SIGNAL"]._serialized_end = 519
+    _globals["_SIGNAL_DIRECTION"]._serialized_start = 479
+    _globals["_SIGNAL_DIRECTION"]._serialized_end = 519
+    _globals["_POSITION"]._serialized_start = 522
+    _globals["_POSITION"]._serialized_end = 654
+    _globals["_PORTFOLIOSTATE"]._serialized_start = 657
+    _globals["_PORTFOLIOSTATE"]._serialized_end = 810
+    _globals["_RISKMETRICS"]._serialized_start = 813
+    _globals["_RISKMETRICS"]._serialized_end = 950
+    _globals["_MARKETREGIME"]._serialized_start = 953
+    _globals["_MARKETREGIME"]._serialized_end = 1182
+    _globals["_MARKETREGIME_REGIMETYPE"]._serialized_start = 1091
+    _globals["_MARKETREGIME_REGIMETYPE"]._serialized_end = 1182
+    _globals["_MARKETEVENT"]._serialized_start = 1185
+    _globals["_MARKETEVENT"]._serialized_end = 1464
+    _globals["_MARKETEVENT_EVENTTYPE"]._serialized_start = 1357
+    _globals["_MARKETEVENT_EVENTTYPE"]._serialized_end = 1464
+    _globals["_ALERT"]._serialized_start = 1467
+    _globals["_ALERT"]._serialized_end = 1769
+    _globals["_ALERT_ALERTTYPE"]._serialized_start = 1651
+    _globals["_ALERT_ALERTTYPE"]._serialized_end = 1720
+    _globals["_ALERT_SEVERITY"]._serialized_start = 1722
+    _globals["_ALERT_SEVERITY"]._serialized_end = 1769
+    _globals["_STREAMMESSAGE"]._serialized_start = 1772
+    _globals["_STREAMMESSAGE"]._serialized_end = 2336
+    _globals["_STREAMMESSAGE_MESSAGETYPE"]._serialized_start = 2205
+    _globals["_STREAMMESSAGE_MESSAGETYPE"]._serialized_end = 2325
+    _globals["_TICKREQUEST"]._serialized_start = 2338
+    _globals["_TICKREQUEST"]._serialized_end = 2368
+    _globals["_OHLCVREQUEST"]._serialized_start = 2370
+    _globals["_OHLCVREQUEST"]._serialized_end = 2458
+    _globals["_SIGNALREQUEST"]._serialized_start = 2460
+    _globals["_SIGNALREQUEST"]._serialized_end = 2516
+    _globals["_SIGNALLIST"]._serialized_start = 2518
+    _globals["_SIGNALLIST"]._serialized_end = 2567
+    _globals["_PORTFOLIOREQUEST"]._serialized_start = 2569
+    _globals["_PORTFOLIOREQUEST"]._serialized_end = 2609
+    _globals["_RISKREQUEST"]._serialized_start = 2611
+    _globals["_RISKREQUEST"]._serialized_end = 2646
+    _globals["_MARKETSERVICE"]._serialized_start = 2649
+    _globals["_MARKETSERVICE"]._serialized_end = 2852
+    _globals["_SIGNALSERVICE"]._serialized_start = 2855
+    _globals["_SIGNALSERVICE"]._serialized_end = 3007
+    _globals["_PORTFOLIOSERVICE"]._serialized_start = 3010
+    _globals["_PORTFOLIOSERVICE"]._serialized_end = 3181
+    _globals["_RISKSERVICE"]._serialized_start = 3184
+    _globals["_RISKSERVICE"]._serialized_end = 3324
 # @@protoc_insertion_point(module_scope)

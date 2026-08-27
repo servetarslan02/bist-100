@@ -18,28 +18,82 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 def compute_financial_sentiment(title: str, summary: str = "") -> float:
     """Metin üzerinden gerçek, deterministik Türkçe ve İngilizce finansal NLP duygu skoru üretir (-1.0 ile +1.0 arası)."""
     text = f"{title} {summary}".lower()
 
     pos_weights = {
-        "rekor": 0.8, "tavan": 0.9, "kâr": 0.6, "karını artırdı": 0.75, "katladı": 0.8,
-        "anlaşma": 0.6, "ihale": 0.65, "sipariş": 0.6, "büyüme": 0.5, "yükseliş": 0.55,
-        "temettü": 0.6, "bedelsiz": 0.6, "onay": 0.45, "tahminleri aştı": 0.7, "yeşil ışık": 0.5,
-        "güçlü": 0.4, "zirve": 0.5, "artış": 0.4, "alım": 0.35, "fırsat": 0.4, "ralli": 0.75,
-        "ortaklık": 0.5, "yatırım": 0.55, "kapasite artışı": 0.6, "hedef yükseltti": 0.7,
-        "outperform": 0.6, "buy": 0.5, "upgrade": 0.65, "kazandı": 0.6, "lider": 0.4,
-        "faiz indirimi": 0.55, "enflasyon düştü": 0.65, "cari fazla": 0.6, "ihracat rekoru": 0.7,
+        "rekor": 0.8,
+        "tavan": 0.9,
+        "kâr": 0.6,
+        "karını artırdı": 0.75,
+        "katladı": 0.8,
+        "anlaşma": 0.6,
+        "ihale": 0.65,
+        "sipariş": 0.6,
+        "büyüme": 0.5,
+        "yükseliş": 0.55,
+        "temettü": 0.6,
+        "bedelsiz": 0.6,
+        "onay": 0.45,
+        "tahminleri aştı": 0.7,
+        "yeşil ışık": 0.5,
+        "güçlü": 0.4,
+        "zirve": 0.5,
+        "artış": 0.4,
+        "alım": 0.35,
+        "fırsat": 0.4,
+        "ralli": 0.75,
+        "ortaklık": 0.5,
+        "yatırım": 0.55,
+        "kapasite artışı": 0.6,
+        "hedef yükseltti": 0.7,
+        "outperform": 0.6,
+        "buy": 0.5,
+        "upgrade": 0.65,
+        "kazandı": 0.6,
+        "lider": 0.4,
+        "faiz indirimi": 0.55,
+        "enflasyon düştü": 0.65,
+        "cari fazla": 0.6,
+        "ihracat rekoru": 0.7,
     }
 
     neg_weights = {
-        "taban": -0.9, "zarar": -0.7, "düşüş": -0.5, "çöküş": -0.85, "kayıp": -0.6,
-        "dava": -0.6, "ceza": -0.75, "soruşturma": -0.65, "iptal": -0.7, "iflas": -0.95,
-        "konkordato": -0.9, "zayıf": -0.45, "risk": -0.4, "satış": -0.3, "şahin": -0.4,
-        "kriz": -0.75, "siber saldırı": -0.6, "maliyet": -0.35, "kesinti": -0.5,
-        "hedef düşürdü": -0.65, "downscale": -0.6, "sell": -0.5, "uyarı": -0.45, "geriledi": -0.45,
-        "enflasyon": -0.50, "zam": -0.40, "faiz artışı": -0.50, "borç": -0.45, "yaptırım": -0.55,
-        "cari açık": -0.50, "bütçe açığı": -0.55, "işsizlik": -0.45, "pahallılık": -0.50,
+        "taban": -0.9,
+        "zarar": -0.7,
+        "düşüş": -0.5,
+        "çöküş": -0.85,
+        "kayıp": -0.6,
+        "dava": -0.6,
+        "ceza": -0.75,
+        "soruşturma": -0.65,
+        "iptal": -0.7,
+        "iflas": -0.95,
+        "konkordato": -0.9,
+        "zayıf": -0.45,
+        "risk": -0.4,
+        "satış": -0.3,
+        "şahin": -0.4,
+        "kriz": -0.75,
+        "siber saldırı": -0.6,
+        "maliyet": -0.35,
+        "kesinti": -0.5,
+        "hedef düşürdü": -0.65,
+        "downscale": -0.6,
+        "sell": -0.5,
+        "uyarı": -0.45,
+        "geriledi": -0.45,
+        "enflasyon": -0.50,
+        "zam": -0.40,
+        "faiz artışı": -0.50,
+        "borç": -0.45,
+        "yaptırım": -0.55,
+        "cari açık": -0.50,
+        "bütçe açığı": -0.55,
+        "işsizlik": -0.45,
+        "pahallılık": -0.50,
     }
 
     score = 0.0
@@ -66,8 +120,17 @@ def is_relevant_to_bist_and_macro(title: str, summary: str = "") -> bool:
     text = f"{title} {summary}".lower()
 
     irrelevant_geos = [
-        "venezuela", "sri lanka", "somali", "nijerya", "peru", "kongo",
-        "zimbabve", "haiti", "patriot hareketliliği", "yunanistan'da patriot", "starlink cihazı"
+        "venezuela",
+        "sri lanka",
+        "somali",
+        "nijerya",
+        "peru",
+        "kongo",
+        "zimbabve",
+        "haiti",
+        "patriot hareketliliği",
+        "yunanistan'da patriot",
+        "starlink cihazı",
     ]
     return not any(geo in text for geo in irrelevant_geos)
 
@@ -231,6 +294,7 @@ class NewsProvider:
         # Önce config'den dene
         try:
             from services.core.observability import config_manager
+
             feeds = config_manager.get("news.rss_feeds")
             if feeds:
                 return feeds
@@ -268,9 +332,23 @@ class NewsProvider:
 
                             # Finans dışı genel gürültü filtresi
                             noise_keywords = [
-                                "sakatlık", "futbol", "maç", "süper lig", "dizi", "ünlü", "magazin",
-                                "şampiyonlar ligi", "kandil", "hava durumu", "sıcaklıklar", "ösym",
-                                "ags sonuçları", "şans oyunları", "milli piyango", "deprem", "namaz"
+                                "sakatlık",
+                                "futbol",
+                                "maç",
+                                "süper lig",
+                                "dizi",
+                                "ünlü",
+                                "magazin",
+                                "şampiyonlar ligi",
+                                "kandil",
+                                "hava durumu",
+                                "sıcaklıklar",
+                                "ösym",
+                                "ags sonuçları",
+                                "şans oyunları",
+                                "milli piyango",
+                                "deprem",
+                                "namaz",
                             ]
                             if any(k in f"{t} {s}".lower() for k in noise_keywords):
                                 continue
@@ -281,6 +359,7 @@ class NewsProvider:
                             if hasattr(entry, "published_parsed") and entry.published_parsed:
                                 try:
                                     import calendar
+
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
                                     dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
@@ -290,15 +369,17 @@ class NewsProvider:
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
-                            items.append({
-                                "title": t,
-                                "summary": s,
-                                "link": entry.get("link", ""),
-                                "published": pub_str,
-                                "published_epoch": epoch,
-                                "source": feed_url,
-                                "sentiment_score": compute_financial_sentiment(t, s),
-                            })
+                            items.append(
+                                {
+                                    "title": t,
+                                    "summary": s,
+                                    "link": entry.get("link", ""),
+                                    "published": pub_str,
+                                    "published_epoch": epoch,
+                                    "source": feed_url,
+                                    "sentiment_score": compute_financial_sentiment(t, s),
+                                }
+                            )
             except Exception as e:
                 logger.debug(f"RSS fetch note: {feed_url} - {e}")
             return items
@@ -340,6 +421,7 @@ class NewsProvider:
                             if hasattr(entry, "published_parsed") and entry.published_parsed:
                                 try:
                                     import calendar
+
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
                                     dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
@@ -349,16 +431,18 @@ class NewsProvider:
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
-                            items.append({
-                                "title": t,
-                                "summary": s,
-                                "link": entry.get("link", ""),
-                                "published": pub_str,
-                                "published_epoch": epoch,
-                                "source": "KAP (Kamuyu Aydınlatma Platformu)",
-                                "type": "KAP",
-                                "sentiment_score": compute_financial_sentiment(t, s),
-                            })
+                            items.append(
+                                {
+                                    "title": t,
+                                    "summary": s,
+                                    "link": entry.get("link", ""),
+                                    "published": pub_str,
+                                    "published_epoch": epoch,
+                                    "source": "KAP (Kamuyu Aydınlatma Platformu)",
+                                    "type": "KAP",
+                                    "sentiment_score": compute_financial_sentiment(t, s),
+                                }
+                            )
         except Exception as e:
             logger.debug(f"Official KAP fetch note: {e}")
         return items
@@ -387,6 +471,7 @@ class NewsProvider:
                             if hasattr(entry, "published_parsed") and entry.published_parsed:
                                 try:
                                     import calendar
+
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
                                     dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
@@ -396,16 +481,18 @@ class NewsProvider:
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
-                            items.append({
-                                "title": t,
-                                "summary": s,
-                                "link": entry.get("link", ""),
-                                "published": pub_str,
-                                "published_epoch": epoch,
-                                "source": "TCMB / Merkez Bankası",
-                                "type": "MACRO",
-                                "sentiment_score": compute_financial_sentiment(t, s),
-                            })
+                            items.append(
+                                {
+                                    "title": t,
+                                    "summary": s,
+                                    "link": entry.get("link", ""),
+                                    "published": pub_str,
+                                    "published_epoch": epoch,
+                                    "source": "TCMB / Merkez Bankası",
+                                    "type": "MACRO",
+                                    "sentiment_score": compute_financial_sentiment(t, s),
+                                }
+                            )
         except Exception as e:
             logger.debug(f"Official TCMB fetch note: {e}")
         return items
@@ -434,15 +521,17 @@ class NewsProvider:
                         for entry in feed.entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
-                            all_news.append({
-                                "title": t,
-                                "summary": s,
-                                "link": entry.get("link", ""),
-                                "published": entry.get("published", ""),
-                                "source": "Google News / KAP",
-                                "ticker": ticker_clean,
-                                "sentiment_score": compute_financial_sentiment(t, s),
-                            })
+                            all_news.append(
+                                {
+                                    "title": t,
+                                    "summary": s,
+                                    "link": entry.get("link", ""),
+                                    "published": entry.get("published", ""),
+                                    "source": "Google News / KAP",
+                                    "ticker": ticker_clean,
+                                    "sentiment_score": compute_financial_sentiment(t, s),
+                                }
+                            )
         except Exception as e:
             logger.debug(f"Dynamic ticker news note for {ticker_clean}: {e}")
 
@@ -458,6 +547,7 @@ class NewsProvider:
         4. COMPANY_NAME_MAP takma isimleri
         """
         import re
+
         text = f"{news.get('title', '')} {news.get('summary', '')}"
         text_lower = text.lower()
         ticker_upper = ticker.strip().upper()
@@ -469,17 +559,22 @@ class NewsProvider:
             return True
 
         # 2. BIST ticker kodu (tam kelime olarak eşleşmeli)
-        ticker_pattern = re.compile(r'\b' + re.escape(ticker_lower) + r'\b', re.IGNORECASE)
+        ticker_pattern = re.compile(r"\b" + re.escape(ticker_lower) + r"\b", re.IGNORECASE)
         if ticker_pattern.search(text):
             return True
 
         # 3. Dinamik Universe üzerinden Şirket Resmi Adı ve Marka Kelimeleri (629+ hisse)
         try:
             from ..bist_universe import bist_universe
+
             stock_info = bist_universe._updater.get_universe().get(ticker_upper)
             if stock_info and stock_info.name:
                 raw_name = stock_info.name.lower()
-                clean_name = re.sub(r'\b(a\.ş\.|as|sanayi|ticaret|anonim|şirketi|holding|yatırım|yatirim|menkul|değerler|degerler|üretim|uretim)\b', '', raw_name).strip()
+                clean_name = re.sub(
+                    r"\b(a\.ş\.|as|sanayi|ticaret|anonim|şirketi|holding|yatırım|yatirim|menkul|değerler|degerler|üretim|uretim)\b",
+                    "",
+                    raw_name,
+                ).strip()
                 tokens = [t.strip() for t in clean_name.split() if len(t.strip()) >= 3]
                 if tokens:
                     # Ana marka kelimesi (ör: "zorlu", "a1 capital", "garanti", "aselsan")
@@ -495,6 +590,6 @@ class NewsProvider:
         company_alias = self.COMPANY_NAME_MAP.get(ticker_lower, "")
         return bool(company_alias and company_alias.lower() in text_lower)
 
+
 # Singleton
 news_provider = NewsProvider()
-

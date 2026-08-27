@@ -31,10 +31,11 @@ logger = structlog.get_logger()
 @dataclass
 class LabelResult:
     """Label sonucu."""
+
     ticker: str
     labels: dict[str, np.ndarray]  # label_name → values
-    valid_mask: np.ndarray          # Label hesaplanabilir mi?
-    stats: dict[str, float]         # İstatistikler
+    valid_mask: np.ndarray  # Label hesaplanabilir mi?
+    stats: dict[str, float]  # İstatistikler
 
 
 class LabelGenerator:
@@ -100,13 +101,15 @@ class LabelGenerator:
                         bench_fwd[i] = forward_ret[i] - benchmark_returns[i] * period
                 labels[f"y_{period}d_vs_benchmark"] = bench_fwd
                 labels[f"y_{period}d_outperform"] = np.where(bench_fwd > 0, 1, 0).astype(float)
-                labels[f"y_{period}d_outperform"] = np.where(np.isnan(bench_fwd), np.nan, labels[f"y_{period}d_outperform"])
+                labels[f"y_{period}d_outperform"] = np.where(
+                    np.isnan(bench_fwd), np.nan, labels[f"y_{period}d_outperform"]
+                )
 
         # Max drawdown (forward 20 gün)
         max_dd = np.full(n, np.nan)
         for i in range(n - 20):
             if mask[i] == 1:
-                future_prices = close[i:i + 21]
+                future_prices = close[i : i + 21]
                 valid_prices = future_prices[~np.isnan(future_prices)]
                 if len(valid_prices) > 1:
                     peak = np.maximum.accumulate(valid_prices)
@@ -117,7 +120,7 @@ class LabelGenerator:
         # Volatilite (forward 20 gün)
         fwd_vol = np.full(n, np.nan)
         for i in range(n - 20):
-            period_returns = log_returns[i + 1:i + 21]
+            period_returns = log_returns[i + 1 : i + 21]
             valid_returns = period_returns[~np.isnan(period_returns)]
             if len(valid_returns) >= 10:
                 fwd_vol[i] = float(np.std(valid_returns) * np.sqrt(252) * 100)
@@ -214,13 +217,15 @@ class LabelGenerator:
         """Tüm label isimlerini döndür."""
         names = []
         for period in self.FORWARD_PERIODS:
-            names.extend([
-                f"y_{period}d",
-                f"y_{period}d_binary",
-                f"y_{period}d_vs_sector",
-                f"y_{period}d_vs_benchmark",
-                f"y_{period}d_outperform",
-            ])
+            names.extend(
+                [
+                    f"y_{period}d",
+                    f"y_{period}d_binary",
+                    f"y_{period}d_vs_sector",
+                    f"y_{period}d_vs_benchmark",
+                    f"y_{period}d_outperform",
+                ]
+            )
         names.extend(["y_max_dd_20d", "y_volatility_20d"])
         return names
 

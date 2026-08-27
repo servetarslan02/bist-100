@@ -24,11 +24,12 @@ logger = structlog.get_logger()
 @dataclass
 class AuditEntry:
     """Audit log kaydı (immutable)."""
+
     audit_id: str
-    action: str           # DECISION, RISK_CHECK, ORDER, FILL, STATE_CHANGE, CONFIG_CHANGE
-    entity_type: str      # ticker, portfolio, order, model
+    action: str  # DECISION, RISK_CHECK, ORDER, FILL, STATE_CHANGE, CONFIG_CHANGE
+    entity_type: str  # ticker, portfolio, order, model
     entity_id: str
-    actor: str            # system, decision_engine, risk_engine, user
+    actor: str  # system, decision_engine, risk_engine, user
     details: dict[str, Any]
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     correlation_id: str = ""
@@ -59,10 +60,9 @@ class AuditLog:
             self._index[key] = []
         self._index[key].append(idx)
 
-        logger.debug("Audit log",
-                    action=entry.action,
-                    entity=f"{entry.entity_type}:{entry.entity_id}",
-                    actor=entry.actor)
+        logger.debug(
+            "Audit log", action=entry.action, entity=f"{entry.entity_type}:{entry.entity_id}", actor=entry.actor
+        )
 
     def log_decision(
         self,
@@ -75,21 +75,23 @@ class AuditLog:
         correlation_id: str = "",
     ):
         """Karar kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="DECISION",
-            entity_type="ticker",
-            entity_id=ticker,
-            actor="decision_engine",
-            details={
-                "action": action,
-                "direction": direction,
-                "confidence": confidence,
-                "reasons": reasons,
-                "risks": risks,
-            },
-            correlation_id=correlation_id,
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="DECISION",
+                entity_type="ticker",
+                entity_id=ticker,
+                actor="decision_engine",
+                details={
+                    "action": action,
+                    "direction": direction,
+                    "confidence": confidence,
+                    "reasons": reasons,
+                    "risks": risks,
+                },
+                correlation_id=correlation_id,
+            )
+        )
 
     def log_risk_check(
         self,
@@ -99,18 +101,20 @@ class AuditLog:
         correlation_id: str = "",
     ):
         """Risk kontrolü kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="RISK_CHECK",
-            entity_type="ticker",
-            entity_id=ticker,
-            actor="risk_engine",
-            details={
-                "approved": approved,
-                "checks": checks,
-            },
-            correlation_id=correlation_id,
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="RISK_CHECK",
+                entity_type="ticker",
+                entity_id=ticker,
+                actor="risk_engine",
+                details={
+                    "approved": approved,
+                    "checks": checks,
+                },
+                correlation_id=correlation_id,
+            )
+        )
 
     def log_order(
         self,
@@ -123,21 +127,23 @@ class AuditLog:
         correlation_id: str = "",
     ):
         """Emir kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="ORDER",
-            entity_type="order",
-            entity_id=order_id,
-            actor="order_service",
-            details={
-                "ticker": ticker,
-                "side": side,
-                "quantity": quantity,
-                "price": price,
-                "order_type": order_type,
-            },
-            correlation_id=correlation_id,
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="ORDER",
+                entity_type="order",
+                entity_id=order_id,
+                actor="order_service",
+                details={
+                    "ticker": ticker,
+                    "side": side,
+                    "quantity": quantity,
+                    "price": price,
+                    "order_type": order_type,
+                },
+                correlation_id=correlation_id,
+            )
+        )
 
     def log_fill(
         self,
@@ -151,22 +157,24 @@ class AuditLog:
         correlation_id: str = "",
     ):
         """Dolum kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="FILL",
-            entity_type="fill",
-            entity_id=fill_id,
-            actor="execution_simulator",
-            details={
-                "order_id": order_id,
-                "ticker": ticker,
-                "side": side,
-                "quantity": quantity,
-                "price": price,
-                "commission": commission,
-            },
-            correlation_id=correlation_id,
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="FILL",
+                entity_type="fill",
+                entity_id=fill_id,
+                actor="execution_simulator",
+                details={
+                    "order_id": order_id,
+                    "ticker": ticker,
+                    "side": side,
+                    "quantity": quantity,
+                    "price": price,
+                    "commission": commission,
+                },
+                correlation_id=correlation_id,
+            )
+        )
 
     def log_state_change(
         self,
@@ -177,18 +185,20 @@ class AuditLog:
         reason: str,
     ):
         """State değişikliği kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="STATE_CHANGE",
-            entity_type=entity_type,
-            entity_id=entity_id,
-            actor="system",
-            details={
-                "old": str(old_value),
-                "new": str(new_value),
-                "reason": reason,
-            },
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="STATE_CHANGE",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                actor="system",
+                details={
+                    "old": str(old_value),
+                    "new": str(new_value),
+                    "reason": reason,
+                },
+            )
+        )
 
     def log_config_change(
         self,
@@ -198,17 +208,19 @@ class AuditLog:
         actor: str = "user",
     ):
         """Config değişikliği kaydı."""
-        self.log(AuditEntry(
-            audit_id=self._generate_id(),
-            action="CONFIG_CHANGE",
-            entity_type="config",
-            entity_id=config_key,
-            actor=actor,
-            details={
-                "old": str(old_value),
-                "new": str(new_value),
-            },
-        ))
+        self.log(
+            AuditEntry(
+                audit_id=self._generate_id(),
+                action="CONFIG_CHANGE",
+                entity_type="config",
+                entity_id=config_key,
+                actor=actor,
+                details={
+                    "old": str(old_value),
+                    "new": str(new_value),
+                },
+            )
+        )
 
     def get_entity_history(
         self,
@@ -236,8 +248,13 @@ class AuditLog:
 
         # Sıralı: RAW_DATA → FEATURE → SIGNAL → DECISION → RISK → ORDER → FILL
         action_order = {
-            "RAW_DATA": 0, "FEATURE": 1, "SIGNAL": 2,
-            "DECISION": 3, "RISK_CHECK": 4, "ORDER": 5, "FILL": 6,
+            "RAW_DATA": 0,
+            "FEATURE": 1,
+            "SIGNAL": 2,
+            "DECISION": 3,
+            "RISK_CHECK": 4,
+            "ORDER": 5,
+            "FILL": 6,
         }
         history.sort(key=lambda x: action_order.get(x["action"], 99))
         return history

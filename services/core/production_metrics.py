@@ -61,7 +61,9 @@ class ProductionMetrics:
                     "min": round(min(values), 4),
                     "max": round(max(values), 4),
                     "p50": round(sorted(values)[len(values) // 2], 4),
-                    "p95": round(sorted(values)[int(len(values) * 0.95)], 4) if len(values) >= 20 else round(max(values), 4),
+                    "p95": round(sorted(values)[int(len(values) * 0.95)], 4)
+                    if len(values) >= 20
+                    else round(max(values), 4),
                 }
         return result
 
@@ -101,6 +103,7 @@ class _Timer:
 # Pre-defined metric names
 class Metrics:
     """Sabit metric isimleri."""
+
     # Data
     DATA_FETCH_TOTAL = "data_fetch_total"
     DATA_FETCH_ERRORS = "data_fetch_errors"

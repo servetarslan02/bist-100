@@ -39,6 +39,7 @@ class ScanAlertType(StrEnum):
 @dataclass
 class ScanAlert:
     """Tarama alert'i."""
+
     alert_id: str
     alert_type: ScanAlertType
     severity: ScanAlertSeverity
@@ -57,11 +58,12 @@ class ScanAlert:
 @dataclass
 class ScanAlertRule:
     """Alert kuralı."""
+
     rule_id: str
     name: str
     alert_type: ScanAlertType
     severity: ScanAlertSeverity
-    condition: str       # "score_gt", "new_signal", "tier_change", "anomaly"
+    condition: str  # "score_gt", "new_signal", "tier_change", "anomaly"
     threshold: float
     enabled: bool = True
     cooldown_seconds: int = 300  # 5 dakika
@@ -229,10 +231,7 @@ class ScanAlertManager:
                     new_alerts.append(alert)
                     rule.last_fired = now
 
-                    logger.warning("Scan alert fired",
-                                 rule=rule.rule_id,
-                                 ticker=ticker,
-                                 severity=rule.severity.value)
+                    logger.warning("Scan alert fired", rule=rule.rule_id, ticker=ticker, severity=rule.severity.value)
 
             # Sinyal geçmişini güncelle
             if signal:
@@ -343,10 +342,7 @@ class ScanAlertManager:
             max_age_hours: Maksimum yaş (saat)
         """
         cutoff = time.time() - (max_age_hours * 3600)
-        self._alerts = [
-            a for a in self._alerts
-            if datetime.fromisoformat(a.timestamp).timestamp() > cutoff
-        ]
+        self._alerts = [a for a in self._alerts if datetime.fromisoformat(a.timestamp).timestamp() > cutoff]
 
 
 # Singleton

@@ -17,15 +17,46 @@ class NewsSentimentAnalyzer:
     """Haber duygu analizi."""
 
     POSITIVE_WORDS = {
-        "artış", "yükseliş", "kâr", "kar", "büyüme", "rekor", "zirve",
-        "güçlü", "olumlu", "başarı", "iyileşme", "toparlanma", "yükseldi",
-        "arttı", "kazandı", "değerlendi", "pozitif", "temettü", "bedelsiz",
+        "artış",
+        "yükseliş",
+        "kâr",
+        "kar",
+        "büyüme",
+        "rekor",
+        "zirve",
+        "güçlü",
+        "olumlu",
+        "başarı",
+        "iyileşme",
+        "toparlanma",
+        "yükseldi",
+        "arttı",
+        "kazandı",
+        "değerlendi",
+        "pozitif",
+        "temettü",
+        "bedelsiz",
     }
 
     NEGATIVE_WORDS = {
-        "düşüş", "kayıp", "zarar", "gerileme", "çöküş", "dip", "kriz",
-        "zayıf", "olumsuz", "başarısızlık", "kötüleşme", "düşürdü",
-        "azaldı", "kaybetti", "negatif", "risk", "iflas", "borç",
+        "düşüş",
+        "kayıp",
+        "zarar",
+        "gerileme",
+        "çöküş",
+        "dip",
+        "kriz",
+        "zayıf",
+        "olumsuz",
+        "başarısızlık",
+        "kötüleşme",
+        "düşürdü",
+        "azaldı",
+        "kaybetti",
+        "negatif",
+        "risk",
+        "iflas",
+        "borç",
     }
 
     def analyze(self, text: str, ticker: str | None = None) -> dict[str, Any]:
@@ -34,7 +65,7 @@ class NewsSentimentAnalyzer:
             return {"sentiment": "NEUTRAL", "score": 0.0, "confidence": 0.0}
 
         text_lower = text.lower()
-        words = set(re.findall(r'\w+', text_lower))
+        words = set(re.findall(r"\w+", text_lower))
 
         pos_matches = words & self.POSITIVE_WORDS
         neg_matches = words & self.NEGATIVE_WORDS

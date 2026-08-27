@@ -27,17 +27,19 @@ logger = structlog.get_logger()
 @dataclass
 class RetryConfig:
     """Retry yapılandırması."""
-    max_attempts: int = 3           # Maksimum deneme sayısı
-    base_delay_s: float = 1.0       # Başlangıç gecikme süresi
-    max_delay_s: float = 30.0       # Maksimum gecikme süresi
-    backoff_factor: float = 2.0     # Gecikme çarpanı (exponential)
-    jitter: bool = True             # Rastgele gecikme ekle
-    jitter_range: float = 0.2       # Jitter aralığı (±%20)
+
+    max_attempts: int = 3  # Maksimum deneme sayısı
+    base_delay_s: float = 1.0  # Başlangıç gecikme süresi
+    max_delay_s: float = 30.0  # Maksimum gecikme süresi
+    backoff_factor: float = 2.0  # Gecikme çarpanı (exponential)
+    jitter: bool = True  # Rastgele gecikme ekle
+    jitter_range: float = 0.2  # Jitter aralığı (±%20)
 
 
 @dataclass
 class RetryStats:
     """Retry istatistikleri."""
+
     total_calls: int = 0
     total_retries: int = 0
     total_successes: int = 0
@@ -69,9 +71,7 @@ class RetryExhaustedError(Exception):
     def __init__(self, attempts: int, last_error: Exception):
         self.attempts = attempts
         self.last_error = last_error
-        super().__init__(
-            f"Retry exhausted after {attempts} attempts: {last_error}"
-        )
+        super().__init__(f"Retry exhausted after {attempts} attempts: {last_error}")
 
 
 class RetryPolicy:
@@ -140,9 +140,7 @@ class RetryPolicy:
     def _calculate_delay(self, attempt: int) -> float:
         """Gecikme süresini hesapla (exponential backoff + jitter)."""
         # Exponential backoff
-        delay = self.config.base_delay_s * (
-            self.config.backoff_factor ** (attempt - 1)
-        )
+        delay = self.config.base_delay_s * (self.config.backoff_factor ** (attempt - 1))
 
         # Max delay sınırı
         delay = min(delay, self.config.max_delay_s)
@@ -183,9 +181,7 @@ class RetryPolicy:
                 result = await func(*args, **kwargs)
                 self.stats.total_successes += 1
                 if attempt > 1:
-                    logger.info("Retry succeeded",
-                               attempt=attempt,
-                               total_attempts=self.config.max_attempts)
+                    logger.info("Retry succeeded", attempt=attempt, total_attempts=self.config.max_attempts)
                 return result
 
             except Exception as e:
@@ -193,9 +189,7 @@ class RetryPolicy:
 
                 # Non-retryable hata → hemen fırlat
                 if not self._is_retryable(e):
-                    logger.warning("Non-retryable error",
-                                  error=str(e),
-                                  error_type=type(e).__name__)
+                    logger.warning("Non-retryable error", error=str(e), error_type=type(e).__name__)
                     self.stats.total_failures += 1
                     raise
 
@@ -208,16 +202,16 @@ class RetryPolicy:
                 self.stats.total_retries += 1
                 self.stats.total_wait_seconds += delay
                 self.stats.last_retry_time = time.time()
-                self.stats.max_attempts_used = max(
-                    self.stats.max_attempts_used, attempt
-                )
+                self.stats.max_attempts_used = max(self.stats.max_attempts_used, attempt)
 
-                logger.warning("Retry attempt",
-                              attempt=attempt,
-                              max_attempts=self.config.max_attempts,
-                              delay_seconds=round(delay, 2),
-                              error=str(e),
-                              error_type=type(e).__name__)
+                logger.warning(
+                    "Retry attempt",
+                    attempt=attempt,
+                    max_attempts=self.config.max_attempts,
+                    delay_seconds=round(delay, 2),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
 
                 await asyncio.sleep(delay)
 
@@ -236,6 +230,7 @@ class RetryPolicy:
     ) -> Any:
         """Sync fonksiyonu retry ile çalıştır."""
         import time as time_module
+
         self.stats.total_calls += 1
         last_error = None
 
@@ -259,10 +254,7 @@ class RetryPolicy:
                 self.stats.total_retries += 1
                 self.stats.total_wait_seconds += delay
 
-                logger.warning("Retry attempt (sync)",
-                              attempt=attempt,
-                              delay_seconds=round(delay, 2),
-                              error=str(e))
+                logger.warning("Retry attempt (sync)", attempt=attempt, delay_seconds=round(delay, 2), error=str(e))
 
                 time_module.sleep(delay)
 
@@ -279,12 +271,8 @@ class RetryPolicy:
             "total_retries": self.stats.total_retries,
             "total_successes": self.stats.total_successes,
             "total_failures": self.stats.total_failures,
-            "success_rate": round(
-                self.stats.total_successes / max(self.stats.total_calls, 1), 3
-            ),
-            "avg_retries_per_call": round(
-                self.stats.total_retries / max(self.stats.total_calls, 1), 2
-            ),
+            "success_rate": round(self.stats.total_successes / max(self.stats.total_calls, 1), 3),
+            "avg_retries_per_call": round(self.stats.total_retries / max(self.stats.total_calls, 1), 2),
             "total_wait_seconds": round(self.stats.total_wait_seconds, 2),
             "max_attempts_used": self.stats.max_attempts_used,
         }

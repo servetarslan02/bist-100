@@ -50,9 +50,7 @@ async def check_replication_health() -> dict:
 
                 # Uyarılar
                 if health["lag_bytes"] and health["lag_bytes"] > 1048576:  # 1MB
-                    health["errors"].append(
-                        f"Replikasyon lag: {health['lag_bytes'] / 1048576:.1f} MB"
-                    )
+                    health["errors"].append(f"Replikasyon lag: {health['lag_bytes'] / 1048576:.1f} MB")
             else:
                 health["primary"]["status"] = "no_replica_connected"
                 health["errors"].append("Replica bağlı değil")
@@ -78,9 +76,7 @@ async def check_replication_health() -> dict:
                 health["lag_seconds"] = round(float(lag), 2) if lag else 0
 
                 if health["lag_seconds"] and health["lag_seconds"] > 60:
-                    health["errors"].append(
-                        f"Replica lag: {health['lag_seconds']}s"
-                    )
+                    health["errors"].append(f"Replica lag: {health['lag_seconds']}s")
             else:
                 health["replica"]["status"] = "not_in_recovery"
                 health["errors"].append("Replica recovery modunda değil")

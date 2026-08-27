@@ -62,6 +62,7 @@ class AgentRole(StrEnum):
 @dataclass
 class AgentTask:
     """Agent görevi."""
+
     task_id: str
     agent_role: AgentRole
     ticker: str
@@ -76,6 +77,7 @@ class AgentTask:
 @dataclass
 class AgentResult:
     """Agent sonucu."""
+
     task_id: str
     agent_role: AgentRole
     ticker: str
@@ -98,41 +100,61 @@ class AgentToolRegistry:
 
     ALLOWED_TOOLS = {
         AgentRole.RESEARCH: [
-            "read_market_data", "read_news", "read_fundamentals",
-            "run_technical_analysis", "run_valuation",
+            "read_market_data",
+            "read_news",
+            "read_fundamentals",
+            "run_technical_analysis",
+            "run_valuation",
         ],
         AgentRole.NEWS: [
-            "read_news", "read_kap", "read_social",
+            "read_news",
+            "read_kap",
+            "read_social",
         ],
         AgentRole.MACRO: [
-            "read_macro_data", "read_world_state",
+            "read_macro_data",
+            "read_world_state",
         ],
         AgentRole.FUNDAMENTAL: [
-            "read_fundamentals", "read_financials", "run_valuation",
+            "read_fundamentals",
+            "read_financials",
+            "run_valuation",
         ],
         AgentRole.TECHNICAL: [
-            "read_market_data", "run_technical_analysis",
+            "read_market_data",
+            "run_technical_analysis",
         ],
         AgentRole.RISK: [
-            "read_portfolio", "calculate_risk", "approve_decision", "reject_decision",
+            "read_portfolio",
+            "calculate_risk",
+            "approve_decision",
+            "reject_decision",
         ],
         AgentRole.PORTFOLIO: [
-            "read_portfolio", "calculate_position_size",
+            "read_portfolio",
+            "calculate_position_size",
         ],
         AgentRole.SCENARIO: [
-            "run_scenario", "run_stress_test",
+            "run_scenario",
+            "run_stress_test",
         ],
         AgentRole.BACKTEST: [
-            "run_backtest", "read_historical_data",
+            "run_backtest",
+            "read_historical_data",
         ],
         AgentRole.SYNTHESIS: [
-            "read_all_results", "generate_report",
+            "read_all_results",
+            "generate_report",
         ],
         AgentRole.BULL: [
-            "read_market_data", "read_fundamentals", "run_technical_analysis",
+            "read_market_data",
+            "read_fundamentals",
+            "run_technical_analysis",
         ],
         AgentRole.BEAR: [
-            "read_market_data", "read_fundamentals", "run_technical_analysis",
+            "read_market_data",
+            "read_fundamentals",
+            "run_technical_analysis",
         ],
     }
 
@@ -174,9 +196,7 @@ class AIOutputValidator:
         }
 
         if expected_schema and expected_schema in schema_map:
-            is_valid, validated, schema_errors = validate_agent_output(
-                parsed, schema_class=schema_map[expected_schema]
-            )
+            is_valid, validated, schema_errors = validate_agent_output(parsed, schema_class=schema_map[expected_schema])
             if not is_valid:
                 errors.extend(schema_errors)
             else:
@@ -210,7 +230,7 @@ class AIOutputValidator:
         # 5. Source validation
         if "source" in parsed:
             source = parsed["source"]
-            if isinstance(source, str) and source.startswith("http") and not re.match(r'https?://', source):
+            if isinstance(source, str) and source.startswith("http") and not re.match(r"https?://", source):
                 errors.append(f"Suspicious source URL: {source}")
 
         # 6. F-030: Price/Date hallucination validation
@@ -236,6 +256,7 @@ class AIOutputValidator:
             date_str = str(parsed["date"])
             try:
                 from datetime import datetime
+
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 # Gelecek tarih kontrolü (1 yıldan fazla ileri)
                 if dt.year > datetime.now(UTC).year + 1:
@@ -338,11 +359,14 @@ class BaseAgent:
         client = llm_client or self.llm_client
 
         # Input hash
-        input_str = orjson.dumps({
-            "ticker": task.ticker,
-            "prompt": task.prompt[:200],
-            "context_keys": list(task.context.keys()),
-        }, sort_keys=True)
+        input_str = orjson.dumps(
+            {
+                "ticker": task.ticker,
+                "prompt": task.prompt[:200],
+                "context_keys": list(task.context.keys()),
+            },
+            sort_keys=True,
+        )
         input_hash = hashlib.sha256(input_str.encode()).hexdigest()[:16]
 
         try:
@@ -351,9 +375,7 @@ class BaseAgent:
                 output = await self._call_llm(task, client)
             else:
                 # Rule-based fallback
-                output = AIFallback.rule_based_analysis(
-                    task.context.get("features", {}), task.ticker
-                )
+                output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
             # Validate — rol -> şema eşlemesi ile (önceden expected_schema
             # hiç geçirilmediği için Pydantic doğrulama katmanı hiçbir
@@ -376,9 +398,7 @@ class BaseAgent:
                     "AI output validation failed, using fallback",
                     errors=validation["errors"],
                 )
-                output = AIFallback.rule_based_analysis(
-                    task.context.get("features", {}), task.ticker
-                )
+                output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
             duration = (time.monotonic() - start) * 1000
 
@@ -448,28 +468,28 @@ Kurallar: Sadece verilen verilere dayan. JSON formatında yanıt ver. Confidence
 
         if not response.success:
             # F-029: LLM fallback detaylı logging
-            logger.warning("LLM call failed, using rule-based fallback",
-                         error=response.error,
-                         ticker=task.ticker,
-                         agent_role=task.agent_role,
-                         model=getattr(client, '_model', 'unknown'),
-                         fallback_type="rule_based_analysis")
-            return AIFallback.rule_based_analysis(
-                task.context.get("features", {}), task.ticker
+            logger.warning(
+                "LLM call failed, using rule-based fallback",
+                error=response.error,
+                ticker=task.ticker,
+                agent_role=task.agent_role,
+                model=getattr(client, "_model", "unknown"),
+                fallback_type="rule_based_analysis",
             )
+            return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
         # JSON parse
         parsed = parse_llm_json(response.content)
         if parsed is None:
             # F-029: Parse hatası detaylı logging
-            logger.warning("Failed to parse LLM output, using rule-based fallback",
-                         ticker=task.ticker,
-                         agent_role=task.agent_role,
-                         content_preview=response.content[:200] if response.content else "empty",
-                         fallback_type="rule_based_analysis")
-            return AIFallback.rule_based_analysis(
-                task.context.get("features", {}), task.ticker
+            logger.warning(
+                "Failed to parse LLM output, using rule-based fallback",
+                ticker=task.ticker,
+                agent_role=task.agent_role,
+                content_preview=response.content[:200] if response.content else "empty",
+                fallback_type="rule_based_analysis",
             )
+            return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
         # Token bilgilerini ekle
         parsed["_tokens_in"] = response.tokens_in
@@ -507,8 +527,10 @@ class AgentOrchestrator:
 
         # Paralel çalıştır (asyncio.gather ile)
         research_roles = [
-            AgentRole.TECHNICAL, AgentRole.FUNDAMENTAL,
-            AgentRole.NEWS, AgentRole.MACRO,
+            AgentRole.TECHNICAL,
+            AgentRole.FUNDAMENTAL,
+            AgentRole.NEWS,
+            AgentRole.MACRO,
         ]
 
         template_map = {
@@ -544,9 +566,7 @@ class AgentOrchestrator:
                 self._results = self._results[-1000:]
 
         # Synthesis
-        synth_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(
-            AgentRole.SYNTHESIS, llm_client=client
-        )
+        synth_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(AgentRole.SYNTHESIS, llm_client=client)
         synth_task = AgentTask(
             task_id=f"{ticker}-SYNTHESIS-{datetime.now(UTC).strftime('%H%M%S')}",
             agent_role=AgentRole.SYNTHESIS,

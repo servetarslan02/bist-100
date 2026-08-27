@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 @dataclass
 class ReturnDistribution:
     """Getiri dağılımı."""
+
     ticker: str
     horizon_days: int
     mean_return: float
@@ -33,6 +34,7 @@ class ReturnDistribution:
 @dataclass
 class CalibrationResult:
     """Kalibrasyon sonucu."""
+
     mean_predicted: float
     mean_actual: float
     brier_score: float
@@ -43,6 +45,7 @@ class CalibrationResult:
 @dataclass
 class PredictionOutcome:
     """Tahmin ve sonuç çifti."""
+
     predicted_probability: float
     actual_outcome: bool  # True = pozitif getiri
     ticker: str
@@ -66,8 +69,12 @@ class ProbabilityEngine:
         """
         if not historical_returns or len(historical_returns) < 10:
             return ReturnDistribution(
-                ticker=ticker, horizon_days=horizon_days,
-                mean_return=0, std_return=0, skewness=0, kurtosis=0,
+                ticker=ticker,
+                horizon_days=horizon_days,
+                mean_return=0,
+                std_return=0,
+                skewness=0,
+                kurtosis=0,
                 percentiles={10: 0, 25: 0, 50: 0, 75: 0, 90: 0},
             )
 
@@ -78,7 +85,7 @@ class ProbabilityEngine:
             # Rolling horizon returns
             horizon_returns = []
             for i in range(len(returns) - horizon_days + 1):
-                cum_return = np.prod(1 + returns[i:i + horizon_days] / 100) - 1
+                cum_return = np.prod(1 + returns[i : i + horizon_days] / 100) - 1
                 horizon_returns.append(cum_return * 100)
             returns = np.array(horizon_returns)
 
@@ -138,8 +145,11 @@ class ProbabilityEngine:
         """
         if not predictions:
             return CalibrationResult(
-                mean_predicted=0, mean_actual=0,
-                brier_score=0, calibration_error=0, bins=[],
+                mean_predicted=0,
+                mean_actual=0,
+                brier_score=0,
+                calibration_error=0,
+                bins=[],
             )
 
         # Bin'le
@@ -148,21 +158,20 @@ class ProbabilityEngine:
             lower = i / num_bins
             upper = (i + 1) / num_bins
 
-            bin_predictions = [
-                p for p in predictions
-                if lower <= p.predicted_probability < upper
-            ]
+            bin_predictions = [p for p in predictions if lower <= p.predicted_probability < upper]
 
             if bin_predictions:
                 mean_predicted = np.mean([p.predicted_probability for p in bin_predictions])
                 mean_actual = np.mean([1.0 if p.actual_outcome else 0.0 for p in bin_predictions])
-                bins.append({
-                    "lower": round(lower, 2),
-                    "upper": round(upper, 2),
-                    "predicted": round(float(mean_predicted), 4),
-                    "actual": round(float(mean_actual), 4),
-                    "count": len(bin_predictions),
-                })
+                bins.append(
+                    {
+                        "lower": round(lower, 2),
+                        "upper": round(upper, 2),
+                        "predicted": round(float(mean_predicted), 4),
+                        "actual": round(float(mean_actual), 4),
+                        "count": len(bin_predictions),
+                    }
+                )
 
         # Genel metrikler
         all_predicted = [p.predicted_probability for p in predictions]

@@ -38,8 +38,7 @@ async def test_exponential_backoff():
     issues = []
 
     # Lock al ve kilitle
-    lock1 = DatabaseLock(db, dialect="sqlite", key="test_backoff",
-                         max_retries=3, base_retry_ms=10, max_retry_ms=100)
+    lock1 = DatabaseLock(db, dialect="sqlite", key="test_backoff", max_retries=3, base_retry_ms=10, max_retry_ms=100)
     await lock1.acquire()
 
     # İkinci lock — retry ile karşılaşmalı
@@ -68,8 +67,7 @@ async def test_lock_lease_renewal():
     db = fresh_db()
     issues = []
 
-    lock = DatabaseLock(db, dialect="sqlite", key="test_renewal",
-                        lease_renewal_interval_s=0.1)  # 100ms renewal
+    lock = DatabaseLock(db, dialect="sqlite", key="test_renewal", lease_renewal_interval_s=0.1)  # 100ms renewal
 
     await lock.acquire()
 
@@ -124,6 +122,7 @@ async def test_pg_advisory_lock_interface():
 
     # _acquire_pg pg_try_advisory_lock kullanmalı
     import inspect
+
     source = inspect.getsource(lock._acquire_pg)
     if "pg_try_advisory_lock" not in source:
         issues.append("_acquire_pg pg_try_advisory_lock kullanmıyor")
@@ -175,12 +174,10 @@ async def test_lock_timeout_logging():
     issues = []
 
     # Çok kısa timeout ile lock
-    DatabaseLock(db, dialect="sqlite", key="test_timeout_log",
-                        timeout_ms=1, max_retries=1, base_retry_ms=1)
+    DatabaseLock(db, dialect="sqlite", key="test_timeout_log", timeout_ms=1, max_retries=1, base_retry_ms=1)
 
     # Lock al ve hemen başka bir lock deneyelim (farklı key ile)
-    lock2 = DatabaseLock(db, dialect="sqlite", key="test_timeout_log2",
-                         timeout_ms=1, max_retries=1)
+    lock2 = DatabaseLock(db, dialect="sqlite", key="test_timeout_log2", timeout_ms=1, max_retries=1)
     await lock2.acquire()
     await lock2.release()
 
@@ -197,8 +194,7 @@ async def test_long_transaction():
     db = fresh_db()
     issues = []
 
-    lock = DatabaseLock(db, dialect="sqlite", key="test_long_txn",
-                        lease_renewal_interval_s=0.05)  # 50ms renewal
+    lock = DatabaseLock(db, dialect="sqlite", key="test_long_txn", lease_renewal_interval_s=0.05)  # 50ms renewal
 
     await lock.acquire()
 
@@ -221,11 +217,16 @@ async def test_portfolio_health_status():
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = 'X'")
     xid = row["id"]
 
@@ -269,11 +270,16 @@ async def test_metrics_after_operations():
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = 'X'")
     xid = row["id"]
 
@@ -304,6 +310,7 @@ async def test_metrics_after_operations():
 # ============================================================
 # RUN
 # ============================================================
+
 
 async def run_all():
     print("=" * 60)

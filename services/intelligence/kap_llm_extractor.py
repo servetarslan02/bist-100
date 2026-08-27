@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class KAPDocument:
     """KAP dokümanı."""
+
     doc_id: str
     ticker: str
     date: str
@@ -38,6 +39,7 @@ class KAPDocument:
 @dataclass
 class LLMInsight:
     """LLM analiz sonucu."""
+
     ticker: str
     overall_sentiment: float
     confidence: float
@@ -108,13 +110,15 @@ class KAPLLMExtractor:
         )
 
         # Knowledge graph'a ekle
-        self._knowledge_graph[ticker]["events"].append({
-            "date": date,
-            "category": detected_category,
-            "sentiment": sentiment,
-            "importance": cat_info["importance"],
-            "metrics": key_metrics,
-        })
+        self._knowledge_graph[ticker]["events"].append(
+            {
+                "date": date,
+                "category": detected_category,
+                "sentiment": sentiment,
+                "importance": cat_info["importance"],
+                "metrics": key_metrics,
+            }
+        )
 
         return doc
 
@@ -182,8 +186,7 @@ class KAPLLMExtractor:
             summary=self._generate_summary(documents, overall_sentiment),
         )
 
-        logger.info("LLM analysis completed", ticker=ticker,
-                   sentiment=round(overall_sentiment, 4), topics=len(topics))
+        logger.info("LLM analysis completed", ticker=ticker, sentiment=round(overall_sentiment, 4), topics=len(topics))
 
         return insight
 
@@ -204,29 +207,35 @@ class KAPLLMExtractor:
 
         # Basit faktör keşfi (gerçek implementasyonda daha karmaşık)
         # Örnek: momentum + volume interaction
-        discovered_factors.append({
-            "name": "momentum_volume_interaction",
-            "formula": "momentum_20d * volume_zscore",
-            "description": "Yüksek momentum + yüksek hacim = güçlü trend",
-            "expected_ic": 0.05,
-            "source": "agentic_discovery",
-        })
+        discovered_factors.append(
+            {
+                "name": "momentum_volume_interaction",
+                "formula": "momentum_20d * volume_zscore",
+                "description": "Yüksek momentum + yüksek hacim = güçlü trend",
+                "expected_ic": 0.05,
+                "source": "agentic_discovery",
+            }
+        )
 
-        discovered_factors.append({
-            "name": "quality_momentum",
-            "formula": "quality_score * momentum_20d",
-            "description": "Kaliteli şirketlerde momentum daha sürdürülebilir",
-            "expected_ic": 0.04,
-            "source": "agentic_discovery",
-        })
+        discovered_factors.append(
+            {
+                "name": "quality_momentum",
+                "formula": "quality_score * momentum_20d",
+                "description": "Kaliteli şirketlerde momentum daha sürdürülebilir",
+                "expected_ic": 0.04,
+                "source": "agentic_discovery",
+            }
+        )
 
-        discovered_factors.append({
-            "name": "sentiment_reversal",
-            "formula": "-combined_sentiment * rsi_14d",
-            "description": "Aşırı negatif sentiment + oversold = reversal",
-            "expected_ic": 0.03,
-            "source": "agentic_discovery",
-        })
+        discovered_factors.append(
+            {
+                "name": "sentiment_reversal",
+                "formula": "-combined_sentiment * rsi_14d",
+                "description": "Aşırı negatif sentiment + oversold = reversal",
+                "expected_ic": 0.03,
+                "source": "agentic_discovery",
+            }
+        )
 
         logger.info("Factor discovery completed", factors=len(discovered_factors))
 
@@ -257,16 +266,17 @@ class KAPLLMExtractor:
     def _extract_metrics(self, text: str, fields: list[str]) -> dict[str, float]:
         """Metinden sayısal metrikler çıkar."""
         import re
+
         metrics = {}
 
         # TL cinsinden tutarlar
-        tl_pattern = r'(\d+(?:[.,]\d+)?)\s*(?:milyon|mn|m)?\s*TL'
+        tl_pattern = r"(\d+(?:[.,]\d+)?)\s*(?:milyon|mn|m)?\s*TL"
         tl_matches = re.findall(tl_pattern, text.lower())
         if tl_matches:
             metrics["tl_amount"] = float(tl_matches[0].replace(",", "."))
 
         # Yüzde değerleri
-        pct_pattern = r'(%\d+|\d+(?:[.,]\d+)?\s*%)'
+        pct_pattern = r"(%\d+|\d+(?:[.,]\d+)?\s*%)"
         pct_matches = re.findall(pct_pattern, text)
         if pct_matches:
             metrics["percentage"] = float(pct_matches[0].replace("%", "").replace(",", "."))
@@ -280,11 +290,12 @@ class KAPLLMExtractor:
 
         # Şirket isimleri (büyük harfli kelimeler)
         import re
-        companies = re.findall(r'[A-Z][A-Z\s]{2,}', text)
+
+        companies = re.findall(r"[A-Z][A-Z\s]{2,}", text)
         entities.extend(companies[:5])
 
         # Tarihler
-        dates = re.findall(r'\d{2}[./]\d{2}[./]\d{4}', text)
+        dates = re.findall(r"\d{2}[./]\d{2}[./]\d{4}", text)
         entities.extend(dates[:3])
 
         return list(set(entities))
@@ -293,13 +304,40 @@ class KAPLLMExtractor:
         """Basit sentiment analizi."""
         text_lower = text.lower()
 
-        positive_words = ["artış", "kâr", "büyüme", "başarı", "olumlu", "pozitif",
-                         "yükseliş", "gelir", "temettü", "dividend", "growth",
-                         "profit", "increase", "positive", "strong"]
+        positive_words = [
+            "artış",
+            "kâr",
+            "büyüme",
+            "başarı",
+            "olumlu",
+            "pozitif",
+            "yükseliş",
+            "gelir",
+            "temettü",
+            "dividend",
+            "growth",
+            "profit",
+            "increase",
+            "positive",
+            "strong",
+        ]
 
-        negative_words = ["zarar", "düşüş", "azalma", "olumsuz", "negatif",
-                         "risk", "tehdit", "kriz", "loss", "decline", "negative",
-                         "weak", "decrease", "fall"]
+        negative_words = [
+            "zarar",
+            "düşüş",
+            "azalma",
+            "olumsuz",
+            "negatif",
+            "risk",
+            "tehdit",
+            "kriz",
+            "loss",
+            "decline",
+            "negative",
+            "weak",
+            "decrease",
+            "fall",
+        ]
 
         pos_count = sum(1 for w in positive_words if w in text_lower)
         neg_count = sum(1 for w in negative_words if w in text_lower)
@@ -312,7 +350,7 @@ class KAPLLMExtractor:
 
     def _extract_title(self, text: str) -> str:
         """İlk satırı başlık olarak al."""
-        lines = text.strip().split('\n')
+        lines = text.strip().split("\n")
         return lines[0][:200] if lines else ""
 
     def _estimate_sector_impact(self, documents: list[KAPDocument]) -> dict[str, float]:
@@ -337,6 +375,7 @@ class KAPLLMExtractor:
 
         try:
             from services.intelligence.gemini_service import call_gemini
+
             doc_snippets = "\n".join([f"- [{d.category}] {d.title}: {d.content[:150]}" for d in documents[:5]])
             prompt = f"Aşağıdaki KAP şirket açıklamalarını BİST yatırımcısı perspektifiyle 2-3 cümlede özetle ve kilit etkiyi belirt:\n{doc_snippets}"
             ai_summary = call_gemini(prompt)
@@ -354,8 +393,10 @@ class KAPLLMExtractor:
             tone = "nötr"
 
         categories = ", ".join(set(d.category for d in documents))
-        return f"{len(documents)} KAP dokümanı analiz edildi. Genel ton: {tone}. " \
-               f"Kategoriler: {categories}. Sentiment: {sentiment:.2f}"
+        return (
+            f"{len(documents)} KAP dokümanı analiz edildi. Genel ton: {tone}. "
+            f"Kategoriler: {categories}. Sentiment: {sentiment:.2f}"
+        )
 
     def get_knowledge_graph(self, ticker: str) -> dict:
         """Knowledge graph'ı getir."""

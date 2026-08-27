@@ -29,15 +29,17 @@ logger = structlog.get_logger()
 
 class SystemState(StrEnum):
     """Sistem durumları."""
-    FULL = "FULL"                    # Tüm özellikler aktif
-    DEGRADED = "DEGRADED"           # Kritik olmayan özellikler devre dışı
-    READ_ONLY = "READ_ONLY"         # Sadece okuma
-    RECOVERY = "RECOVERY"           # Kurtarma modu
-    SHUTDOWN = "SHUTDOWN"           # Kapatılıyor
+
+    FULL = "FULL"  # Tüm özellikler aktif
+    DEGRADED = "DEGRADED"  # Kritik olmayan özellikler devre dışı
+    READ_ONLY = "READ_ONLY"  # Sadece okuma
+    RECOVERY = "RECOVERY"  # Kurtarma modu
+    SHUTDOWN = "SHUTDOWN"  # Kapatılıyor
 
 
 class FeatureFlag(StrEnum):
     """Feature flag'ler."""
+
     LIVE_TRADING = "live_trading"
     NEW_POSITIONS = "new_positions"
     SCANNING = "scanning"
@@ -53,6 +55,7 @@ class FeatureFlag(StrEnum):
 @dataclass
 class StateTransition:
     """Durum geçiş kaydı."""
+
     from_state: SystemState
     to_state: SystemState
     reason: str
@@ -72,6 +75,7 @@ class StateTransition:
 @dataclass
 class HealthCheck:
     """Sağlık kontrolü sonucu."""
+
     component: str
     is_healthy: bool
     latency_ms: float
@@ -109,7 +113,7 @@ class SystemStateGovernor:
         self._callbacks: list[Callable] = []
         self._auto_recovery_enabled = True
         self._degradation_threshold = 0.5  # %50 unhealthy → DEGRADED
-        self._readonly_threshold = 0.75    # %75 unhealthy → READ_ONLY
+        self._readonly_threshold = 0.75  # %75 unhealthy → READ_ONLY
 
         # State-specific feature overrides
         self._state_features: dict[SystemState, set[FeatureFlag]] = {
@@ -189,11 +193,13 @@ class SystemStateGovernor:
         if len(self._transition_history) > 1000:
             self._transition_history = self._transition_history[-1000:]
 
-        logger.warning("System state transition",
-                      old=old_state.value,
-                      new=new_state.value,
-                      reason=reason,
-                      triggered_by=triggered_by)
+        logger.warning(
+            "System state transition",
+            old=old_state.value,
+            new=new_state.value,
+            reason=reason,
+            triggered_by=triggered_by,
+        )
 
         # Notify callbacks (handle both sync and async contexts)
         try:
@@ -281,13 +287,13 @@ class SystemStateGovernor:
                 self.transition(
                     SystemState.READ_ONLY,
                     f"Auto: {unhealthy}/{total} components unhealthy ({unhealthy_ratio:.0%})",
-                    "auto"
+                    "auto",
                 )
             elif unhealthy_ratio >= self._degradation_threshold:
                 self.transition(
                     SystemState.DEGRADED,
                     f"Auto: {unhealthy}/{total} components unhealthy ({unhealthy_ratio:.0%})",
-                    "auto"
+                    "auto",
                 )
 
         elif self._state in (SystemState.DEGRADED, SystemState.READ_ONLY, SystemState.RECOVERY):
@@ -295,7 +301,7 @@ class SystemStateGovernor:
                 self.transition(
                     SystemState.FULL,
                     f"Auto recovery: {unhealthy}/{total} components unhealthy ({unhealthy_ratio:.0%})",
-                    "auto"
+                    "auto",
                 )
 
     async def _notify_callbacks(
@@ -318,18 +324,11 @@ class SystemStateGovernor:
         """Sistem durumu özeti."""
         return {
             "state": self._state.value,
-            "feature_flags": {
-                f.value: v for f, v in self._feature_flags.items()
-            },
-            "enabled_features": [
-                f.value for f, v in self._feature_flags.items() if v
-            ],
-            "disabled_features": [
-                f.value for f, v in self._feature_flags.items() if not v
-            ],
+            "feature_flags": {f.value: v for f, v in self._feature_flags.items()},
+            "enabled_features": [f.value for f, v in self._feature_flags.items() if v],
+            "disabled_features": [f.value for f, v in self._feature_flags.items() if not v],
             "health": {
-                comp: {"healthy": h.is_healthy, "latency_ms": h.latency_ms}
-                for comp, h in self._health_results.items()
+                comp: {"healthy": h.is_healthy, "latency_ms": h.latency_ms} for comp, h in self._health_results.items()
             },
             "transitions": len(self._transition_history),
         }
@@ -341,9 +340,7 @@ class SystemStateGovernor:
     def force_feature(self, feature: FeatureFlag, enabled: bool):
         """Feature flag'i zorla ayarla."""
         self._feature_flags[feature] = enabled
-        logger.info("Feature flag forced",
-                    feature=feature.value,
-                    enabled=enabled)
+        logger.info("Feature flag forced", feature=feature.value, enabled=enabled)
 
     def get_fallback_response(self, feature: FeatureFlag) -> dict[str, Any] | None:
         """
@@ -376,10 +373,13 @@ class SystemStateGovernor:
             },
         }
 
-        return fallbacks.get(feature, {
-            "status": "unavailable",
-            "message": f"Feature {feature.value} is currently disabled",
-        })
+        return fallbacks.get(
+            feature,
+            {
+                "status": "unavailable",
+                "message": f"Feature {feature.value} is currently disabled",
+            },
+        )
 
 
 # Singleton

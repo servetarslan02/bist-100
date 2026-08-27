@@ -94,10 +94,7 @@ def _bbox_from_center(lat: float, lon: float, radius_m: int) -> tuple[float, flo
 def _bbox_to_wkt(bbox: tuple[float, float, float, float]) -> str:
     """Bounding box'ı WKT POLYGON formatına çevir."""
     west, south, east, north = bbox
-    return (
-        f"POLYGON(({west} {south}, {east} {south}, "
-        f"{east} {north}, {west} {north}, {west} {south}))"
-    )
+    return f"POLYGON(({west} {south}, {east} {south}, {east} {north}, {west} {north}, {west} {south}))"
 
 
 class SatelliteAdapter(BaseAdapter):
@@ -127,14 +124,17 @@ class SatelliteAdapter(BaseAdapter):
         try:
             import aiohttp
 
-            async with aiohttp.ClientSession() as session, session.post(
-                "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
-                data={
-                    "grant_type": "client_credentials",
-                    "client_id": "cdse-public",
-                },
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": "cdse-public",
+                    },
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp,
+            ):
                 if resp.status == 200:
                     data = await resp.json()
                     self._token = data.get("access_token")
@@ -187,9 +187,7 @@ class SatelliteAdapter(BaseAdapter):
         try:
             import aiohttp
 
-            bbox = _bbox_from_center(
-                location["lat"], location["lon"], location["radius_m"]
-            )
+            bbox = _bbox_from_center(location["lat"], location["lon"], location["radius_m"])
             _bbox_to_wkt(bbox)
 
             # Son 30 günün en bulutsuz görüntüsünü ara
@@ -241,12 +239,15 @@ class SatelliteAdapter(BaseAdapter):
 
             headers = {"Authorization": f"Bearer {token}"}
 
-            async with aiohttp.ClientSession() as session, session.post(
-                self.PROCESS_URL,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    self.PROCESS_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp,
+            ):
                 if resp.status != 200:
                     logger.debug("Sentinel-2 request failed", status=resp.status, location=location["name"])
                     return None

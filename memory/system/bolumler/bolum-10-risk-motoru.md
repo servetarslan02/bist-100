@@ -111,15 +111,13 @@ def compute_country_risk(cds_5y):
 ### Kur riski:
 ```python
 def compute_fx_risk(portfolio, usdtry_change):
-    fx_exposure = sum(
-        pos["value"] * pos.get("fx_beta", 0) for pos in portfolio
-    )
+    fx_exposure = sum(pos["value"] * pos.get("fx_beta", 0) for pos in portfolio)
     fx_impact = fx_exposure * usdtry_change
-    
+
     return {
         "fx_exposure": fx_exposure,
         "fx_impact": fx_impact,
-        "hedge_needed": abs(fx_impact) > portfolio.total_value * 0.02
+        "hedge_needed": abs(fx_impact) > portfolio.total_value * 0.02,
     }
 ```
 
@@ -159,7 +157,7 @@ Bu bölümün risk motoru, Bölüm 32'deki türev araçlarla genişler:
 ```python
 from services.viop.greeks import calculate_greeks
 
-greeks = calculate_greeks(S=305.25, K=310, T=30/365, r=0.42, sigma=0.25)
+greeks = calculate_greeks(S=305.25, K=310, T=30 / 365, r=0.42, sigma=0.25)
 # delta: 0.55 → fiyat riski
 # gamma: 0.02 → delta değişimi
 # theta: -0.15 → zaman aşınması

@@ -20,10 +20,10 @@ logger = structlog.get_logger()
 
 class DrawdownAction(StrEnum):
     NONE = "NONE"
-    REDUCE_SIZE = "REDUCE_SIZE"           # Pozisyon boyutunu azalt
-    STOP_NEW = "STOP_NEW"                 # Yeni pozisyon durdur
-    CLOSE_POSITIONS = "CLOSE_POSITIONS"   # Pozisyon kapat
-    HALT_SYSTEM = "HALT_SYSTEM"           # Sistem durdur
+    REDUCE_SIZE = "REDUCE_SIZE"  # Pozisyon boyutunu azalt
+    STOP_NEW = "STOP_NEW"  # Yeni pozisyon durdur
+    CLOSE_POSITIONS = "CLOSE_POSITIONS"  # Pozisyon kapat
+    HALT_SYSTEM = "HALT_SYSTEM"  # Sistem durdur
 
 
 class DrawdownSeverity(StrEnum):
@@ -36,6 +36,7 @@ class DrawdownSeverity(StrEnum):
 @dataclass
 class DrawdownState:
     """Drawdown durumu."""
+
     current_drawdown_pct: float
     max_drawdown_pct: float
     peak_equity: float
@@ -51,6 +52,7 @@ class DrawdownState:
 @dataclass
 class DrawdownEvent:
     """Drawdown olay kaydı."""
+
     timestamp: str
     drawdown_pct: float
     action_taken: DrawdownAction
@@ -164,16 +166,19 @@ class DrawdownResponseSystem:
             if len(self._events) > 500:
                 self._events = self._events[-500:]
 
-            logger.warning("Drawdown action changed",
-                          drawdown_pct=f"{drawdown_pct:.1f}%",
-                          action=action.value,
-                          severity=severity.value)
+            logger.warning(
+                "Drawdown action changed",
+                drawdown_pct=f"{drawdown_pct:.1f}%",
+                action=action.value,
+                severity=severity.value,
+            )
 
             # KILL_SWITCH_TRIGGERED event publish (audit #5)
             if severity.value == "EMERGENCY":
                 try:
                     from services.core.event_bus import publish_event
                     from services.core.event_schema import CanonicalEvent, EventType
+
                     kill_event = CanonicalEvent(
                         event_type=EventType.KILL_SWITCH_TRIGGERED,
                         payload={
@@ -185,8 +190,7 @@ class DrawdownResponseSystem:
                         },
                     )
                     publish_event(kill_event, key="system")
-                    logger.critical("KILL_SWITCH_TRIGGERED event published",
-                                   drawdown_pct=f"{drawdown_pct:.1f}%")
+                    logger.critical("KILL_SWITCH_TRIGGERED event published", drawdown_pct=f"{drawdown_pct:.1f}%")
                 except Exception as e:
                     logger.error("Failed to publish KILL_SWITCH event", error=str(e))
 
@@ -306,8 +310,9 @@ class DrawdownResponseSystem:
         if self._current_action == DrawdownAction.KILL_SWITCH and not force:
             logger.warning("Drawdown reset blocked — kill switch active. Use force=True to override.")
             return
-        logger.warning("Drawdown system reset", reason=reason, force=force,
-                       peak=self._peak_equity, max_dd=self._max_drawdown_pct)
+        logger.warning(
+            "Drawdown system reset", reason=reason, force=force, peak=self._peak_equity, max_dd=self._max_drawdown_pct
+        )
         self._peak_equity = 0.0
         self._current_equity = 0.0
         self._current_action = DrawdownAction.NONE

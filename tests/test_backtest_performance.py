@@ -36,21 +36,29 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
     for ticker in tickers:
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
-        pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
+        pl.date_range(datetime.now() - timedelta(days=n_days * 2), datetime.now(), timedelta(days=1), eager=True).tail(
+            n_days
+        )
         close = 100 * np.exp(np.cumsum(np.random.randn(n_days) * vol + trend))
         high = close * (1 + np.abs(np.random.randn(n_days) * 0.008))
         low = close * (1 - np.abs(np.random.randn(n_days) * 0.008))
         volume = np.random.randint(50000, 500000, n_days).astype(float)
-        market[ticker] = pl.DataFrame({
-            'Open': close * (1 + np.random.randn(n_days) * 0.002),
-            'High': high, 'Low': low, 'Close': close, 'Volume': volume
-        })
+        market[ticker] = pl.DataFrame(
+            {
+                "Open": close * (1 + np.random.randn(n_days) * 0.002),
+                "High": high,
+                "Low": low,
+                "Close": close,
+                "Volume": volume,
+            }
+        )
     return market
 
 
 # =====================================================
 # CACHE TESTS
 # =====================================================
+
 
 def test_feature_cache():
     """Feature cache doğru çalışmalı."""
@@ -110,6 +118,7 @@ def test_quality_cache():
 # =====================================================
 # PORTFOLIO SIMULATOR TESTS
 # =====================================================
+
 
 def test_simulator_commission():
     """Komisyon hesapları doğru olmalı."""
@@ -227,6 +236,7 @@ def test_simulator_win_rate():
 # BACKTEST CORRECTNESS
 # =====================================================
 
+
 def test_backtest_look_ahead():
     """Look-ahead bias kontrolü."""
     issues = []
@@ -300,6 +310,7 @@ def test_backtest_result_consistency():
 # PERFORMANCE BENCHMARKS
 # =====================================================
 
+
 def test_benchmark_100():
     """100 hisse / 1 yıl benchmark."""
     market = make_market_data(20, 120)
@@ -351,6 +362,7 @@ def test_benchmark_1000():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -411,5 +423,6 @@ def run_all():
 
 if __name__ == "__main__":
     import sys
+
     ok = run_all()
     sys.exit(0 if ok else 1)

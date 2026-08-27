@@ -26,14 +26,16 @@ logger = structlog.get_logger()
 @dataclass
 class RateLimitConfig:
     """Rate limit yapılandırması."""
-    max_requests: int         # Pencerede izin verilen maksimum istek
-    window_seconds: float     # Pencere süresi (saniye)
-    burst_size: int = 0       # Anlık patlama izni (0 = max_requests ile aynı)
+
+    max_requests: int  # Pencerede izin verilen maksimum istek
+    window_seconds: float  # Pencere süresi (saniye)
+    burst_size: int = 0  # Anlık patlama izni (0 = max_requests ile aynı)
 
 
 @dataclass
 class RateLimitStats:
     """Rate limit istatistikleri."""
+
     total_requests: int = 0
     total_waits: int = 0
     total_wait_seconds: float = 0.0
@@ -76,10 +78,7 @@ class RateLimiter:
         if provider not in self._locks:
             self._locks[provider] = asyncio.Lock()
 
-        logger.info("Rate limit set",
-                    provider=provider,
-                    max_requests=max_requests,
-                    window_seconds=window_seconds)
+        logger.info("Rate limit set", provider=provider, max_requests=max_requests, window_seconds=window_seconds)
 
     def _cleanup_window(self, provider: str):
         """Eski istekleri pencereden çıkar."""
@@ -129,9 +128,7 @@ class RateLimiter:
             if wait_time > 0:
                 stats.total_waits += 1
                 stats.total_wait_seconds += wait_time
-                logger.debug("Rate limit wait",
-                            provider=provider,
-                            wait_seconds=round(wait_time, 2))
+                logger.debug("Rate limit wait", provider=provider, wait_seconds=round(wait_time, 2))
                 await asyncio.sleep(wait_time)
 
             # İsteği kaydet
@@ -172,17 +169,12 @@ class RateLimiter:
             "total_requests": stats.total_requests,
             "total_waits": stats.total_waits,
             "total_wait_seconds": round(stats.total_wait_seconds, 2),
-            "avg_wait_ms": round(
-                (stats.total_wait_seconds / max(stats.total_waits, 1)) * 1000, 1
-            ),
+            "avg_wait_ms": round((stats.total_wait_seconds / max(stats.total_waits, 1)) * 1000, 1),
         }
 
     def get_all_stats(self) -> dict:
         """Tüm provider istatistikleri."""
-        return {
-            provider: self.get_stats(provider)
-            for provider in self._limits
-        }
+        return {provider: self.get_stats(provider) for provider in self._limits}
 
     def is_limited(self, provider: str) -> bool:
         """Provider şu an limitli mi?"""
@@ -191,15 +183,15 @@ class RateLimiter:
 
 # BIST'e özgü varsayılan limitler
 BIST_RATE_LIMITS = {
-    "yfinance": {"max_requests": 60, "window_seconds": 60},     # 60 istek/dakika
-    "kap": {"max_requests": 30, "window_seconds": 60},           # 30 istek/dakika
-    "tcmb": {"max_requests": 20, "window_seconds": 60},          # 20 istek/dakika
-    "bist": {"max_requests": 30, "window_seconds": 60},          # 30 istek/dakika
-    "matriks": {"max_requests": 30, "window_seconds": 60},       # 30 istek/dakika
-    "social": {"max_requests": 15, "window_seconds": 60},        # 15 istek/dakika
-    "news": {"max_requests": 20, "window_seconds": 60},          # 20 istek/dakika
-    "fundamental": {"max_requests": 30, "window_seconds": 60},   # 30 istek/dakika
-    "macro": {"max_requests": 20, "window_seconds": 60},         # 20 istek/dakika
+    "yfinance": {"max_requests": 60, "window_seconds": 60},  # 60 istek/dakika
+    "kap": {"max_requests": 30, "window_seconds": 60},  # 30 istek/dakika
+    "tcmb": {"max_requests": 20, "window_seconds": 60},  # 20 istek/dakika
+    "bist": {"max_requests": 30, "window_seconds": 60},  # 30 istek/dakika
+    "matriks": {"max_requests": 30, "window_seconds": 60},  # 30 istek/dakika
+    "social": {"max_requests": 15, "window_seconds": 60},  # 15 istek/dakika
+    "news": {"max_requests": 20, "window_seconds": 60},  # 20 istek/dakika
+    "fundamental": {"max_requests": 30, "window_seconds": 60},  # 30 istek/dakika
+    "macro": {"max_requests": 20, "window_seconds": 60},  # 20 istek/dakika
 }
 
 

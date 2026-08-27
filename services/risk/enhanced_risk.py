@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class PortfolioWeights:
     """Portföy ağırlıkları."""
+
     weights: dict[str, float]  # ticker → weight (0-1)
     total_weight: float
     n_positions: int
@@ -38,6 +39,7 @@ class PortfolioWeights:
 @dataclass
 class RiskMetrics:
     """Risk metrikleri."""
+
     portfolio_volatility: float
     concentration_hhi: float
     max_position_weight: float
@@ -202,7 +204,7 @@ class RebalanceEngine:
 
     def __init__(self, turnover_limit: float = 0.3, threshold_pct: float = 5.0):
         self.turnover_limit = turnover_limit  # Maksimum turnover (0-1)
-        self.threshold_pct = threshold_pct      # Sapma eşiği (%)
+        self.threshold_pct = threshold_pct  # Sapma eşiği (%)
 
     def compute_rebalance(
         self,
@@ -267,7 +269,7 @@ class ConcentrationRisk:
         1/N = perfect diversification
         1.0 = all in one stock
         """
-        return sum(w ** 2 for w in weights.values())
+        return sum(w**2 for w in weights.values())
 
     def compute_sector_concentration(
         self,
@@ -352,9 +354,7 @@ def compute_full_risk_metrics(
     component_var = None
     if cov_matrix is not None and len(weights) > 1:
         try:
-            cv = var_calculator.calculate_component_var(
-                weights_array, cov_matrix, 0.95, portfolio_value, tickers
-            )
+            cv = var_calculator.calculate_component_var(weights_array, cov_matrix, 0.95, portfolio_value, tickers)
             component_var = {cvr.ticker: cvr.component_var_95 for cvr in cv}
         except Exception:
             logger.warning("Caught Exception in compute_full_risk_metrics", exc_info=True)
@@ -388,17 +388,20 @@ def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> 
     """Portföy hedge önerisi."""
     try:
         from services.viop.hedging import hedge_portfolio
+
         return hedge_portfolio(portfolio_value, beta, futures_price)
     except Exception as e:
         logger.warning("VIOP hedging failed", error=str(e))
         return {"error": "VIOP hedging not available"}
 
 
-def check_options_strategy(spot_price: float, strike: float, premium: float,
-                           strategy_type: str = "covered_call") -> dict[str, Any]:
+def check_options_strategy(
+    spot_price: float, strike: float, premium: float, strategy_type: str = "covered_call"
+) -> dict[str, Any]:
     """Opsiyon stratejisi kontrolü."""
     try:
         from services.viop.strategies import create_covered_call, create_protective_put
+
         if strategy_type == "covered_call":
             return create_covered_call(spot_price, strike, premium, 100)
         elif strategy_type == "protective_put":

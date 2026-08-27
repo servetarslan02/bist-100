@@ -802,6 +802,7 @@ def execute_auto_rebalance(self, signals=None):
 ```python
 def _run_intelligence_pipeline(self, ticker, features, regime):
     from services.intelligence.pipeline import IntelligencePipeline
+
     ip = IntelligencePipeline()  # ← NEW INSTANCE EVERY CALL
 ```
 **Impact:** Wasted computation, no state persistence between calls, potential memory leaks
@@ -1394,7 +1395,7 @@ These tests have real assertions, test actual module behavior, and would catch r
 
 #### 🔴 CRITICAL: `apps/api/main.py` CORS allows all origins
 ```python
-allow_origins=["*"],  # Production'da kısıtla
+allow_origins = (["*"],)  # Production'da kısıtla
 ```
 This allows any website to make authenticated requests to the API. The main `services/api/app.py` properly reads from `CORS_ORIGINS` env var, but this standalone server does not.
 

@@ -25,27 +25,30 @@ logger = structlog.get_logger()
 
 class LiquidityScenario(StrEnum):
     """3 Senaryolu Likidite Değerlendirmesi."""
+
     PESSIMISTIC = "PESSIMISTIC"  # Stres Senaryosu: Geniş spread, sığ derinlik, katı katılım sınırı (%2 ADV)
-    NORMAL = "NORMAL"            # Baz Senaryo: Standart Corwin-Schultz, medyan derinlik (%5 ADV)
-    OPTIMISTIC = "OPTIMISTIC"    # İyimser Senaryo: Dar spread, geniş derinlik (%10 ADV)
+    NORMAL = "NORMAL"  # Baz Senaryo: Standart Corwin-Schultz, medyan derinlik (%5 ADV)
+    OPTIMISTIC = "OPTIMISTIC"  # İyimser Senaryo: Dar spread, geniş derinlik (%10 ADV)
 
 
 class LiquidityRegime(StrEnum):
     """Hisse Likidite Sınıflandırması."""
-    HIGH_LIQUIDITY = "HIGH_LIQUIDITY"    # BIST 30 yüksek hacimli paylar
-    NORMAL_LIQUIDITY = "NORMAL_LIQUIDITY" # BIST 100 standart paylar
-    ILLIQUID = "ILLIQUID"                # Sığ / Düşük hacimli paylar
+
+    HIGH_LIQUIDITY = "HIGH_LIQUIDITY"  # BIST 30 yüksek hacimli paylar
+    NORMAL_LIQUIDITY = "NORMAL_LIQUIDITY"  # BIST 100 standart paylar
+    ILLIQUID = "ILLIQUID"  # Sığ / Düşük hacimli paylar
 
 
 @dataclass
 class LiquidityMetrics:
     """Hisse likidite ve mikro-yapı tahmin metrikleri."""
+
     ticker: str
     mid_price: float
-    spread_pct: float             # Corwin-Schultz + BIST floor spread oranı (%)
-    spread_amount: float          # TL cinsinden spread
-    adv: float                    # Ortalama günlük hacim (lot)
-    volatility: float             # Parkinson / Garman-Klass volatilite oranı
+    spread_pct: float  # Corwin-Schultz + BIST floor spread oranı (%)
+    spread_amount: float  # TL cinsinden spread
+    adv: float  # Ortalama günlük hacim (lot)
+    volatility: float  # Parkinson / Garman-Klass volatilite oranı
     regime: LiquidityRegime
     tick_size: float
     effective_spread_floor: float
@@ -77,13 +80,13 @@ class SyntheticLiquidityEstimator:
         try:
             log_hl_curr = math.log(max(high_curr / max(low_curr, 1e-6), 1.0))
             log_hl_prev = math.log(max(high_prev / max(low_prev, 1e-6), 1.0))
-            beta = (log_hl_curr ** 2) + (log_hl_prev ** 2)
+            beta = (log_hl_curr**2) + (log_hl_prev**2)
 
             # 2. İki günlük gama hesaplaması: gamma = ln(H_{t-1,t} / L_{t-1,t})^2
             high_2d = max(high_curr, high_prev)
             low_2d = min(low_curr, low_prev)
             log_hl_2d = math.log(max(high_2d / max(low_2d, 1e-6), 1.0))
-            gamma = log_hl_2d ** 2
+            gamma = log_hl_2d**2
 
             # 3. Alpha hesaplaması: alpha = (sqrt(2*beta) - sqrt(beta)) / (3 - 2*sqrt(2)) - sqrt(gamma / (3 - 2*sqrt(2)))
             k = 3.0 - 2.0 * math.sqrt(2.0)  # ~0.17157
@@ -200,19 +203,19 @@ class SyntheticOrderBookBuilder:
             "spread_multiplier": 1.5,
             "depth_multiplier": 0.5,
             "max_participation_pct": 0.02,  # ADV'nin en fazla %2'si tek seferde
-            "decay_factor": 0.45,            # Kademeler hızla sığlaşır
+            "decay_factor": 0.45,  # Kademeler hızla sığlaşır
         },
         LiquidityScenario.NORMAL: {
             "spread_multiplier": 1.0,
             "depth_multiplier": 1.0,
             "max_participation_pct": 0.05,  # ADV'nin en fazla %5'i tek seferde
-            "decay_factor": 0.30,            # Standart derinlik sönümlenmesi
+            "decay_factor": 0.30,  # Standart derinlik sönümlenmesi
         },
         LiquidityScenario.OPTIMISTIC: {
             "spread_multiplier": 0.7,
             "depth_multiplier": 1.5,
             "max_participation_pct": 0.10,  # ADV'nin en fazla %10'u tek seferde
-            "decay_factor": 0.18,            # Derin kademeler
+            "decay_factor": 0.18,  # Derin kademeler
         },
     }
 
@@ -233,7 +236,9 @@ class SyntheticOrderBookBuilder:
         Deterministik 5-10 Kademeli BIST uyumlu sentetik L2 derinlik defteri üretir.
         """
         cfg = cls.SCENARIO_CONFIGS.get(scenario, cls.SCENARIO_CONFIGS[LiquidityScenario.NORMAL])
-        effective_spread_pct = max(spread_pct * cfg["spread_multiplier"], (get_bist_tick_size(mid_price) / mid_price) * 100.0)
+        effective_spread_pct = max(
+            spread_pct * cfg["spread_multiplier"], (get_bist_tick_size(mid_price) / mid_price) * 100.0
+        )
         half_spread = (mid_price * (effective_spread_pct / 100.0)) / 2.0
 
         # BIST kuruş adımlarına uygun best bid / best ask
@@ -293,7 +298,7 @@ class SyntheticOrderBookBuilder:
     def execute_market_order_walk(
         cls,
         book: OrderBookSnapshot,
-        side: str,                  # "BUY" | "SELL"
+        side: str,  # "BUY" | "SELL"
         requested_quantity: int,
         adv: float,
         scenario: LiquidityScenario = LiquidityScenario.NORMAL,

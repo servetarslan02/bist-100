@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class WorldState:
     """Dynamic world state — zaman içinde değişen latent faktörler."""
+
     timestamp: datetime
 
     # Latent factors (0-1 arası normalize)
@@ -37,31 +38,49 @@ class WorldState:
     max_value: float = 1.0
 
     # Factor bazlı nötr seviyeler
-    neutral_levels: dict[str, float] = field(default_factory=lambda: {
-        "global_risk_appetite": 0.5, "usd_strength": 0.5, "us_rate_pressure": 0.5,
-        "commodity_pressure": 0.5, "oil_pressure": 0.5, "turkey_macro_risk": 0.6,
-        "geopolitical_risk": 0.45, "em_risk_appetite": 0.5, "inflation_pressure": 0.55,
-    })
-    decay_rates: dict[str, float] = field(default_factory=lambda: {
-        "global_risk_appetite": 0.95, "usd_strength": 0.90, "us_rate_pressure": 0.92,
-        "commodity_pressure": 0.88, "oil_pressure": 0.88, "turkey_macro_risk": 0.97,
-        "geopolitical_risk": 0.93, "em_risk_appetite": 0.95, "inflation_pressure": 0.96,
-    })
+    neutral_levels: dict[str, float] = field(
+        default_factory=lambda: {
+            "global_risk_appetite": 0.5,
+            "usd_strength": 0.5,
+            "us_rate_pressure": 0.5,
+            "commodity_pressure": 0.5,
+            "oil_pressure": 0.5,
+            "turkey_macro_risk": 0.6,
+            "geopolitical_risk": 0.45,
+            "em_risk_appetite": 0.5,
+            "inflation_pressure": 0.55,
+        }
+    )
+    decay_rates: dict[str, float] = field(
+        default_factory=lambda: {
+            "global_risk_appetite": 0.95,
+            "usd_strength": 0.90,
+            "us_rate_pressure": 0.92,
+            "commodity_pressure": 0.88,
+            "oil_pressure": 0.88,
+            "turkey_macro_risk": 0.97,
+            "geopolitical_risk": 0.93,
+            "em_risk_appetite": 0.95,
+            "inflation_pressure": 0.96,
+        }
+    )
 
     def to_vector(self) -> np.ndarray:
         """State'i numpy vektörüne çevir."""
-        return np.array([
-            self.global_risk_appetite,
-            self.usd_strength,
-            self.us_rate_pressure,
-            self.commodity_pressure,
-            self.oil_pressure,
-            self.turkey_macro_risk,
-            self.geopolitical_risk,
-            self.em_risk_appetite,
-            self.vix_level / 100.0,  # normalize
-            self.inflation_pressure,
-        ])
+        return np.array(
+            [
+                self.global_risk_appetite,
+                self.usd_strength,
+                self.us_rate_pressure,
+                self.commodity_pressure,
+                self.oil_pressure,
+                self.turkey_macro_risk,
+                self.geopolitical_risk,
+                self.em_risk_appetite,
+                self.vix_level / 100.0,  # normalize
+                self.inflation_pressure,
+            ]
+        )
 
     def from_vector(self, vec: np.ndarray):
         """Vektörden state güncelle."""
@@ -95,17 +114,23 @@ class WorldState:
     def apply_decay(self, hours_elapsed: float):
         """Zaman geçtikçe etki azalır — factor bazlı decay."""
         factors = [
-            "global_risk_appetite", "usd_strength", "us_rate_pressure",
-            "commodity_pressure", "oil_pressure", "turkey_macro_risk",
-            "geopolitical_risk", "em_risk_appetite", "inflation_pressure",
+            "global_risk_appetite",
+            "usd_strength",
+            "us_rate_pressure",
+            "commodity_pressure",
+            "oil_pressure",
+            "turkey_macro_risk",
+            "geopolitical_risk",
+            "em_risk_appetite",
+            "inflation_pressure",
         ]
         for factor in factors:
             neutral = self.neutral_levels.get(factor, 0.5)
             factor_decay = self.decay_rates.get(factor, self.decay_rate)
-            decay = factor_decay ** hours_elapsed
+            decay = factor_decay**hours_elapsed
             current = getattr(self, factor)
             setattr(self, factor, neutral + (current - neutral) * decay)
-        vix_decay = self.decay_rate ** hours_elapsed
+        vix_decay = self.decay_rate**hours_elapsed
         self.vix_level = 20 + (self.vix_level - 20) * vix_decay
 
 
@@ -272,9 +297,7 @@ class WorldStateManager:
                 # z-score > 1.5 = significant move
                 if abs(zscore) > 1.5:
                     delta = float(np.clip(zscore * 0.1, -0.3, 0.3))
-                    self._current_state.oil_pressure = float(np.clip(
-                        self._current_state.oil_pressure + delta, 0, 1
-                    ))
+                    self._current_state.oil_pressure = float(np.clip(self._current_state.oil_pressure + delta, 0, 1))
 
         self._current_state.timestamp = datetime.now(UTC)
 

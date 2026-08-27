@@ -70,8 +70,11 @@ class FeatureEngine:
     """
 
     LOOKBACK = {
-        "short": 5, "medium": 20, "long": 60,
-        "xlong": 120, "annual": 252,
+        "short": 5,
+        "medium": 20,
+        "long": 60,
+        "xlong": 120,
+        "annual": 252,
     }
 
     def _normalize(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -160,8 +163,8 @@ class FeatureEngine:
         if n > 100:
             high_52w = high.rolling_max(252)[-1] if n >= 252 else high.max()
             low_52w = low.rolling_min(252)[-1] if n >= 252 else low.min()
-            f['pct_from_52w_high'] = _safe_float((close[-1] / high_52w) - 1)
-            f['pct_from_52w_low'] = _safe_float((close[-1] / low_52w) - 1)
+            f["pct_from_52w_high"] = _safe_float((close[-1] / high_52w) - 1)
+            f["pct_from_52w_low"] = _safe_float((close[-1] / low_52w) - 1)
 
         # RSI-14
         if n > 20:
@@ -171,19 +174,17 @@ class FeatureEngine:
             # Polars'da 0'a bölünmeyi None yap
             rs = gain / loss.replace(0, None)
             rsi = (100 - 100 / (1 + rs))[-1]
-            f['rsi_14'] = _safe_float(rsi)
+            f["rsi_14"] = _safe_float(rsi)
 
         # Momentum acceleration
         if "roc_5d" in f and "roc_20d" in f:
-            f['momentum_accel'] = f["roc_5d"] - f["roc_20d"] / 4
+            f["momentum_accel"] = f["roc_5d"] - f["roc_20d"] / 4
 
         # Kısa dönem mean reversion
         if n > 20:
             std = close.pct_change().rolling_std(20)[-1]
             sma20 = close.rolling_mean(20)[-1]
-            f['zscore_vs_sma20'] = _safe_float(
-                (close[-1] - sma20) / (std * sma20 + 1e-9)
-            )
+            f["zscore_vs_sma20"] = _safe_float((close[-1] - sma20) / (std * sma20 + 1e-9))
 
         return f
 
@@ -207,7 +208,7 @@ class FeatureEngine:
         if len(stock_ret) > 25:
             rs_series = stock_ret - bm_ret
             rs_5d = rs_series.rolling_sum(5)
-            f['rs_trend_5d'] = _safe_float(rs_5d.diff(5)[-1] if len(rs_5d) > 5 else np.nan)
+            f["rs_trend_5d"] = _safe_float(rs_5d.diff(5)[-1] if len(rs_5d) > 5 else np.nan)
 
         return f
 
@@ -256,26 +257,29 @@ class FeatureEngine:
             sma50 = close.rolling_mean(50)[-1]
             sma200 = close.rolling_mean(200)[-1]
             alignment = 0
-            if sma20 > sma50: alignment += 1
-            if sma50 > sma200: alignment += 1
-            if close[-1] > sma20: alignment += 1
-            f['sma_alignment'] = float(alignment)
+            if sma20 > sma50:
+                alignment += 1
+            if sma50 > sma200:
+                alignment += 1
+            if close[-1] > sma20:
+                alignment += 1
+            f["sma_alignment"] = float(alignment)
 
         # Higher highs / Higher lows
         if n >= 20:
             highs = close.rolling_max(5).drop_nulls()
             lows = close.rolling_min(5).drop_nulls()
             if len(highs) >= 4:
-                f['higher_highs'] = float(int(highs[-1] > highs[-3]))
-                f['higher_lows'] = float(int(lows[-1] > lows[-3]))
+                f["higher_highs"] = float(int(highs[-1] > highs[-3]))
+                f["higher_lows"] = float(int(lows[-1] > lows[-3]))
 
         # Drawdown
         if n >= 20:
             peak = close.rolling_max(20)[-1]
-            f['drawdown_20d'] = float((close[-1] / peak) - 1)
+            f["drawdown_20d"] = float((close[-1] / peak) - 1)
         if n >= 60:
             peak60 = close.rolling_max(60)[-1]
-            f['drawdown_60d'] = float((close[-1] / peak60) - 1)
+            f["drawdown_60d"] = float((close[-1] / peak60) - 1)
 
         return f
 
@@ -293,20 +297,20 @@ class FeatureEngine:
 
         # Z-score
         z = (volume[-1] - vol_mean[-1]) / (vol_std[-1] + 1)
-        f['volume_zscore_20d'] = float(z)
+        f["volume_zscore_20d"] = float(z)
 
         # Percentile (rank-based)
         if n >= 60:
             window = min(n, 252)
             vol_tail = volume.tail(window)
             rank_val = (vol_tail <= volume[-1]).sum() / window
-            f['volume_percentile'] = float(rank_val)
+            f["volume_percentile"] = float(rank_val)
 
         # Volume trend
         if n >= 20:
             short_avg = volume.rolling_mean(5)[-1]
             long_avg = volume.rolling_mean(20)[-1]
-            f['volume_trend_ratio'] = float(short_avg / (long_avg + 1))
+            f["volume_trend_ratio"] = float(short_avg / (long_avg + 1))
 
         # Price-volume divergence
         if n >= 10:
@@ -316,9 +320,8 @@ class FeatureEngine:
                 pc = float(price_change)
                 vc = float(vol_change)
                 if not np.isnan(pc) and not np.isnan(vc):
-                    f['price_vol_divergence'] = float(
-                        1 if (pc > 0 and vc < -0.2) else
-                        (-1 if (pc < 0 and vc > 0.2) else 0)
+                    f["price_vol_divergence"] = float(
+                        1 if (pc > 0 and vc < -0.2) else (-1 if (pc < 0 and vc > 0.2) else 0)
                     )
 
         # On-Balance Volume
@@ -326,7 +329,7 @@ class FeatureEngine:
             direction = (close.diff() > 0).cast(pl.Float64) * 2 - 1
             obv = (volume * direction).cum_sum()
             obv_20d_change = (obv[-1] - obv[-21]) / (abs(obv[-21]) + 1)
-            f['obv_trend_20d'] = float(obv_20d_change)
+            f["obv_trend_20d"] = float(obv_20d_change)
 
         return f
 
@@ -339,25 +342,21 @@ class FeatureEngine:
         returns = close.pct_change().drop_nulls()
 
         if len(returns) >= 20:
-            f['volatility_20d'] = float(returns.rolling_std(20)[-1] * np.sqrt(252))
+            f["volatility_20d"] = float(returns.rolling_std(20)[-1] * np.sqrt(252))
         if len(returns) >= 60:
-            f['volatility_60d'] = float(returns.rolling_std(60)[-1] * np.sqrt(252))
+            f["volatility_60d"] = float(returns.rolling_std(60)[-1] * np.sqrt(252))
 
         # ATR %
         if n >= 14 and len(high) > 0 and len(low) > 0:
-            tr = pl.max_horizontal(
-                high - low,
-                (high - close.shift(1)).abs(),
-                (low - close.shift(1)).abs()
-            )
+            tr = pl.max_horizontal(high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs())
             atr_pct = (tr.rolling_mean(14) / close)[-1]
-            f['atr_pct'] = float(atr_pct)
+            f["atr_pct"] = float(atr_pct)
 
         # Downside volatility
         if len(returns) >= 20:
             neg_returns = returns.filter(returns < 0)
             if len(neg_returns) >= 5:
-                f['downside_vol_20d'] = float(neg_returns.rolling_std(20)[-1] * np.sqrt(252))
+                f["downside_vol_20d"] = float(neg_returns.rolling_std(20)[-1] * np.sqrt(252))
 
         return f
 
@@ -365,7 +364,9 @@ class FeatureEngine:
     # F) Cross-Sectional
     # ------------------------------------------------------------------ #
     def _cross_sectional(
-        self, ticker: str, close: pl.Series,
+        self,
+        ticker: str,
+        close: pl.Series,
         universe_returns: dict[str, float],
     ) -> dict:
         f = {}
@@ -382,10 +383,10 @@ class FeatureEngine:
         std = arr.std()
 
         if std > 1e-9:
-            f['cs_zscore_ret_1d'] = float((this_ret - mean) / std)
+            f["cs_zscore_ret_1d"] = float((this_ret - mean) / std)
 
         rank = float(np.mean(arr <= this_ret))
-        f['cs_rank_ret_1d'] = rank
+        f["cs_rank_ret_1d"] = rank
 
         return f
 
@@ -399,14 +400,13 @@ class FeatureEngine:
         if n >= 130:
             ret_6m = float(close.pct_change(120)[-1])
             ret_1m = float(close.pct_change(20)[-1])
-            f['momentum_reversal_risk'] = float(
-                1 if (ret_6m > 0.15 and ret_1m < -0.05) else
-                (-1 if (ret_6m < -0.15 and ret_1m > 0.05) else 0)
+            f["momentum_reversal_risk"] = float(
+                1 if (ret_6m > 0.15 and ret_1m < -0.05) else (-1 if (ret_6m < -0.15 and ret_1m > 0.05) else 0)
             )
 
         if len(volume) > 0 and n >= 20:
             avg_vol = volume.rolling_mean(20)[-1]
-            f['liquidity_score'] = float(min(1.0, np.log1p(avg_vol) / 15))
+            f["liquidity_score"] = float(min(1.0, np.log1p(avg_vol) / 15))
 
         return f
 
@@ -476,7 +476,8 @@ def compute_universe_features(
             sect = sector_map.get(ticker, "OTHER")
             sect_ret = sector_series.get(sect)
             features = engine.compute_all(
-                ticker=ticker, df=df,
+                ticker=ticker,
+                df=df,
                 benchmark_df=benchmark_df,
                 sector_returns=sect_ret,
                 universe_returns=universe_returns,
@@ -486,7 +487,9 @@ def compute_universe_features(
             logger.warning("Feature computation failed", ticker=ticker, error=str(e))
             result[ticker] = {}
 
-    logger.info("Universe features computed",
-                tickers=len(result),
-                avg_features=np.mean([len(v) for v in result.values()]) if result else 0)
+    logger.info(
+        "Universe features computed",
+        tickers=len(result),
+        avg_features=np.mean([len(v) for v in result.values()]) if result else 0,
+    )
     return result

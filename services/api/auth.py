@@ -37,6 +37,7 @@ ROLE_PERMISSIONS: dict[Role, list[str]] = {
 @dataclass
 class User:
     """Kullanıcı modeli."""
+
     user_id: str
     username: str
     role: Role
@@ -47,6 +48,7 @@ class User:
 @dataclass
 class TokenPayload:
     """JWT token payload."""
+
     sub: str  # user_id
     username: str
     role: str

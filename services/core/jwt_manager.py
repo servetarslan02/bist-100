@@ -40,6 +40,7 @@ class TokenType(StrEnum):
 @dataclass
 class JWTClaims:
     """JWT claims."""
+
     sub: str  # user_id
     role: str
     permissions: list[str]
@@ -155,11 +156,7 @@ class JWTManager:
 
         token = f"{header_b64}.{payload_b64}.{sig_b64}"
 
-        logger.debug("JWT token generated",
-                    user_id=user_id,
-                    role=role,
-                    type=token_type.value,
-                    expires_in=ttl)
+        logger.debug("JWT token generated", user_id=user_id, role=role, type=token_type.value, expires_in=ttl)
 
         return token
 
@@ -285,10 +282,7 @@ class JWTManager:
 
         api_key = f"ak_{header_b64}.{payload_b64}.{sig_b64}"
 
-        logger.info("API key generated",
-                    user_id=user_id,
-                    name=name,
-                    role=role)
+        logger.info("API key generated", user_id=user_id, name=name, role=role)
 
         return api_key
 
@@ -300,17 +294,13 @@ class JWTManager:
         """
         old_secret_preview = self._secret[:8] + "..."
         self._secret = new_secret
-        logger.warning("JWT secret rotated",
-                      old_secret_preview=old_secret_preview)
+        logger.warning("JWT secret rotated", old_secret_preview=old_secret_preview)
 
     def _sign(self, message: str) -> bytes:
         """HMAC-SHA256 ile imzala."""
         import hashlib as hl
-        return hmac.new(
-            self._secret.encode(),
-            message.encode(),
-            hl.sha256
-        ).digest()
+
+        return hmac.new(self._secret.encode(), message.encode(), hl.sha256).digest()
 
     @staticmethod
     def _base64url_encode(data: bytes) -> str:

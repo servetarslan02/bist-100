@@ -2,6 +2,7 @@
 
 Detaylı performans metrikleri, factor exposure, benchmark karşılaştırma.
 """
+
 from typing import Any
 
 import numpy as np
@@ -52,7 +53,7 @@ def track_factor_performance(
     # Formül: sqrt(mean(min(r - daily_rf, 0)^2)) * sqrt(252)
     daily_rf = risk_free_rate / 252
     downside_diff = np.minimum(f - daily_rf, 0.0)
-    downside_dev = float(np.sqrt(np.mean(downside_diff ** 2)) * np.sqrt(252))
+    downside_dev = float(np.sqrt(np.mean(downside_diff**2)) * np.sqrt(252))
     sortino = (annual_return - risk_free_rate) / max(downside_dev, 0.001)
 
     # Calmar (annual return / max drawdown)
@@ -68,6 +69,7 @@ def track_factor_performance(
     # Skewness ve kurtosis
     try:
         from scipy.stats import kurtosis, skew
+
         if volatility > 1e-10:
             skewness = float(skew(f))
             kurt = float(kurtosis(f))
@@ -119,14 +121,16 @@ def track_factor_performance(
         else:
             treynor = None  # Beta sıfıra yakınsa Treynor tanımsız
 
-        result.update({
-            "alpha": round(alpha, 4),
-            "beta": round(beta, 4),
-            "tracking_error": round(tracking_error, 4),
-            "information_ratio": round(info_ratio, 4),
-            "treynor_ratio": round(treynor, 4) if treynor is not None else None,
-            "correlation": round(float(np.corrcoef(f, b)[0, 1]), 4),
-        })
+        result.update(
+            {
+                "alpha": round(alpha, 4),
+                "beta": round(beta, 4),
+                "tracking_error": round(tracking_error, 4),
+                "information_ratio": round(info_ratio, 4),
+                "treynor_ratio": round(treynor, 4) if treynor is not None else None,
+                "correlation": round(float(np.corrcoef(f, b)[0, 1]), 4),
+            }
+        )
 
     return result
 

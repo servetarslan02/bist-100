@@ -122,38 +122,52 @@ M-Score < -1.78 → Manipülasyon olasılığı düşük
 # services/factors/beneish.py
 def calculate_m_score(financials):
     # DSRI
-    dsri = (financials["receivables"] / financials["revenue"]) / \
-           (financials["receivables_prev"] / financials["revenue_prev"])
-    
+    dsri = (financials["receivables"] / financials["revenue"]) / (
+        financials["receivables_prev"] / financials["revenue_prev"]
+    )
+
     # GMI
     gmi = financials["gross_margin_prev"] / financials["gross_margin"]
-    
+
     # AQI
-    aqi = (1 - (financials["current_assets"] + financials["ppe"]) / financials["total_assets"]) / \
-          (1 - (financials["current_assets_prev"] + financials["ppe_prev"]) / financials["total_assets_prev"])
-    
+    aqi = (1 - (financials["current_assets"] + financials["ppe"]) / financials["total_assets"]) / (
+        1 - (financials["current_assets_prev"] + financials["ppe_prev"]) / financials["total_assets_prev"]
+    )
+
     # SGI
     sgi = financials["revenue"] / financials["revenue_prev"]
-    
+
     # DEPI
-    depi = (financials["depreciation_prev"] / (financials["ppe_prev"] + financials["depreciation_prev"])) / \
-           (financials["depreciation"] / (financials["ppe"] + financials["depreciation"]))
-    
+    depi = (financials["depreciation_prev"] / (financials["ppe_prev"] + financials["depreciation_prev"])) / (
+        financials["depreciation"] / (financials["ppe"] + financials["depreciation"])
+    )
+
     # SGAI
-    sgai = (financials["sga_expense"] / financials["revenue"]) / \
-           (financials["sga_expense_prev"] / financials["revenue_prev"])
-    
+    sgai = (financials["sga_expense"] / financials["revenue"]) / (
+        financials["sga_expense_prev"] / financials["revenue_prev"]
+    )
+
     # TATA
     tata = (financials["net_income"] - financials["operating_cash_flow"]) / financials["total_assets"]
-    
+
     # LVGI
-    lvgi = (financials["total_debt"] / financials["total_assets"]) / \
-           (financials["total_debt_prev"] / financials["total_assets_prev"])
-    
+    lvgi = (financials["total_debt"] / financials["total_assets"]) / (
+        financials["total_debt_prev"] / financials["total_assets_prev"]
+    )
+
     # M-Score
-    m_score = -4.84 + 0.92*dsri + 0.528*gmi + 0.404*aqi + 0.892*sgi + \
-              0.115*depi - 0.172*sgai + 4.679*tata - 0.327*lvgi
-    
+    m_score = (
+        -4.84
+        + 0.92 * dsri
+        + 0.528 * gmi
+        + 0.404 * aqi
+        + 0.892 * sgi
+        + 0.115 * depi
+        - 0.172 * sgai
+        + 4.679 * tata
+        - 0.327 * lvgi
+    )
+
     return m_score
 ```
 
@@ -190,9 +204,9 @@ def calculate_z_score(financials):
     x3 = financials["ebit"] / financials["total_assets"]
     x4 = financials["market_cap"] / financials["total_liabilities"]
     x5 = financials["revenue"] / financials["total_assets"]
-    
-    z = 1.2*x1 + 1.4*x2 + 3.3*x3 + 0.6*x4 + 1.0*x5
-    
+
+    z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
+
     return z
 ```
 
@@ -332,20 +346,20 @@ ranked = rank_stocks(bist100, factors)
 # services/factors/performance.py
 def track_factor_performance(factor_returns, benchmark_returns):
     results = {}
-    
+
     # Faktör getirisi
     results["factor_return"] = factor_returns.mean() * 252
     results["benchmark_return"] = benchmark_returns.mean() * 252
     results["alpha"] = results["factor_return"] - results["benchmark_return"]
-    
+
     # Faktör Sharpe
-    results["factor_sharpe"] = results["factor_return"] / (factor_returns.std() * (252 ** 0.5))
-    
+    results["factor_sharpe"] = results["factor_return"] / (factor_returns.std() * (252**0.5))
+
     # Faktör drawdown
     cumulative = (1 + factor_returns).cumprod()
     drawdown = (cumulative / cumulative.cummax() - 1).min()
     results["max_drawdown"] = drawdown
-    
+
     return results
 ```
 

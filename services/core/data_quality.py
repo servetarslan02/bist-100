@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class TradabilityMask:
     """Hisse başına tradability durumu."""
+
     ticker: str
     timestamp: datetime
     is_tradable: bool
@@ -163,6 +164,7 @@ class DataQualityEngine:
 # DataFrame Kalite Kontrolleri (Polars-Native)
 # =====================================================
 
+
 @dataclass
 class QualityIssue:
     check: str
@@ -177,8 +179,10 @@ class QualityIssue:
 
     def to_dict(self):
         return {
-            "check": self.check, "severity": self.severity,
-            "message": self.message, "details": self.details,
+            "check": self.check,
+            "severity": self.severity,
+            "message": self.message,
+            "details": self.details,
             "affected_rows": self.affected_rows,
         }
 
@@ -193,9 +197,11 @@ class QualityReport:
 
     def to_dict(self):
         return {
-            "ticker": self.ticker, "total_rows": self.total_rows,
+            "ticker": self.ticker,
+            "total_rows": self.total_rows,
             "issues": [i.to_dict() for i in self.issues],
-            "quality_score": self.quality_score, "passed": self.passed,
+            "quality_score": self.quality_score,
+            "passed": self.passed,
         }
 
 
@@ -219,26 +225,36 @@ class DataQualityChecker:
             # Duplicate kontrolü
             dup_count = df[date_col].is_duplicated().sum()
             if dup_count > 0:
-                issues.append(QualityIssue(
-                    "duplicate_dates", "CRITICAL",
-                    f"{dup_count} duplike tarih", affected_rows=int(dup_count),
-                ))
+                issues.append(
+                    QualityIssue(
+                        "duplicate_dates",
+                        "CRITICAL",
+                        f"{dup_count} duplike tarih",
+                        affected_rows=int(dup_count),
+                    )
+                )
             # Sıralama kontrolü
             if not df[date_col].is_sorted():
-                issues.append(QualityIssue(
-                    "unsorted_timestamps", "WARNING",
-                    "Timestamp sıralı değil",
-                ))
+                issues.append(
+                    QualityIssue(
+                        "unsorted_timestamps",
+                        "WARNING",
+                        "Timestamp sıralı değil",
+                    )
+                )
             # Gap kontrolü (> 5 gün)
             if total_rows > 1:
                 try:
                     date_diffs = df[date_col].diff().dt.total_days()
                     large_gaps = (date_diffs > 5).sum()
                     if large_gaps > 0:
-                        issues.append(QualityIssue(
-                            "large_gaps", "WARNING",
-                            f"{large_gaps} büyük zaman aralığı (>5 gün)",
-                        ))
+                        issues.append(
+                            QualityIssue(
+                                "large_gaps",
+                                "WARNING",
+                                f"{large_gaps} büyük zaman aralığı (>5 gün)",
+                            )
+                        )
                 except Exception:
                     pass  # Date diff hesaplanamazsa atla
 
@@ -248,20 +264,28 @@ class DataQualityChecker:
                 missing = df[col_name].null_count()
                 if missing > 0:
                     severity = "CRITICAL" if col_name.lower() == "close" else "WARNING"
-                    issues.append(QualityIssue(
-                        f"missing_{col_name}", severity,
-                        f"{col_name}: {missing} eksik", affected_rows=int(missing),
-                    ))
+                    issues.append(
+                        QualityIssue(
+                            f"missing_{col_name}",
+                            severity,
+                            f"{col_name}: {missing} eksik",
+                            affected_rows=int(missing),
+                        )
+                    )
 
         # Geçersiz fiyat kontrolü (≤0)
         for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low"]:
             if col_name in df.columns:
                 invalid = (df[col_name] <= 0).sum()
                 if invalid > 0:
-                    issues.append(QualityIssue(
-                        f"invalid_{col_name}", "CRITICAL",
-                        f"{col_name}: {invalid} geçersiz", affected_rows=int(invalid),
-                    ))
+                    issues.append(
+                        QualityIssue(
+                            f"invalid_{col_name}",
+                            "CRITICAL",
+                            f"{col_name}: {invalid} geçersiz",
+                            affected_rows=int(invalid),
+                        )
+                    )
 
         # High < Low kontrolü
         high_col = "High" if "High" in df.columns else "high"
@@ -269,10 +293,14 @@ class DataQualityChecker:
         if high_col in df.columns and low_col in df.columns:
             inv = (df[high_col] < df[low_col]).sum()
             if inv > 0:
-                issues.append(QualityIssue(
-                    "high_low_inv", "CRITICAL",
-                    f"High<Low: {inv}", affected_rows=int(inv),
-                ))
+                issues.append(
+                    QualityIssue(
+                        "high_low_inv",
+                        "CRITICAL",
+                        f"High<Low: {inv}",
+                        affected_rows=int(inv),
+                    )
+                )
 
         critical = sum(1 for i in issues if i.severity == "CRITICAL")
         warnings = sum(1 for i in issues if i.severity == "WARNING")

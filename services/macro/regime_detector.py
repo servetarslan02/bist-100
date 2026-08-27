@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class RegimeResult:
     """Rejim tespit sonucu."""
+
     regime: str
     confidence: float
     all_scores: dict[str, float]
@@ -40,6 +41,7 @@ class RegimeResult:
 @dataclass
 class RegimeTransition:
     """Rejim geçiş kaydı."""
+
     from_regime: str
     to_regime: str
     timestamp: str
@@ -138,10 +140,12 @@ class MacroRegimeDetector:
                     self._transitions = self._transitions[-500:]
                 self._regime_duration = 0
 
-                logger.warning("Macro regime change",
-                             from_regime=self._current_regime,
-                             to_regime=best_regime,
-                             confidence=round(best_score, 4))
+                logger.warning(
+                    "Macro regime change",
+                    from_regime=self._current_regime,
+                    to_regime=best_regime,
+                    confidence=round(best_score, 4),
+                )
         else:
             self._regime_duration += 1
 
@@ -189,8 +193,7 @@ class MacroRegimeDetector:
 
         # Rejim değişimi (son 30 günde değişti mi?)
         recent_transitions = [
-            t for t in self._transitions
-            if t.timestamp > (datetime.now(UTC) - timedelta(days=30)).isoformat()
+            t for t in self._transitions if t.timestamp > (datetime.now(UTC) - timedelta(days=30)).isoformat()
         ]
         features["macro_regime_changed_30d"] = 1.0 if recent_transitions else 0.0
 
@@ -207,12 +210,9 @@ class MacroRegimeDetector:
             "duration_days": self._regime_duration,
             "total_transitions": len(self._transitions),
             "recent_transitions": [
-                {"from": t.from_regime, "to": t.to_regime, "timestamp": t.timestamp}
-                for t in self._transitions[-5:]
+                {"from": t.from_regime, "to": t.to_regime, "timestamp": t.timestamp} for t in self._transitions[-5:]
             ],
-            "regime_descriptions": {
-                k: v["description"] for k, v in self.MACRO_REGIMES.items()
-            },
+            "regime_descriptions": {k: v["description"] for k, v in self.MACRO_REGIMES.items()},
         }
 
     # ===================== SKOR FONKSİYONLARI =====================

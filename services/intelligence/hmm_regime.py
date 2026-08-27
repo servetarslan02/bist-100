@@ -32,6 +32,7 @@ logger = structlog.get_logger()
 # hmmlearn opsiyonel — yoksa fallback
 try:
     from hmmlearn.hmm import GaussianHMM
+
     HMM_AVAILABLE = True
 except ImportError:
     HMM_AVAILABLE = False
@@ -41,10 +42,11 @@ except ImportError:
 @dataclass
 class HMMRegimeResult:
     """HMM rejim sonucu."""
-    regime: str                      # BULL, BEAR, HIGH_VOL, LOW_VOL
-    confidence: float                # En yüksek olasılık
+
+    regime: str  # BULL, BEAR, HIGH_VOL, LOW_VOL
+    confidence: float  # En yüksek olasılık
     probabilities: dict[str, float]  # Tüm rejim olasılıkları
-    regime_index: int                # 0-3 arası rejim indeksi
+    regime_index: int  # 0-3 arası rejim indeksi
     transition_matrix: np.ndarray | None = None
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -94,15 +96,13 @@ class HMMRegimeDetector:
             return False
 
         if len(returns) < self.rolling_window:
-            logger.warning("Not enough data for HMM",
-                          data_len=len(returns),
-                          required=self.rolling_window)
+            logger.warning("Not enough data for HMM", data_len=len(returns), required=self.rolling_window)
             return False
 
         try:
             # Son rolling_window gözlemi kullan
-            train_returns = returns[-self.rolling_window:]
-            train_vol = volatility[-self.rolling_window:]
+            train_returns = returns[-self.rolling_window :]
+            train_vol = volatility[-self.rolling_window :]
 
             # 2D feature matrix: [return, volatility]
             X = np.column_stack([train_returns, train_vol])
@@ -131,10 +131,12 @@ class HMMRegimeDetector:
             # Transition matrix
             self._transition_matrix = self._model.transmat_
 
-            logger.info("HMM fitted",
-                       n_regimes=self.n_regimes,
-                       train_size=len(X),
-                       transition_entropy=self._compute_transition_entropy())
+            logger.info(
+                "HMM fitted",
+                n_regimes=self.n_regimes,
+                train_size=len(X),
+                transition_entropy=self._compute_transition_entropy(),
+            )
 
             return True
 
@@ -179,10 +181,7 @@ class HMMRegimeDetector:
             result = HMMRegimeResult(
                 regime=regime_names[regime_idx],
                 confidence=float(probs[regime_idx]),
-                probabilities={
-                    name: float(probs[i])
-                    for i, name in enumerate(regime_names)
-                },
+                probabilities={name: float(probs[i]) for i, name in enumerate(regime_names)},
                 regime_index=int(regime_idx),
                 transition_matrix=self._transition_matrix,
             )
@@ -224,21 +223,23 @@ class HMMRegimeDetector:
         for i in range(self.rolling_window, n):
             # Yeniden eğitim gerekli mi?
             if i - self._last_retrain_index >= self.retrain_interval:
-                train_returns = returns[max(0, i - self.rolling_window):i]
-                train_vol = volatility[max(0, i - self.rolling_window):i]
+                train_returns = returns[max(0, i - self.rolling_window) : i]
+                train_vol = volatility[max(0, i - self.rolling_window) : i]
                 self.fit(train_returns, train_vol)
                 self._last_retrain_index = i
 
             # Tahmin
             result = self.predict_regime(
-                returns[max(0, i - 5):i + 1],
-                volatility[max(0, i - 5):i + 1],
+                returns[max(0, i - 5) : i + 1],
+                volatility[max(0, i - 5) : i + 1],
             )
             results.append(result)
 
-        logger.info("Rolling detection completed",
-                   total_predictions=len(results),
-                   retrains=(n - self.rolling_window) // self.retrain_interval)
+        logger.info(
+            "Rolling detection completed",
+            total_predictions=len(results),
+            retrains=(n - self.rolling_window) // self.retrain_interval,
+        )
 
         return results
 
@@ -250,7 +251,7 @@ class HMMRegimeDetector:
         En yüksek return → BULL, en düşük → BEAR
         """
         if self._model is None:
-            return self.REGIME_NAMES[:len(probabilities)]
+            return self.REGIME_NAMES[: len(probabilities)]
 
         try:
             # Her rejimin ortalama return'ü
@@ -280,7 +281,7 @@ class HMMRegimeDetector:
             return [name_mapping.get(i, f"REGIME_{i}") for i in range(len(probabilities))]
 
         except Exception:
-            return self.REGIME_NAMES[:len(probabilities)]
+            return self.REGIME_NAMES[: len(probabilities)]
 
     def _rule_based_fallback(
         self,
@@ -290,8 +291,10 @@ class HMMRegimeDetector:
         """Rule-based fallback — HMM yoksa."""
         if len(returns) == 0:
             return HMMRegimeResult(
-                regime="UNKNOWN", confidence=0.0,
-                probabilities={}, regime_index=-1,
+                regime="UNKNOWN",
+                confidence=0.0,
+                probabilities={},
+                regime_index=-1,
             )
 
         avg_return = float(np.mean(returns[-20:])) if len(returns) >= 20 else float(np.mean(returns))

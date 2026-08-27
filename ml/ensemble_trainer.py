@@ -45,9 +45,21 @@ class BistEnsembleTrainer:
         self.train_df = train_df
         self.oos_df = oos_df
         self.feature_cols = [
-            "rsi_14", "atr_pct", "ret_1d", "ret_5d", "ret_20d",
-            "vol_surge", "buyer_pressure", "near_20d_high", "breakout_setup", "dip_setup",
-            "bm_is_bull", "bm_dist_sma200", "bm_is_crisis", "bm_ret_5d", "bm_vol_20d"
+            "rsi_14",
+            "atr_pct",
+            "ret_1d",
+            "ret_5d",
+            "ret_20d",
+            "vol_surge",
+            "buyer_pressure",
+            "near_20d_high",
+            "breakout_setup",
+            "dip_setup",
+            "bm_is_bull",
+            "bm_dist_sma200",
+            "bm_is_crisis",
+            "bm_ret_5d",
+            "bm_vol_20d",
         ]
         self.target_col = "target_risk_adj"
         self.save_dir = Path("ml/saved_models")
@@ -77,7 +89,7 @@ class BistEnsembleTrainer:
                 subsample=0.8,
                 colsample_bytree=0.8,
                 n_jobs=-1,
-                random_state=42
+                random_state=42,
             )
             lgb_model.fit(X_train, y_train)
             lgb_model.predict(X_train)
@@ -86,16 +98,17 @@ class BistEnsembleTrainer:
             lgb_r2 = r2_score(y_oos, lgb_oos_pred)
             lgb_ic = float(np.corrcoef(y_oos, lgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
 
-            self.models['lightgbm'] = lgb_model
+            self.models["lightgbm"] = lgb_model
             results["lightgbm"] = {
                 "r2": round(float(lgb_r2), 4),
                 "ic": round(float(lgb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
                     for feat, imp in zip(self.feature_cols, lgb_model.feature_importances_, strict=False)
-                }
+                },
             }
             from services.core.safe_pickle import safe_pickle_dump
+
             safe_pickle_dump(lgb_model, str(self.save_dir / "lightgbm_model.pkl"))
             logger.info(f"LightGBM Eğitildi -> OOS IC: {lgb_ic:.4f}, R2: {lgb_r2:.4f}")
 
@@ -109,21 +122,21 @@ class BistEnsembleTrainer:
                 subsample=0.8,
                 colsample_bytree=0.8,
                 n_jobs=-1,
-                random_state=42
+                random_state=42,
             )
             xgb_model.fit(X_train, y_train)
             xgb_oos_pred = xgb_model.predict(X_oos)
             xgb_r2 = r2_score(y_oos, xgb_oos_pred)
             xgb_ic = float(np.corrcoef(y_oos, xgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
 
-            self.models['xgboost'] = xgb_model
+            self.models["xgboost"] = xgb_model
             results["xgboost"] = {
                 "r2": round(float(xgb_r2), 4),
                 "ic": round(float(xgb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
                     for feat, imp in zip(self.feature_cols, xgb_model.feature_importances_, strict=False)
-                }
+                },
             }
             safe_pickle_dump(xgb_model, str(self.save_dir / "xgboost_model.pkl"))
             logger.info(f"XGBoost Eğitildi -> OOS IC: {xgb_ic:.4f}, R2: {xgb_r2:.4f}")
@@ -132,26 +145,21 @@ class BistEnsembleTrainer:
         if cb:
             logger.info("CatBoost Modeli eğitiliyor (24 Core CPU)...")
             cb_model = cb.CatBoostRegressor(
-                iterations=400,
-                learning_rate=0.03,
-                depth=6,
-                thread_count=-1,
-                random_seed=42,
-                verbose=False
+                iterations=400, learning_rate=0.03, depth=6, thread_count=-1, random_seed=42, verbose=False
             )
             cb_model.fit(X_train, y_train)
             cb_oos_pred = cb_model.predict(X_oos)
             cb_r2 = r2_score(y_oos, cb_oos_pred)
             cb_ic = float(np.corrcoef(y_oos, cb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
 
-            self.models['catboost'] = cb_model
+            self.models["catboost"] = cb_model
             results["catboost"] = {
                 "r2": round(float(cb_r2), 4),
                 "ic": round(float(cb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
                     for feat, imp in zip(self.feature_cols, cb_model.get_feature_importance(), strict=False)
-                }
+                },
             }
             safe_pickle_dump(cb_model, str(self.save_dir / "catboost_model.pkl"))
             logger.info(f"CatBoost Eğitildi -> OOS IC: {cb_ic:.4f}, R2: {cb_r2:.4f}")
@@ -160,7 +168,7 @@ class BistEnsembleTrainer:
         et_model = ExtraTreesRegressor(n_estimators=200, max_depth=8, n_jobs=-1, random_state=42)
         et_model.fit(X_train, y_train)
         et_oos_pred = et_model.predict(X_oos)
-        self.models['extratrees'] = et_model
+        self.models["extratrees"] = et_model
         safe_pickle_dump(et_model, str(self.save_dir / "extratrees_model.pkl"))
 
         # 5. Ensemble Tahmini (Ağırlıklı Ortalama — ExtraTrees dahil)
@@ -200,11 +208,8 @@ class BistEnsembleTrainer:
             "features": self.feature_cols,
             "models_trained": list(self.models.keys()),
             "individual_results": results,
-            "ensemble_metrics": {
-                "oos_information_coefficient_ic": round(ens_ic, 4),
-                "oos_r2_score": round(ens_r2, 4)
-            },
-            "top_feature_importances": sorted_importance
+            "ensemble_metrics": {"oos_information_coefficient_ic": round(ens_ic, 4), "oos_r2_score": round(ens_r2, 4)},
+            "top_feature_importances": sorted_importance,
         }
 
         with open("data/model_metrics.json", "w", encoding="utf-8") as f:

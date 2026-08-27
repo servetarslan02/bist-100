@@ -3,6 +3,7 @@
 Optuna Bayesian optimization — IC-based objective, regime-specific tuning,
 cross-validation within trials, multi-model support, trial history analysis.
 """
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -15,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class TuningResult:
     """Tuning sonucu."""
+
     best_params: dict[str, Any]
     best_value: float
     n_trials: int
@@ -26,6 +28,7 @@ class TuningResult:
 @dataclass
 class RegimeTuningResult:
     """Regime-specific tuning sonucu."""
+
     regime: str
     result: TuningResult
     n_samples: int
@@ -76,6 +79,7 @@ class HyperparameterTuner:
             return TuningResult(best_params={}, best_value=0, n_trials=0, trial_history=[], tuning_time_seconds=0)
 
         import time
+
         start_time = time.time()
 
         def objective(trial):
@@ -94,7 +98,9 @@ class HyperparameterTuner:
 
             # Cross-validation within trial
             if self.cv_folds > 1:
-                return self._cv_objective(lgb.LGBMRegressor, params, X_train, y_train, objective_type, sample_weight_train)
+                return self._cv_objective(
+                    lgb.LGBMRegressor, params, X_train, y_train, objective_type, sample_weight_train
+                )
             else:
                 model = lgb.LGBMRegressor(**params)
                 fit_params = {}
@@ -153,6 +159,7 @@ class HyperparameterTuner:
             return TuningResult(best_params={}, best_value=0, n_trials=0, trial_history=[], tuning_time_seconds=0)
 
         import time
+
         start_time = time.time()
 
         def objective(trial):
@@ -184,7 +191,8 @@ class HyperparameterTuner:
 
         trial_history = [
             {"trial": t.number, "value": t.value, "params": t.params, "state": str(t.state)}
-            for t in study.trials if t.value is not None
+            for t in study.trials
+            if t.value is not None
         ]
 
         result = TuningResult(
@@ -216,6 +224,7 @@ class HyperparameterTuner:
             return TuningResult(best_params={}, best_value=0, n_trials=0, trial_history=[], tuning_time_seconds=0)
 
         import time
+
         start_time = time.time()
 
         def objective(trial):
@@ -243,9 +252,13 @@ class HyperparameterTuner:
             best_params=study.best_params,
             best_value=round(float(study.best_value), 4),
             n_trials=len(study.trials),
-            trial_history=[{"trial": t.number, "value": t.value, "params": t.params} for t in study.trials if t.value is not None],
+            trial_history=[
+                {"trial": t.number, "value": t.value, "params": t.params} for t in study.trials if t.value is not None
+            ],
             tuning_time_seconds=round(elapsed, 1),
-            convergence_info=self._analyze_convergence([{"trial": t.number, "value": t.value} for t in study.trials if t.value is not None]),
+            convergence_info=self._analyze_convergence(
+                [{"trial": t.number, "value": t.value} for t in study.trials if t.value is not None]
+            ),
         )
 
         logger.info("catboost_tuned", best_value=result.best_value, n_trials=result.n_trials)
@@ -335,6 +348,7 @@ class HyperparameterTuner:
             return float(ic) if not np.isnan(ic) else 0.0
         elif objective_type == "auc":
             from sklearn.metrics import roc_auc_score
+
             try:
                 return float(roc_auc_score(y_true, preds))
             except Exception:

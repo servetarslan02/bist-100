@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 # RATE LIMITER
 # =====================================================
 
+
 class RateLimiter:
     """Token bucket rate limiter.
 
@@ -44,10 +45,7 @@ class RateLimiter:
         async with self._lock:
             now = time.monotonic()
             elapsed = now - self._last_refill
-            self._tokens = min(
-                self.max_requests,
-                self._tokens + elapsed * (self.max_requests / self.window_seconds)
-            )
+            self._tokens = min(self.max_requests, self._tokens + elapsed * (self.max_requests / self.window_seconds))
             self._last_refill = now
 
             if self._tokens < 1:
@@ -63,9 +61,10 @@ class RateLimiter:
 # CIRCUIT BREAKER
 # =====================================================
 
+
 class CircuitState(StrEnum):
-    CLOSED = "CLOSED"      # Normal çalışma
-    OPEN = "OPEN"          # Servis kesik, istek yok
+    CLOSED = "CLOSED"  # Normal çalışma
+    OPEN = "OPEN"  # Servis kesik, istek yok
     HALF_OPEN = "HALF_OPEN"  # Test aşaması
 
 
@@ -137,9 +136,11 @@ class CircuitBreaker:
 # DATA QUALITY VALIDATOR
 # =====================================================
 
+
 @dataclass
 class QualityReport:
     """Veri kalitesi raporu."""
+
     is_valid: bool
     score: float  # 0-1
     issues: list[str] = field(default_factory=list)
@@ -183,9 +184,11 @@ class DataQualityValidator:
         # 1. Null check
         if data is None:
             return QualityReport(
-                is_valid=False, score=0.0,
+                is_valid=False,
+                score=0.0,
                 issues=["Data is None"],
-                checks_passed=0, checks_failed=1,
+                checks_passed=0,
+                checks_failed=1,
             )
 
         checks_passed += 1
@@ -199,8 +202,11 @@ class DataQualityValidator:
 
         if not isinstance(data, dict):
             return QualityReport(
-                is_valid=False, score=0.2,
-                issues=issues, checks_passed=checks_passed, checks_failed=checks_failed,
+                is_valid=False,
+                score=0.2,
+                issues=issues,
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
             )
 
         # 3. Empty check
@@ -275,6 +281,7 @@ class DataQualityValidator:
 # =====================================================
 # BASE ADAPTER
 # =====================================================
+
 
 class BaseAdapter(ABC):
     """Tüm alternative data adapter'ları için soyut sınıf.
@@ -409,6 +416,7 @@ class BaseAdapter(ABC):
 # ADAPTER REGISTRY
 # =====================================================
 
+
 class AdapterRegistry:
     """Adapter kayıt ve yönetim merkezi."""
 
@@ -430,10 +438,7 @@ class AdapterRegistry:
 
     def get_all_status(self) -> dict[str, Any]:
         """Tüm adapter durumları."""
-        return {
-            name: adapter.get_status()
-            for name, adapter in self._adapters.items()
-        }
+        return {name: adapter.get_status() for name, adapter in self._adapters.items()}
 
     async def collect_all(
         self,
@@ -442,15 +447,11 @@ class AdapterRegistry:
     ) -> dict[str, dict[str, float]]:
         """Tüm (veya belirtilen) kaynaklardan veri topla."""
         target_adapters = {
-            name: adapter for name, adapter in self._adapters.items()
-            if sources is None or name in sources
+            name: adapter for name, adapter in self._adapters.items() if sources is None or name in sources
         }
 
         # Paralel toplama
-        tasks = {
-            name: adapter.fetch(ticker)
-            for name, adapter in target_adapters.items()
-        }
+        tasks = {name: adapter.fetch(ticker) for name, adapter in target_adapters.items()}
 
         results = {}
         gathered = await asyncio.gather(

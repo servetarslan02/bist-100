@@ -111,6 +111,7 @@ async def test_migration_dependency_validation():
     issues = []
 
     from services.core.migrations.runner import MigrationFile
+
     test_migrations = [
         MigrationFile(version=1, name="a", up_sql="", down_sql="", checksum="a"),
         MigrationFile(version=2, name="b", up_sql="", down_sql="", checksum="b"),
@@ -156,11 +157,16 @@ async def test_portfolio_trade_lock():
     dev_db._db = None  # Fresh DB
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = 'X'")
     xid = row["id"]
 
@@ -196,6 +202,7 @@ async def test_portfolio_invariant_check():
     dev_db._db = None  # Fresh DB
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
     svc = PortfolioService(initial_capital=100000)
@@ -237,11 +244,16 @@ async def test_oversell_prevention():
     dev_db._db = None  # Fresh DB
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = 'X'")
     xid = row["id"]
 
@@ -270,6 +282,7 @@ async def test_oversell_prevention():
 # ============================================================
 # RUN
 # ============================================================
+
 
 async def run_all():
     print("=" * 60)

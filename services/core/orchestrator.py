@@ -26,6 +26,7 @@ DEFAULT_PORTFOLIO_VALUE = 10_000_000  # ₺10M
 _bg_loop = None
 _bg_thread = None
 
+
 def _get_bg_loop():
     """Get or create a background asyncio event loop for sync→async bridge."""
     global _bg_loop, _bg_thread
@@ -35,13 +36,16 @@ def _get_bg_loop():
         _bg_thread.start()
     return _bg_loop
 
+
 def _publish_event_async(event, key="default"):
     """Publish event directly (publish_event is synchronous)."""
     try:
         from services.core.event_bus import publish_event
+
         publish_event(event, key=key)
     except Exception as e:
         logger.debug("event_publish_failed", error=str(e))
+
 
 logger = structlog.get_logger()
 
@@ -49,6 +53,7 @@ logger = structlog.get_logger()
 @dataclass
 class PipelineReport:
     """run_full_pipeline() çıktısı — çoklu-hisse batch çalıştırma raporu."""
+
     date: str
     results: dict[str, Any] = field(default_factory=dict)
     system_health: dict[str, Any] = field(default_factory=dict)
@@ -74,58 +79,61 @@ class MasterOrchestrator:
     # is_class=True → instantiate; is_class=False → import attribute directly
     _SERVICE_REGISTRY = [
         # Core
-        ("event_bus",          "services.core.event_bus",                "event_bus",              False),
+        ("event_bus", "services.core.event_bus", "event_bus", False),
         # Features
-        ("feature_calculator", "services.features.calculator",           "feature_calculator",     False),
+        ("feature_calculator", "services.features.calculator", "feature_calculator", False),
         # Intelligence
-        ("world_state",        "services.intelligence.world_state",      "WorldStateManager",      True),
-        ("regime",             "services.intelligence.regime",           "regime_engine",          False),
-        ("forecasting",        "services.intelligence.forecasting",      "ForecastingEngine",      True),
-        ("monte_carlo",        "services.intelligence.monte_carlo",      "MonteCarloEngine",       True),
-        ("probability",        "services.intelligence.probability",      "ProbabilityEngine",      True),
-        ("spec_engine",        "services.intelligence.spec_engine",      "spec_engine",            False),
-        ("signal_fusion",      "services.intelligence.signal_fusion",    "SignalFusionEngine",     True),
-        ("knowledge_graph",    "services.intelligence.knowledge_graph",  "KnowledgeGraph",         True),
-        ("research_memory",    "services.intelligence.research_memory",  "ResearchMemory",         True),
-        ("evidence",           "services.intelligence.evidence_engine",  "EvidenceVerificationEngine", True),
-        ("factor_engine",      "services.intelligence.factor_engine",    "FactorEngine",           True),
-        ("impact_engine",      "services.intelligence.impact_engine",    "ImpactEngine",           True),
-        ("macro_sensitivity",  "services.intelligence.macro_sensitivity","MacroSensitivityEngine", True),
-        ("news_pipeline",      "services.intelligence.news_pipeline",    "NewsPipeline",           True),
-        ("trade_planner",      "services.intelligence.trade_planner",    "TradePlanner",           True),
-        ("llm_agent",          "services.intelligence.llm_agent",        "llm_agent",              False),
-        ("agent_pipeline",     "services.agents.agent_pipeline",         "AgentPipelineOrchestrator", True),
+        ("world_state", "services.intelligence.world_state", "WorldStateManager", True),
+        ("regime", "services.intelligence.regime", "regime_engine", False),
+        ("forecasting", "services.intelligence.forecasting", "ForecastingEngine", True),
+        ("monte_carlo", "services.intelligence.monte_carlo", "MonteCarloEngine", True),
+        ("probability", "services.intelligence.probability", "ProbabilityEngine", True),
+        ("spec_engine", "services.intelligence.spec_engine", "spec_engine", False),
+        ("signal_fusion", "services.intelligence.signal_fusion", "SignalFusionEngine", True),
+        ("knowledge_graph", "services.intelligence.knowledge_graph", "KnowledgeGraph", True),
+        ("research_memory", "services.intelligence.research_memory", "ResearchMemory", True),
+        ("evidence", "services.intelligence.evidence_engine", "EvidenceVerificationEngine", True),
+        ("factor_engine", "services.intelligence.factor_engine", "FactorEngine", True),
+        ("impact_engine", "services.intelligence.impact_engine", "ImpactEngine", True),
+        ("macro_sensitivity", "services.intelligence.macro_sensitivity", "MacroSensitivityEngine", True),
+        ("news_pipeline", "services.intelligence.news_pipeline", "NewsPipeline", True),
+        ("trade_planner", "services.intelligence.trade_planner", "TradePlanner", True),
+        ("llm_agent", "services.intelligence.llm_agent", "llm_agent", False),
+        ("agent_pipeline", "services.agents.agent_pipeline", "AgentPipelineOrchestrator", True),
         # Decision
-        ("decision_engine",    "services.core.decision_engine",          "DecisionEngine",         True),
+        ("decision_engine", "services.core.decision_engine", "DecisionEngine", True),
         # Risk
-        ("risk_gate",          "services.core.risk_gate",                "RiskGate",               True),
-        ("position_sizing",    "services.risk.position_sizing",          "PositionSizer",          True),
-        ("compliance",         "services.core.compliance",               "compliance_checker",     False),
-        ("short_selling",      "services.core.short_selling",            "short_selling_monitor",  False),
-        ("halt_monitor",       "services.core.halt_monitor",             "halt_monitor",           False),
+        ("risk_gate", "services.core.risk_gate", "RiskGate", True),
+        ("position_sizing", "services.risk.position_sizing", "PositionSizer", True),
+        ("compliance", "services.core.compliance", "compliance_checker", False),
+        ("short_selling", "services.core.short_selling", "short_selling_monitor", False),
+        ("halt_monitor", "services.core.halt_monitor", "halt_monitor", False),
         # Portfolio
-        ("portfolio_manager",  "services.portfolio.portfolio_manager",   "PortfolioManager",       True),
-        ("commission_model",   "services.portfolio.portfolio_manager",   "CommissionModel",        True),
+        ("portfolio_manager", "services.portfolio.portfolio_manager", "PortfolioManager", True),
+        ("commission_model", "services.portfolio.portfolio_manager", "CommissionModel", True),
         # Learning
-        ("outcome_tracker",    "services.learning.outcome_tracker",      "OutcomeTracker",         True),
-        ("learning",           "services.learning.integrated_learning",  "IntegratedLearningSystem", True),
+        ("outcome_tracker", "services.learning.outcome_tracker", "OutcomeTracker", True),
+        ("learning", "services.learning.integrated_learning", "IntegratedLearningSystem", True),
         # Macro (B28)
-        ("macro_features",     "services.features.macro",                "compute_all_macro_features", False),
+        ("macro_features", "services.features.macro", "compute_all_macro_features", False),
         # Factors (B30)
-        ("financial_scores",   "services.intelligence.factor_engine",    "compute_financial_scores", False),
+        ("financial_scores", "services.intelligence.factor_engine", "compute_financial_scores", False),
         # Event Study (B31)
-        ("event_impact",       "services.intelligence.impact_engine",    "analyze_event_impact",   False),
+        ("event_impact", "services.intelligence.impact_engine", "analyze_event_impact", False),
     ]
 
     # Multi-attribute imports: one module → multiple services
     _MULTI_SERVICE_REGISTRY = [
-        ("services.intelligence.analysis_engines", [
-            ("price_action",       "PriceActionEngine"),
-            ("volume_engine",      "VolumeEngine"),
-            ("sector_engine",      "SectorEngine"),
-            ("relative_strength",  "RelativeStrengthEngine"),
-            ("correlation",        "CorrelationEngine"),
-        ]),
+        (
+            "services.intelligence.analysis_engines",
+            [
+                ("price_action", "PriceActionEngine"),
+                ("volume_engine", "VolumeEngine"),
+                ("sector_engine", "SectorEngine"),
+                ("relative_strength", "RelativeStrengthEngine"),
+                ("correlation", "CorrelationEngine"),
+            ],
+        ),
     ]
 
     async def initialize(self):
@@ -142,7 +150,9 @@ class MasterOrchestrator:
                 obj = getattr(module, attr_name)
                 self._services[key] = obj() if is_class else obj
             except ImportError as e:
-                logger.error("ImportError loading module", module=module_path, attr=attr_name, error=str(e), exc_info=True)
+                logger.error(
+                    "ImportError loading module", module=module_path, attr=attr_name, error=str(e), exc_info=True
+                )
             except Exception as e:
                 logger.error("Failed to load module", module=attr_name, error=str(e), exc_info=True)
 
@@ -160,6 +170,7 @@ class MasterOrchestrator:
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
             from services.agents.agent_pipeline import AgentPipelineOrchestrator
+
             self._services["agent_pipeline"] = AgentPipelineOrchestrator(
                 enable_debate=True,
                 enable_memory=True,
@@ -174,13 +185,15 @@ class MasterOrchestrator:
             eb = self._services.get("event_bus")
             if eb:
                 from services.core.event_schema import EventType
+
                 async def _on_simulation_completed(event):
                     ticker = event.data.get("ticker", "")
                     if ticker:
-                        if not hasattr(self, '_simulation_results'):
+                        if not hasattr(self, "_simulation_results"):
                             self._simulation_results = {}
                         self._simulation_results[ticker] = event.data.get("result")
                         logger.debug("Simulation result cached", ticker=ticker)
+
                 try:
                     await eb.subscribe(EventType.SIMULATION_COMPLETED, _on_simulation_completed)
                     logger.info("SIMULATION_COMPLETED handler registered")
@@ -194,11 +207,13 @@ class MasterOrchestrator:
             eb = self._services.get("event_bus")
             if eb:
                 from services.core.event_schema import EventType
+
                 async def _on_regime_transition(event):
                     old_regime = event.data.get("old_regime", "")
                     new_regime = event.data.get("new_regime", "")
                     logger.info("Regime transition detected", old=old_regime, new=new_regime)
                     self._last_regime_transition = event.data
+
                 with contextlib.suppress(Exception):
                     await eb.subscribe("market.regime_transition", _on_regime_transition)
         except Exception as e:
@@ -209,6 +224,7 @@ class MasterOrchestrator:
             eb = self._services.get("event_bus")
             if eb:
                 from services.core.event_schema import EventType
+
                 async def _on_agent_analysis(event):
                     ticker = event.data.get("ticker", "")
                     direction = event.data.get("direction", "")
@@ -224,6 +240,7 @@ class MasterOrchestrator:
                             )
                     except Exception as e:
                         logger.debug("outcome_tracker_add_prediction_failed", error=str(e))
+
                 with contextlib.suppress(Exception):
                     await eb.subscribe("agent.analysis", _on_agent_analysis)
         except Exception as e:
@@ -236,14 +253,14 @@ class MasterOrchestrator:
         """Shared thread pool for sync→async bridging (lazy init)."""
         if self._thread_pool is None:
             import concurrent.futures
-            self._thread_pool = concurrent.futures.ThreadPoolExecutor(
-                max_workers=4, thread_name_prefix="orch-async"
-            )
+
+            self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="orch-async")
         return self._thread_pool
 
     def _run_agent_async(self, coro):
         """Run an async agent coroutine from sync context."""
         import asyncio as _asyncio
+
         try:
             _asyncio.get_running_loop()
             return self._get_thread_pool().submit(_asyncio.run, coro).result(timeout=180)
@@ -270,15 +287,18 @@ class MasterOrchestrator:
             calc = self._services.get("feature_calculator")
             if calc:
                 import polars as _pl
-                ohlcv_df = _pl.DataFrame({
-                    "Open": market_data.get("opens", raw_prices),
-                    "High": market_data.get("highs", raw_prices),
-                    "Low": market_data.get("lows", raw_prices),
-                    "Close": market_data.get("closes", raw_prices),
-                    "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
-                })
+
+                ohlcv_df = _pl.DataFrame(
+                    {
+                        "Open": market_data.get("opens", raw_prices),
+                        "High": market_data.get("highs", raw_prices),
+                        "Low": market_data.get("lows", raw_prices),
+                        "Close": market_data.get("closes", raw_prices),
+                        "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
+                    }
+                )
                 ohlcv_df = ohlcv_df.dropna(subset=["Close"])
-                ohlcv_df = ohlcv_df.filter(pl.col('Close') > 0)
+                ohlcv_df = ohlcv_df.filter(pl.col("Close") > 0)
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))
@@ -301,11 +321,12 @@ class MasterOrchestrator:
 
         try:
             from services.macro.surprise_model import MacroSurpriseModel
+
             surprise = MacroSurpriseModel()
-            if hasattr(surprise, 'compute_surprise') and market_data.get("macro"):
+            if hasattr(surprise, "compute_surprise") and market_data.get("macro"):
                 surprise_result = surprise.compute_surprise(market_data["macro"])
                 if surprise_result:
-                    features['macro_surprise'] = surprise_result
+                    features["macro_surprise"] = surprise_result
         except Exception as e:
             logger.debug("macro_surprise_failed", ticker=ticker, error=str(e))
 
@@ -317,10 +338,10 @@ class MasterOrchestrator:
                 for raw_item in market_data["news"]:
                     processed = news_pipe.process(raw_item)
                     if processed and hasattr(processed, "sentiment"):
-                        features['news_sentiment'] = processed.sentiment
-                        features['news_importance'] = getattr(processed, 'importance', 0.5)
+                        features["news_sentiment"] = processed.sentiment
+                        features["news_importance"] = getattr(processed, "importance", 0.5)
                         if hasattr(processed, "key_insight") and processed.key_insight:
-                            features['news_key_insight'] = processed.key_insight
+                            features["news_key_insight"] = processed.key_insight
         except Exception as e:
             logger.debug("news_sentiment_failed", ticker=ticker, error=str(e))
 
@@ -360,7 +381,7 @@ class MasterOrchestrator:
             try:
                 eng = self._services.get(service_key)
                 if eng:
-                    analysis[service_key] = eng.analyze(features) if hasattr(eng, 'analyze') else "available"
+                    analysis[service_key] = eng.analyze(features) if hasattr(eng, "analyze") else "available"
             except Exception as e:
                 logger.debug(error_label, error=str(e))
                 analysis[service_key] = "error"
@@ -373,6 +394,7 @@ class MasterOrchestrator:
             fe = self._services.get("forecasting")
             if fe:
                 import polars as _pl
+
                 hist_returns = []
                 if len(prices) > 1:
                     _closes = _pl.Series(prices)
@@ -417,7 +439,7 @@ class MasterOrchestrator:
                     vol_annual = float(vol_20d) / 100.0
                 else:
                     vol_annual = float(vol_20d) if vol_20d else 0.20
-                cached_mc = getattr(self, '_simulation_results', {}).get(ticker)
+                cached_mc = getattr(self, "_simulation_results", {}).get(ticker)
                 if cached_mc:
                     mc_result = cached_mc
                 else:
@@ -458,6 +480,7 @@ class MasterOrchestrator:
         """Intelligence pipeline çalıştır."""
         try:
             from services.intelligence.pipeline import IntelligencePipeline
+
             if "_intelligence_pipeline" not in self._services:
                 self._services["_intelligence_pipeline"] = IntelligencePipeline()
             ip = self._services["_intelligence_pipeline"]
@@ -526,10 +549,12 @@ class MasterOrchestrator:
                     "risks": agent_pipeline_result.synthesis.risks[:5],
                     "duration_ms": agent_pipeline_result.total_duration_ms,
                 }
-                logger.info("Agent pipeline completed",
-                           ticker=ticker,
-                           direction=agent_result["direction"],
-                           confidence=agent_result["confidence"])
+                logger.info(
+                    "Agent pipeline completed",
+                    ticker=ticker,
+                    direction=agent_result["direction"],
+                    confidence=agent_result["confidence"],
+                )
         except Exception as e:
             logger.warning("Agent pipeline failed", ticker=ticker, error=str(e))
         return agent_result
@@ -542,6 +567,7 @@ class MasterOrchestrator:
             eb = self._services.get("event_bus")
             if eb:
                 from services.core.event_schema import CanonicalEvent, EventType
+
                 event = CanonicalEvent(
                     event_type=EventType.AGENT_ANALYSIS_COMPLETED,
                     payload={
@@ -560,8 +586,17 @@ class MasterOrchestrator:
         except Exception as e:
             logger.warning("Agent event publish failed", step="agent_event_publish", error=str(e))
 
-    def _fuse_signals(self, ticker: str, features: dict, regime: str, factors: dict,
-                      spec: dict, agent_result: dict, monte_carlo: dict, world_state: dict) -> dict:
+    def _fuse_signals(
+        self,
+        ticker: str,
+        features: dict,
+        regime: str,
+        factors: dict,
+        spec: dict,
+        agent_result: dict,
+        monte_carlo: dict,
+        world_state: dict,
+    ) -> dict:
         """Sinyalleri füzyonla."""
         fused_signal = {}
         try:
@@ -599,9 +634,15 @@ class MasterOrchestrator:
             val_dir = "LONG" if val_score > 55 else ("SHORT" if val_score < 45 else "NEUTRAL")
 
             signals = {
-                "technical": {"direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT", "score": features.get("rsi_14", 50)},
+                "technical": {
+                    "direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT",
+                    "score": features.get("rsi_14", 50),
+                },
                 "fundamental": {"direction": fund_dir, "score": fund_score},
-                "momentum": {"direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT", "score": min(max(features.get("roc_20d", 0) + 50, 0), 100)},
+                "momentum": {
+                    "direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT",
+                    "score": min(max(features.get("roc_20d", 0) + 50, 0), 100),
+                },
                 "macro": {"direction": macro_dir, "score": macro_score},
                 "valuation": {"direction": val_dir, "score": val_score},
                 "ai": {
@@ -609,8 +650,12 @@ class MasterOrchestrator:
                     "score": agent_result.get("score", 50),
                 },
                 "monte_carlo": {
-                    "direction": "LONG" if monte_carlo.get("prob_positive", 0) > 0.55 else ("SHORT" if monte_carlo.get("prob_positive", 0) < 0.45 else "NEUTRAL"),
-                    "score": min(max(monte_carlo.get("expected_return", 0) * 5 + 50, 0), 100) if monte_carlo.get("simulated") else 50,
+                    "direction": "LONG"
+                    if monte_carlo.get("prob_positive", 0) > 0.55
+                    else ("SHORT" if monte_carlo.get("prob_positive", 0) < 0.45 else "NEUTRAL"),
+                    "score": min(max(monte_carlo.get("expected_return", 0) * 5 + 50, 0), 100)
+                    if monte_carlo.get("simulated")
+                    else 50,
                 },
             }
             fused = sf.fuse_signals(ticker, signals, regime)
@@ -619,9 +664,19 @@ class MasterOrchestrator:
             logger.warning("Pipeline step failed", step="signal_fusion", error=str(e))
         return fused_signal
 
-    def _make_decision(self, ticker: str, prices, features: dict, fused_signal: dict,
-                       agent_result: dict, regime: str, monte_carlo: dict, forecast: dict,
-                       spec: dict, world_state: dict) -> dict:
+    def _make_decision(
+        self,
+        ticker: str,
+        prices,
+        features: dict,
+        fused_signal: dict,
+        agent_result: dict,
+        regime: str,
+        monte_carlo: dict,
+        forecast: dict,
+        spec: dict,
+        world_state: dict,
+    ) -> dict:
         """Karar motorunu çalıştır."""
         decision = {}
         try:
@@ -629,6 +684,7 @@ class MasterOrchestrator:
             if not de:
                 return decision
             from services.core.decision_engine import DecisionInput
+
             inp = DecisionInput(
                 ticker=ticker,
                 price=float(prices[-1]) if len(prices) > 0 else 0,
@@ -658,6 +714,7 @@ class MasterOrchestrator:
             if not decision.get("llm_narrative"):
                 try:
                     from services.intelligence.llm_agent import llm_agent
+
                     decision["llm_narrative"] = llm_agent.generate_decision_narrative(
                         ticker=ticker,
                         decision=decision,
@@ -672,6 +729,7 @@ class MasterOrchestrator:
                 if eb and decision.get("action"):
                     from services.core.event_schema import CanonicalEvent
                     from services.core.event_schema import EventType as ET
+
                     dec_event = CanonicalEvent(
                         event_type=ET.DECISION_CREATED,
                         payload={
@@ -696,11 +754,11 @@ class MasterOrchestrator:
         """Öğrenme geri bildirimini uygula (in-place)."""
         try:
             ls = self._services.get("learning")
-            if ls and hasattr(ls, 'get_regime_accuracy'):
+            if ls and hasattr(ls, "get_regime_accuracy"):
                 regime_acc = ls.get_regime_accuracy(regime)
                 if regime_acc and regime_acc < 0.4 and decision.get("confidence", 0) > 0:
-                    decision['confidence'] = decision['confidence'] * 0.8
-                    decision['learning_adjustment'] = f"Low regime accuracy ({regime_acc:.2f})"
+                    decision["confidence"] = decision["confidence"] * 0.8
+                    decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
         except Exception as e:
             logger.debug("learning_feedback_failed", error=str(e))
 
@@ -723,8 +781,9 @@ class MasterOrchestrator:
             logger.warning("Pipeline step failed", step="trade_plan", error=str(e))
         return trade_plan
 
-    def _check_risk(self, ticker: str, decision: dict, trade_plan: dict, prices,
-                    fused_signal: dict, monte_carlo: dict) -> dict:
+    def _check_risk(
+        self, ticker: str, decision: dict, trade_plan: dict, prices, fused_signal: dict, monte_carlo: dict
+    ) -> dict:
         """Risk kontrolü yap."""
         risk_check = {"allowed": False}
         try:
@@ -732,7 +791,7 @@ class MasterOrchestrator:
             if rg:
                 # PortfolioManager'dan gerçek portföy durumunu al
                 pm = self._services.get("portfolio_manager")
-                if pm and hasattr(pm, 'get_portfolio'):
+                if pm and hasattr(pm, "get_portfolio"):
                     pf = pm.get_portfolio()
                     actual_portfolio_value = pf.get("total_value", DEFAULT_PORTFOLIO_VALUE)
                     actual_positions = {}
@@ -774,14 +833,16 @@ class MasterOrchestrator:
             if comp:
                 # PortfolioManager'dan gerçek portföy durumunu al
                 pm = self._services.get("portfolio_manager")
-                if pm and hasattr(pm, 'get_portfolio'):
+                if pm and hasattr(pm, "get_portfolio"):
                     pf = pm.get_portfolio()
                     actual_portfolio_value = pf.get("total_value", DEFAULT_PORTFOLIO_VALUE)
                     pos = pf.get("positions", [])
                     current_pos_pct = 0
                     for p in pos:
                         if p["ticker"] == ticker:
-                            current_pos_pct = p.get("market_value", 0) / actual_portfolio_value if actual_portfolio_value > 0 else 0
+                            current_pos_pct = (
+                                p.get("market_value", 0) / actual_portfolio_value if actual_portfolio_value > 0 else 0
+                            )
                             break
                 else:
                     actual_portfolio_value = DEFAULT_PORTFOLIO_VALUE
@@ -789,9 +850,7 @@ class MasterOrchestrator:
 
                 order_value = trade_plan.get("quantity", 0) * float(prices[-1]) if isinstance(trade_plan, dict) else 0
                 compliance = comp.check_spk_compliance(
-                    decision.get("action", "HOLD"), ticker,
-                    order_value,
-                    actual_portfolio_value, current_pos_pct
+                    decision.get("action", "HOLD"), ticker, order_value, actual_portfolio_value, current_pos_pct
                 ).to_dict()
         except Exception as e:
             logger.warning("Pipeline step failed", step="compliance", error=str(e))
@@ -803,10 +862,10 @@ class MasterOrchestrator:
         try:
             kg = self._services.get("knowledge_graph")
             if kg:
-                context['knowledge'] = 'available'
+                context["knowledge"] = "available"
             rm = self._services.get("research_memory")
             if rm:
-                context['memory'] = 'available'
+                context["memory"] = "available"
         except Exception as e:
             logger.warning("Pipeline step failed", step="knowledge_graph", error=str(e))
         return context
@@ -855,57 +914,61 @@ class MasterOrchestrator:
         # 1. Veri hazırlama
         raw_prices, prices, error = self._prepare_prices(market_data)
         if error:
-            result['error'] = error
+            result["error"] = error
             return result
 
         # 2. Özellik hesaplama
         features = self._compute_features(ticker, market_data, raw_prices)
         self._compute_macro_features(features, market_data, ticker)
         self._compute_news_sentiment(features, market_data, ticker)
-        result['features'] = features
+        result["features"] = features
 
         # 3. Dünya durumu ve rejim
         world_state = self._compute_world_state()
-        result['world_state'] = world_state
+        result["world_state"] = world_state
         regime = self._detect_regime(features)
-        result['regime'] = regime
+        result["regime"] = regime
 
         # 4. Analiz motorları
-        result['analysis'] = self._run_analysis_engines(features)
+        result["analysis"] = self._run_analysis_engines(features)
 
         # 5. Tahmin ve simülasyon
         forecast = self._compute_forecast(ticker, features, prices)
-        result['forecast'] = forecast
+        result["forecast"] = forecast
         monte_carlo = self._run_monte_carlo(ticker, prices, features)
-        result['monte_carlo'] = monte_carlo
-        result['intelligence_pipeline'] = self._run_intelligence_pipeline(ticker, features, regime)
+        result["monte_carlo"] = monte_carlo
+        result["intelligence_pipeline"] = self._run_intelligence_pipeline(ticker, features, regime)
 
         # 6. Spec ve faktörler
         spec = self._compute_spec(ticker, features, world_state)
-        result['spec'] = spec
+        result["spec"] = spec
         factors = self._compute_factors(market_data)
-        result['factors'] = factors
+        result["factors"] = factors
 
         # 7. Agent pipeline
         agent_result = self._run_agent_pipeline(ticker, features, sector_map, regime, prices)
-        result['agent'] = agent_result
+        result["agent"] = agent_result
         self._publish_agent_event(ticker, agent_result)
 
         # 8. Sinyal füzyonu ve karar
-        fused_signal = self._fuse_signals(ticker, features, regime, factors, spec, agent_result, monte_carlo, world_state)
-        result['signal'] = fused_signal
-        decision = self._make_decision(ticker, prices, features, fused_signal, agent_result, regime, monte_carlo, forecast, spec, world_state)
+        fused_signal = self._fuse_signals(
+            ticker, features, regime, factors, spec, agent_result, monte_carlo, world_state
+        )
+        result["signal"] = fused_signal
+        decision = self._make_decision(
+            ticker, prices, features, fused_signal, agent_result, regime, monte_carlo, forecast, spec, world_state
+        )
         self._apply_learning_feedback(decision, regime)
-        result['decision'] = decision
+        result["decision"] = decision
 
         # 9. İşlem planı ve risk
         trade_plan = self._create_trade_plan(ticker, decision, prices, features, spec)
-        result['trade_plan'] = trade_plan
-        result['risk'] = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
-        result['compliance'] = self._check_compliance(ticker, decision, trade_plan, prices)
+        result["trade_plan"] = trade_plan
+        result["risk"] = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
+        result["compliance"] = self._check_compliance(ticker, decision, trade_plan, prices)
 
         # 10. Bağlam ve öğrenme
-        result['context'] = self._build_context()
+        result["context"] = self._build_context()
         self._record_prediction(ticker, decision, features)
 
         return result
@@ -952,7 +1015,7 @@ class MasterOrchestrator:
             # Macro data (market_data'dan çıkar veya servislerden al)
             macro_data = {}
             for _ticker, _df in market_data.items():
-                if hasattr(_df, 'columns') and 'Close' in _df.columns:
+                if hasattr(_df, "columns") and "Close" in _df.columns:
                     # Basit macro data çıkarma
                     pass
 
@@ -972,20 +1035,22 @@ class MasterOrchestrator:
         # Macro factor decomposition (audit #22)
         try:
             from services.macro.factor_decomposition import MacroFactorDecomposition
+
             mfd = MacroFactorDecomposition()
-            if hasattr(mfd, 'decompose'):
+            if hasattr(mfd, "decompose"):
                 factor_result = mfd.decompose(macro_data)
-                macro_analysis['factor_decomposition'] = factor_result
+                macro_analysis["factor_decomposition"] = factor_result
         except Exception as e:
             logger.debug("macro_factor_decomposition_failed", error=str(e))
 
         # Macro correlation tracker (audit #21)
         try:
             from services.macro.correlation_tracker import MacroCorrelationTracker
+
             mct = MacroCorrelationTracker()
-            if hasattr(mct, 'get_current_regime'):
+            if hasattr(mct, "get_current_regime"):
                 corr_regime = mct.get_current_regime()
-                macro_analysis['correlation_regime'] = corr_regime
+                macro_analysis["correlation_regime"] = corr_regime
         except Exception as e:
             logger.debug("macro_correlation_tracker_failed", error=str(e))
 
@@ -1003,7 +1068,7 @@ class MasterOrchestrator:
                     sector = sector_map.get(ticker, "OTHER")
                     try:
                         impact = macro_impact_analyzer.compute_cumulative_impact(ticker, sector)
-                        features['macro_cumulative_impact'] = impact.get('cumulative_impact', 0)
+                        features["macro_cumulative_impact"] = impact.get("cumulative_impact", 0)
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="orchestrator.py:614")
 
@@ -1039,8 +1104,11 @@ class MasterOrchestrator:
                     errors.append(f"{ticker}: feature hesaplanamadı (boş sonuç)")
             except Exception as e:
                 per_ticker_results[ticker] = {
-                    "ticker": ticker, "sector": sector_map.get(ticker, "UNKNOWN"),
-                    "features": {}, "feature_count": 0, "error": str(e),
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "UNKNOWN"),
+                    "features": {},
+                    "feature_count": 0,
+                    "error": str(e),
                 }
                 errors.append(f"{ticker}: {e}")
 
@@ -1068,19 +1136,21 @@ class MasterOrchestrator:
         for ticker, data in per_ticker_results.items():
             agent = data.get("agent", {})
             if agent and agent.get("direction") in ["LONG", "SHORT"]:
-                top_opportunities.append({
-                    "ticker": ticker,
-                    "direction": agent.get("direction", "NEUTRAL"),
-                    "score": agent.get("score", 50),
-                    "confidence": agent.get("confidence", 0),
-                    "sector": data.get("sector", "UNKNOWN"),
-                })
+                top_opportunities.append(
+                    {
+                        "ticker": ticker,
+                        "direction": agent.get("direction", "NEUTRAL"),
+                        "score": agent.get("score", 50),
+                        "confidence": agent.get("confidence", 0),
+                        "sector": data.get("sector", "UNKNOWN"),
+                    }
+                )
                 agent_results_all[ticker] = agent
 
         # Score'a göre sırala
         top_opportunities.sort(key=lambda x: x["score"], reverse=True)
         for i, opp in enumerate(top_opportunities[:20], 1):
-            opp['rank'] = i
+            opp["rank"] = i
 
         # Learning status (audit #12)
         learning_status = {}
@@ -1090,7 +1160,7 @@ class MasterOrchestrator:
             learning_status = {
                 "outcome_tracker": "active" if ot else "not_loaded",
                 "learning_system": "active" if ls else "not_loaded",
-                "predictions_recorded": len(getattr(ot, '_predictions', [])) if ot else 0,
+                "predictions_recorded": len(getattr(ot, "_predictions", [])) if ot else 0,
             }
         except Exception as e:
             learning_status = {"status": "unavailable"}
@@ -1118,6 +1188,7 @@ class MasterOrchestrator:
     def export_daily_report_json(self, date: str) -> str:
         """Günlük pipeline raporunu JSON olarak dışa aktar."""
         import orjson as _json
+
         report = {
             "date": date,
             "status": self.get_status(),

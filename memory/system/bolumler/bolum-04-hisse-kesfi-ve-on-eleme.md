@@ -44,7 +44,8 @@ Düşük likiditeli hisseler elenir.
 from services.ingestion.universe_enhancements import universe_enhancements
 
 score = universe_enhancements.compute_liquidity_score(
-    avg_volume=1000000, avg_spread_pct=0.05, market_cap=50_000_000_000)
+    avg_volume=1000000, avg_spread_pct=0.05, market_cap=50_000_000_000
+)
 # score = 90/100 (yüksek likidite)
 ```
 
@@ -87,8 +88,13 @@ Her hisse 7 ayrı perspektiften analiz edilir.
 from services.features.seven_motors import seven_motor_engine
 
 features = seven_motor_engine.compute_all(
-    ticker="THYAO", close=close, open_=open_, high=high, low=low,
-    volume=volume, benchmark_close=benchmark,
+    ticker="THYAO",
+    close=close,
+    open_=open_,
+    high=high,
+    low=low,
+    volume=volume,
+    benchmark_close=benchmark,
     fundamentals={"pe_ratio": 8.5, "roe": 0.15},
     market_regime="BULL",
 )
@@ -117,9 +123,10 @@ predictions = ranking_model.predict(features_list, regime="BULL")
 
 ```python
 import numpy as np
+
 all_scores = [72, 68, 65, 60, 55, 50, 48, 45, 42, 40]
 median_score = np.median(all_scores)  # 52.5
-std_score = np.std(all_scores)        # 10.2
+std_score = np.std(all_scores)  # 10.2
 adaptive_threshold = max(40, median_score + 0.5 * std_score)  # 57.6
 ```
 
@@ -136,8 +143,8 @@ Olağandışı fiyat/hacim hareketlerini tespit eder ve şüpheli hisseleri işa
 from services.core.streaming_anomaly import streaming_anomaly_detector
 
 result = streaming_anomaly_detector.check_all(
-    ticker="THYAO", price=350.0, previous_price=305.0,
-    volume=5000000, bid=349.5, ask=350.5, volatility=0.25)
+    ticker="THYAO", price=350.0, previous_price=305.0, volume=5000000, bid=349.5, ask=350.5, volatility=0.25
+)
 # price anomaly: CRITICAL (ani sıçrama)
 # volume anomaly: HIGH (anormal hacim)
 # spread anomaly: LOW (normal spread)

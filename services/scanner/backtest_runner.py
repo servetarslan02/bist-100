@@ -31,6 +31,7 @@ logger = structlog.get_logger()
 # DATA CLASSES
 # =====================================================
 
+
 @dataclass
 class BacktestTrade:
     date: str
@@ -44,10 +45,14 @@ class BacktestTrade:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "date": self.date, "ticker": self.ticker,
-            "direction": self.direction, "quantity": self.quantity,
-            "price": self.price, "commission": round(self.commission, 2),
-            "slippage": round(self.slippage, 2), "pnl": round(self.pnl, 2),
+            "date": self.date,
+            "ticker": self.ticker,
+            "direction": self.direction,
+            "quantity": self.quantity,
+            "price": self.price,
+            "commission": round(self.commission, 2),
+            "slippage": round(self.slippage, 2),
+            "pnl": round(self.pnl, 2),
         }
 
 
@@ -59,8 +64,7 @@ class BacktestSignal:
     score: float
 
     def to_dict(self) -> dict[str, Any]:
-        return {"date": self.date, "ticker": self.ticker,
-                "signal": self.signal, "score": round(self.score, 2)}
+        return {"date": self.date, "ticker": self.ticker, "signal": self.signal, "score": round(self.score, 2)}
 
 
 @dataclass
@@ -75,7 +79,8 @@ class DailySnapshot:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "date": self.date, "equity": round(self.equity, 2),
+            "date": self.date,
+            "equity": round(self.equity, 2),
             "cash": round(self.cash, 2),
             "market_value": round(self.market_value, 2),
             "positions": self.positions,
@@ -102,7 +107,8 @@ class BacktestResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "start_date": self.start_date, "end_date": self.end_date,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
             "total_scans": self.total_scans,
             "signals_generated": self.signals_generated,
             "trades_executed": self.trades_executed,
@@ -118,6 +124,7 @@ class BacktestResult:
 # =====================================================
 # FEATURE CACHE
 # =====================================================
+
 
 class FeatureCache:
     """Ticker bazında feature cache. Tarih değişince invalidation."""
@@ -163,6 +170,7 @@ class QualityCache:
 # =====================================================
 # PORTFOLIO SIMULATOR v2.0
 # =====================================================
+
 
 class PortfolioSimulator:
     """Backtest portföy simülasyonu — v2.0."""
@@ -217,14 +225,20 @@ class PortfolioSimulator:
 
         self._cash -= total_cost
         self._positions[ticker] = {
-            "quantity": quantity, "entry_price": price,
-            "entry_date": date, "cost_basis": total_cost,
+            "quantity": quantity,
+            "entry_price": price,
+            "entry_date": date,
+            "cost_basis": total_cost,
         }
 
         trade = BacktestTrade(
-            date=date, ticker=ticker, direction="BUY",
-            quantity=quantity, price=price,
-            commission=commission, slippage=slippage,
+            date=date,
+            ticker=ticker,
+            direction="BUY",
+            quantity=quantity,
+            price=price,
+            commission=commission,
+            slippage=slippage,
         )
         self._trades.append(trade)
         if len(self._trades) > 5000:
@@ -251,9 +265,14 @@ class PortfolioSimulator:
         self._cash += net_revenue
 
         trade = BacktestTrade(
-            date=date, ticker=ticker, direction="SELL",
-            quantity=quantity, price=price,
-            commission=commission, slippage=slippage, pnl=pnl,
+            date=date,
+            ticker=ticker,
+            direction="SELL",
+            quantity=quantity,
+            price=price,
+            commission=commission,
+            slippage=slippage,
+            pnl=pnl,
         )
         self._trades.append(trade)
         if len(self._trades) > 5000:
@@ -263,10 +282,7 @@ class PortfolioSimulator:
 
     def update_equity(self, prices: dict[str, float], date: str):
         """Günlük equity snapshot."""
-        market_value = sum(
-            pos["quantity"] * prices.get(t, pos["entry_price"])
-            for t, pos in self._positions.items()
-        )
+        market_value = sum(pos["quantity"] * prices.get(t, pos["entry_price"]) for t, pos in self._positions.items())
         equity = self._cash + market_value
 
         if equity > self._high_water_mark:
@@ -275,11 +291,17 @@ class PortfolioSimulator:
         drawdown = (self._high_water_mark - equity) / self._high_water_mark if self._high_water_mark > 0 else 0
         daily_return = (equity / self._prev_equity - 1) if self._prev_equity > 0 else 0
 
-        self._daily_snapshots.append(DailySnapshot(
-            date=date, equity=equity, cash=self._cash,
-            market_value=market_value, positions=len(self._positions),
-            drawdown=drawdown, daily_return=daily_return,
-        ))
+        self._daily_snapshots.append(
+            DailySnapshot(
+                date=date,
+                equity=equity,
+                cash=self._cash,
+                market_value=market_value,
+                positions=len(self._positions),
+                drawdown=drawdown,
+                daily_return=daily_return,
+            )
+        )
         self._prev_equity = equity
 
     def get_summary(self) -> dict[str, Any]:
@@ -290,14 +312,17 @@ class PortfolioSimulator:
             win_rate = winning / len(sell_trades) * 100 if sell_trades else 0
             gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
             gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
             total_commission = sum(t.commission for t in self._trades)
             total_slippage = sum(t.slippage for t in self._trades)
             return {
                 "initial_capital": self._initial_capital,
                 "final_equity": self._cash,
-                "total_return_pct": 0, "sharpe_ratio": 0, "sortino_ratio": 0,
-                "max_drawdown_pct": 0, "total_trades": len(self._trades),
+                "total_return_pct": 0,
+                "sharpe_ratio": 0,
+                "sortino_ratio": 0,
+                "max_drawdown_pct": 0,
+                "total_trades": len(self._trades),
                 "win_rate_pct": round(win_rate, 1),
                 "profit_factor": round(profit_factor, 2),
                 "total_commission": round(total_commission, 2),
@@ -313,7 +338,7 @@ class PortfolioSimulator:
         if len(returns) > 1:
             sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
             downside_returns = np.minimum(returns, 0)
-            downside_std = np.sqrt(np.mean(downside_returns ** 2))
+            downside_std = np.sqrt(np.mean(downside_returns**2))
             sortino = np.mean(returns) / downside_std * np.sqrt(252) if downside_std > 0 else 0
         else:
             sharpe = sortino = 0
@@ -328,7 +353,7 @@ class PortfolioSimulator:
         # Profit factor
         gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
         gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         total_commission = sum(t.commission for t in self._trades)
         total_slippage = sum(t.slippage for t in self._trades)
@@ -352,6 +377,7 @@ class PortfolioSimulator:
 # =====================================================
 # BACKTEST RUNNER v3.0
 # =====================================================
+
 
 class ScannerBacktestRunner:
     """Backtest runner v3.0 — optimized."""
@@ -383,6 +409,7 @@ class ScannerBacktestRunner:
     ) -> BacktestResult:
         """Optimize edilmiş backtest."""
         import time as _time
+
         start_time = _time.time()
 
         sim = PortfolioSimulator(
@@ -424,7 +451,7 @@ class ScannerBacktestRunner:
         for i in range(effective_lookback, len(sorted_dates) - 1):
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
-            date_str = str(current_date.date()) if hasattr(current_date, 'date') else str(current_date)
+            date_str = str(current_date.date()) if hasattr(current_date, "date") else str(current_date)
 
             day_signals = []
 
@@ -456,13 +483,14 @@ class ScannerBacktestRunner:
                     df_lookback = df_until[-effective_lookback:]
                     try:
                         mask = self._tm.compute_mask(
-                            ticker, df_lookback['Open'].to_numpy(),
-                            df_lookback['High'].to_numpy(), df_lookback['Low'].to_numpy(),
-                            df_lookback['Close'].to_numpy(), df_lookback['Volume'].to_numpy(),
+                            ticker,
+                            df_lookback["Open"].to_numpy(),
+                            df_lookback["High"].to_numpy(),
+                            df_lookback["Low"].to_numpy(),
+                            df_lookback["Close"].to_numpy(),
+                            df_lookback["Volume"].to_numpy(),
                         )
-                        features = self._calc.compute_all_features(
-                            df_lookback, mask=mask.mask, ticker=ticker
-                        )
+                        features = self._calc.compute_all_features(df_lookback, mask=mask.mask, ticker=ticker)
                         if features:
                             self._feature_cache.set(ticker, date_str, features)
                     except Exception:
@@ -476,10 +504,14 @@ class ScannerBacktestRunner:
                 score = self._compute_score(features)
                 signal = self._determine_signal(score, signal_threshold)
 
-                day_signals.append(BacktestSignal(
-                    date=date_str, ticker=ticker,
-                    signal=signal, score=score,
-                ))
+                day_signals.append(
+                    BacktestSignal(
+                        date=date_str,
+                        ticker=ticker,
+                        signal=signal,
+                        score=score,
+                    )
+                )
 
             signals.extend(day_signals)
 
@@ -487,27 +519,28 @@ class ScannerBacktestRunner:
             sells = [s for s in day_signals if s.signal in ("STRONG_SELL", "SELL")]
             buys = sorted(
                 [s for s in day_signals if s.signal in ("STRONG_BUY", "BUY")],
-                key=lambda s: s.score, reverse=True,
+                key=lambda s: s.score,
+                reverse=True,
             )
 
             # Satışlar önce
             for sig in sells:
                 if sig.ticker in market_data and next_date in market_data[sig.ticker].index:
-                    price = market_data[sig.ticker].loc[next_date, 'Open']
+                    price = market_data[sig.ticker].loc[next_date, "Open"]
                     sim.execute_sell(sig.ticker, price, date_str)
 
             # Alımlar
             for sig in buys:
                 if sig.ticker not in sim._positions and sig.ticker in market_data:
                     if next_date in market_data[sig.ticker].index:
-                        price = market_data[sig.ticker].loc[next_date, 'Open']
+                        price = market_data[sig.ticker].loc[next_date, "Open"]
                         sim.execute_buy(sig.ticker, price, date_str)
 
             # Equity güncelle
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = market_data[ticker].loc[current_date, 'Close']
+                    prices[ticker] = market_data[ticker].loc[current_date, "Close"]
             sim.update_equity(prices, date_str)
 
         elapsed = _time.time() - start_time
@@ -534,11 +567,19 @@ class ScannerBacktestRunner:
 
     def _empty_result(self, dates) -> BacktestResult:
         return BacktestResult(
-            start_date="", end_date="", total_scans=0,
-            signals_generated=0, trades_executed=0,
-            look_ahead_violations=0, survivorship_violations=0,
-            data_quality_issues=0, signals=[], trades=[],
-            portfolio={}, performance={}, equity_curve=[],
+            start_date="",
+            end_date="",
+            total_scans=0,
+            signals_generated=0,
+            trades_executed=0,
+            look_ahead_violations=0,
+            survivorship_violations=0,
+            data_quality_issues=0,
+            signals=[],
+            trades=[],
+            portfolio={},
+            performance={},
+            equity_curve=[],
         )
 
     def _compute_score(self, features: dict[str, Any]) -> float:
@@ -553,6 +594,7 @@ class ScannerBacktestRunner:
         - regime_fit: 10%
         - technical: 20% (event ve ML yerine)
         """
+
         def _s(v):
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 

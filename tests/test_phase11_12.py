@@ -16,9 +16,14 @@ def test_position_sizing():
 
     # 1. Basic position sizing
     result = position_sizer.calculate(
-        ticker="THYAO", entry_price=305.25, stop_price=290.0,
-        portfolio_value=100000, max_position_pct=10, max_risk_per_trade_pct=2.0,
-        confidence=0.8, volatility=0.25,
+        ticker="THYAO",
+        entry_price=305.25,
+        stop_price=290.0,
+        portfolio_value=100000,
+        max_position_pct=10,
+        max_risk_per_trade_pct=2.0,
+        confidence=0.8,
+        volatility=0.25,
     )
     assert result.shares > 0
     assert result.position_value > 0
@@ -30,9 +35,14 @@ def test_position_sizing():
 
     # 2. Max position limit
     result2 = position_sizer.calculate(
-        ticker="TEST", entry_price=10, stop_price=9.5,
-        portfolio_value=100000, max_position_pct=5, max_risk_per_trade_pct=10.0,
-        confidence=1.0, volatility=0.25,
+        ticker="TEST",
+        entry_price=10,
+        stop_price=9.5,
+        portfolio_value=100000,
+        max_position_pct=5,
+        max_risk_per_trade_pct=10.0,
+        confidence=1.0,
+        volatility=0.25,
     )
     assert result2.position_pct <= 5.0
     passed += 1
@@ -40,7 +50,9 @@ def test_position_sizing():
 
     # 3. Zero stop distance
     result3 = position_sizer.calculate(
-        ticker="TEST", entry_price=100, stop_price=100,
+        ticker="TEST",
+        entry_price=100,
+        stop_price=100,
         portfolio_value=100000,
     )
     assert result3.shares == 0
@@ -50,12 +62,18 @@ def test_position_sizing():
 
     # 4. High correlation adjustment
     result4 = position_sizer.calculate(
-        ticker="TEST", entry_price=100, stop_price=95,
-        portfolio_value=100000, correlation_to_portfolio=0.9,
+        ticker="TEST",
+        entry_price=100,
+        stop_price=95,
+        portfolio_value=100000,
+        correlation_to_portfolio=0.9,
     )
     result4b = position_sizer.calculate(
-        ticker="TEST", entry_price=100, stop_price=95,
-        portfolio_value=100000, correlation_to_portfolio=0.3,
+        ticker="TEST",
+        entry_price=100,
+        stop_price=95,
+        portfolio_value=100000,
+        correlation_to_portfolio=0.3,
     )
     assert result4.shares <= result4b.shares
     passed += 1
@@ -74,8 +92,12 @@ def test_reconciliation():
     # 1. Consistent portfolio
     result = reconciliation_engine.reconcile(
         portfolio_id=1,
-        ledger_cash=50000, ledger_positions_value=50000, ledger_equity=100000,
-        db_cash=50000, db_positions_value=50000, db_equity=100000,
+        ledger_cash=50000,
+        ledger_positions_value=50000,
+        ledger_equity=100000,
+        db_cash=50000,
+        db_positions_value=50000,
+        db_equity=100000,
     )
     assert result.is_consistent
     assert len(result.errors) == 0
@@ -85,8 +107,12 @@ def test_reconciliation():
     # 2. Cash mismatch
     result2 = reconciliation_engine.reconcile(
         portfolio_id=1,
-        ledger_cash=50000, ledger_positions_value=50000, ledger_equity=100000,
-        db_cash=49000, db_positions_value=50000, db_equity=100000,
+        ledger_cash=50000,
+        ledger_positions_value=50000,
+        ledger_equity=100000,
+        db_cash=49000,
+        db_positions_value=50000,
+        db_equity=100000,
     )
     assert not result2.is_consistent
     assert any("Cash" in e for e in result2.errors)
@@ -96,8 +122,12 @@ def test_reconciliation():
     # 3. Equity equation mismatch
     result3 = reconciliation_engine.reconcile(
         portfolio_id=1,
-        ledger_cash=50000, ledger_positions_value=50000, ledger_equity=100000,
-        db_cash=50000, db_positions_value=50000, db_equity=99000,
+        ledger_cash=50000,
+        ledger_positions_value=50000,
+        ledger_equity=100000,
+        db_cash=50000,
+        db_positions_value=50000,
+        db_equity=99000,
     )
     assert not result3.is_consistent
     passed += 1
@@ -121,7 +151,10 @@ def test_backtest_engine():
         {"date": "2024-04-15", "ticker": "ASELS", "action": "SELL", "price": 38, "confidence": 0.3},
     ]
     result = backtest_engine.run_backtest(
-        strategy_name="Test", signals=signals, price_data={}, initial_capital=100000,
+        strategy_name="Test",
+        signals=signals,
+        price_data={},
+        initial_capital=100000,
     )
     assert result.initial_capital == 100000
     assert result.final_capital > 0
@@ -165,17 +198,23 @@ def test_walk_forward():
     # Generate test signals
     signals = []
     for i in range(500):
-        signals.append({
-            "date": f"2024-{(i//30)+1:02d}-{(i%30)+1:02d}",
-            "ticker": "TEST",
-            "action": "BUY" if i % 3 == 0 else "SELL",
-            "price": 100 + i * 0.1,
-            "pnl_pct": 1.0 if i % 3 == 0 else -0.5,
-            "pnl": 100 if i % 3 == 0 else -50,
-        })
+        signals.append(
+            {
+                "date": f"2024-{(i // 30) + 1:02d}-{(i % 30) + 1:02d}",
+                "ticker": "TEST",
+                "action": "BUY" if i % 3 == 0 else "SELL",
+                "price": 100 + i * 0.1,
+                "pnl_pct": 1.0 if i % 3 == 0 else -0.5,
+                "pnl": 100 if i % 3 == 0 else -50,
+            }
+        )
 
     result = walk_forward_engine.run_walk_forward(
-        signals=signals, price_data={}, train_days=100, test_days=30, step_days=15,
+        signals=signals,
+        price_data={},
+        train_days=100,
+        test_days=30,
+        step_days=15,
     )
     assert result.total_folds > 0
     passed += 1
@@ -216,6 +255,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

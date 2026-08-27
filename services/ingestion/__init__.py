@@ -25,10 +25,13 @@ from .retry_policy import HTTPStatusError, RetryExhaustedError, RetryPolicy, get
 # Orchestrator integration — lazy import (providers need yfinance etc.)
 # from .orchestrator_integration import IngestionOrchestrator, IngestionResult, PipelineReport, ingestion_orchestrator
 
+
 def get_orchestrator():
     """Lazy import — sadece gerektiğinde yüklenir."""
     from .orchestrator_integration import IngestionOrchestrator, ingestion_orchestrator
+
     return ingestion_orchestrator
+
 
 __all__ = [
     # Circuit Breaker

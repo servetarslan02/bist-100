@@ -1,6 +1,7 @@
 """
 ALPHA BIST — Tüm 16 Sayfa ve 5 Temel İlke Denetim Testi
 """
+
 import os
 import sys
 
@@ -8,7 +9,7 @@ import requests
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 PAGES = [
     ("/", "Ana Yönetim Paneli"),
@@ -26,8 +27,9 @@ PAGES = [
     ("/data", "Veri Merkezi & ClickHouse Depolama"),
     ("/research", "Yapay Zeka Araştırma Raporları"),
     ("/system", "Sistem & Servis Sağlığı"),
-    ("/map", "Sektörel Isı Haritası")
+    ("/map", "Sektörel Isı Haritası"),
 ]
+
 
 def audit_all_pages():
     print("=" * 80)
@@ -49,6 +51,7 @@ def audit_all_pages():
     print("-" * 80)
     print(f"Sonuç: {success_count}/{len(PAGES)} sayfa %100 çalışır durumda ve yayında.")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     audit_all_pages()

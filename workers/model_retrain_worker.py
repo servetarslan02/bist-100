@@ -33,6 +33,7 @@ class ModelRetrainWorker:
         try:
             try:
                 from services.learning.closed_loop import ClosedLoopLearning
+
                 loop = ClosedLoopLearning()
                 loop.evaluate_recent_predictions()
                 result["steps"]["evaluation"] = "ok"
@@ -41,6 +42,7 @@ class ModelRetrainWorker:
 
             try:
                 from services.learning.weight_adjuster import WeightAdjuster
+
                 adjuster = WeightAdjuster()
                 adjuster.update_weights()
                 result["steps"]["weight_update"] = "ok"

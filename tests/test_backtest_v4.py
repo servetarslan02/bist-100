@@ -48,6 +48,7 @@ from services.scanner.backtest_runner import (
 # HELPERS
 # =====================================================
 
+
 def make_market_data(n_stocks=100, n_days=252, seed=42):
     """Gerçekçi market dataset."""
     np.random.seed(seed)
@@ -61,16 +62,23 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
         high = close * (1 + np.abs(np.random.randn(n_days) * 0.008))
         low = close * (1 - np.abs(np.random.randn(n_days) * 0.008))
         volume = np.random.randint(50000, 500000, n_days).astype(float)
-        market[ticker] = pl.DataFrame({
-            'Open': close * (1 + np.random.randn(n_days) * 0.002),
-            'High': high, 'Low': low, 'Close': close, 'Volume': volume
-        }, index=dates)
+        market[ticker] = pl.DataFrame(
+            {
+                "Open": close * (1 + np.random.randn(n_days) * 0.002),
+                "High": high,
+                "Low": low,
+                "Close": close,
+                "Volume": volume,
+            },
+            index=dates,
+        )
     return market
 
 
 # =====================================================
 # 1. PORTFOLIO SIMULATOR v3.0 TESTS
 # =====================================================
+
 
 def test_sim_v3_buy_sell():
     """Temel alım-satım döngüsü."""
@@ -224,7 +232,7 @@ def test_sim_v3_drawdown():
 
     sim.execute_buy("X", 100.0, "2026-01-01")
     sim.update_equity({"X": 120.0}, "2026-01-02")  # Büyük artış
-    sim.update_equity({"X": 90.0}, "2026-01-03")   # Büyük düşüş
+    sim.update_equity({"X": 90.0}, "2026-01-03")  # Büyük düşüş
 
     metrics = sim.compute_metrics()
     max_dd = metrics.get("max_drawdown_pct", 0)
@@ -270,7 +278,7 @@ def test_sim_v3_invalid_price():
     if r2 is not None:
         issues.append("Negatif fiyat kabul edildi")
 
-    r3 = sim.execute_buy("X", float('nan'), "2026-01-01")
+    r3 = sim.execute_buy("X", float("nan"), "2026-01-01")
     if r3 is not None:
         issues.append("NaN fiyat kabul edildi")
 
@@ -280,6 +288,7 @@ def test_sim_v3_invalid_price():
 # =====================================================
 # 2. PERSISTENCE TESTS
 # =====================================================
+
 
 def test_persistence_save_load():
     """Save ve load cycle."""
@@ -298,14 +307,36 @@ def test_persistence_save_load():
         "total_trades": 50,
     }
     persist.save_run("test_run_1", "2025-01-01", "2025-12-31", 100000, metrics)
-    persist.save_trades("test_run_1", [
-        {"trade_id": 1, "ticker": "THYAO", "side": "BUY", "date": "2025-01-15",
-         "quantity": 100, "price": 300, "commission": 10, "slippage": 3, "pnl": 0},
-    ])
-    persist.save_equity_curve("test_run_1", [
-        {"date": "2025-01-15", "equity": 100000, "cash": 70000, "market_value": 30000,
-         "positions": 1, "drawdown": 0, "daily_return": 0},
-    ])
+    persist.save_trades(
+        "test_run_1",
+        [
+            {
+                "trade_id": 1,
+                "ticker": "THYAO",
+                "side": "BUY",
+                "date": "2025-01-15",
+                "quantity": 100,
+                "price": 300,
+                "commission": 10,
+                "slippage": 3,
+                "pnl": 0,
+            },
+        ],
+    )
+    persist.save_equity_curve(
+        "test_run_1",
+        [
+            {
+                "date": "2025-01-15",
+                "equity": 100000,
+                "cash": 70000,
+                "market_value": 30000,
+                "positions": 1,
+                "drawdown": 0,
+                "daily_return": 0,
+            },
+        ],
+    )
 
     # Load
     run = persist.get_run("test_run_1")
@@ -348,13 +379,26 @@ def test_persistence_recovery():
 
     # İlk instance
     persist1 = BacktestPersistence(db_path)
-    persist1.save_run("recovery_test", "2025-01-01", "2025-12-31", 100000,
-                      {"final_equity": 115000, "total_return_pct": 15.0})
-    persist1.save_trades("recovery_test", [
-        {"trade_id": i, "ticker": f"T{i}", "side": "BUY", "date": "2025-01-01",
-         "quantity": 10, "price": 100, "commission": 1, "slippage": 0.1, "pnl": 0}
-        for i in range(100)
-    ])
+    persist1.save_run(
+        "recovery_test", "2025-01-01", "2025-12-31", 100000, {"final_equity": 115000, "total_return_pct": 15.0}
+    )
+    persist1.save_trades(
+        "recovery_test",
+        [
+            {
+                "trade_id": i,
+                "ticker": f"T{i}",
+                "side": "BUY",
+                "date": "2025-01-01",
+                "quantity": 10,
+                "price": 100,
+                "commission": 1,
+                "slippage": 0.1,
+                "pnl": 0,
+            }
+            for i in range(100)
+        ],
+    )
 
     # İkinci instance (simüle restart)
     persist2 = BacktestPersistence(db_path)
@@ -375,6 +419,7 @@ def test_persistence_recovery():
 # =====================================================
 # 3. CACHE TESTS
 # =====================================================
+
 
 def test_feature_cache_v4():
     """Feature cache v4.0 doğruluğu."""
@@ -433,15 +478,18 @@ def test_quality_cache_v4():
 # 4. BACKTEST ENGINE v4.0 TESTS
 # =====================================================
 
+
 def test_engine_v4_basic():
     """Temel backtest çalışmalı."""
     issues = []
     market = make_market_data(20, 150, seed=42)
-    engine = BacktestEngineV4(BacktestConfig(
-        lookback_days=40,
-        initial_capital=100000,
-        signal_threshold=60.0,
-    ))
+    engine = BacktestEngineV4(
+        BacktestConfig(
+            lookback_days=40,
+            initial_capital=100000,
+            signal_threshold=60.0,
+        )
+    )
 
     result = engine.run(market, persist=False)
 
@@ -541,6 +589,7 @@ def test_engine_v4_persistence():
     engine = BacktestEngineV4(BacktestConfig(lookback_days=40))
     # Persistence modülünü override et
     import services.backtest.engine_v4 as eng_mod
+
     old_persist = eng_mod.backtest_persistence
     eng_mod.backtest_persistence = BacktestPersistence(db_path)
 
@@ -570,6 +619,7 @@ def test_engine_v4_persistence():
 # 5. OLD vs NEW EQUIVALENCE
 # =====================================================
 
+
 def test_equivalence_old_new():
     """v2.0 ve v4.0 aynı finansal sonuçları üretmeli.
 
@@ -584,11 +634,13 @@ def test_equivalence_old_new():
     r2 = runner_v2.run(market, lookback_days=40)
 
     # v4.0
-    engine_v4 = BacktestEngineV4(BacktestConfig(
-        initial_capital=100000,
-        lookback_days=40,
-        signal_threshold=60.0,
-    ))
+    engine_v4 = BacktestEngineV4(
+        BacktestConfig(
+            initial_capital=100000,
+            lookback_days=40,
+            signal_threshold=60.0,
+        )
+    )
     r4 = engine_v4.run(market, persist=False)
 
     # v4 zaten pozisyondaki hisseleri scan etmediği için scan sayısı farklı olabilir
@@ -607,6 +659,7 @@ def test_equivalence_old_new():
 # 6. PERFORMANCE BENCHMARKS
 # =====================================================
 
+
 def test_benchmark_100_stocks():
     """100 hisse / 1 yıl benchmark."""
     market = make_market_data(100, 252, seed=42)
@@ -621,8 +674,12 @@ def test_benchmark_100_stocks():
     if elapsed > 600:
         issues.append(f"Süre: {elapsed:.1f}s (limit: 600s)")
 
-    return "Benchmark 100", len(issues) == 0, issues, \
-        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s"
+    return (
+        "Benchmark 100",
+        len(issues) == 0,
+        issues,
+        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s",
+    )
 
 
 def test_benchmark_500_stocks():
@@ -640,8 +697,12 @@ def test_benchmark_500_stocks():
     if elapsed > 300:
         issues.append(f"Süre: {elapsed:.1f}s (limit: 300s)")
 
-    return "Benchmark 50 (≈500)", len(issues) == 0, issues, \
-        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s"
+    return (
+        "Benchmark 50 (≈500)",
+        len(issues) == 0,
+        issues,
+        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s",
+    )
 
 
 def test_benchmark_1000_stocks():
@@ -660,13 +721,18 @@ def test_benchmark_1000_stocks():
     if elapsed > 120:
         issues.append(f"Süre: {elapsed:.1f}s (limit: 120s)")
 
-    return "Benchmark 20 (smoke)", len(issues) == 0, issues, \
-        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s"
+    return (
+        "Benchmark 20 (smoke)",
+        len(issues) == 0,
+        issues,
+        f"{elapsed:.1f}s, {result.total_scans} scans, {result.trades_executed} trades, {result.scans_per_second:.0f} scans/s",
+    )
 
 
 # =====================================================
 # 7. V2.0 REGRESSION (mevcut testlerin v4.0'a uyarlanması)
 # =====================================================
+
 
 def test_v2_feature_cache():
     """v2.0 Feature Cache geriye uyumluluk."""
@@ -749,6 +815,7 @@ def test_v2_simulator_cash_invariant():
 # RUN
 # =====================================================
 
+
 def run_all():
     print("=" * 70)
     print("  ALPHA BIST — Backtest v4.0 Comprehensive Test Suite")
@@ -807,6 +874,7 @@ def run_all():
         except Exception as e:
             name, ok, issues, extra = test_func.__name__, False, [f"Exception: {e}"], ""
             import traceback
+
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"

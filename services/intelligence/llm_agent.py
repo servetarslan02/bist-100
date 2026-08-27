@@ -33,13 +33,14 @@ from services.intelligence.llm_tools import TOOL_SCHEMAS, llm_tool_executor
 @dataclass
 class AgentAnalysis:
     """LLM Ajan analiz çıktısı."""
+
     ticker: str | None
-    analysis_type: str                   # news | kap | signal_fusion | narrative
+    analysis_type: str  # news | kap | signal_fusion | narrative
 
     # Ana çıktılar
     entities: list[dict] = field(default_factory=list)
     event_type: str = "OTHER"
-    sentiment: float = 0.0               # -1.0 ile +1.0
+    sentiment: float = 0.0  # -1.0 ile +1.0
     importance: float = 0.1
     affected_tickers: list[str] = field(default_factory=list)
     affected_sectors: list[str] = field(default_factory=list)
@@ -47,8 +48,8 @@ class AgentAnalysis:
     uncertainty_score: float = 0.3
 
     # Signal Fusion meta-skor
-    ai_direction: str = "NEUTRAL"        # LONG | SHORT | NEUTRAL
-    ai_score: float = 50.0               # 0-100
+    ai_direction: str = "NEUTRAL"  # LONG | SHORT | NEUTRAL
+    ai_score: float = 50.0  # 0-100
     ai_confidence: float = 0.5
 
     # Rejim override (varsa)
@@ -62,9 +63,7 @@ class AgentAnalysis:
 
     # Meta
     tool_calls_made: list[str] = field(default_factory=list)
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     is_mock: bool = False
 
 
@@ -144,9 +143,7 @@ class LLMAgent:
         logger.info("LLM Agent: KAP analysis", ticker=ticker, text_length=len(text))
 
         # 1. KAP bağlamı (geçmiş + WorldState)
-        context = llm_context_builder.build_kap_context(
-            ticker=ticker, kap_history=kap_history
-        )
+        context = llm_context_builder.build_kap_context(ticker=ticker, kap_history=kap_history)
 
         # 2. Görev promptu
         prompt = self._build_kap_prompt(ticker, text, kap_history)
@@ -326,9 +323,7 @@ HABER:
 
 Analizini tamamla ve yapılandırılmış JSON çıktı ver."""
 
-    def _build_kap_prompt(
-        self, ticker: str, text: str, history: list[dict] | None
-    ) -> str:
+    def _build_kap_prompt(self, ticker: str, text: str, history: list[dict] | None) -> str:
         history_note = ""
         if history:
             history_note = f"\nŞirketin son {len(history)} KAP bildirimi bağlamda mevcut."
@@ -352,8 +347,7 @@ geçmiş bildirimleri göz önünde bulundurarak belirle."""
         conflicts: list[str],
     ) -> str:
         signal_summary = ", ".join(
-            f"{k}: {v.get('direction', 'N')} ({v.get('score', 50):.0f})"
-            for k, v in signals.items()
+            f"{k}: {v.get('direction', 'N')} ({v.get('score', 50):.0f})" for k, v in signals.items()
         )
         conflict_text = "; ".join(conflicts) if conflicts else "Çatışma yok"
         return f"""{ticker} için sinyal analizi:
@@ -374,12 +368,15 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
         is_macro_shock = analysis.event_type in ("GEOPOLITICAL", "MACRO")
 
         if negative_sentiment and is_macro_shock:
-            result = llm_tool_executor.execute("override_regime", {
-                "new_regime": "RISK_OFF",
-                "reason": f"LLM: Yüksek önemli negatif haber (sentiment={analysis.sentiment:.2f}). "
-                          f"Insight: {analysis.key_insight}",
-                "confidence": analysis.importance,
-            })
+            result = llm_tool_executor.execute(
+                "override_regime",
+                {
+                    "new_regime": "RISK_OFF",
+                    "reason": f"LLM: Yüksek önemli negatif haber (sentiment={analysis.sentiment:.2f}). "
+                    f"Insight: {analysis.key_insight}",
+                    "confidence": analysis.importance,
+                },
+            )
             if result.get("status") == "ok":
                 analysis.regime_override = "RISK_OFF"
                 analysis.regime_override_reason = result.get("reason", "")
@@ -400,13 +397,16 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
         elif analysis.sentiment < -0.2:
             direction = "SHORT"
 
-        llm_tool_executor.execute("store_analysis", {
-            "ticker": analysis.ticker,
-            "thesis": analysis.key_insight or f"{analysis.event_type} haberi analiz edildi.",
-            "direction": direction,
-            "confidence": float(analysis.importance),
-            "key_risks": analysis.key_risks,
-        })
+        llm_tool_executor.execute(
+            "store_analysis",
+            {
+                "ticker": analysis.ticker,
+                "thesis": analysis.key_insight or f"{analysis.event_type} haberi analiz edildi.",
+                "direction": direction,
+                "confidence": float(analysis.importance),
+                "key_risks": analysis.key_risks,
+            },
+        )
 
 
 # Singleton

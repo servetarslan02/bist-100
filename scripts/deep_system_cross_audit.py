@@ -12,7 +12,7 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 findings = {
     "look_ahead_bias": [],

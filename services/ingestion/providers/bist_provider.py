@@ -36,11 +36,16 @@ class BISTProvider:
     }
 
     def __init__(self):
-        self._client = get_client("bist", timeout=15.0, max_retries=3, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept": "application/json, text/html, */*",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        })
+        self._client = get_client(
+            "bist",
+            timeout=15.0,
+            max_retries=3,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept": "application/json, text/html, */*",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            },
+        )
 
     async def fetch_index_data(self) -> dict[str, Any]:
         """BIST endeks verilerini çek (async)."""

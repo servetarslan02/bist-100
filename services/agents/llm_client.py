@@ -29,6 +29,7 @@ logger = structlog.get_logger()
 @dataclass
 class LLMResponse:
     """LLM yanıt standardı."""
+
     content: str
     model: str
     provider: str
@@ -43,6 +44,7 @@ class LLMResponse:
 @dataclass
 class LLMConfig:
     """LLM yapılandırması."""
+
     provider: str = "ollama"
     model: str = "gemma4:12b-q4_0"
     base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -95,9 +97,7 @@ class BaseLLMClient(ABC):
         last_error = None
         for attempt in range(self.config.max_retries):
             try:
-                response = await self.generate(
-                    system_prompt, user_prompt, temperature, max_tokens
-                )
+                response = await self.generate(system_prompt, user_prompt, temperature, max_tokens)
                 if response.success:
                     return response
                 last_error = response.error
@@ -111,7 +111,7 @@ class BaseLLMClient(ABC):
                 )
 
             if attempt < self.config.max_retries - 1:
-                delay = self.config.retry_delay * (2 ** attempt)  # exponential backoff
+                delay = self.config.retry_delay * (2**attempt)  # exponential backoff
                 await asyncio.sleep(delay)
 
         # Tüm denemeler başarısız
@@ -394,10 +394,7 @@ class LLMClientFactory:
         provider = config.provider.lower()
         client_class = cls._providers.get(provider)
         if not client_class:
-            raise ValueError(
-                f"Unknown LLM provider: {provider}. "
-                f"Available: {list(cls._providers.keys())}"
-            )
+            raise ValueError(f"Unknown LLM provider: {provider}. Available: {list(cls._providers.keys())}")
         return client_class(config)
 
     @classmethod
@@ -443,7 +440,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         logger.warning("JSON parse error in parse_llm_json", exc_info=True)
 
     # 2. ```json ... ``` bloğu
-    json_block = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+    json_block = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
     if json_block:
         try:
             return orjson.loads(json_block.group(1))
@@ -451,7 +448,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
             logger.warning("JSON parse error in parse_llm_json", exc_info=True)
 
     # 3. İlk { ... }
-    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
+    json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, re.DOTALL)
     if json_match:
         try:
             return orjson.loads(json_match.group())
@@ -483,7 +480,7 @@ def _extract_from_text(content: str) -> dict[str, Any]:
         result["direction"] = "SHORT"
 
     # Confidence tespiti
-    conf_match = re.search(r'(?:confidence|güven)[\s:]*(\d+(?:\.\d+)?)', content, re.IGNORECASE)
+    conf_match = re.search(r"(?:confidence|güven)[\s:]*(\d+(?:\.\d+)?)", content, re.IGNORECASE)
     if conf_match:
         conf = float(conf_match.group(1))
         if conf > 1:

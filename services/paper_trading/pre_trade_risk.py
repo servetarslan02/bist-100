@@ -58,11 +58,11 @@ class PreTradeRiskEngine:
     def validate_order(
         self,
         ticker: str,
-        side: str,                 # "BUY" | "SELL" | "SHORT"
-        order_type: str,           # "MARKET" | "LIMIT" | "STOP_LIMIT" | "TRADE_AT_CLOSE"
+        side: str,  # "BUY" | "SELL" | "SHORT"
+        order_type: str,  # "MARKET" | "LIMIT" | "STOP_LIMIT" | "TRADE_AT_CLOSE"
         quantity: int,
-        price: float,              # Limit fiyatı veya tahmini piyasa fiyatı
-        reference_price: float,    # Önceki kapanış / baz fiyat
+        price: float,  # Limit fiyatı veya tahmini piyasa fiyatı
+        reference_price: float,  # Önceki kapanış / baz fiyat
         market_phase: BISTMarketPhase,
         portfolio_cash: float,
         last_trade_price: float | None = None,
@@ -82,22 +82,27 @@ class PreTradeRiskEngine:
         # Normal işlemler tam lot olmalı
         if quantity != int(quantity):
             return PreTradeValidationResult(
-                False, "FRACTIONAL_LOT_NOT_ALLOWED",
-                f"Küsüratlı lot ({quantity}) normal işlemlerde kabul edilmez. Tam lot girilmeli."
+                False,
+                "FRACTIONAL_LOT_NOT_ALLOWED",
+                f"Küsüratlı lot ({quantity}) normal işlemlerde kabul edilmez. Tam lot girilmeli.",
             )
 
         # 2. SEANS FAZI VE EMİR TÜRÜ UYGUNLUĞU (OrderTypeValidator)
         if market_phase == BISTMarketPhase.CLOSED:
             return PreTradeValidationResult(False, "MARKET_CLOSED", "Piyasa kapalı, emir kabul edilmez.")
 
-        if market_phase in {BISTMarketPhase.OPENING_AUCTION_DETERMINATION, BISTMarketPhase.CLOSING_AUCTION_DETERMINATION}:
+        if market_phase in {
+            BISTMarketPhase.OPENING_AUCTION_DETERMINATION,
+            BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
+        }:
             return PreTradeValidationResult(False, "MATCHING_PHASE", "Fiyat belirleme fazında yeni emir girilemez.")
 
         if market_phase == BISTMarketPhase.CLOSING_PRICE_TRADING:
             if order_type not in {"TRADE_AT_CLOSE", "MARKET", "LIMIT"}:
                 return PreTradeValidationResult(
-                    False, "INVALID_ORDER_FOR_SESSION",
-                    "Kapanış fiyatından işlemler fazında sadece sabit kapanış fiyatlı emirler kabul edilir."
+                    False,
+                    "INVALID_ORDER_FOR_SESSION",
+                    "Kapanış fiyatından işlemler fazında sadece sabit kapanış fiyatlı emirler kabul edilir.",
                 )
 
         # KİE (Kalanı İptal Et): Sürekli işlem ve kapanış seansında geçerli
@@ -107,8 +112,7 @@ class PreTradeRiskEngine:
             BISTMarketPhase.CLOSING_PRICE_TRADING,
         }:
             return PreTradeValidationResult(
-                False, "INVALID_ORDER_FOR_SESSION",
-                "KİE emri sadece sürekli işlem ve kapanış seansında kabul edilir."
+                False, "INVALID_ORDER_FOR_SESSION", "KİE emri sadece sürekli işlem ve kapanış seansında kabul edilir."
             )
 
         # KPY (Kalanı Pasife Yaz): Sürekli işlem seansında geçerli
@@ -116,8 +120,7 @@ class PreTradeRiskEngine:
             BISTMarketPhase.CONTINUOUS_AUCTION,
         }:
             return PreTradeValidationResult(
-                False, "INVALID_ORDER_FOR_SESSION",
-                "KPY emri sadece sürekli işlem seansında kabul edilir."
+                False, "INVALID_ORDER_FOR_SESSION", "KPY emri sadece sürekli işlem seansında kabul edilir."
             )
 
         # GİE (Gerçekleşmezse İptal): Açılış ve kapanış seansında geçerli
@@ -126,16 +129,16 @@ class PreTradeRiskEngine:
             BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
         }:
             return PreTradeValidationResult(
-                False, "INVALID_ORDER_FOR_SESSION",
-                "GİE emri sadece açılış ve kapanış seansında kabul edilir."
+                False, "INVALID_ORDER_FOR_SESSION", "GİE emri sadece açılış ve kapanış seansında kabul edilir."
             )
 
         # 3. FİYAT ADIMI DENETİMİ (PriceTickValidator)
         if order_type == "LIMIT" and price > 0 and not is_valid_bist_tick(price):
             expected_tick = get_bist_tick_size(price)
             return PreTradeValidationResult(
-                False, "INVALID_TICK_SIZE",
-                f"Fiyat {price:.4f} TL, BIST fiyat adımına ({expected_tick:.2f} TL) uymuyor."
+                False,
+                "INVALID_TICK_SIZE",
+                f"Fiyat {price:.4f} TL, BIST fiyat adımına ({expected_tick:.2f} TL) uymuyor.",
             )
 
         # 4. FİYAT MARJI VE TAVAN/TABAN KİLİT DENETİMİ (PriceLimitValidator)
@@ -147,45 +150,52 @@ class PreTradeRiskEngine:
             # Fiyat limit dışı mı?
             if price > upper_limit + 1e-4:
                 return PreTradeValidationResult(
-                    False, "ABOVE_UPPER_LIMIT",
-                    f"Fiyat {price} TL tavan fiyatın ({upper_limit} TL) üzerinde."
+                    False, "ABOVE_UPPER_LIMIT", f"Fiyat {price} TL tavan fiyatın ({upper_limit} TL) üzerinde."
                 )
             if price < lower_limit - 1e-4:
                 return PreTradeValidationResult(
-                    False, "BELOW_LOWER_LIMIT",
-                    f"Fiyat {price} TL taban fiyatın ({lower_limit} TL) altında."
+                    False, "BELOW_LOWER_LIMIT", f"Fiyat {price} TL taban fiyatın ({lower_limit} TL) altında."
                 )
 
             # Tavan / Taban Likidite Kilit Kontrolü
             if side == "SELL" and price <= lower_limit + 1e-4:
                 # Taban kilit kontrolü
                 return PreTradeValidationResult(
-                    False, "BIST_LIMIT_DOWN_LOCKED",
-                    f"{ticker} taban fiyatta ({lower_limit} TL). Satış kuyruğunda likidite yok."
+                    False,
+                    "BIST_LIMIT_DOWN_LOCKED",
+                    f"{ticker} taban fiyatta ({lower_limit} TL). Satış kuyruğunda likidite yok.",
                 )
             if side == "BUY" and price >= upper_limit - 1e-4:
                 # Tavan kilit kontrolü
                 return PreTradeValidationResult(
-                    False, "BIST_LIMIT_UP_LOCKED",
-                    f"{ticker} tavan fiyatta ({upper_limit} TL). Tavanda satıcı likiditesi yok."
+                    False,
+                    "BIST_LIMIT_UP_LOCKED",
+                    f"{ticker} tavan fiyatta ({upper_limit} TL). Tavanda satıcı likiditesi yok.",
                 )
 
         # 5. AÇIĞA SATIŞ DENETİMİ (ShortSaleValidator)
         if side == "SHORT":
             if ticker in self._spk_banned_tickers:
-                return PreTradeValidationResult(False, "SPK_SHORT_BANNED", f"{ticker} için SPK açığa satış yasağı mevcuttur.")
+                return PreTradeValidationResult(
+                    False, "SPK_SHORT_BANNED", f"{ticker} için SPK açığa satış yasağı mevcuttur."
+                )
 
             if self._short_sale_eligible_tickers and ticker not in self._short_sale_eligible_tickers:
-                return PreTradeValidationResult(False, "SHORT_NOT_ELIGIBLE", f"{ticker} açığa satışa uygun enstrüman listesinde değil.")
+                return PreTradeValidationResult(
+                    False, "SHORT_NOT_ELIGIBLE", f"{ticker} açığa satışa uygun enstrüman listesinde değil."
+                )
 
             if ticker in self._gross_settlement_tickers:
-                return PreTradeValidationResult(False, "GROSS_SETTLEMENT_NO_SHORT", f"{ticker} brüt takastadır, açığa satış yapılamaz.")
+                return PreTradeValidationResult(
+                    False, "GROSS_SETTLEMENT_NO_SHORT", f"{ticker} brüt takastadır, açığa satış yapılamaz."
+                )
 
             # BIST Uptick Kuralı: Açığa satış fiyatı son işlem fiyatından düşük olamaz
             if last_trade_price and last_trade_price > 0 and price < last_trade_price:
                 return PreTradeValidationResult(
-                    False, "UPTICK_RULE_VIOLATION",
-                    f"Açığa satış fiyatı ({price}) son işlem fiyatından ({last_trade_price}) düşük olamaz (Uptick Kuralı)."
+                    False,
+                    "UPTICK_RULE_VIOLATION",
+                    f"Açığa satış fiyatı ({price}) son işlem fiyatından ({last_trade_price}) düşük olamaz (Uptick Kuralı).",
                 )
 
         # 6. NAKİT İŞLEM GÜCÜ DENETİMİ (CashAvailabilityValidator)
@@ -193,8 +203,9 @@ class PreTradeRiskEngine:
             estimated_cost = quantity * price
             if estimated_cost > portfolio_cash:
                 return PreTradeValidationResult(
-                    False, "INSUFFICIENT_FUNDS",
-                    f"Yetersiz işlem gücü. Gerekli: {estimated_cost:.2f} TL, Mevcut: {portfolio_cash:.2f} TL"
+                    False,
+                    "INSUFFICIENT_FUNDS",
+                    f"Yetersiz işlem gücü. Gerekli: {estimated_cost:.2f} TL, Mevcut: {portfolio_cash:.2f} TL",
                 )
 
         return PreTradeValidationResult(True)

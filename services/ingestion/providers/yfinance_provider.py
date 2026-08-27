@@ -38,6 +38,7 @@ class YFinanceProvider:
         60d → 90d, 30d → 45d, 1y → 1y (zaten yeterli)
         """
         import re
+
         m = re.match(r"^(\d+)(d|mo|y)$", period)
         if not m:
             return period
@@ -53,6 +54,7 @@ class YFinanceProvider:
     def _run_with_timeout(fn, *args, timeout: int = 15, **kwargs):
         """Blocking fonksiyonu timeout ile çalıştır."""
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(fn, *args, **kwargs)
             try:
@@ -111,7 +113,7 @@ class YFinanceProvider:
                 lambda: t.history(period=expanded_period, interval=interval),
                 timeout=self._FETCH_TIMEOUT,
             )
-            if df is None or (hasattr(df, 'empty') and df.empty):
+            if df is None or (hasattr(df, "empty") and df.empty):
                 return None
 
             if df.empty:
@@ -121,15 +123,17 @@ class YFinanceProvider:
             df["Ticker"] = ticker
 
             # Capitalize columns for feature_calculator compatibility
-            df = df.rename(columns={
-                "Date": "timestamp",
-                "Open": "Open",
-                "High": "High",
-                "Low": "Low",
-                "Close": "Close",
-                "Volume": "Volume",
-                "Ticker": "Ticker",
-            })
+            df = df.rename(
+                columns={
+                    "Date": "timestamp",
+                    "Open": "Open",
+                    "High": "High",
+                    "Low": "Low",
+                    "Close": "Close",
+                    "Volume": "Volume",
+                    "Ticker": "Ticker",
+                }
+            )
 
             return df[["Ticker", "timestamp", "Open", "High", "Low", "Close", "Volume"]]
 

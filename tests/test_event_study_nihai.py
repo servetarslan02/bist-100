@@ -1,4 +1,5 @@
 """Event Study Nihai Sistem Testleri — 14 Modül, 50+ Test."""
+
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -6,9 +7,11 @@ import pytest
 
 # ─── Estimation Window Tests ───
 
+
 class TestEstimationWindow:
     def test_default_window(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager()
         event_date = datetime(2025, 6, 15)
         start, end = mgr.get_window(event_date, "DEFAULT")
@@ -17,12 +20,14 @@ class TestEstimationWindow:
 
     def test_financial_results_window(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager()
         start, end = mgr.get_window(datetime(2025, 6, 15), "FINANCIAL_RESULTS")
         assert (end - start).days >= 100
 
     def test_gap_days(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager(gap_days=6)
         event_date = datetime(2025, 6, 15)
         _, end = mgr.get_window(event_date)
@@ -30,18 +35,21 @@ class TestEstimationWindow:
 
     def test_validate_data_sufficient(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager()
         returns = np.random.randn(100) * 0.02
         assert mgr.validate_data(returns, "DEFAULT") is True
 
     def test_validate_data_insufficient(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager()
         returns = np.random.randn(5) * 0.02
         assert mgr.validate_data(returns, "DEFAULT") is False
 
     def test_extract_window_data(self):
         from services.event_study.estimation_window import EstimationWindowManager
+
         mgr = EstimationWindowManager()
         returns = np.random.randn(200) * 0.02
         dates = np.array([datetime(2025, 1, 1) + timedelta(days=i) for i in range(200)])
@@ -53,9 +61,11 @@ class TestEstimationWindow:
 
 # ─── Event Window Tests ───
 
+
 class TestEventWindow:
     def test_default_window(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         start, end = mgr.get_window("DEFAULT")
         assert start == -5
@@ -63,6 +73,7 @@ class TestEventWindow:
 
     def test_financial_results_window(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         start, end = mgr.get_window("FINANCIAL_RESULTS")
         assert start == -5
@@ -70,6 +81,7 @@ class TestEventWindow:
 
     def test_tcmb_window(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         start, end = mgr.get_window("TCMB_RATE")
         assert start == -1
@@ -77,12 +89,14 @@ class TestEventWindow:
 
     def test_window_size(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         assert mgr.get_window_size("FINANCIAL_RESULTS") == 11
         assert mgr.get_window_size("DIVIDEND") == 7
 
     def test_get_window_dates(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         event_date = datetime(2025, 6, 15)
         start, end = mgr.get_window_dates(event_date, "DIVIDEND")
@@ -91,6 +105,7 @@ class TestEventWindow:
 
     def test_align_to_event_day(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         returns = np.random.randn(20) * 0.02
         dates = np.array([datetime(2025, 6, 10) + timedelta(days=i) for i in range(20)])
@@ -100,6 +115,7 @@ class TestEventWindow:
 
     def test_sub_windows(self):
         from services.event_study.event_window import EventWindowManager
+
         mgr = EventWindowManager()
         subs = mgr.get_sub_windows("DEFAULT")
         assert "pre" in subs
@@ -110,9 +126,11 @@ class TestEventWindow:
 
 # ─── Expected Return Tests ───
 
+
 class TestExpectedReturn:
     def test_market_model(self):
         from services.event_study.expected_return import calculate_expected_return
+
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
         result = calculate_expected_return(sr, mr, model="market")
@@ -123,6 +141,7 @@ class TestExpectedReturn:
 
     def test_fama_french_3(self):
         from services.event_study.expected_return import calculate_expected_return
+
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
         smb = np.random.randn(100) * 0.01
@@ -134,6 +153,7 @@ class TestExpectedReturn:
 
     def test_insufficient_data(self):
         from services.event_study.expected_return import calculate_expected_return
+
         sr = np.random.randn(3) * 0.02
         mr = np.random.randn(3) * 0.015
         result = calculate_expected_return(sr, mr)
@@ -142,12 +162,21 @@ class TestExpectedReturn:
 
     def test_predict_value(self):
         from services.event_study.expected_return import calculate_expected_return_value
-        params = {"alpha": 0.001, "beta_market": 1.2, "beta_smb": 0.0, "beta_hml": 0.0, "beta_rmw": 0.0, "beta_cma": 0.0}
+
+        params = {
+            "alpha": 0.001,
+            "beta_market": 1.2,
+            "beta_smb": 0.0,
+            "beta_hml": 0.0,
+            "beta_rmw": 0.0,
+            "beta_cma": 0.0,
+        }
         er = calculate_expected_return_value(params, 0.02)
         assert abs(er - (0.001 + 1.2 * 0.02)) < 0.0001
 
     def test_backward_compat(self):
         from services.event_study.expected_return import calculate_expected_return_simple
+
         sr = np.random.randn(50) * 0.02
         mr = np.random.randn(50) * 0.015
         alpha, beta = calculate_expected_return_simple(sr, mr)
@@ -157,9 +186,11 @@ class TestExpectedReturn:
 
 # ─── Abnormal Return Tests ───
 
+
 class TestAbnormalReturn:
     def test_basic_ar(self):
         from services.event_study.abnormal_return import calculate_abnormal_return
+
         sr = np.array([0.05, -0.03, 0.02])
         mr = np.array([0.03, -0.02, 0.01])
         ar = calculate_abnormal_return(sr, mr, 0.0, 1.0)
@@ -168,6 +199,7 @@ class TestAbnormalReturn:
 
     def test_with_alpha_beta(self):
         from services.event_study.abnormal_return import calculate_abnormal_return
+
         sr = np.array([0.05, -0.03, 0.02])
         mr = np.array([0.03, -0.02, 0.01])
         ar = calculate_abnormal_return(sr, mr, 0.01, 0.8)
@@ -175,6 +207,7 @@ class TestAbnormalReturn:
 
     def test_batch(self):
         from services.event_study.abnormal_return import calculate_abnormal_return_batch
+
         stocks = {"A": np.random.randn(50) * 0.02, "B": np.random.randn(50) * 0.02}
         mr = np.random.randn(50) * 0.015
         params = {"A": {"alpha": 0.0, "beta_market": 1.0}, "B": {"alpha": 0.01, "beta_market": 0.9}}
@@ -185,15 +218,18 @@ class TestAbnormalReturn:
 
 # ─── CAR Tests ───
 
+
 class TestCAR:
     def test_basic_car(self):
         from services.event_study.car import calculate_car
+
         ar = np.array([0.01, 0.02, -0.005])
         car = calculate_car(ar)
         assert abs(car - 0.025) < 0.001
 
     def test_car_window(self):
         from services.event_study.car import calculate_car_window
+
         ar = np.array([0.01, 0.02, -0.005, 0.03, -0.01])
         offsets = np.array([-2, -1, 0, 1, 2])
         car = calculate_car_window(ar, offsets, -1, 1)
@@ -201,6 +237,7 @@ class TestCAR:
 
     def test_car_sub_windows(self):
         from services.event_study.car import calculate_car_sub_windows
+
         ar = np.array([0.01, 0.02, -0.005, 0.03, -0.01])
         offsets = np.array([-2, -1, 0, 1, 2])
         subs = calculate_car_sub_windows(ar, offsets)
@@ -211,6 +248,7 @@ class TestCAR:
 
     def test_car_series(self):
         from services.event_study.car import calculate_car_series
+
         ar = np.array([0.01, 0.02, -0.005])
         series = calculate_car_series(ar)
         assert len(series) == 3
@@ -219,6 +257,7 @@ class TestCAR:
 
     def test_aar(self):
         from services.event_study.car import calculate_aar
+
         cars = {"A": 0.05, "B": -0.02, "C": 0.03}
         aar = calculate_aar(cars)
         assert abs(aar - 0.02) < 0.001
@@ -226,9 +265,11 @@ class TestCAR:
 
 # ─── Statistical Test Tests ───
 
+
 class TestStatisticalTest:
     def test_significance_basic(self):
         from services.event_study.statistical_test import test_significance
+
         ar = np.random.randn(100) * 0.02
         r = test_significance(0.05, ar)
         assert "t_statistic" in r
@@ -240,6 +281,7 @@ class TestStatisticalTest:
 
     def test_t_distribution(self):
         from services.event_study.statistical_test import test_significance
+
         # Büyük CAR, düşük volatilite → significant olmalı
         ar = np.random.randn(100) * 0.001
         r = test_significance(0.05, ar)
@@ -247,6 +289,7 @@ class TestStatisticalTest:
 
     def test_not_significant(self):
         from services.event_study.statistical_test import test_significance
+
         # Küçük CAR, yüksek volatilite → significant olmamalı
         ar = np.random.randn(100) * 0.10
         r = test_significance(0.001, ar)
@@ -254,6 +297,7 @@ class TestStatisticalTest:
 
     def test_cross_sectional(self):
         from services.event_study.statistical_test import test_significance_cross_sectional
+
         cars = [0.05, -0.02, 0.03, 0.01, -0.01, 0.04, 0.02, -0.03, 0.06, 0.01]
         r = test_significance_cross_sectional(cars)
         assert "t_statistic" in r
@@ -262,6 +306,7 @@ class TestStatisticalTest:
 
     def test_bonferroni(self):
         from services.event_study.statistical_test import bonferroni_correction
+
         p_values = [0.01, 0.03, 0.04, 0.06, 0.08]
         r = bonferroni_correction(p_values, alpha=0.05)
         assert r["n_tests"] == 5
@@ -272,6 +317,7 @@ class TestStatisticalTest:
 
     def test_benjamini_hochberg(self):
         from services.event_study.statistical_test import benjamini_hochberg_correction
+
         p_values = [0.001, 0.008, 0.039, 0.041, 0.060]
         r = benjamini_hochberg_correction(p_values, alpha=0.05)
         assert r["n_tests"] == 5
@@ -279,6 +325,7 @@ class TestStatisticalTest:
 
     def test_wilcoxon(self):
         from services.event_study.statistical_test import wilcoxon_test
+
         cars = [0.05, -0.02, 0.03, 0.01, -0.01, 0.04, 0.02, -0.03, 0.06, 0.01]
         r = wilcoxon_test(cars)
         assert "statistic" in r
@@ -287,9 +334,11 @@ class TestStatisticalTest:
 
 # ─── Impact Tests ───
 
+
 class TestImpact:
     def test_basic_impact(self):
         from services.event_study.impact import calculate_event_impact
+
         r = calculate_event_impact(0.05, 0.01, 0.3)
         assert r["impact_score"] > 0
         assert r["direction"] == "POSITIVE"
@@ -297,6 +346,7 @@ class TestImpact:
 
     def test_event_type_weights(self):
         from services.event_study.impact import calculate_event_impact
+
         r1 = calculate_event_impact(0.05, 0.01, 0.3, "FINANCIAL_RESULTS")
         r2 = calculate_event_impact(0.05, 0.01, 0.3, "MANAGEMENT_CHANGE")
         # FINANCIAL_RESULTS daha yüksek ağırlığa sahip
@@ -304,6 +354,7 @@ class TestImpact:
 
     def test_impact_levels(self):
         from services.event_study.impact import calculate_event_impact
+
         r_high = calculate_event_impact(0.15, 0.001, 0.8, "MERGER")
         r_low = calculate_event_impact(0.003, 0.50, 0.0, "DEFAULT")
         assert r_high["impact_level"] in ["HIGH", "VERY_HIGH"]
@@ -311,6 +362,7 @@ class TestImpact:
 
     def test_batch(self):
         from services.event_study.impact import calculate_impact_batch
+
         events = [
             {"car": 0.05, "p_value": 0.01, "volume_change": 0.3, "event_type": "FINANCIAL_RESULTS"},
             {"car": -0.02, "p_value": 0.15, "volume_change": 0.1, "event_type": "DIVIDEND"},
@@ -322,30 +374,36 @@ class TestImpact:
 
 # ─── KAP Event Tests ───
 
+
 class TestKAPEvent:
     def test_classify_financial(self):
         from services.event_study.kap_event import classify_kap_event
+
         r = classify_kap_event("2025 yılı 3. dönem konsolide finansal sonuçları")
         assert r["event_type"] == "FINANCIAL_RESULTS"
         assert r["confidence"] > 0
 
     def test_classify_dividend(self):
         from services.event_study.kap_event import classify_kap_event
+
         r = classify_kap_event("Nakit temettü dağıtımı kararı")
         assert r["event_type"] == "DIVIDEND"
 
     def test_classify_buyback(self):
         from services.event_study.kap_event import classify_kap_event
+
         r = classify_kap_event("Pay geri alım programı")
         assert r["event_type"] == "BUYBACK"
 
     def test_classify_unknown(self):
         from services.event_study.kap_event import classify_kap_event
+
         r = classify_kap_event("Genel bilgilendirme")
         assert r["event_type"] == "UNKNOWN"
 
     def test_analyze_kap_event(self):
         from services.event_study.kap_event import analyze_kap_event
+
         est_sr = np.random.randn(100) * 0.02
         est_mr = np.random.randn(100) * 0.015
         evt_sr = np.random.randn(11) * 0.02
@@ -366,6 +424,7 @@ class TestKAPEvent:
 
     def test_analyze_kap_event_simple(self):
         from services.event_study.kap_event import analyze_kap_event_simple
+
         sr = np.random.randn(50) * 0.02
         mr = np.random.randn(50) * 0.015
         r = analyze_kap_event_simple(
@@ -381,9 +440,11 @@ class TestKAPEvent:
 
 # ─── Macro Event Tests ───
 
+
 class TestMacroEvent:
     def test_tcmb_hawkish(self):
         from services.event_study.macro_event import analyze_tcmb_event
+
         mr = np.array([0.01, -0.02, -0.015, 0.005])
         r = analyze_tcmb_event(45.0, 42.5, 42.5, mr)
         assert r["surprise"] == 2.5
@@ -391,6 +452,7 @@ class TestMacroEvent:
 
     def test_tcmb_dovish(self):
         from services.event_study.macro_event import analyze_tcmb_event
+
         mr = np.array([-0.01, 0.02, 0.015, -0.005])
         r = analyze_tcmb_event(40.0, 42.5, 42.5, mr)
         assert r["surprise"] == -2.5
@@ -398,6 +460,7 @@ class TestMacroEvent:
 
     def test_tcmb_neutral(self):
         from services.event_study.macro_event import analyze_tcmb_event
+
         mr = np.array([0.001, -0.002, 0.001, 0.0])
         r = analyze_tcmb_event(42.5, 42.5, 42.5, mr)
         assert r["surprise"] == 0.0
@@ -405,6 +468,7 @@ class TestMacroEvent:
 
     def test_macro_event_inflation(self):
         from services.event_study.macro_event import analyze_macro_event
+
         mr = np.array([0.01, -0.02, -0.015, 0.005])
         r = analyze_macro_event("INFLATION", 65.0, 60.0, 62.0, mr)
         assert r["event_type"] == "INFLATION"
@@ -412,12 +476,14 @@ class TestMacroEvent:
 
     def test_macro_event_gdp(self):
         from services.event_study.macro_event import analyze_macro_event
+
         mr = np.array([0.01, 0.02, 0.015, 0.005])
         r = analyze_macro_event("GDP", 5.5, 4.5, 4.0, mr)
         assert r["direction"] == "POSITIVE_SURPRISE"
 
     def test_batch(self):
         from services.event_study.macro_event import analyze_macro_events_batch
+
         mr = np.random.randn(20) * 0.015
         events = [
             {"event_type": "INFLATION", "actual": 65.0, "expected": 60.0, "previous": 62.0},
@@ -429,9 +495,11 @@ class TestMacroEvent:
 
 # ─── Multi-Factor Tests ───
 
+
 class TestMultiFactor:
     def test_fit_market(self):
         from services.event_study.multi_factor import MultiFactorModel
+
         model = MultiFactorModel("market")
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
@@ -441,6 +509,7 @@ class TestMultiFactor:
 
     def test_fit_ff3(self):
         from services.event_study.multi_factor import MultiFactorModel
+
         model = MultiFactorModel("fama_french_3")
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
@@ -451,6 +520,7 @@ class TestMultiFactor:
 
     def test_predict(self):
         from services.event_study.multi_factor import MultiFactorModel
+
         model = MultiFactorModel("market")
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
@@ -460,12 +530,14 @@ class TestMultiFactor:
 
     def test_predict_without_fit(self):
         from services.event_study.multi_factor import MultiFactorModel
+
         model = MultiFactorModel("market")
         with pytest.raises(ValueError):
             model.predict(0.02)
 
     def test_factors(self):
         from services.event_study.multi_factor import FamaFrenchFactors
+
         smb = FamaFrenchFactors.calculate_smb(
             np.array([0.03, 0.02]),
             np.array([0.01, 0.01]),
@@ -475,9 +547,11 @@ class TestMultiFactor:
 
 # ─── Cross-Sectional Tests ───
 
+
 class TestCrossSectional:
     def test_analyze(self):
         from services.event_study.cross_sectional import CrossSectionalEventStudy
+
         cs = CrossSectionalEventStudy()
         events = [
             {"ticker": "A", "event_type": "FIN", "sector": "BANKA", "car": 0.05, "p_value": 0.01},
@@ -491,6 +565,7 @@ class TestCrossSectional:
 
     def test_analyze_by_type(self):
         from services.event_study.cross_sectional import CrossSectionalEventStudy
+
         cs = CrossSectionalEventStudy()
         events = [
             {"ticker": "A", "event_type": "FIN", "car": 0.05},
@@ -503,6 +578,7 @@ class TestCrossSectional:
 
     def test_regression(self):
         from services.event_study.cross_sectional import CrossSectionalEventStudy
+
         cs = CrossSectionalEventStudy()
         events = [
             {"car": 0.05, "volume": 1.5, "size": 100},
@@ -516,6 +592,7 @@ class TestCrossSectional:
 
     def test_empty(self):
         from services.event_study.cross_sectional import CrossSectionalEventStudy
+
         cs = CrossSectionalEventStudy()
         r = cs.analyze([])
         assert r["n_events"] == 0
@@ -523,9 +600,11 @@ class TestCrossSectional:
 
 # ─── Event Clustering Tests ───
 
+
 class TestEventClustering:
     def test_detect_clusters(self):
         from services.event_study.event_clustering import EventClusteringDetector
+
         detector = EventClusteringDetector(window_days=3)
         events = [
             {"date": "2025-06-10", "ticker": "A", "event_type": "FIN", "car": 0.05},
@@ -537,6 +616,7 @@ class TestEventClustering:
 
     def test_no_clusters(self):
         from services.event_study.event_clustering import EventClusteringDetector
+
         detector = EventClusteringDetector(window_days=2)
         events = [
             {"date": "2025-06-10", "ticker": "A", "event_type": "FIN", "car": 0.05},
@@ -547,6 +627,7 @@ class TestEventClustering:
 
     def test_cluster_statistics(self):
         from services.event_study.event_clustering import EventClusteringDetector
+
         detector = EventClusteringDetector()
         clusters = [
             {"events": [1, 2], "size": 2},
@@ -558,6 +639,7 @@ class TestEventClustering:
 
     def test_adjust_car(self):
         from services.event_study.event_clustering import EventClusteringDetector
+
         detector = EventClusteringDetector(window_days=3)
         events = [
             {"date": "2025-06-10", "ticker": "A", "event_type": "FIN", "car": 0.05},
@@ -571,9 +653,11 @@ class TestEventClustering:
 
 # ─── Event Decay Tests ───
 
+
 class TestEventDecay:
     def test_decay_basic(self):
         from services.event_study.event_decay import EventImpactDecay
+
         decay = EventImpactDecay()
         ar = np.array([0.05, 0.035, 0.025, 0.018, 0.013, 0.01])
         r = decay.calculate_decay(ar)
@@ -584,6 +668,7 @@ class TestEventDecay:
 
     def test_no_decay(self):
         from services.event_study.event_decay import EventImpactDecay
+
         decay = EventImpactDecay()
         ar = np.array([0.05, 0.05, 0.05, 0.05])
         r = decay.calculate_decay(ar)
@@ -591,6 +676,7 @@ class TestEventDecay:
 
     def test_batch(self):
         from services.event_study.event_decay import EventImpactDecay
+
         decay = EventImpactDecay()
         ar_list = [
             np.array([0.05, 0.03, 0.02, 0.01]),
@@ -603,9 +689,11 @@ class TestEventDecay:
 
 # ─── Sector Event Tests ───
 
+
 class TestSectorEvent:
     def test_sector_event(self):
         from services.event_study.sector_event import SectorEventAnalyzer
+
         analyzer = SectorEventAnalyzer()
         sr = np.random.randn(20) * 0.02
         mr = np.random.randn(20) * 0.015
@@ -616,6 +704,7 @@ class TestSectorEvent:
 
     def test_peer_comparison(self):
         from services.event_study.sector_event import SectorEventAnalyzer
+
         analyzer = SectorEventAnalyzer()
         peers = {
             "AKBNK": np.random.randn(20) * 0.02,
@@ -630,6 +719,7 @@ class TestSectorEvent:
 
     def test_sector_rotation(self):
         from services.event_study.sector_event import SectorEventAnalyzer
+
         analyzer = SectorEventAnalyzer()
         sector_cars = {"BANKA": 0.05, "SANAYI": -0.03, "TEKNOLOJI": 0.02, "ENERJI": -0.05}
         r = analyzer.detect_sector_rotation(sector_cars)
@@ -639,6 +729,7 @@ class TestSectorEvent:
 
     def test_get_sector_stocks(self):
         from services.event_study.sector_event import SectorEventAnalyzer
+
         analyzer = SectorEventAnalyzer()
         stocks = analyzer.get_sector_stocks("BANKA")
         assert "AKBNK" in stocks
@@ -646,12 +737,14 @@ class TestSectorEvent:
 
     def test_get_stock_sector(self):
         from services.event_study.sector_event import SectorEventAnalyzer
+
         analyzer = SectorEventAnalyzer()
         sector = analyzer.get_stock_sector("THYAO")
         assert sector is not None
 
 
 # ─── Integration Tests ───
+
 
 class TestIntegration:
     def test_full_pipeline(self):

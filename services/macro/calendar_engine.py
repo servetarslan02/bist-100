@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class MacroEvent:
     """Makro olay."""
+
     event_id: str
     event_type: str  # TCMB_PPK, CPI, GDP, FOMC, ECB
     date: str
@@ -41,24 +42,39 @@ class MacroCalendarEngine:
 
     # TCMB PPK toplantı tarihleri 2026
     TCMB_PPK_DATES = [
-        "2026-01-23", "2026-02-20", "2026-03-19", "2026-04-16",
-        "2026-05-21", "2026-06-18", "2026-07-23", "2026-08-20",
-        "2026-09-17", "2026-10-22", "2026-11-19", "2026-12-17",
+        "2026-01-23",
+        "2026-02-20",
+        "2026-03-19",
+        "2026-04-16",
+        "2026-05-21",
+        "2026-06-18",
+        "2026-07-23",
+        "2026-08-20",
+        "2026-09-17",
+        "2026-10-22",
+        "2026-11-19",
+        "2026-12-17",
     ]
 
     # TÜİK veri açıklama tarihleri (ayın belirli günleri)
     TUIK_SCHEDULE = {
-        "CPI": "monthly_10",      # Ayın 10'u
-        "PPI": "monthly_10",      # Ayın 10'u
-        "GDP": "quarterly_30",    # Çeyreğin son günü
+        "CPI": "monthly_10",  # Ayın 10'u
+        "PPI": "monthly_10",  # Ayın 10'u
+        "GDP": "quarterly_30",  # Çeyreğin son günü
         "UNEMPLOYMENT": "monthly_15",  # Ayın 15'i
-        "INDUSTRIAL": "monthly_12",    # Ayın 12'si
+        "INDUSTRIAL": "monthly_12",  # Ayın 12'si
     }
 
     # FOMC toplantı tarihleri 2026
     FOMC_DATES = [
-        "2026-01-28", "2026-03-18", "2026-05-06", "2026-06-17",
-        "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-16",
+        "2026-01-28",
+        "2026-03-18",
+        "2026-05-06",
+        "2026-06-17",
+        "2026-07-29",
+        "2026-09-16",
+        "2026-10-28",
+        "2026-12-16",
     ]
 
     def __init__(self):
@@ -73,24 +89,28 @@ class MacroCalendarEngine:
         # TCMB PPK
         for date_str in self.TCMB_PPK_DATES:
             if date_str.startswith(str(year)):
-                self._events.append(MacroEvent(
-                    event_id=f"TCMB_PPK_{date_str}",
-                    event_type="TCMB_PPK",
-                    date=date_str,
-                    indicator="POLICY_RATE",
-                    description="TCMB Para Politikası Kurulu Toplantısı",
-                ))
+                self._events.append(
+                    MacroEvent(
+                        event_id=f"TCMB_PPK_{date_str}",
+                        event_type="TCMB_PPK",
+                        date=date_str,
+                        indicator="POLICY_RATE",
+                        description="TCMB Para Politikası Kurulu Toplantısı",
+                    )
+                )
 
         # FOMC
         for date_str in self.FOMC_DATES:
             if date_str.startswith(str(year)):
-                self._events.append(MacroEvent(
-                    event_id=f"FOMC_{date_str}",
-                    event_type="FOMC",
-                    date=date_str,
-                    indicator="FED_RATE",
-                    description="ABD Federal Açık Piyasa Komitesi Toplantısı",
-                ))
+                self._events.append(
+                    MacroEvent(
+                        event_id=f"FOMC_{date_str}",
+                        event_type="FOMC",
+                        date=date_str,
+                        indicator="FED_RATE",
+                        description="ABD Federal Açık Piyasa Komitesi Toplantısı",
+                    )
+                )
 
     def get_upcoming_events(self, days: int = 7) -> list[MacroEvent]:
         """Yaklaşan makro olayları getir."""
@@ -129,14 +149,15 @@ class MacroCalendarEngine:
                     event.surprise = actual - event.expected_value
                     event.status = "ANALYZED"
 
-                    logger.warning("Macro event completed with surprise",
-                                 event_id=event_id,
-                                 expected=event.expected_value,
-                                 actual=actual,
-                                 surprise=event.surprise)
+                    logger.warning(
+                        "Macro event completed with surprise",
+                        event_id=event_id,
+                        expected=event.expected_value,
+                        actual=actual,
+                        surprise=event.surprise,
+                    )
                 else:
-                    logger.info("Macro event completed (no expectation)",
-                               event_id=event_id, actual=actual)
+                    logger.info("Macro event completed (no expectation)", event_id=event_id, actual=actual)
 
                 return event
 
@@ -199,7 +220,9 @@ class MacroCalendarEngine:
                 "type": upcoming[0].event_type,
                 "date": upcoming[0].date,
                 "days_until": (datetime.strptime(upcoming[0].date, "%Y-%m-%d").date() - now.date()).days,
-            } if upcoming else None,
+            }
+            if upcoming
+            else None,
             "expectations_set": len(self._expectations),
         }
 

@@ -14,9 +14,9 @@ BIST Pay Piyasası Fiyat Adımı Tablosu (Standart):
 
 # Özel fiyat adımı tablosu (enstrüman tipine göre)
 SPECIAL_TICK_SIZES = {
-    "warrant": 0.001,      # Varant
+    "warrant": 0.001,  # Varant
     "certificate": 0.001,  # Sertifika
-    "fund": 0.001,         # Yatırım fonu katılma payı
+    "fund": 0.001,  # Yatırım fonu katılma payı
 }
 
 

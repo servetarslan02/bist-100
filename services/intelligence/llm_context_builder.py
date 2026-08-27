@@ -181,6 +181,7 @@ class LLMContextBuilder:
     def _fetch_world_state(self) -> dict[str, Any]:
         try:
             from services.intelligence.world_state import world_state_manager
+
             return world_state_manager.get_state_dict()
         except ImportError:
             logger.warning("world_state module not available — returning empty state")
@@ -198,6 +199,7 @@ class LLMContextBuilder:
     def _fetch_regime(self) -> dict[str, Any]:
         try:
             from services.intelligence.regime import regime_engine
+
             r = regime_engine.get_regime()
             return {
                 "regime": r.regime if hasattr(r, "regime") else str(r),
@@ -210,6 +212,7 @@ class LLMContextBuilder:
     def _fetch_research_memory(self, ticker: str, limit: int = 5) -> list[dict]:
         try:
             from services.intelligence.research_memory import research_memory
+
             return research_memory.get_ticker_history(ticker, limit=limit)
         except ImportError:
             return []
@@ -221,6 +224,7 @@ class LLMContextBuilder:
     def _fetch_sector_relations(self, sector: str) -> list[dict]:
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
+
             entity_id = f"sector_{sector}"
             relations = knowledge_graph.get_related_entities(entity_id)
             return [
@@ -237,6 +241,7 @@ class LLMContextBuilder:
     def _fetch_spec_score(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.spec_engine import spec_engine
+
             result = spec_engine.get_latest(ticker)
             if result:
                 return {

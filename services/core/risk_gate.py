@@ -76,7 +76,9 @@ class RiskGate:
         if not data_valid:
             return RiskDecision(False, "Invalid/stale data", 0, 1, {"data": "invalid"})
         if quantity <= 0 or price <= 0:
-            return RiskDecision(False, f"Invalid order quantity ({quantity}) or price ({price})", 0, 1, {"order": "invalid_parameters"})
+            return RiskDecision(
+                False, f"Invalid order quantity ({quantity}) or price ({price})", 0, 1, {"order": "invalid_parameters"}
+            )
 
         checks_passed = 3
         checks_failed = 0
@@ -123,7 +125,9 @@ class RiskGate:
             worst_impact = self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0)
             if worst_impact < self.macro_stress_threshold_pct:
                 checks_failed += 1
-                reasons.append(f"Macro stress test: %{abs(worst_impact):.1f} kayıp riski (eşik: %{abs(self.macro_stress_threshold_pct):.0f})")
+                reasons.append(
+                    f"Macro stress test: %{abs(worst_impact):.1f} kayıp riski (eşik: %{abs(self.macro_stress_threshold_pct):.0f})"
+                )
             else:
                 checks_passed += 1
             details["macro_stress_worst"] = worst_impact
@@ -138,19 +142,23 @@ class RiskGate:
             return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
         try:
             from services.core.auto_circuit_breaker import auto_circuit_breaker
+
             if auto_circuit_breaker.get_status().get("ebdks_active", False):
                 return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
         except Exception:
             logger.warning("Circuit breaker check failed", exc_info=True)
         try:
             from services.core.price_limits import price_limit_monitor
+
             if price_limit_monitor.get_effective_limit(ticker) == 0.0:
                 details["ipo_no_limit"] = True
         except Exception:
             logger.warning("Price limit check failed", exc_info=True)
         return None
 
-    def _check_position_limits(self, ticker, side, quantity, price, portfolio_value, current_positions, model_confidence):
+    def _check_position_limits(
+        self, ticker, side, quantity, price, portfolio_value, current_positions, model_confidence
+    ):
         """Pozisyon boyutu ve confidence kontrolleri."""
         passed = failed = 0
         details = {}
@@ -262,6 +270,7 @@ class RiskGate:
         """Macro stres testi çalıştır ve sonucu kaydet."""
         try:
             from services.macro.stress_test import macro_stress_test
+
             report = macro_stress_test.get_report(portfolio)
             self._macro_stress_result = report
             return report
@@ -275,6 +284,7 @@ class RiskGate:
         """PortfolioManager'dan günlük P&L otomatik çek."""
         try:
             from services.portfolio.portfolio_manager import portfolio_manager
+
             if portfolio_manager:
                 snapshots = portfolio_manager.get_equity_snapshots(limit=2)
                 if len(snapshots) >= 2:

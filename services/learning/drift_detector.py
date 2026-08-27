@@ -43,6 +43,7 @@ logger = structlog.get_logger()
 @dataclass
 class DriftResult:
     """Tek feature için drift sonucu."""
+
     feature_name: str
     drift_detected: bool
     drift_type: str  # MINOR, MAJOR, SIGNIFICANT, GRADUAL, SUDDEN, EXTREME, CONCEPT
@@ -54,6 +55,7 @@ class DriftResult:
 @dataclass
 class ComprehensiveDriftReport:
     """Kapsamlı drift raporu."""
+
     timestamp: str
     overall_drift: bool
     drift_type: str
@@ -99,8 +101,11 @@ class AdvancedDriftDetector:
         if performance_data:
             self._performance_history = performance_data
 
-        logger.info("Baseline set", features=len(self._baseline_distributions),
-                   performance_records=len(self._performance_history))
+        logger.info(
+            "Baseline set",
+            features=len(self._baseline_distributions),
+            performance_records=len(self._performance_history),
+        )
 
     def detect_all_drift(
         self,
@@ -187,10 +192,13 @@ class AdvancedDriftDetector:
         self._last_report = report
 
         if report.overall_drift:
-            logger.warning("Drift detected",
-                         type=drift_type, severity=severity,
-                         features=len(drifted_features),
-                         recommendation=recommendation)
+            logger.warning(
+                "Drift detected",
+                type=drift_type,
+                severity=severity,
+                features=len(drifted_features),
+                recommendation=recommendation,
+            )
         else:
             logger.info("No drift detected", features=len(feature_results))
 
@@ -231,17 +239,23 @@ class AdvancedDriftDetector:
 
         if len(current) < 5:
             return DriftResult(
-                feature_name=name, drift_detected=False,
-                drift_type="INSUFFICIENT_DATA", severity="LOW",
-                methods_agreed=0, details={"reason": "Insufficient data"},
+                feature_name=name,
+                drift_detected=False,
+                drift_type="INSUFFICIENT_DATA",
+                severity="LOW",
+                methods_agreed=0,
+                details={"reason": "Insufficient data"},
             )
 
         baseline_data = baseline.get("data")
         if baseline_data is None or len(baseline_data) < 5:
             return DriftResult(
-                feature_name=name, drift_detected=False,
-                drift_type="NO_BASELINE", severity="LOW",
-                methods_agreed=0, details={"reason": "No baseline data"},
+                feature_name=name,
+                drift_detected=False,
+                drift_type="NO_BASELINE",
+                severity="LOW",
+                methods_agreed=0,
+                details={"reason": "No baseline data"},
             )
 
         drift_signals = []
@@ -280,9 +294,7 @@ class AdvancedDriftDetector:
             drift_signals.append("ZSCORE")
 
         # 4. Page-Hinkley
-        ph_result = StatisticalTests.page_hinkley_test(
-            current, threshold=cfg.ph_threshold, delta=cfg.ph_delta
-        )
+        ph_result = StatisticalTests.page_hinkley_test(current, threshold=cfg.ph_threshold, delta=cfg.ph_delta)
         details["page_hinkley"] = {
             "drift": ph_result.drift_detected,
             "max_deviation": ph_result.max_deviation,
@@ -372,7 +384,7 @@ class AdvancedDriftDetector:
             return {"concept_drift": False, "reason": "Insufficient performance data"}
 
         # Son N performans
-        recent = self._performance_history[-cfg.concept_drift_window:]
+        recent = self._performance_history[-cfg.concept_drift_window :]
         if len(recent) < 10:
             return {"concept_drift": False, "reason": "Insufficient recent data"}
 
@@ -392,8 +404,8 @@ class AdvancedDriftDetector:
         winrate_drop = avg_hist_winrate - current_winrate
 
         concept_drift = bool(
-            sharpe_drop > cfg.concept_drift_accuracy_drop * avg_hist_sharpe or
-            winrate_drop > cfg.concept_drift_accuracy_drop
+            sharpe_drop > cfg.concept_drift_accuracy_drop * avg_hist_sharpe
+            or winrate_drop > cfg.concept_drift_accuracy_drop
         )
 
         return {

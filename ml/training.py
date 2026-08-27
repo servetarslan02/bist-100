@@ -17,6 +17,7 @@ import structlog
 # LabelGenerator entegrasyonu — gelişmiş label'lar için
 try:
     from services.labels.generator import LabelGenerator, label_generator  # noqa: F401
+
     HAS_LABEL_GENERATOR = True
 except ImportError:
     HAS_LABEL_GENERATOR = False
@@ -27,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class TrainingConfig:
     """ML training konfigürasyonu."""
+
     model_name: str
     target: str  # "return_5d", "return_20d", "direction_5d", etc.
     feature_names: list[str]
@@ -43,6 +45,7 @@ class TrainingConfig:
 @dataclass
 class LabelSpec:
     """Label (hedef değişken) tanımı."""
+
     name: str
     formula: str
     horizon_days: int
@@ -104,10 +107,14 @@ class MLTrainer:
         self.models: dict[str, Any] = {}
         self.training_results: dict[str, dict] = {}
 
-    def generate_labels(self, data: pl.DataFrame, label_name: str,
-                        price_column: str = "close",
-                        high_column: str = "high",
-                        low_column: str = "low") -> pl.DataFrame:
+    def generate_labels(
+        self,
+        data: pl.DataFrame,
+        label_name: str,
+        price_column: str = "close",
+        high_column: str = "high",
+        low_column: str = "low",
+    ) -> pl.DataFrame:
         """
         Label'ları hesapla. Look-ahead bias yok — sadece geleceğe bakarak label üretiyoruz
         ama feature hesaplama sadece geçmişle.
@@ -129,22 +136,22 @@ class MLTrainer:
                 ret = (prices[i + 5] / prices[i] - 1) * 100
                 labels[i] = 1 if ret > 0 else 0
             elif label_name == "breakout_success":
-                future_high = np.max(prices[i + 1:i + 11]) if i + 11 <= n else np.nan
+                future_high = np.max(prices[i + 1 : i + 11]) if i + 11 <= n else np.nan
                 labels[i] = 1 if future_high > prices[i] * 1.03 else 0
             elif label_name == "max_drawdown_20d":
-                future_prices = prices[i:i + 21]
+                future_prices = prices[i : i + 21]
                 min_price = np.min(future_prices)
                 labels[i] = (min_price / prices[i] - 1) * 100
             elif label_name == "spec_outcome":
                 ret = (prices[i + 20] / prices[i] - 1) * 100 if i + 20 < n else np.nan
-                dd = (np.min(prices[i:i + 21]) / prices[i] - 1) * 100 if i + 21 <= n else np.nan
+                dd = (np.min(prices[i : i + 21]) / prices[i] - 1) * 100 if i + 21 <= n else np.nan
                 labels[i] = 1 if (ret > 5 and dd > -3) else 0
 
         return data.with_columns(pl.Series(label_name, labels))
 
-    def prepare_dataset(self, data: pl.DataFrame, feature_names: list[str],
-                        label_name: str, date_column: str = "timestamp"
-                        ) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    def prepare_dataset(
+        self, data: pl.DataFrame, feature_names: list[str], label_name: str, date_column: str = "timestamp"
+    ) -> tuple[np.ndarray, np.ndarray, list[str]]:
         """Training dataset hazırla — NaN temizle."""
         available_features = [f for f in feature_names if f in data.columns]
 
@@ -155,13 +162,19 @@ class MLTrainer:
         mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
         X, y = X[mask], y[mask]
 
-        logger.info("Dataset prepared", samples=len(X), features=len(available_features),
-                    label=label_name, positive_rate=f"{np.mean(y > 0) * 100:.1f}%" if not np.all(np.isnan(y)) else "N/A")
+        logger.info(
+            "Dataset prepared",
+            samples=len(X),
+            features=len(available_features),
+            label=label_name,
+            positive_rate=f"{np.mean(y > 0) * 100:.1f}%" if not np.all(np.isnan(y)) else "N/A",
+        )
 
         return X, y, available_features
 
-    def train_with_walkforward(self, data: pl.DataFrame, config: TrainingConfig,
-                               date_column: str = "timestamp") -> dict[str, Any]:
+    def train_with_walkforward(
+        self, data: pl.DataFrame, config: TrainingConfig, date_column: str = "timestamp"
+    ) -> dict[str, Any]:
         """
         Purged walk-forward validation ile model eğit.
         """
@@ -185,14 +198,8 @@ class MLTrainer:
             train_end = current_test_start - timedelta(days=config.purge_days)
             train_start = train_end - timedelta(days=config.train_months * 30)
 
-            train = data_sorted.filter(
-                (pl.col(date_column) >= train_start) &
-                (pl.col(date_column) <= train_end)
-            )
-            test = data_sorted.filter(
-                (pl.col(date_column) >= current_test_start) &
-                (pl.col(date_column) <= test_end)
-            )
+            train = data_sorted.filter((pl.col(date_column) >= train_start) & (pl.col(date_column) <= train_end))
+            test = data_sorted.filter((pl.col(date_column) >= current_test_start) & (pl.col(date_column) <= test_end))
 
             # Embargo
             if config.embargo_days > 0:
@@ -214,12 +221,8 @@ class MLTrainer:
         all_predictions = []
 
         for i, (train, test, test_start, test_end) in enumerate(splits):
-            X_train, y_train, feat_names = self.prepare_dataset(
-                train, config.feature_names, config.target
-            )
-            X_test, y_test, _ = self.prepare_dataset(
-                test, config.feature_names, config.target
-            )
+            X_train, y_train, feat_names = self.prepare_dataset(train, config.feature_names, config.target)
+            X_test, y_test, _ = self.prepare_dataset(test, config.feature_names, config.target)
 
             if len(X_train) < 50 or len(X_test) < 10:
                 continue
@@ -258,7 +261,8 @@ class MLTrainer:
                     X_tr, X_val = X_train[:-val_size], X_train[-val_size:]
                     y_tr, y_val = y_train[:-val_size], y_train[-val_size:]
                     model.fit(
-                        X_tr, y_tr,
+                        X_tr,
+                        y_tr,
                         eval_set=[(X_val, y_val)],
                         callbacks=[lgb.early_stopping(config.early_stopping_rounds, verbose=False)],
                     )
@@ -311,12 +315,14 @@ class MLTrainer:
 
             # Store predictions for confidence calculation
             for j in range(len(y_pred)):
-                all_predictions.append({
-                    "split": i,
-                    "predicted": float(y_pred[j]),
-                    "actual": float(y_test[j]),
-                    "correct": bool(np.sign(y_pred[j]) == np.sign(y_test[j])),
-                })
+                all_predictions.append(
+                    {
+                        "split": i,
+                        "predicted": float(y_pred[j]),
+                        "actual": float(y_test[j]),
+                        "correct": bool(np.sign(y_pred[j]) == np.sign(y_test[j])),
+                    }
+                )
 
         # Aggregate metrics
         if split_results:
@@ -333,23 +339,23 @@ class MLTrainer:
         confidence = self._calculate_confidence(all_predictions, split_results)
 
         # Train final model on all data
-        X_all, y_all, feat_names = self.prepare_dataset(
-            data_sorted, config.feature_names, config.target
-        )
+        X_all, y_all, feat_names = self.prepare_dataset(data_sorted, config.feature_names, config.target)
 
         if is_classification:
             final_model = lgb.LGBMClassifier(
                 n_estimators=config.n_estimators,
                 max_depth=config.max_depth,
                 learning_rate=config.learning_rate,
-                random_state=42, verbose=-1,
+                random_state=42,
+                verbose=-1,
             )
         else:
             final_model = lgb.LGBMRegressor(
                 n_estimators=config.n_estimators,
                 max_depth=config.max_depth,
                 learning_rate=config.learning_rate,
-                random_state=42, verbose=-1,
+                random_state=42,
+                verbose=-1,
             )
 
         final_model.fit(X_all, y_all)
@@ -362,14 +368,19 @@ class MLTrainer:
             pickle.dump(final_model, f)
 
         with open(model_dir / "config.json", "w") as f:
-            f.write(orjson.dumps({
-                "model_name": config.model_name,
-                "target": config.target,
-                "features": feat_names,
-                "metrics": avg_metrics,
-                "confidence": confidence,
-                "training_date": datetime.now(UTC).isoformat(),
-            }, option=orjson.OPT_INDENT_2).decode())
+            f.write(
+                orjson.dumps(
+                    {
+                        "model_name": config.model_name,
+                        "target": config.target,
+                        "features": feat_names,
+                        "metrics": avg_metrics,
+                        "confidence": confidence,
+                        "training_date": datetime.now(UTC).isoformat(),
+                    },
+                    option=orjson.OPT_INDENT_2,
+                ).decode()
+            )
 
         self.models[config.model_name] = final_model
         self.training_results[config.model_name] = {
@@ -378,9 +389,12 @@ class MLTrainer:
             "splits": split_results,
         }
 
-        logger.info("Training complete", model=config.model_name,
-                    accuracy=avg_metrics.get("avg_direction_accuracy"),
-                    confidence=confidence)
+        logger.info(
+            "Training complete",
+            model=config.model_name,
+            accuracy=avg_metrics.get("avg_direction_accuracy"),
+            confidence=confidence,
+        )
 
         return {
             "model_name": config.model_name,
@@ -390,8 +404,7 @@ class MLTrainer:
             "feature_importance": dict(zip(feat_names, final_model.feature_importances_.tolist(), strict=False)),
         }
 
-    def _calculate_confidence(self, predictions: list[dict],
-                              split_results: list[dict]) -> float:
+    def _calculate_confidence(self, predictions: list[dict], split_results: list[dict]) -> float:
         """
         Model confidence — out-of-sample performance bazlı.
 

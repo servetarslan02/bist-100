@@ -16,6 +16,7 @@ from typing import Any
 @dataclass
 class ScanResult:
     """Standart tarama sonucu — tüm scanner'lar bu formatta döndürür."""
+
     ticker: str
     timestamp: datetime
     price: float = 0.0

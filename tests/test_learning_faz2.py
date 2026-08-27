@@ -139,8 +139,10 @@ def test_multiple_features():
     assert "feat_drifted" in report.affected_features
     assert report.feature_results["feat_normal"].drift_detected is False
     assert report.feature_results["feat_drifted"].drift_detected is True
-    print(f"✅ Multiple features: normal={report.feature_results['feat_normal'].drift_detected}, "
-          f"drifted={report.feature_results['feat_drifted'].drift_detected}")
+    print(
+        f"✅ Multiple features: normal={report.feature_results['feat_normal'].drift_detected}, "
+        f"drifted={report.feature_results['feat_drifted'].drift_detected}"
+    )
 
 
 def test_drift_type_classification():
@@ -334,9 +336,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 2 TEST SONUÇLARI (Drift Detection)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

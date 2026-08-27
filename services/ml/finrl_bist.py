@@ -3,6 +3,7 @@
 Gymnasium uyumlu trading environment — multi-stock,
 portfolio management, transaction cost, proper reward.
 """
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class BISTEnvConfig:
     """Environment konfigürasyonu."""
+
     initial_capital: float = 100_000
     commission_rate: float = 0.001
     slippage_rate: float = 0.0005
@@ -41,7 +43,7 @@ class BISTTradingEnv:
     def __init__(
         self,
         features: dict[str, np.ndarray],  # {ticker: (time, features)}
-        prices: dict[str, np.ndarray],    # {ticker: (time,)}
+        prices: dict[str, np.ndarray],  # {ticker: (time,)}
         tickers: list[str],
         config: BISTEnvConfig | None = None,
     ):
@@ -64,6 +66,7 @@ class BISTTradingEnv:
     def _make_obs_space(self):
         try:
             from gymnasium import spaces
+
             n_obs = len(self.tickers) * self.config.features_per_stock + len(self.tickers) + 1
             return spaces.Box(low=-np.inf, high=np.inf, shape=(n_obs,), dtype=np.float32)
         except ImportError:
@@ -72,6 +75,7 @@ class BISTTradingEnv:
     def _make_action_space(self):
         try:
             from gymnasium import spaces
+
             return spaces.MultiDiscrete([3] * len(self.tickers))  # 0=BUY, 1=HOLD, 2=SELL per stock
         except ImportError:
             return None
@@ -151,7 +155,11 @@ class BISTTradingEnv:
         # Position ratios
         total_value = self._portfolio_values[-1]
         for ticker in self.tickers:
-            pos_value = self._positions[ticker] * self.prices[ticker][self._current_step] if self._current_step < len(self.prices[ticker]) else 0
+            pos_value = (
+                self._positions[ticker] * self.prices[ticker][self._current_step]
+                if self._current_step < len(self.prices[ticker])
+                else 0
+            )
             obs.append(pos_value / max(total_value, 1))
 
         # Cash ratio

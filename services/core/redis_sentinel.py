@@ -19,6 +19,7 @@ import structlog
 try:
     import redis.asyncio as aioredis
     from redis.sentinel import Sentinel
+
     HAS_REDIS = True
 except ImportError:
     HAS_REDIS = False
@@ -29,6 +30,7 @@ logger = structlog.get_logger()
 # =====================================================
 # Config
 # =====================================================
+
 
 def _get_sentinel_hosts() -> list[tuple[str, int]]:
     """Sentinel adreslerini ortam değişkeninden oku."""
@@ -103,16 +105,15 @@ async def get_ha_redis():
             await master.ping()
             _ha_redis = master
             _ha_loop = current_loop
-            logger.info("Redis Sentinel connected",
-                       master=master_name, sentinels=len(sentinel_hosts))
+            logger.info("Redis Sentinel connected", master=master_name, sentinels=len(sentinel_hosts))
             return _ha_redis
         except Exception as e:
-            logger.warning("Redis Sentinel failed, falling back to direct",
-                         error=str(e))
+            logger.warning("Redis Sentinel failed, falling back to direct", error=str(e))
 
     # Direct mod (backward compatible)
     try:
         from .config import settings
+
         _ha_redis = aioredis.from_url(
             settings.redis_url,
             decode_responses=True,

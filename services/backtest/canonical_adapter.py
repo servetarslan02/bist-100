@@ -22,8 +22,9 @@ logger = structlog.get_logger()
 
 def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
     """Dict/nested feature'ları filtrele, sadece scalar olanları tut."""
-    return {k: v for k, v in feats.items()
-            if isinstance(v, (int, float, np.floating, np.integer)) and np.isfinite(float(v))}
+    return {
+        k: v for k, v in feats.items() if isinstance(v, (int, float, np.floating, np.integer)) and np.isfinite(float(v))
+    }
 
 
 class BacktestCanonicalAdapter:
@@ -40,9 +41,11 @@ class BacktestCanonicalAdapter:
     def _lazy_load(self):
         if self._scoring is None:
             from services.core.canonical_scoring import canonical_scoring
+
             self._scoring = canonical_scoring
         if self._decision_engine is None:
             from services.core.decision_engine import decision_engine
+
             self._decision_engine = decision_engine
 
     def compute_score(
@@ -73,13 +76,14 @@ class BacktestCanonicalAdapter:
 
         # Feature parity: model beklenen feature'ları doğrula ve CS normalization uygula
         if ml_model is not None:
-            model_features = getattr(ml_model, 'feature_names', [])
-            model_cs = getattr(ml_model, 'cs_features', [])
-            model_impute = getattr(ml_model, 'impute_values', None)
+            model_features = getattr(ml_model, "feature_names", [])
+            model_cs = getattr(ml_model, "cs_features", [])
+            model_impute = getattr(ml_model, "impute_values", None)
 
             if model_features and all_day_features:
                 try:
                     from services.ml.training_validator import prepare_features_for_inference
+
                     # Scalar olmayan feature'ları filtrele (volume_profile dict vb.)
                     clean_features = _scalar_features(features)
                     clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
@@ -119,13 +123,14 @@ class BacktestCanonicalAdapter:
 
         # Feature parity uygula
         if ml_model is not None:
-            model_features = getattr(ml_model, 'feature_names', [])
-            model_cs = getattr(ml_model, 'cs_features', [])
-            model_impute = getattr(ml_model, 'impute_values', None)
+            model_features = getattr(ml_model, "feature_names", [])
+            model_cs = getattr(ml_model, "cs_features", [])
+            model_impute = getattr(ml_model, "impute_values", None)
 
             if model_features and all_day_features:
                 try:
                     from services.ml.training_validator import prepare_features_for_inference
+
                     clean_features = _scalar_features(features)
                     clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
                     features = prepare_features_for_inference(

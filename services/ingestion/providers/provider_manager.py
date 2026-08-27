@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class ProviderHealth:
     """Provider sağlık durumu."""
+
     name: str
     is_healthy: bool = True
     last_success: datetime | None = None
@@ -32,6 +33,7 @@ class ProviderHealth:
 @dataclass
 class ProviderResult:
     """Provider sonuç verisi."""
+
     provider: str
     data: Any
     timestamp: datetime

@@ -24,9 +24,9 @@ logger = structlog.get_logger()
 
 
 class CircuitState(StrEnum):
-    CLOSED = "CLOSED"           # Normal çalışıyor
-    OPEN = "OPEN"               # Hatalı, atla
-    HALF_OPEN = "HALF_OPEN"     # Dene, başarırsa CLOSED
+    CLOSED = "CLOSED"  # Normal çalışıyor
+    OPEN = "OPEN"  # Hatalı, atla
+    HALF_OPEN = "HALF_OPEN"  # Dene, başarırsa CLOSED
 
 
 @dataclass
@@ -39,6 +39,7 @@ class CircuitBreaker:
     HALF_OPEN → success → CLOSED
     HALF_OPEN → failure → OPEN
     """
+
     name: str
     failure_threshold: int = 5
     recovery_timeout_seconds: int = 60
@@ -67,8 +68,7 @@ class CircuitBreaker:
 
         if self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
-            logger.warning("Circuit breaker OPENED", name=self.name,
-                         failures=self.failure_count)
+            logger.warning("Circuit breaker OPENED", name=self.name, failures=self.failure_count)
         elif self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.OPEN
             logger.warning("Circuit breaker re-OPENED (half-open failure)", name=self.name)
@@ -115,6 +115,7 @@ class CircuitBreaker:
         """Durumu DuckDB'ye kaydet (SSD dostu — buffered)."""
         try:
             from .state_store import state_store
+
             state_store.save_circuit_state(
                 self.name,
                 self.state.value,
@@ -129,6 +130,7 @@ class CircuitBreaker:
         """Durumu DuckDB'den geri yükle."""
         try:
             from .state_store import state_store
+
             saved = state_store.load_circuit_state(self.name)
             if saved:
                 self.state = CircuitState(saved["state"])
@@ -137,8 +139,7 @@ class CircuitBreaker:
                     self.last_failure_time = datetime.fromisoformat(saved["last_failure_at"])
                 if saved.get("last_success_at"):
                     self.last_success_time = datetime.fromisoformat(saved["last_success_at"])
-                logger.info("Circuit breaker state restored",
-                           name=self.name, state=self.state.value)
+                logger.info("Circuit breaker state restored", name=self.name, state=self.state.value)
         except Exception as e:
             logger.debug("Circuit breaker restore skipped", name=self.name, error=str(e))
 
@@ -150,10 +151,11 @@ class RateLimiter:
     Her provider için saniyede max istek sayısı.
     Limit dolduğunda bekle, hata verme.
     """
+
     name: str
-    max_tokens: float = 10.0          # Bucket kapasitesi
-    refill_rate: float = 1.0          # Saniyede kaç token yenilenir
-    tokens: float = 10.0              # Mevcut token
+    max_tokens: float = 10.0  # Bucket kapasitesi
+    refill_rate: float = 1.0  # Saniyede kaç token yenilenir
+    tokens: float = 10.0  # Mevcut token
     last_refill: float = field(default_factory=time.monotonic)
 
     def acquire(self) -> float:
@@ -204,7 +206,7 @@ class RetryPolicy:
 
     def get_delay(self, attempt: int) -> float:
         """Retry gecikmesi hesapla (exponential backoff + jitter)."""
-        delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+        delay = min(self.base_delay * (2**attempt), self.max_delay)
         jitter = delay * 0.1 * (2 * random.random() - 1)  # ±%10
         return max(0, delay + jitter)
 
@@ -248,17 +250,19 @@ class ProviderReliability:
         if not success:
             self._total_failures += 1
 
-        self._results.append({
-            "success": success,
-            "latency_ms": latency_ms,
-            "timestamp": datetime.now(UTC),
-        })
+        self._results.append(
+            {
+                "success": success,
+                "latency_ms": latency_ms,
+                "timestamp": datetime.now(UTC),
+            }
+        )
         if len(self._results) > 1000:
             self._results = self._results[-1000:]
 
         # Pencere boyutunu aş
         if len(self._results) > self.window_size:
-            self._results = self._results[-self.window_size:]
+            self._results = self._results[-self.window_size :]
 
     def get_score(self) -> float:
         """Güvenilirlik skoru (0-1)."""

@@ -15,7 +15,7 @@ import polars as pl
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
 from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
@@ -44,19 +44,21 @@ def run_forensic_proof():
     )
 
     tickers = ["THYAO", "AKBNK", "GARAN", "KCHOL", "BIMAS", "TUPRS", "SISE", "EREGL", "ASELS", "SAHOL"]
-    dates = pl.date_range(date(2024, 1, 5), date(2024, 1, 15), timedelta(days=1), eager=True).head(6) # Cuma -> Cuma
+    dates = pl.date_range(date(2024, 1, 5), date(2024, 1, 15), timedelta(days=1), eager=True).head(6)  # Cuma -> Cuma
     date_strs = [d.strftime("%Y-%m-%d") for d in dates]
 
     # Mock market data dataframe'leri
     market_data = {}
     for t in tickers:
-        df = pl.DataFrame({
-            "Open": [100.0, 102.0, 101.5, 105.0, 98.0, 99.0],
-            "High": [103.0, 104.0, 106.0, 107.0, 100.0, 101.0],
-            "Low":  [99.0,  100.5, 100.0, 103.0, 96.0,  97.5],
-            "Close":[102.0, 101.5, 105.0, 98.0,  99.0,  100.5],
-            "Volume":[5_000_000] * 6,
-        })
+        df = pl.DataFrame(
+            {
+                "Open": [100.0, 102.0, 101.5, 105.0, 98.0, 99.0],
+                "High": [103.0, 104.0, 106.0, 107.0, 100.0, 101.0],
+                "Low": [99.0, 100.5, 100.0, 103.0, 96.0, 97.5],
+                "Close": [102.0, 101.5, 105.0, 98.0, 99.0, 100.5],
+                "Volume": [5_000_000] * 6,
+            }
+        )
         market_data[t] = df
 
     sector_map = {
@@ -66,7 +68,7 @@ def run_forensic_proof():
         "KCHOL": "Holding",
         "BIMAS": "Perakende",
         "TUPRS": "Petrol_Kimya",
-        "SISE":  "Cam_Seramik",
+        "SISE": "Cam_Seramik",
         "EREGL": "Metal_Ana",
         "ASELS": "Savunma",
         "SAHOL": "Holding",
@@ -77,8 +79,15 @@ def run_forensic_proof():
     # -------------------------------------------------------------
     print(f"\n[1] 📅 CUMA AKŞAMI ({date_strs[0]} 18:15) — EOD Sinyal Üretimi")
     cuma_signals = [
-        {"ticker": t, "direction": "LONG", "rank": i+1, "score": 10.0-i,
-         "confidence": 0.90, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10}
+        {
+            "ticker": t,
+            "direction": "LONG",
+            "rank": i + 1,
+            "score": 10.0 - i,
+            "confidence": 0.90,
+            "model_version": "LambdaRank_v3_LOCKED",
+            "target_weight": 0.10,
+        }
         for i, t in enumerate(tickers)
     ]
     orch.queue_pending_signals(cuma_signals, date_strs[0])
@@ -88,7 +97,9 @@ def run_forensic_proof():
     assert summary["total_value"] == 1_000_000.0, "Cuma akşamı değer bozulmamalı!"
     assert summary["num_positions"] == 0, "Cuma akşamı pozisyon açılmamalı!"
     assert summary["total_cash"] == 1_000_000.0, "Nakit eksilmemeli!"
-    print(f"  ✓ Sinyaller başarıyla kuyruğa alındı. Açık Pozisyon: {summary['num_positions']}, Toplam Değer: {summary['total_value']:,.2f} ₺")
+    print(
+        f"  ✓ Sinyaller başarıyla kuyruğa alındı. Açık Pozisyon: {summary['num_positions']}, Toplam Değer: {summary['total_value']:,.2f} ₺"
+    )
 
     # -------------------------------------------------------------
     # ADIM 2: PAZARTESİ SABAHI (2024-01-08 09:55) - T+1 Açılış Yürütmesi
@@ -102,7 +113,9 @@ def run_forensic_proof():
     p_summary = orch.portfolio.get_summary()
     print(f"  ✓ 10 emir Walk-the-Book ile eşleşti. Açık Pozisyon: {p_summary['num_positions']}")
     print(f"  ✓ Pazartesi Açılış Sonrası Portföy Değeri: {p_summary['total_value']:,.2f} ₺")
-    print(f"  ✓ Kalan Serbest Nakit: {p_summary['total_cash']:,.2f} ₺, Yatırılan Tutar: {p_summary['invested_value']:,.2f} ₺")
+    print(
+        f"  ✓ Kalan Serbest Nakit: {p_summary['total_cash']:,.2f} ₺, Yatırılan Tutar: {p_summary['invested_value']:,.2f} ₺"
+    )
 
     # Muhasebe Invariant Kontrolü: total_value == total_cash + invested_value
     assert abs(p_summary["total_value"] - (p_summary["total_cash"] + p_summary["invested_value"])) < 1e-4
@@ -118,17 +131,23 @@ def run_forensic_proof():
         restriction_type="VBTS_GROSS_SETTLEMENT",
         published_at="2024-01-08T18:30:00Z",
         effective_date=date_strs[2],
-        details="VBTS Kapsamında Brüt Takas Tedbiri"
+        details="VBTS Kapsamında Brüt Takas Tedbiri",
     )
 
     # THYAO için bugün nakit ekleyip 100 lot alalım
     orch.portfolio.settled_cash += 50_000.0
-    open_res = orch.portfolio.open_position("THYAO", quantity=100, price=101.5, date=date_strs[2], is_gross_settlement=True)
+    open_res = orch.portfolio.open_position(
+        "THYAO", quantity=100, price=101.5, date=date_strs[2], is_gross_settlement=True
+    )
     assert open_res["success"] is True
 
     # Şimdi bugün alınan bu 100 lotu da içerecek şekilde TÜM THYAO pozisyonunu satmayı deneyelim -> Kesinlikle BLOKLANMALI!
-    res_sell = orch.portfolio.close_position("THYAO", price=101.5, quantity=orch.portfolio._positions["THYAO"]["quantity"], date=date_strs[2])
-    assert res_sell.get("error") == "GROSS_SETTLEMENT_BLOCKED", "Brüt takastaki hissenin aynı gün satışı engellenmeliydi!"
+    res_sell = orch.portfolio.close_position(
+        "THYAO", price=101.5, quantity=orch.portfolio._positions["THYAO"]["quantity"], date=date_strs[2]
+    )
+    assert res_sell.get("error") == "GROSS_SETTLEMENT_BLOCKED", (
+        "Brüt takastaki hissenin aynı gün satışı engellenmeliydi!"
+    )
     print("  ✓ [KAP KISITI DOĞRULANDI]: Brüt takastaki hissenin gün içi satışı başarıyla BLOKLANDI!")
 
     # -------------------------------------------------------------
@@ -137,9 +156,31 @@ def run_forensic_proof():
     print(f"\n[4] 📅 ÇARŞAMBA SABAHI ({date_strs[3]}) — Rebalance & Takasbank T+2 Mahsup Doğrulaması")
     # THYAO ve AKBNK çıksın, yerine KCHOL ve ASELS lotları artsın
     rebalance_signals = [
-        {"ticker": "THYAO", "direction": "SHORT", "rank": 99, "score": 0.0, "confidence": 1.0, "model_version": "LambdaRank_v3_LOCKED"},
-        {"ticker": "AKBNK", "direction": "SHORT", "rank": 99, "score": 0.0, "confidence": 1.0, "model_version": "LambdaRank_v3_LOCKED"},
-        {"ticker": "TUPRS", "direction": "LONG", "rank": 1, "score": 9.9, "confidence": 0.95, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+        {
+            "ticker": "THYAO",
+            "direction": "SHORT",
+            "rank": 99,
+            "score": 0.0,
+            "confidence": 1.0,
+            "model_version": "LambdaRank_v3_LOCKED",
+        },
+        {
+            "ticker": "AKBNK",
+            "direction": "SHORT",
+            "rank": 99,
+            "score": 0.0,
+            "confidence": 1.0,
+            "model_version": "LambdaRank_v3_LOCKED",
+        },
+        {
+            "ticker": "TUPRS",
+            "direction": "LONG",
+            "rank": 1,
+            "score": 9.9,
+            "confidence": 0.95,
+            "model_version": "LambdaRank_v3_LOCKED",
+            "target_weight": 0.10,
+        },
     ]
     # Salı akşamı kuyruğa al
     orch.queue_pending_signals(rebalance_signals, date_strs[2])
@@ -158,12 +199,22 @@ def run_forensic_proof():
     # -------------------------------------------------------------
     print(f"\n[5] 📅 PERŞEMBE ({date_strs[4]}) — Stres Senaryosu & Risk Kapısı Kill-Switch Testi")
     # Portföyde yapay %30 drawdown oluşturalım
-    orch.portfolio._max_equity = 1_500_000.0 # Zirve
+    orch.portfolio._max_equity = 1_500_000.0  # Zirve
     # Risk kapısı kill-switch kontrolü
     assert orch.portfolio.get_current_drawdown() > 25.0
 
     # Yeni alım sinyali geldiğinde risk kapısı BLOCK vermeli
-    crash_signal = [{"ticker": "BIMAS", "direction": "LONG", "rank": 1, "score": 9.9, "confidence": 0.95, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10}]
+    crash_signal = [
+        {
+            "ticker": "BIMAS",
+            "direction": "LONG",
+            "rank": 1,
+            "score": 9.9,
+            "confidence": 0.95,
+            "model_version": "LambdaRank_v3_LOCKED",
+            "target_weight": 0.10,
+        }
+    ]
     orch.queue_pending_signals(crash_signal, date_strs[3])
     rep_crash = orch.execute_pending_signals(date_strs[4], market_data, sector_map)
 
@@ -177,6 +228,7 @@ def run_forensic_proof():
     # Temizlik
     if os.path.exists(test_db):
         os.remove(test_db)
+
 
 if __name__ == "__main__":
     run_forensic_proof()

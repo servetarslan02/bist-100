@@ -70,11 +70,17 @@ impacts = knowledge_graph.propagate_impact("macro_OIL", 0.5)
 ```python
 from services.intelligence.research_memory import research_memory, ResearchRecord
 
-research_memory.add_record(ResearchRecord(
-    record_id="R001", ticker="THYAO", date="2026-08-15",
-    thesis="Momentum strong", evidence=["volume spike", "breakout"],
-    risks=["high volatility"], prediction={"return": 5.0, "prob": 0.7},
-))
+research_memory.add_record(
+    ResearchRecord(
+        record_id="R001",
+        ticker="THYAO",
+        date="2026-08-15",
+        thesis="Momentum strong",
+        evidence=["volume spike", "breakout"],
+        risks=["high volatility"],
+        prediction={"return": 5.0, "prob": 0.7},
+    )
+)
 
 history = research_memory.get_ticker_history("THYAO")
 # history[0]: {date: "2026-08-15", thesis: "Momentum strong", ...}
@@ -90,8 +96,7 @@ history = research_memory.get_ticker_history("THYAO")
 from services.intelligence.research_memory import data_lineage
 
 data_lineage.add_node(LineageNode("raw_data", "price_THYAO", "2026-08-15T10:00:00"))
-data_lineage.add_node(LineageNode("feature", "rsi_THYAO", "2026-08-15T10:00:01",
-    parent_ids=["raw_data:price_THYAO"]))
+data_lineage.add_node(LineageNode("feature", "rsi_THYAO", "2026-08-15T10:00:01", parent_ids=["raw_data:price_THYAO"]))
 
 forward = data_lineage.trace_forward("raw_data", "price_THYAO")
 # forward: [{type: "raw_data", id: "price_THYAO"}, {type: "feature", id: "rsi_THYAO"}]

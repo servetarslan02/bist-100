@@ -40,6 +40,7 @@ BIST'e Özel Düzeltmeler:
 - Likidite filtresi: Düşük hacimli hisseleri hariç tut (Amihud illiquidity)
 - Sektör kontrolü: BIST'te bankacılık/holding ağırlığı yüksek
 """
+
 import concurrent.futures
 from dataclasses import dataclass
 from datetime import date
@@ -55,29 +56,31 @@ logger = structlog.get_logger()
 @dataclass
 class StockData:
     """Hisse verisi (factor hesaplama için)."""
+
     ticker: str
-    market_cap: float          # Piyasa değeri (TL)
-    book_to_market: float      # Book-to-Market oranı
-    roe: float                 # Return on Equity
-    operating_margin: float    # Operating Margin
-    asset_growth: float        # Total Asset Growth (yıllık)
-    daily_return: float        # Günlük getiri
+    market_cap: float  # Piyasa değeri (TL)
+    book_to_market: float  # Book-to-Market oranı
+    roe: float  # Return on Equity
+    operating_margin: float  # Operating Margin
+    asset_growth: float  # Total Asset Growth (yıllık)
+    daily_return: float  # Günlük getiri
     sector: str = ""
-    avg_volume: float = 0.0    # Ortalama günlük hacim (likidite filtresi)
+    avg_volume: float = 0.0  # Ortalama günlük hacim (likidite filtresi)
 
 
 @dataclass
 class FactorReturns:
     """Günlük factor return'leri."""
+
     date: date
-    smb: float    # Small Minus Big
-    hml: float    # High Minus Low
-    rmw: float    # Robust Minus Weak
-    cma: float    # Conservative Minus Aggressive
+    smb: float  # Small Minus Big
+    hml: float  # High Minus Low
+    rmw: float  # Robust Minus Weak
+    cma: float  # Conservative Minus Aggressive
     n_small: int  # Küçük hisse sayısı
-    n_big: int    # Büyük hisse sayısı
+    n_big: int  # Büyük hisse sayısı
     n_value: int  # Value hisse sayısı
-    n_growth: int # Growth hisse sayısı
+    n_growth: int  # Growth hisse sayısı
 
 
 class FamaFrenchFactorBuilder:
@@ -96,14 +99,14 @@ class FamaFrenchFactorBuilder:
 
     def __init__(
         self,
-        size_breakpoint: float = 0.5,     # Median
-        bm_low: float = 0.30,             # B/M alt eşik
-        bm_high: float = 0.70,            # B/M üst eşik
-        roe_low: float = 0.30,            # ROE alt eşik
-        roe_high: float = 0.70,           # ROE üst eşik
-        ag_low: float = 0.30,             # Asset Growth alt eşik
-        ag_high: float = 0.70,            # Asset Growth üst eşik
-        min_volume_tl: float = 100_000,   # Minimum günlük hacim (TL)
+        size_breakpoint: float = 0.5,  # Median
+        bm_low: float = 0.30,  # B/M alt eşik
+        bm_high: float = 0.70,  # B/M üst eşik
+        roe_low: float = 0.30,  # ROE alt eşik
+        roe_high: float = 0.70,  # ROE üst eşik
+        ag_low: float = 0.30,  # Asset Growth alt eşik
+        ag_high: float = 0.70,  # Asset Growth üst eşik
+        min_volume_tl: float = 100_000,  # Minimum günlük hacim (TL)
         min_market_cap: float = 50_000_000,  # Minimum piyasa değeri (50M TL)
     ):
         self.size_breakpoint = size_breakpoint
@@ -215,9 +218,7 @@ class FamaFrenchFactorBuilder:
         """
         results = []
         for trade_date in sorted(daily_stocks.keys()):
-            factors = self.calculate_daily_factors(
-                daily_stocks[trade_date], trade_date
-            )
+            factors = self.calculate_daily_factors(daily_stocks[trade_date], trade_date)
             if factors is not None:
                 results.append(factors)
 
@@ -397,7 +398,7 @@ class FamaFrenchFactorBuilder:
         small = market_caps <= median_cap
         big = market_caps > median_cap
         conservative = asset_growths <= ag_low_threshold  # Düşük büyüme = muhafazakâr
-        aggressive = asset_growths >= ag_high_threshold    # Yüksek büyüme = agresif
+        aggressive = asset_growths >= ag_high_threshold  # Yüksek büyüme = agresif
 
         sc_mask = small & conservative
         bc_mask = big & conservative
@@ -515,7 +516,7 @@ class FamaFrenchDataFetcher:
         factor_series = []
 
         # Trading günlerini belirle (fiyat verisinden)
-        if hasattr(price_data.index, 'date'):
+        if hasattr(price_data.index, "date"):
             trading_dates = [d.date() for d in price_data.index]
         else:
             trading_dates = [d for d in price_data.index]
@@ -593,9 +594,7 @@ class FamaFrenchDataFetcher:
 
         return factor_series
 
-    async def _fetch_fundamentals(
-        self, tickers: list[str]
-    ) -> dict[str, dict[str, float]]:
+    async def _fetch_fundamentals(self, tickers: list[str]) -> dict[str, dict[str, float]]:
         """Hisse fundamental verilerini çek."""
 
         fundamentals = {}
@@ -614,18 +613,22 @@ class FamaFrenchDataFetcher:
 
                 if balance_sheet is not None and not balance_sheet.empty:
                     if "Total Assets" in balance_sheet.index:
-                        total_assets = float(balance_sheet.iloc[
-                            balance_sheet.index.get_loc("Total Assets")
-                        ].iloc[0]) if len(balance_sheet.columns) > 0 else 0
+                        total_assets = (
+                            float(balance_sheet.iloc[balance_sheet.index.get_loc("Total Assets")].iloc[0])
+                            if len(balance_sheet.columns) > 0
+                            else 0
+                        )
                         if len(balance_sheet.columns) > 1:
-                            prev_total_assets = float(balance_sheet.iloc[
-                                balance_sheet.index.get_loc("Total Assets")
-                            ].iloc[1])
+                            prev_total_assets = float(
+                                balance_sheet.iloc[balance_sheet.index.get_loc("Total Assets")].iloc[1]
+                            )
 
                     if "Stockholders Equity" in balance_sheet.index:
-                        book_value = float(balance_sheet.iloc[
-                            balance_sheet.index.get_loc("Stockholders Equity")
-                        ].iloc[0]) if len(balance_sheet.columns) > 0 else 0
+                        book_value = (
+                            float(balance_sheet.iloc[balance_sheet.index.get_loc("Stockholders Equity")].iloc[0])
+                            if len(balance_sheet.columns) > 0
+                            else 0
+                        )
 
                 # Gelir tablosu
                 income = stock.income_stmt
@@ -634,9 +637,11 @@ class FamaFrenchDataFetcher:
 
                 if income is not None and not income.empty:
                     if "Net Income" in income.index and book_value > 0:
-                        net_income = float(income.iloc[
-                            income.index.get_loc("Net Income")
-                        ].iloc[0]) if len(income.columns) > 0 else 0
+                        net_income = (
+                            float(income.iloc[income.index.get_loc("Net Income")].iloc[0])
+                            if len(income.columns) > 0
+                            else 0
+                        )
                         roe = net_income / book_value
 
                 return ticker, {
@@ -655,9 +660,7 @@ class FamaFrenchDataFetcher:
 
         # Paralel çek
         loop = __import__("asyncio").get_event_loop()
-        futures = [
-            loop.run_in_executor(executor, _fetch_one, t) for t in tickers
-        ]
+        futures = [loop.run_in_executor(executor, _fetch_one, t) for t in tickers]
         results = await __import__("asyncio").gather(*futures, return_exceptions=True)
 
         for result in results:

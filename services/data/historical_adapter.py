@@ -29,6 +29,7 @@ class HistoricalDataAdapter:
     def __init__(self, repository: HistoricalDataRepository | None = None):
         if repository is None:
             from .persistent_repository import PersistentHistoricalRepository
+
             self._repo = PersistentHistoricalRepository()
         else:
             self._repo = repository
@@ -155,9 +156,7 @@ class HistoricalDataAdapter:
         PIT kuralı: published_at <= current_date
         Duplicate kontrolü: aynı event_id ile sadece bir kez döner.
         """
-        events = self._repo.get_event_snapshots(
-            ticker, current_date, event_types=None
-        )
+        events = self._repo.get_event_snapshots(ticker, current_date, event_types=None)
 
         # Duplicate kontrolü
         seen_ids = set()
@@ -166,16 +165,18 @@ class HistoricalDataAdapter:
             if event.event_id in seen_ids:
                 continue
             seen_ids.add(event.event_id)
-            result.append({
-                "id": event.event_id,
-                "ticker": event.ticker,
-                "title": event.title,
-                "category": event.event_type,
-                "publish_date": event.published_at[:10],
-                "sentiment": event.sentiment,
-                "importance": event.importance,
-                "source": event.source,
-            })
+            result.append(
+                {
+                    "id": event.event_id,
+                    "ticker": event.ticker,
+                    "title": event.title,
+                    "category": event.event_type,
+                    "publish_date": event.published_at[:10],
+                    "sentiment": event.sentiment,
+                    "importance": event.importance,
+                    "source": event.source,
+                }
+            )
             if len(result) >= limit:
                 break
 
@@ -192,9 +193,7 @@ class HistoricalDataAdapter:
         PIT kuralı: published_at <= current_date
         Duplicate kontrolü: aynı event_id ile sadece bir kez döner.
         """
-        events = self._repo.get_event_snapshots(
-            ticker, current_date, event_types=None
-        )
+        events = self._repo.get_event_snapshots(ticker, current_date, event_types=None)
 
         # Sadece news kaynaklarını filtrele
         news_events = [e for e in events if e.source in ("news", "rss")]
@@ -206,15 +205,17 @@ class HistoricalDataAdapter:
             if event.event_id in seen_ids:
                 continue
             seen_ids.add(event.event_id)
-            result.append({
-                "title": event.title,
-                "published": event.published_at[:10],
-                "date": event.published_at[:10],
-                "sentiment": event.sentiment,
-                "importance": event.importance,
-                "source": event.source,
-                "ticker": event.ticker,
-            })
+            result.append(
+                {
+                    "title": event.title,
+                    "published": event.published_at[:10],
+                    "date": event.published_at[:10],
+                    "sentiment": event.sentiment,
+                    "importance": event.importance,
+                    "source": event.source,
+                    "ticker": event.ticker,
+                }
+            )
             if len(result) >= limit:
                 break
 
@@ -238,6 +239,7 @@ class HistoricalDataAdapter:
             # days_until: event_date - current_date
             try:
                 from datetime import datetime
+
                 d_event = datetime.strptime(cat.event_date, "%Y-%m-%d")
                 d_current = datetime.strptime(current_date, "%Y-%m-%d")
                 days_until = (d_event - d_current).days
@@ -246,14 +248,16 @@ class HistoricalDataAdapter:
             except ValueError:
                 days_until = 0
 
-            result.append({
-                "type": cat.catalyst_type,
-                "importance": cat.importance,
-                "days_until": max(0, days_until),
-                "source": cat.source,
-                "announcement_date": cat.announcement_date,
-                "event_date": cat.event_date,
-            })
+            result.append(
+                {
+                    "type": cat.catalyst_type,
+                    "importance": cat.importance,
+                    "days_until": max(0, days_until),
+                    "source": cat.source,
+                    "announcement_date": cat.announcement_date,
+                    "event_date": cat.event_date,
+                }
+            )
 
         return result
 

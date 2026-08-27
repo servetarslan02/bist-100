@@ -17,15 +17,15 @@ logger = structlog.get_logger()
 
 # İşlem maliyetleri
 COMMISSION_RATE = 0.0015  # %0.15 komisyon
-SLIPPAGE_RATE = 0.0010    # %0.10 slippage
+SLIPPAGE_RATE = 0.0010  # %0.10 slippage
 
 
 @dataclass
 class RiskParityParameters:
     # Risk Yönetimi
-    risk_per_trade_pct: float = 0.010       # Her işlemde portföyün en fazla %1.0'ı riske atılır
-    max_position_size_pct: float = 0.10     # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
-    max_portfolio_heat_pct: float = 0.05    # Portföy açık risk tavanı: %5.0
+    risk_per_trade_pct: float = 0.010  # Her işlemde portföyün en fazla %1.0'ı riske atılır
+    max_position_size_pct: float = 0.10  # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
+    max_portfolio_heat_pct: float = 0.05  # Portföy açık risk tavanı: %5.0
     max_sector_concentration_pct: float = 0.30  # Tek sektörde max %30 yoğunlaşma
 
     # Teknik Eşikler
@@ -35,16 +35,16 @@ class RiskParityParameters:
     volume_surge_mult: float = 1.20
 
     # ATR Stop & Trailing
-    atr_initial_stop_mult: float = 2.20     # İlk stop mesafesi
-    atr_breakeven_mult: float = 2.20        # Kâra geçince stopu maliyete çekme eşiği
-    atr_trailing_bull_mult: float = 6.00    # Boğada trendi sağma mesafesi
-    atr_trailing_bear_mult: float = 2.00    # Ayıda sıkı koruma mesafesi
+    atr_initial_stop_mult: float = 2.20  # İlk stop mesafesi
+    atr_breakeven_mult: float = 2.20  # Kâra geçince stopu maliyete çekme eşiği
+    atr_trailing_bull_mult: float = 6.00  # Boğada trendi sağma mesafesi
+    atr_trailing_bear_mult: float = 2.00  # Ayıda sıkı koruma mesafesi
 
     # Rejim & Kriz Teyidi
     regime_sma_fast: int = 50
     regime_sma_slow: int = 200
     crisis_exit_buffer: float = 0.96
-    crisis_confirm_days: int = 3            # Kriz çıkışı için 3 ardışık gün teyit şartı
+    crisis_confirm_days: int = 3  # Kriz çıkışı için 3 ardışık gün teyit şartı
     max_positions_bull: int = 8
     max_positions_bear: int = 3
 
@@ -93,7 +93,7 @@ class RiskParityEngine:
             tr = np.maximum(tr1, np.maximum(tr2, tr3))
             atr14 = np.zeros(len(df), dtype=np.float64)
             for i in range(14, len(df)):
-                atr14[i] = np.mean(tr[max(0, i-14):i])
+                atr14[i] = np.mean(tr[max(0, i - 14) : i])
 
             # RSI 14
             diff = np.diff(closes)
@@ -101,8 +101,8 @@ class RiskParityEngine:
             losses = np.where(diff < 0, -diff, 0)
             rsi14 = np.full(len(df), 50.0, dtype=np.float64)
             for i in range(14, len(df)):
-                avg_g = np.mean(gains[max(0, i-14):i])
-                avg_l = np.mean(losses[max(0, i-14):i])
+                avg_g = np.mean(gains[max(0, i - 14) : i])
+                avg_l = np.mean(losses[max(0, i - 14) : i])
                 if avg_l == 0:
                     rsi14[i] = 100.0
                 else:
@@ -113,8 +113,8 @@ class RiskParityEngine:
             vol_avg20 = np.zeros(len(df), dtype=np.float64)
             high_20d = np.zeros(len(df), dtype=np.float64)
             for i in range(20, len(df)):
-                vol_avg20[i] = np.mean(volumes[max(0, i-20):i])
-                high_20d[i] = np.max(highs[max(0, i-20):i])
+                vol_avg20[i] = np.mean(volumes[max(0, i - 20) : i])
+                high_20d[i] = np.max(highs[max(0, i - 20) : i])
 
             canonical_ticker = ticker if ticker.endswith(".IS") else f"{ticker}.IS"
             self.tech_cache[canonical_ticker] = {
@@ -127,7 +127,7 @@ class RiskParityEngine:
                 "volumes": volumes,
                 "vol_avg20": vol_avg20,
                 "high_20d": high_20d,
-                "dates": df.index
+                "dates": df.index,
             }
 
     def _get_sector_exposure(self, positions: dict, total_equity: float) -> dict[str, float]:
@@ -142,7 +142,13 @@ class RiskParityEngine:
     COMMISSION_RATE = 0.0015
     SLIPPAGE_RATE = 0.0010
 
-    def simulate(self, params: RiskParityParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0) -> RiskAuditResult:
+    def simulate(
+        self,
+        params: RiskParityParameters,
+        start_year: int = 1997,
+        end_year: int = 2026,
+        initial_capital: float = 100000.0,
+    ) -> RiskAuditResult:
         """Risk Parity & 3 Günlük Kriz Teyidi + Breakout Destekli Simülasyon."""
         trading_dates = [d for d in self.bm_df.index if start_year <= d.year <= end_year]
         if len(trading_dates) < 30:
@@ -191,10 +197,16 @@ class RiskParityEngine:
                         capital += (exit_p * pos["shares"]) - (exit_p * pos["shares"] * COMMISSION_RATE)
 
                         ret_pct = ((exit_p - pos["entry_price"]) / pos["entry_price"]) * 100
-                        trade_logs.append({
-                            "ticker": t, "entry_date": pos["entry_date"], "exit_date": current_date,
-                            "pnl": net_pnl, "ret_pct": ret_pct, "reason": sell_ord.get("reason", "STOP")
-                        })
+                        trade_logs.append(
+                            {
+                                "ticker": t,
+                                "entry_date": pos["entry_date"],
+                                "exit_date": current_date,
+                                "pnl": net_pnl,
+                                "ret_pct": ret_pct,
+                                "reason": sell_ord.get("reason", "STOP"),
+                            }
+                        )
                         positions.pop(t, None)
             pending_sell_orders = []
 
@@ -230,14 +242,14 @@ class RiskParityEngine:
                                 "peak_price": entry_p,
                                 "stop_loss": entry_p - stop_dist,
                                 "breakeven_hit": False,
-                                "initial_stop_dist": stop_dist
+                                "initial_stop_dist": stop_dist,
                             }
             pending_buy_orders = []
 
             # 3. Rejim & Kriz Teyidi (3 Günlük Teyit Filtresi)
             bm_now = bm_closes[global_idx]
-            bm_sma50 = np.mean(bm_closes[max(0, global_idx-params.regime_sma_fast):global_idx+1])
-            bm_sma200 = np.mean(bm_closes[max(0, global_idx-params.regime_sma_slow):global_idx+1])
+            bm_sma50 = np.mean(bm_closes[max(0, global_idx - params.regime_sma_fast) : global_idx + 1])
+            bm_sma200 = np.mean(bm_closes[max(0, global_idx - params.regime_sma_slow) : global_idx + 1])
             is_bull = bm_now >= bm_sma50
 
             # Kriz eşiği kontrolü
@@ -263,15 +275,15 @@ class RiskParityEngine:
                 atr_val = max(cdata["atr14"][d_idx], close_p * 0.01)
 
                 if high_p > pos["peak_price"]:
-                    pos['peak_price'] = high_p
+                    pos["peak_price"] = high_p
 
                 # Breakeven kontrolü
                 if close_p >= pos["entry_price"] + (atr_val * params.atr_breakeven_mult):
-                    pos['breakeven_hit'] = True
+                    pos["breakeven_hit"] = True
 
                 if pos["breakeven_hit"]:
                     new_stop = pos["peak_price"] - (atr_val * trailing_mult)
-                    pos['stop_loss'] = max(pos['stop_loss'], new_stop, pos['entry_price'])
+                    pos["stop_loss"] = max(pos["stop_loss"], new_stop, pos["entry_price"])
 
                 # Kalan açık risk hesabı
                 if not pos["breakeven_hit"]:
@@ -280,7 +292,9 @@ class RiskParityEngine:
 
                 # Satış Tetiklenmesi
                 if close_p <= pos["stop_loss"]:
-                    pending_sell_orders.append({"ticker": ticker, "reason": "TRAILING_STOP" if pos["breakeven_hit"] else "STOP_LOSS"})
+                    pending_sell_orders.append(
+                        {"ticker": ticker, "reason": "TRAILING_STOP" if pos["breakeven_hit"] else "STOP_LOSS"}
+                    )
                 elif is_confirmed_crisis:
                     pending_sell_orders.append({"ticker": ticker, "reason": "CRISIS_EXIT"})
 
@@ -289,7 +303,11 @@ class RiskParityEngine:
             active_cnt = len(positions) + len(pending_buy_orders) - len(pending_sell_orders)
             portfolio_heat_ratio = total_open_risk / max(total_equity, 1.0)
 
-            if active_cnt < max_pos and portfolio_heat_ratio < params.max_portfolio_heat_pct and not is_confirmed_crisis:
+            if (
+                active_cnt < max_pos
+                and portfolio_heat_ratio < params.max_portfolio_heat_pct
+                and not is_confirmed_crisis
+            ):
                 candidates = []
                 for ticker, cdata in self.tech_cache.items():
                     if ticker in positions or any(o["ticker"] == ticker for o in pending_buy_orders):
@@ -316,10 +334,12 @@ class RiskParityEngine:
                     buyer_press = ((lower_wick + body) / total_range) * 100.0
 
                     # 1. Kural: Klasik Dip Dönüşü (Oversold + Alıcı Baskısı)
-                    is_dip_setup = (buyer_press >= params.min_buyer_pressure and (vol_v >= vol_avg * params.volume_surge_mult or rsi_v <= params.rsi_oversold))
+                    is_dip_setup = buyer_press >= params.min_buyer_pressure and (
+                        vol_v >= vol_avg * params.volume_surge_mult or rsi_v <= params.rsi_oversold
+                    )
 
                     # 2. Kural: Boğa Rejiminde 20 Günlük Zirve Breakout (Momentum Katılımı)
-                    is_breakout_setup = (is_bull and close_p >= high_20 and vol_v >= vol_avg * 1.10 and rsi_v >= 55.0)
+                    is_breakout_setup = is_bull and close_p >= high_20 and vol_v >= vol_avg * 1.10 and rsi_v >= 55.0
 
                     if is_dip_setup or is_breakout_setup:
                         score = buyer_press + (15.0 if is_breakout_setup else 0.0)
@@ -331,7 +351,7 @@ class RiskParityEngine:
                 # Sektör yoğunlaşma kontrolü
                 sector_exposure = self._get_sector_exposure(positions, total_equity)
 
-                for cand in candidates[:available * 2]:  # Fazla aday al, filtrele
+                for cand in candidates[: available * 2]:  # Fazla aday al, filtrele
                     if len(pending_buy_orders) >= available:
                         break
                     ticker = cand["ticker"]
@@ -340,8 +360,7 @@ class RiskParityEngine:
 
                     # Sektör yoğunlaşma limiti kontrolü
                     if sector_pct >= params.max_sector_concentration_pct:
-                        logger.debug("Sektör yoğunlaşma limiti", ticker=ticker,
-                                   sector=sector, pct=f"{sector_pct:.1%}")
+                        logger.debug("Sektör yoğunlaşma limiti", ticker=ticker, sector=sector, pct=f"{sector_pct:.1%}")
                         continue
 
                     pending_buy_orders.append({"ticker": ticker})
@@ -364,16 +383,20 @@ class RiskParityEngine:
 
         df_t = pl.DataFrame(trade_logs)
         t_cnt = len(df_t)
-        w_cnt = len(df_t.filter(pl.col('pnl') > 0)) if t_cnt > 0 else 0
+        w_cnt = len(df_t.filter(pl.col("pnl") > 0)) if t_cnt > 0 else 0
         w_rate = (w_cnt / t_cnt * 100.0) if t_cnt > 0 else 0.0
-        w_sum = df_t.filter(pl.col('pnl') > 0)["pnl"].sum() if t_cnt > 0 else 0.0
-        l_sum = abs(df_t.filter(pl.col('pnl') < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
+        w_sum = df_t.filter(pl.col("pnl") > 0)["pnl"].sum() if t_cnt > 0 else 0.0
+        l_sum = abs(df_t.filter(pl.col("pnl") < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
         pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
 
         returns = df_eq.pct_change().dropna()
         sharpe = float(np.mean(returns) / (np.std(returns) + 1e-9) * np.sqrt(252)) if len(returns) > 10 else 0.0
         downside_returns = returns[returns < 0]
-        sortino = float(np.mean(returns) / (np.std(downside_returns) + 1e-9) * np.sqrt(252)) if len(downside_returns) > 5 else sharpe
+        sortino = (
+            float(np.mean(returns) / (np.std(downside_returns) + 1e-9) * np.sqrt(252))
+            if len(downside_returns) > 5
+            else sharpe
+        )
 
         years = len(trading_dates) / 252.0
         cagr = ((final_eq / initial_capital) ** (1.0 / max(years, 0.1)) - 1.0) * 100.0
@@ -388,5 +411,5 @@ class RiskParityEngine:
             max_drawdown=round(max_dd, 2),
             total_trades=t_cnt,
             equity_curve=equity_curve,
-            trade_logs=trade_logs
+            trade_logs=trade_logs,
         )

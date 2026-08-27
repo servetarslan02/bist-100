@@ -73,6 +73,7 @@ np.bool, np.int, np.float, np.complex, np.object, np.str
 ```python
 # Mevcut kullanım (doğru):
 import redis.asyncio as aioredis
+
 _redis = aioredis.from_url(settings.redis_url, decode_responses=True)
 ```
 

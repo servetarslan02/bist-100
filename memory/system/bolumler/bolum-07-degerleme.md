@@ -37,7 +37,8 @@ DCF + Çarpan Analizi → Fair Value → Mevcut Fiyat → Upside/Downside → Ma
 from services.intelligence.valuation.engine import valuation_engine
 
 multiples = valuation_engine.compute_multiples_valuation(
-    ticker="THYAO", current_price=305.25,
+    ticker="THYAO",
+    current_price=305.25,
     company_multiples={"pe": 8.5, "pb": 1.4, "ev_ebitda": 5.1},
     sector_multiples={"pe": {"median": 11.0, "avg": 12.5}},
 )
@@ -52,11 +53,13 @@ multiples = valuation_engine.compute_multiples_valuation(
 
 ```python
 dcf = valuation_engine.compute_dcf(
-    ticker="THYAO", current_price=305.25,
+    ticker="THYAO",
+    current_price=305.25,
     revenue_forecast=[60e9, 70e9, 80e9, 90e9, 100e9],
     margin_forecast=[0.10, 0.11, 0.12, 0.12, 0.13],
     shares_outstanding=1_373_278_203,
-    total_debt=5e9, total_cash=10e9,
+    total_debt=5e9,
+    total_cash=10e9,
 )
 # implied_price: 340.50, upside: +11.6%
 # sensitivity_table: WACC × terminal_growth → fiyat
@@ -92,7 +95,8 @@ multiples = valuation_engine.compute_multiples_valuation("THYAO", 305.25, compan
 
 ```python
 scenarios = valuation_engine.compute_valuation_scenarios(
-    ticker="THYAO", current_price=305.25,
+    ticker="THYAO",
+    current_price=305.25,
     base_assumptions={"revenue_growth": 0.10, "margin": 0.12, "wacc": 0.20},
     bear_adjustments={"revenue_growth": -0.05, "margin": -0.03, "wacc": 0.03},
     bull_adjustments={"revenue_growth": 0.05, "margin": 0.03, "wacc": -0.02},

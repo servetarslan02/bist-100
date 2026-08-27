@@ -14,12 +14,13 @@ tests/test_suite.py::TestRankingModel içinde mevcut ve geçiyor.
 Bu dosya, birisi bilinçli olarak ya eski sınıfları geri getirmeye ya da testleri
 yeni API'ye göre yeniden yazmaya karar verene kadar skip ediliyor.
 """
+
 import pytest
 
 pytestmark = pytest.mark.skip(
     reason="Eski RankingModel API'sini test ediyor (RuleBasedRanker/LightGBMRanker/"
-           "FeatureImportanceTracker/AdjustedMSELoss artık mevcut değil). Güncel "
-           "mimari testleri için tests/test_suite.py::TestRankingModel'e bakın."
+    "FeatureImportanceTracker/AdjustedMSELoss artık mevcut değil). Güncel "
+    "mimari testleri için tests/test_suite.py::TestRankingModel'e bakın."
 )
 
 import sys
@@ -70,9 +71,30 @@ def test_rule_based_ranker():
     failed = 0
 
     features_list = [
-        {"ticker": "A", "rs_vs_bist_5d": 5, "momentum_acceleration": 2, "volume_percentile": 0.8, "balance_sheet_quality": 80, "why_falling": 0},
-        {"ticker": "B", "rs_vs_bist_5d": -3, "momentum_acceleration": -1, "volume_percentile": 0.3, "balance_sheet_quality": 50, "why_falling": 1},
-        {"ticker": "C", "rs_vs_bist_5d": 2, "momentum_acceleration": 1, "volume_percentile": 0.6, "balance_sheet_quality": 70, "why_falling": 0},
+        {
+            "ticker": "A",
+            "rs_vs_bist_5d": 5,
+            "momentum_acceleration": 2,
+            "volume_percentile": 0.8,
+            "balance_sheet_quality": 80,
+            "why_falling": 0,
+        },
+        {
+            "ticker": "B",
+            "rs_vs_bist_5d": -3,
+            "momentum_acceleration": -1,
+            "volume_percentile": 0.3,
+            "balance_sheet_quality": 50,
+            "why_falling": 1,
+        },
+        {
+            "ticker": "C",
+            "rs_vs_bist_5d": 2,
+            "momentum_acceleration": 1,
+            "volume_percentile": 0.6,
+            "balance_sheet_quality": 70,
+            "why_falling": 0,
+        },
     ]
 
     predictions = ranker.predict(features_list, "BULL")
@@ -209,9 +231,45 @@ def test_ranking_model_integration():
 
     # 1. Rule-based fallback (LightGBM eğitilmeden)
     features_list = [
-        {"ticker": "THYAO", "rs_vs_bist_5d": 5, "momentum_acceleration": 2, "trend_slope_20d": 0.5, "volume_percentile": 0.8, "tick_rule": 0.3, "balance_sheet_quality": 80, "kap_sentiment_avg": 0.5, "catalyst_importance": 0.7, "drawdown_20d": 3, "why_falling": 0},
-        {"ticker": "AKBNK", "rs_vs_bist_5d": -2, "momentum_acceleration": -1, "trend_slope_20d": -0.3, "volume_percentile": 0.4, "tick_rule": -0.2, "balance_sheet_quality": 60, "kap_sentiment_avg": 0.2, "catalyst_importance": 0.3, "drawdown_20d": 8, "why_falling": 1},
-        {"ticker": "ASELS", "rs_vs_bist_5d": 3, "momentum_acceleration": 1.5, "trend_slope_20d": 0.3, "volume_percentile": 0.7, "tick_rule": 0.1, "balance_sheet_quality": 75, "kap_sentiment_avg": 0.4, "catalyst_importance": 0.5, "drawdown_20d": 5, "why_falling": 0},
+        {
+            "ticker": "THYAO",
+            "rs_vs_bist_5d": 5,
+            "momentum_acceleration": 2,
+            "trend_slope_20d": 0.5,
+            "volume_percentile": 0.8,
+            "tick_rule": 0.3,
+            "balance_sheet_quality": 80,
+            "kap_sentiment_avg": 0.5,
+            "catalyst_importance": 0.7,
+            "drawdown_20d": 3,
+            "why_falling": 0,
+        },
+        {
+            "ticker": "AKBNK",
+            "rs_vs_bist_5d": -2,
+            "momentum_acceleration": -1,
+            "trend_slope_20d": -0.3,
+            "volume_percentile": 0.4,
+            "tick_rule": -0.2,
+            "balance_sheet_quality": 60,
+            "kap_sentiment_avg": 0.2,
+            "catalyst_importance": 0.3,
+            "drawdown_20d": 8,
+            "why_falling": 1,
+        },
+        {
+            "ticker": "ASELS",
+            "rs_vs_bist_5d": 3,
+            "momentum_acceleration": 1.5,
+            "trend_slope_20d": 0.3,
+            "volume_percentile": 0.7,
+            "tick_rule": 0.1,
+            "balance_sheet_quality": 75,
+            "kap_sentiment_avg": 0.4,
+            "catalyst_importance": 0.5,
+            "drawdown_20d": 5,
+            "why_falling": 0,
+        },
     ]
 
     predictions = ranking_model.predict(features_list, "BULL")
@@ -282,6 +340,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

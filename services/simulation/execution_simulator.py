@@ -47,6 +47,7 @@ class OrderType(StrEnum):
 @dataclass
 class Order:
     """Emir."""
+
     order_id: str
     portfolio_id: int
     instrument_id: int
@@ -54,8 +55,8 @@ class Order:
     side: OrderSide
     order_type: OrderType
     quantity: int
-    price: float = 0.0          # Limit emir fiyati
-    stop_price: float = 0.0     # Stop fiyati
+    price: float = 0.0  # Limit emir fiyati
+    stop_price: float = 0.0  # Stop fiyati
     status: OrderStatus = OrderStatus.CREATED
     filled_quantity: int = 0
     avg_fill_price: float = 0.0
@@ -72,6 +73,7 @@ class Order:
 @dataclass
 class Fill:
     """Dolum."""
+
     fill_id: str
     order_id: str
     instrument_id: int
@@ -91,10 +93,10 @@ class ExecutionSimulator:
     """
 
     # Komisyon oranlari (BIST)
-    BROKER_COMMISSION_RATE = 0.0003   # %0.03
-    EXCHANGE_FEE_RATE = 0.000056      # %0.0056
-    BSMV_RATE = 0.05                  # BSMV (komisyon uzerinden %5)
-    MIN_COMMISSION = 1.0              # Minimum 1 TL
+    BROKER_COMMISSION_RATE = 0.0003  # %0.03
+    EXCHANGE_FEE_RATE = 0.000056  # %0.0056
+    BSMV_RATE = 0.05  # BSMV (komisyon uzerinden %5)
+    MIN_COMMISSION = 1.0  # Minimum 1 TL
 
     def execute_order(
         self,
@@ -133,9 +135,7 @@ class ExecutionSimulator:
         order.status = OrderStatus.SUBMITTED
 
         # Slippage hesapla
-        slippage = self._compute_slippage(
-            order.quantity, avg_volume, volatility, spread_pct, order.side
-        )
+        slippage = self._compute_slippage(order.quantity, avg_volume, volatility, spread_pct, order.side)
 
         # Uygulanacak fiyat
         if order.order_type == OrderType.MARKET:
@@ -180,14 +180,16 @@ class ExecutionSimulator:
         order.slippage = round(slippage * 100, 4)  # Yuzde olarak
         order.filled_at = datetime.now(UTC)
 
-        logger.info("Order executed",
-                    order_id=order.order_id,
-                    ticker=order.ticker,
-                    side=order.side.value,
-                    qty=fill_qty,
-                    price=fill_price,
-                    commission=commission,
-                    slippage=order.slippage)
+        logger.info(
+            "Order executed",
+            order_id=order.order_id,
+            ticker=order.ticker,
+            side=order.side.value,
+            qty=fill_qty,
+            price=fill_price,
+            commission=commission,
+            slippage=order.slippage,
+        )
 
         return order
 
@@ -233,6 +235,7 @@ class ExecutionSimulator:
     def create_fill(self, order: Order) -> Fill:
         """Fill olustur."""
         import hashlib
+
         fill_id = hashlib.sha256(
             f"{order.order_id}-{order.filled_quantity}-{order.avg_fill_price}".encode()
         ).hexdigest()[:16]

@@ -29,6 +29,7 @@ logger = structlog.get_logger()
 @dataclass
 class AuditEntry:
     """Audit log kaydı."""
+
     entry_id: str
     timestamp: datetime
     user_id: str
@@ -43,19 +44,20 @@ class AuditEntry:
 
     def compute_hash(self, previous_hash: str = "") -> str:
         """Hash hesapla."""
-        content = orjson.dumps({
-            "entry_id": self.entry_id,
-            "timestamp": self.timestamp.isoformat(),
-            "user_id": self.user_id,
-            "action": self.action,
-            "resource_type": self.resource_type,
-            "resource_id": self.resource_id,
-            "details": self.details,
-        }, sort_keys=True)
+        content = orjson.dumps(
+            {
+                "entry_id": self.entry_id,
+                "timestamp": self.timestamp.isoformat(),
+                "user_id": self.user_id,
+                "action": self.action,
+                "resource_type": self.resource_type,
+                "resource_id": self.resource_id,
+                "details": self.details,
+            },
+            sort_keys=True,
+        )
 
-        return hashlib.sha256(
-            f"{previous_hash}:{content}".encode()
-        ).hexdigest()[:32]
+        return hashlib.sha256(f"{previous_hash}:{content}".encode()).hexdigest()[:32]
 
     def seal(self, previous_hash: str = ""):
         """Hash'i hesapla ve kaydet (immutable seal)."""
@@ -123,9 +125,8 @@ class ImmutableAuditLog:
             AuditEntry (sealed, immutable)
         """
         import hashlib as hl
-        entry_id = hl.md5(
-            f"audit_{user_id}_{action}_{time.time()}".encode()
-        ).hexdigest()[:16]
+
+        entry_id = hl.md5(f"audit_{user_id}_{action}_{time.time()}".encode()).hexdigest()[:16]
 
         entry = AuditEntry(
             entry_id=entry_id,
@@ -148,11 +149,9 @@ class ImmutableAuditLog:
             self._entries = self._entries[-1000:]
         self._total_entries += 1
 
-        logger.info("Audit log entry",
-                    entry_id=entry_id,
-                    user=user_id,
-                    action=action,
-                    resource=f"{resource_type}:{resource_id}")
+        logger.info(
+            "Audit log entry", entry_id=entry_id, user=user_id, action=action, resource=f"{resource_type}:{resource_id}"
+        )
 
         # Persist if configured
         if self._storage_path:

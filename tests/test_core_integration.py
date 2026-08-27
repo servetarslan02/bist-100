@@ -20,6 +20,7 @@ import pytest
 # TEST 1: Event Bus → DLQ Integration
 # =====================================================
 
+
 class TestEventBusDLQ:
     """Event handler crash → DLQ'ya düşmeli."""
 
@@ -59,9 +60,7 @@ class TestEventBusDLQ:
         dlq.register_retry_handler("market.tick", retry_handler)
 
         # next_retry_at=None ile push et (hemen retry edilebilir)
-        entry = asyncio.get_event_loop().run_until_complete(
-            dlq.push("evt_002", "market.tick", "{}", "test error")
-        )
+        entry = asyncio.get_event_loop().run_until_complete(dlq.push("evt_002", "market.tick", "{}", "test error"))
         # next_retry_at'ı None yap (hemen retry)
         entry.next_retry_at = None
 
@@ -83,9 +82,7 @@ class TestEventBusDLQ:
         # İlk retry — handler yok → EXHAUSTED
         asyncio.get_event_loop().run_until_complete(dlq.retry_failed())
 
-        entries = asyncio.get_event_loop().run_until_complete(
-            dlq.get_entries(event_type="unknown.type")
-        )
+        entries = asyncio.get_event_loop().run_until_complete(dlq.get_entries(event_type="unknown.type"))
         assert len(entries) == 1
         assert entries[0]["status"] == "EXHAUSTED"
 
@@ -93,6 +90,7 @@ class TestEventBusDLQ:
 # =====================================================
 # TEST 2: Security → JWT Manager
 # =====================================================
+
 
 class TestSecurityJWT:
     """Security servisi JWT Manager kullanmalı."""
@@ -147,9 +145,7 @@ class TestSecurityJWT:
         from services.core.jwt_manager import JWTManager, TokenType
 
         mgr = JWTManager(secret_key="test-secret-key-12345678")
-        refresh_token = mgr.generate_token(
-            "user1", "ADMIN", ["READ"], TokenType.REFRESH
-        )
+        refresh_token = mgr.generate_token("user1", "ADMIN", ["READ"], TokenType.REFRESH)
 
         new_access = mgr.refresh_token(refresh_token)
         claims = mgr.validate_token(new_access)
@@ -172,6 +168,7 @@ class TestSecurityJWT:
 # TEST 3: Circuit Breaker + Metrics
 # =====================================================
 
+
 class TestCircuitBreaker:
     """Circuit breaker durum geçişleri ve metrikleri."""
 
@@ -192,9 +189,7 @@ class TestCircuitBreaker:
         assert not cb.can_execute()
 
         # Recovery timeout → HALF_OPEN
-        cb.last_failure_time = cb.last_failure_time.replace(
-            second=cb.last_failure_time.second - 2
-        )
+        cb.last_failure_time = cb.last_failure_time.replace(second=cb.last_failure_time.second - 2)
         assert cb.can_execute()
         assert cb.state == CircuitState.HALF_OPEN
 
@@ -208,12 +203,13 @@ class TestCircuitBreaker:
 
         collector = CircuitBreakerMetricsCollector()
         # Metrics export fonksiyonu var
-        assert hasattr(collector, 'collect_all') or hasattr(collector, 'get_all_snapshots')
+        assert hasattr(collector, "collect_all") or hasattr(collector, "get_all_snapshots")
 
 
 # =====================================================
 # TEST 4: Transaction Helper
 # =====================================================
+
 
 class TestTransactionHelper:
     """Transaction helper testleri."""
@@ -235,14 +231,13 @@ class TestTransactionHelper:
 
         helper = TransactionHelper()
         with pytest.raises(RuntimeError, match="pool not configured"):
-            asyncio.get_event_loop().run_until_complete(
-                helper.execute_batch([lambda tx: None])
-            )
+            asyncio.get_event_loop().run_until_complete(helper.execute_batch([lambda tx: None]))
 
 
 # =====================================================
 # TEST 5: Config Hot-Reload
 # =====================================================
+
 
 class TestConfigHotReload:
     """Config hot-reload testleri."""
@@ -255,7 +250,7 @@ class TestConfigHotReload:
 
         from services.core.config_hot_reload import ConfigHotReload
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(orjson.dumps({"key": "value1"}).decode())
             path = f.name
 
@@ -269,6 +264,7 @@ class TestConfigHotReload:
         assert len(history) == 0
 
         import os
+
         os.unlink(path)
 
     def test_force_reload(self):
@@ -279,7 +275,7 @@ class TestConfigHotReload:
 
         from services.core.config_hot_reload import ConfigHotReload
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(orjson.dumps({"x": 1}).decode())
             path = f.name
 
@@ -288,12 +284,14 @@ class TestConfigHotReload:
         assert config.get("x") == 1
 
         import os
+
         os.unlink(path)
 
 
 # =====================================================
 # TEST 6: Immutable Audit Log
 # =====================================================
+
 
 class TestImmutableAudit:
     """Immutable audit log testleri."""
@@ -318,7 +316,7 @@ class TestImmutableAudit:
         audit.log("user1", "CREATE", "portfolio", "p1", {})
 
         # Manuel müdahale (simüle)
-        if hasattr(audit, '_entries') and audit._entries:
+        if hasattr(audit, "_entries") and audit._entries:
             audit._entries[0].action = "TAMPERED"
             result = audit.verify_integrity()
             # verify_integrity tuple (bool, str) döndürebilir
@@ -329,6 +327,7 @@ class TestImmutableAudit:
 # =====================================================
 # TEST 7: System Governor
 # =====================================================
+
 
 class TestSystemGovernor:
     """Graceful degradation testleri."""
@@ -366,6 +365,7 @@ class TestSystemGovernor:
 # TEST 8: Distributed Tracing
 # =====================================================
 
+
 class TestDistributedTracing:
     """Distributed tracing testleri."""
 
@@ -398,6 +398,7 @@ class TestDistributedTracing:
 # =====================================================
 # TEST 9: RBAC
 # =====================================================
+
 
 class TestRBAC:
     """Role-based access control testleri."""
@@ -432,6 +433,7 @@ class TestRBAC:
 # =====================================================
 # TEST 10: Secret Redaction
 # =====================================================
+
 
 class TestSecretRedaction:
     """Loglarda hassas bilgi gizleme."""

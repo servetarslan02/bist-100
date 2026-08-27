@@ -10,11 +10,12 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 print("=" * 85)
 print("ALPHA BIST — 7/24 TAM OTONOM SİSTEM VE OTOMATİK EĞİTİM KANITI")
 print("=" * 85)
+
 
 async def verify_autonomous():
     # -------------------------------------------------------------
@@ -45,11 +46,21 @@ async def verify_autonomous():
     # 3. GÜNLÜK OTONOM İŞ AKIŞI ÇİZELGESİ (WORKFLOW TIMELINE)
     # -------------------------------------------------------------
     print("\n[3. KATMAN] 24 Saatlik Sıfır Müdahaleli Otonom Akış Çizelgesi:")
-    print("  ⏰ 09:40 - 10:00 (Açılış Öncesi) : Dinamik 629 hisse evreni güncellenir, dünün KAP ve sabah haberleri taranır.")
-    print("  ⏰ 10:00 - 18:00 (Canlı Seans)   : Her 15-60 saniyede canlı radar, anlık sinyal üretimi, stop-loss ve trailing stop takibi.")
-    print("  ⏰ 18:05 - 18:30 (Kapanış Analizi): Günlük işlemlerin kâr/zarar defteri kilitlenir, günün kapanış fiyatları arşivlenir.")
-    print("  ⏰ 18:30 - 20:00 (Gece Eğitimi)  : Model Drift (Performans Kayması) kontrol edilir, XGBoost/LambdaRank otomatik yeniden eğitilir.")
-    print("  ⏰ 20:00 - 09:40 (Gece Nöbeti)   : Küresel makro (DXY, ABD 10Y, Petrol, Asya/ABD borsaları) ve gece KAP akışı taranır.")
+    print(
+        "  ⏰ 09:40 - 10:00 (Açılış Öncesi) : Dinamik 629 hisse evreni güncellenir, dünün KAP ve sabah haberleri taranır."
+    )
+    print(
+        "  ⏰ 10:00 - 18:00 (Canlı Seans)   : Her 15-60 saniyede canlı radar, anlık sinyal üretimi, stop-loss ve trailing stop takibi."
+    )
+    print(
+        "  ⏰ 18:05 - 18:30 (Kapanış Analizi): Günlük işlemlerin kâr/zarar defteri kilitlenir, günün kapanış fiyatları arşivlenir."
+    )
+    print(
+        "  ⏰ 18:30 - 20:00 (Gece Eğitimi)  : Model Drift (Performans Kayması) kontrol edilir, XGBoost/LambdaRank otomatik yeniden eğitilir."
+    )
+    print(
+        "  ⏰ 20:00 - 09:40 (Gece Nöbeti)   : Küresel makro (DXY, ABD 10Y, Petrol, Asya/ABD borsaları) ve gece KAP akışı taranır."
+    )
 
     # -------------------------------------------------------------
     # 4. MANUEL MÜDAHALE GEREKSİNİMİ DEĞERLENDİRMESİ
@@ -64,6 +75,7 @@ async def verify_autonomous():
     print("\n" + "=" * 85)
     print("KANITLANDI: SİSTEM BAŞTAN SONA %100 TAM OTONOMDUR, SİZE HİÇBİR İŞ DÜŞMEZ.")
     print("=" * 85)
+
 
 if __name__ == "__main__":
     asyncio.run(verify_autonomous())

@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class PositionImpact:
     """Pozisyon etki sonucu."""
+
     ticker: str
     sector: str
     value: float
@@ -35,6 +36,7 @@ class PositionImpact:
 @dataclass
 class StressTestResult:
     """Stres testi sonucu."""
+
     scenario: str
     description: str
     shocks: dict[str, float]
@@ -50,6 +52,7 @@ class StressTestResult:
 @dataclass
 class BreakingPointResult:
     """Breaking point sonucu."""
+
     shock_type: str
     breaking_point_pct: float
     portfolio_impact_at_breaking: float
@@ -72,16 +75,96 @@ class MacroStressTest:
 
     # Sektör hassasiyet matrisi
     SECTOR_SENSITIVITY = {
-        "BANK": {"usdtry": -0.3, "interest_rate": 0.9, "oil": -0.1, "inflation": -0.7, "global": 0.5, "vix": -0.4, "bist": 0.7},
-        "AVIATION": {"usdtry": -0.8, "interest_rate": -0.5, "oil": -0.9, "inflation": -0.4, "global": 0.6, "vix": -0.5, "bist": 0.6},
-        "ENERGY": {"usdtry": 0.5, "interest_rate": -0.4, "oil": 0.9, "inflation": 0.3, "global": 0.7, "vix": -0.3, "bist": 0.5},
-        "TECH": {"usdtry": 0.4, "interest_rate": -0.6, "oil": -0.1, "inflation": -0.3, "global": 0.8, "vix": -0.6, "bist": 0.8},
-        "RETAIL": {"usdtry": -0.6, "interest_rate": -0.5, "oil": -0.3, "inflation": -0.8, "global": 0.3, "vix": -0.3, "bist": 0.6},
-        "METAL": {"usdtry": 0.4, "interest_rate": -0.3, "oil": -0.5, "inflation": 0.3, "global": 0.8, "vix": -0.4, "bist": 0.7},
-        "CONSTR": {"usdtry": -0.6, "interest_rate": -0.8, "oil": -0.4, "inflation": -0.7, "global": 0.3, "vix": -0.4, "bist": 0.7},
-        "FOOD": {"usdtry": -0.5, "interest_rate": -0.4, "oil": -0.3, "inflation": -0.6, "global": 0.3, "vix": -0.3, "bist": 0.5},
-        "HOLDING": {"usdtry": -0.4, "interest_rate": -0.5, "oil": -0.2, "inflation": -0.4, "global": 0.5, "vix": -0.4, "bist": 0.6},
-        "OTHER": {"usdtry": -0.4, "interest_rate": -0.4, "oil": -0.2, "inflation": -0.4, "global": 0.4, "vix": -0.3, "bist": 0.5},
+        "BANK": {
+            "usdtry": -0.3,
+            "interest_rate": 0.9,
+            "oil": -0.1,
+            "inflation": -0.7,
+            "global": 0.5,
+            "vix": -0.4,
+            "bist": 0.7,
+        },
+        "AVIATION": {
+            "usdtry": -0.8,
+            "interest_rate": -0.5,
+            "oil": -0.9,
+            "inflation": -0.4,
+            "global": 0.6,
+            "vix": -0.5,
+            "bist": 0.6,
+        },
+        "ENERGY": {
+            "usdtry": 0.5,
+            "interest_rate": -0.4,
+            "oil": 0.9,
+            "inflation": 0.3,
+            "global": 0.7,
+            "vix": -0.3,
+            "bist": 0.5,
+        },
+        "TECH": {
+            "usdtry": 0.4,
+            "interest_rate": -0.6,
+            "oil": -0.1,
+            "inflation": -0.3,
+            "global": 0.8,
+            "vix": -0.6,
+            "bist": 0.8,
+        },
+        "RETAIL": {
+            "usdtry": -0.6,
+            "interest_rate": -0.5,
+            "oil": -0.3,
+            "inflation": -0.8,
+            "global": 0.3,
+            "vix": -0.3,
+            "bist": 0.6,
+        },
+        "METAL": {
+            "usdtry": 0.4,
+            "interest_rate": -0.3,
+            "oil": -0.5,
+            "inflation": 0.3,
+            "global": 0.8,
+            "vix": -0.4,
+            "bist": 0.7,
+        },
+        "CONSTR": {
+            "usdtry": -0.6,
+            "interest_rate": -0.8,
+            "oil": -0.4,
+            "inflation": -0.7,
+            "global": 0.3,
+            "vix": -0.4,
+            "bist": 0.7,
+        },
+        "FOOD": {
+            "usdtry": -0.5,
+            "interest_rate": -0.4,
+            "oil": -0.3,
+            "inflation": -0.6,
+            "global": 0.3,
+            "vix": -0.3,
+            "bist": 0.5,
+        },
+        "HOLDING": {
+            "usdtry": -0.4,
+            "interest_rate": -0.5,
+            "oil": -0.2,
+            "inflation": -0.4,
+            "global": 0.5,
+            "vix": -0.4,
+            "bist": 0.6,
+        },
+        "OTHER": {
+            "usdtry": -0.4,
+            "interest_rate": -0.4,
+            "oil": -0.2,
+            "inflation": -0.4,
+            "global": 0.4,
+            "vix": -0.3,
+            "bist": 0.5,
+        },
     }
 
     # Senaryo açıklamaları
@@ -160,7 +243,7 @@ class MacroStressTest:
             shock_type=shock_type,
             breaking_point_pct=round(breaking_point * 100, 2),
             portfolio_impact_at_breaking=round(threshold_pct * 100, 2),
-            description=f"{shock_type} %{breaking_point*100:.1f} şoku portföyü %{abs(threshold_pct)*100:.0f} kayıp ettirir",
+            description=f"{shock_type} %{breaking_point * 100:.1f} şoku portföyü %{abs(threshold_pct) * 100:.0f} kayıp ettirir",
         )
 
     def run_all_scenarios(
@@ -244,14 +327,16 @@ class MacroStressTest:
             impact_value = value * impact_pct
             total_impact_value += impact_value
 
-            position_impacts.append(PositionImpact(
-                ticker=ticker,
-                sector=sector,
-                value=value,
-                weight=weight,
-                impact_pct=round(impact_pct * 100, 2),
-                impact_value=round(impact_value, 2),
-            ))
+            position_impacts.append(
+                PositionImpact(
+                    ticker=ticker,
+                    sector=sector,
+                    value=value,
+                    weight=weight,
+                    impact_pct=round(impact_pct * 100, 2),
+                    impact_value=round(impact_value, 2),
+                )
+            )
 
         total_impact_pct = total_impact_value / total_value if total_value > 0 else 0
 

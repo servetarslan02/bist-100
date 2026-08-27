@@ -16,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class FeatureDiscoveryResult:
     """Feature discovery sonucu."""
+
     selected_features: list[str]
     feature_importance: dict[str, float]
     feature_interactions: list[dict[str, Any]]
@@ -54,46 +55,32 @@ class FeatureDiscoveryPipeline:
         logger.info("Starting feature discovery", initial_features=len(feature_names))
 
         # Step 1: Generate interactions
-        expanded_data, expanded_names = self._generate_interactions(
-            feature_data, feature_names
-        )
+        expanded_data, expanded_names = self._generate_interactions(feature_data, feature_names)
         logger.info("Interactions generated", total_features=len(expanded_names))
 
         # Step 2: Mutual Information
         mi_scores = self._mutual_information(expanded_data, target, expanded_names)
-        mi_selected = [
-            name for name, score in mi_scores.items() if score > 0.01
-        ]
+        mi_selected = [name for name, score in mi_scores.items() if score > 0.01]
         logger.info("MI filtering", selected=len(mi_selected))
 
         # Step 3: Correlation filter
-        corr_filtered = self._correlation_filter(
-            expanded_data.select(mi_selected), mi_selected, threshold=0.95
-        )
+        corr_filtered = self._correlation_filter(expanded_data.select(mi_selected), mi_selected, threshold=0.95)
         logger.info("Correlation filter", selected=len(corr_filtered))
 
         # Step 4: Permutation Importance
-        perm_importance = self._permutation_importance(
-            expanded_data.select(corr_filtered), target, corr_filtered
-        )
+        perm_importance = self._permutation_importance(expanded_data.select(corr_filtered), target, corr_filtered)
         logger.info("Permutation importance computed")
 
         # Step 5: SHAP (simplified)
-        shap_importance = self._shap_importance(
-            expanded_data.select(corr_filtered), target, corr_filtered
-        )
+        shap_importance = self._shap_importance(expanded_data.select(corr_filtered), target, corr_filtered)
         logger.info("SHAP importance computed")
 
         # Step 6: Feature stability
-        stability = self._feature_stability(
-            expanded_data.select(corr_filtered), target, corr_filtered
-        )
+        stability = self._feature_stability(expanded_data.select(corr_filtered), target, corr_filtered)
         logger.info("Feature stability computed")
 
         # Step 7: Leakage detection
-        leakage = self._detect_leakage(
-            expanded_data.select(corr_filtered), target, corr_filtered
-        )
+        leakage = self._detect_leakage(expanded_data.select(corr_filtered), target, corr_filtered)
         logger.info("Leakage detection done", flagged=sum(leakage.values()))
 
         # Step 8: Regime-conditioned importance
@@ -105,10 +92,7 @@ class FeatureDiscoveryPipeline:
             logger.info("Regime importance computed")
 
         # Final selection: combine all signals
-        final_features = self._final_selection(
-            corr_filtered, perm_importance, shap_importance,
-            stability, leakage
-        )
+        final_features = self._final_selection(corr_filtered, perm_importance, shap_importance, stability, leakage)
 
         # Combined importance
         combined_importance = {}
@@ -135,9 +119,7 @@ class FeatureDiscoveryPipeline:
     # Step 1: Feature Interaction Generation
     # =====================================================
 
-    def _generate_interactions(
-        self, data: pl.DataFrame, feature_names: list[str]
-    ) -> tuple[pl.DataFrame, list[str]]:
+    def _generate_interactions(self, data: pl.DataFrame, feature_names: list[str]) -> tuple[pl.DataFrame, list[str]]:
         """Generate pairwise feature interactions."""
         new_data = data.clone()
         new_names = list(feature_names)
@@ -146,29 +128,22 @@ class FeatureDiscoveryPipeline:
         top_features = feature_names[:20]
 
         for i, f1 in enumerate(top_features):
-            for f2 in top_features[i + 1:]:
+            for f2 in top_features[i + 1 :]:
                 # Product
                 prod_name = f"{f1}_x_{f2}"
-                new_data = new_data.with_columns(
-                    (pl.col(f1) * pl.col(f2)).alias(prod_name)
-                )
+                new_data = new_data.with_columns((pl.col(f1) * pl.col(f2)).alias(prod_name))
                 new_names.append(prod_name)
 
                 # Ratio (avoid division by zero)
                 ratio_name = f"{f1}_div_{f2}"
                 new_data = new_data.with_columns(
-                    pl.when(pl.col(f2).abs() > 1e-10)
-                    .then(pl.col(f1) / pl.col(f2))
-                    .otherwise(0)
-                    .alias(ratio_name)
+                    pl.when(pl.col(f2).abs() > 1e-10).then(pl.col(f1) / pl.col(f2)).otherwise(0).alias(ratio_name)
                 )
                 new_names.append(ratio_name)
 
                 # Difference
                 diff_name = f"{f1}_minus_{f2}"
-                new_data = new_data.with_columns(
-                    (pl.col(f1) - pl.col(f2)).alias(diff_name)
-                )
+                new_data = new_data.with_columns((pl.col(f1) - pl.col(f2)).alias(diff_name))
                 new_names.append(diff_name)
 
         return new_data, new_names
@@ -177,9 +152,7 @@ class FeatureDiscoveryPipeline:
     # Step 2: Mutual Information
     # =====================================================
 
-    def _mutual_information(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
-    ) -> dict[str, float]:
+    def _mutual_information(self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]) -> dict[str, float]:
         """Compute mutual information between features and target."""
         from sklearn.feature_selection import mutual_info_regression
 
@@ -201,9 +174,7 @@ class FeatureDiscoveryPipeline:
     # Step 3: Correlation Filter
     # =====================================================
 
-    def _correlation_filter(
-        self, data: pl.DataFrame, feature_names: list[str], threshold: float = 0.95
-    ) -> list[str]:
+    def _correlation_filter(self, data: pl.DataFrame, feature_names: list[str], threshold: float = 0.95) -> list[str]:
         """Remove highly correlated features — Polars only."""
         # Polars correlation matrix — numpy ile hesapla
         selected = data.select(feature_names).to_numpy()
@@ -249,6 +220,7 @@ class FeatureDiscoveryPipeline:
 
         # Permutation importance
         from sklearn.inspection import permutation_importance
+
         result = permutation_importance(model, X, y, n_repeats=5, random_state=42)
 
         return dict(zip(feature_names, result.importances_mean, strict=False))
@@ -257,9 +229,7 @@ class FeatureDiscoveryPipeline:
     # Step 5: SHAP (Simplified)
     # =====================================================
 
-    def _shap_importance(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
-    ) -> dict[str, float]:
+    def _shap_importance(self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]) -> dict[str, float]:
         """Compute SHAP-based feature importance."""
         import lightgbm as lgb
 
@@ -279,6 +249,7 @@ class FeatureDiscoveryPipeline:
         # SHAP TreeExplainer (fast for tree models)
         try:
             import shap
+
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X[:500])  # sample for speed
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
@@ -292,9 +263,7 @@ class FeatureDiscoveryPipeline:
     # Step 6: Feature Stability
     # =====================================================
 
-    def _feature_stability(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
-    ) -> dict[str, float]:
+    def _feature_stability(self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]) -> dict[str, float]:
         """Check if feature importance is stable across time periods."""
         import lightgbm as lgb
 
@@ -338,9 +307,7 @@ class FeatureDiscoveryPipeline:
     # Step 7: Leakage Detection
     # =====================================================
 
-    def _detect_leakage(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
-    ) -> dict[str, bool]:
+    def _detect_leakage(self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]) -> dict[str, bool]:
         """Detect if any feature leaks future information.
 
         Temporal validation: feature'in gelecekteki target ile korelasyonu

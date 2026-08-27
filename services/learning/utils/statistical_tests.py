@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class PSIResult:
     """PSI sonucu."""
+
     psi: float
     drift_detected: bool
     severity: str  # STABLE, WARNING, ALERT, CRITICAL
@@ -28,6 +29,7 @@ class PSIResult:
 @dataclass
 class KSTestResult:
     """KS test sonucu."""
+
     statistic: float
     p_value: float
     drift_detected: bool
@@ -37,6 +39,7 @@ class KSTestResult:
 @dataclass
 class PageHinkleyResult:
     """Page-Hinkley test sonucu."""
+
     drift_detected: bool
     max_deviation: float
     threshold: float
@@ -46,6 +49,7 @@ class PageHinkleyResult:
 @dataclass
 class ADWINResult:
     """ADWIN test sonucu."""
+
     drift_detected: bool
     window_size: int
     t_statistic: float
@@ -55,6 +59,7 @@ class ADWINResult:
 @dataclass
 class WelchTTestResult:
     """Welch's t-test sonucu."""
+
     t_statistic: float
     p_value: float
     significant: bool
@@ -134,12 +139,14 @@ class StatisticalTests:
         # Bin detayları
         bin_details = []
         for i in range(len(expected_pct)):
-            bin_details.append({
-                "bin_index": i,
-                "expected_pct": round(float(expected_pct[i]), 4),
-                "actual_pct": round(float(actual_pct[i]), 4),
-                "psi_contribution": round(float(psi_values[i]), 4),
-            })
+            bin_details.append(
+                {
+                    "bin_index": i,
+                    "expected_pct": round(float(expected_pct[i]), 4),
+                    "actual_pct": round(float(actual_pct[i]), 4),
+                    "psi_contribution": round(float(psi_values[i]), 4),
+                }
+            )
 
         return PSIResult(
             psi=round(psi, 4),
@@ -178,10 +185,7 @@ class StatisticalTests:
         sample2 = sample2[np.isfinite(sample2)]
 
         if len(sample1) < 5 or len(sample2) < 5:
-            return KSTestResult(
-                statistic=0.0, p_value=1.0, drift_detected=False,
-                interpretation="Insufficient data"
-            )
+            return KSTestResult(statistic=0.0, p_value=1.0, drift_detected=False, interpretation="Insufficient data")
 
         ks_result = stats.ks_2samp(sample1, sample2)
         ks_stat = ks_result.statistic
@@ -231,8 +235,7 @@ class StatisticalTests:
 
         if len(data) < 10:
             return PageHinkleyResult(
-                drift_detected=False, max_deviation=0.0,
-                threshold=threshold, change_point_index=None
+                drift_detected=False, max_deviation=0.0, threshold=threshold, change_point_index=None
             )
 
         # Kümülatif ortalama
@@ -288,10 +291,7 @@ class StatisticalTests:
         data = data[np.isfinite(data)]
 
         if len(data) < min_window * 2:
-            return ADWINResult(
-                drift_detected=False, window_size=0,
-                t_statistic=0.0, p_value=1.0
-            )
+            return ADWINResult(drift_detected=False, window_size=0, t_statistic=0.0, p_value=1.0)
 
         # Adaptif pencere boyutu
         best_drift = False
@@ -393,10 +393,7 @@ class StatisticalTests:
         sample2 = sample2[np.isfinite(sample2)]
 
         if len(sample1) < 5 or len(sample2) < 5:
-            return WelchTTestResult(
-                t_statistic=0.0, p_value=1.0, significant=False,
-                interpretation="Insufficient data"
-            )
+            return WelchTTestResult(t_statistic=0.0, p_value=1.0, significant=False, interpretation="Insufficient data")
 
         t_result = stats.ttest_ind(sample1, sample2, equal_var=False)
         t_stat = t_result.statistic
@@ -559,16 +556,11 @@ class StatisticalTests:
         # where γ = Euler-Mascheroni constant
         euler_gamma = 0.5772
         log_n = np.log(n_trials)
-        expected_max_sr = (
-            np.sqrt(2 * log_n) * (1 - euler_gamma / log_n)
-            + euler_gamma / np.sqrt(2 * log_n)
-        )
+        expected_max_sr = np.sqrt(2 * log_n) * (1 - euler_gamma / log_n) + euler_gamma / np.sqrt(2 * log_n)
 
         # Standard error of Sharpe
         se_sharpe = np.sqrt(
-            (1 + 0.5 * observed_sharpe**2
-             - skewness * observed_sharpe
-             + (kurtosis - 3) / 4 * observed_sharpe**2)
+            (1 + 0.5 * observed_sharpe**2 - skewness * observed_sharpe + (kurtosis - 3) / 4 * observed_sharpe**2)
             / (n_observations - 1)
         )
 

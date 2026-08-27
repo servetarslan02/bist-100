@@ -82,69 +82,72 @@ Reward = Portfolio return - λ × Risk - γ × Transaction cost
 import gymnasium as gym
 import numpy as np
 
+
 class BISTTradingEnv(gym.Env):
     def __init__(self, data, initial_capital=100000):
         super().__init__()
         self.data = data
         self.initial_capital = initial_capital
-        
+
         # State: [price, volume, rsi, macd, bb_pct, atr, usdtry, cds, portfolio_weight]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(9,))
-        
+
         # Action: [-1, +1] (sell all to buy all)
         self.action_space = gym.spaces.Box(low=-1, high=1, shape=(1,))
-        
+
         self.reset()
-    
+
     def reset(self):
         self.current_step = 0
         self.portfolio_value = self.initial_capital
         self.cash = self.initial_capital
         self.shares = 0
         return self._get_observation(), {}
-    
+
     def step(self, action):
         # Aksiyonu uygula
         action = action[0]
-        
+
         if action > 0.1:  # BUY
             buy_amount = self.cash * action
             shares_to_buy = int(buy_amount / self.data[self.current_step]["price"])
             self.shares += shares_to_buy
             self.cash -= shares_to_buy * self.data[self.current_step]["price"]
-        
+
         elif action < -0.1:  # SELL
             shares_to_sell = int(self.shares * abs(action))
             self.cash += shares_to_sell * self.data[self.current_step]["price"]
             self.shares -= shares_to_sell
-        
+
         # Portfolio değeri
         new_value = self.cash + self.shares * self.data[self.current_step]["price"]
-        
+
         # Reward
         reward = (new_value - self.portfolio_value) / self.portfolio_value
         reward -= 0.001 * abs(action)  # İşlem maliyeti
         reward -= 0.0001 * (self.shares * self.data[self.current_step]["price"] / new_value)  # Risk
-        
+
         self.portfolio_value = new_value
         self.current_step += 1
-        
+
         done = self.current_step >= len(self.data) - 1
-        
+
         return self._get_observation(), reward, done, False, {}
-    
+
     def _get_observation(self):
-        return np.array([
-            self.data[self.current_step]["price"],
-            self.data[self.current_step]["volume"],
-            self.data[self.current_step]["rsi"],
-            self.data[self.current_step]["macd"],
-            self.data[self.current_step]["bb_pct"],
-            self.data[self.current_step]["atr"],
-            self.data[self.current_step]["usdtry"],
-            self.data[self.current_step]["cds"],
-            self.shares * self.data[self.current_step]["price"] / self.portfolio_value,
-        ])
+        return np.array(
+            [
+                self.data[self.current_step]["price"],
+                self.data[self.current_step]["volume"],
+                self.data[self.current_step]["rsi"],
+                self.data[self.current_step]["macd"],
+                self.data[self.current_step]["bb_pct"],
+                self.data[self.current_step]["atr"],
+                self.data[self.current_step]["usdtry"],
+                self.data[self.current_step]["cds"],
+                self.shares * self.data[self.current_step]["price"] / self.portfolio_value,
+            ]
+        )
 ```
 
 ---
@@ -156,6 +159,7 @@ class BISTTradingEnv(gym.Env):
 ```python
 # services/ml/rl_agent.py
 from stable_baselines3 import PPO
+
 
 def train_rl_agent(env, total_timesteps=100000):
     model = PPO(
@@ -170,9 +174,9 @@ def train_rl_agent(env, total_timesteps=100000):
         clip_range=0.2,
         verbose=0,
     )
-    
+
     model.learn(total_timesteps=total_timesteps)
-    
+
     return model
 ```
 
@@ -197,18 +201,19 @@ def train_rl_agent(env, total_timesteps=100000):
 # services/ml/fingpt.py
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+
 class FinGPTSentiment:
     def __init__(self, model_path="ai4finance/fingpt-sentiment"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(model_path)
-    
+
     def analyze(self, text):
         prompt = f"Analyze the sentiment of this financial text: {text}\nSentiment:"
-        
+
         inputs = self.tokenizer(prompt, return_tensors="pt")
         outputs = self.model.generate(**inputs, max_new_tokens=10)
         result = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
+
         # Parse sentiment
         if "positive" in result.lower():
             return {"sentiment": "POSITIVE", "score": 0.8}

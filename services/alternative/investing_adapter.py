@@ -82,7 +82,7 @@ class InvestingAdapter(BaseAdapter):
                         return {}
 
                     html = await resp.text()
-                    soup = BeautifulSoup(html, 'html.parser')
+                    soup = BeautifulSoup(html, "html.parser")
 
                     comments = []
                     # Yorum kutularını bul
@@ -152,14 +152,50 @@ class InvestingAdapter(BaseAdapter):
         text_lower = text.lower()
         words = text_lower.split()
         pos = [
-            "yükseliş", "artış", "güçlü", "olumlu", "al", "hedef", "potansiyel", "kâr",
-            "büyüme", "rekor", "başarı", "destek", "teşvik", "ihracat", "yatırım",
-            "genişleme", "iyileşme", "toparlanma", "temettü", "sipariş", "sözleşme",
+            "yükseliş",
+            "artış",
+            "güçlü",
+            "olumlu",
+            "al",
+            "hedef",
+            "potansiyel",
+            "kâr",
+            "büyüme",
+            "rekor",
+            "başarı",
+            "destek",
+            "teşvik",
+            "ihracat",
+            "yatırım",
+            "genişleme",
+            "iyileşme",
+            "toparlanma",
+            "temettü",
+            "sipariş",
+            "sözleşme",
         ]
         neg = [
-            "düşüş", "zarar", "zayıf", "sat", "risk", "tehlike", "kısa", "short",
-            "kayıp", "azalma", "gerileme", "iptal", "iflas", "borç", "dava",
-            "ceza", "soruşturma", "kriz", "olumsuz", "daralma", "temerrüt",
+            "düşüş",
+            "zarar",
+            "zayıf",
+            "sat",
+            "risk",
+            "tehlike",
+            "kısa",
+            "short",
+            "kayıp",
+            "azalma",
+            "gerileme",
+            "iptal",
+            "iflas",
+            "borç",
+            "dava",
+            "ceza",
+            "soruşturma",
+            "kriz",
+            "olumsuz",
+            "daralma",
+            "temerrüt",
         ]
         p = 0
         n = 0

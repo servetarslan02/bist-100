@@ -61,14 +61,15 @@ R_mt: Piyasa getirisi (BIST-100)
 # services/event_study/expected_return.py
 import statsmodels.api as sm
 
+
 def calculate_expected_return(stock_returns, market_returns, estimation_window):
     # Estimation window ile parametreleri tahmin et
     X = sm.add_constant(market_returns[estimation_window])
     model = sm.OLS(stock_returns[estimation_window], X).fit()
-    
+
     alpha = model.params[0]
     beta = model.params[1]
-    
+
     return alpha, beta
 ```
 
@@ -133,15 +134,12 @@ p < 0.05 → Anlamlı
 # services/event_study/statistical_test.py
 from scipy import stats
 
+
 def test_significance(car, std_error):
     t_stat = car / std_error
-    p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(car)-2))
-    
-    return {
-        "t_statistic": t_stat,
-        "p_value": p_value,
-        "significant": p_value < 0.05
-    }
+    p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(car) - 2))
+
+    return {"t_statistic": t_stat, "p_value": p_value, "significant": p_value < 0.05}
 ```
 
 ---
@@ -168,34 +166,29 @@ def analyze_kap_event(ticker, event_type, event_date):
     # Veriyi al
     stock_data = get_stock_data(ticker, event_date - timedelta(days=300), event_date + timedelta(days=10))
     market_data = get_market_data(event_date - timedelta(days=300), event_date + timedelta(days=10))
-    
+
     # Estimation window
-    est_window = (stock_data.index >= event_date - timedelta(days=250)) & \
-                 (stock_data.index < event_date - timedelta(days=5))
-    
+    est_window = (stock_data.index >= event_date - timedelta(days=250)) & (
+        stock_data.index < event_date - timedelta(days=5)
+    )
+
     # Event window
-    event_window = (stock_data.index >= event_date - timedelta(days=5)) & \
-                   (stock_data.index <= event_date + timedelta(days=5))
-    
+    event_window = (stock_data.index >= event_date - timedelta(days=5)) & (
+        stock_data.index <= event_date + timedelta(days=5)
+    )
+
     # Expected return
-    alpha, beta = calculate_expected_return(
-        stock_data["returns"][est_window],
-        market_data["returns"][est_window]
-    )
-    
+    alpha, beta = calculate_expected_return(stock_data["returns"][est_window], market_data["returns"][est_window])
+
     # Abnormal return
-    ar = calculate_abnormal_return(
-        stock_data["returns"],
-        market_data["returns"],
-        alpha, beta, event_window
-    )
-    
+    ar = calculate_abnormal_return(stock_data["returns"], market_data["returns"], alpha, beta, event_window)
+
     # CAR
     car = calculate_car(ar, event_window)
-    
+
     # Significance test
     result = test_significance(car[-1], ar.std() / (len(ar) ** 0.5))
-    
+
     return {
         "ticker": ticker,
         "event_type": event_type,
@@ -205,7 +198,7 @@ def analyze_kap_event(ticker, event_type, event_date):
         "t_statistic": result["t_statistic"],
         "p_value": result["p_value"],
         "significant": result["significant"],
-        "interpretation": "POSITIVE" if car[-1] > 0 else "NEGATIVE"
+        "interpretation": "POSITIVE" if car[-1] > 0 else "NEGATIVE",
     }
 ```
 
@@ -227,23 +220,23 @@ Etki: CAR = f(sürpriz büyüklüğü)
 # services/event_study/macro_event.py
 def analyze_tcmb_event(rate_actual, rate_expected, market_returns):
     surprise = rate_actual - rate_expected
-    
+
     # Event window: faiz kararından 2 gün önce ve sonra
     event_window = market_returns[-5:]  # Son 5 gün
-    
+
     # CAR hesapla
     car = event_window.cumsum()
-    
+
     # Sürpriz ile CAR ilişkisi
     correlation = np.corrcoef([surprise], [car[-1]])[0, 1]
-    
+
     return {
         "rate_actual": rate_actual,
         "rate_expected": rate_expected,
         "surprise": surprise,
         "car_5d": car[-1],
         "correlation": correlation,
-        "interpretation": "POSITIVE" if surprise > 0 and car[-1] > 0 else "NEGATIVE"
+        "interpretation": "POSITIVE" if surprise > 0 and car[-1] > 0 else "NEGATIVE",
     }
 ```
 
@@ -266,16 +259,16 @@ Volume_Change: Hacim değişimi katsayısı
 # services/event_study/impact.py
 def calculate_event_impact(car, p_value, volume_change):
     significance_multiplier = 1.5 if p_value < 0.01 else (1.0 if p_value < 0.05 else 0.5)
-    
+
     impact = abs(car) * significance_multiplier * (1 + volume_change)
-    
+
     # Skor: 0-100
     score = min(impact * 100, 100)
-    
+
     return {
         "impact_score": score,
         "magnitude": "HIGH" if score > 50 else ("MEDIUM" if score > 20 else "LOW"),
-        "direction": "POSITIVE" if car > 0 else "NEGATIVE"
+        "direction": "POSITIVE" if car > 0 else "NEGATIVE",
     }
 ```
 

@@ -80,11 +80,13 @@ class FeatureEngineService:
             if ticker not in self._price_cache:
                 self._price_cache[ticker] = []
 
-            self._price_cache[ticker].append({
-                "price": price,
-                "volume": volume,
-                "timestamp": event.timestamp.isoformat(),
-            })
+            self._price_cache[ticker].append(
+                {
+                    "price": price,
+                    "volume": volume,
+                    "timestamp": event.timestamp.isoformat(),
+                }
+            )
 
             # Keep last 200 ticks
             self._price_cache[ticker] = self._price_cache[ticker][-200:]
@@ -95,9 +97,9 @@ class FeatureEngineService:
 
                 if features:
                     # Store in Redis (hot state) — anlık erişim için
-                    await redis_hset(f"features:{ticker}", {
-                        k: str(v) for k, v in features.items() if isinstance(v, (int, float))
-                    })
+                    await redis_hset(
+                        f"features:{ticker}", {k: str(v) for k, v in features.items() if isinstance(v, (int, float))}
+                    )
 
                     # Store in ClickHouse (historical)
                     self._store_features_ch(instrument_id or 0, ticker, features)
@@ -134,11 +136,13 @@ class FeatureEngineService:
             # kolon adlari bekliyor - kucuk harfle KeyError('Close') ile sessizce {}
             # donuyor ve feature hic hesaplanmiyor (bkz. try/except).
             df = df.rename({"price": "Close", "volume": "Volume"})
-            df = df.with_columns([
-                pl.col("Close").alias("Open"),
-                pl.col("Close").alias("High"),
-                pl.col("Close").alias("Low"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.col("Close").alias("Open"),
+                    pl.col("Close").alias("High"),
+                    pl.col("Close").alias("Low"),
+                ]
+            )
 
             # Compute features
             features = feature_calculator.compute_all_features(df)
@@ -152,6 +156,7 @@ class FeatureEngineService:
             # Feature store'a kaydet, drift detection çalıştır
             try:
                 import asyncio as _asyncio
+
                 try:
                     loop = _asyncio.get_running_loop()
                     # Zaten bir loop içinde — background task olarak çalıştır
@@ -193,20 +198,29 @@ class FeatureEngineService:
 
             for feature_name, feature_value in features.items():
                 if isinstance(feature_value, (int, float)):
-                    rows.append([
-                        instrument_id,
-                        now,
-                        feature_name,
-                        float(feature_value),
-                        1,  # version
-                        "feature-engine",
-                    ])
+                    rows.append(
+                        [
+                            instrument_id,
+                            now,
+                            feature_name,
+                            float(feature_value),
+                            1,  # version
+                            "feature-engine",
+                        ]
+                    )
 
             if rows:
                 ch_insert(
                     "features",
                     rows,
-                    column_names=["instrument_id", "timestamp", "feature_name", "feature_value", "feature_version", "source"],
+                    column_names=[
+                        "instrument_id",
+                        "timestamp",
+                        "feature_name",
+                        "feature_value",
+                        "feature_version",
+                        "source",
+                    ],
                 )
 
         except Exception as e:
@@ -217,6 +231,7 @@ class FeatureEngineService:
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -225,10 +240,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "features"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -236,6 +251,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the feature engine service."""

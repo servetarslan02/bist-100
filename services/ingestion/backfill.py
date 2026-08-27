@@ -32,15 +32,16 @@ logger = structlog.get_logger()
 
 
 class BackfillPriority(StrEnum):
-    CRITICAL = "CRITICAL"    # Son 1 gün
-    HIGH = "HIGH"            # Son 1 hafta
-    MEDIUM = "MEDIUM"        # Son 1 ay
-    LOW = "LOW"              # 1 aydan eski
+    CRITICAL = "CRITICAL"  # Son 1 gün
+    HIGH = "HIGH"  # Son 1 hafta
+    MEDIUM = "MEDIUM"  # Son 1 ay
+    LOW = "LOW"  # 1 aydan eski
 
 
 @dataclass
 class DataGap:
     """Veri boşluğu."""
+
     ticker: str
     gap_start: datetime
     gap_end: datetime
@@ -56,6 +57,7 @@ class DataGap:
 @dataclass
 class BackfillResult:
     """Backfill sonucu."""
+
     ticker: str
     gap_start: datetime
     gap_end: datetime
@@ -68,6 +70,7 @@ class BackfillResult:
 @dataclass
 class BackfillStats:
     """Backfill istatistikleri."""
+
     total_gaps: int = 0
     gaps_filled: int = 0
     gaps_failed: int = 0
@@ -126,6 +129,7 @@ class BackfillManager:
             # BIST listesini al
             try:
                 from ..ingestion.bist_universe import bist_universe
+
                 tickers = bist_universe.BIST_100_TICKERS
             except Exception:
                 logger.warning("Cannot load BIST universe for gap detection")
@@ -135,9 +139,7 @@ class BackfillManager:
 
         for ticker in tickers:
             try:
-                ticker_gaps = await self._detect_ticker_gaps(
-                    ticker, clickhouse_client, pg_pool
-                )
+                ticker_gaps = await self._detect_ticker_gaps(ticker, clickhouse_client, pg_pool)
                 gaps.extend(ticker_gaps)
             except Exception as e:
                 logger.warning("Gap detection failed", ticker=ticker, error=str(e))
@@ -152,10 +154,12 @@ class BackfillManager:
         gaps.sort(key=lambda g: (priority_order[g.priority], g.gap_start))
 
         self._stats.total_gaps = len(gaps)
-        logger.info("Data gaps detected",
-                    total_gaps=len(gaps),
-                    critical=sum(1 for g in gaps if g.priority == BackfillPriority.CRITICAL),
-                    high=sum(1 for g in gaps if g.priority == BackfillPriority.HIGH))
+        logger.info(
+            "Data gaps detected",
+            total_gaps=len(gaps),
+            critical=sum(1 for g in gaps if g.priority == BackfillPriority.CRITICAL),
+            high=sum(1 for g in gaps if g.priority == BackfillPriority.HIGH),
+        )
 
         return gaps
 
@@ -175,14 +179,16 @@ class BackfillManager:
             # Hiç veri yok — tüm lookback periyodu boş
             gap_start = datetime.now(UTC) - timedelta(days=self._max_lookback_days)
             gap_end = datetime.now(UTC)
-            gaps.append(DataGap(
-                ticker=ticker,
-                gap_start=gap_start,
-                gap_end=gap_end,
-                gap_type="daily",
-                priority=BackfillPriority.CRITICAL,
-                estimated_bars=int(self._max_lookback_days),
-            ))
+            gaps.append(
+                DataGap(
+                    ticker=ticker,
+                    gap_start=gap_start,
+                    gap_end=gap_end,
+                    gap_type="daily",
+                    priority=BackfillPriority.CRITICAL,
+                    estimated_bars=int(self._max_lookback_days),
+                )
+            )
             return gaps
 
         # Son kayıt ile şu an arasındaki fark
@@ -206,14 +212,16 @@ class BackfillManager:
         gap_start = last_date + timedelta(days=1)
         business_days = self._count_business_days(gap_start, now)
 
-        gaps.append(DataGap(
-            ticker=ticker,
-            gap_start=gap_start,
-            gap_end=now,
-            gap_type="daily",
-            priority=priority,
-            estimated_bars=business_days,
-        ))
+        gaps.append(
+            DataGap(
+                ticker=ticker,
+                gap_start=gap_start,
+                gap_end=now,
+                gap_type="daily",
+                priority=priority,
+                estimated_bars=business_days,
+            )
+        )
 
         return gaps
 
@@ -228,8 +236,7 @@ class BackfillManager:
         if clickhouse_client:
             try:
                 result = clickhouse_client.query(
-                    "SELECT max(timestamp) as last_ts FROM market_bars WHERE ticker = %(ticker)s",
-                    {"ticker": ticker}
+                    "SELECT max(timestamp) as last_ts FROM market_bars WHERE ticker = %(ticker)s", {"ticker": ticker}
                 )
                 if result.result_rows and result.result_rows[0][0]:
                     return result.result_rows[0][0]
@@ -241,8 +248,7 @@ class BackfillManager:
             try:
                 async with pg_pool.acquire() as conn:
                     row = await conn.fetchrow(
-                        "SELECT max(timestamp) as last_ts FROM market_data WHERE ticker = $1",
-                        ticker
+                        "SELECT max(timestamp) as last_ts FROM market_data WHERE ticker = $1", ticker
                     )
                     if row and row["last_ts"]:
                         return row["last_ts"]
@@ -276,7 +282,7 @@ class BackfillManager:
             if not self._running:
                 break
 
-            chunk = gaps[i:i + self._chunk_size]
+            chunk = gaps[i : i + self._chunk_size]
             chunk_results = await self._backfill_chunk(chunk)
             results.extend(chunk_results)
 
@@ -291,11 +297,13 @@ class BackfillManager:
         self._stats.total_duration_seconds = time.time() - start_time
         self._stats.last_backfill_time = time.time()
 
-        logger.info("Backfill completed",
-                    filled=self._stats.gaps_filled,
-                    failed=self._stats.gaps_failed,
-                    bars=self._stats.total_bars_filled,
-                    duration_seconds=round(self._stats.total_duration_seconds, 1))
+        logger.info(
+            "Backfill completed",
+            filled=self._stats.gaps_filled,
+            failed=self._stats.gaps_failed,
+            bars=self._stats.total_bars_filled,
+            duration_seconds=round(self._stats.total_duration_seconds, 1),
+        )
 
         return results
 
@@ -322,11 +330,13 @@ class BackfillManager:
         try:
             import yfinance as yf
 
-            logger.info("Backfilling",
-                       ticker=gap.ticker,
-                       from_date=gap.gap_start.date().isoformat(),
-                       to_date=gap.gap_end.date().isoformat(),
-                       priority=gap.priority.value)
+            logger.info(
+                "Backfilling",
+                ticker=gap.ticker,
+                from_date=gap.gap_start.date().isoformat(),
+                to_date=gap.gap_end.date().isoformat(),
+                priority=gap.priority.value,
+            )
 
             # yfinance ile veri çek
             ticker_symbol = f"{gap.ticker}.IS"
@@ -354,8 +364,9 @@ class BackfillManager:
             # Veriyi PostgreSQL'e yaz
             try:
                 from ..core.database import pg_execute
+
                 for idx, row in hist.iterrows():
-                    trade_date = idx.date() if hasattr(idx, 'date') else idx
+                    trade_date = idx.date() if hasattr(idx, "date") else idx
                     await pg_execute(
                         """INSERT INTO daily_bars (ticker, trade_date, open, high, low, close, volume)
                         VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -363,17 +374,18 @@ class BackfillManager:
                             open = EXCLUDED.open, high = EXCLUDED.high,
                             low = EXCLUDED.low, close = EXCLUDED.close,
                             volume = EXCLUDED.volume""",
-                        gap.ticker, trade_date,
-                        float(row.get('Open', 0)), float(row.get('High', 0)),
-                        float(row.get('Low', 0)), float(row.get('Close', 0)),
-                        int(row.get('Volume', 0))
+                        gap.ticker,
+                        trade_date,
+                        float(row.get("Open", 0)),
+                        float(row.get("High", 0)),
+                        float(row.get("Low", 0)),
+                        float(row.get("Close", 0)),
+                        int(row.get("Volume", 0)),
                     )
             except Exception as write_err:
                 logger.warning("Backfill DB write failed", error=str(write_err))
 
-            logger.info("Backfill data fetched",
-                       ticker=gap.ticker,
-                       bars=bars_filled)
+            logger.info("Backfill data fetched", ticker=gap.ticker, bars=bars_filled)
 
             return BackfillResult(
                 ticker=gap.ticker,
@@ -385,9 +397,7 @@ class BackfillManager:
             )
 
         except Exception as e:
-            logger.error("Backfill failed",
-                        ticker=gap.ticker,
-                        error=str(e))
+            logger.error("Backfill failed", ticker=gap.ticker, error=str(e))
             return BackfillResult(
                 ticker=gap.ticker,
                 gap_start=gap.gap_start,
@@ -423,9 +433,9 @@ class BackfillManager:
             "gaps_failed": self._stats.gaps_failed,
             "total_bars_filled": self._stats.total_bars_filled,
             "total_duration_seconds": round(self._stats.total_duration_seconds, 1),
-            "last_backfill": datetime.fromtimestamp(
-                self._stats.last_backfill_time, tz=UTC
-            ).isoformat() if self._stats.last_backfill_time else None,
+            "last_backfill": datetime.fromtimestamp(self._stats.last_backfill_time, tz=UTC).isoformat()
+            if self._stats.last_backfill_time
+            else None,
             "running": self._running,
         }
 

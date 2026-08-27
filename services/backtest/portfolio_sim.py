@@ -27,11 +27,13 @@ logger = structlog.get_logger()
 # Lazy import to avoid circular dependency
 _transaction_cost_engine = None
 
+
 def _get_cost_engine():
     global _transaction_cost_engine
     if _transaction_cost_engine is None:
         try:
             from .transaction_costs import bist_transaction_cost
+
             _transaction_cost_engine = bist_transaction_cost
         except ImportError:
             _transaction_cost_engine = None
@@ -42,18 +44,20 @@ def _get_cost_engine():
 # DATA CLASSES
 # =====================================================
 
+
 @dataclass
 class Trade:
     """Tek bir trade kaydı."""
+
     trade_id: int
     ticker: str
-    side: str              # BUY | SELL
+    side: str  # BUY | SELL
     date: str
     quantity: int
     price: float
     commission: float
     slippage: float
-    pnl: float = 0.0       # Sadece SELL'de
+    pnl: float = 0.0  # Sadece SELL'de
     pnl_pct: float = 0.0
     holding_days: int = 0
 
@@ -76,11 +80,12 @@ class Trade:
 @dataclass
 class Position:
     """Açık pozisyon."""
+
     ticker: str
     quantity: int
     entry_price: float
     entry_date: str
-    cost_basis: float       # Toplam maliyet (fiyat × adet + komisyon + slippage)
+    cost_basis: float  # Toplam maliyet (fiyat × adet + komisyon + slippage)
     current_price: float = 0.0
 
     @property
@@ -114,6 +119,7 @@ class Position:
 @dataclass
 class EquitySnapshot:
     """Günlük equity kaydı."""
+
     date: str
     equity: float
     cash: float
@@ -137,9 +143,10 @@ class EquitySnapshot:
 @dataclass
 class AuditEntry:
     """Audit trail kaydı."""
+
     timestamp: str
     date: str
-    entry_type: str    # BUY | SELL | EQUITY | ERROR | INFO
+    entry_type: str  # BUY | SELL | EQUITY | ERROR | INFO
     ticker: str = ""
     details: dict[str, Any] = field(default_factory=dict)
 
@@ -148,13 +155,14 @@ class AuditEntry:
 # COMMISSION MODEL (BIST)
 # =====================================================
 
+
 class BISTCommissionModel:
     """BIST komisyon yapısı."""
 
-    BROKER_RATE = 0.0003      # %0.03
-    EXCHANGE_RATE = 0.000056   # %0.0056
-    BSMV_RATE = 0.05           # BSMV (komisyon üzerinden %5)
-    MIN_COMMISSION = 1.0       # Minimum 1 TL
+    BROKER_RATE = 0.0003  # %0.03
+    EXCHANGE_RATE = 0.000056  # %0.0056
+    BSMV_RATE = 0.05  # BSMV (komisyon üzerinden %5)
+    MIN_COMMISSION = 1.0  # Minimum 1 TL
 
     @classmethod
     def compute(cls, amount: float) -> float:
@@ -168,6 +176,7 @@ class BISTCommissionModel:
 # =====================================================
 # PORTFOLIO SIMULATOR v3.0
 # =====================================================
+
 
 class PortfolioSimulatorV3:
     """Kurumsal seviye portföy simülasyonu.
@@ -245,7 +254,7 @@ class PortfolioSimulatorV3:
             total_equity = self.get_total_value()
             max_amount = min(
                 total_equity * self._max_position_pct,
-                self._cash * 0.95  # %5 nakit buffer
+                self._cash * 0.95,  # %5 nakit buffer
             )
             quantity = int(max_amount / (price * (1 + self._slippage_rate + 0.001)))
             if quantity <= 0:
@@ -289,12 +298,19 @@ class PortfolioSimulatorV3:
             # Düşük quantity ile dene
             quantity = int((self._cash - 1) / (fill_price * 1.002))
             if quantity <= 0:
-                self._audit(date, "ERROR", ticker, {"reason": "insufficient_cash",
-                            "required": total_cost, "available": self._cash})
+                self._audit(
+                    date,
+                    "ERROR",
+                    ticker,
+                    {"reason": "insufficient_cash", "required": total_cost, "available": self._cash},
+                )
                 return None
             if cost_engine is not None:
                 cost_detail = cost_engine.calculate_total_cost(
-                    side="BUY", price=price, quantity=quantity, ticker=ticker,
+                    side="BUY",
+                    price=price,
+                    quantity=quantity,
+                    ticker=ticker,
                     avg_daily_volume=adv,
                     volatility_ratio=vol_r,
                 )
@@ -432,12 +448,17 @@ class PortfolioSimulatorV3:
         # Invariant check
         invariant_ok = abs(equity - (self._cash + market_value)) < 0.01
         if not invariant_ok:
-            self._audit(date, "ERROR", "", {
-                "reason": "equity_invariant_violation",
-                "equity": equity,
-                "cash": self._cash,
-                "market_value": market_value,
-            })
+            self._audit(
+                date,
+                "ERROR",
+                "",
+                {
+                    "reason": "equity_invariant_violation",
+                    "equity": equity,
+                    "cash": self._cash,
+                    "market_value": market_value,
+                },
+            )
 
         # High water mark
         if equity > self._high_water_mark:
@@ -455,6 +476,7 @@ class PortfolioSimulatorV3:
         if drawdown > 0 and self._drawdown_start_date is not None:
             try:
                 from datetime import datetime
+
                 d1 = datetime.strptime(self._drawdown_start_date, "%Y-%m-%d")
                 d2 = datetime.strptime(date, "%Y-%m-%d")
                 dd_duration = (d2 - d1).days
@@ -527,7 +549,7 @@ class PortfolioSimulatorV3:
         win_rate = winning / len(sell_pnls) * 100 if len(sell_pnls) > 0 else 0
         gross_profit = float(np.sum(sell_pnls[sell_pnls > 0])) if len(sell_pnls) > 0 else 0
         gross_loss = float(np.abs(np.sum(sell_pnls[sell_pnls < 0]))) if len(sell_pnls) > 0 else 0
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
         expectancy = float(np.mean(sell_pnls)) if len(sell_pnls) > 0 else 0
         total_commission = sum(t.commission for t in self._trades)
         total_slippage = sum(t.slippage for t in self._trades)
@@ -536,8 +558,11 @@ class PortfolioSimulatorV3:
             return {
                 "initial_capital": self._initial_capital,
                 "final_equity": self._cash + sum(p.market_value for p in self._positions.values()),
-                "total_return_pct": 0, "cagr_pct": 0,
-                "sharpe_ratio": 0, "sortino_ratio": 0, "calmar_ratio": 0,
+                "total_return_pct": 0,
+                "cagr_pct": 0,
+                "sharpe_ratio": 0,
+                "sortino_ratio": 0,
+                "calmar_ratio": 0,
                 "max_drawdown_pct": 0,
                 "win_rate_pct": round(win_rate, 1),
                 "profit_factor": round(profit_factor, 4),
@@ -547,9 +572,11 @@ class PortfolioSimulatorV3:
                 "total_commission": round(total_commission, 2),
                 "total_slippage": round(total_slippage, 2),
                 "open_positions": len(self._positions),
-                "benchmark_return_pct": 0, "alpha_pct": 0,
+                "benchmark_return_pct": 0,
+                "alpha_pct": 0,
                 "daily_returns_count": 0,
-                "var_95": 0, "cvar_95": 0,
+                "var_95": 0,
+                "cvar_95": 0,
                 "max_drawdown_duration_days": 0,
             }
 
@@ -567,7 +594,7 @@ class PortfolioSimulatorV3:
 
         # Sortino (correct: sqrt of mean squared downside)
         downside_returns = np.minimum(returns, 0)
-        downside_std = float(np.sqrt(np.mean(downside_returns ** 2)))
+        downside_std = float(np.sqrt(np.mean(downside_returns**2)))
         sortino = float(np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
 
         # VaR 95% (Historical)
@@ -596,7 +623,11 @@ class PortfolioSimulatorV3:
         # CAGR
         n_days = len(self._equity_curve)
         n_years = n_days / 252 if n_days > 0 else 1
-        cagr = ((final_equity / self._initial_capital) ** (1 / n_years) - 1) * 100 if n_years > 0 and final_equity > 0 else 0
+        cagr = (
+            ((final_equity / self._initial_capital) ** (1 / n_years) - 1) * 100
+            if n_years > 0 and final_equity > 0
+            else 0
+        )
 
         return {
             "initial_capital": self._initial_capital,
@@ -661,6 +692,7 @@ class PortfolioSimulatorV3:
     def _compute_holding_days(entry_date: str, exit_date: str) -> int:
         try:
             from datetime import datetime
+
             d1 = datetime.strptime(entry_date, "%Y-%m-%d")
             d2 = datetime.strptime(exit_date, "%Y-%m-%d")
             return max(0, (d2 - d1).days)
@@ -669,13 +701,16 @@ class PortfolioSimulatorV3:
 
     def _audit(self, date: str, entry_type: str, ticker: str, details: dict[str, Any]):
         from datetime import datetime
-        self._audit_log.append(AuditEntry(
-            timestamp=datetime.now(UTC).isoformat(),
-            date=date,
-            entry_type=entry_type,
-            ticker=ticker,
-            details=details,
-        ))
+
+        self._audit_log.append(
+            AuditEntry(
+                timestamp=datetime.now(UTC).isoformat(),
+                date=date,
+                entry_type=entry_type,
+                ticker=ticker,
+                details=details,
+            )
+        )
 
     def reset(self):
         """Sıfırla."""

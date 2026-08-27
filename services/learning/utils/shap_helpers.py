@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class SHAPResult:
     """SHAP hesaplama sonucu."""
+
     feature_names: list[str]
     shap_values: np.ndarray  # (n_samples, n_features)
     base_value: float
@@ -30,6 +31,7 @@ class SHAPResult:
 @dataclass
 class SHAPInteractionResult:
     """SHAP interaction sonucu."""
+
     feature_pairs: list[tuple[str, str]]
     interaction_values: np.ndarray
     top_interactions: list[dict]
@@ -83,7 +85,7 @@ class SHAPHelpers:
                 shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
 
             # Base value
-            if hasattr(explainer, 'expected_value'):
+            if hasattr(explainer, "expected_value"):
                 base_value = explainer.expected_value
                 if isinstance(base_value, np.ndarray):
                     base_value = float(base_value[1] if len(base_value) > 1 else base_value[0])
@@ -95,16 +97,12 @@ class SHAPHelpers:
             # Feature importance (mean |SHAP|)
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
             feature_importance = {
-                name: round(float(imp), 6)
-                for name, imp in zip(feature_names, mean_abs_shap, strict=False)
+                name: round(float(imp), 6) for name, imp in zip(feature_names, mean_abs_shap, strict=False)
             }
 
             # Top features
             top_indices = np.argsort(mean_abs_shap)[::-1]
-            top_features = [
-                (feature_names[i], round(float(mean_abs_shap[i]), 6))
-                for i in top_indices
-            ]
+            top_features = [(feature_names[i], round(float(mean_abs_shap[i]), 6)) for i in top_indices]
 
             return SHAPResult(
                 feature_names=feature_names,
@@ -134,16 +132,10 @@ class SHAPHelpers:
         except AttributeError:
             importances = np.ones(len(feature_names)) / len(feature_names)
 
-        feature_importance = {
-            name: round(float(imp), 6)
-            for name, imp in zip(feature_names, importances, strict=False)
-        }
+        feature_importance = {name: round(float(imp), 6) for name, imp in zip(feature_names, importances, strict=False)}
 
         top_indices = np.argsort(importances)[::-1]
-        top_features = [
-            (feature_names[i], round(float(importances[i]), 6))
-            for i in top_indices
-        ]
+        top_features = [(feature_names[i], round(float(importances[i]), 6)) for i in top_indices]
 
         return SHAPResult(
             feature_names=feature_names,
@@ -189,11 +181,13 @@ class SHAPHelpers:
             pairs = []
             for i in range(len(feature_names)):
                 for j in range(i + 1, len(feature_names)):
-                    pairs.append({
-                        "feature_1": feature_names[i],
-                        "feature_2": feature_names[j],
-                        "interaction_strength": round(float(mean_interactions[i, j]), 6),
-                    })
+                    pairs.append(
+                        {
+                            "feature_1": feature_names[i],
+                            "feature_2": feature_names[j],
+                            "interaction_strength": round(float(mean_interactions[i, j]), 6),
+                        }
+                    )
 
             pairs.sort(key=lambda x: x["interaction_strength"], reverse=True)
             top_pairs = pairs[:top_n]
@@ -238,9 +232,7 @@ class SHAPHelpers:
             if len(X) < 10:
                 continue
 
-            result = SHAPHelpers.compute_shap_values(
-                model, X, feature_names, sample_size=sample_size
-            )
+            result = SHAPHelpers.compute_shap_values(model, X, feature_names, sample_size=sample_size)
             regime_importance[regime] = result.feature_importance
 
         return regime_importance
@@ -273,12 +265,14 @@ class SHAPHelpers:
             # Feature contributions
             contributions = []
             for name, value, shap_val in zip(feature_names, X_single[0], shap_values[0], strict=False):
-                contributions.append({
-                    "feature": name,
-                    "feature_value": round(float(value), 4),
-                    "shap_value": round(float(shap_val), 4),
-                    "abs_shap": round(float(abs(shap_val)), 4),
-                })
+                contributions.append(
+                    {
+                        "feature": name,
+                        "feature_value": round(float(value), 4),
+                        "shap_value": round(float(shap_val), 4),
+                        "abs_shap": round(float(abs(shap_val)), 4),
+                    }
+                )
 
             contributions.sort(key=lambda x: x["abs_shap"], reverse=True)
 
@@ -296,7 +290,6 @@ class SHAPHelpers:
         except Exception as e:
             logger.error("SHAP explanation failed", error=str(e))
             return {"error": str(e)}
-
 
     def compute_global_shap(
         self,
@@ -333,11 +326,13 @@ class SHAPHelpers:
             mean_shap = np.abs(shap_values).mean(axis=0)
 
             if len(feature_names) == len(mean_shap):
-                return dict(sorted(
-                    zip(feature_names, mean_shap.tolist(), strict=False),
-                    key=lambda x: x[1],
-                    reverse=True,
-                ))
+                return dict(
+                    sorted(
+                        zip(feature_names, mean_shap.tolist(), strict=False),
+                        key=lambda x: x[1],
+                        reverse=True,
+                    )
+                )
             return {f"f{i}": float(v) for i, v in enumerate(mean_shap)}
 
         except ImportError:
@@ -451,11 +446,13 @@ class SHAPHelpers:
             for i in range(n):
                 for j in range(i + 1, n):
                     strength = float(mean_interaction[i, j])
-                    interactions.append({
-                        "feature_1": feature_names[i],
-                        "feature_2": feature_names[j],
-                        "interaction_strength": round(strength, 6),
-                    })
+                    interactions.append(
+                        {
+                            "feature_1": feature_names[i],
+                            "feature_2": feature_names[j],
+                            "interaction_strength": round(strength, 6),
+                        }
+                    )
 
             interactions.sort(key=lambda x: x["interaction_strength"], reverse=True)
             return interactions[:top_n]

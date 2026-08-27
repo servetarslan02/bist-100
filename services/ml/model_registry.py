@@ -3,6 +3,7 @@
 Model version tracking, metrics storage, status management, lineage,
 artifact management, model comparison, snapshot/restore.
 """
+
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -19,6 +20,7 @@ MODEL_STATUSES = ["CANDIDATE", "SHADOW", "CHAMPION", "RETIRED", "FAILED", "ARCHI
 @dataclass
 class ModelEntry:
     """Registry entry for a model."""
+
     model_id: str
     version: str
     model_type: str
@@ -178,7 +180,8 @@ class ModelRegistry:
     def get_latest(self, model_id: str, status: str | None = None) -> dict[str, Any] | None:
         """En son version'u getir."""
         candidates = [
-            (key, entry) for key, entry in self._entries.items()
+            (key, entry)
+            for key, entry in self._entries.items()
             if entry.model_id == model_id and (status is None or entry.status == status)
         ]
         if not candidates:
@@ -214,19 +217,21 @@ class ModelRegistry:
                 continue
             if tag and tag not in entry.tags:
                 continue
-            results.append({
-                "key": key,
-                "model_id": entry.model_id,
-                "version": entry.version,
-                "model_type": entry.model_type,
-                "status": entry.status,
-                "metrics": entry.metrics,
-                "created_at": entry.created_at,
-                "promoted_at": entry.promoted_at,
-                "description": entry.description,
-                "tags": entry.tags,
-                "author": entry.author,
-            })
+            results.append(
+                {
+                    "key": key,
+                    "model_id": entry.model_id,
+                    "version": entry.version,
+                    "model_type": entry.model_type,
+                    "status": entry.status,
+                    "metrics": entry.metrics,
+                    "created_at": entry.created_at,
+                    "promoted_at": entry.promoted_at,
+                    "description": entry.description,
+                    "tags": entry.tags,
+                    "author": entry.author,
+                }
+            )
 
         results.sort(key=lambda x: x["created_at"], reverse=True)
         return results[:limit]
@@ -270,7 +275,8 @@ class ModelRegistry:
                 diff = val_b - val_a
                 pct = (diff / abs(val_a) * 100) if val_a != 0 else 0
                 comparison["metrics_comparison"][metric] = {
-                    "a": val_a, "b": val_b,
+                    "a": val_a,
+                    "b": val_b,
                     "diff": round(diff, 4),
                     "pct_change": round(pct, 2),
                     "b_better": diff > 0,
@@ -337,10 +343,7 @@ class ModelRegistry:
 
     def _next_version(self, model_id: str) -> str:
         """Sonraki version numarasını hesapla."""
-        existing = [
-            e.version for e in self._entries.values()
-            if e.model_id == model_id
-        ]
+        existing = [e.version for e in self._entries.values() if e.model_id == model_id]
         if not existing:
             return "v1"
 
@@ -361,6 +364,7 @@ class ModelRegistry:
         """Model'i diske kaydet (SHA256 hash ile)."""
         try:
             from services.core.safe_pickle import safe_pickle_dump
+
             path = os.path.join(self._registry_path, f"{key.replace(':', '_')}.pkl")
             safe_pickle_dump(model, path)
         except Exception as e:
@@ -370,6 +374,7 @@ class ModelRegistry:
         """Model'i diskten yükle (SHA256 doğrulamalı)."""
         try:
             from services.core.safe_pickle import safe_pickle_load
+
             path = os.path.join(self._registry_path, f"{key.replace(':', '_')}.pkl")
             if os.path.exists(path):
                 return safe_pickle_load(path)

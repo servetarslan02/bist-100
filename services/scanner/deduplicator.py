@@ -21,13 +21,14 @@ logger = structlog.get_logger()
 @dataclass
 class ScanRecord:
     """Tarama kaydı."""
+
     ticker: str
-    last_scan_time: float       # time.time()
+    last_scan_time: float  # time.time()
     scan_count: int = 0
     last_score: float = 0.0
     last_signal: str = ""
     last_tier: int = 0
-    forced: bool = False        # Event-driven force scan
+    forced: bool = False  # Event-driven force scan
 
 
 class ScanDeduplicator:
@@ -47,9 +48,9 @@ class ScanDeduplicator:
 
     def __init__(
         self,
-        cooldown_seconds: int = 300,          # 5 dakika default
-        event_cooldown_seconds: int = 10,     # Event-driven: 10 saniye
-        max_tracked_tickers: int = 1000,      # Maksimum takip edilen hisse
+        cooldown_seconds: int = 300,  # 5 dakika default
+        event_cooldown_seconds: int = 10,  # Event-driven: 10 saniye
+        max_tracked_tickers: int = 1000,  # Maksimum takip edilen hisse
     ):
         self._cooldown = cooldown_seconds
         self._event_cooldown = event_cooldown_seconds
@@ -92,10 +93,9 @@ class ScanDeduplicator:
         elapsed = time.time() - record.last_scan_time
         if elapsed < self._cooldown:
             self._total_blocked += 1
-            logger.debug("Scan blocked (cooldown)",
-                        ticker=ticker,
-                        elapsed=f"{elapsed:.0f}s",
-                        cooldown=f"{self._cooldown}s")
+            logger.debug(
+                "Scan blocked (cooldown)", ticker=ticker, elapsed=f"{elapsed:.0f}s", cooldown=f"{self._cooldown}s"
+            )
             return False
 
         self._total_allowed += 1
@@ -196,9 +196,7 @@ class ScanDeduplicator:
 
         return {
             "ticker": record.ticker,
-            "last_scan_time": datetime.fromtimestamp(
-                record.last_scan_time, tz=UTC
-            ).isoformat(),
+            "last_scan_time": datetime.fromtimestamp(record.last_scan_time, tz=UTC).isoformat(),
             "scan_count": record.scan_count,
             "last_score": record.last_score,
             "last_signal": record.last_signal,
@@ -222,10 +220,7 @@ class ScanDeduplicator:
         Returns:
             Deduplication istatistikleri
         """
-        block_rate = (
-            self._total_blocked / self._total_checks * 100
-            if self._total_checks > 0 else 0
-        )
+        block_rate = self._total_blocked / self._total_checks * 100 if self._total_checks > 0 else 0
 
         return {
             "tracked_tickers": len(self._records),
@@ -245,10 +240,7 @@ class ScanDeduplicator:
         Returns:
             ticker → son tarama bilgisi
         """
-        return {
-            ticker: self.get_last_scan_info(ticker)
-            for ticker in self._records
-        }
+        return {ticker: self.get_last_scan_info(ticker) for ticker in self._records}
 
     def clear(self):
         """Tüm kayıtları temizle."""
@@ -261,10 +253,7 @@ class ScanDeduplicator:
         if not self._records:
             return
 
-        oldest_ticker = min(
-            self._records,
-            key=lambda t: self._records[t].last_scan_time
-        )
+        oldest_ticker = min(self._records, key=lambda t: self._records[t].last_scan_time)
         del self._records[oldest_ticker]
         logger.debug("Evicted oldest record", ticker=oldest_ticker)
 

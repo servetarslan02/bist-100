@@ -51,6 +51,7 @@ async def _startup_services() -> asyncio.Task | None:
 
     try:
         from ..core.sharding import init_sharding
+
         await init_sharding()
     except Exception as e:
         logger.warning(f"Sharding not started: {e}")
@@ -58,6 +59,7 @@ async def _startup_services() -> asyncio.Task | None:
     refresh_task = None
     try:
         from ..core.cache_warmer import cache_warmer
+
         await cache_warmer.warm_all()
         refresh_task = asyncio.create_task(cache_warmer.refresh_hot_keys())
     except Exception as e:
@@ -65,6 +67,7 @@ async def _startup_services() -> asyncio.Task | None:
 
     try:
         from services.portfolio.main import portfolio_service
+
         await portfolio_service.start()
         logger.info("PortfolioService started in API lifespan")
     except Exception as e:
@@ -83,6 +86,7 @@ def _start_background_tasks(refresh_task) -> dict:
         paper_trading_scheduler,
         radar_cache_refresher,
     )
+
     return {
         "radar": asyncio.create_task(radar_cache_refresher()),
         "ml": asyncio.create_task(ml_learning_scheduler()),
@@ -95,6 +99,7 @@ async def _start_grpc():
     """gRPC sunucusunu başlat."""
     try:
         from ..grpc.server import start_grpc_server
+
         grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
         server = await start_grpc_server(port=grpc_port)
         if server:
@@ -109,6 +114,7 @@ async def _start_nats():
     """NATS bağlantısını başlat."""
     try:
         from ..nats.client import nats_client
+
         await nats_client.connect()
     except Exception as e:
         logger.warning("NATS not connected", error=str(e))
@@ -118,6 +124,7 @@ async def _start_service_mesh():
     """Service mesh başlat."""
     try:
         from ..core.service_mesh import init_service_mesh, service_mesh
+
         init_service_mesh()
         return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
@@ -136,6 +143,7 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
 
     try:
         from ..core.state_store import state_store
+
         state_store.flush()
         logger.info("State store buffer flushed on shutdown")
     except Exception as e:
@@ -143,6 +151,7 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
 
     try:
         from ..core.offline_queue import offline_queue
+
         await offline_queue.flush()
         logger.info("Offline queue flushed on shutdown")
     except Exception as e:
@@ -157,6 +166,7 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
 
     try:
         from ..nats.client import nats_client
+
         await nats_client.close()
     except Exception:
         logger.warning("Caught Exception in _shutdown", exc_info=True)
@@ -177,6 +187,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await _shutdown(background_tasks, refresh_task, mesh_task, grpc_server)
+
 
 def create_app() -> FastAPI:
     """FastAPI uygulaması oluştur."""
@@ -224,7 +235,12 @@ def create_app() -> FastAPI:
         method = request.method
 
         # Local dev and internal docker proxy bypass
-        if client_id in ["127.0.0.1", "localhost", "testclient"] or client_id.startswith("172.") or client_id.startswith("192.168.") or client_id.startswith("10."):
+        if (
+            client_id in ["127.0.0.1", "localhost", "testclient"]
+            or client_id.startswith("172.")
+            or client_id.startswith("192.168.")
+            or client_id.startswith("10.")
+        ):
             allowed = True
             info = {"limit": 10000, "remaining": 9999, "retry_after": 0}
         else:
@@ -250,11 +266,13 @@ def create_app() -> FastAPI:
     # v1 router
     app.include_router(v1_router)
     from .v1.ws import router as root_ws_router
+
     app.include_router(root_ws_router, prefix="/ws", tags=["WebSockets (Root)"])
 
     # mTLS health endpoint
     try:
         from ..core.mtls import create_mtls_health_endpoint
+
         app.include_router(create_mtls_health_endpoint(), tags=["mTLS"])
         logger.info("mTLS health endpoint registered")
     except Exception as e:
@@ -264,7 +282,9 @@ def create_app() -> FastAPI:
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
     async def dashboard():
-        dashboard_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html")
+        dashboard_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html"
+        )
         if os.path.exists(dashboard_path):
             with open(dashboard_path, "rb") as f:
                 content = f.read()
@@ -280,6 +300,7 @@ def create_app() -> FastAPI:
         nats_status = "unavailable"
         try:
             from ..nats.client import nats_client
+
             if nats_client.is_connected:
                 nats_status = "healthy"
         except Exception:
@@ -289,6 +310,7 @@ def create_app() -> FastAPI:
         grpc_status = "unavailable"
         try:
             from ..grpc.server import HAS_GRPC
+
             grpc_status = "healthy" if HAS_GRPC else "unavailable"
         except Exception:
             logger.warning("Caught Exception in health", exc_info=True)
@@ -297,6 +319,7 @@ def create_app() -> FastAPI:
         mtls_status = "unavailable"
         try:
             from ..core.mtls import get_mtls_status
+
             mtls_info = get_mtls_status()
             mtls_status = "healthy" if mtls_info.get("enabled") else "disabled"
         except Exception:
@@ -333,6 +356,7 @@ def create_app() -> FastAPI:
     async def metrics():
         """Prometheus metrics endpoint."""
         from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
         return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     return app

@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class WalkForwardFold:
     """Walk-forward fold sonucu."""
+
     fold_id: int
     train_start: int
     train_end: int
@@ -42,6 +43,7 @@ class WalkForwardFold:
 @dataclass
 class WalkForwardResult:
     """Walk-forward tam sonuç."""
+
     total_folds: int
     avg_test_return: float
     avg_test_sharpe: float
@@ -132,18 +134,26 @@ class PurgeEmbargoWalkForward:
         if not folds:
             logger.warning("No walk-forward folds generated", n_days=n_days)
             return WalkForwardResult(
-                total_folds=0, avg_test_return=0, avg_test_sharpe=0,
-                avg_precision_at_5=0, avg_precision_at_10=0, avg_ic=0,
-                avg_hit_rate=0, avg_max_drawdown=0, avg_turnover=0,
-                stability_score=0, deflated_sharpe=0, folds=[],
+                total_folds=0,
+                avg_test_return=0,
+                avg_test_sharpe=0,
+                avg_precision_at_5=0,
+                avg_precision_at_10=0,
+                avg_ic=0,
+                avg_hit_rate=0,
+                avg_max_drawdown=0,
+                avg_turnover=0,
+                stability_score=0,
+                deflated_sharpe=0,
+                folds=[],
             )
 
         fold_results = []
 
         for fold_id, (train_start, train_end, test_start, test_end) in enumerate(folds):
             # Test dönemindeki tahminler ve gerçekler
-            test_preds = predictions[test_start:test_end + 1]
-            test_actuals = actuals[test_start:test_end + 1]
+            test_preds = predictions[test_start : test_end + 1]
+            test_actuals = actuals[test_start : test_end + 1]
 
             # Precision@K
             p_at_5 = self._precision_at_k(test_preds, test_actuals, k=5)
@@ -169,26 +179,28 @@ class PurgeEmbargoWalkForward:
             turnover = self._compute_turnover(test_preds, test_actuals)
 
             # Train return (basit referans)
-            train_preds = predictions[train_start:train_end + 1]
-            train_actuals = actuals[train_start:train_end + 1]
+            train_preds = predictions[train_start : train_end + 1]
+            train_actuals = actuals[train_start : train_end + 1]
             train_return = self._compute_top_k_return(train_preds, train_actuals, k=10)
 
-            fold_results.append(WalkForwardFold(
-                fold_id=fold_id,
-                train_start=train_start,
-                train_end=train_end,
-                test_start=test_start,
-                test_end=test_end,
-                train_return=round(train_return, 4),
-                test_return=round(test_return, 4),
-                precision_at_5=round(p_at_5, 4),
-                precision_at_10=round(p_at_10, 4),
-                ic=round(ic, 4),
-                hit_rate=round(hit_rate, 4),
-                sharpe=round(sharpe, 4),
-                max_drawdown=round(max_dd, 4),
-                turnover=round(turnover, 4),
-            ))
+            fold_results.append(
+                WalkForwardFold(
+                    fold_id=fold_id,
+                    train_start=train_start,
+                    train_end=train_end,
+                    test_start=test_start,
+                    test_end=test_end,
+                    train_return=round(train_return, 4),
+                    test_return=round(test_return, 4),
+                    precision_at_5=round(p_at_5, 4),
+                    precision_at_10=round(p_at_10, 4),
+                    ic=round(ic, 4),
+                    hit_rate=round(hit_rate, 4),
+                    sharpe=round(sharpe, 4),
+                    max_drawdown=round(max_dd, 4),
+                    turnover=round(turnover, 4),
+                )
+            )
 
         # Aggregate
         test_returns = [f.test_return for f in fold_results]

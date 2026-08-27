@@ -41,18 +41,28 @@ Spread + Slippage + Likidite → Fill → Sanal Portföy → P&L → Gerçek Son
 ```python
 # services/simulation/execution_simulator.py
 from services.simulation.execution_simulator import (
-    execution_simulator, Order, OrderSide, OrderType,
+    execution_simulator,
+    Order,
+    OrderSide,
+    OrderType,
 )
 
 order = Order(
-    order_id="ORD-001", portfolio_id=1, instrument_id=1,
-    ticker="THYAO", side=OrderSide.BUY, order_type=OrderType.MARKET,
+    order_id="ORD-001",
+    portfolio_id=1,
+    instrument_id=1,
+    ticker="THYAO",
+    side=OrderSide.BUY,
+    order_type=OrderType.MARKET,
     quantity=1000,
 )
 
 result = execution_simulator.execute_order(
-    order, market_price=305.25,
-    avg_volume=500000, volatility=0.25, spread_pct=0.1,
+    order,
+    market_price=305.25,
+    avg_volume=500000,
+    volatility=0.25,
+    spread_pct=0.1,
 )
 # status: FILLED
 # filled_quantity: 1000

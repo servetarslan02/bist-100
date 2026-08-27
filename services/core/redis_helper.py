@@ -11,6 +11,7 @@ _redis_client = None
 _redis_available = None
 _CACHE_FILE = os.path.join(tempfile.gettempdir(), "alpha_bist_cache.json")
 
+
 def _load_cache():
     if os.path.exists(_CACHE_FILE):
         try:
@@ -20,12 +21,14 @@ def _load_cache():
             logger.warning("Caught Exception in _load_cache", exc_info=True)
     return {}
 
+
 def _save_cache(data):
     try:
         with open(_CACHE_FILE, "w") as f:
             f.write(orjson.dumps(data).decode())
     except Exception:
         logger.warning("Caught Exception in _save_cache", exc_info=True)
+
 
 def get_client():
     global _redis_client, _redis_available
@@ -35,17 +38,28 @@ def get_client():
         return _redis_client
     try:
         import redis as redis_lib
+
         host = os.environ.get("REDIS_HOST", "redis")
         port = int(os.environ.get("REDIS_PORT", "6379"))
         db = int(os.environ.get("REDIS_DB", "0"))
         password = os.environ.get("REDIS_PASSWORD", "") or None
-        _redis_client = redis_lib.Redis(host=host, port=port, db=db, password=password, socket_timeout=1, socket_connect_timeout=1, retry_on_timeout=False, decode_responses=False)
+        _redis_client = redis_lib.Redis(
+            host=host,
+            port=port,
+            db=db,
+            password=password,
+            socket_timeout=1,
+            socket_connect_timeout=1,
+            retry_on_timeout=False,
+            decode_responses=False,
+        )
         _redis_client.ping()
         _redis_available = True
         return _redis_client
     except Exception:
         _redis_available = False
         return None
+
 
 def get_cached(key: str) -> Any | None:
     r = get_client()
@@ -62,6 +76,7 @@ def get_cached(key: str) -> Any | None:
         logger.warning("Caught Exception in get_cached", exc_info=True)
     return None
 
+
 def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
     r = get_client()
     if r is None:
@@ -74,6 +89,7 @@ def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
         return True
     except Exception:
         return False
+
 
 def delete_cached(key: str) -> bool:
     r = get_client()
@@ -88,6 +104,7 @@ def delete_cached(key: str) -> bool:
         return True
     except Exception:
         return False
+
 
 def is_available() -> bool:
     return True

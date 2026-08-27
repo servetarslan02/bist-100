@@ -13,7 +13,8 @@ import tempfile
 def _make_temp_repo():
     """Geçici SQLite repository oluştur."""
     from services.data.persistent_repository import PersistentHistoricalRepository
-    fd, path = tempfile.mkstemp(suffix='.db')
+
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     return PersistentHistoricalRepository(db_path=path), path
 
@@ -105,6 +106,7 @@ def _make_test_snapshots():
 # 1. FUTURE FUNDAMENTAL CANNOT AFFECT SCORE
 # =====================================================
 
+
 def test_future_fundamental_no_score_effect():
     """Gelecekteki fundamental veri skoru etkilememeli."""
     import os
@@ -113,18 +115,26 @@ def test_future_fundamental_no_score_effect():
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     # Fundamental ekle (2025-08-14'te açıklandı)
     from services.data.historical_contracts import FundamentalSnapshot
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5, "roe": 0.18}, source="yfinance", status="FRESH",
-    ))
+
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5, "roe": 0.18},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     base_features = {"rsi_14": 55, "momentum_20d": 5}
@@ -153,6 +163,7 @@ def test_future_fundamental_no_score_effect():
 # 2. FUTURE KAP CANNOT AFFECT SCORE
 # =====================================================
 
+
 def test_future_kap_no_score_effect():
     """Gelecekteki KAP event skoru etkilememeli."""
     import os
@@ -160,18 +171,25 @@ def test_future_kap_no_score_effect():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="KAP-FUTURE", ticker="THYAO",
-        published_at="2025-09-01T10:00:00", event_type="FINANCIAL_REPORT",
-        title="Future Report", source="kap",
-    ))
+
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="KAP-FUTURE",
+            ticker="THYAO",
+            published_at="2025-09-01T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="Future Report",
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -189,6 +207,7 @@ def test_future_kap_no_score_effect():
 # 3. FUTURE NEWS CANNOT AFFECT SCORE
 # =====================================================
 
+
 def test_future_news_no_score_effect():
     """Gelecekteki news event skoru etkilememeli."""
     import os
@@ -196,18 +215,25 @@ def test_future_news_no_score_effect():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="NEWS-FUTURE", ticker="THYAO",
-        published_at="2025-09-01T08:00:00", event_type="NEWS",
-        title="Future News", source="news",
-    ))
+
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="NEWS-FUTURE",
+            ticker="THYAO",
+            published_at="2025-09-01T08:00:00",
+            event_type="NEWS",
+            title="Future News",
+            source="news",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -224,6 +250,7 @@ def test_future_news_no_score_effect():
 # 4. FUTURE CATALYST CANNOT AFFECT SCORE
 # =====================================================
 
+
 def test_future_catalyst_no_score_effect():
     """Gelecekteki catalyst skoru etkilememeli."""
     import os
@@ -231,18 +258,26 @@ def test_future_catalyst_no_score_effect():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import CatalystSnapshot
-    repo.add_catalyst_snapshot(CatalystSnapshot(
-        event_id="CAT-FUTURE", ticker="THYAO",
-        announcement_date="2025-09-01", event_date="2025-09-15",
-        catalyst_type="EARNINGS", importance=0.9, source="kap",
-    ))
+
+    repo.add_catalyst_snapshot(
+        CatalystSnapshot(
+            event_id="CAT-FUTURE",
+            ticker="THYAO",
+            announcement_date="2025-09-01",
+            event_date="2025-09-15",
+            catalyst_type="EARNINGS",
+            importance=0.9,
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -259,6 +294,7 @@ def test_future_catalyst_no_score_effect():
 # 5. PUBLICATION DATE VS PERIOD END
 # =====================================================
 
+
 def test_publication_vs_period_end():
     """publication_date ve period_end karışmamalı."""
     import os
@@ -266,18 +302,26 @@ def test_publication_vs_period_end():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
+
     # period_end=2025-06-30, available_at=2025-08-14
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5}, source="yfinance", status="FRESH",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -299,23 +343,29 @@ def test_publication_vs_period_end():
 # 6. DUPLICATE INGESTION IDEMPOTENCY
 # =====================================================
 
+
 def test_duplicate_ingestion_idempotent():
     """Aynı veri tekrar tekrar_ingest edilebilmeli (idempotent)."""
     import os
     import tempfile
 
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
+
     snapshot = EventSnapshot(
-        event_id="DUP-TEST", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="Test", source="kap",
+        event_id="DUP-TEST",
+        ticker="THYAO",
+        published_at="2025-08-10T10:00:00",
+        event_type="FINANCIAL_REPORT",
+        title="Test",
+        source="kap",
     )
 
     # 3 kez ekle
@@ -323,9 +373,7 @@ def test_duplicate_ingestion_idempotent():
         repo.add_event_snapshot(snapshot)
 
     conn = repo._get_conn()
-    count = conn.execute(
-        "SELECT COUNT(*) FROM event_snapshots WHERE event_id = 'DUP-TEST'"
-    ).fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM event_snapshots WHERE event_id = 'DUP-TEST'").fetchone()[0]
 
     if count != 1:
         issues.append(f"Duplicate count: {count} (beklenen1)")
@@ -338,35 +386,46 @@ def test_duplicate_ingestion_idempotent():
 # 7. SAME EVENT FROM TWO SOURCES
 # =====================================================
 
+
 def test_same_event_two_sources():
     """Aynı event farklı kaynaklardan gelirse tek event olmalı."""
     import os
     import tempfile
 
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
+
     # Aynı event_id, farklı kaynaklar
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="SAME-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="From KAP", source="kap",
-    ))
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="SAME-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="From News", source="news",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="SAME-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="From KAP",
+            source="kap",
+        )
+    )
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="SAME-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="From News",
+            source="news",
+        )
+    )
 
     conn = repo._get_conn()
-    count = conn.execute(
-        "SELECT COUNT(*) FROM event_snapshots WHERE event_id = 'SAME-001'"
-    ).fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM event_snapshots WHERE event_id = 'SAME-001'").fetchone()[0]
 
     if count != 1:
         issues.append(f"Same event count: {count} (beklenen1)")
@@ -379,6 +438,7 @@ def test_same_event_two_sources():
 # 8. MISSING PUBLICATION TIMESTAMP
 # =====================================================
 
+
 def test_missing_publication_timestamp():
     """Publication timestamp yoksa UNKNOWN olarak işaretlenmeli."""
     import os
@@ -386,18 +446,26 @@ def test_missing_publication_timestamp():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
+
     # available_at boş
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="",
-        values={"pe_ratio": 8.5}, source="yfinance", status="UNKNOWN",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="",
+            values={"pe_ratio": 8.5},
+            source="yfinance",
+            status="UNKNOWN",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     adapter.get_fundamental_features("THYAO", "2025-12-01")
@@ -413,6 +481,7 @@ def test_missing_publication_timestamp():
 # 9. STALE FUNDAMENTAL
 # =====================================================
 
+
 def test_stale_fundamental():
     """Eski fundamental veri STALE olarak işaretlenmeli."""
     import os
@@ -420,17 +489,25 @@ def test_stale_fundamental():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2024-03-31", available_at="2024-05-10",
-        values={"pe_ratio": 10.0}, source="yfinance", status="STALE",
-    ))
+
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2024-03-31",
+            available_at="2024-05-10",
+            values={"pe_ratio": 10.0},
+            source="yfinance",
+            status="STALE",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     feats = adapter.get_fundamental_features("THYAO", "2025-01-01")
@@ -446,6 +523,7 @@ def test_stale_fundamental():
 # 10. RESTATED FUNDAMENTAL
 # =====================================================
 
+
 def test_restated_fundamental():
     """Restate edilmiş fundamental veri en güncel olanı kullanılmalı."""
     import os
@@ -453,23 +531,37 @@ def test_restated_fundamental():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
+
     # Orijinal Q2
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5}, source="yfinance", status="FRESH",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
     # Restate edilmiş Q2 (daha sonra açıklandı)
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-09-01",
-        values={"pe_ratio": 8.0}, source="yfinance_restate", status="FRESH",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-09-01",
+            values={"pe_ratio": 8.0},
+            source="yfinance_restate",
+            status="FRESH",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     feats = adapter.get_fundamental_features("THYAO", "2025-09-15")
@@ -487,25 +579,33 @@ def test_restated_fundamental():
 # 11. PARTIAL INGESTION RECOVERY
 # =====================================================
 
+
 def test_partial_ingestion_recovery():
     """Partial ingestion'dan sonra mevcut veri bozulmamalı."""
     import os
     import tempfile
 
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
+
     # İlk ingestion
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="PARTIAL-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="First", source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="PARTIAL-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="First",
+            source="kap",
+        )
+    )
 
     # İkinci ingestion başarısız olsun (simüle)
     # Ama ilk veri hâlâ orada olmalı
@@ -523,23 +623,32 @@ def test_partial_ingestion_recovery():
 # 12. PROVIDER TIMEOUT RECOVERY
 # =====================================================
 
+
 def test_provider_timeout_recovery():
     """Provider timeout olursa mevcut veri bozulmamalı."""
     import os
     import tempfile
 
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5}, source="yfinance", status="FRESH",
-    ))
+
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     # Provider timeout simüle (yeni veri eklenemedi)
     # Mevcut veri hâlâ orada olmalı
@@ -557,6 +666,7 @@ def test_provider_timeout_recovery():
 # 13. DETERMINISTIC HISTORICAL REPLAY
 # =====================================================
 
+
 def test_deterministic_historical_replay():
     """Aynı historical veri → aynı sonuç (deterministic)."""
     import os
@@ -565,17 +675,25 @@ def test_deterministic_historical_replay():
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5, "roe": 0.18}, source="yfinance", status="FRESH",
-    ))
+
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5, "roe": 0.18},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     base = {"rsi_14": 55, "momentum_20d": 5}
@@ -597,6 +715,7 @@ def test_deterministic_historical_replay():
 # 14. FUTURE-DATA MUTATION INVARIANCE
 # =====================================================
 
+
 def test_future_data_mutation_invariance():
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
     import os
@@ -605,18 +724,27 @@ def test_future_data_mutation_invariance():
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import EventSnapshot
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="EVT-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="Q2 Report", sentiment=0.5, importance=1.0, source="kap",
-    ))
+
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="EVT-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="Q2 Report",
+            sentiment=0.5,
+            importance=1.0,
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     base = {"rsi_14": 55, "momentum_20d": 5}
@@ -627,11 +755,16 @@ def test_future_data_mutation_invariance():
     cs_before = canonical_scoring.compute_canonical_score("THYAO", {**base, **sent_before}, "BULL")
 
     # Gelecekteki event ekle
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="EVT-FUTURE", ticker="THYAO",
-        published_at="2025-09-01T10:00:00", event_type="DIVIDEND",
-        title="Future Dividend", source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="EVT-FUTURE",
+            ticker="THYAO",
+            published_at="2025-09-01T10:00:00",
+            event_type="DIVIDEND",
+            title="Future Dividend",
+            source="kap",
+        )
+    )
 
     # 2025-08-05 skoru hâlâ aynı olmalı
     kap_after = adapter.get_kap_events("THYAO", "2025-08-05")
@@ -639,9 +772,7 @@ def test_future_data_mutation_invariance():
     cs_after = canonical_scoring.compute_canonical_score("THYAO", {**base, **sent_after}, "BULL")
 
     if cs_before.opportunity_score != cs_after.opportunity_score:
-        issues.append(
-            f"Skor değişti: {cs_before.opportunity_score} → {cs_after.opportunity_score}"
-        )
+        issues.append(f"Skor değişti: {cs_before.opportunity_score} → {cs_after.opportunity_score}")
 
     os.unlink(path)
     return "Future data mutation invariance", len(issues) == 0, issues
@@ -651,6 +782,7 @@ def test_future_data_mutation_invariance():
 # 15. HISTORICAL SNAPSHOT REPRODUCIBILITY
 # =====================================================
 
+
 def test_historical_snapshot_reproducibility():
     """Aynı snapshot farklı session'larda aynı sonucu vermeli."""
     import os
@@ -658,17 +790,25 @@ def test_historical_snapshot_reproducibility():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5}, source="yfinance", status="FRESH",
-    ))
+
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 8.5},
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     # İlk okuma
     adapter1 = HistoricalDataAdapter(repo)
@@ -690,23 +830,32 @@ def test_historical_snapshot_reproducibility():
 # 16-21. ADDITIONAL TESTS
 # =====================================================
 
+
 def test_persistent_repo_basic():
     """Persistent repository temel operasyonları çalışıyor mu?"""
     import os
     import tempfile
 
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import FundamentalSnapshot
-    ok = repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="TEST", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 10}, source="test", status="FRESH",
-    ))
+
+    ok = repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="TEST",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={"pe_ratio": 10},
+            source="test",
+            status="FRESH",
+        )
+    )
     if not ok:
         issues.append("add_fundamental_snapshot failed")
 
@@ -725,6 +874,7 @@ def test_persistent_repo_basic():
 def test_ingestion_pipeline_import():
     """Ingestion pipeline import edilebiliyor mu?"""
     from services.data.ingestion_pipeline import HistoricalIngestionPipeline
+
     issues = []
 
     if not HistoricalIngestionPipeline:
@@ -740,9 +890,10 @@ def test_historical_adapter_with_persistent_repo():
 
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
@@ -753,22 +904,46 @@ def test_historical_adapter_with_persistent_repo():
     )
 
     # Veri ekle
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5, "roe": 0.18, "free_cash_flow": 5e9,
-                "market_cap": 200e9, "debt_to_equity": 0.3, "current_ratio": 2.5},
-        source="yfinance", status="FRESH",
-    ))
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="KAP-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="Q2 Report", sentiment=0.5, importance=1.0, source="kap",
-    ))
-    repo.add_catalyst_snapshot(CatalystSnapshot(
-        event_id="CAT-001", ticker="THYAO",
-        announcement_date="2025-08-10", event_date="2025-08-20",
-        catalyst_type="EARNINGS", importance=0.9, source="kap",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={
+                "pe_ratio": 8.5,
+                "roe": 0.18,
+                "free_cash_flow": 5e9,
+                "market_cap": 200e9,
+                "debt_to_equity": 0.3,
+                "current_ratio": 2.5,
+            },
+            source="yfinance",
+            status="FRESH",
+        )
+    )
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="KAP-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="Q2 Report",
+            sentiment=0.5,
+            importance=1.0,
+            source="kap",
+        )
+    )
+    repo.add_catalyst_snapshot(
+        CatalystSnapshot(
+            event_id="CAT-001",
+            ticker="THYAO",
+            announcement_date="2025-08-10",
+            event_date="2025-08-20",
+            catalyst_type="EARNINGS",
+            importance=0.9,
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -806,9 +981,10 @@ def test_canonical_scoring_with_all_historical():
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
@@ -818,27 +994,58 @@ def test_canonical_scoring_with_all_historical():
         FundamentalSnapshot,
     )
 
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO", period_end="2025-06-30", available_at="2025-08-14",
-        values={"pe_ratio": 8.5, "roe": 0.18, "free_cash_flow": 5e9,
-                "market_cap": 200e9, "debt_to_equity": 0.3, "current_ratio": 2.5},
-        source="yfinance", status="FRESH",
-    ))
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="KAP-001", ticker="THYAO",
-        published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-        title="Q2 Report", sentiment=0.5, importance=1.0, source="kap",
-    ))
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="NEWS-001", ticker="THYAO",
-        published_at="2025-08-12T08:00:00", event_type="NEWS",
-        title="Positive news", sentiment=0.4, importance=0.6, source="news",
-    ))
-    repo.add_catalyst_snapshot(CatalystSnapshot(
-        event_id="CAT-001", ticker="THYAO",
-        announcement_date="2025-08-10", event_date="2025-08-20",
-        catalyst_type="EARNINGS", importance=0.9, source="kap",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={
+                "pe_ratio": 8.5,
+                "roe": 0.18,
+                "free_cash_flow": 5e9,
+                "market_cap": 200e9,
+                "debt_to_equity": 0.3,
+                "current_ratio": 2.5,
+            },
+            source="yfinance",
+            status="FRESH",
+        )
+    )
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="KAP-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="Q2 Report",
+            sentiment=0.5,
+            importance=1.0,
+            source="kap",
+        )
+    )
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="NEWS-001",
+            ticker="THYAO",
+            published_at="2025-08-12T08:00:00",
+            event_type="NEWS",
+            title="Positive news",
+            sentiment=0.4,
+            importance=0.6,
+            source="news",
+        )
+    )
+    repo.add_catalyst_snapshot(
+        CatalystSnapshot(
+            event_id="CAT-001",
+            ticker="THYAO",
+            announcement_date="2025-08-10",
+            event_date="2025-08-20",
+            catalyst_type="EARNINGS",
+            importance=0.9,
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -880,9 +1087,10 @@ def test_news_ingestion():
 
     from services.data.ingestion_pipeline import HistoricalIngestionPipeline
     from services.data.persistent_repository import PersistentHistoricalRepository
+
     issues = []
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
@@ -904,6 +1112,7 @@ def test_news_ingestion():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -953,6 +1162,7 @@ def run_all():
         except Exception as e:
             name, ok, issues = test_func.__name__, False, [f"Exception: {e}"]
             import traceback
+
             traceback.print_exc()
 
         if ok is None:

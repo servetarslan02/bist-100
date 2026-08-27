@@ -56,9 +56,7 @@ class PortfolioService:
 
         # Coordinated lock (asyncio + DB) oluştur
         pool = await get_pg_pool()
-        self._coordinated_lock = CoordinatedLock(
-            pool, dialect="postgresql", key="portfolio_trade", timeout_ms=10000
-        )
+        self._coordinated_lock = CoordinatedLock(pool, dialect="postgresql", key="portfolio_trade", timeout_ms=10000)
 
         # Portfolio initialization lock (multi-instance safety)
         async with self._trade_lock:
@@ -74,12 +72,11 @@ class PortfolioService:
             self._running = True
 
         # Config watcher başlat
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                   "..", "config", "alpha_config.json")
+        config_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "alpha_config.json"
+        )
         if os.path.exists(config_path):
-            self._config_watcher = ConfigWatcher(
-                config_path, reload_fn=self._on_config_change, watch_interval_s=5.0
-            )
+            self._config_watcher = ConfigWatcher(config_path, reload_fn=self._on_config_change, watch_interval_s=5.0)
             self._config_watcher.start()
 
         logger.info("Portfolio Service v2.0 started", portfolio_id=self._portfolio_id)
@@ -124,8 +121,8 @@ class PortfolioService:
         try:
             s = str(raw).strip()
             # ISO format: 2026-08-17T04:00:00+00:00 veya 2026-08-17 04:00:00
-            if '+' in s or s.endswith('Z'):
-                return datetime.fromisoformat(s.replace('Z', '+00:00'))
+            if "+" in s or s.endswith("Z"):
+                return datetime.fromisoformat(s.replace("Z", "+00:00"))
             # Naive timestamp → UTC varsay
             dt = datetime.fromisoformat(s)
             return dt.replace(tzinfo=UTC)
@@ -149,21 +146,22 @@ class PortfolioService:
         from ..portfolio.portfolio_manager import Position, Trade
 
         # 1. Portfolio bilgisi
-        pf = await pg_fetchrow(
-            "SELECT * FROM portfolios WHERE id = ?", self._portfolio_id
-        )
+        pf = await pg_fetchrow("SELECT * FROM portfolios WHERE id = ?", self._portfolio_id)
         if pf:
             self._pm._cash = float(pf["cash_balance"])
             self._pm._initial_capital = float(pf["initial_capital"])
             self._pm._realized_pnl_total = float(pf.get("total_pnl") or 0)
 
         # 2. Pozisyonları yükle (entry_commission dahil)
-        rows = await pg_fetch("""
+        rows = await pg_fetch(
+            """
             SELECT p.*, i.symbol as ticker
             FROM positions p
             JOIN instruments i ON p.instrument_id = i.id
             WHERE p.portfolio_id = ? AND p.status = 'OPEN'
-        """, self._portfolio_id)
+        """,
+            self._portfolio_id,
+        )
 
         for row in rows:
             ticker = row["ticker"]
@@ -191,20 +189,22 @@ class PortfolioService:
 
         # 3. Commission total (position_history SUM'dan)
         comm_hist = await pg_fetch(
-            "SELECT SUM(commission) as total FROM position_history WHERE portfolio_id = ?",
-            self._portfolio_id
+            "SELECT SUM(commission) as total FROM position_history WHERE portfolio_id = ?", self._portfolio_id
         )
         if comm_hist and comm_hist[0].get("total"):
             self._pm._commission_total = float(comm_hist[0]["total"])
 
         # 4. Trade geçmişini position_history'den restore et
-        closed_trades = await pg_fetch("""
+        closed_trades = await pg_fetch(
+            """
             SELECT ph.*, i.symbol as ticker
             FROM position_history ph
             LEFT JOIN instruments i ON i.symbol = ph.ticker
             WHERE ph.portfolio_id = ? AND ph.action IN ('CLOSE', 'REDUCE')
             ORDER BY ph.id ASC
-        """, self._portfolio_id)
+        """,
+            self._portfolio_id,
+        )
 
         for ct in closed_trades:
             trade = Trade(
@@ -223,16 +223,17 @@ class PortfolioService:
 
         # 5. High-water mark + equity snapshots
         all_snapshots = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id ASC",
-            self._portfolio_id
+            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id ASC", self._portfolio_id
         )
         for snap in all_snapshots:
-            self._pm._equity_curve.append({
-                "timestamp": snap.get("created_at", ""),
-                "equity": float(snap["total_equity"]),
-                "cash": float(snap["cash"]),
-                "invested": float(snap["invested"]),
-            })
+            self._pm._equity_curve.append(
+                {
+                    "timestamp": snap.get("created_at", ""),
+                    "equity": float(snap["total_equity"]),
+                    "cash": float(snap["cash"]),
+                    "invested": float(snap["invested"]),
+                }
+            )
         if all_snapshots:
             last = all_snapshots[-1]
             self._pm._high_water_mark = float(last["high_water_mark"])
@@ -241,39 +242,41 @@ class PortfolioService:
         # 6. Daily P&L restore
         try:
             daily_rows = await pg_fetch(
-                "SELECT * FROM daily_pnl WHERE portfolio_id = ? ORDER BY pnl_date ASC",
-                self._portfolio_id
+                "SELECT * FROM daily_pnl WHERE portfolio_id = ? ORDER BY pnl_date ASC", self._portfolio_id
             )
             for dr in daily_rows:
-                self._pm._daily_pnl.append({
-                    "date": dr["pnl_date"],
-                    "realized": float(dr.get("realized_pnl") or 0),
-                    "unrealized": float(dr.get("unrealized_pnl") or 0),
-                    "commission": float(dr.get("commission") or 0),
-                    "net": float(dr.get("net_pnl") or 0),
-                    "equity_start": float(dr.get("equity_start") or 0),
-                    "equity_end": float(dr.get("equity_end") or 0),
-                })
+                self._pm._daily_pnl.append(
+                    {
+                        "date": dr["pnl_date"],
+                        "realized": float(dr.get("realized_pnl") or 0),
+                        "unrealized": float(dr.get("unrealized_pnl") or 0),
+                        "commission": float(dr.get("commission") or 0),
+                        "net": float(dr.get("net_pnl") or 0),
+                        "equity_start": float(dr.get("equity_start") or 0),
+                        "equity_end": float(dr.get("equity_end") or 0),
+                    }
+                )
         except Exception:
             logger.warning("Caught Exception in _load_state", exc_info=True)
 
         # 7. Invariant doğrula
         acc = self._pm.get_accounting_summary()
         if not acc["invariant_check"]:
-            logger.warning("INVARIANT VIOLATION after load",
-                         equity=acc["total_equity"],
-                         cash=acc["cash"],
-                         mv=acc["market_value"])
+            logger.warning(
+                "INVARIANT VIOLATION after load", equity=acc["total_equity"], cash=acc["cash"], mv=acc["market_value"]
+            )
 
-        logger.info("State fully restored",
-                   positions=len(self._pm._positions),
-                   trades=len(self._pm._trades),
-                   cash=self._pm._cash,
-                   realized_pnl=self._pm._realized_pnl_total,
-                   commission_total=self._pm._commission_total,
-                   hwm=self._pm._high_water_mark,
-                   equity_curve_points=len(self._pm._equity_curve),
-                   daily_pnl_points=len(self._pm._daily_pnl))
+        logger.info(
+            "State fully restored",
+            positions=len(self._pm._positions),
+            trades=len(self._pm._trades),
+            cash=self._pm._cash,
+            realized_pnl=self._pm._realized_pnl_total,
+            commission_total=self._pm._commission_total,
+            hwm=self._pm._high_water_mark,
+            equity_curve_points=len(self._pm._equity_curve),
+            daily_pnl_points=len(self._pm._daily_pnl),
+        )
 
     async def get_closed_positions(self, limit: int = 50) -> list[dict]:
         """Kapalı pozisyonların tarihsel kayıtları.
@@ -281,11 +284,15 @@ class PortfolioService:
         ticker doğrudan position_history'den alınır (instruments JOIN yok).
         Böylece instrument silinse bile kayıtlar korunur.
         """
-        rows = await pg_fetch("""
+        rows = await pg_fetch(
+            """
             SELECT * FROM position_history
             WHERE portfolio_id = ? AND action = 'CLOSE'
             ORDER BY id DESC LIMIT ?
-        """, self._portfolio_id, limit)
+        """,
+            self._portfolio_id,
+            limit,
+        )
         return rows
 
     async def get_daily_pnl_history(self, limit: int = 252) -> list[dict]:
@@ -293,7 +300,8 @@ class PortfolioService:
         try:
             rows = await pg_fetch(
                 "SELECT * FROM daily_pnl WHERE portfolio_id = ? ORDER BY pnl_date DESC LIMIT ?",
-                self._portfolio_id, limit
+                self._portfolio_id,
+                limit,
             )
             return rows
         except Exception:
@@ -312,7 +320,8 @@ class PortfolioService:
             # Mevcut gün kaydı var mı?
             existing = await pg_fetchrow(
                 "SELECT id, realized_pnl, commission, net_pnl FROM daily_pnl WHERE portfolio_id = ? AND pnl_date = ?",
-                self._portfolio_id, today
+                self._portfolio_id,
+                today,
             )
 
             if existing:
@@ -322,20 +331,24 @@ class PortfolioService:
                 new_net = new_realized - new_commission
                 await pg_execute(
                     "UPDATE daily_pnl SET realized_pnl = ?, commission = ?, net_pnl = ?, equity_end = ? WHERE id = ?",
-                    round(new_realized, 2), round(new_commission, 2), round(new_net, 2),
-                    round(pf["total_value"], 2), existing["id"]
+                    round(new_realized, 2),
+                    round(new_commission, 2),
+                    round(new_net, 2),
+                    round(pf["total_value"], 2),
+                    existing["id"],
                 )
             else:
                 # Yeni gün kaydı
                 await pg_execute(
                     "INSERT INTO daily_pnl (portfolio_id, pnl_date, realized_pnl, unrealized_pnl, commission, net_pnl, equity_start, equity_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    self._portfolio_id, today,
+                    self._portfolio_id,
+                    today,
                     round(realized_pnl, 2),
                     round(pf["unrealized_pnl"], 2),
                     round(commission, 2),
                     round(net, 2),
                     round(pf["total_value"] - net, 2),
-                    round(pf["total_value"], 2)
+                    round(pf["total_value"], 2),
                 )
         except Exception as e:
             logger.warning("Daily P&L update failed", error=str(e))
@@ -348,17 +361,17 @@ class PortfolioService:
         """EQUITY = CASH + MARKET_VALUE invariant doğrula."""
         acc = self._pm.get_accounting_summary()
         if not acc["invariant_check"]:
-            logger.critical("INVARIANT VIOLATION",
-                         context=context,
-                         equity=acc["total_equity"],
-                         cash=acc["cash"],
-                         mv=acc["market_value"])
+            logger.critical(
+                "INVARIANT VIOLATION",
+                context=context,
+                equity=acc["total_equity"],
+                cash=acc["cash"],
+                mv=acc["market_value"],
+            )
             raise RuntimeError(
                 f"Portfolio invariant ihlali ({context}): "
                 f"EQUITY={acc['total_equity']} != CASH={acc['cash']} + MV={acc['market_value']}"
             )
-
-
 
     async def execute_buy(
         self,
@@ -379,14 +392,12 @@ class PortfolioService:
             if isinstance(lock, CoordinatedLock):
                 async with lock:
                     return await self._execute_buy_atomic(
-                        ticker, quantity, price, instrument_id,
-                        stop_price, target_price, sector
+                        ticker, quantity, price, instrument_id, stop_price, target_price, sector
                     )
             else:
                 async with lock:
                     return await self._execute_buy_atomic(
-                        ticker, quantity, price, instrument_id,
-                        stop_price, target_price, sector
+                        ticker, quantity, price, instrument_id, stop_price, target_price, sector
                     )
         except RuntimeError as e:
             return {"success": False, "error": str(e)}
@@ -406,14 +417,10 @@ class PortfolioService:
         try:
             if isinstance(lock, CoordinatedLock):
                 async with lock:
-                    return await self._execute_sell_atomic(
-                        ticker, quantity, price, instrument_id
-                    )
+                    return await self._execute_sell_atomic(ticker, quantity, price, instrument_id)
             else:
                 async with lock:
-                    return await self._execute_sell_atomic(
-                        ticker, quantity, price, instrument_id
-                    )
+                    return await self._execute_sell_atomic(ticker, quantity, price, instrument_id)
         except RuntimeError as e:
             return {"success": False, "error": str(e)}
 
@@ -432,7 +439,8 @@ class PortfolioService:
                 if ticker in self._position_cache:
                     await pg_execute(
                         "UPDATE positions SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        price, self._position_cache[ticker]["id"]
+                        price,
+                        self._position_cache[ticker]["id"],
                     )
         except Exception as e:
             logger.warning("Position price update failed", error=str(e))
@@ -454,22 +462,21 @@ class PortfolioService:
     # =====================================================
 
     async def _execute_buy_atomic(
-        self, ticker, quantity, price, instrument_id,
-        stop_price, target_price, sector
+        self, ticker, quantity, price, instrument_id, stop_price, target_price, sector
     ) -> dict[str, Any]:
         """Atomik alım işlemi (lock altında çağrılır)."""
         commission = self._commission_model.calculate(quantity * price)
 
         # In-process cash kontrolü
         if self._pm._cash < quantity * price + commission:
-            logger.error(f"Yetersiz nakit: cash={self._pm._cash}, cost={quantity * price + commission}, qty={quantity}, price={price}, comm={commission}")
+            logger.error(
+                f"Yetersiz nakit: cash={self._pm._cash}, cost={quantity * price + commission}, qty={quantity}, price={price}, comm={commission}"
+            )
             return {"success": False, "error": "Yetersiz nakit"}
 
         # DB'den güncel cash oku (multi-instance tutarlılığı)
         try:
-            pf_row = await pg_fetchrow(
-                "SELECT cash_balance FROM portfolios WHERE id = ?", self._portfolio_id
-            )
+            pf_row = await pg_fetchrow("SELECT cash_balance FROM portfolios WHERE id = ?", self._portfolio_id)
             db_cash = float(pf_row["cash_balance"]) if pf_row else self._pm._cash
             if db_cash < quantity * price + commission:
                 return {"success": False, "error": "Yetersiz nakit (DB)"}
@@ -477,9 +484,14 @@ class PortfolioService:
             logger.warning("DB cash read failed — using in-memory", error=str(e), ticker=ticker)
 
         result = self._pm.open_position(
-            ticker=ticker, direction="LONG", quantity=quantity,
-            price=price, stop_price=stop_price, target_price=target_price,
-            sector=sector, commission=commission,
+            ticker=ticker,
+            direction="LONG",
+            quantity=quantity,
+            price=price,
+            stop_price=stop_price,
+            target_price=target_price,
+            sector=sector,
+            commission=commission,
         )
 
         if not result.get("success"):
@@ -489,9 +501,7 @@ class PortfolioService:
         self._verify_invariant(f"BUY {ticker}")
         return result
 
-    async def _execute_sell_atomic(
-        self, ticker, quantity, price, instrument_id
-    ) -> dict[str, Any]:
+    async def _execute_sell_atomic(self, ticker, quantity, price, instrument_id) -> dict[str, Any]:
         """Atomik satış işlemi (lock altında çağrılır)."""
         if ticker not in self._pm._positions:
             return {"success": False, "error": f"{ticker} pozisyonu yok"}
@@ -506,14 +516,19 @@ class PortfolioService:
         if quantity >= pos.quantity:
             update_result = await pg_execute(
                 "UPDATE positions SET quantity = 0, status = 'CLOSED', entry_commission = 0, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN' AND quantity >= ?",
-                self._portfolio_id, instrument_id, quantity
+                self._portfolio_id,
+                instrument_id,
+                quantity,
             )
             if "OK 0" in str(update_result):
                 return {"success": False, "error": "Oversell (DB atomic): yeterli pozisyon yok"}
         else:
             update_result = await pg_execute(
                 "UPDATE positions SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN' AND quantity >= ?",
-                quantity, self._portfolio_id, instrument_id, quantity
+                quantity,
+                self._portfolio_id,
+                instrument_id,
+                quantity,
             )
             if "OK 0" in str(update_result):
                 return {"success": False, "error": "Oversell (DB atomic): yeterli pozisyon yok"}
@@ -571,13 +586,15 @@ class PortfolioService:
         # Portfolio cash güncelle
         await pg_execute(
             "UPDATE portfolios SET cash_balance = cash_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            cost + commission, self._portfolio_id
+            cost + commission,
+            self._portfolio_id,
         )
 
         # Pozisyon güncelle/oluştur
         existing = await pg_fetchrow(
             "SELECT id, quantity, avg_cost FROM positions WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN'",
-            self._portfolio_id, instrument_id
+            self._portfolio_id,
+            instrument_id,
         )
 
         if existing:
@@ -589,31 +606,51 @@ class PortfolioService:
             new_comm = old_comm + commission
             await pg_execute(
                 "UPDATE positions SET quantity = ?, avg_cost = ?, entry_commission = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                new_qty, round(new_avg, 4), round(new_comm, 4), existing["id"]
+                new_qty,
+                round(new_avg, 4),
+                round(new_comm, 4),
+                existing["id"],
             )
             pos_id = existing["id"]
         else:
             await pg_execute(
                 "INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, entry_commission, current_price, entry_date, status) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'OPEN')",
-                self._portfolio_id, instrument_id, quantity, round(price, 4), round(commission, 4), price
+                self._portfolio_id,
+                instrument_id,
+                quantity,
+                round(price, 4),
+                round(commission, 4),
+                price,
             )
-            row = await pg_fetchrow("SELECT id FROM positions WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN' ORDER BY id DESC LIMIT 1", self._portfolio_id, instrument_id)
+            row = await pg_fetchrow(
+                "SELECT id FROM positions WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN' ORDER BY id DESC LIMIT 1",
+                self._portfolio_id,
+                instrument_id,
+            )
             pos_id = row["id"] if row else 0
 
         # Cash ledger kaydet
         balance = self._pm._cash
         await pg_execute(
             "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES (?, ?, ?, 'BUY', ?, ?)",
-            self._portfolio_id, -(cost + commission), round(balance, 2),
-            f"BUY {quantity} {ticker} @ {price:.4f} (komisyon: {commission:.2f})", ticker
+            self._portfolio_id,
+            -(cost + commission),
+            round(balance, 2),
+            f"BUY {quantity} {ticker} @ {price:.4f} (komisyon: {commission:.2f})",
+            ticker,
         )
 
         # Position history kaydet
         pos = self._pm._positions.get(ticker)
         await pg_execute(
             "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES (?, ?, 'OPEN', 'LONG', ?, ?, ?, 0, ?, 0, ?, 0)",
-            self._portfolio_id, ticker, quantity, price, commission,
-            round(pos.entry_price, 4) if pos else price, quantity
+            self._portfolio_id,
+            ticker,
+            quantity,
+            price,
+            commission,
+            round(pos.entry_price, 4) if pos else price,
+            quantity,
         )
 
         # Cache güncelle
@@ -625,7 +662,9 @@ class PortfolioService:
             "current_price": price,
         }
 
-    async def _persist_sell(self, ticker: str, quantity: int, price: float, commission: float, result: dict, instrument_id: int = 0):
+    async def _persist_sell(
+        self, ticker: str, quantity: int, price: float, commission: float, result: dict, instrument_id: int = 0
+    ):
         """Satışı DB'ye kaydet."""
         realized_pnl = result.get("realized_pnl", 0)
 
@@ -639,7 +678,8 @@ class PortfolioService:
         revenue = quantity * price - commission
         await pg_execute(
             "UPDATE portfolios SET cash_balance = cash_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            revenue, self._portfolio_id
+            revenue,
+            self._portfolio_id,
         )
 
         # Pozisyon zaten atomik olarak güncellendi (execute_sell'de)
@@ -648,7 +688,9 @@ class PortfolioService:
             pos = self._pm._positions[ticker]
             await pg_execute(
                 "UPDATE positions SET entry_commission = ?, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN'",
-                round(pos.entry_commission, 4), self._portfolio_id, instrument_id
+                round(pos.entry_commission, 4),
+                self._portfolio_id,
+                instrument_id,
             )
         else:
             # Pozisyon zaten kapatıldı — cache temizle
@@ -658,8 +700,11 @@ class PortfolioService:
         balance = self._pm._cash
         await pg_execute(
             "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES (?, ?, ?, 'SELL', ?, ?)",
-            self._portfolio_id, revenue, round(balance, 2),
-            f"SELL {quantity} {ticker} @ {price:.4f} (P&L: {realized_pnl:.2f}, komisyon: {commission:.2f})", ticker
+            self._portfolio_id,
+            revenue,
+            round(balance, 2),
+            f"SELL {quantity} {ticker} @ {price:.4f} (P&L: {realized_pnl:.2f}, komisyon: {commission:.2f})",
+            ticker,
         )
 
         # Position history
@@ -667,16 +712,24 @@ class PortfolioService:
         pos_before = self._pm._positions.get(ticker)
         await pg_execute(
             "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES (?, ?, ?, 'LONG', ?, ?, ?, ?, ?, ?, ?, ?)",
-            self._portfolio_id, ticker, action, quantity, price, commission,
-            0, round(pos_before.entry_price, 4) if pos_before else 0,
+            self._portfolio_id,
+            ticker,
+            action,
+            quantity,
+            price,
+            commission,
+            0,
+            round(pos_before.entry_price, 4) if pos_before else 0,
             quantity + (pos_before.quantity if pos_before else 0),
-            pos_before.quantity if pos_before else 0, realized_pnl
+            pos_before.quantity if pos_before else 0,
+            realized_pnl,
         )
 
         # Toplam P&L güncelle
         await pg_execute(
             "UPDATE portfolios SET total_pnl = total_pnl + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            realized_pnl, self._portfolio_id
+            realized_pnl,
+            self._portfolio_id,
         )
 
     async def _update_portfolio_totals(self):
@@ -688,8 +741,11 @@ class PortfolioService:
 
         await pg_execute(
             "UPDATE portfolios SET cash_balance = ?, invested_value = ?, current_capital = ?, total_return_pct = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            pf["cash"], pf["invested_value"], pf["total_value"],
-            acc["return_on_equity_pct"], self._portfolio_id
+            pf["cash"],
+            pf["invested_value"],
+            pf["total_value"],
+            acc["return_on_equity_pct"],
+            self._portfolio_id,
         )
 
     async def _save_equity_snapshot(self):
@@ -707,23 +763,31 @@ class PortfolioService:
             # Equity snapshot
             await pg_execute(
                 "INSERT INTO equity_snapshots (portfolio_id, snapshot_date, total_equity, cash, invested, unrealized_pnl, realized_pnl_today, commission_today, positions_count, high_water_mark, drawdown_from_hwm) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                self._portfolio_id, today,
-                pf["total_value"], pf["cash"], pf["invested_value"],
-                pf["unrealized_pnl"], self._daily_realized_pnl, self._daily_commission,
-                pf["positions_count"], acc["high_water_mark"], acc["drawdown_pct"]
+                self._portfolio_id,
+                today,
+                pf["total_value"],
+                pf["cash"],
+                pf["invested_value"],
+                pf["unrealized_pnl"],
+                self._daily_realized_pnl,
+                self._daily_commission,
+                pf["positions_count"],
+                acc["high_water_mark"],
+                acc["drawdown_pct"],
             )
 
             # Daily P&L
             net_pnl = self._daily_realized_pnl - self._daily_commission
             await pg_execute(
                 "INSERT INTO daily_pnl (portfolio_id, pnl_date, realized_pnl, unrealized_pnl, commission, net_pnl, equity_start, equity_end) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (portfolio_id, pnl_date) DO NOTHING",
-                self._portfolio_id, today,
+                self._portfolio_id,
+                today,
                 round(self._daily_realized_pnl, 2),
                 round(pf["unrealized_pnl"], 2),
                 round(self._daily_commission, 2),
                 round(net_pnl, 2),
                 round(pf["total_value"] - net_pnl, 2),
-                round(pf["total_value"], 2)
+                round(pf["total_value"], 2),
             )
 
             self._last_snapshot_date = today
@@ -747,8 +811,7 @@ class PortfolioService:
     async def get_cash_ledger(self, limit: int = 100) -> list[dict]:
         """DB'den nakit hareket geçmişi."""
         rows = await pg_fetch(
-            "SELECT * FROM cash_ledger WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
-            self._portfolio_id, limit
+            "SELECT * FROM cash_ledger WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?", self._portfolio_id, limit
         )
         return rows
 
@@ -757,20 +820,22 @@ class PortfolioService:
         if ticker:
             rows = await pg_fetch(
                 "SELECT * FROM position_history WHERE portfolio_id = ? AND ticker = ? ORDER BY id DESC LIMIT ?",
-                self._portfolio_id, ticker, limit
+                self._portfolio_id,
+                ticker,
+                limit,
             )
         else:
             rows = await pg_fetch(
                 "SELECT * FROM position_history WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
-                self._portfolio_id, limit
+                self._portfolio_id,
+                limit,
             )
         return rows
 
     async def get_equity_snapshots(self, limit: int = 252) -> list[dict]:
         """DB'den equity snapshot'ları."""
         rows = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
-            self._portfolio_id, limit
+            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?", self._portfolio_id, limit
         )
         return rows
 
@@ -805,6 +870,7 @@ def get_portfolio_enhancements() -> dict[str, Any]:
             PerformanceAttribution,
             TaxModel,
         )
+
         result["tax_model"] = TaxModel()
         result["dividend_handler"] = DividendHandler()
         result["benchmark_engine"] = BenchmarkEngine()
@@ -816,6 +882,7 @@ def get_portfolio_enhancements() -> dict[str, Any]:
         logger.warning("Caught Exception in get_portfolio_enhancements", exc_info=True)
     return result
 
+
 async def main():
     try:
         await portfolio_service.start()
@@ -824,5 +891,6 @@ async def main():
     except KeyboardInterrupt:
         await portfolio_service.stop()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

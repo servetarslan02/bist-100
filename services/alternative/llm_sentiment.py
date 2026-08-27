@@ -122,6 +122,7 @@ class LLMSentimentAnalyzer:
 
             if response.success:
                 from services.agents.llm_client import parse_llm_json
+
                 parsed = parse_llm_json(response.content)
                 if parsed and "sentiment_score" in parsed:
                     return {
@@ -149,20 +150,66 @@ class LLMSentimentAnalyzer:
 
         # Finansal pozitif kelimeler
         positive = [
-            "artış", "yükseliş", "büyüme", "kâr", "rekor", "başarı",
-            "arttı", "yükseldi", "güçlü", "olumlu", "destek", "teşvik",
-            "ihracat", "yatırım", "genişleme", "iyileşme", "toparlanma",
-            "temettü", "bedelsiz", "sermaye artışı", "satın alma",
-            "işbirliği", "anlaşma", "sözleşme", "ihale", "sipariş",
+            "artış",
+            "yükseliş",
+            "büyüme",
+            "kâr",
+            "rekor",
+            "başarı",
+            "arttı",
+            "yükseldi",
+            "güçlü",
+            "olumlu",
+            "destek",
+            "teşvik",
+            "ihracat",
+            "yatırım",
+            "genişleme",
+            "iyileşme",
+            "toparlanma",
+            "temettü",
+            "bedelsiz",
+            "sermaye artışı",
+            "satın alma",
+            "işbirliği",
+            "anlaşma",
+            "sözleşme",
+            "ihale",
+            "sipariş",
         ]
 
         negative = [
-            "düşüş", "kayıp", "zarar", "azalma", "gerileme", "kriz",
-            "düştü", "azaldı", "zayıf", "olumsuz", "risk", "tehlike",
-            "iflas", "batık", "restrüktür", "borç", "yükümlülük",
-            "dava", "ceza", "soruşturma", "skandal", "yanlış",
-            "iptal", "ertelemme", "askıya", "durdurma", "kapatma",
-            "işten çıkarma", "tasfiye", "kayıp", "zarar",
+            "düşüş",
+            "kayıp",
+            "zarar",
+            "azalma",
+            "gerileme",
+            "kriz",
+            "düştü",
+            "azaldı",
+            "zayıf",
+            "olumsuz",
+            "risk",
+            "tehlike",
+            "iflas",
+            "batık",
+            "restrüktür",
+            "borç",
+            "yükümlülük",
+            "dava",
+            "ceza",
+            "soruşturma",
+            "skandal",
+            "yanlış",
+            "iptal",
+            "ertelemme",
+            "askıya",
+            "durdurma",
+            "kapatma",
+            "işten çıkarma",
+            "tasfiye",
+            "kayıp",
+            "zarar",
         ]
 
         pos_count = 0

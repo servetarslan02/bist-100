@@ -21,6 +21,7 @@ from services.core.async_http import AsyncHTTPClient, close_all_clients, get_cli
 # ASYNC HTTP CLIENT TESTS
 # =====================================================
 
+
 async def test_client_creation():
     """Client oluşturma çalışmalı."""
     issues = []
@@ -61,7 +62,9 @@ async def test_client_timeout():
     # result None dönmeli veya exception fırlatılmalı
     timeout_detected = (result is None) or (isinstance(result, str) and "timeout" in result.lower())
     await client.close()
-    assert timeout_detected, f"Client Timeout: beklenen None veya timeout hatası, alınan: {type(result).__name__}={result!r}"
+    assert timeout_detected, (
+        f"Client Timeout: beklenen None veya timeout hatası, alınan: {type(result).__name__}={result!r}"
+    )
 
 
 async def test_client_retry():
@@ -116,17 +119,19 @@ async def test_context_manager():
 # PROVIDER ASYNC TESTS
 # =====================================================
 
+
 async def test_bist_provider_async():
     """BIST provider async methodlara sahip olmalı."""
     issues = []
 
     from services.ingestion.providers.bist_provider import bist_provider
 
-    if not hasattr(bist_provider, 'fetch_index_data'):
+    if not hasattr(bist_provider, "fetch_index_data"):
         issues.append("fetch_index_data yok")
 
     # Method'un async olduğunu kontrol et
     import inspect
+
     if not inspect.iscoroutinefunction(bist_provider.fetch_index_data):
         issues.append("fetch_index_data async değil")
     if not inspect.iscoroutinefunction(bist_provider.fetch_market_summary):
@@ -145,6 +150,7 @@ async def test_kap_provider_async():
     import inspect
 
     from services.ingestion.providers.kap_provider import kap_provider
+
     if not inspect.iscoroutinefunction(kap_provider.fetch_disclosures):
         issues.append("fetch_disclosures async değil")
     if not inspect.iscoroutinefunction(kap_provider.fetch_company_info):
@@ -161,6 +167,7 @@ async def test_news_provider_async():
     import inspect
 
     from services.ingestion.providers.news_provider import NewsProvider
+
     provider = NewsProvider()
     if not inspect.iscoroutinefunction(provider.fetch_financial_news_rss):
         issues.append("fetch_news async değil")
@@ -171,6 +178,7 @@ async def test_news_provider_async():
 # =====================================================
 # CONFIG TESTS
 # =====================================================
+
 
 async def test_config_file_exists():
     """Config dosyaları mevcut olmalı."""
@@ -235,6 +243,7 @@ async def test_config_values():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

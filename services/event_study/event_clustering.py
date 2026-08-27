@@ -3,6 +3,7 @@
 Yakın tarihli event'lerin etkileşimini tespit etme ve düzeltme.
 MacKinlay (1997) — clustered events problem.
 """
+
 from datetime import datetime
 from typing import Any
 
@@ -24,9 +25,7 @@ class EventClusteringDetector:
         self.window_days = window_days
         self.min_cluster_size = min_cluster_size
 
-    def detect_clusters(
-        self, events: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def detect_clusters(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Event'leri tarihe göre cluster'lara ayır.
 
         Args:
@@ -66,14 +65,16 @@ class EventClusteringDetector:
                     break
 
             if len(cluster) >= self.min_cluster_size:
-                clusters.append({
-                    "events": cluster,
-                    "size": len(cluster),
-                    "start_date": cluster[0].get("date"),
-                    "end_date": cluster[-1].get("date"),
-                    "tickers": list(set(e.get("ticker") for e in cluster)),
-                    "event_types": list(set(e.get("event_type") for e in cluster)),
-                })
+                clusters.append(
+                    {
+                        "events": cluster,
+                        "size": len(cluster),
+                        "start_date": cluster[0].get("date"),
+                        "end_date": cluster[-1].get("date"),
+                        "tickers": list(set(e.get("ticker") for e in cluster)),
+                        "event_types": list(set(e.get("event_type") for e in cluster)),
+                    }
+                )
 
         logger.info(
             "event_clusters_detected",
@@ -131,9 +132,7 @@ class EventClusteringDetector:
 
         return adjusted_events
 
-    def get_cluster_statistics(
-        self, clusters: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def get_cluster_statistics(self, clusters: list[dict[str, Any]]) -> dict[str, Any]:
         """Cluster istatistikleri.
 
         Returns:
@@ -148,9 +147,7 @@ class EventClusteringDetector:
             "avg_size": round(float(np.mean(sizes)), 1),
             "max_size": max(sizes),
             "min_size": min(sizes),
-            "size_distribution": {
-                f"size_{s}": sizes.count(s) for s in set(sizes)
-            },
+            "size_distribution": {f"size_{s}": sizes.count(s) for s in set(sizes)},
         }
 
     def _parse_date(self, date_val: Any) -> datetime | None:

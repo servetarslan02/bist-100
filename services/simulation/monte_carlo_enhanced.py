@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class MonteCarloResult:
     """Monte Carlo simülasyon sonucu."""
+
     ticker: str
     current_price: float
     horizon_days: int

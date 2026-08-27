@@ -40,8 +40,8 @@ async def analyze_tables():
 
         print(f"\n📊 {len(tables)} tablo ANALYZ ediliyor...")
         for table in tables:
-            schema = table['schemaname']
-            name = table['tablename']
+            schema = table["schemaname"]
+            name = table["tablename"]
             await conn.execute(f'ANALYZE "{schema}"."{name}"')
             print(f"  ✅ {schema}.{name}")
 
@@ -71,10 +71,10 @@ async def vacuum_tables():
 
         print(f"\n🧹 {len(tables)} tablo VACUUM ediliyor (dead rows > 1000)...")
         for table in tables:
-            schema = table['schemaname']
-            name = table['tablename']
-            dead = table['n_dead_tup']
-            pct = table['dead_pct']
+            schema = table["schemaname"]
+            name = table["tablename"]
+            dead = table["n_dead_tup"]
+            pct = table["dead_pct"]
             print(f"  🔄 {schema}.{name}: {dead} dead rows ({pct}%)")
             await conn.execute(f'VACUUM ANALYZE "{schema}"."{name}"')
             print(f"  ✅ {schema}.{name} tamamlandı")
@@ -95,8 +95,8 @@ async def refresh_materialized_views():
 
         print(f"\n🔄 {len(views)} materialized view yenileniyor...")
         for view in views:
-            schema = view['schemaname']
-            name = view['matviewname']
+            schema = view["schemaname"]
+            name = view["matviewname"]
             print(f"  🔄 {schema}.{name}...")
             await conn.execute(f'REFRESH MATERIALIZED VIEW CONCURRENTLY "{schema}"."{name}"')
             print(f"  ✅ {schema}.{name} tamamlandı")
@@ -109,7 +109,8 @@ async def show_slow_queries(limit: int = 20):
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
         try:
-            queries = await conn.fetch("""
+            queries = await conn.fetch(
+                """
                 SELECT
                     query,
                     calls,
@@ -122,7 +123,9 @@ async def show_slow_queries(limit: int = 20):
                 WHERE calls > 5
                 ORDER BY mean_exec_time DESC
                 LIMIT $1
-            """, limit)
+            """,
+                limit,
+            )
 
             print(f"\n🐌 En Yavaş {limit} Sorgu:")
             print("-" * 100)
@@ -130,8 +133,10 @@ async def show_slow_queries(limit: int = 20):
             print("-" * 100)
 
             for q in queries:
-                query_short = q['query'][:60].replace('\n', ' ')
-                print(f"{q['mean_time_ms']:>9.1f}ms {q['total_time_ms']:>9.1f}ms {q['calls']:>6} {q['rows']:>8} {q['cache_hit_pct'] or 0:>6.1f}%  {query_short}")
+                query_short = q["query"][:60].replace("\n", " ")
+                print(
+                    f"{q['mean_time_ms']:>9.1f}ms {q['total_time_ms']:>9.1f}ms {q['calls']:>6} {q['rows']:>8} {q['cache_hit_pct'] or 0:>6.1f}%  {query_short}"
+                )
 
         except Exception as e:
             print(f"\n⚠️ pg_stat_statements extension bulunamadı: {e}")
@@ -161,7 +166,9 @@ async def show_table_sizes():
         print("-" * 90)
 
         for t in tables:
-            print(f"{t['tablename']:<30} {t['total_size']:>10} {t['table_size']:>10} {t['index_size']:>10} {t['row_count']:>10} {t['dead_rows']:>10}")
+            print(
+                f"{t['tablename']:<30} {t['total_size']:>10} {t['table_size']:>10} {t['index_size']:>10} {t['row_count']:>10} {t['dead_rows']:>10}"
+            )
 
 
 async def show_index_usage():
@@ -209,7 +216,7 @@ async def show_connection_stats():
         print(f"  Boşta:           {stats['idle']}")
         print(f"  Idle in TX:      {stats['idle_in_tx']}")
 
-        if stats['idle_in_tx'] > 5:
+        if stats["idle_in_tx"] > 5:
             print(f"\n  ⚠️ Uyarı: {stats['idle_in_tx']} bağlantı idle in transaction durumunda!")
 
 
@@ -227,7 +234,7 @@ async def show_cache_hit_ratio():
             WHERE datname = current_database()
         """)
 
-        pct = ratio['cache_hit_pct'] or 0
+        pct = ratio["cache_hit_pct"] or 0
         print(f"\n💾 Cache Hit Ratio: {pct}%")
 
         if pct < 95:
@@ -284,8 +291,19 @@ async def main():
     if args.all or args.cache:
         await show_cache_hit_ratio()
 
-    if not any([args.analyze, args.vacuum, args.refresh_views, args.slow_queries,
-                args.table_sizes, args.index_usage, args.connections, args.cache, args.all]):
+    if not any(
+        [
+            args.analyze,
+            args.vacuum,
+            args.refresh_views,
+            args.slow_queries,
+            args.table_sizes,
+            args.index_usage,
+            args.connections,
+            args.cache,
+            args.all,
+        ]
+    ):
         print("\nKullanım: python scripts/optimize_db_performance.py --all")
         print("  --analyze        ANALYZE tüm tablolar")
         print("  --vacuum         VACUUM dead rows")

@@ -88,8 +88,9 @@ APP_CONTAINERS = [
 # 1. ENV DOSYASI OLUŞTURMA
 # =====================================================
 
+
 def ensure_env_file():
-    """".env dosyası yoksa .env.example'dan oluştur, otomatik şifre üret."""
+    """ ".env dosyası yoksa .env.example'dan oluştur, otomatik şifre üret."""
     env_path = PROJECT_ROOT / ".env"
     example_path = PROJECT_ROOT / ".env.example"
 
@@ -157,6 +158,7 @@ def ensure_env_file():
 # 2. DOCKER KONTROLÜ
 # =====================================================
 
+
 def is_docker_running() -> bool:
     """Docker daemon'un çalışıp çalışmadığını kontrol et."""
     try:
@@ -213,7 +215,7 @@ def start_docker_desktop():
         if is_docker_running():
             print("[OK] Docker daemon aktif!")
             return True
-        print(f"    Bekleniyor... ({i+1}/30)")
+        print(f"    Bekleniyor... ({i + 1}/30)")
 
     print("[HATA] Docker başlatılamadı. Elle açıp tekrar deneyin.")
     return False
@@ -223,12 +225,15 @@ def start_docker_desktop():
 # 3. SSD YAZMA HIZI LİMİTİ
 # =====================================================
 
+
 def get_container_pid(container_name: str) -> str:
     """Container PID'sini al."""
     try:
         result = subprocess.run(
             ["docker", "inspect", "-f", "{{.State.Pid}}", container_name],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             pid = result.stdout.strip()
@@ -268,15 +273,20 @@ def get_block_device_id() -> str:
     try:
         result = subprocess.run(
             ["findmnt", "-n", "-o", "SOURCE", "/"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             device = result.stdout.strip()
             import re
-            base_device = re.sub(r'p?\d+$', '', device)
+
+            base_device = re.sub(r"p?\d+$", "", device)
             stat_result = subprocess.run(
                 ["stat", "-c", "%t:%T", base_device],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if stat_result.returncode == 0:
                 parts = stat_result.stdout.strip().split(":")
@@ -284,7 +294,10 @@ def get_block_device_id() -> str:
                 minor = int(parts[1], 16)
                 return f"{major}:{minor}"
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):
-        logger.warning("Error in get_block_device_id: (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError)", exc_info=True)
+        logger.warning(
+            "Error in get_block_device_id: (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError)",
+            exc_info=True,
+        )
     return "8:0"
 
 
@@ -346,6 +359,7 @@ def apply_ssd_write_limit():
 # 4. HEALTH CHECK
 # =====================================================
 
+
 def wait_for_containers_healthy(timeout_s: int = 180):
     """Tüm container'ların healthy olmasını bekle."""
     print(f"\n[*] Servislerin hazır olması bekleniyor (maks {timeout_s}sn)...")
@@ -360,7 +374,9 @@ def wait_for_containers_healthy(timeout_s: int = 180):
             try:
                 result = subprocess.run(
                     ["docker", "inspect", "-f", "{{.State.Health.Status}}", name],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 status = result.stdout.strip()
                 if status not in ("healthy", ""):
@@ -393,6 +409,7 @@ def wait_for_containers_healthy(timeout_s: int = 180):
 # 5. BACKUP CRON KURULUMU
 # =====================================================
 
+
 def setup_backup_cron():
     """Otomatik backup cron'u kur (sadece Linux/Mac)."""
     if platform.system() == "Windows":
@@ -420,7 +437,8 @@ def setup_backup_cron():
         new_cron = current_cron.rstrip() + "\n" + cron_line + "\n"
         proc = subprocess.run(
             ["crontab", "-"],
-            input=new_cron, text=True,
+            input=new_cron,
+            text=True,
             capture_output=True,
         )
 
@@ -440,6 +458,7 @@ def setup_backup_cron():
 # =====================================================
 # 6. RESILIENCE DOĞRULAMA
 # =====================================================
+
 
 def verify_resilience():
     """Resilience bileşenlerini doğrula."""
@@ -530,6 +549,7 @@ def verify_resilience():
 # 7. SERVİS DURUMU ÖZETİ
 # =====================================================
 
+
 def print_service_status():
     """Servis durumu özeti."""
     print("\n" + "=" * 72)
@@ -545,7 +565,9 @@ def print_service_status():
         try:
             result = subprocess.run(
                 ["docker", "inspect", "-f", "{{.State.Status}}", name],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             status = result.stdout.strip()
             if status == "running":
@@ -584,6 +606,7 @@ def print_access_points():
 # =====================================================
 # MAIN
 # =====================================================
+
 
 def main():
     print("=" * 72)

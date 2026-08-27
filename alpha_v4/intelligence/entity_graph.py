@@ -32,6 +32,5 @@ class EntityGraph:
         return tuple(
             item
             for item in self._relations
-            if item.effective_at <= as_of
-            and (item.source == entity or item.target == entity)
+            if item.effective_at <= as_of and (item.source == entity or item.target == entity)
         )

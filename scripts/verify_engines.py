@@ -1,4 +1,3 @@
-
 print("=========================================================")
 print("ALPHA BIST — KURUMSAL MOTORLAR DENETİM & DOĞRULAMA")
 print("=========================================================")
@@ -20,19 +19,19 @@ from services.intelligence.spec_engine import SPECEngine
 
 engine = SPECEngine()
 spec_res = engine.compute_spec(
-    ticker='POLTK',
+    ticker="POLTK",
     asset_state={
-        'volume_zscore': 3.4,
-        'price_change_1d_zscore': 2.1,
-        'volatility_zscore': 1.8,
-        'bb_position': 0.96,
-        'relative_strength_vs_sector': 2.2,
-        'kap_sentiment': 0.8,
-        'roc_5d': 12.5,
-        'price_acceleration': 1.2,
-        'flow_score': 0.88,
+        "volume_zscore": 3.4,
+        "price_change_1d_zscore": 2.1,
+        "volatility_zscore": 1.8,
+        "bb_position": 0.96,
+        "relative_strength_vs_sector": 2.2,
+        "kap_sentiment": 0.8,
+        "roc_5d": 12.5,
+        "price_acceleration": 1.2,
+        "flow_score": 0.88,
     },
-    market_state={'regime': 'BULL_MOMENTUM', 'risk_appetite': 0.74}
+    market_state={"regime": "BULL_MOMENTUM", "risk_appetite": 0.74},
 )
 print(f"  • Örnek SPEC Hissesi (POLTK) Skoru: {spec_res.spec_score} / 100")
 print(f"  • Sınıflandırma: {spec_res.category}")

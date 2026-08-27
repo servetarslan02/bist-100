@@ -23,6 +23,7 @@ from services.api.rate_limiter import InMemoryRateLimiter
 # AUTH TESTS
 # =====================================================
 
+
 class TestJWT:
     """JWT handler test'leri."""
 
@@ -136,6 +137,7 @@ class TestRBACChecker:
 # RATE LIMITER TESTS
 # =====================================================
 
+
 class TestRateLimiter:
     """Rate limiter test'leri."""
 
@@ -188,17 +190,20 @@ class TestRateLimiter:
 # APP TESTS
 # =====================================================
 
+
 class TestApp:
     """FastAPI uygulama test'leri."""
 
     def test_create_app(self):
         from services.api.app import create_app
+
         app = create_app()
         assert app.title == "ALPHA BIST API"
         assert app.version == "2.0.0"
 
     def test_routes_count(self):
         from services.api.app import create_app
+
         app = create_app()
         routes = [r for r in app.routes if hasattr(r, "methods")]
         # Root + health + OpenAPI + docs endpoint'leri
@@ -206,11 +211,13 @@ class TestApp:
 
     def test_v1_router_prefix(self):
         from services.api.v1 import v1_router
+
         assert v1_router.prefix == "/api/v1"
 
     def test_openapi_available(self):
         """OpenAPI/Swagger endpoint'leri erişilebilir olmalı."""
         from services.api.app import create_app
+
         app = create_app()
         assert app.docs_url == "/docs"
         assert app.redoc_url == "/redoc"
@@ -220,6 +227,7 @@ class TestApp:
         """v1 router'ları spec'deki92+ endpoint sayısını karşılamalı."""
         import os
         import re
+
         endpoint_count = 0
         v1_dir = os.path.join(os.path.dirname(__file__), "..", "services", "api", "v1")
         for f in os.listdir(v1_dir):
@@ -227,7 +235,7 @@ class TestApp:
                 continue
             with open(os.path.join(v1_dir, f)) as fh:
                 content = fh.read()
-            endpoint_count += len(re.findall(r'@router\.(get|post|put|delete|patch|websocket)', content, re.IGNORECASE))
+            endpoint_count += len(re.findall(r"@router\.(get|post|put|delete|patch|websocket)", content, re.IGNORECASE))
         # Spec: 92 endpoint hedefi, mevcut: 126+
         assert endpoint_count >= 90, f"Expected >=90 endpoints, got {endpoint_count}"
 
@@ -238,6 +246,7 @@ class TestSecurity:
     def test_rbac_roles_match_spec(self):
         """RBAC rolleri spec ile uyumlu olmalı."""
         from services.api.auth import Role
+
         roles = [r.value for r in Role]
         assert "VIEWER" in roles
         assert "ANALYST" in roles
@@ -248,6 +257,7 @@ class TestSecurity:
     def test_rate_limit_groups_match_spec(self):
         """Rate limit grupları spec ile uyumlu olmalı."""
         from services.api.rate_limiter import RATE_LIMITS
+
         assert "default" in RATE_LIMITS
         assert "analysis" in RATE_LIMITS
         assert "backtest" in RATE_LIMITS
@@ -257,6 +267,7 @@ class TestSecurity:
     def test_rate_limit_values_match_spec(self):
         """Rate limit değerleri spec ile uyumlu olmalı."""
         from services.api.rate_limiter import RATE_LIMITS
+
         assert RATE_LIMITS["default"].max_requests == 1000
         assert RATE_LIMITS["analysis"].max_requests == 300
         assert RATE_LIMITS["backtest"].max_requests == 60
@@ -266,12 +277,14 @@ class TestSecurity:
     def test_jwt_algorithm(self):
         """JWT HS256 kullanmalı."""
         from services.api.auth import JWTHandler
+
         handler = JWTHandler()
         assert handler.algorithm == "HS256"
 
     def test_endpoint_group_recognition(self):
         """Tüm v1 endpoint grupları tanınmalı."""
         from services.api.rate_limiter import InMemoryRateLimiter
+
         limiter = InMemoryRateLimiter()
         # Spec'deki tüm gruplar
         assert limiter.get_endpoint_group("/api/v1/backtests", "POST") == "backtest"

@@ -25,31 +25,32 @@ logger = structlog.get_logger()
 
 
 class ClaimType(StrEnum):
-    FACT = "FACT"              # Kaynakta doğrudan yazan
-    INFERENCE = "INFERENCE"    # Veriden çıkarılan
+    FACT = "FACT"  # Kaynakta doğrudan yazan
+    INFERENCE = "INFERENCE"  # Veriden çıkarılan
     PREDICTION = "PREDICTION"  # Gelecek tahmini
-    OPINION = "OPINION"        # Yorum/değerlendirme
+    OPINION = "OPINION"  # Yorum/değerlendirme
 
 
 class VerificationResult(StrEnum):
-    VERIFIED = "VERIFIED"          # Doğrulandı
-    UNVERIFIED = "UNVERIFIED"      # Doğrulanamadı
-    REJECTED = "REJECTED"          # Reddedildi (yanlış)
+    VERIFIED = "VERIFIED"  # Doğrulandı
+    UNVERIFIED = "UNVERIFIED"  # Doğrulanamadı
+    REJECTED = "REJECTED"  # Reddedildi (yanlış)
     CONTRADICTED = "CONTRADICTED"  # Çelişkili
 
 
 class SourceReliability(StrEnum):
-    PRIMARY = "PRIMARY"        # Resmi kaynak (KAP, TCMB)
-    FINANCIAL = "FINANCIAL"    # Güvenilir finansal veri
-    NEWS = "NEWS"              # Güvenilir haber
-    ANALYSIS = "ANALYSIS"      # Analiz/araştırma
-    SOCIAL = "SOCIAL"          # Sosyal medya
-    UNKNOWN = "UNKNOWN"        # Bilinmeyen
+    PRIMARY = "PRIMARY"  # Resmi kaynak (KAP, TCMB)
+    FINANCIAL = "FINANCIAL"  # Güvenilir finansal veri
+    NEWS = "NEWS"  # Güvenilir haber
+    ANALYSIS = "ANALYSIS"  # Analiz/araştırma
+    SOCIAL = "SOCIAL"  # Sosyal medya
+    UNKNOWN = "UNKNOWN"  # Bilinmeyen
 
 
 @dataclass
 class Claim:
     """Doğrulanacak iddia."""
+
     claim_id: str
     text: str
     source: str
@@ -61,10 +62,11 @@ class Claim:
 @dataclass
 class VerifiedClaim:
     """Doğrulanmış iddia."""
+
     claim: Claim
     claim_type: ClaimType
     result: VerificationResult
-    evidence_score: float          # 0-100
+    evidence_score: float  # 0-100
     source_reliability: SourceReliability
     timestamp_valid: bool
     cross_check_passed: bool
@@ -98,7 +100,7 @@ class EvidenceVerificationEngine:
         claims = []
 
         # Basit claim extraction
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         for i, sentence in enumerate(sentences):
             sentence = sentence.strip()
             if len(sentence) < 10:
@@ -107,13 +109,15 @@ class EvidenceVerificationEngine:
             # Claim type belirle
             self._classify_claim(sentence)
 
-            claims.append(Claim(
-                claim_id=f"{ticker}-{i}",
-                text=sentence,
-                source=source,
-                source_type=self._get_source_type(source),
-                ticker=ticker,
-            ))
+            claims.append(
+                Claim(
+                    claim_id=f"{ticker}-{i}",
+                    text=sentence,
+                    source=source,
+                    source_type=self._get_source_type(source),
+                    ticker=ticker,
+                )
+            )
 
         return claims
 
@@ -159,8 +163,12 @@ class EvidenceVerificationEngine:
 
         # 5. Evidence score hesapla
         evidence_score = self._compute_evidence_score(
-            claim_type, source_reliability, timestamp_valid,
-            cross_check_passed, contradictions, supporting,
+            claim_type,
+            source_reliability,
+            timestamp_valid,
+            cross_check_passed,
+            contradictions,
+            supporting,
         )
 
         # 6. Verification result
@@ -199,20 +207,26 @@ class EvidenceVerificationEngine:
         text_lower = text.lower()
 
         # Prediction indicators
-        prediction_words = ["tahmin", "beklenti", "olasılık", "bekleniyor",
-                           "forecast", "expected", "prediction", "will"]
+        prediction_words = [
+            "tahmin",
+            "beklenti",
+            "olasılık",
+            "bekleniyor",
+            "forecast",
+            "expected",
+            "prediction",
+            "will",
+        ]
         if any(w in text_lower for w in prediction_words):
             return ClaimType.PREDICTION
 
         # Opinion indicators
-        opinion_words = ["bence", "görüşümce", "tavsiye", "öneri",
-                        "in my opinion", "recommend", "suggest"]
+        opinion_words = ["bence", "görüşümce", "tavsiye", "öneri", "in my opinion", "recommend", "suggest"]
         if any(w in text_lower for w in opinion_words):
             return ClaimType.OPINION
 
         # Inference indicators
-        inference_words = ["bu durumda", "bu nedenle", "sonuç olarak",
-                          "therefore", "thus", "implies", "suggests"]
+        inference_words = ["bu durumda", "bu nedenle", "sonuç olarak", "therefore", "thus", "implies", "suggests"]
         if any(w in text_lower for w in inference_words):
             return ClaimType.INFERENCE
 
@@ -308,15 +322,15 @@ class EvidenceVerificationEngine:
         issues = []
 
         # 1. Uydurma ticker kontrolü
-        tickers_mentioned = re.findall(r'\b([A-Z]{4,5})\b', ai_output)
+        tickers_mentioned = re.findall(r"\b([A-Z]{4,5})\b", ai_output)
         # (Gerçek ticker listesiyle karşılaştırma yapılmalı)
 
         # 2. Uydurma fiyat kontrolü
-        prices_mentioned = re.findall(r'(\d+(?:\.\d+)?)\s*(?:TL|₺)', ai_output)
+        prices_mentioned = re.findall(r"(\d+(?:\.\d+)?)\s*(?:TL|₺)", ai_output)
         # (Gerçek fiyatlarla karşılaştırma yapılmalı)
 
         # 3. Uydurma tarih kontrolü
-        dates_mentioned = re.findall(r'\d{4}-\d{2}-\d{2}', ai_output)
+        dates_mentioned = re.findall(r"\d{4}-\d{2}-\d{2}", ai_output)
         # (Geçerli tarih aralığında mı?)
 
         # 4. Uydurma KAP referansı

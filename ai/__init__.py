@@ -9,7 +9,10 @@ from .news_sentiment import NewsSentimentAnalyzer, news_sentiment
 from .report_generator import ReportGenerator, report_generator
 
 __all__ = [
-    "MarketAnalyst", "market_analyst",
-    "ReportGenerator", "report_generator",
-    "NewsSentimentAnalyzer", "news_sentiment",
+    "MarketAnalyst",
+    "market_analyst",
+    "ReportGenerator",
+    "report_generator",
+    "NewsSentimentAnalyzer",
+    "news_sentiment",
 ]

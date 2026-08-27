@@ -58,6 +58,7 @@ class PortfolioMonitor:
 
         try:
             from services.paper_trading.paper_orchestrator import paper_orchestrator
+
             summary = paper_orchestrator.portfolio.get_summary()
 
             # Portfolio gauges
@@ -71,7 +72,10 @@ class PortfolioMonitor:
             self._last_sync_time = now
 
             # Invariant check (Equity == Cash + Invested)
-            invariant_ok = abs(summary.get("total_value", 0.0) - (summary.get("cash", 0.0) + summary.get("invested_value", 0.0))) < 1.0
+            invariant_ok = (
+                abs(summary.get("total_value", 0.0) - (summary.get("cash", 0.0) + summary.get("invested_value", 0.0)))
+                < 1.0
+            )
             if not invariant_ok:
                 self._invariant_failure_count += 1
                 prometheus_metrics.inc("portfolio_invariant_failures")
@@ -112,8 +116,7 @@ class PortfolioMonitor:
                 portfolio_health = {"status": "UNHEALTHY", "issues": [str(e)]}
 
         # Genel durum
-        statuses = [lock_health.get("overall_status", "UNKNOWN"),
-                    portfolio_health.get("status", "UNKNOWN")]
+        statuses = [lock_health.get("overall_status", "UNKNOWN"), portfolio_health.get("status", "UNKNOWN")]
 
         if "UNHEALTHY" in statuses:
             overall = "UNHEALTHY"
@@ -124,15 +127,15 @@ class PortfolioMonitor:
 
         # Health checker bileşenlerini güncelle
         lock_status = lock_health.get("overall_status", "UNKNOWN")
-        health_checker.update_status("portfolio_locks", lock_status,
-                                     f"Lock status: {lock_status}")
+        health_checker.update_status("portfolio_locks", lock_status, f"Lock status: {lock_status}")
 
         acc_status = "HEALTHY"
         if portfolio_health.get("portfolio", {}).get("invariant_check") is False:
             acc_status = "FAILED"
             overall = "UNHEALTHY"
-        health_checker.update_status("portfolio_accounting", acc_status,
-                                     f"Invariant: {'OK' if acc_status == 'HEALTHY' else 'FAILED'}")
+        health_checker.update_status(
+            "portfolio_accounting", acc_status, f"Invariant: {'OK' if acc_status == 'HEALTHY' else 'FAILED'}"
+        )
 
         # Alert kontrolü
         alerting.check_health({"status": overall, "issues": []})
@@ -157,7 +160,7 @@ class PortfolioMonitor:
         for name, value in metrics.get("counters", {}).items():
             clean_name = name.split("{")[0]
             if "{" in name:
-                name[name.index("{"):]
+                name[name.index("{") :]
             lines.append(f"# TYPE {clean_name} counter")
             lines.append(f"{name} {value}")
 
@@ -175,7 +178,7 @@ class PortfolioMonitor:
             lines.append(f"{name}_sum {stats['sum']:.6f}")
             for bucket in [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]:
                 count = sum(1 for v in [stats.get("p50", 0)] if v <= bucket)
-                lines.append(f"{name}_bucket{{le=\"{bucket}\"}} {count}")
+                lines.append(f'{name}_bucket{{le="{bucket}"}} {count}')
 
         return "\n".join(lines) + "\n"
 
@@ -193,6 +196,7 @@ class PortfolioMonitor:
         """Portfolio durumu (API endpoint)."""
         try:
             from services.paper_trading.paper_orchestrator import paper_orchestrator
+
             summary = paper_orchestrator.portfolio.get_summary()
             return {
                 "portfolio": summary,

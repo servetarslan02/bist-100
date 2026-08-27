@@ -20,19 +20,21 @@ logger = structlog.get_logger()
 @dataclass
 class MultiplesValuation:
     """Multiples değerleme sonucu."""
+
     ticker: str
-    metric: str           # P/E, P/B, EV/EBITDA
+    metric: str  # P/E, P/B, EV/EBITDA
     company_value: float  # Şirketin mevcut çarpanı
     sector_median: float  # Sektör medyanı
-    sector_avg: float     # Sektör ortalaması
-    historical_avg: float # Şirketin kendi tarihsel ortalaması
+    sector_avg: float  # Sektör ortalaması
+    historical_avg: float  # Şirketin kendi tarihsel ortalaması
     implied_price: float  # Sektör medyanına göre ima edilen fiyat
-    upside_pct: float     # Mevcut fiyata göre upside/downside
+    upside_pct: float  # Mevcut fiyata göre upside/downside
 
 
 @dataclass
 class DCFResult:
     """DCF değerleme sonucu."""
+
     ticker: str
     enterprise_value: float
     equity_value: float
@@ -41,7 +43,7 @@ class DCFResult:
     upside_pct: float
     wacc: float
     terminal_growth: float
-    pv_fcfs: list[float]     # Bugünkü değerler
+    pv_fcfs: list[float]  # Bugünkü değerler
     terminal_value: float
     sensitivity_table: dict[str, dict[str, float]]  # WACC × growth → price
 
@@ -49,8 +51,9 @@ class DCFResult:
 @dataclass
 class ValuationScenario:
     """Değerleme senaryosu."""
-    name: str              # Bear, Base, Bull
-    probability: float     # Olasılık
+
+    name: str  # Bear, Base, Bull
+    probability: float  # Olasılık
     assumptions: dict[str, float]
     implied_price: float
     upside_pct: float
@@ -59,6 +62,7 @@ class ValuationScenario:
 @dataclass
 class ValuationSummary:
     """Değerleme özeti."""
+
     ticker: str
     current_price: float
     multiples: list[MultiplesValuation]
@@ -66,16 +70,16 @@ class ValuationSummary:
     scenarios: list[ValuationScenario]
     expected_value: float  # Olasılık ağırlıklı
     overall_upside_pct: float
-    overall_view: str      # UNDERVALUED, FAIR, OVERVALUED
+    overall_view: str  # UNDERVALUED, FAIR, OVERVALUED
 
 
 class ValuationEngine:
     """Değerleme motoru."""
 
     # F-021: Türkiye enflasyon/faiz gerçeğine uygun güncel varsayılanlar
-    DEFAULT_WACC = 0.45        # %45 (yüksek enflasyon ortamı WACC)
+    DEFAULT_WACC = 0.45  # %45 (yüksek enflasyon ortamı WACC)
     DEFAULT_TERMINAL_GROWTH = 0.15  # %15 (uzun vadeli enflasyon beklentisi)
-    DEFAULT_TAX_RATE = 0.25    # %25 güncel kurumlar vergisi
+    DEFAULT_TAX_RATE = 0.25  # %25 güncel kurumlar vergisi
 
     def __init__(
         self,
@@ -124,16 +128,18 @@ class ValuationEngine:
 
             upside_pct = ((implied_price / current_price) - 1) * 100 if current_price > 0 and implied_price > 0 else 0
 
-            results.append(MultiplesValuation(
-                ticker=ticker,
-                metric=metric.upper(),
-                company_value=round(company_val, 2),
-                sector_median=round(sector_median, 2),
-                sector_avg=round(sector_avg, 2),
-                historical_avg=round(hist_avg, 2),
-                implied_price=round(implied_price, 2),
-                upside_pct=round(upside_pct, 2),
-            ))
+            results.append(
+                MultiplesValuation(
+                    ticker=ticker,
+                    metric=metric.upper(),
+                    company_value=round(company_val, 2),
+                    sector_median=round(sector_median, 2),
+                    sector_avg=round(sector_avg, 2),
+                    historical_avg=round(hist_avg, 2),
+                    implied_price=round(implied_price, 2),
+                    upside_pct=round(upside_pct, 2),
+                )
+            )
 
         return results
 
@@ -141,10 +147,10 @@ class ValuationEngine:
         self,
         ticker: str,
         current_price: float,
-        revenue_forecast: list[float],      # 5 yıllık gelir tahmini
-        margin_forecast: list[float],        # 5 yıllık marj tahmini
-        capex_forecast: list[float],         # 5 yıllık capex tahmini
-        wc_change_forecast: list[float],     # 5 yıllık working capital değişimi
+        revenue_forecast: list[float],  # 5 yıllık gelir tahmini
+        margin_forecast: list[float],  # 5 yıllık marj tahmini
+        capex_forecast: list[float],  # 5 yıllık capex tahmini
+        wc_change_forecast: list[float],  # 5 yıllık working capital değişimi
         shares_outstanding: int,
         total_debt: float = 0,
         total_cash: float = 0,
@@ -271,10 +277,10 @@ class ValuationEngine:
             fcfs = []
             rev = base_revenue
             for _ in range(5):
-                rev *= (1 + rev_growth)
+                rev *= 1 + rev_growth
                 ebit = rev * margin
                 nopat = ebit * 0.77  # %23 vergi
-                fcf = nopat * 0.7   # %30 capex+WC
+                fcf = nopat * 0.7  # %30 capex+WC
                 fcfs.append(fcf)
 
             # Terminal value
@@ -291,13 +297,15 @@ class ValuationEngine:
             implied_price = equity / shares_outstanding if shares_outstanding > 0 else 0
             upside = ((implied_price / current_price) - 1) * 100 if current_price > 0 else 0
 
-            scenarios.append(ValuationScenario(
-                name=name,
-                probability=probability,
-                assumptions=assumptions,
-                implied_price=round(implied_price, 2),
-                upside_pct=round(upside, 2),
-            ))
+            scenarios.append(
+                ValuationScenario(
+                    name=name,
+                    probability=probability,
+                    assumptions=assumptions,
+                    implied_price=round(implied_price, 2),
+                    upside_pct=round(upside, 2),
+                )
+            )
 
         return scenarios
 

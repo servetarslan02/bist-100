@@ -66,13 +66,15 @@ def calculate_span_margin(positions: list[dict[str, Any]]) -> dict[str, Any]:
                 margin *= 1.1  # %10 ek risk marjı
 
         total_margin += margin
-        position_margins.append({
-            "value": value,
-            "margin_rate": margin_rate,
-            "margin": round(margin, 2),
-            "position_type": position_type,
-            "is_option": is_option,
-        })
+        position_margins.append(
+            {
+                "value": value,
+                "margin_rate": margin_rate,
+                "margin": round(margin, 2),
+                "position_type": position_type,
+                "is_option": is_option,
+            }
+        )
 
     return {
         "total_margin": round(total_margin, 2),

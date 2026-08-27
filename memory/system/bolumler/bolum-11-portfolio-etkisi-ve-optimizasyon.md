@@ -89,13 +89,12 @@ sector_conc = concentration_risk.compute_sector_concentration(
 from services.risk.enhanced_risk import position_sizer
 
 # Yarım Kelly (daha güvenli)
-kelly = position_sizer.kelly_criterion(
-    win_rate=0.6, avg_win=2.0, avg_loss=1.0, fraction=0.5)
+kelly = position_sizer.kelly_criterion(win_rate=0.6, avg_win=2.0, avg_loss=1.0, fraction=0.5)
 # kelly = 0.20
 
 size = position_sizer.compute_position_size(
-    capital=100000, kelly_fraction=kelly,
-    price=305.25, stop_distance=15.26, max_position_pct=10)
+    capital=100000, kelly_fraction=kelly, price=305.25, stop_distance=15.26, max_position_pct=10
+)
 # size = 131 lot
 ```
 

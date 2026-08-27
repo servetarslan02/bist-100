@@ -49,27 +49,30 @@ class OutcomeTracker:
         horizon = prediction.get("horizon", "1-5D")
         wait_days = self.HORIZON_DAYS.get(horizon, 5)
 
-        self._pending.append({
-            "prediction_id": prediction_id,
-            "ticker": ticker,
-            "predicted_direction": predicted_direction,
-            "entry_price": entry_price,
-            "entry_time": prediction.get("timestamp", datetime.now(UTC).isoformat()),
-            "check_after": (datetime.now(UTC) + timedelta(days=wait_days)).isoformat(),
-            "horizon": horizon,
-            "checked": False,
-        })
+        self._pending.append(
+            {
+                "prediction_id": prediction_id,
+                "ticker": ticker,
+                "predicted_direction": predicted_direction,
+                "entry_price": entry_price,
+                "entry_time": prediction.get("timestamp", datetime.now(UTC).isoformat()),
+                "check_after": (datetime.now(UTC) + timedelta(days=wait_days)).isoformat(),
+                "horizon": horizon,
+                "checked": False,
+            }
+        )
         if len(self._pending) > 1000:
             self._pending = self._pending[-1000:]
 
-        logger.debug("Outcome tracking started",
-                     ticker=ticker, prediction_id=prediction_id,
-                     check_after=f"{wait_days} days")
+        logger.debug(
+            "Outcome tracking started", ticker=ticker, prediction_id=prediction_id, check_after=f"{wait_days} days"
+        )
 
     async def _default_price_fetcher(self, ticker: str) -> float | None:
         """Varsayılan fiyat çekici — ingestion katmanından fiyat çeker."""
         try:
             from services.ingestion.providers.yfinance_provider import YFinanceProvider
+
             provider = YFinanceProvider()
             data = await provider.get_latest_price(ticker)
             if data and data > 0:
@@ -80,6 +83,7 @@ class OutcomeTracker:
         # Fallback: Redis cache'den dene
         try:
             from services.core.database import redis_get
+
             cached = await redis_get(f"price:latest:{ticker}")
             if cached:
                 return float(cached)
@@ -143,20 +147,24 @@ class OutcomeTracker:
                         self._checked_today.add(prediction_id)
 
                         actual_return = (current_price / entry_price - 1) * 100
-                        results.append({
-                            "prediction_id": prediction_id,
-                            "ticker": ticker,
-                            "entry_price": entry_price,
-                            "actual_price": current_price,
-                            "actual_return": round(actual_return, 2),
-                            "predicted_direction": pending["predicted_direction"],
-                        })
+                        results.append(
+                            {
+                                "prediction_id": prediction_id,
+                                "ticker": ticker,
+                                "entry_price": entry_price,
+                                "actual_price": current_price,
+                                "actual_return": round(actual_return, 2),
+                                "predicted_direction": pending["predicted_direction"],
+                            }
+                        )
 
-                        logger.info("Outcome recorded",
-                                   ticker=ticker,
-                                   entry=entry_price,
-                                   actual=current_price,
-                                   return_pct=round(actual_return, 2))
+                        logger.info(
+                            "Outcome recorded",
+                            ticker=ticker,
+                            entry=entry_price,
+                            actual=current_price,
+                            return_pct=round(actual_return, 2),
+                        )
                     else:
                         # Giriş fiyatı yoksa fiyatı kaydet ve sonraki kontrole bekle
                         pending["entry_price"] = current_price
@@ -169,8 +177,7 @@ class OutcomeTracker:
 
         # Eski kayıtları temizle (30 günden eski)
         cutoff = (now - timedelta(days=30)).isoformat()
-        self._pending = [p for p in self._pending
-                        if not p["checked"] or p.get("entry_time", "") > cutoff]
+        self._pending = [p for p in self._pending if not p["checked"] or p.get("entry_time", "") > cutoff]
 
         # Günlük sayacı sıfırla (yeni gün)
         # (Basit implementasyon - her saat sıfırla)
@@ -204,12 +211,12 @@ class OutcomeTracker:
             "pending": total - checked,
         }
 
-
     async def run_pending_check(self) -> list[dict]:
         """Scheduler'dan çağrılabilir — learning_system ve price_fetcher otomatik bağlanır."""
         learning_system = None
         try:
             from services.learning.integrated_learning import integrated_learning_system
+
             learning_system = integrated_learning_system
         except Exception as e:
             logger.debug("Learning system not available for outcome check", error=str(e))

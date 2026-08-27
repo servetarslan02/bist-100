@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class LearningCycle:
     """Tek öğrenme döngüsü kaydı."""
+
     cycle_id: str
     timestamp: str
     regime: str
@@ -42,6 +43,7 @@ class LearningCycle:
 @dataclass
 class ModelRegistry:
     """Model kayıt defteri."""
+
     versions: list[dict] = field(default_factory=list)
     active_version: str = ""
     champion_version: str = ""
@@ -80,9 +82,11 @@ class ContinuousLearningPipeline:
         self._drift_detected = False
         self._drift_features: list[str] = []
 
-        logger.info("ContinuousLearningPipeline v3.0 initialized",
-                   retrain_interval=retrain_interval_days,
-                   drift_interval=drift_check_interval)
+        logger.info(
+            "ContinuousLearningPipeline v3.0 initialized",
+            retrain_interval=retrain_interval_days,
+            drift_interval=drift_check_interval,
+        )
 
     def run_daily_pipeline(
         self,
@@ -174,9 +178,9 @@ class ContinuousLearningPipeline:
         # 5. Kayıt defteri güncelle
         self._update_registry(date, results)
 
-        logger.info("Daily pipeline completed",
-                   date=date, regime=regime,
-                   retrain=should_retrain, drift=self._drift_detected)
+        logger.info(
+            "Daily pipeline completed", date=date, regime=regime, retrain=should_retrain, drift=self._drift_detected
+        )
 
         return results
 
@@ -228,8 +232,7 @@ class ContinuousLearningPipeline:
             "n_predictions": len(predictions),
         }
 
-        logger.info("Daily performance recorded", date=date,
-                   sharpe=metrics["sharpe"], ic=metrics["ic"])
+        logger.info("Daily performance recorded", date=date, sharpe=metrics["sharpe"], ic=metrics["ic"])
 
         return metrics
 
@@ -259,12 +262,13 @@ class ContinuousLearningPipeline:
                 return False
 
         # Performans düşüşü
-        recent_sharpes = [m["sharpe"] for m in list(self._daily_performance)[-self.performance_window:]]
+        recent_sharpes = [m["sharpe"] for m in list(self._daily_performance)[-self.performance_window :]]
         if recent_sharpes:
             avg_sharpe = np.mean(recent_sharpes)
             if avg_sharpe < cfg.sharpe_threshold:
-                logger.warning("Retrain triggered: low Sharpe", avg_sharpe=round(avg_sharpe, 4),
-                             threshold=cfg.sharpe_threshold)
+                logger.warning(
+                    "Retrain triggered: low Sharpe", avg_sharpe=round(avg_sharpe, 4), threshold=cfg.sharpe_threshold
+                )
                 return True
 
         # Drift tespiti
@@ -273,11 +277,13 @@ class ContinuousLearningPipeline:
             return True
 
         # Win rate düşüşü
-        recent_win_rates = [m["win_rate"] for m in list(self._daily_performance)[-self.performance_window:]]
+        recent_win_rates = [m["win_rate"] for m in list(self._daily_performance)[-self.performance_window :]]
         if recent_win_rates and np.mean(recent_win_rates) < cfg.winrate_threshold:
-            logger.warning("Retrain triggered: low win rate",
-                         avg=round(np.mean(recent_win_rates), 4),
-                         threshold=cfg.winrate_threshold)
+            logger.warning(
+                "Retrain triggered: low win rate",
+                avg=round(np.mean(recent_win_rates), 4),
+                threshold=cfg.winrate_threshold,
+            )
             return True
 
         # Zorunlu interval doldu
@@ -343,12 +349,14 @@ class ContinuousLearningPipeline:
 
     def _update_registry(self, date: str, results: dict):
         """Model kayıt defterini güncelle."""
-        self._registry.performance_history.append({
-            "date": date,
-            "metrics": results.get("daily_metrics", {}),
-            "retrain": results.get("should_retrain", False),
-            "drift": results.get("drift_check", {}).get("drift_detected", False),
-        })
+        self._registry.performance_history.append(
+            {
+                "date": date,
+                "metrics": results.get("daily_metrics", {}),
+                "retrain": results.get("should_retrain", False),
+                "drift": results.get("drift_check", {}).get("drift_detected", False),
+            }
+        )
 
     def get_learning_report(self) -> dict[str, Any]:
         """Öğrenme raporu oluştur."""
@@ -357,17 +365,24 @@ class ContinuousLearningPipeline:
 
         return {
             "total_cycles": len(self._cycles),
-            "recent_cycles": [{
-                "cycle_id": c.cycle_id,
-                "action": c.action,
-                "status": c.status,
-                "regime": c.regime,
-                "model_version": c.model_version,
-            } for c in recent_cycles],
+            "recent_cycles": [
+                {
+                    "cycle_id": c.cycle_id,
+                    "action": c.action,
+                    "status": c.status,
+                    "regime": c.regime,
+                    "model_version": c.model_version,
+                }
+                for c in recent_cycles
+            ],
             "performance_summary": {
-                "avg_sharpe_30d": round(np.mean([m["sharpe"] for m in recent_performance]), 4) if recent_performance else 0,
+                "avg_sharpe_30d": round(np.mean([m["sharpe"] for m in recent_performance]), 4)
+                if recent_performance
+                else 0,
                 "avg_ic_30d": round(np.mean([m["ic"] for m in recent_performance]), 4) if recent_performance else 0,
-                "avg_win_rate_30d": round(np.mean([m["win_rate"] for m in recent_performance]), 4) if recent_performance else 0,
+                "avg_win_rate_30d": round(np.mean([m["win_rate"] for m in recent_performance]), 4)
+                if recent_performance
+                else 0,
             },
             "registry": {
                 "versions": len(self._registry.versions),
@@ -384,14 +399,17 @@ class ContinuousLearningPipeline:
     def export_state(self) -> dict[str, Any]:
         """Pipeline durumunu dışa aktar."""
         return {
-            "cycles": [{
-                "cycle_id": c.cycle_id,
-                "timestamp": c.timestamp,
-                "regime": c.regime,
-                "action": c.action,
-                "status": c.status,
-                "model_version": c.model_version,
-            } for c in self._cycles],
+            "cycles": [
+                {
+                    "cycle_id": c.cycle_id,
+                    "timestamp": c.timestamp,
+                    "regime": c.regime,
+                    "action": c.action,
+                    "status": c.status,
+                    "model_version": c.model_version,
+                }
+                for c in self._cycles
+            ],
             "registry": {
                 "versions": self._registry.versions,
                 "active_version": self._registry.active_version,

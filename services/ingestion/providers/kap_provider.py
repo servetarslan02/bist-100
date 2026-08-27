@@ -36,11 +36,16 @@ class KAPProvider:
     }
 
     def __init__(self):
-        self._client = get_client("kap", timeout=3.0, max_retries=1, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/html, */*",
-            "Accept-Language": "tr-TR,tr;q=0.9",
-        })
+        self._client = get_client(
+            "kap",
+            timeout=3.0,
+            max_retries=1,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/html, */*",
+                "Accept-Language": "tr-TR,tr;q=0.9",
+            },
+        )
 
     async def fetch_disclosures(
         self,
@@ -189,9 +194,7 @@ class KAPProvider:
         from_date: str | None = None,
     ) -> list[dict[str, Any]]:
         """Fiyat olayı niteliğindeki KAP açıklamaları (async)."""
-        all_disclosures = await self.fetch_disclosures(
-            ticker=ticker, from_date=from_date, limit=100
-        )
+        all_disclosures = await self.fetch_disclosures(ticker=ticker, from_date=from_date, limit=100)
         return [d for d in all_disclosures if d.get("is_price_sensitive")]
 
     def _is_price_sensitive(self, item: dict) -> bool:
@@ -200,16 +203,27 @@ class KAPProvider:
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
         sensitive_keywords = [
-            "temettü", "kar payı", "dividend",
-            "bölünme", "split",
-            "bedelsiz", "bonus",
-            "bedelli", "rights",
-            "birleşme", "merger",
-            "devralma", "acquisition",
-            "borsadan çıkış", "delisting",
-            "sermaye artırımı", "capital increase",
-            "iptal", "cancellation",
-            "satın alma", "purchase",
+            "temettü",
+            "kar payı",
+            "dividend",
+            "bölünme",
+            "split",
+            "bedelsiz",
+            "bonus",
+            "bedelli",
+            "rights",
+            "birleşme",
+            "merger",
+            "devralma",
+            "acquisition",
+            "borsadan çıkış",
+            "delisting",
+            "sermaye artırımı",
+            "capital increase",
+            "iptal",
+            "cancellation",
+            "satın alma",
+            "purchase",
         ]
 
         if category in ("DIVIDEND", "MERGER", "CAPITAL_MARKETS"):
@@ -222,20 +236,77 @@ class KAPProvider:
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
         positive = [
-            "artış", "büyüme", "kâr", "rekor", "yükseliş", "pozitif", "başarı",
-            "sermaye artırımı", "temettü", "kar payı", "ciro artışı", "sipariş",
-            "sözleşme", "anlaşma", "işbirliği", "ihale", "yatırım", "genişleme",
-            "ihracat", "büyüme hedefi", "kapasite artışı", "verimlilik", "optimizasyon",
-            "iyileştirme", "güçlü", "sağlıklı", "istikrarlı", "toparlanma", "yükseltme",
-            "alım", "tavsiye", "hedef fiyat", "endeks üstü", "outperform",
+            "artış",
+            "büyüme",
+            "kâr",
+            "rekor",
+            "yükseliş",
+            "pozitif",
+            "başarı",
+            "sermaye artırımı",
+            "temettü",
+            "kar payı",
+            "ciro artışı",
+            "sipariş",
+            "sözleşme",
+            "anlaşma",
+            "işbirliği",
+            "ihale",
+            "yatırım",
+            "genişleme",
+            "ihracat",
+            "büyüme hedefi",
+            "kapasite artışı",
+            "verimlilik",
+            "optimizasyon",
+            "iyileştirme",
+            "güçlü",
+            "sağlıklı",
+            "istikrarlı",
+            "toparlanma",
+            "yükseltme",
+            "alım",
+            "tavsiye",
+            "hedef fiyat",
+            "endeks üstü",
+            "outperform",
         ]
         negative = [
-            "düşüş", "kayıp", "zarar", "azalma", "gerileme", "iptal", "risk",
-            "iflas", "erteleme", "daralma", "borç", "temerrüt", "dava", "ceza",
-            "soruşturma", "yaptırım", "kısıtlama", "askıya alma", "durdurma",
-            "ihraç", "geri çağırma", "recall", "kriz", "çöküş", "bunalım",
-            "zayıf", "olumsuz", "negatif", "satış", "çıkış", "azaltma",
-            "downgrade", "sat", "ağırlık azalt", "underperform",
+            "düşüş",
+            "kayıp",
+            "zarar",
+            "azalma",
+            "gerileme",
+            "iptal",
+            "risk",
+            "iflas",
+            "erteleme",
+            "daralma",
+            "borç",
+            "temerrüt",
+            "dava",
+            "ceza",
+            "soruşturma",
+            "yaptırım",
+            "kısıtlama",
+            "askıya alma",
+            "durdurma",
+            "ihraç",
+            "geri çağırma",
+            "recall",
+            "kriz",
+            "çöküş",
+            "bunalım",
+            "zayıf",
+            "olumsuz",
+            "negatif",
+            "satış",
+            "çıkış",
+            "azaltma",
+            "downgrade",
+            "sat",
+            "ağırlık azalt",
+            "underperform",
         ]
 
         pos = sum(1 for w in positive if w in title)
@@ -282,9 +353,9 @@ class KAPProvider:
         """Temettü miktarını çıkar."""
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
-            r'hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)',
-            r'(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse',
-            r'kar\s+payı\s+(\d+[.,]\d+)',
+            r"hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)",
+            r"(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse",
+            r"kar\s+payı\s+(\d+[.,]\d+)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -331,7 +402,7 @@ class KAPProvider:
                     restriction_type="VBTS_GROSS_SETTLEMENT",
                     published_at=pub_date,
                     effective_date=current_date,
-                    details=item.get("title", "KAP VBTS Brüt Takas Bildirimi")
+                    details=item.get("title", "KAP VBTS Brüt Takas Bildirimi"),
                 )
                 registered_count += 1
 
@@ -342,7 +413,7 @@ class KAPProvider:
                     restriction_type="VBTS_SHORT_BAN",
                     published_at=pub_date,
                     effective_date=current_date,
-                    details=item.get("title", "KAP Açığa Satış Yasağı")
+                    details=item.get("title", "KAP Açığa Satış Yasağı"),
                 )
                 registered_count += 1
 
@@ -353,7 +424,7 @@ class KAPProvider:
                     restriction_type="HALT",
                     published_at=pub_date,
                     effective_date=current_date,
-                    details=item.get("title", "KAP İşlem Sırası Durdurma")
+                    details=item.get("title", "KAP İşlem Sırası Durdurma"),
                 )
                 registered_count += 1
 

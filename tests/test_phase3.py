@@ -53,11 +53,13 @@ def test_world_state():
     print("  ✓ Invariant (clamp)")
 
     # 6. Macro update
-    wsm.update_from_macro({
-        "USD/TRY": {"price": 48.0},
-        "VIX": {"price": 18.0},
-        "Oil": {"change_pct": 5.0},
-    })
+    wsm.update_from_macro(
+        {
+            "USD/TRY": {"price": 48.0},
+            "VIX": {"price": 18.0},
+            "Oil": {"change_pct": 5.0},
+        }
+    )
     state = wsm.current_state
     assert state.vix_level == 18.0
     passed += 1
@@ -88,9 +90,14 @@ def test_regime_engine():
 
     # 1. Bull regime
     features = {
-        "breadth_pct": 72, "momentum_avg": 8, "volatility_avg": 18,
-        "rsi_avg": 65, "risk_appetite": 0.75, "usdtry_momentum": 1,
-        "vix_level": 12, "global_momentum": 3,
+        "breadth_pct": 72,
+        "momentum_avg": 8,
+        "volatility_avg": 18,
+        "rsi_avg": 65,
+        "risk_appetite": 0.75,
+        "usdtry_momentum": 1,
+        "vix_level": 12,
+        "global_momentum": 3,
     }
     result = regime_engine.detect_regime(features)
     assert result.regime in [Regime.BULL, Regime.RISK_ON, Regime.MOMENTUM_EXPANSION], f"Got: {result.regime}"
@@ -100,20 +107,32 @@ def test_regime_engine():
 
     # 2. Bear regime
     features = {
-        "breadth_pct": 25, "momentum_avg": -8, "volatility_avg": 35,
-        "rsi_avg": 30, "risk_appetite": 0.25, "usdtry_momentum": 8,
-        "vix_level": 30, "global_momentum": -5,
+        "breadth_pct": 25,
+        "momentum_avg": -8,
+        "volatility_avg": 35,
+        "rsi_avg": 30,
+        "risk_appetite": 0.25,
+        "usdtry_momentum": 8,
+        "vix_level": 30,
+        "global_momentum": -5,
     }
     result = regime_engine.detect_regime(features)
-    assert result.regime in [Regime.BEAR, Regime.RISK_OFF, Regime.CRISIS, Regime.MOMENTUM_CONTRACTION], f"Got: {result.regime}"
+    assert result.regime in [Regime.BEAR, Regime.RISK_OFF, Regime.CRISIS, Regime.MOMENTUM_CONTRACTION], (
+        f"Got: {result.regime}"
+    )
     passed += 1
     print(f"  ✓ Bear detection: {result.regime.value}")
 
     # 3. Crisis regime
     features = {
-        "breadth_pct": 15, "momentum_avg": -15, "volatility_avg": 50,
-        "rsi_avg": 20, "risk_appetite": 0.15, "usdtry_momentum": 15,
-        "vix_level": 45, "global_momentum": -10,
+        "breadth_pct": 15,
+        "momentum_avg": -15,
+        "volatility_avg": 50,
+        "rsi_avg": 20,
+        "risk_appetite": 0.15,
+        "usdtry_momentum": 15,
+        "vix_level": 45,
+        "global_momentum": -10,
     }
     result = regime_engine.detect_regime(features)
     assert result.regime in [Regime.CRISIS, Regime.BEAR], f"Got: {result.regime}"
@@ -122,9 +141,14 @@ def test_regime_engine():
 
     # 4. Sideways regime
     features = {
-        "breadth_pct": 50, "momentum_avg": 0.5, "volatility_avg": 18,
-        "rsi_avg": 50, "risk_appetite": 0.5, "usdtry_momentum": 0,
-        "vix_level": 15, "global_momentum": 0,
+        "breadth_pct": 50,
+        "momentum_avg": 0.5,
+        "volatility_avg": 18,
+        "rsi_avg": 50,
+        "risk_appetite": 0.5,
+        "usdtry_momentum": 0,
+        "vix_level": 15,
+        "global_momentum": 0,
     }
     result = regime_engine.detect_regime(features)
     assert result.regime in [Regime.SIDEWAYS, Regime.LOW_VOLATILITY], f"Got: {result.regime}"
@@ -178,20 +202,16 @@ def test_macro_sensitivity():
 
     # 3. Macro impact calculation
     impact = macro_sensitivity_engine.compute_macro_impact(
-        "THYAO", "AVIATION",
-        {"usdtry_change": 0.10, "oil_change": 0.20}
+        "THYAO", "AVIATION", {"usdtry_change": 0.10, "oil_change": 0.20}
     )
     assert impact.get("usdtry_impact", 0) < 0  # USDTRY artış = negatif (yakıt maliyeti)
-    assert impact.get("oil_impact", 0) < 0      # Petrol artış = negatif
+    assert impact.get("oil_impact", 0) < 0  # Petrol artış = negatif
     assert impact.get("total_macro_impact", 0) < 0
     passed += 1
     print(f"  ✓ THYAO macro impact: {impact.get('total_macro_impact')}")
 
     # 4. Bank interest rate sensitivity
-    impact = macro_sensitivity_engine.compute_macro_impact(
-        "AKBNK", "BANK",
-        {"interest_rate_change": 0.05}
-    )
+    impact = macro_sensitivity_engine.compute_macro_impact("AKBNK", "BANK", {"interest_rate_change": 0.05})
     assert impact.get("interest_rate_impact", 0) > 0  # Faiz artışı = bankalar için pozitif
     passed += 1
     print(f"  ✓ AKBNK interest impact: {impact.get('interest_rate_impact')}")
@@ -241,6 +261,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

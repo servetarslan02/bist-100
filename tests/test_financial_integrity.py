@@ -30,15 +30,21 @@ async def setup():
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING"
+    )
 
 
 # =====================================================
 # INVARIANT TESTS
 # =====================================================
+
 
 async def test_invariant_detects_negative_cash():
     """Negatif cash invariant bozmalı."""
@@ -178,6 +184,7 @@ async def test_invariant_multi_instance():
 # MEMORY SAFETY TESTS
 # =====================================================
 
+
 async def test_trades_list_limit():
     """Trades listesi sınırlı olmalı."""
     issues = []
@@ -249,6 +256,7 @@ async def test_position_history_limit():
 # EXCEPTION RECOVERY TESTS
 # =====================================================
 
+
 async def test_invalid_price_handling():
     """Geçersiz fiyat exception üretmemeli, graceful fail olmalı."""
     issues = []
@@ -256,7 +264,7 @@ async def test_invalid_price_handling():
     pm = PortfolioManager(100000)
 
     # NaN fiyat
-    result = pm.open_position("X", "LONG", 100, float('nan'))
+    result = pm.open_position("X", "LONG", 100, float("nan"))
     if result.get("success"):
         issues.append("NaN fiyat ile pozisyon açıldı")
 
@@ -328,6 +336,7 @@ async def test_commission_accounting():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

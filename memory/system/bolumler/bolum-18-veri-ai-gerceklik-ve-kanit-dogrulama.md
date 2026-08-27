@@ -75,8 +75,7 @@ Sosyal medya → 0.40
 ### Örnek: Hallucination tespiti
 
 ```python
-halluc = evidence_engine.detect_hallucination(
-    "THYAO 500 TL olacak ve ASELS %20 artacak", {})
+halluc = evidence_engine.detect_hallucination("THYAO 500 TL olacak ve ASELS %20 artacak", {})
 # tickers_mentioned: ["THYAO", "ASELS"]
 # prices_mentioned: ["500"]
 # hallucination_detected: True (fiyat uydurma)
@@ -91,8 +90,9 @@ halluc = evidence_engine.detect_hallucination(
 ```python
 from services.intelligence.evidence_engine import Claim, SourceReliability
 
-claim = Claim(claim_id="C1", text="Şirket yeni sözleşme imzaladı",
-    source="kap.org.tr", source_type=SourceReliability.PRIMARY)
+claim = Claim(
+    claim_id="C1", text="Şirket yeni sözleşme imzaladı", source="kap.org.tr", source_type=SourceReliability.PRIMARY
+)
 result = evidence_engine.verify_claim(claim)
 # result: VERIFIED, evidence_score: 95, claim_type: FACT
 ```

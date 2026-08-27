@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class CorrelationResult:
     """Korelasyon sonucu."""
+
     var1: str
     var2: str
     correlation: float
@@ -37,6 +38,7 @@ class CorrelationResult:
 @dataclass
 class CorrelationBreakdown:
     """Korelasyon bozulma tespiti."""
+
     var1: str
     var2: str
     historical_corr: float
@@ -83,8 +85,8 @@ class MacroCorrelationTracker:
 
             # Rolling window
             if len(self._history[key]) > self._window * 2:
-                self._history[key] = self._history[key][-self._window * 2:]
-                self._timestamps[key] = self._timestamps[key][-self._window * 2:]
+                self._history[key] = self._history[key][-self._window * 2 :]
+                self._timestamps[key] = self._timestamps[key][-self._window * 2 :]
 
     def get_correlation(
         self,
@@ -122,6 +124,7 @@ class MacroCorrelationTracker:
         if abs(corr) < 1.0 and n_obs > 2:
             t_stat = corr * np.sqrt((n_obs - 2) / (1 - corr**2))
             from scipy import stats
+
             p_value = 2 * (1 - stats.t.cdf(abs(t_stat), n_obs - 2))
         else:
             p_value = 0.0
@@ -133,7 +136,7 @@ class MacroCorrelationTracker:
         if pair_key not in self._correlation_history:
             self._correlation_history[pair_key] = []
         self._correlation_history[pair_key].append(corr)
-        self._correlation_history[pair_key] = self._correlation_history[pair_key][-self._window:]
+        self._correlation_history[pair_key] = self._correlation_history[pair_key][-self._window :]
 
         return CorrelationResult(
             var1=var1,
@@ -193,10 +196,13 @@ class MacroCorrelationTracker:
             )
 
             if breakdown.alert:
-                logger.warning("Correlation breakdown detected",
-                             var1=v1, var2=v2,
-                             historical=historical_avg,
-                             current=current.correlation)
+                logger.warning(
+                    "Correlation breakdown detected",
+                    var1=v1,
+                    var2=v2,
+                    historical=historical_avg,
+                    current=current.correlation,
+                )
 
             breakdowns.append(breakdown)
 
@@ -228,9 +234,7 @@ class MacroCorrelationTracker:
         # Genel korelasyon stresi (kaç çiftte bozulma var?)
         breakdowns = self.detect_correlation_breakdown()
         features["correlation_stress"] = float(sum(1 for b in breakdowns if b.alert))
-        features["correlation_stress_pct"] = round(
-            sum(1 for b in breakdowns if b.alert) / max(len(breakdowns), 1), 4
-        )
+        features["correlation_stress_pct"] = round(sum(1 for b in breakdowns if b.alert) / max(len(breakdowns), 1), 4)
 
         return features
 
@@ -242,12 +246,14 @@ class MacroCorrelationTracker:
         for v1, v2 in cfg.tracked_pairs:
             result = self.get_correlation(v1, v2)
             if result:
-                pairs_data.append({
-                    "pair": f"{v1}-{v2}",
-                    "correlation": result.correlation,
-                    "significant": result.significant,
-                    "p_value": result.p_value,
-                })
+                pairs_data.append(
+                    {
+                        "pair": f"{v1}-{v2}",
+                        "correlation": result.correlation,
+                        "significant": result.significant,
+                        "p_value": result.p_value,
+                    }
+                )
 
         breakdowns = self.detect_correlation_breakdown()
 

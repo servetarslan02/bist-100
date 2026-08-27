@@ -57,8 +57,7 @@ AgentToolRegistry.can_access(AgentRole.NEWS, "calculate_risk")  # False
 ```python
 from services.agents.agent_system import AIOutputValidator
 
-validation = AIOutputValidator.validate(
-    '{"direction": "LONG", "confidence": 75, "reasoning": "Strong momentum"}')
+validation = AIOutputValidator.validate('{"direction": "LONG", "confidence": 75, "reasoning": "Strong momentum"}')
 # valid: True, confidence normalized to 0.75
 ```
 
@@ -75,8 +74,7 @@ Primary LLM → Secondary LLM → Rule-based → NO_TRADE
 ```python
 from services.agents.agent_system import AIFallback
 
-result = AIFallback.rule_based_analysis(
-    {"roc_5d": 5, "volume_zscore": 3, "rsi_14": 55}, "THYAO")
+result = AIFallback.rule_based_analysis({"roc_5d": 5, "volume_zscore": 3, "rsi_14": 55}, "THYAO")
 # direction: LONG, confidence: 0.65, source: rule_based_fallback
 ```
 

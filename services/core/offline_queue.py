@@ -108,9 +108,7 @@ class OfflineQueue:
         ttl_hours: int | None = None,
     ) -> str:
         """Event'i kuyruğa ekle."""
-        entry_id = hashlib.md5(
-            f"oq_{event_type}_{time.time()}_{id(payload)}".encode()
-        ).hexdigest()[:16]
+        entry_id = hashlib.md5(f"oq_{event_type}_{time.time()}_{id(payload)}".encode()).hexdigest()[:16]
 
         ttl = ttl_hours or self._default_ttl_hours
         expires_at = datetime.now(UTC) + timedelta(hours=ttl)
@@ -118,21 +116,26 @@ class OfflineQueue:
         payload_json = orjson.dumps(payload, default=str).decode()
 
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO offline_queue
                 (entry_id, event_type, subject, payload, priority, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                entry_id, event_type, subject, payload_json, priority,
-                datetime.now(UTC).isoformat(),
-                expires_at.isoformat(),
-            ))
+            """,
+                (
+                    entry_id,
+                    event_type,
+                    subject,
+                    payload_json,
+                    priority,
+                    datetime.now(UTC).isoformat(),
+                    expires_at.isoformat(),
+                ),
+            )
             conn.commit()
 
         self._total_enqueued += 1
-        logger.info("Event queued for offline delivery",
-                    entry_id=entry_id, event_type=event_type,
-                    priority=priority)
+        logger.info("Event queued for offline delivery", entry_id=entry_id, event_type=event_type, priority=priority)
         return entry_id
 
     async def flush(self) -> int:
@@ -171,36 +174,29 @@ class OfflineQueue:
                                 handler(entry["subject"], payload)
 
                             # Başarılı — kuyruktan çıkar
-                            conn.execute(
-                                "DELETE FROM offline_queue WHERE entry_id = ?",
-                                (entry["entry_id"],)
-                            )
+                            conn.execute("DELETE FROM offline_queue WHERE entry_id = ?", (entry["entry_id"],))
                             flushed += 1
                             self._total_flushed += 1
 
                         except Exception as e:
                             # Başarısız — attempt sayısını artır
-                            conn.execute("""
+                            conn.execute(
+                                """
                                 UPDATE offline_queue
                                 SET attempts = attempts + 1, last_error = ?
                                 WHERE entry_id = ?
-                            """, (str(e)[:200], entry["entry_id"]))
+                            """,
+                                (str(e)[:200], entry["entry_id"]),
+                            )
 
                             # 5 denemeden fazla başarısızsa çıkar
                             if entry["attempts"] >= 5:
-                                conn.execute(
-                                    "DELETE FROM offline_queue WHERE entry_id = ?",
-                                    (entry["entry_id"],)
-                                )
-                                logger.warning("Offline queue entry exhausted",
-                                             entry_id=entry["entry_id"])
+                                conn.execute("DELETE FROM offline_queue WHERE entry_id = ?", (entry["entry_id"],))
+                                logger.warning("Offline queue entry exhausted", entry_id=entry["entry_id"])
 
                     else:
                         # Handler yok — çıkar
-                        conn.execute(
-                            "DELETE FROM offline_queue WHERE entry_id = ?",
-                            (entry["entry_id"],)
-                        )
+                        conn.execute("DELETE FROM offline_queue WHERE entry_id = ?", (entry["entry_id"],))
 
                 conn.commit()
 
@@ -218,9 +214,7 @@ class OfflineQueue:
         """Süresi dolmuş kayıtları temizle."""
         now = datetime.now(UTC).isoformat()
         with self._connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM offline_queue WHERE expires_at <= ?", (now,)
-            )
+            cursor = conn.execute("DELETE FROM offline_queue WHERE expires_at <= ?", (now,))
             expired = cursor.rowcount
             conn.commit()
             if expired > 0:
@@ -230,9 +224,7 @@ class OfflineQueue:
     async def get_stats(self) -> dict[str, Any]:
         """Kuyruk istatistikleri."""
         with self._connect() as conn:
-            total = conn.execute(
-                "SELECT COUNT(*) as cnt FROM offline_queue"
-            ).fetchone()["cnt"]
+            total = conn.execute("SELECT COUNT(*) as cnt FROM offline_queue").fetchone()["cnt"]
 
             by_type = {}
             rows = conn.execute("""
@@ -256,11 +248,14 @@ class OfflineQueue:
     async def get_entries(self, limit: int = 50) -> list[dict[str, Any]]:
         """Kuyruktaki kayıtları listele."""
         with self._connect() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM offline_queue
                 ORDER BY priority ASC, created_at ASC
                 LIMIT ?
-            """, (limit,)).fetchall()
+            """,
+                (limit,),
+            ).fetchall()
             return [dict(r) for r in rows]
 
     async def clear(self) -> int:

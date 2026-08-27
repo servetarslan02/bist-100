@@ -37,6 +37,7 @@ logger = structlog.get_logger()
 @dataclass
 class ProviderConfig:
     """Provider yapılandırması."""
+
     name: str
     func: Callable
     priority: int = 0
@@ -47,6 +48,7 @@ class ProviderConfig:
 @dataclass
 class ProviderResult:
     """Provider sonuç verisi."""
+
     provider: str
     data: Any
     timestamp: datetime
@@ -59,6 +61,7 @@ class ProviderResult:
 @dataclass
 class ProviderHealth:
     """Provider sağlık durumu."""
+
     name: str
     is_healthy: bool = True
     last_success: datetime | None = None
@@ -132,11 +135,7 @@ class ProviderManager:
         else:
             self._retry_policies[name] = get_retry_policy(name)
 
-        logger.info("Provider registered",
-                    data_type=data_type,
-                    name=name,
-                    priority=priority,
-                    timeout_s=timeout_s)
+        logger.info("Provider registered", data_type=data_type, name=name, priority=priority, timeout_s=timeout_s)
 
     async def fetch(
         self,
@@ -204,9 +203,7 @@ class ProviderManager:
                     health.consecutive_failures = 0
                     health.total_requests += 1
                     health.total_successes += 1
-                    health.avg_latency_ms = (
-                        health.avg_latency_ms * 0.9 + latency_ms * 0.1
-                    )
+                    health.avg_latency_ms = health.avg_latency_ms * 0.9 + latency_ms * 0.1
                     health.success_rate = min(
                         1.0,
                         health.success_rate + 0.01,
@@ -228,15 +225,10 @@ class ProviderManager:
                     health.consecutive_failures += 1
                     health.total_requests += 1
                     health.total_failures += 1
-                    health.success_rate = max(
-                        0, health.success_rate - 0.05
-                    )
+                    health.success_rate = max(0, health.success_rate - 0.05)
 
                 errors.append(f"{name}: {str(e)}")
-                logger.warning("Provider failed",
-                              provider=name,
-                              error=str(e),
-                              attempt=errors.__len__())
+                logger.warning("Provider failed", provider=name, error=str(e), attempt=errors.__len__())
 
             except Exception as e:
                 cb.record_failure()
@@ -248,13 +240,9 @@ class ProviderManager:
                     health.total_failures += 1
 
                 errors.append(f"{name}: {str(e)}")
-                logger.warning("Provider unexpected error",
-                              provider=name,
-                              error=str(e))
+                logger.warning("Provider unexpected error", provider=name, error=str(e))
 
-        logger.error("All providers failed",
-                    data_type=data_type,
-                    errors=errors)
+        logger.error("All providers failed", data_type=data_type, errors=errors)
         return None
 
     async def fetch_multi(
@@ -329,10 +317,7 @@ class ProviderManager:
 
     def get_retry_stats(self) -> dict[str, dict]:
         """Tüm retry istatistikleri."""
-        return {
-            name: policy.get_stats()
-            for name, policy in self._retry_policies.items()
-        }
+        return {name: policy.get_stats() for name, policy in self._retry_policies.items()}
 
     def get_full_status(self) -> dict[str, Any]:
         """Tam durum raporu."""
@@ -342,9 +327,7 @@ class ProviderManager:
             "rate_limiters": self.get_rate_limiter_stats(),
             "retry_policies": self.get_retry_stats(),
             "registered_types": list(self._providers.keys()),
-            "total_providers": sum(
-                len(providers) for providers in self._providers.values()
-            ),
+            "total_providers": sum(len(providers) for providers in self._providers.values()),
         }
 
     def enable_provider(self, data_type: str, name: str):

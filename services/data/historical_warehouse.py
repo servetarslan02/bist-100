@@ -19,13 +19,41 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
 DB_FILE = os.path.join(DATA_DIR, "bist_30y_warehouse.db")
 
 BIST_ALL_KEY_TICKERS = [
-    "THYAO.IS", "GARAN.IS", "AKBNK.IS", "ISCTR.IS", "YKBNK.IS",
-    "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS", "SISE.IS",
-    "ARCLK.IS", "FROTO.IS", "TOASO.IS", "ENKAI.IS", "PETKM.IS",
-    "CCOLA.IS", "AEFES.IS", "TCELL.IS", "VAKBN.IS", "HALKB.IS",
-    "BIMAS.IS", "ASELS.IS", "PGSUS.IS", "TTKOM.IS", "MGROS.IS",
-    "ASTOR.IS", "KONTR.IS", "HEKTS.IS", "SASA.IS", "KOZAL.IS",
-    "GUBRF.IS", "KRDMD.IS", "OYAKC.IS", "ALARK.IS", "SOKM.IS"
+    "THYAO.IS",
+    "GARAN.IS",
+    "AKBNK.IS",
+    "ISCTR.IS",
+    "YKBNK.IS",
+    "KCHOL.IS",
+    "SAHOL.IS",
+    "TUPRS.IS",
+    "EREGL.IS",
+    "SISE.IS",
+    "ARCLK.IS",
+    "FROTO.IS",
+    "TOASO.IS",
+    "ENKAI.IS",
+    "PETKM.IS",
+    "CCOLA.IS",
+    "AEFES.IS",
+    "TCELL.IS",
+    "VAKBN.IS",
+    "HALKB.IS",
+    "BIMAS.IS",
+    "ASELS.IS",
+    "PGSUS.IS",
+    "TTKOM.IS",
+    "MGROS.IS",
+    "ASTOR.IS",
+    "KONTR.IS",
+    "HEKTS.IS",
+    "SASA.IS",
+    "KOZAL.IS",
+    "GUBRF.IS",
+    "KRDMD.IS",
+    "OYAKC.IS",
+    "ALARK.IS",
+    "SOKM.IS",
 ]
 
 BENCHMARK_TICKER = "XU100.IS"
@@ -36,7 +64,7 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     if yf_df is None or len(yf_df) == 0:
         return pl.DataFrame()
     df = yf_df.reset_index()
-    if isinstance(df.columns, __import__('pandas').MultiIndex):
+    if isinstance(df.columns, __import__("pandas").MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return pl.from_pandas(df)
 
@@ -75,18 +103,20 @@ class HistoricalDataWarehouse:
             bm_df.to_pandas().to_sql("benchmark_xu100", conn, if_exists="replace", index=True)
 
         # 2. Hisseler
-        stocks_raw = yf.download(BIST_ALL_KEY_TICKERS, start="1997-01-01", end="2026-08-23", progress=False, group_by="ticker")
+        stocks_raw = yf.download(
+            BIST_ALL_KEY_TICKERS, start="1997-01-01", end="2026-08-23", progress=False, group_by="ticker"
+        )
 
         all_dfs = []
         for t in BIST_ALL_KEY_TICKERS:
             if t in stocks_raw.columns.get_level_values(0):
                 df_t = stocks_raw[t].dropna().copy()
-                if isinstance(df_t.columns, __import__('pandas').MultiIndex):
+                if isinstance(df_t.columns, __import__("pandas").MultiIndex):
                     df_t.columns = [c[0] for c in df_t.columns]
                 if len(df_t) > 30:
                     sym = t.replace(".IS", "")
                     pl_df = _yf_to_polars(df_t)
-                    pl_df = pl_df.with_columns(pl.lit(sym).alias('symbol'))
+                    pl_df = pl_df.with_columns(pl.lit(sym).alias("symbol"))
                     all_dfs.append(pl_df)
 
         if all_dfs:

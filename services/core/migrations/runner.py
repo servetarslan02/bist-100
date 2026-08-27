@@ -41,6 +41,7 @@ LOCK_OWNER_PREFIX = "alpha_migrate_"
 @dataclass
 class MigrationFile:
     """Parsed migration dosyası."""
+
     version: int
     name: str
     up_sql: str
@@ -68,8 +69,11 @@ class MigrationFile:
         checksum = hashlib.sha256(up_sql.encode("utf-8")).hexdigest()[:16]
 
         return MigrationFile(
-            version=version, name=name,
-            up_sql=up_sql, down_sql=down_sql, checksum=checksum,
+            version=version,
+            name=name,
+            up_sql=up_sql,
+            down_sql=down_sql,
+            checksum=checksum,
         )
 
 
@@ -117,6 +121,7 @@ class MigrationRunner:
             False: başka bir instance kilitli (timeout dolmamış)
         """
         import uuid
+
         await self._init_lock_table()
 
         self._lock_id = f"{LOCK_OWNER_PREFIX}{uuid.uuid4().hex[:8]}"
@@ -124,16 +129,16 @@ class MigrationRunner:
         expires = now + LOCK_TIMEOUT_SECONDS
 
         # Stale lock temizle (timeout aşmış)
-        await self._execute(
-            f"DELETE FROM {LOCK_TABLE} WHERE expires_at < ?",
-            now
-        )
+        await self._execute(f"DELETE FROM {LOCK_TABLE} WHERE expires_at < ?", now)
 
         # Lock almayı dene (INSERT = atomic, çakışma yok)
         try:
             await self._execute(
                 f"INSERT INTO {LOCK_TABLE} (lock_key, owner, acquired_at, expires_at) VALUES (?, ?, ?, ?)",
-                "migration", self._lock_id, now, expires
+                "migration",
+                self._lock_id,
+                now,
+                expires,
             )
             logger.info("Migration lock acquired", owner=self._lock_id)
             self._start_heartbeat()
@@ -141,22 +146,26 @@ class MigrationRunner:
         except Exception:
             # Lock zaten var — timeout kontrolü
             row = await self._fetchone(
-                f"SELECT owner, acquired_at, expires_at FROM {LOCK_TABLE} WHERE lock_key = ?",
-                "migration"
+                f"SELECT owner, acquired_at, expires_at FROM {LOCK_TABLE} WHERE lock_key = ?", "migration"
             )
             if row:
                 if row["expires_at"] < now:
                     # Stale lock — zorla al
                     await self._execute(
                         f"UPDATE {LOCK_TABLE} SET owner = ?, acquired_at = ?, expires_at = ? WHERE lock_key = ?",
-                        self._lock_id, now, expires, "migration"
+                        self._lock_id,
+                        now,
+                        expires,
+                        "migration",
                     )
                     logger.warning("Stale migration lock recovered", old_owner=row["owner"])
                     return True
                 else:
-                    logger.warning("Migration locked by another instance",
-                                 owner=row["owner"],
-                                 remaining_sec=int(row["expires_at"] - now))
+                    logger.warning(
+                        "Migration locked by another instance",
+                        owner=row["owner"],
+                        remaining_sec=int(row["expires_at"] - now),
+                    )
                     return False
             return False
 
@@ -166,8 +175,7 @@ class MigrationRunner:
         if self._lock_id:
             try:
                 await self._execute(
-                    f"DELETE FROM {LOCK_TABLE} WHERE lock_key = ? AND owner = ?",
-                    "migration", self._lock_id
+                    f"DELETE FROM {LOCK_TABLE} WHERE lock_key = ? AND owner = ?", "migration", self._lock_id
                 )
                 logger.info("Migration lock released", owner=self._lock_id)
             except Exception as e:
@@ -181,7 +189,9 @@ class MigrationRunner:
                 new_expires = time.time() + LOCK_TIMEOUT_SECONDS
                 await self._execute(
                     f"UPDATE {LOCK_TABLE} SET expires_at = ? WHERE lock_key = ? AND owner = ?",
-                    new_expires, "migration", self._lock_id
+                    new_expires,
+                    "migration",
+                    self._lock_id,
                 )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="runner.py:187")
@@ -190,6 +200,7 @@ class MigrationRunner:
         """Arka planda lock süresini otomatik yenile."""
         if self._heartbeat_task is not None:
             return
+
         async def _heartbeat_loop():
             while True:
                 try:
@@ -199,6 +210,7 @@ class MigrationRunner:
                     break
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="runner.py:201")
+
         try:
             self._heartbeat_task = asyncio.ensure_future(_heartbeat_loop())
         except RuntimeError:
@@ -285,8 +297,7 @@ class MigrationRunner:
         for v in applied_versions:
             if v not in available_versions:
                 raise RuntimeError(
-                    f"DB'de v{v:03d} uygulanmış ama dosyası bulunamadı! "
-                    f"Migration dosyası silinmiş olabilir."
+                    f"DB'de v{v:03d} uygulanmış ama dosyası bulunamadı! Migration dosyası silinmiş olabilir."
                 )
 
     # =====================================================
@@ -384,7 +395,9 @@ class MigrationRunner:
 
             await self._execute(
                 "INSERT INTO schema_migrations (version, name, checksum) VALUES (?, ?, ?)",
-                m.version, m.name, m.checksum
+                m.version,
+                m.name,
+                m.checksum,
             )
             await self._commit()
         except Exception:
@@ -405,10 +418,7 @@ class MigrationRunner:
             applied_map = await self.get_applied()
             all_migrations = self.discover_migrations()
 
-            to_rollback = sorted(
-                [v for v in applied_map if v > target_version],
-                reverse=True
-            )
+            to_rollback = sorted([v for v in applied_map if v > target_version], reverse=True)
 
             if not to_rollback:
                 logger.info("Nothing to rollback", target=target_version)
@@ -444,9 +454,7 @@ class MigrationRunner:
                 stmt = self._prepare_statement(stmt)
                 if stmt:
                     await self._execute_safe(stmt)
-            await self._execute(
-                "DELETE FROM schema_migrations WHERE version = ?", m.version
-            )
+            await self._execute("DELETE FROM schema_migrations WHERE version = ?", m.version)
             await self._commit()
         except Exception:
             await self._rollback()
@@ -541,19 +549,29 @@ class MigrationRunner:
         s = re.sub(r"VARCHAR\(\d+\)", "TEXT", s, flags=re.IGNORECASE)
         s = re.sub(r"\$(\d+)", "?", s)
         # INSERT ... ON CONFLICT (...) DO NOTHING  ->  INSERT OR IGNORE ...
-        s = re.sub(
-            r"\bINSERT\b",
-            "INSERT OR IGNORE",
-            s,
-            flags=re.IGNORECASE,
-        ) if re.search(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", s, re.IGNORECASE) else s
+        s = (
+            re.sub(
+                r"\bINSERT\b",
+                "INSERT OR IGNORE",
+                s,
+                flags=re.IGNORECASE,
+            )
+            if re.search(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", s, re.IGNORECASE)
+            else s
+        )
         s = re.sub(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", "", s, flags=re.IGNORECASE)
         # Partial indexes (WHERE clause) - SQLite supports them but strip them from UNIQUE CREATE INDEX WHERE for safety
-        s = re.sub(r"(CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF NOT EXISTS\s+)?\w+\s+ON\s+\w+\s*\([^)]+\))\s+WHERE\s+[^\n;]+",
-                   r"\1", s, flags=re.IGNORECASE)
+        s = re.sub(
+            r"(CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF NOT EXISTS\s+)?\w+\s+ON\s+\w+\s*\([^)]+\))\s+WHERE\s+[^\n;]+",
+            r"\1",
+            s,
+            flags=re.IGNORECASE,
+        )
         s = re.sub(r"\s+FOR UPDATE", "", s, flags=re.IGNORECASE)
         s = re.sub(r"GENERATED ALWAYS AS\s*\([^)]+\)", "", s, flags=re.IGNORECASE)
-        s = re.sub(r"ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+IF NOT EXISTS", r"ALTER TABLE \1 ADD COLUMN", s, flags=re.IGNORECASE)
+        s = re.sub(
+            r"ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+IF NOT EXISTS", r"ALTER TABLE \1 ADD COLUMN", s, flags=re.IGNORECASE
+        )
         s = re.sub(r"\bDOUBLE PRECISION\b", "REAL", s, flags=re.IGNORECASE)
         s = re.sub(r"\bJSONB\b", "TEXT", s, flags=re.IGNORECASE)
         s = re.sub(r"\bDECIMAL\(\d+,\d+\)\b", "REAL", s, flags=re.IGNORECASE)

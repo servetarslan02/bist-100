@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class RobustnessReport:
     """Sağlamlık ve stres testi sonuç karnesi."""
+
     base_params: StrategyParameters
     base_return: float
     base_sharpe: float
@@ -61,21 +62,23 @@ class RobustnessTester:
                 atr_trailing_mult=round(base_params.atr_trailing_mult * (1 + delta), 2),
                 crisis_exit_buffer=base_params.crisis_exit_buffer,
                 max_positions_bull=base_params.max_positions_bull,
-                position_alloc_bull=base_params.position_alloc_bull
+                position_alloc_bull=base_params.position_alloc_bull,
             )
 
             res = self.optimizer.simulate_fast(p_perturbed, start_year=1997, end_year=2023)
             sharpe_list.append(res.sharpe_ratio)
-            results.append({
-                "perturbation": f"{delta:+,.0%}",
-                "trailing_atr": p_perturbed.atr_trailing_mult,
-                "initial_stop_atr": p_perturbed.atr_initial_stop_mult,
-                "total_return": res.total_return_pct,
-                "sharpe": res.sharpe_ratio,
-                "profit_factor": res.profit_factor,
-                "max_drawdown": res.max_drawdown,
-                "trades": res.total_trades
-            })
+            results.append(
+                {
+                    "perturbation": f"{delta:+,.0%}",
+                    "trailing_atr": p_perturbed.atr_trailing_mult,
+                    "initial_stop_atr": p_perturbed.atr_initial_stop_mult,
+                    "total_return": res.total_return_pct,
+                    "sharpe": res.sharpe_ratio,
+                    "profit_factor": res.profit_factor,
+                    "max_drawdown": res.max_drawdown,
+                    "trades": res.total_trades,
+                }
+            )
 
         # Plato Stabilitesi: Komşu değerlerde Sharpe oranı sert düşüyor mu?
         # Standart sapma düşük ve ortalama pozitif olmalı
@@ -95,7 +98,7 @@ class RobustnessTester:
             "%0.25 (Standart)": (0.0015, 0.0010),
             "%0.50 (Yüksek Komisyon)": (0.0030, 0.0020),
             "%1.00 (Zorlu Piyasa)": (0.0060, 0.0040),
-            "%1.50 (Aşırı Kayma & Stres)": (0.0090, 0.0060)
+            "%1.50 (Aşırı Kayma & Stres)": (0.0090, 0.0060),
         }
 
         stress_results = {}
@@ -138,5 +141,5 @@ class RobustnessTester:
             is_plateau_stable=is_stable,
             plateau_stability_score=stab_score,
             cost_stress_results=cost_results,
-            cost_resilience_passed=cost_passed
+            cost_resilience_passed=cost_passed,
         )

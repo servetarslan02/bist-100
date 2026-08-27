@@ -59,7 +59,7 @@ def main():
                         atr_breakeven_mult=2.20,
                         atr_trailing_bull_mult=trail_bull,
                         atr_trailing_bear_mult=2.00,
-                        crisis_exit_buffer=0.96
+                        crisis_exit_buffer=0.96,
                     )
 
                     is_res = engine.simulate(p, start_year=1997, end_year=2023)
@@ -79,9 +79,9 @@ def main():
     print("\n" + "=" * 105)
     print("🏆 BULUNAN NİHAİ KURUMSAL RİSK PARİTY MODELİ (TÜM HEDEFLER TESTİ):")
     print("=" * 105)
-    print(f"  • İşlem Başına Risk Limiti   : %{p.risk_per_trade_pct*100:.1f}")
-    print(f"  • Maksimum Tek Hisse Tavanı  : %{p.max_position_size_pct*100:.1f}")
-    print(f"  • Portföy Açık Isı Tavanı    : %{p.max_portfolio_heat_pct*100:.1f}")
+    print(f"  • İşlem Başına Risk Limiti   : %{p.risk_per_trade_pct * 100:.1f}")
+    print(f"  • Maksimum Tek Hisse Tavanı  : %{p.max_position_size_pct * 100:.1f}")
+    print(f"  • Portföy Açık Isı Tavanı    : %{p.max_portfolio_heat_pct * 100:.1f}")
     print(f"  • Boğa ATR Trailing Mesafesi : {p.atr_trailing_bull_mult:.2f}x ATR")
     print(f"  • RSI Aşırı Satım Eşiği      : {p.rsi_oversold:.1f}")
 
@@ -101,16 +101,24 @@ def main():
 
     print("\n📅 YIL BAZINDA PERFORMANS (1997 - 2026):")
     print("-" * 105)
-    print(f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'MAX DD':<12} | {'PF'}")
+    print(
+        f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'MAX DD':<12} | {'PF'}"
+    )
     print("-" * 105)
     years = sorted(list(set(d.year for d in bm_df.index)))
     for y in years:
         res = engine.simulate(p, start_year=y, end_year=y)
         bm_y = bm_df[bm_df.index.year == y]
-        bm_y_ret = ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0 if len(bm_y) > 10 else 0.0
+        bm_y_ret = (
+            ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0
+            if len(bm_y) > 10
+            else 0.0
+        )
         diff = res.total_return_pct - bm_y_ret
         kriz_tag = " ⚠️ KRİZ" if y in [2000, 2001, 2008, 2018] else ""
-        print(f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>9.2f} | {res.profit_factor:>4.2f}{kriz_tag}")
+        print(
+            f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>9.2f} | {res.profit_factor:>4.2f}{kriz_tag}"
+        )
     print("=" * 105)
 
 

@@ -28,7 +28,8 @@ async def setup_tables():
     """
 
     await pg_execute(query)
-    print('Paper trade tables created successfully.')
+    print("Paper trade tables created successfully.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(setup_tables())

@@ -28,12 +28,13 @@ logger = structlog.get_logger()
 @dataclass
 class ReconciliationResult:
     """Uzlaştırma sonucu."""
+
     ticker: str
     canonical_price: float
-    source: str                     # "reconciled" veya tek kaynak adı
-    conflict: bool                  # Kaynaklar arası çakışma var mı
-    quality_score: float            # 0-1
-    max_deviation_pct: float        # Maksimum sapma %
+    source: str  # "reconciled" veya tek kaynak adı
+    conflict: bool  # Kaynaklar arası çakışma var mı
+    quality_score: float  # 0-1
+    max_deviation_pct: float  # Maksimum sapma %
     sources: dict[str, float] = field(default_factory=dict)  # source → price
     deviations: dict[str, float] = field(default_factory=dict)  # source → deviation %
     warnings: list[str] = field(default_factory=list)
@@ -132,9 +133,7 @@ class SourceReconciler:
         if conflict:
             for source, dev in deviations.items():
                 if dev > max_dev:
-                    warnings.append(
-                        f"{source}: {dev:.2f}% deviation from canonical"
-                    )
+                    warnings.append(f"{source}: {dev:.2f}% deviation from canonical")
 
         return ReconciliationResult(
             ticker=ticker,
@@ -218,10 +217,7 @@ class SourceReconciler:
         """Kalite raporu."""
         total = len(results)
         consistent = sum(1 for r in results.values() if not r.conflict)
-        avg_quality = (
-            sum(r.quality_score for r in results.values()) / total
-            if total > 0 else 0
-        )
+        avg_quality = sum(r.quality_score for r in results.values()) / total if total > 0 else 0
 
         all_warnings = []
         for r in results.values():
@@ -231,9 +227,7 @@ class SourceReconciler:
             "total_tickers": total,
             "consistent": consistent,
             "conflicts": total - consistent,
-            "consistency_rate": round(
-                consistent / max(total, 1) * 100, 1
-            ),
+            "consistency_rate": round(consistent / max(total, 1) * 100, 1),
             "avg_quality_score": round(avg_quality, 3),
             "warnings": all_warnings[:20],
         }

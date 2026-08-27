@@ -21,11 +21,13 @@ import pytest
 # DEDUPLICATION TESTS
 # =====================================================
 
+
 class TestScanDeduplicator:
     """Deduplication testleri."""
 
     def setup_method(self):
         from services.scanner.deduplicator import ScanDeduplicator
+
         self.dedup = ScanDeduplicator(cooldown_seconds=5)
 
     def test_first_scan_allowed(self):
@@ -38,6 +40,7 @@ class TestScanDeduplicator:
 
     def test_cooldown_expires(self):
         from services.scanner.deduplicator import ScanDeduplicator
+
         dedup = ScanDeduplicator(cooldown_seconds=0)  # 0 saniye cooldown
         dedup.should_scan("THYAO")
         dedup.record_scan("THYAO", score=70)
@@ -100,11 +103,13 @@ class TestScanDeduplicator:
 # ADAPTIVE SCAN SCHEDULER TESTS
 # =====================================================
 
+
 class TestAdaptiveScanScheduler:
     """Adaptive scheduler testleri."""
 
     def setup_method(self):
         from services.scanner.scan_scheduler import AdaptiveScanScheduler
+
         self.scheduler = AdaptiveScanScheduler(base_interval=60)
 
     def test_default_interval(self):
@@ -165,10 +170,11 @@ class TestAdaptiveScanScheduler:
 
     def test_volatility_scales(self):
         from services.scanner.scan_scheduler import AdaptiveScanScheduler
+
         s = AdaptiveScanScheduler()
 
-        assert s._get_volatility_scale(0.05) == 2.0   # very_low → yavaş
-        assert s._get_volatility_scale(0.20) == 1.0   # normal
+        assert s._get_volatility_scale(0.05) == 2.0  # very_low → yavaş
+        assert s._get_volatility_scale(0.20) == 1.0  # normal
         assert s._get_volatility_scale(0.40) == 0.25  # very_high → hızlı
 
 
@@ -176,11 +182,13 @@ class TestAdaptiveScanScheduler:
 # SCAN PERSISTENCE TESTS
 # =====================================================
 
+
 class TestScanPersistence:
     """Scan persistence testleri."""
 
     def setup_method(self):
         from services.scanner.scan_persistence import ScanPersistence, ScanResultRecord
+
         self.db_path = tempfile.mktemp(suffix=".db")
         self.persistence = ScanPersistence(db_path=self.db_path)
         self.ScanResultRecord = ScanResultRecord
@@ -276,11 +284,13 @@ class TestScanPersistence:
 # PERFORMANCE TRACKER TESTS
 # =====================================================
 
+
 class TestScanPerformanceTracker:
     """Performance tracker testleri."""
 
     def setup_method(self):
         from services.scanner.performance_tracker import ScanPerformanceTracker
+
         self.tracker = ScanPerformanceTracker()
 
     def test_record_scan(self):
@@ -316,18 +326,35 @@ class TestScanPerformanceTracker:
 
     def test_signal_accuracy(self):
         from services.scanner.performance_tracker import SignalOutcome
-        self.tracker.record_signal_outcome(SignalOutcome(
-            ticker="THYAO", signal_type="MOMENTUM", direction="LONG",
-            score=80, confidence=0.8, entry_price=250.0,
-            entry_time=datetime.now(UTC).isoformat(),
-            exit_price=260.0, return_pct=4.0, correct=True,
-        ))
-        self.tracker.record_signal_outcome(SignalOutcome(
-            ticker="GARAN", signal_type="BREAKOUT", direction="LONG",
-            score=70, confidence=0.7, entry_price=100.0,
-            entry_time=datetime.now(UTC).isoformat(),
-            exit_price=95.0, return_pct=-5.0, correct=False,
-        ))
+
+        self.tracker.record_signal_outcome(
+            SignalOutcome(
+                ticker="THYAO",
+                signal_type="MOMENTUM",
+                direction="LONG",
+                score=80,
+                confidence=0.8,
+                entry_price=250.0,
+                entry_time=datetime.now(UTC).isoformat(),
+                exit_price=260.0,
+                return_pct=4.0,
+                correct=True,
+            )
+        )
+        self.tracker.record_signal_outcome(
+            SignalOutcome(
+                ticker="GARAN",
+                signal_type="BREAKOUT",
+                direction="LONG",
+                score=70,
+                confidence=0.7,
+                entry_price=100.0,
+                entry_time=datetime.now(UTC).isoformat(),
+                exit_price=95.0,
+                return_pct=-5.0,
+                correct=False,
+            )
+        )
 
         accuracy = self.tracker.get_signal_accuracy()
         assert accuracy["total_signals"] == 2
@@ -335,13 +362,22 @@ class TestScanPerformanceTracker:
 
     def test_top_performing_filters(self):
         from services.scanner.performance_tracker import SignalOutcome
+
         for i in range(5):
-            self.tracker.record_signal_outcome(SignalOutcome(
-                ticker=f"T{i}", signal_type="MOMENTUM", direction="LONG",
-                score=80, confidence=0.8, entry_price=100.0,
-                entry_time=datetime.now(UTC).isoformat(),
-                exit_price=105.0, return_pct=5.0, correct=True,
-            ))
+            self.tracker.record_signal_outcome(
+                SignalOutcome(
+                    ticker=f"T{i}",
+                    signal_type="MOMENTUM",
+                    direction="LONG",
+                    score=80,
+                    confidence=0.8,
+                    entry_price=100.0,
+                    entry_time=datetime.now(UTC).isoformat(),
+                    exit_price=105.0,
+                    return_pct=5.0,
+                    correct=True,
+                )
+            )
 
         top = self.tracker.get_top_performing_filters()
         assert len(top) > 0
@@ -357,11 +393,13 @@ class TestScanPerformanceTracker:
 # SCAN ALERTS TESTS
 # =====================================================
 
+
 class TestScanAlertManager:
     """Scan alert testleri."""
 
     def setup_method(self):
         from services.scanner.scan_alerts import ScanAlertManager
+
         self.manager = ScanAlertManager()
 
     def test_high_score_alert(self):
@@ -386,8 +424,7 @@ class TestScanAlertManager:
         assert any(a.alert_type.value == "NEW_SIGNAL" for a in alerts)
 
     def test_volume_anomaly_alert(self):
-        results = [{"ticker": "THYAO", "score": 60, "signal": "", "direction": "NEUTRAL",
-                    "volume_zscore": 5.0}]
+        results = [{"ticker": "THYAO", "score": 60, "signal": "", "direction": "NEUTRAL", "volume_zscore": 5.0}]
         alerts = self.manager.check_scan_results(results)
         assert any(a.alert_type.value == "ANOMALY" for a in alerts)
 
@@ -416,11 +453,13 @@ class TestScanAlertManager:
 # CUSTOM FILTERS TESTS
 # =====================================================
 
+
 class TestCustomFilterEngine:
     """Custom filter testleri."""
 
     def setup_method(self):
         from services.scanner.custom_filters import CustomFilter, CustomFilterEngine
+
         self.engine = CustomFilterEngine()
         self.CustomFilter = CustomFilter
 
@@ -442,12 +481,14 @@ class TestCustomFilterEngine:
         assert len(filtered) == 1
 
     def test_custom_filter_added(self):
-        self.engine.add_filter(self.CustomFilter(
-            name="test_filter",
-            description="Test filtre",
-            condition=lambda r: r.get("score", 0) > 60,
-            action="exclude",
-        ))
+        self.engine.add_filter(
+            self.CustomFilter(
+                name="test_filter",
+                description="Test filtre",
+                condition=lambda r: r.get("score", 0) > 60,
+                action="exclude",
+            )
+        )
 
         results = [
             {"ticker": "THYAO", "score": 80, "price": 250.0, "volume": 500000},
@@ -458,13 +499,15 @@ class TestCustomFilterEngine:
         assert filtered[0]["ticker"] == "THYAO"
 
     def test_score_adjustment(self):
-        self.engine.add_filter(self.CustomFilter(
-            name="bonus",
-            description="Bonus",
-            condition=lambda r: r.get("score", 0) > 70,
-            action="adjust_score",
-            score_adjustment=10.0,
-        ))
+        self.engine.add_filter(
+            self.CustomFilter(
+                name="bonus",
+                description="Bonus",
+                condition=lambda r: r.get("score", 0) > 70,
+                action="adjust_score",
+                score_adjustment=10.0,
+            )
+        )
 
         results = [{"ticker": "THYAO", "score": 80, "price": 250.0, "volume": 500000}]
         filtered, log = self.engine.apply_filters(results)
@@ -497,11 +540,13 @@ class TestCustomFilterEngine:
 # SCAN API TESTS
 # =====================================================
 
+
 class TestScanAPI:
     """Scan API testleri."""
 
     def setup_method(self):
         from services.scanner.scan_api import ScanAPI
+
         self.api = ScanAPI()
 
     def test_get_status(self):
@@ -547,12 +592,14 @@ class TestScanAPI:
 # INTEGRATION TESTS
 # =====================================================
 
+
 class TestScannerIntegration:
     """Entegrasyon testleri."""
 
     def test_dedup_with_scanner(self):
         """Deduplication scanner ile entegrasyon."""
         from services.scanner.deduplicator import ScanDeduplicator
+
         dedup = ScanDeduplicator(cooldown_seconds=5)
 
         # İlk tarama
@@ -576,10 +623,22 @@ class TestScannerIntegration:
 
         # Düşük hacimli hisseyi filtrele
         results = [
-            {"ticker": "THYAO", "score": 85, "signal": "MOMENTUM", "direction": "LONG",
-             "price": 250.0, "volume": 500000},
-            {"ticker": "SMALL", "score": 95, "signal": "BREAKOUT", "direction": "LONG",
-             "price": 10.0, "volume": 50000},  # Düşük hacim
+            {
+                "ticker": "THYAO",
+                "score": 85,
+                "signal": "MOMENTUM",
+                "direction": "LONG",
+                "price": 250.0,
+                "volume": 500000,
+            },
+            {
+                "ticker": "SMALL",
+                "score": 95,
+                "signal": "BREAKOUT",
+                "direction": "LONG",
+                "price": 10.0,
+                "volume": 50000,
+            },  # Düşük hacim
         ]
 
         # Filtre uygula

@@ -31,6 +31,7 @@ logger = structlog.get_logger()
 @dataclass
 class DelistingEvent:
     """Delisting olayı kaydı."""
+
     ticker: str
     delisting_date: datetime
     reason: str  # bankruptcy | merger | acquisition | voluntary | regulatory
@@ -50,6 +51,7 @@ class DelistingEvent:
 @dataclass
 class UniverseSnapshot:
     """Belirli bir tarihteki evren (universe) durumu."""
+
     date: datetime
     active_tickers: set[str]
     delisted_tickers: set[str]
@@ -85,10 +87,9 @@ class SurvivorshipBiasHandler:
         if len(self._delisting_events) > 500:
             self._delisting_events = self._delisting_events[-500:]
         self._delisted_tickers[event.ticker] = event.delisting_date
-        logger.info("Delisting registered",
-                    ticker=event.ticker,
-                    date=event.delisting_date.isoformat(),
-                    reason=event.reason)
+        logger.info(
+            "Delisting registered", ticker=event.ticker, date=event.delisting_date.isoformat(), reason=event.reason
+        )
 
     def register_delistings_batch(self, events: list[DelistingEvent]):
         """Toplu delisting kaydı."""
@@ -158,24 +159,17 @@ class SurvivorshipBiasHandler:
         corrected = returns.copy()
 
         for delist in delistings:
-            mask = (
-                (corrected[ticker_col] == delist.ticker) &
-                (corrected[date_col] >= delist.delisting_date)
-            )
+            mask = (corrected[ticker_col] == delist.ticker) & (corrected[date_col] >= delist.delisting_date)
 
             if mask.any():
                 if delist.reason == "bankruptcy" and delist.recovery_rate is not None:
                     # İflas durumunda son fiyat × recovery_rate
                     corrected.loc[mask, return_col] = -1 + delist.recovery_rate
-                    logger.info("Applied bankruptcy correction",
-                               ticker=delist.ticker,
-                               recovery=delist.recovery_rate)
+                    logger.info("Applied bankruptcy correction", ticker=delist.ticker, recovery=delist.recovery_rate)
                 elif delist.final_price is not None:
                     # Birleşme/devralma durumunda final fiyat
                     # Son getiri = (final_price / son_bilinen_fiyat) - 1
-                    logger.info("Applied delisting correction",
-                               ticker=delist.ticker,
-                               final_price=delist.final_price)
+                    logger.info("Applied delisting correction", ticker=delist.ticker, final_price=delist.final_price)
 
         return corrected
 
@@ -200,11 +194,13 @@ class SurvivorshipBiasHandler:
 
         full_sharpe = (
             full_returns["return"].mean() / full_returns["return"].std() * np.sqrt(252)
-            if full_returns["return"].std() > 0 else 0
+            if full_returns["return"].std() > 0
+            else 0
         )
         survivor_sharpe = (
             survivor_only_returns["return"].mean() / survivor_only_returns["return"].std() * np.sqrt(252)
-            if survivor_only_returns["return"].std() > 0 else 0
+            if survivor_only_returns["return"].std() > 0
+            else 0
         )
 
         return {
@@ -237,14 +233,16 @@ class SurvivorshipBiasHandler:
             active = self.get_universe_at_date(current, all_known_tickers)
             delisted = all_known_tickers - active
 
-            snapshots.append(UniverseSnapshot(
-                date=current,
-                active_tickers=active,
-                delisted_tickers=delisted,
-                total_count=len(all_known_tickers),
-                active_count=len(active),
-                delisted_count=len(delisted),
-            ))
+            snapshots.append(
+                UniverseSnapshot(
+                    date=current,
+                    active_tickers=active,
+                    delisted_tickers=delisted,
+                    total_count=len(all_known_tickers),
+                    active_count=len(active),
+                    delisted_count=len(delisted),
+                )
+            )
 
             current = current + datetime.timedelta(days=interval_days)
 
@@ -271,13 +269,15 @@ class BISTSurvivorshipDataLoader:
         df = pl.read_csv(filepath)
         events = []
         for _, row in df.iterrows():
-            events.append(DelistingEvent(
-                ticker=row["ticker"],
-                delisting_date=pl.Series(row["delisting_date"]),
-                reason=row.get("reason", "unknown"),
-                final_price=row.get("final_price"),
-                recovery_rate=row.get("recovery_rate"),
-            ))
+            events.append(
+                DelistingEvent(
+                    ticker=row["ticker"],
+                    delisting_date=pl.Series(row["delisting_date"]),
+                    reason=row.get("reason", "unknown"),
+                    final_price=row.get("final_price"),
+                    recovery_rate=row.get("recovery_rate"),
+                )
+            )
         return events
 
     @staticmethod

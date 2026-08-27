@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class CircuitBreakerEvent:
     """Devre kesici tetikleme olayı."""
+
     ticker: str
     event_type: str  # "PAY_BAZINDA" | "EBDKS"
     trigger_price: float
@@ -94,8 +95,9 @@ class AutoCircuitBreakerEngine:
         # EBDKS: BIST-100 %6 veya daha fazla düşüş
         if change_pct <= -bist_session_fsm.EBDKS_THRESHOLD_PCT:
             # Bugün zaten tetiklendi mi kontrol et (aynı eşik seviyesinde tekrar tetiklenmemeli)
-            if self._ebdks_triggered_today == 0 or \
-               (self._ebdks_triggered_today > 0 and change_pct <= -(bist_session_fsm.EBDKS_THRESHOLD_PCT + 2)):
+            if self._ebdks_triggered_today == 0 or (
+                self._ebdks_triggered_today > 0 and change_pct <= -(bist_session_fsm.EBDKS_THRESHOLD_PCT + 2)
+            ):
                 # İlk tetikleme veya ek %2 düşüş daha
 
                 # Özellik kodu belirle (şimdilik varsayılan)
@@ -118,12 +120,14 @@ class AutoCircuitBreakerEngine:
                 self._events.append(event)
                 self._ebdks_triggered_today += 1
 
-                logger.warning("EBDKS OTOMATİK TETİKLENDİ",
-                             change_pct=f"{change_pct:.2f}%",
-                             threshold=f"%{bist_session_fsm.EBDKS_THRESHOLD_PCT}",
-                             current=current_price,
-                             reference=self._bist100_reference,
-                             count_today=self._ebdks_triggered_today)
+                logger.warning(
+                    "EBDKS OTOMATİK TETİKLENDİ",
+                    change_pct=f"{change_pct:.2f}%",
+                    threshold=f"%{bist_session_fsm.EBDKS_THRESHOLD_PCT}",
+                    current=current_price,
+                    reference=self._bist100_reference,
+                    count_today=self._ebdks_triggered_today,
+                )
 
                 return event
 
@@ -159,8 +163,7 @@ class AutoCircuitBreakerEngine:
 
         # Pazar bazında eşikleri al
         thresholds = bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS.get(
-            market_type,
-            bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
+            market_type, bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
         )
 
         # Bugün bu hisse için hangi eşikler tetiklendi?
@@ -188,12 +191,14 @@ class AutoCircuitBreakerEngine:
                     self._triggered_today[ticker] = []
                 self._triggered_today[ticker].append(threshold)
 
-                logger.warning("PAY BAZINDA DEVRE KESICI TETİKLENDİ",
-                             ticker=ticker,
-                             change_pct=f"{change_pct:.2f}%",
-                             threshold=f"%{threshold}",
-                             current=current_price,
-                             reference=reference_price)
+                logger.warning(
+                    "PAY BAZINDA DEVRE KESICI TETİKLENDİ",
+                    ticker=ticker,
+                    change_pct=f"{change_pct:.2f}%",
+                    threshold=f"%{threshold}",
+                    current=current_price,
+                    reference=reference_price,
+                )
 
                 return event
 
@@ -216,9 +221,9 @@ class AutoCircuitBreakerEngine:
             "ebdks_triggered_today": self._ebdks_triggered_today,
             "bist100_reference": self._bist100_reference,
             "bist100_current": self._bist100_current,
-            "bist100_change_pct": round(
-                ((self._bist100_current / self._bist100_reference) - 1) * 100, 2
-            ) if self._bist100_reference > 0 else 0,
+            "bist100_change_pct": round(((self._bist100_current / self._bist100_reference) - 1) * 100, 2)
+            if self._bist100_reference > 0
+            else 0,
             "pay_circuit_breakers_today": len(self._triggered_today),
             "total_events_today": len(self._events),
             "ebdks_active": bist_session_fsm.is_ebdks_active(),

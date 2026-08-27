@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 
 class OHLCVSchema(BaseModel):
     """OHLCV veri doğrulama şeması."""
+
     date: datetime
     open: float = Field(gt=0)
     high: float = Field(gt=0)
@@ -50,6 +51,7 @@ class OHLCVSchema(BaseModel):
 
 class FeatureVectorSchema(BaseModel):
     """Feature vektörü doğrulama şeması."""
+
     ticker: str
     date: datetime
     features: dict[str, float]
@@ -64,6 +66,7 @@ class FeatureVectorSchema(BaseModel):
 
 class PredictionSchema(BaseModel):
     """Model tahmin doğrulama şeması."""
+
     model_id: str
     ticker: str
     timestamp: datetime
@@ -74,6 +77,7 @@ class PredictionSchema(BaseModel):
 
 class SignalSchema(BaseModel):
     """Sinyal doğrulama şeması."""
+
     ticker: str
     action: str = Field(pattern="^(BUY|SELL|HOLD)$")
     price: float = Field(gt=0)
@@ -84,6 +88,7 @@ class SignalSchema(BaseModel):
 
 class PositionSchema(BaseModel):
     """Pozisyon doğrulama şeması."""
+
     ticker: str
     direction: str = Field(pattern="^(LONG|SHORT)$")
     quantity: int = Field(gt=0)

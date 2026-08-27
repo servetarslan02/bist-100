@@ -9,7 +9,7 @@ import sys
 import httpx
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 BASE_URL = "http://localhost:8000/api/v1"
 
@@ -25,6 +25,7 @@ ENDPOINTS = [
 ]
 
 MOCK_KEYWORDS = ["MOCK", "DUMMY", "SYNTHETIC_TEST", "SAMPLE_EVENT", "84.2M Satır", "62.4M", "14.2 Milyar ₺"]
+
 
 async def run_audit():
     print("=" * 75)
@@ -68,6 +69,7 @@ async def run_audit():
     else:
         print(f"{failed} UC NOKTADA SORUN TESPIT EDILDI.")
     print("=" * 75)
+
 
 if __name__ == "__main__":
     asyncio.run(run_audit())

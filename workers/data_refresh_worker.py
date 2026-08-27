@@ -26,11 +26,13 @@ class DataRefreshWorker:
 
         try:
             from services.ingestion.bist_universe import bist_universe
+
             tickers = bist_universe.BIST_100_TICKERS
             result["bist100_count"] = len(tickers) if tickers else 0
 
             # BIST-50 cache yenile
             from services.core.short_selling import short_selling_monitor
+
             short_selling_monitor.auto_refresh_if_needed()
             result["bist50_cache"] = "ok"
 

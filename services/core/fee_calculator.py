@@ -20,13 +20,14 @@ logger = structlog.get_logger()
 @dataclass
 class FeeBreakdown:
     """İşlem maliyet detayı."""
-    amount: float           # İşlem tutarı
-    broker_fee: float       # Broker komisyonu
-    bist_fee: float         # BIST payı
-    mkk_fee: float          # MKK payı
-    bsmv: float             # Banka ve Sigorta Muameleleri Vergisi
-    total: float            # Toplam maliyet
-    effective_rate: float   # Efektif oran (%)
+
+    amount: float  # İşlem tutarı
+    broker_fee: float  # Broker komisyonu
+    bist_fee: float  # BIST payı
+    mkk_fee: float  # MKK payı
+    bsmv: float  # Banka ve Sigorta Muameleleri Vergisi
+    total: float  # Toplam maliyet
+    effective_rate: float  # Efektif oran (%)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -44,14 +45,14 @@ class FeeCalculator:
     """BIST işlem maliyetleri hesaplayıcı."""
 
     # Standart oranlar
-    BIST_FEE_RATE = 0.000056    # %0.0056
-    MKK_FEE_RATE = 0.0000109    # %0.00109
-    BSMV_RATE = 0.05            # %5 (komisyon üzerinden)
-    MIN_COMMISSION = 1.0        # Minimum ₺1
+    BIST_FEE_RATE = 0.000056  # %0.0056
+    MKK_FEE_RATE = 0.0000109  # %0.00109
+    BSMV_RATE = 0.05  # %5 (komisyon üzerinden)
+    MIN_COMMISSION = 1.0  # Minimum ₺1
 
     def __init__(self, broker_rate: float = 0.0003):
         """Args:
-            broker_rate: Broker komisyon oranı (default: %0.03)
+        broker_rate: Broker komisyon oranı (default: %0.03)
         """
         self.broker_rate = broker_rate
 

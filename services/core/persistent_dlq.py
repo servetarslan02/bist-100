@@ -47,6 +47,7 @@ class DLQStatus(StrEnum):
 @dataclass
 class DLQEntry:
     """DLQ kaydı — backward compatibility için."""
+
     entry_id: str
     event_id: str
     event_type: str
@@ -165,31 +166,37 @@ class PersistentDeadLetterQueue:
         max_retries: int = 3,
     ) -> str:
         """Başarısız event'i DLQ'ya kaydet."""
-        entry_id = hashlib.md5(
-            f"dlq_{event_id}_{time.time()}".encode()
-        ).hexdigest()[:16]
+        entry_id = hashlib.md5(f"dlq_{event_id}_{time.time()}".encode()).hexdigest()[:16]
 
-        backoff_seconds = 5 * (2 ** retry_count)
+        backoff_seconds = 5 * (2**retry_count)
         next_retry = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
 
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO dlq_entries
                 (entry_id, event_id, event_type, payload, error, retry_count,
                  max_retries, status, created_at, next_retry_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
-            """, (
-                entry_id, event_id, event_type, payload, error,
-                retry_count, max_retries,
-                datetime.now(UTC).isoformat(),
-                next_retry.isoformat(),
-            ))
+            """,
+                (
+                    entry_id,
+                    event_id,
+                    event_type,
+                    payload,
+                    error,
+                    retry_count,
+                    max_retries,
+                    datetime.now(UTC).isoformat(),
+                    next_retry.isoformat(),
+                ),
+            )
             conn.commit()
 
         self._total_pushed += 1
-        logger.warning("Event pushed to persistent DLQ",
-                      entry_id=entry_id, event_type=event_type,
-                      retry_count=retry_count)
+        logger.warning(
+            "Event pushed to persistent DLQ", entry_id=entry_id, event_type=event_type, retry_count=retry_count
+        )
         return entry_id
 
     async def retry_failed(self, batch_size: int = 100) -> int:
@@ -198,14 +205,17 @@ class PersistentDeadLetterQueue:
         now = datetime.now(UTC).isoformat()
 
         with self._connect() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM dlq_entries
                 WHERE status = 'PENDING'
                 AND (next_retry_at IS NULL OR next_retry_at <= ?)
                 AND retry_count < max_retries
                 ORDER BY created_at ASC
                 LIMIT ?
-            """, (now, batch_size)).fetchall()
+            """,
+                (now, batch_size),
+            ).fetchall()
 
             for row in rows:
                 entry = dict(row)
@@ -214,8 +224,7 @@ class PersistentDeadLetterQueue:
                 if handler:
                     try:
                         conn.execute(
-                            "UPDATE dlq_entries SET status = 'RETRYING' WHERE entry_id = ?",
-                            (entry["entry_id"],)
+                            "UPDATE dlq_entries SET status = 'RETRYING' WHERE entry_id = ?", (entry["entry_id"],)
                         )
                         conn.commit()
 
@@ -225,10 +234,13 @@ class PersistentDeadLetterQueue:
                             handler(entry["payload"])
 
                         # Başarılı
-                        conn.execute("""
+                        conn.execute(
+                            """
                             UPDATE dlq_entries SET status = 'RESOLVED', resolved_at = ?
                             WHERE entry_id = ?
-                        """, (datetime.now(UTC).isoformat(), entry["entry_id"]))
+                        """,
+                            (datetime.now(UTC).isoformat(), entry["entry_id"]),
+                        )
                         conn.commit()
 
                         self._total_resolved += 1
@@ -239,27 +251,35 @@ class PersistentDeadLetterQueue:
                         # Retry başarısız
                         new_count = entry["retry_count"] + 1
                         if new_count >= entry["max_retries"]:
-                            conn.execute("""
+                            conn.execute(
+                                """
                                 UPDATE dlq_entries SET status = 'EXHAUSTED',
                                 retry_count = ?, error = ?
                                 WHERE entry_id = ?
-                            """, (new_count, str(e), entry["entry_id"]))
+                            """,
+                                (new_count, str(e), entry["entry_id"]),
+                            )
                             self._total_exhausted += 1
                         else:
-                            backoff = 5 * (2 ** new_count)
-                            next_retry = (datetime.now(UTC) +
-                                        timedelta(seconds=backoff)).isoformat()
-                            conn.execute("""
+                            backoff = 5 * (2**new_count)
+                            next_retry = (datetime.now(UTC) + timedelta(seconds=backoff)).isoformat()
+                            conn.execute(
+                                """
                                 UPDATE dlq_entries SET status = 'PENDING',
                                 retry_count = ?, error = ?, next_retry_at = ?
                                 WHERE entry_id = ?
-                            """, (new_count, str(e), next_retry, entry["entry_id"]))
+                            """,
+                                (new_count, str(e), next_retry, entry["entry_id"]),
+                            )
                         conn.commit()
                 else:
                     # Handler yok
-                    conn.execute("""
+                    conn.execute(
+                        """
                         UPDATE dlq_entries SET status = 'EXHAUSTED' WHERE entry_id = ?
-                    """, (entry["entry_id"],))
+                    """,
+                        (entry["entry_id"],),
+                    )
                     conn.commit()
                     self._total_exhausted += 1
 
@@ -337,10 +357,13 @@ class PersistentDeadLetterQueue:
         """Çözülmüş kayıtları temizle (son 24 saat tut)."""
         cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 DELETE FROM dlq_entries
                 WHERE status = 'RESOLVED' AND resolved_at < ?
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
             conn.commit()
 
     def _evict_oldest(self):
@@ -349,13 +372,16 @@ class PersistentDeadLetterQueue:
             count = conn.execute("SELECT COUNT(*) as cnt FROM dlq_entries").fetchone()["cnt"]
             if count > self._max_entries:
                 excess = count - self._max_entries
-                conn.execute("""
+                conn.execute(
+                    """
                     DELETE FROM dlq_entries WHERE entry_id IN (
                         SELECT entry_id FROM dlq_entries
                         WHERE status IN ('RESOLVED', 'EXHAUSTED')
                         ORDER BY created_at ASC LIMIT ?
                     )
-                """, (excess,))
+                """,
+                    (excess,),
+                )
                 conn.commit()
 
 

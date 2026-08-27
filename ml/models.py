@@ -13,12 +13,14 @@ logger = structlog.get_logger()
 
 class SecurityError(Exception):
     """Güvenlik doğrulama hatası."""
+
     pass
 
 
 @dataclass
 class ModelConfig:
     """Configuration for an ML model."""
+
     name: str
     model_type: str  # "lightgbm", "xgboost", "pytorch"
     target: str  # "return_5d", "return_20d", "direction", "volatility"
@@ -31,25 +33,47 @@ class ModelConfig:
 # Default feature set
 DEFAULT_FEATURES = [
     # Returns
-    "return_1d", "return_5d", "return_10d", "return_20d",
-
+    "return_1d",
+    "return_5d",
+    "return_10d",
+    "return_20d",
     # Volume
-    "volume_ratio_5d", "volume_ratio_20d", "volume_zscore", "volume_trend",
-
+    "volume_ratio_5d",
+    "volume_ratio_20d",
+    "volume_zscore",
+    "volume_trend",
     # Momentum
-    "roc_5d", "roc_10d", "roc_20d", "momentum_5d", "momentum_20d", "price_acceleration",
-
+    "roc_5d",
+    "roc_10d",
+    "roc_20d",
+    "momentum_5d",
+    "momentum_20d",
+    "price_acceleration",
     # Volatility
-    "atr_14_pct", "realized_vol_5d", "realized_vol_20d", "bb_width", "bb_position", "volatility_ratio",
-
+    "atr_14_pct",
+    "realized_vol_5d",
+    "realized_vol_20d",
+    "bb_width",
+    "bb_position",
+    "volatility_ratio",
     # Technical
-    "rsi_14", "macd_histogram", "stochastic_k", "adx", "cci", "williams_r", "mfi",
-
+    "rsi_14",
+    "macd_histogram",
+    "stochastic_k",
+    "adx",
+    "cci",
+    "williams_r",
+    "mfi",
     # Trend
-    "price_vs_sma20", "price_vs_sma50", "trend_slope_20d",
-
+    "price_vs_sma20",
+    "price_vs_sma50",
+    "trend_slope_20d",
     # Pattern
-    "gap_pct", "daily_range_pct", "consecutive_up", "near_20d_high", "near_20d_low",
+    "gap_pct",
+    "daily_range_pct",
+    "consecutive_up",
+    "near_20d_high",
+    "near_20d_low",
 ]
 
 # Model configurations
@@ -188,17 +212,21 @@ class AlphaModel:
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(model_path, "wb") as f:
-            pickle.dump({
-                "model": self.model,
-                "config": self.config,
-                "metrics": self.metrics,
-                "feature_importance": self.feature_importance,
-                "is_trained": self.is_trained,
-            }, f)
+            pickle.dump(
+                {
+                    "model": self.model,
+                    "config": self.config,
+                    "metrics": self.metrics,
+                    "feature_importance": self.feature_importance,
+                    "is_trained": self.is_trained,
+                },
+                f,
+            )
 
         # Hash dosyası oluştur (pickle deserilization güvenliği)
         try:
             import hashlib
+
             with open(path, "rb") as hf:
                 file_hash = hashlib.sha256(hf.read()).hexdigest()
             hash_path = path + ".sha256"
@@ -216,6 +244,7 @@ class AlphaModel:
         try:
             import hashlib
             import os
+
             if os.path.exists(hash_path):
                 expected_hash = open(hash_path).read().strip()
                 actual_hash = hashlib.sha256(open(path, "rb").read()).hexdigest()
@@ -263,7 +292,8 @@ class LightGBMModel(AlphaModel):
         callbacks = [lgb.log_evaluation(period=100)]
 
         self.model.fit(
-            X, y,
+            X,
+            y,
             eval_set=eval_set,
             callbacks=callbacks,
         )
@@ -296,7 +326,8 @@ class XGBoostModel(AlphaModel):
         eval_set = [(X_val, y_val)] if X_val is not None and y_val is not None else None
 
         self.model.fit(
-            X, y,
+            X,
+            y,
             eval_set=eval_set,
             verbose=False,
         )

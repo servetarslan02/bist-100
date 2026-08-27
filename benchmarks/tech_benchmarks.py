@@ -76,7 +76,9 @@ def benchmark_dataframe():
 
         # Test data — BIST benzeri OHLCV verisi
         n_rows = 100_000
-        dates = pl.datetime_range(datetime(2020, 1, 1), datetime(2020, 1, 1) + timedelta(minutes=n_rows-1), timedelta(minutes=1), eager=True)
+        dates = pl.datetime_range(
+            datetime(2020, 1, 1), datetime(2020, 1, 1) + timedelta(minutes=n_rows - 1), timedelta(minutes=1), eager=True
+        )
         np.random.seed(42)
         data = {
             "date": dates,
@@ -92,9 +94,7 @@ def benchmark_dataframe():
         start = time.perf_counter()
         for _ in range(10):
             df_pd = pl.DataFrame(data)
-            df_pd.group_by("ticker").agg(
-                {"close": "mean", "volume": "sum", "high": "max", "low": "min"}
-            )
+            df_pd.group_by("ticker").agg({"close": "mean", "volume": "sum", "high": "max", "low": "min"})
         pandas_time = time.perf_counter() - start
 
         # Polars benchmark
@@ -213,6 +213,7 @@ def _compute_auc(y_true, y_pred):
     """AUC hesapla (scikit-learn olmadan)."""
     try:
         from sklearn.metrics import roc_auc_score
+
         return roc_auc_score(y_true, y_pred)
     except ImportError:
         # Manuel AUC hesaplama (basit)

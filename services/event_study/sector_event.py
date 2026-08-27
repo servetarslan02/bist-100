@@ -3,6 +3,7 @@
 Sektör bazlı event study — peer comparison, sector-relative CAR,
 sector rotation detection.
 """
+
 from typing import Any
 
 import numpy as np
@@ -140,9 +141,9 @@ class SectorEventAnalyzer:
                 "car": target_car,
                 "rank": rankings[target_ticker],
                 "vs_sector_avg": round(target_car - sector_avg, 4),
-                "percentile": round(
-                    sum(1 for c in all_cars if c < target_car) / len(all_cars) * 100, 1
-                ) if all_cars else 0,
+                "percentile": round(sum(1 for c in all_cars if c < target_car) / len(all_cars) * 100, 1)
+                if all_cars
+                else 0,
             }
 
         return result

@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class ScenarioResult:
     """Tek senaryo sonucu."""
+
     scenario_name: str
     scenario_type: str  # historical, hypothetical, monte_carlo
     total_impact_pct: float
@@ -38,6 +39,7 @@ class ScenarioResult:
 @dataclass
 class StressTestReport:
     """Stres testi raporu."""
+
     portfolio_value: float
     scenarios: list[ScenarioResult]
     worst_scenario: ScenarioResult
@@ -156,7 +158,7 @@ class StressTestEngine:
             "name": "TCMB +500bp Faiz Artışı",
             "rate_change": 0.05,
             "sector_impacts": {
-                "BANKING": 0.05,      # Bankalar faizden kazanır
+                "BANKING": 0.05,  # Bankalar faizden kazanır
                 "FINANCE": -0.03,
                 "INDUSTRY": -0.08,
                 "TECHNOLOGY": -0.10,
@@ -211,8 +213,7 @@ class StressTestEngine:
         Returns:
             ScenarioResult
         """
-        scenario = self.HISTORICAL_SCENARIOS.get(scenario_key) or \
-                   self.HYPOTHETICAL_SCENARIOS.get(scenario_key)
+        scenario = self.HISTORICAL_SCENARIOS.get(scenario_key) or self.HYPOTHETICAL_SCENARIOS.get(scenario_key)
 
         if not scenario:
             return ScenarioResult(
@@ -248,13 +249,15 @@ class StressTestEngine:
                     impact_pct -= usdtry_change * 0.2  # Negatif etki
 
             impact_amount = value * impact_pct
-            position_impacts.append({
-                "ticker": ticker,
-                "sector": sector,
-                "value": value,
-                "impact_pct": round(impact_pct * 100, 2),
-                "impact_amount": round(impact_amount, 2),
-            })
+            position_impacts.append(
+                {
+                    "ticker": ticker,
+                    "sector": sector,
+                    "value": value,
+                    "impact_pct": round(impact_pct * 100, 2),
+                    "impact_amount": round(impact_amount, 2),
+                }
+            )
 
         total_impact = sum(p["impact_amount"] for p in position_impacts)
         total_impact_pct = (total_impact / total_value * 100) if total_value > 0 else 0
@@ -380,9 +383,7 @@ class StressTestEngine:
         # yerine bileşikleştiriyoruz; P&L'nin portföy değeriyle tutarlı
         # olması için gerekli olan budur.
         if sigma <= 0:
-            cumulative_returns = np.full(
-                n_simulations, (1.0 + mu) ** holding_days - 1.0
-            )
+            cumulative_returns = np.full(n_simulations, (1.0 + mu) ** holding_days - 1.0)
         else:
             daily_returns = rng.normal(mu, sigma, (n_simulations, holding_days))
             cumulative_returns = np.prod(1.0 + daily_returns, axis=1) - 1.0
@@ -438,12 +439,14 @@ class StressTestEngine:
         for key, scenario in {**self.HISTORICAL_SCENARIOS, **self.HYPOTHETICAL_SCENARIOS}.items():
             result = self.run_scenario(portfolio, key)
             if abs(result.total_impact_pct) >= max_loss_pct:
-                breaking_scenarios.append({
-                    "scenario": scenario.get("name", key),
-                    "impact_pct": result.total_impact_pct,
-                    "impact_amount": result.total_impact_amount,
-                    "exceeds_by": abs(result.total_impact_pct) - max_loss_pct,
-                })
+                breaking_scenarios.append(
+                    {
+                        "scenario": scenario.get("name", key),
+                        "impact_pct": result.total_impact_pct,
+                        "impact_amount": result.total_impact_amount,
+                        "exceeds_by": abs(result.total_impact_pct) - max_loss_pct,
+                    }
+                )
 
         return {
             "max_loss_pct": max_loss_pct,
@@ -493,11 +496,11 @@ class StressTestEngine:
 
         # Konsantrasyon (ağırlık: %15)
         if scenarios:
-            worst_position_impact = max(
-                abs(p["impact_pct"])
-                for s in scenarios
-                for p in s.position_impacts
-            ) if any(s.position_impacts for s in scenarios) else 0
+            worst_position_impact = (
+                max(abs(p["impact_pct"]) for s in scenarios for p in s.position_impacts)
+                if any(s.position_impacts for s in scenarios)
+                else 0
+            )
             score += min(15, worst_position_impact / 2)
 
         return min(100, score)
@@ -525,7 +528,9 @@ class StressTestEngine:
         for sector, impacts in sector_impacts.items():
             avg_impact = np.mean(impacts)
             if avg_impact > 20:
-                recommendations.append(f"🟡 {sector} sektörü stres altında çok etkileniyor (ortalama %{avg_impact:.1f})")
+                recommendations.append(
+                    f"🟡 {sector} sektörü stres altında çok etkileniyor (ortalama %{avg_impact:.1f})"
+                )
 
         if not recommendations:
             recommendations.append("✅ Portföy stres testlerinde makul seviyelerde")

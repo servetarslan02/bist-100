@@ -21,21 +21,83 @@ logger = structlog.get_logger()
 
 # Türkçe sentiment sözlüğü
 TURKISH_POSITIVE = [
-    "yükseliş", "artış", "kazanç", "rekor", "büyüme", "kar", "kâr",
-    "pozitif", "güçlü", "iyimser", "toparlanma", "al", "alım", "alın",
-    "patlama", "fırlama", "uçma", "coşku", "mutlu", "güzel", "harika",
-    "süper", "mükemmel", "devam", "destek", "güven", "umut",
-    "bullish", "moon", "pump", "buy", "long", "gain", "rocket",
-    "breakout", "rally", "surge", "soar", "boom",
+    "yükseliş",
+    "artış",
+    "kazanç",
+    "rekor",
+    "büyüme",
+    "kar",
+    "kâr",
+    "pozitif",
+    "güçlü",
+    "iyimser",
+    "toparlanma",
+    "al",
+    "alım",
+    "alın",
+    "patlama",
+    "fırlama",
+    "uçma",
+    "coşku",
+    "mutlu",
+    "güzel",
+    "harika",
+    "süper",
+    "mükemmel",
+    "devam",
+    "destek",
+    "güven",
+    "umut",
+    "bullish",
+    "moon",
+    "pump",
+    "buy",
+    "long",
+    "gain",
+    "rocket",
+    "breakout",
+    "rally",
+    "surge",
+    "soar",
+    "boom",
 ]
 
 TURKISH_NEGATIVE = [
-    "düşüş", "kayıp", "zarar", "gerileme", "kriz", "risk",
-    "negatif", "zayıf", "kötümser", "sat", "satış", "satın",
-    "çöküş", "panik", "korku", "endişe", "tehlike", "alarm",
-    "felaket", "berbat", "korkunç", "kötü", "çarpı", "batış",
-    "bearish", "dump", "sell", "short", "crash", "loss",
-    "collapse", "plunge", "tank", "nosedive", "freefall",
+    "düşüş",
+    "kayıp",
+    "zarar",
+    "gerileme",
+    "kriz",
+    "risk",
+    "negatif",
+    "zayıf",
+    "kötümser",
+    "sat",
+    "satış",
+    "satın",
+    "çöküş",
+    "panik",
+    "korku",
+    "endişe",
+    "tehlike",
+    "alarm",
+    "felaket",
+    "berbat",
+    "korkunç",
+    "kötü",
+    "çarpı",
+    "batış",
+    "bearish",
+    "dump",
+    "sell",
+    "short",
+    "crash",
+    "loss",
+    "collapse",
+    "plunge",
+    "tank",
+    "nosedive",
+    "freefall",
 ]
 
 
@@ -91,9 +153,9 @@ class SocialProvider:
                     "like_count": metrics.get("like_count", 0),
                     "reply_count": metrics.get("reply_count", 0),
                     "engagement_score": (
-                        metrics.get("retweet_count", 0) * 3 +
-                        metrics.get("like_count", 0) * 1 +
-                        metrics.get("reply_count", 0) * 2
+                        metrics.get("retweet_count", 0) * 3
+                        + metrics.get("like_count", 0) * 1
+                        + metrics.get("reply_count", 0) * 2
                     ),
                     "sentiment": self._analyze_sentiment(item.get("text", "")),
                 }
@@ -224,7 +286,7 @@ class SocialProvider:
 
         for i, content in enumerate(contents[:max_entries]):
             # HTML tag'lerini temizle
-            clean_content = re.sub(r'<[^>]+>', '', content).strip()
+            clean_content = re.sub(r"<[^>]+>", "", content).strip()
             clean_content = clean_content.replace("&amp;", "&")
             clean_content = clean_content.replace("&lt;", "<")
             clean_content = clean_content.replace("&gt;", ">")
@@ -323,14 +385,9 @@ class SocialProvider:
                     "url": f"https://reddit.com{post_data.get('permalink', '')}",
                     "score": post_data.get("score", 0),
                     "num_comments": post_data.get("num_comments", 0),
-                    "created_at": datetime.fromtimestamp(
-                        post_data.get("created_utc", 0), tz=UTC
-                    ).isoformat(),
+                    "created_at": datetime.fromtimestamp(post_data.get("created_utc", 0), tz=UTC).isoformat(),
                     "sentiment": self._analyze_sentiment(content),
-                    "engagement_score": (
-                        post_data.get("score", 0) * 2 +
-                        post_data.get("num_comments", 0) * 3
-                    ),
+                    "engagement_score": (post_data.get("score", 0) * 2 + post_data.get("num_comments", 0) * 3),
                 }
                 posts.append(post)
 

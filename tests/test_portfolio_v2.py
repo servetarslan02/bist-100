@@ -194,11 +194,13 @@ def test_accounting_invariant():
 
     # Invariant kontrolü
     if not acc["invariant_check"]:
-        issues.append(f"EQUITY ≠ CASH + MARKET_VALUE: equity={acc['total_equity']}, cash={acc['cash']}, mv={acc['market_value']}")
+        issues.append(
+            f"EQUITY ≠ CASH + MARKET_VALUE: equity={acc['total_equity']}, cash={acc['cash']}, mv={acc['market_value']}"
+        )
 
     # Manuel doğrulama
-    expected_cash = 100000 - (100*250 + 50) - (200*100 + 30) - (150*80 + 25)
-    expected_mv = 100*260 + 200*95 + 150*85
+    expected_cash = 100000 - (100 * 250 + 50) - (200 * 100 + 30) - (150 * 80 + 25)
+    expected_mv = 100 * 260 + 200 * 95 + 150 * 85
     expected_equity = expected_cash + expected_mv
 
     if abs(acc["cash"] - expected_cash) > 0.01:
@@ -213,7 +215,7 @@ def test_accounting_invariant():
     # GARAN: (95-100)*200 = -1000
     # AKBNK: (85-80)*150 = 750
     # Net = 1000 - 1000 + 750 = 750
-    expected_unrealized = (260-250)*100 + (95-100)*200 + (85-80)*150
+    expected_unrealized = (260 - 250) * 100 + (95 - 100) * 200 + (85 - 80) * 150
     if abs(acc["unrealized_pnl"] - expected_unrealized) > 0.01:
         issues.append(f"Unrealized P&L yanlış: {acc['unrealized_pnl']} != {expected_unrealized}")
 
@@ -295,7 +297,7 @@ def test_no_negative_weight():
 
     # NaN fiyat
     pm2 = PortfolioManager(initial_capital=100000)
-    result = pm2.open_position("TEST", "LONG", 100, float('nan'))
+    result = pm2.open_position("TEST", "LONG", 100, float("nan"))
     if result.get("success"):
         issues.append("NaN fiyat ile pozisyon açıldı")
 
@@ -315,6 +317,7 @@ def test_no_negative_weight():
 # ============================================================
 # RUN ALL TESTS
 # ============================================================
+
 
 def main():
     print("=" * 60)

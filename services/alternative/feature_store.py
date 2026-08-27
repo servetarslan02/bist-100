@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class FeatureManifest:
     """Feature manifest — feature metadata."""
+
     feature_name: str
     version: str
     source: str
@@ -93,15 +94,17 @@ class FeatureStore:
         # Manifest'leri otomatik oluştur
         for name, _value in features.items():
             if name not in self._manifests:
-                self.register_feature(FeatureManifest(
-                    feature_name=name,
-                    version="v1",
-                    source=source,
-                    description=f"Auto-registered from {source}",
-                    dtype="float",
-                    range_min=-1000,
-                    range_max=1000,
-                ))
+                self.register_feature(
+                    FeatureManifest(
+                        feature_name=name,
+                        version="v1",
+                        source=source,
+                        description=f"Auto-registered from {source}",
+                        dtype="float",
+                        range_min=-1000,
+                        range_max=1000,
+                    )
+                )
 
     def get(
         self,
@@ -165,10 +168,7 @@ class FeatureStore:
     def list_features(self, source: str | None = None) -> list[str]:
         """Feature'ları listele."""
         if source:
-            return [
-                name for name, m in self._manifests.items()
-                if m.source == source
-            ]
+            return [name for name, m in self._manifests.items() if m.source == source]
         return list(self._manifests.keys())
 
     def get_stats(self) -> dict[str, Any]:
@@ -224,7 +224,6 @@ class FeatureStore:
             logger.info("Feature store loaded", path=load_path)
         except Exception as e:
             logger.warning("Failed to load feature store", path=load_path, error=str(e))
-
 
     def __del__(self):
         """Auto-save on garbage collection."""

@@ -14,17 +14,26 @@ import sys
 try:
     from pydantic import Field, field_validator, model_validator
     from pydantic_settings import BaseSettings, SettingsConfigDict
+
     _PYDANTIC_V2 = True
 except ImportError:
     from pydantic.v1 import BaseSettings, Field, root_validator, validator
+
     _PYDANTIC_V2 = False
 
 logger = logging.getLogger(__name__)
 
 # Insecure defaults that MUST NOT be used in production
 _INSECURE_VALUES = {
-    "change-this", "change-me", "password", "secret",
-    "alpha_secure_2026", "admin", "default", "", "test",
+    "change-this",
+    "change-me",
+    "password",
+    "secret",
+    "alpha_secure_2026",
+    "admin",
+    "default",
+    "",
+    "test",
 }
 
 _MIN_SECRET_LENGTH = 16
@@ -217,7 +226,7 @@ class Settings(BaseSettings):
 
             if errors:
                 error_msg = "\n".join(f"  - {e}" for e in errors)
-                logger.critical(f"\n{'='*60}\nPRODUCTION SECURITY VIOLATION:\n{error_msg}\n{'='*60}")
+                logger.critical(f"\n{'=' * 60}\nPRODUCTION SECURITY VIOLATION:\n{error_msg}\n{'=' * 60}")
                 sys.exit(1)
             return self
 
@@ -236,6 +245,7 @@ class Settings(BaseSettings):
             return v
 
     else:
+
         class Config:
             extra = "allow"
 
@@ -267,7 +277,7 @@ class Settings(BaseSettings):
 
             if errors:
                 error_msg = "\n".join(f"  - {e}" for e in errors)
-                logger.critical(f"\n{'='*60}\nPRODUCTION SECURITY VIOLATION:\n{error_msg}\n{'='*60}")
+                logger.critical(f"\n{'=' * 60}\nPRODUCTION SECURITY VIOLATION:\n{error_msg}\n{'=' * 60}")
                 sys.exit(1)
             return values
 

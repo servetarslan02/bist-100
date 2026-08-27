@@ -35,6 +35,7 @@ logger = structlog.get_logger()
 @dataclass
 class SystemState:
     """Sistem durumu snapshot'ı."""
+
     timestamp: datetime
     cash: float
     positions: dict[str, dict[str, Any]]
@@ -59,6 +60,7 @@ class SystemState:
 @dataclass
 class ReplayDecision:
     """Replay sırasında verilen karar."""
+
     timestamp: datetime
     ticker: str
     action: str  # BUY | SELL | HOLD | NO_ACTION
@@ -82,6 +84,7 @@ class ReplayDecision:
 @dataclass
 class AuditRecord:
     """Denetim kaydı."""
+
     event_id: str
     timestamp: datetime
     event_type: str  # market_data | signal | trade | decision | state_change
@@ -104,6 +107,7 @@ class AuditRecord:
 @dataclass
 class ReplaySnapshot:
     """Replay anlık durumu."""
+
     timestamp: datetime
     equity: float
     cash: float
@@ -186,10 +190,12 @@ class EnhancedReplayEngine:
         Returns:
             (decisions, trades, audit_trail)
         """
-        logger.info("Starting day replay",
-                    date=target_date.isoformat(),
-                    initial_cash=initial_state.cash,
-                    initial_positions=len(initial_state.positions))
+        logger.info(
+            "Starting day replay",
+            date=target_date.isoformat(),
+            initial_cash=initial_state.cash,
+            initial_positions=len(initial_state.positions),
+        )
 
         decisions = []
         trades = []
@@ -209,7 +215,7 @@ class EnhancedReplayEngine:
         positions = state["positions"]
 
         # Get day's market data
-        day_data = market_data.filter(pl.col('date') == target_date)
+        day_data = market_data.filter(pl.col("date") == target_date)
 
         if day_data.empty:
             logger.warning("No market data for date", date=target_date.isoformat())
@@ -235,16 +241,12 @@ class EnhancedReplayEngine:
         if feature_engine:
             for ticker in day_data["ticker"].unique():
                 # Sadece bu ana kadar olan veriyi kullan
-                available_data = market_data[
-                    (market_data["date"] <= target_date) &
-                    (market_data["ticker"] == ticker)
-                ]
+                available_data = market_data[(market_data["date"] <= target_date) & (market_data["ticker"] == ticker)]
                 try:
                     features = feature_engine(available_data, ticker, target_date)
                     features_by_ticker[ticker] = features
                 except Exception as e:
-                    logger.warning("Feature engine error",
-                                  ticker=ticker, error=str(e))
+                    logger.warning("Feature engine error", ticker=ticker, error=str(e))
 
         # Generate signals
         if signal_engine:
@@ -270,10 +272,8 @@ class EnhancedReplayEngine:
 
                     # Execute trades based on decisions
                     if decision.action == "BUY" and decision.score >= 70:
-                        price = day_data.filter(pl.col('ticker') == ticker)["close"][0]
-                        quantity = self._calculate_position_size(
-                            cash, price, decision.confidence
-                        )
+                        price = day_data.filter(pl.col("ticker") == ticker)["close"][0]
+                        quantity = self._calculate_position_size(cash, price, decision.confidence)
                         if quantity > 0:
                             trade = {
                                 "date": str(target_date),
@@ -298,7 +298,7 @@ class EnhancedReplayEngine:
                             )
 
                     elif decision.action == "SELL" and ticker in positions:
-                        price = day_data.filter(pl.col('ticker') == ticker)["close"][0]
+                        price = day_data.filter(pl.col("ticker") == ticker)["close"][0]
                         pos = positions[ticker]
                         trade = {
                             "date": str(target_date),
@@ -319,8 +319,7 @@ class EnhancedReplayEngine:
                         )
 
                 except Exception as e:
-                    logger.warning("Signal engine error",
-                                  ticker=ticker, error=str(e))
+                    logger.warning("Signal engine error", ticker=ticker, error=str(e))
 
         # Record end-of-day state
         self._record_event(
@@ -330,19 +329,22 @@ class EnhancedReplayEngine:
                 "type": "day_end",
                 "cash": cash,
                 "positions": len(positions),
-                "equity": cash + sum(
-                    p["quantity"] * day_data.filter(pl.col('ticker') == ticker)["close"][0]
+                "equity": cash
+                + sum(
+                    p["quantity"] * day_data.filter(pl.col("ticker") == ticker)["close"][0]
                     for t, p in positions.items()
-                    if not day_data.filter(pl.col('ticker') == ticker).empty
+                    if not day_data.filter(pl.col("ticker") == ticker).empty
                 ),
             },
         )
 
-        logger.info("Day replay complete",
-                    date=target_date.isoformat(),
-                    decisions=len(decisions),
-                    trades=len(trades),
-                    audit_events=len(self._audit_trail))
+        logger.info(
+            "Day replay complete",
+            date=target_date.isoformat(),
+            decisions=len(decisions),
+            trades=len(trades),
+            audit_events=len(self._audit_trail),
+        )
 
         return decisions, trades, self._audit_trail
 
@@ -372,19 +374,23 @@ class EnhancedReplayEngine:
             if key in actual_map:
                 act = actual_map[key]
                 if abs(exp.score - act.score) > tolerance:
-                    mismatches.append({
+                    mismatches.append(
+                        {
+                            "ticker": exp.ticker,
+                            "action": exp.action,
+                            "expected_score": round(exp.score, 2),
+                            "actual_score": round(act.score, 2),
+                            "difference": round(abs(exp.score - act.score), 4),
+                        }
+                    )
+            else:
+                mismatches.append(
+                    {
                         "ticker": exp.ticker,
                         "action": exp.action,
-                        "expected_score": round(exp.score, 2),
-                        "actual_score": round(act.score, 2),
-                        "difference": round(abs(exp.score - act.score), 4),
-                    })
-            else:
-                mismatches.append({
-                    "ticker": exp.ticker,
-                    "action": exp.action,
-                    "status": "missing_in_actual",
-                })
+                        "status": "missing_in_actual",
+                    }
+                )
 
         return {
             "total_expected": len(expected),
@@ -434,8 +440,7 @@ class EnhancedReplayEngine:
         for record in self._audit_trail:
             expected_hash = record.compute_hash(prev_hash)
             if record.hash_chain != expected_hash:
-                logger.error("Audit trail integrity violation",
-                           event_id=record.event_id)
+                logger.error("Audit trail integrity violation", event_id=record.event_id)
                 return False
             prev_hash = record.hash_chain
         return True

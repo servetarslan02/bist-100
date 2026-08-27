@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class DebateRound:
     """Tek tur tartışma sonucu."""
+
     round_num: int
     bull_direction: str = "NEUTRAL"
     bull_confidence: float = 0.0
@@ -56,6 +57,7 @@ class DebateRound:
 @dataclass
 class DebateResult:
     """Tartışma sonucu."""
+
     consensus: str  # LONG, SHORT, NEUTRAL, NO_TRADE
     consensus_confidence: float
     rounds: list[DebateRound]
@@ -217,12 +219,10 @@ class DebateEngine:
         """Tek tur tartışma çalıştır."""
 
         # Confidence damping
-        damping = self.confidence_damping ** round_num
+        damping = self.confidence_damping**round_num
 
         # === BULL ARGÜMAN ===
-        bull_prompt_vars = self._create_bull_prompt_vars(
-            round_num, ticker, context, bear_arg, history
-        )
+        bull_prompt_vars = self._create_bull_prompt_vars(round_num, ticker, context, bear_arg, history)
         bull_task = AgentTask(
             task_id=f"bull-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BULL,
@@ -237,9 +237,7 @@ class DebateEngine:
         bull_confidence = round(bull_result.confidence * damping, 4)
 
         # === BEAR CEVAP ===
-        bear_prompt_vars = self._create_bear_prompt_vars(
-            round_num, ticker, context, bull_result, history
-        )
+        bear_prompt_vars = self._create_bear_prompt_vars(round_num, ticker, context, bull_result, history)
         bear_task = AgentTask(
             task_id=f"bear-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BEAR,

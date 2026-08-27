@@ -20,8 +20,10 @@ import numpy as np
 
 # ===================== HELPERS =====================
 
+
 class MockModel:
     """Test için basit model — güçlü sinyal."""
+
     def __init__(self):
         self._coef = None
         self._bias = 0.0
@@ -60,6 +62,7 @@ def generate_test_data(n_samples=800, n_features=5, seed=42):
 
 # ===================== VERSION ID =====================
 
+
 def test_version_id_unique():
     """Her version ID benzersiz olmalı."""
     from services.learning.retrain_engine import RetrainEngine
@@ -90,12 +93,14 @@ def test_version_id_format():
 
 # ===================== WALK-FORWARD SPLITS =====================
 
+
 def test_wf_splits_generation():
     """Walk-forward split'ler doğru oluşuyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
     engine = RetrainEngine()
     from services.learning.config.learning_config import learning_settings
+
     cfg = learning_settings.retrain
 
     # 600 gün veri
@@ -117,6 +122,7 @@ def test_wf_splits_insufficient_data():
 
     engine = RetrainEngine()
     from services.learning.config.learning_config import learning_settings
+
     cfg = learning_settings.retrain
 
     # Çok az veri
@@ -133,6 +139,7 @@ def test_wf_splits_purge_embargo():
 
     engine = RetrainEngine()
     from services.learning.config.learning_config import learning_settings
+
     cfg = learning_settings.retrain
 
     dates = [datetime(2024, 1, 1) + timedelta(days=i) for i in range(600)]
@@ -151,6 +158,7 @@ def test_wf_splits_step_size():
 
     engine = RetrainEngine()
     from services.learning.config.learning_config import learning_settings
+
     cfg = learning_settings.retrain
 
     dates = [datetime(2024, 1, 1) + timedelta(days=i) for i in range(600)]
@@ -163,6 +171,7 @@ def test_wf_splits_step_size():
 
 
 # ===================== FEATURE PREPARATION =====================
+
 
 def test_prepare_features_dict():
     """Dict of arrays → matrix dönüşümü doğru mu?"""
@@ -228,6 +237,7 @@ def test_prepare_features_empty():
 
 # ===================== WF METRIC EVALUATION =====================
 
+
 def test_evaluate_wf_metrics_pass():
     """İyi metriklerle retrain kabul edilmeli."""
     from services.learning.config.learning_config import learning_settings
@@ -237,10 +247,15 @@ def test_evaluate_wf_metrics_pass():
     cfg = learning_settings.retrain
 
     metrics = WalkForwardMetrics(
-        avg_correlation=0.3, std_correlation=0.1,
-        avg_direction_accuracy=58.0, std_direction_accuracy=5.0,
-        avg_sharpe=1.5, deflated_sharpe=0.8,
-        total_splits=10, passed_splits=8, pass_rate=0.8,
+        avg_correlation=0.3,
+        std_correlation=0.1,
+        avg_direction_accuracy=58.0,
+        std_direction_accuracy=5.0,
+        avg_sharpe=1.5,
+        deflated_sharpe=0.8,
+        total_splits=10,
+        passed_splits=8,
+        pass_rate=0.8,
     )
 
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
@@ -258,10 +273,15 @@ def test_evaluate_wf_metrics_low_correlation():
     cfg = learning_settings.retrain
 
     metrics = WalkForwardMetrics(
-        avg_correlation=0.01, std_correlation=0.05,
-        avg_direction_accuracy=58.0, std_direction_accuracy=5.0,
-        avg_sharpe=1.5, deflated_sharpe=0.8,
-        total_splits=10, passed_splits=8, pass_rate=0.8,
+        avg_correlation=0.01,
+        std_correlation=0.05,
+        avg_direction_accuracy=58.0,
+        std_direction_accuracy=5.0,
+        avg_sharpe=1.5,
+        deflated_sharpe=0.8,
+        total_splits=10,
+        passed_splits=8,
+        pass_rate=0.8,
     )
 
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
@@ -279,10 +299,15 @@ def test_evaluate_wf_metrics_low_accuracy():
     cfg = learning_settings.retrain
 
     metrics = WalkForwardMetrics(
-        avg_correlation=0.3, std_correlation=0.1,
-        avg_direction_accuracy=48.0, std_direction_accuracy=5.0,
-        avg_sharpe=1.5, deflated_sharpe=0.8,
-        total_splits=10, passed_splits=8, pass_rate=0.8,
+        avg_correlation=0.3,
+        std_correlation=0.1,
+        avg_direction_accuracy=48.0,
+        std_direction_accuracy=5.0,
+        avg_sharpe=1.5,
+        deflated_sharpe=0.8,
+        total_splits=10,
+        passed_splits=8,
+        pass_rate=0.8,
     )
 
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
@@ -300,10 +325,15 @@ def test_evaluate_wf_metrics_low_pass_rate():
     cfg = learning_settings.retrain
 
     metrics = WalkForwardMetrics(
-        avg_correlation=0.3, std_correlation=0.1,
-        avg_direction_accuracy=58.0, std_direction_accuracy=5.0,
-        avg_sharpe=1.5, deflated_sharpe=0.8,
-        total_splits=10, passed_splits=2, pass_rate=0.2,
+        avg_correlation=0.3,
+        std_correlation=0.1,
+        avg_direction_accuracy=58.0,
+        std_direction_accuracy=5.0,
+        avg_sharpe=1.5,
+        deflated_sharpe=0.8,
+        total_splits=10,
+        passed_splits=2,
+        pass_rate=0.2,
     )
 
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
@@ -313,6 +343,7 @@ def test_evaluate_wf_metrics_low_pass_rate():
 
 
 # ===================== FULL RETRAIN =====================
+
 
 def test_full_retrain_success():
     """Tam retrain başarılı olmalı."""
@@ -334,9 +365,11 @@ def test_full_retrain_success():
     assert result.wf_metrics is not None
     assert result.training_samples > 0
     assert result.version_id.startswith("retrain_")
-    print(f"✅ Full retrain success: version={result.version_id}, "
-          f"samples={result.training_samples}, "
-          f"wf_corr={result.wf_metrics.avg_correlation}")
+    print(
+        f"✅ Full retrain success: version={result.version_id}, "
+        f"samples={result.training_samples}, "
+        f"wf_corr={result.wf_metrics.avg_correlation}"
+    )
 
 
 def test_full_retrain_insufficient_data():
@@ -400,6 +433,7 @@ def test_full_retrain_history():
 
 # ===================== REPORT =====================
 
+
 def test_retrain_report_empty():
     """Boş rapor doğru mu?"""
     from services.learning.retrain_engine import RetrainEngine
@@ -428,6 +462,7 @@ def test_retrain_report_after_retrain():
 
 # ===================== CONFIG INTEGRATION =====================
 
+
 def test_config_wf_params():
     """Walk-forward parametreleri config'den okunuyor mu?"""
     from services.learning.config.learning_config import learning_settings
@@ -455,6 +490,7 @@ def test_config_retrain_thresholds():
 
 
 # ===================== MAIN =====================
+
 
 def run_all_tests():
     tests = [
@@ -495,9 +531,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 3 TEST SONUÇLARI (Retrain Engine)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

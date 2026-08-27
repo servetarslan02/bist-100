@@ -31,13 +31,14 @@ logger = structlog.get_logger()
 
 class ConnectivityState(StrEnum):
     ONLINE = "ONLINE"
-    DEGRADED = "DEGRADED"      # Bazı endpoint'ler erişilebilir
+    DEGRADED = "DEGRADED"  # Bazı endpoint'ler erişilebilir
     OFFLINE = "OFFLINE"
 
 
 @dataclass
 class ConnectivityEvent:
     """Bağlantı olayı kaydı."""
+
     timestamp: float
     event_type: str  # "connected", "disconnected", "degraded"
     duration_seconds: float = 0.0
@@ -142,9 +143,11 @@ class ConnectivityMonitor:
             return
         self._running = True
         self._monitor_task = asyncio.create_task(self._monitor_loop())
-        logger.info("Connectivity monitor started",
-                    check_interval=self._check_interval,
-                    failure_threshold=self._failure_threshold)
+        logger.info(
+            "Connectivity monitor started",
+            check_interval=self._check_interval,
+            failure_threshold=self._failure_threshold,
+        )
 
     async def stop(self):
         """Arka plan izleyiciyi durdur."""
@@ -155,8 +158,7 @@ class ConnectivityMonitor:
                 await self._monitor_task
             except asyncio.CancelledError:
                 logger.warning("Timeout/cancellation in stop", exc_info=True)
-        logger.info("Connectivity monitor stopped",
-                    total_offline_seconds=round(self._total_offline_seconds, 1))
+        logger.info("Connectivity monitor stopped", total_offline_seconds=round(self._total_offline_seconds, 1))
 
     async def check_now(self) -> ConnectivityState:
         """Şu an bağlantı kontrolü yap (anlık)."""
@@ -230,9 +232,9 @@ class ConnectivityMonitor:
                 self._last_online_time = time.time()
 
                 self._log_event("connected", offline_duration)
-                logger.info("Internet restored",
-                           offline_seconds=round(offline_duration, 1),
-                           successful_endpoints=successful)
+                logger.info(
+                    "Internet restored", offline_seconds=round(offline_duration, 1), successful_endpoints=successful
+                )
 
                 # Online callback'leri çağır
                 for cb in self._on_online:
@@ -253,8 +255,7 @@ class ConnectivityMonitor:
                     self._offline_since = time.time()
                     self._state = ConnectivityState.OFFLINE
                     self._log_event("disconnected")
-                    logger.warning("Internet lost",
-                                  consecutive_failures=self._consecutive_failures)
+                    logger.warning("Internet lost", consecutive_failures=self._consecutive_failures)
 
                     # Offline callback'leri çağır
                     for cb in self._on_offline:
@@ -283,23 +284,23 @@ class ConnectivityMonitor:
         )
         self._event_log.append(event)
         if len(self._event_log) > self._max_event_log:
-            self._event_log = self._event_log[-self._max_event_log:]
+            self._event_log = self._event_log[-self._max_event_log :]
 
     def get_status(self) -> dict:
         """Durum bilgisi."""
         return {
             "state": self._state.value,
             "is_online": self.is_online,
-            "offline_since": datetime.fromtimestamp(
-                self._offline_since, tz=UTC
-            ).isoformat() if self._offline_since else None,
+            "offline_since": datetime.fromtimestamp(self._offline_since, tz=UTC).isoformat()
+            if self._offline_since
+            else None,
             "offline_duration_seconds": round(self.offline_duration_seconds, 1),
             "total_offline_seconds": round(self.total_offline_seconds, 1),
             "consecutive_failures": self._consecutive_failures,
             "consecutive_successes": self._consecutive_successes,
-            "last_check": datetime.fromtimestamp(
-                self._last_check_time, tz=UTC
-            ).isoformat() if self._last_check_time else None,
+            "last_check": datetime.fromtimestamp(self._last_check_time, tz=UTC).isoformat()
+            if self._last_check_time
+            else None,
             "recent_events": [
                 {
                     "type": e.event_type,

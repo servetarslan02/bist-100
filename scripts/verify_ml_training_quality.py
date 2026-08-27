@@ -17,7 +17,7 @@ import polars as pl
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 print("=" * 85)
 print("ALPHA BIST — MODEL VE MOTOR EĞİTİM METODOLOJİSİ VE ENTEGRASYON KANITI")
@@ -34,14 +34,16 @@ tickers = ["THYAO", "ASELS", "GARAN", "BIMAS"]
 rows = []
 for d in dates:
     for t in tickers:
-        rows.append({
-            "date": d,
-            "ticker": t,
-            "rsi_14": float(np.random.uniform(30, 70)),
-            "momentum_20d": float(np.random.normal(0, 5)),
-            "volume_zscore": float(np.random.normal(0, 1)),
-            "target_return_5d": float(np.random.normal(0.5, 3)),
-        })
+        rows.append(
+            {
+                "date": d,
+                "ticker": t,
+                "rsi_14": float(np.random.uniform(30, 70)),
+                "momentum_20d": float(np.random.normal(0, 5)),
+                "volume_zscore": float(np.random.normal(0, 1)),
+                "target_return_5d": float(np.random.normal(0.5, 3)),
+            }
+        )
 df_train = pl.DataFrame(rows)
 
 features_map = {}
@@ -67,7 +69,7 @@ report = validator.validate_dataset(
 )
 
 print(f"  ✓ Toplam Örneklem: {report.total_samples} satır | Geçerli: {report.valid_samples} satır")
-print(f"  ✓ Veri Kalite Skoru: %{report.quality_score*100:.1f}")
+print(f"  ✓ Veri Kalite Skoru: %{report.quality_score * 100:.1f}")
 print(f"  ✓ Benzersiz Tarih: {report.unique_dates} gün | Benzersiz Hisse: {report.unique_tickers} adet")
 print(f"  ✓ Sızıntı (Leakage / Overlap): {'YOK (TEMİZ)' if not report.train_test_overlap else 'VAR'}")
 print("  [BAŞARILI] Eğitim veri setinin temizliği, sıralaması ve sızıntısızlığı doğrulandı.")
@@ -80,9 +82,9 @@ from services.ml.walk_forward import WalkForwardValidation
 
 wf = WalkForwardValidation(
     train_size=60,  # 60 gün eğitim
-    test_size=20,   # 20 gün test
-    purge_size=5,   # 5 gün sızıntı önleme tamponu (Purge)
-    embargo_size=3, # 3 gün işlem gecikme tamponu (Embargo)
+    test_size=20,  # 20 gün test
+    purge_size=5,  # 5 gün sızıntı önleme tamponu (Purge)
+    embargo_size=3,  # 3 gün işlem gecikme tamponu (Embargo)
     step_size=20,
 )
 
@@ -102,7 +104,7 @@ print("\n[TEST 3] Asimetrik Finansal Kayıp Fonksiyonu (AdjustedMSELoss)...")
 from services.ml.adjusted_loss import AdjustedMSELoss
 
 loss_fn = AdjustedMSELoss(wrong_direction_penalty=11.0)
-y_true = np.array([+5.0, -5.0]) # Biri +%5 kazandırmış, biri -%5 kaybettirmiş
+y_true = np.array([+5.0, -5.0])  # Biri +%5 kazandırmış, biri -%5 kaybettirmiş
 
 # Durum A: Doğru yön tahmini (+ tahmin doğru yönde)
 y_pred_correct = np.array([+4.0, -4.0])
@@ -135,11 +137,11 @@ metrics = xgb_engine.train(
     X_val=X_val,
     y_val=y_val,
     horizon=5,
-    feature_names=["rsi_14", "momentum_20d", "volume_zscore"]
+    feature_names=["rsi_14", "momentum_20d", "volume_zscore"],
 )
 print("  ✓ Model Eğitim Durumu: TAMAMLANDI")
 print(f"  ✓ 5 Günlük Doğrulama AUC Skoru: {metrics.get('val_auc', 0.65):.3f}")
-print(f"  ✓ Doğru Yön Tahmin Oranı: %{metrics.get('val_accuracy', 0.62)*100:.1f}")
+print(f"  ✓ Doğru Yön Tahmin Oranı: %{metrics.get('val_accuracy', 0.62) * 100:.1f}")
 
 top_features = xgb_engine.feature_importance(horizon=5)
 if top_features:

@@ -3,6 +3,7 @@
 FinGPT sentiment + RL action + ML ranking birleşimi.
 Multi-signal fusion, dynamic weighting, conflict resolution.
 """
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class HybridSignal:
     """Hybrid sinyal sonucu."""
+
     action: str  # BUY, SELL, HOLD
     confidence: float
     ml_score: float
@@ -77,9 +79,9 @@ class HybridModel:
             HybridSignal
         """
         # Rejime göre ağırlıklar
-        weights = self._regime_weights.get(regime, {
-            "ml": self.ml_weight, "sentiment": self.sentiment_weight, "rl": self.rl_weight
-        })
+        weights = self._regime_weights.get(
+            regime, {"ml": self.ml_weight, "sentiment": self.sentiment_weight, "rl": self.rl_weight}
+        )
 
         # Sentiment'ı 0-1'e normalize et
         sentiment_normalized = (sentiment_score + 1) / 2  # -1..1 → 0..1
@@ -89,9 +91,7 @@ class HybridModel:
 
         # Weighted score
         weighted_score = (
-            ml_score * weights["ml"]
-            + sentiment_normalized * weights["sentiment"]
-            + rl_normalized * weights["rl"]
+            ml_score * weights["ml"] + sentiment_normalized * weights["sentiment"] + rl_normalized * weights["rl"]
         )
 
         # Conflict detection

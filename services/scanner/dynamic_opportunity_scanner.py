@@ -19,23 +19,24 @@ import yfinance as yf
 
 logger = logging.getLogger("alpha.scanner")
 
+
 class DynamicOpportunityScanner:
     def __init__(self):
         # Tarama parametreleri
-        self.min_volume = 1_000_000       # Min günlük hacim (TL)
+        self.min_volume = 1_000_000  # Min günlük hacim (TL)
         self.min_market_cap = 500_000_000  # Min piyasa değeri (TL)
-        self.max_results = 50             # Max sonuç sayısı
-        self.momentum_window = 20         # Momentum penceresi (gün)
-        self.volatility_window = 20       # Volatilite penceresi (gün)
-        self.rsi_period = 14              # RSI periyodu
-        self.rsi_oversold = 30            # RSI aşırı satım
-        self.rsi_overbought = 70          # RSI aşırı alım
-        self.macd_fast = 12               # MACD hızlı
-        self.macd_slow = 26               # MACD yavaş
-        self.macd_signal = 9              # MACD sinyal
-        self.bollinger_period = 20        # Bollinger periyodu
-        self.bollinger_std = 2.0          # Bollinger standart sapma
-        self.breakout_threshold = 0.02    # Kırılım eşiği %2
+        self.max_results = 50  # Max sonuç sayısı
+        self.momentum_window = 20  # Momentum penceresi (gün)
+        self.volatility_window = 20  # Volatilite penceresi (gün)
+        self.rsi_period = 14  # RSI periyodu
+        self.rsi_oversold = 30  # RSI aşırı satım
+        self.rsi_overbought = 70  # RSI aşırı alım
+        self.macd_fast = 12  # MACD hızlı
+        self.macd_slow = 26  # MACD yavaş
+        self.macd_signal = 9  # MACD sinyal
+        self.bollinger_period = 20  # Bollinger periyodu
+        self.bollinger_std = 2.0  # Bollinger standart sapma
+        self.breakout_threshold = 0.02  # Kırılım eşiği %2
         self.score_weights = {
             "momentum": 0.25,
             "volume": 0.20,
@@ -49,25 +50,75 @@ class DynamicOpportunityScanner:
         from ..ingestion.bist_universe import BISTUniverse
 
         uni = BISTUniverse()
-        tickers = getattr(uni, 'BIST_ALL_TICKERS', [])[:120]
+        tickers = getattr(uni, "BIST_ALL_TICKERS", [])[:120]
         if not tickers:
-            tickers = ["THYAO","GARAN","AKBNK","ISCTR","YKBNK","KCHOL","SAHOL","TUPRS","ASELS",
-                       "BIMAS","MGROS","TCELL","TTKOM","EREGL","KRDMD","SISE","FROTO","TOASO",
-                       "PGSUS","TAVHL","ENKAI","PETKM","CCOLA","HALKB","VAKBN","AKSEN","ENJSA",
-                       "ODAS","ZOREN","SOKM","TTRAK","OYAKC","ARCLK","EKGYO","MPARK","CIMSA",
-                       "AKCNS","VESTL","VESBE","BRSAN","ISDMR","TKFEN","AGHOL","AEFES","TSKB",
-                       "KLNMA","ISGYO","ALGYO","ULKER","BANVT","MAVI","PKART","BRISA","JANTS",
-                       "GUBRF","AFYON","ADEL","LOGO","BURCE","GLYHO","DOHOL"]
+            tickers = [
+                "THYAO",
+                "GARAN",
+                "AKBNK",
+                "ISCTR",
+                "YKBNK",
+                "KCHOL",
+                "SAHOL",
+                "TUPRS",
+                "ASELS",
+                "BIMAS",
+                "MGROS",
+                "TCELL",
+                "TTKOM",
+                "EREGL",
+                "KRDMD",
+                "SISE",
+                "FROTO",
+                "TOASO",
+                "PGSUS",
+                "TAVHL",
+                "ENKAI",
+                "PETKM",
+                "CCOLA",
+                "HALKB",
+                "VAKBN",
+                "AKSEN",
+                "ENJSA",
+                "ODAS",
+                "ZOREN",
+                "SOKM",
+                "TTRAK",
+                "OYAKC",
+                "ARCLK",
+                "EKGYO",
+                "MPARK",
+                "CIMSA",
+                "AKCNS",
+                "VESTL",
+                "VESBE",
+                "BRSAN",
+                "ISDMR",
+                "TKFEN",
+                "AGHOL",
+                "AEFES",
+                "TSKB",
+                "KLNMA",
+                "ISGYO",
+                "ALGYO",
+                "ULKER",
+                "BANVT",
+                "MAVI",
+                "PKART",
+                "BRISA",
+                "JANTS",
+                "GUBRF",
+                "AFYON",
+                "ADEL",
+                "LOGO",
+                "BURCE",
+                "GLYHO",
+                "DOHOL",
+            ]
 
         yf_tickers = [f"{t}.IS" for t in tickers]
         raw = yf.download(
-            yf_tickers,
-            period="6mo",
-            interval="1d",
-            group_by="ticker",
-            auto_adjust=True,
-            progress=False,
-            threads=True
+            yf_tickers, period="6mo", interval="1d", group_by="ticker", auto_adjust=True, progress=False, threads=True
         )
 
         opportunities = []
@@ -111,6 +162,7 @@ class DynamicOpportunityScanner:
 
                 # 10/10 Gelişmiş Mum ve Price Action Analizi
                 from ..intelligence.candle_patterns import candle_engine
+
                 candle_res = candle_engine.analyze_dataframe(df, t)
 
                 score = int(round(candle_res.candle_score * 0.4 + 50 * 0.6))
@@ -194,38 +246,41 @@ class DynamicOpportunityScanner:
                 stop_loss = round(p_now * (1 - stop_pct / 100), 2)
                 rr_ratio = round(target_pct / stop_pct, 2)
 
-                opportunities.append({
-                    "ticker": t,
-                    "symbol": t,
-                    "name": t,
-                    "price": round(p_now, 2),
-                    "change_pct": change_pct,
-                    "score": score,
-                    "direction": "LONG",
-                    "signal": signal_type,
-                    "signal_type": signal_type,
-                    "spec_category": category,
-                    "spec_reason": reason,
-                    "candle_patterns": patterns,
-                    "buyer_pressure_pct": candle_res.buyer_pressure_pct,
-                    "seller_pressure_pct": candle_res.seller_pressure_pct,
-                    "expected_return_pct": target_pct,
-                    "target_price": target_price,
-                    "target_price_2": round(p_now * (1 + (target_pct * 1.6) / 100), 2),
-                    "stop_loss": stop_loss,
-                    "risk_reward_ratio": rr_ratio,
-                    "rsi": round(rsi, 1),
-                    "volume_ratio": vol_ratio,
-                    "momentum_1m": round(mom_1m, 1),
-                    "momentum_3m": round(mom_3m, 1),
-                    "horizon": "SHORT" if target_pct <= 18 else "MID",
-                    "risk_level": "LOW" if stop_pct <= 4.5 else ("MEDIUM" if stop_pct <= 6.0 else "HIGH"),
-                })
+                opportunities.append(
+                    {
+                        "ticker": t,
+                        "symbol": t,
+                        "name": t,
+                        "price": round(p_now, 2),
+                        "change_pct": change_pct,
+                        "score": score,
+                        "direction": "LONG",
+                        "signal": signal_type,
+                        "signal_type": signal_type,
+                        "spec_category": category,
+                        "spec_reason": reason,
+                        "candle_patterns": patterns,
+                        "buyer_pressure_pct": candle_res.buyer_pressure_pct,
+                        "seller_pressure_pct": candle_res.seller_pressure_pct,
+                        "expected_return_pct": target_pct,
+                        "target_price": target_price,
+                        "target_price_2": round(p_now * (1 + (target_pct * 1.6) / 100), 2),
+                        "stop_loss": stop_loss,
+                        "risk_reward_ratio": rr_ratio,
+                        "rsi": round(rsi, 1),
+                        "volume_ratio": vol_ratio,
+                        "momentum_1m": round(mom_1m, 1),
+                        "momentum_3m": round(mom_3m, 1),
+                        "horizon": "SHORT" if target_pct <= 18 else "MID",
+                        "risk_level": "LOW" if stop_pct <= 4.5 else ("MEDIUM" if stop_pct <= 6.0 else "HIGH"),
+                    }
+                )
 
             except Exception:
                 continue
 
         opportunities.sort(key=lambda x: x["score"], reverse=True)
         return opportunities[:limit]
+
 
 dynamic_scanner = DynamicOpportunityScanner()

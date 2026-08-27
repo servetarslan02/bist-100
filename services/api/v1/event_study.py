@@ -48,14 +48,16 @@ _EVENTS_CACHE = [
         "impact_score": 78,
         "sentiment": "NEUTRAL",
         "timestamp": "Bugün 09:15",
-    }
+    },
 ]
 _EVENTS_CACHE_TIME = 0.0
+
 
 async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
     """Canlı KAP, Finans Haberleri ve Makro takvim verilerini çeker."""
     global _EVENTS_CACHE, _EVENTS_CACHE_TIME
     import time
+
     now = time.time()
 
     if not ticker and _EVENTS_CACHE and (now - _EVENTS_CACHE_TIME < 60):
@@ -87,6 +89,7 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
 
             # BIST ve Türkiye Makro ile sıfır ilgisi olan üçüncü dünya/yerel gürültüleri filtrele
             from ...ingestion.providers.news_provider import is_relevant_to_bist_and_macro
+
             if not is_relevant_to_bist_and_macro(title, summary):
                 continue
 
@@ -96,18 +99,24 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
             seen_titles.add(norm_t)
 
             src = item.get("source", "Finans Akışı")
-            if "bloomberght" in src.lower(): src = "BloombergHT"
-            elif "bigpara" in src.lower(): src = "Bigpara"
-            elif "investing" in src.lower(): src = "Investing.com"
-            elif "dunya" in src.lower(): src = "Dünya Gazetesi"
-            elif "trt" in src.lower(): src = "TRT Finans"
+            if "bloomberght" in src.lower():
+                src = "BloombergHT"
+            elif "bigpara" in src.lower():
+                src = "Bigpara"
+            elif "investing" in src.lower():
+                src = "Investing.com"
+            elif "dunya" in src.lower():
+                src = "Dünya Gazetesi"
+            elif "trt" in src.lower():
+                src = "TRT Finans"
 
             # Doğru ve Hassas Ticker Eşleme (Sıfır Yanlış Pozitif)
             matched = item.get("ticker") or item.get("matched_ticker")
             if not matched and not ticker:
                 import re
+
                 # 1. KAP Yıldız Formatı: *** BOBET *** veya (BOBET) veya BOBET:
-                kap_stars = re.search(r'\*\*\*\s*([A-Z0-9]{3,6})\s*\*\*\*', title)
+                kap_stars = re.search(r"\*\*\*\s*([A-Z0-9]{3,6})\s*\*\*\*", title)
                 if kap_stars:
                     cand = kap_stars.group(1).upper()
                     if cand in tickers_set and cand not in {"KAP", "BIST", "BISTECH", "DEVRE", "KESICI", "BORSA"}:
@@ -115,15 +124,33 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
 
                 # 2. Parantez Formatı: (THYAO) veya THYAO:
                 if not matched:
-                    paren_m = re.search(r'\(([A-Z0-9]{3,6})\)', title)
+                    paren_m = re.search(r"\(([A-Z0-9]{3,6})\)", title)
                     if paren_m:
                         cand = paren_m.group(1).upper()
-                        if cand in tickers_set and cand not in {"KAP", "BIST", "FED", "ECB", "TCMB", "TÜİK", "USD", "EUR", "TRY"}:
+                        if cand in tickers_set and cand not in {
+                            "KAP",
+                            "BIST",
+                            "FED",
+                            "ECB",
+                            "TCMB",
+                            "TÜİK",
+                            "USD",
+                            "EUR",
+                            "TRY",
+                        }:
                             matched = cand
 
                 # 3. Tanınmış Şirket Marka ve Türkçe Unvan Eşleşmeleri
                 if not matched:
-                    title_norm = title.lower().replace("ı", "i").replace("ğ", "g").replace("ü", "u").replace("ş", "s").replace("ö", "o").replace("ç", "c")
+                    title_norm = (
+                        title.lower()
+                        .replace("ı", "i")
+                        .replace("ğ", "g")
+                        .replace("ü", "u")
+                        .replace("ş", "s")
+                        .replace("ö", "o")
+                        .replace("ç", "c")
+                    )
                     brand_dict = {
                         "THYAO": ["turk hava yollari", "thy"],
                         "ASELS": ["aselsan"],
@@ -160,18 +187,20 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
                         "ENJSA": ["enerjisa"],
                     }
                     for sym, aliases in brand_dict.items():
-                        if any(re.search(r'\b' + re.escape(alias) + r'\b', title_norm) for alias in aliases):
+                        if any(re.search(r"\b" + re.escape(alias) + r"\b", title_norm) for alias in aliases):
                             matched = sym
                             break
 
             sent = item.get("sentiment_score")
             if sent is None:
                 from ...ingestion.providers.news_provider import compute_financial_sentiment
+
                 sent = compute_financial_sentiment(title, item.get("summary", ""))
 
             pub_epoch = item.get("published_epoch", 0.0)
             if pub_epoch > 0:
                 from datetime import timedelta, timezone
+
                 tr_tz = timezone(timedelta(hours=3))
                 pub_time = datetime.fromtimestamp(pub_epoch, tz=UTC).astimezone(tr_tz).strftime("%d.%m %H:%M")
             else:
@@ -182,16 +211,59 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
             if not event_type:
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
                 macro_keywords = [
-                    "tcmb", "merkez bankası", "fed", "ecb", "faiz", "enflasyon", "tüik",
-                    "ppk", "politika faizi", "rezerv", "cari", "hazine", "bütçe", "döviz",
-                    "dolar", "ihracat", "ithalat", "işsizlik", "istihdam", "büyüme", "gdp",
-                    "makro", "küresel piyasa", "wall street", "almanya", "brezilya", "ab'den",
-                    "petrol", "hürmüz", "tahmin", "para politikası", "tüketici", "üretici"
+                    "tcmb",
+                    "merkez bankası",
+                    "fed",
+                    "ecb",
+                    "faiz",
+                    "enflasyon",
+                    "tüik",
+                    "ppk",
+                    "politika faizi",
+                    "rezerv",
+                    "cari",
+                    "hazine",
+                    "bütçe",
+                    "döviz",
+                    "dolar",
+                    "ihracat",
+                    "ithalat",
+                    "işsizlik",
+                    "istihdam",
+                    "büyüme",
+                    "gdp",
+                    "makro",
+                    "küresel piyasa",
+                    "wall street",
+                    "almanya",
+                    "brezilya",
+                    "ab'den",
+                    "petrol",
+                    "hürmüz",
+                    "tahmin",
+                    "para politikası",
+                    "tüketici",
+                    "üretici",
                 ]
                 kap_keywords = [
-                    "kap", "bildirimi", "pay alım", "pay satım", "sermaye", "temettü",
-                    "genel kurul", "finansal sonuç", "bilanço", "özel durum", "ihale",
-                    "anlaşma", "sipariş", "şirket", "şirketler", "gong", "ortaklık", "satın alma"
+                    "kap",
+                    "bildirimi",
+                    "pay alım",
+                    "pay satım",
+                    "sermaye",
+                    "temettü",
+                    "genel kurul",
+                    "finansal sonuç",
+                    "bilanço",
+                    "özel durum",
+                    "ihale",
+                    "anlaşma",
+                    "sipariş",
+                    "şirket",
+                    "şirketler",
+                    "gong",
+                    "ortaklık",
+                    "satın alma",
                 ]
 
                 if any(k in text_check for k in macro_keywords):
@@ -201,18 +273,20 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
                 else:
                     event_type = "NEWS"
 
-            events.append({
-                "id": str(idx),
-                "timestamp": pub_time,
-                "epoch": pub_epoch,
-                "type": event_type,
-                "source": src,
-                "title": title,
-                "ticker": matched or ticker,
-                "sentiment": sent,
-                "importance": 0.85 if (matched or event_type in ("KAP", "MACRO")) else 0.65,
-                "link": item.get("link", "#"),
-            })
+            events.append(
+                {
+                    "id": str(idx),
+                    "timestamp": pub_time,
+                    "epoch": pub_epoch,
+                    "type": event_type,
+                    "source": src,
+                    "title": title,
+                    "ticker": matched or ticker,
+                    "sentiment": sent,
+                    "importance": 0.85 if (matched or event_type in ("KAP", "MACRO")) else 0.65,
+                    "link": item.get("link", "#"),
+                }
+            )
 
         if not ticker and events:
             _EVENTS_CACHE = events
@@ -227,9 +301,7 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
 @router.get("/events")
 @router.get("/calendar")
 async def event_calendar(
-    ticker: str | None = Query(default=None),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    ticker: str | None = Query(default=None), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ):
     """Canlı olay akışı ve KAP bildirim takvimi (629 Hisse destekli)."""
     events = await _get_live_events(ticker=ticker)
@@ -253,9 +325,9 @@ async def event_study(
         sym_is = f"{sym}.IS" if not sym.endswith(".IS") else sym
 
         data = yf.download([sym_is, "XU100.IS"], period="3mo", interval="1d", auto_adjust=True, progress=False)
-        if not data.empty and 'Close' in data:
-            stock_close = data['Close'][sym_is].dropna()
-            bm_close = data['Close']['XU100.IS'].dropna()
+        if not data.empty and "Close" in data:
+            stock_close = data["Close"][sym_is].dropna()
+            bm_close = data["Close"]["XU100.IS"].dropna()
 
             if len(stock_close) >= 20 and len(bm_close) >= 20:
                 s_ret = stock_close.pct_change().dropna()
@@ -266,6 +338,7 @@ async def event_study(
                 excess = s_ret.loc[common_idx] - b_ret.loc[common_idx]
 
                 import math
+
                 car_val = float(excess.tail(10).sum())
                 t_stat = float(car_val / (excess.std() * np.sqrt(10) + 1e-9))
                 p_val = round(float(2 * (1 - 0.5 * (1 + math.erf(abs(t_stat) / np.sqrt(2))))), 3)

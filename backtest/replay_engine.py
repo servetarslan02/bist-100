@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class ReplayConfig:
     """Replay konfigürasyonu."""
+
     start_date: datetime
     end_date: datetime
     initial_capital: float = 100000
@@ -31,6 +32,7 @@ class ReplayConfig:
 @dataclass
 class ReplayEvent:
     """Replay sırasında oluşan olay."""
+
     timestamp: datetime
     event_type: str
     data: dict[str, Any]
@@ -39,6 +41,7 @@ class ReplayEvent:
 @dataclass
 class ReplayTrade:
     """Replay sırasında yapılan işlem."""
+
     timestamp: datetime
     ticker: str
     side: str  # BUY / SELL
@@ -53,6 +56,7 @@ class ReplayTrade:
 @dataclass
 class ReplayResult:
     """Replay sonucu."""
+
     config: ReplayConfig
     trades: list[ReplayTrade]
     equity_curve: list[tuple[datetime, float]]
@@ -75,8 +79,9 @@ class ReplayEngine:
         self._handlers[event_type] = handler
         return self
 
-    def run(self, config: ReplayConfig, historical_data: pl.DataFrame,
-            events: list[ReplayEvent] | None = None) -> ReplayResult:
+    def run(
+        self, config: ReplayConfig, historical_data: pl.DataFrame, events: list[ReplayEvent] | None = None
+    ) -> ReplayResult:
         """
         Replay çalıştır.
 
@@ -85,10 +90,7 @@ class ReplayEngine:
             historical_data: OHLCV verisi (timestamp, ticker, open, high, low, close, volume)
             events: Opsiyonel historical events (KAP, haber vb.)
         """
-        logger.info("Starting replay",
-                    start=config.start_date,
-                    end=config.end_date,
-                    data_points=len(historical_data))
+        logger.info("Starting replay", start=config.start_date, end=config.end_date, data_points=len(historical_data))
 
         # Initialize
         capital = config.initial_capital
@@ -102,10 +104,7 @@ class ReplayEngine:
         data = historical_data.sort("timestamp")
 
         # Filter to replay window
-        data = data.filter(
-            (pl.col("timestamp") >= config.start_date) &
-            (pl.col("timestamp") <= config.end_date)
-        )
+        data = data.filter((pl.col("timestamp") >= config.start_date) & (pl.col("timestamp") <= config.end_date))
 
         # Merge events if provided
         event_queue = sorted(events or [], key=lambda e: e.timestamp)
@@ -113,8 +112,7 @@ class ReplayEngine:
         # Get unique timestamps
         timestamps = data["timestamp"].unique().sort()
 
-        logger.info("Replay window", timestamps=len(timestamps),
-                    data_points=len(data))
+        logger.info("Replay window", timestamps=len(timestamps), data_points=len(data))
 
         # Process each timestamp
         for ts in timestamps:
@@ -133,13 +131,16 @@ class ReplayEngine:
                 handler = self._handlers.get(event.event_type)
                 if handler:
                     try:
-                        handler(event, {
-                            "available_data": available_data,
-                            "current_prices": current_prices,
-                            "positions": positions,
-                            "cash": cash,
-                            "timestamp": ts,
-                        })
+                        handler(
+                            event,
+                            {
+                                "available_data": available_data,
+                                "current_prices": current_prices,
+                                "positions": positions,
+                                "cash": cash,
+                                "timestamp": ts,
+                            },
+                        )
                     except Exception as e:
                         logger.warning("Event handler error", event_type=event.event_type, error=str(e))
 
@@ -147,20 +148,21 @@ class ReplayEngine:
             handler = self._handlers.get("market.tick")
             if handler:
                 try:
-                    result = handler(None, {
-                        "available_data": available_data,
-                        "current_prices": current_prices,
-                        "positions": positions,
-                        "cash": cash,
-                        "timestamp": ts,
-                    })
+                    result = handler(
+                        None,
+                        {
+                            "available_data": available_data,
+                            "current_prices": current_prices,
+                            "positions": positions,
+                            "cash": cash,
+                            "timestamp": ts,
+                        },
+                    )
 
                     # Handle trades
                     if result and "trades" in result:
                         for trade_data in result["trades"]:
-                            trade = self._execute_trade(
-                                trade_data, current_prices, config, ts
-                            )
+                            trade = self._execute_trade(trade_data, current_prices, config, ts)
                             if trade:
                                 trades.append(trade)
                                 if trade.side == "BUY":
@@ -192,10 +194,12 @@ class ReplayEngine:
         # Calculate metrics
         metrics = self._calculate_metrics(equity_curve, trades, config)
 
-        logger.info("Replay complete",
-                    trades=len(trades),
-                    final_equity=equity_curve[-1][1] if equity_curve else 0,
-                    return_pct=metrics.get("total_return_pct", 0))
+        logger.info(
+            "Replay complete",
+            trades=len(trades),
+            final_equity=equity_curve[-1][1] if equity_curve else 0,
+            return_pct=metrics.get("total_return_pct", 0),
+        )
 
         return ReplayResult(
             config=config,
@@ -205,8 +209,9 @@ class ReplayEngine:
             predictions=predictions,
         )
 
-    def _execute_trade(self, trade_data: dict, prices: dict[str, float],
-                       config: ReplayConfig, timestamp: datetime) -> ReplayTrade | None:
+    def _execute_trade(
+        self, trade_data: dict, prices: dict[str, float], config: ReplayConfig, timestamp: datetime
+    ) -> ReplayTrade | None:
         """İşlemi simüle et (slippage + commission)."""
         ticker = trade_data.get("ticker")
         side = trade_data.get("side")
@@ -237,9 +242,9 @@ class ReplayEngine:
             signal_type=signal_type,
         )
 
-    def _calculate_metrics(self, equity_curve: list[tuple[datetime, float]],
-                           trades: list[ReplayTrade],
-                           config: ReplayConfig) -> dict[str, float]:
+    def _calculate_metrics(
+        self, equity_curve: list[tuple[datetime, float]], trades: list[ReplayTrade], config: ReplayConfig
+    ) -> dict[str, float]:
         """Performans metrikleri hesapla."""
         if not equity_curve:
             return {}
@@ -292,7 +297,7 @@ class ReplayEngine:
         # Profit factor
         gross_profit = sum(r for r in returns if r > 0)
         gross_loss = abs(sum(r for r in returns if r < 0))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         return {
             "total_return_pct": round(total_return, 2),
@@ -310,21 +315,22 @@ class ReplayEngine:
 # Walk-Forward Validation
 # =====================================================
 
+
 class WalkForwardValidator:
     """
     Purged Walk-Forward Validation.
     Train/test split'leri zaman bazlı, purge ve embargo ile.
     """
 
-    def __init__(self, train_months: int = 12, test_months: int = 1,
-                 purge_days: int = 5, embargo_days: int = 5):
+    def __init__(self, train_months: int = 12, test_months: int = 1, purge_days: int = 5, embargo_days: int = 5):
         self.train_months = train_months
         self.test_months = test_months
         self.purge_days = purge_days
         self.embargo_days = embargo_days
 
-    def split(self, data: pl.DataFrame, date_column: str = "timestamp"
-              ) -> list[tuple[pl.DataFrame, pl.DataFrame, datetime, datetime]]:
+    def split(
+        self, data: pl.DataFrame, date_column: str = "timestamp"
+    ) -> list[tuple[pl.DataFrame, pl.DataFrame, datetime, datetime]]:
         """
         Walk-forward split'leri üret.
 
@@ -344,25 +350,17 @@ class WalkForwardValidator:
             embargo_start = current_test_start - timedelta(days=self.embargo_days)
 
             # Train: train_start'tan train_end'e kadar
-            train = data.filter(
-                (pl.col(date_column) >= train_start) &
-                (pl.col(date_column) <= train_end)
-            )
+            train = data.filter((pl.col(date_column) >= train_start) & (pl.col(date_column) <= train_end))
 
             # Test: current_test_start'tan test_end'e kadar
-            test = data.filter(
-                (pl.col(date_column) >= current_test_start) &
-                (pl.col(date_column) <= test_end)
-            )
+            test = data.filter((pl.col(date_column) >= current_test_start) & (pl.col(date_column) <= test_end))
 
             # Purge: train_end ile current_test_start arasındaki veriyi çıkar
             # (zaten filtrelenmiş)
 
             # Embargo: train sonuna yakın veriyi çıkar
             if self.embargo_days > 0:
-                train = train.filter(
-                    pl.col(date_column) < embargo_start
-                )
+                train = train.filter(pl.col(date_column) < embargo_start)
 
             if len(train) > 100 and len(test) > 20:
                 splits.append((train, test, current_test_start, test_end))
@@ -372,9 +370,9 @@ class WalkForwardValidator:
         logger.info("Walk-forward splits generated", count=len(splits))
         return splits
 
-    def validate(self, data: pl.DataFrame, feature_names: list[str],
-                 target_column: str, date_column: str = "timestamp"
-                 ) -> dict[str, Any]:
+    def validate(
+        self, data: pl.DataFrame, feature_names: list[str], target_column: str, date_column: str = "timestamp"
+    ) -> dict[str, Any]:
         """
         Walk-forward validation çalıştır.
 
@@ -405,8 +403,13 @@ class WalkForwardValidator:
 
             # Train
             model = lgb.LGBMRegressor(
-                n_estimators=200, max_depth=5, learning_rate=0.05,
-                subsample=0.8, colsample_bytree=0.8, random_state=42, verbose=-1
+                n_estimators=200,
+                max_depth=5,
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                random_state=42,
+                verbose=-1,
             )
             model.fit(X_train, y_train)
 
@@ -425,17 +428,19 @@ class WalkForwardValidator:
             else:
                 sharpe = 0
 
-            results.append({
-                "split": i,
-                "test_start": test_start.isoformat(),
-                "test_end": test_end.isoformat(),
-                "train_samples": len(X_train),
-                "test_samples": len(X_test),
-                "rmse": round(rmse, 4),
-                "r2": round(r2, 4),
-                "direction_accuracy": round(dir_acc, 1),
-                "sharpe": round(sharpe, 3),
-            })
+            results.append(
+                {
+                    "split": i,
+                    "test_start": test_start.isoformat(),
+                    "test_end": test_end.isoformat(),
+                    "train_samples": len(X_train),
+                    "test_samples": len(X_test),
+                    "rmse": round(rmse, 4),
+                    "r2": round(r2, 4),
+                    "direction_accuracy": round(dir_acc, 1),
+                    "sharpe": round(sharpe, 3),
+                }
+            )
 
         # Aggregate
         if results:

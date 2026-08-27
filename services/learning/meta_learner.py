@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class ModelPerformance:
     """Model performans kaydı."""
+
     model_id: str
     regime: str
     sharpe: float
@@ -55,14 +56,16 @@ class MetaLearner:
             self._regime_performance[regime][model_id] = scores[-500:]
         self._current_regime = regime
 
-        self._model_history.append(ModelPerformance(
-            model_id=model_id,
-            regime=regime,
-            sharpe=metrics.get("sharpe", 0),
-            win_rate=metrics.get("win_rate", 0),
-            ic=metrics.get("ic", 0),
-            timestamp=datetime.now(UTC).isoformat(),
-        ))
+        self._model_history.append(
+            ModelPerformance(
+                model_id=model_id,
+                regime=regime,
+                sharpe=metrics.get("sharpe", 0),
+                win_rate=metrics.get("win_rate", 0),
+                ic=metrics.get("ic", 0),
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
 
     def select_best_model(self, regime: str) -> str | None:
         """Rejim için en iyi modeli seç."""
@@ -75,7 +78,7 @@ class MetaLearner:
 
         for model_id, scores in self._regime_performance[regime].items():
             if scores:
-                recent = scores[-cfg.regime_performance_window:]
+                recent = scores[-cfg.regime_performance_window :]
                 avg_score = np.mean(recent)
                 if avg_score > best_score:
                     best_score = avg_score
@@ -96,7 +99,7 @@ class MetaLearner:
         for model in models:
             if regime in self._regime_performance and model in self._regime_performance[regime]:
                 scores = self._regime_performance[regime][model]
-                recent = scores[-cfg.regime_performance_window:]
+                recent = scores[-cfg.regime_performance_window :]
                 avg_sharpe = np.mean(recent) if recent else 0
             else:
                 avg_sharpe = 0
@@ -116,10 +119,7 @@ class MetaLearner:
         cfg = learning_settings.meta_learning
 
         # Son performansları al
-        recent_perfs = [
-            p for p in self._model_history
-            if p.model_id == model_id
-        ][-60:]
+        recent_perfs = [p for p in self._model_history if p.model_id == model_id][-60:]
 
         if len(recent_perfs) < 30:
             return {"decay_predicted": False, "reason": "Insufficient data"}

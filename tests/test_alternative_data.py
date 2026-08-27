@@ -49,6 +49,7 @@ logger = structlog.get_logger(__name__)
 # HELPERS
 # =====================================================
 
+
 def create_mock_social_data():
     return {
         "sentiment": 0.65,
@@ -115,6 +116,7 @@ def run_async(coro):
 # =====================================================
 # FAZ 0: BASE INFRASTRUCTURE
 # =====================================================
+
 
 class TestFaz0_RateLimiter:
     """Rate limiter test'leri."""
@@ -243,6 +245,7 @@ class TestFaz0_AdapterRegistry:
 # FAZ 1: LEGACY FEATURE FUNCTIONS
 # =====================================================
 
+
 class TestFaz1_LegacyFeatures:
     """Legacy feature fonksiyonları test'leri."""
 
@@ -288,6 +291,7 @@ class TestFaz1_LegacyFeatures:
 # =====================================================
 # FAZ 2: ADAPTERS
 # =====================================================
+
 
 class TestFaz2_BKMAdapter:
     """BKM adapter test'leri."""
@@ -409,6 +413,7 @@ class TestFaz2_EksiSozlukAdapter:
 # FAZ 3: LLM SENTIMENT
 # =====================================================
 
+
 class TestFaz3_LLMSentiment:
     """LLM sentiment test'leri."""
 
@@ -445,6 +450,7 @@ class TestFaz3_LLMSentiment:
 # FAZ 4: FEATURE ENGINE
 # =====================================================
 
+
 class TestFaz4_FeatureEngine:
     """Feature engine test'leri."""
 
@@ -480,6 +486,7 @@ class TestFaz4_FeatureEngine:
 # =====================================================
 # FAZ 5: ENTEGRASYON
 # =====================================================
+
 
 class TestFaz5_InvestingAdapter:
     """Investing.com adapter test'leri."""
@@ -552,6 +559,7 @@ class TestFaz5_SatelliteAdapter:
     def test_company_locations(self):
         """Önemli şirketlerin lokasyon tanımları olmalı."""
         from services.alternative.satellite_adapter import COMPANY_LOCATIONS
+
         assert "THYAO" in COMPANY_LOCATIONS
         assert "EREGL" in COMPANY_LOCATIONS
         assert "ASELS" in COMPANY_LOCATIONS
@@ -615,15 +623,17 @@ class TestFaz5_FeatureStore:
 
     def test_register_feature(self):
         store = FeatureStore()
-        store.register_feature(FeatureManifest(
-            feature_name="test_feature",
-            version="v1",
-            source="test",
-            description="Test feature",
-            dtype="float",
-            range_min=-1,
-            range_max=1,
-        ))
+        store.register_feature(
+            FeatureManifest(
+                feature_name="test_feature",
+                version="v1",
+                source="test",
+                description="Test feature",
+                dtype="float",
+                range_min=-1,
+                range_max=1,
+            )
+        )
         assert "test_feature" in store.list_features()
 
     def test_stats(self):
@@ -656,6 +666,7 @@ class TestFaz5_Integration:
             kariyer_net_adapter,
             reconciler,
         )
+
         assert BaseAdapter is not None
         assert RateLimiter is not None
         assert CircuitBreaker is not None

@@ -3,6 +3,7 @@
 TCMB faiz kararı, enflasyon, GSYH, cari açık, USDTRY reaksiyonu.
 MacKinlay (1997) metodolojisi ile detaylı makro event study.
 """
+
 from typing import Any
 
 import numpy as np
@@ -319,9 +320,7 @@ def analyze_macro_events_batch(
     }
 
 
-def _check_rate_inflation_consistency(
-    rate: float, inflation: float | None
-) -> str:
+def _check_rate_inflation_consistency(rate: float, inflation: float | None) -> str:
     """Faiz-enflasyon tutarlılığı kontrolü."""
     if inflation is None:
         return "UNKNOWN"

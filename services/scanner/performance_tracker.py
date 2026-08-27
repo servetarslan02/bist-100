@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class ScanMetric:
     """Tek tarama metriği."""
+
     scan_type: str
     timestamp: float
     tickers_scanned: int
@@ -36,6 +37,7 @@ class ScanMetric:
 @dataclass
 class SignalOutcome:
     """Sinyal sonucu (performans takibi için)."""
+
     ticker: str
     signal_type: str
     direction: str
@@ -100,7 +102,7 @@ class ScanPerformanceTracker:
 
         # Limit kontrolü
         if len(self._scan_metrics) > self._max_history:
-            self._scan_metrics = self._scan_metrics[-self._max_history:]
+            self._scan_metrics = self._scan_metrics[-self._max_history :]
 
     def record_signal_outcome(self, outcome: SignalOutcome):
         """Sinyal sonucu kaydet (geriye dönük doğrulama).
@@ -113,7 +115,7 @@ class ScanPerformanceTracker:
             self._signal_outcomes = self._signal_outcomes[-5000:]
 
         if len(self._signal_outcomes) > self._max_history:
-            self._signal_outcomes = self._signal_outcomes[-self._max_history:]
+            self._signal_outcomes = self._signal_outcomes[-self._max_history :]
 
     def get_stats(self, scan_type: str = None) -> dict[str, Any]:
         """Tarama istatistikleri.
@@ -135,10 +137,7 @@ class ScanPerformanceTracker:
         recent = metrics[-100:]  # Son 100 tarama
 
         durations = [m.duration_ms for m in recent]
-        hit_rates = [
-            m.opportunities_found / max(m.tickers_scanned, 1)
-            for m in recent
-        ]
+        hit_rates = [m.opportunities_found / max(m.tickers_scanned, 1) for m in recent]
         opportunities = [m.opportunities_found for m in recent]
         signals = [m.signals_generated for m in recent]
 
@@ -178,9 +177,7 @@ class ScanPerformanceTracker:
             stats["total_opportunities"] += metric.opportunities_found
             stats["total_signals"] += metric.signals_generated
             stats["durations"].append(metric.duration_ms)
-            stats["hit_rates"].append(
-                metric.opportunities_found / max(metric.tickers_scanned, 1)
-            )
+            stats["hit_rates"].append(metric.opportunities_found / max(metric.tickers_scanned, 1))
 
         # İstatistikleri hesapla
         result = {}
@@ -267,19 +264,18 @@ class ScanPerformanceTracker:
 
             accuracy = stats["correct"] / stats["count"] * 100
             avg_return = np.mean(stats["returns"])
-            sharpe = (
-                np.mean(stats["returns"]) / np.std(stats["returns"])
-                if np.std(stats["returns"]) > 0 else 0
-            )
+            sharpe = np.mean(stats["returns"]) / np.std(stats["returns"]) if np.std(stats["returns"]) > 0 else 0
 
-            ranked.append({
-                "signal_type": sig,
-                "total_signals": stats["count"],
-                "accuracy_pct": round(accuracy, 2),
-                "avg_return_pct": round(avg_return, 2),
-                "total_return_pct": round(stats["total_return"], 2),
-                "sharpe_ratio": round(sharpe, 2),
-            })
+            ranked.append(
+                {
+                    "signal_type": sig,
+                    "total_signals": stats["count"],
+                    "accuracy_pct": round(accuracy, 2),
+                    "avg_return_pct": round(avg_return, 2),
+                    "total_return_pct": round(stats["total_return"], 2),
+                    "sharpe_ratio": round(sharpe, 2),
+                }
+            )
 
         # Sharpe ratio'ya göre sırala
         ranked.sort(key=lambda x: x["sharpe_ratio"], reverse=True)

@@ -36,19 +36,21 @@ logger = structlog.get_logger()
 
 class CircuitState(StrEnum):
     """Circuit breaker durumları."""
-    CLOSED = "CLOSED"         # Normal — istekler geçiyor
-    OPEN = "OPEN"             # Açık — istekler engelleniyor
-    HALF_OPEN = "HALF_OPEN"   # Yarı açık — test istekleri geçiyor
+
+    CLOSED = "CLOSED"  # Normal — istekler geçiyor
+    OPEN = "OPEN"  # Açık — istekler engelleniyor
+    HALF_OPEN = "HALF_OPEN"  # Yarı açık — test istekleri geçiyor
 
 
 @dataclass
 class CircuitStats:
     """Circuit breaker istatistikleri."""
+
     total_requests: int = 0
     total_successes: int = 0
     total_failures: int = 0
-    total_rejected: int = 0      # OPEN iken reddedilen
-    total_fallbacks: int = 0     # Fallback kullanılan
+    total_rejected: int = 0  # OPEN iken reddedilen
+    total_fallbacks: int = 0  # Fallback kullanılan
     consecutive_failures: int = 0
     consecutive_successes: int = 0
     last_failure_time: float | None = None
@@ -112,10 +114,9 @@ class CircuitBreaker:
             self._half_open_calls = 0
             self._stats.consecutive_successes = 0
 
-        logger.info("Circuit breaker state change",
-                    name=self.name,
-                    old_state=old_state.value,
-                    new_state=new_state.value)
+        logger.info(
+            "Circuit breaker state change", name=self.name, old_state=old_state.value, new_state=new_state.value
+        )
 
     def record_success(self):
         """Başarı kaydet."""
@@ -172,9 +173,7 @@ class CircuitBreaker:
     async def call(self, func: Callable, *args, **kwargs) -> Any:
         """Async fonksiyonu circuit breaker ile çağır."""
         if not self.can_execute():
-            raise CircuitBreakerError(
-                f"Circuit breaker '{self.name}' is OPEN"
-            )
+            raise CircuitBreakerError(f"Circuit breaker '{self.name}' is OPEN")
 
         try:
             result = await func(*args, **kwargs)
@@ -186,8 +185,10 @@ class CircuitBreaker:
 
     def protect(self, func: Callable) -> Callable:
         """Decorator — async fonksiyonu circuit breaker ile sar."""
+
         async def wrapper(*args, **kwargs):
             return await self.call(func, *args, **kwargs)
+
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
         return wrapper
@@ -200,9 +201,7 @@ class CircuitBreaker:
 
         async def __aenter__(self):
             if not self._cb.can_execute():
-                raise CircuitBreakerError(
-                    f"Circuit breaker '{self._cb.name}' is OPEN"
-                )
+                raise CircuitBreakerError(f"Circuit breaker '{self._cb.name}' is OPEN")
             return self
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -229,16 +228,14 @@ class CircuitBreaker:
             "total_successes": self._stats.total_successes,
             "total_failures": self._stats.total_failures,
             "total_rejected": self._stats.total_rejected,
-            "success_rate": round(
-                self._stats.total_successes / max(self._stats.total_requests, 1), 3
-            ),
+            "success_rate": round(self._stats.total_successes / max(self._stats.total_requests, 1), 3),
             "state_changes": self._stats.state_changes,
-            "last_failure": datetime.fromtimestamp(
-                self._stats.last_failure_time, tz=UTC
-            ).isoformat() if self._stats.last_failure_time else None,
-            "last_success": datetime.fromtimestamp(
-                self._stats.last_success_time, tz=UTC
-            ).isoformat() if self._stats.last_success_time else None,
+            "last_failure": datetime.fromtimestamp(self._stats.last_failure_time, tz=UTC).isoformat()
+            if self._stats.last_failure_time
+            else None,
+            "last_success": datetime.fromtimestamp(self._stats.last_success_time, tz=UTC).isoformat()
+            if self._stats.last_success_time
+            else None,
         }
 
     def reset(self):
@@ -272,10 +269,7 @@ class CircuitBreakerManager:
 
     def get_all_states(self) -> dict:
         """Tüm circuit breaker durumları."""
-        return {
-            name: cb.get_state()
-            for name, cb in self._breakers.items()
-        }
+        return {name: cb.get_state() for name, cb in self._breakers.items()}
 
     def reset_all(self):
         """Tümünü sıfırla."""

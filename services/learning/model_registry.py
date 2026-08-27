@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class ModelRecord:
     """Model kayıt kaydı."""
+
     model_id: str
     version: str
     created_at: str
@@ -143,10 +144,12 @@ class ModelRegistry:
         """Performans kaydı ekle."""
         record = self._get_version(version)
         if record:
-            record.performance_history.append({
-                "timestamp": datetime.now(UTC).isoformat(),
-                **metrics,
-            })
+            record.performance_history.append(
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    **metrics,
+                }
+            )
 
     def get_report(self) -> dict[str, Any]:
         """Rapor."""
@@ -181,11 +184,10 @@ class ModelRegistry:
 
         # Eski retired'ları sil
         if len(retired) > cfg.max_versions:
-            to_remove = sorted(retired, key=lambda r: r.created_at)[:len(retired) - cfg.max_versions]
+            to_remove = sorted(retired, key=lambda r: r.created_at)[: len(retired) - cfg.max_versions]
             for r in to_remove:
                 self._records.remove(r)
                 logger.debug("Cleaned up old version", version=r.version)
-
 
     def cleanup_old_versions(self, keep_last: int = 20):
         """Eski versiyonları temizle.

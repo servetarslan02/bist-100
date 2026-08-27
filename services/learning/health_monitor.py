@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class ModuleHealth:
     """Modül sağlık durumu."""
+
     module: str
     status: str  # HEALTHY, WARNING, CRITICAL, DEGRADED, RESTARTING
     last_check: str
@@ -34,6 +35,7 @@ class ModuleHealth:
 @dataclass
 class HealthReport:
     """Kapsamlı sağlık raporu."""
+
     timestamp: str
     overall_status: str
     modules: dict[str, ModuleHealth]
@@ -69,7 +71,9 @@ class HealthReport:
         raise KeyError(key)
 
     def __contains__(self, key: str) -> bool:
-        return key in ["status", "uptime_hours", "error_count", "total_errors", "pending_restarts"] or hasattr(self, key)
+        return key in ["status", "uptime_hours", "error_count", "total_errors", "pending_restarts"] or hasattr(
+            self, key
+        )
 
     def get(self, key: str, default: Any = None) -> Any:
         try:
@@ -146,11 +150,13 @@ class LearningHealthMonitor:
 
     def record_error(self, module: str, error: str):
         """Hata kaydet."""
-        self._error_history.append({
-            "module": module,
-            "error": error,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._error_history.append(
+            {
+                "module": module,
+                "error": error,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._error_history) > 1000:
             self._error_history = self._error_history[-1000:]
 
@@ -176,6 +182,7 @@ class LearningHealthMonitor:
         """Prediction tracking sağlık kontrolü."""
         try:
             from services.learning.integrated_learning import learning_system
+
             stats = learning_system.get_stats()
             status = "HEALTHY" if stats.get("total_predictions", 0) > 0 else "WARNING"
         except Exception as e:
@@ -188,7 +195,9 @@ class LearningHealthMonitor:
             status=status,
             last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "prediction_tracking"),
-            last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "prediction_tracking"), None),
+            last_error=next(
+                (e["error"] for e in reversed(self._error_history) if e["module"] == "prediction_tracking"), None
+            ),
             uptime_hours=(datetime.now(UTC) - self._start_time).total_seconds() / 3600,
         )
 
@@ -196,6 +205,7 @@ class LearningHealthMonitor:
         """Outcome tracking sağlık kontrolü."""
         try:
             from services.learning.outcome_tracker import outcome_tracker
+
             outcome_tracker.get_stats()
             status = "HEALTHY"
         except Exception as e:
@@ -207,7 +217,9 @@ class LearningHealthMonitor:
             status=status,
             last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "outcome_tracking"),
-            last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "outcome_tracking"), None),
+            last_error=next(
+                (e["error"] for e in reversed(self._error_history) if e["module"] == "outcome_tracking"), None
+            ),
             uptime_hours=0,
         )
 
@@ -215,6 +227,7 @@ class LearningHealthMonitor:
         """Calibration sağlık kontrolü."""
         try:
             from services.learning.calibration import confidence_calibrator
+
             report = confidence_calibrator.get_calibration_report()
             status = "HEALTHY" if report.get("status") == "OK" else "WARNING"
         except Exception as e:
@@ -234,6 +247,7 @@ class LearningHealthMonitor:
         """Drift detection sağlık kontrolü."""
         try:
             from services.learning.drift_detector import advanced_drift_detector
+
             report = advanced_drift_detector.get_drift_report()
             status = "WARNING" if report.get("overall_drift") else "HEALTHY"
         except Exception as e:
@@ -245,7 +259,9 @@ class LearningHealthMonitor:
             status=status,
             last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "drift_detection"),
-            last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "drift_detection"), None),
+            last_error=next(
+                (e["error"] for e in reversed(self._error_history) if e["module"] == "drift_detection"), None
+            ),
             uptime_hours=0,
         )
 
@@ -253,6 +269,7 @@ class LearningHealthMonitor:
         """Model performans sağlık kontrolü."""
         try:
             from services.learning.learning_loop import learning_loop
+
             state = learning_loop.get_state()
             if state.get("retrain_needed"):
                 status = "WARNING"
@@ -269,7 +286,9 @@ class LearningHealthMonitor:
             status=status,
             last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "model_performance"),
-            last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "model_performance"), None),
+            last_error=next(
+                (e["error"] for e in reversed(self._error_history) if e["module"] == "model_performance"), None
+            ),
             uptime_hours=0,
         )
 
@@ -278,6 +297,7 @@ class LearningHealthMonitor:
         # Basit: feature_tracker'a bak
         try:
             from services.learning.feature_tracker import feature_importance_tracker
+
             report = feature_importance_tracker.get_report()
             status = "HEALTHY" if report.get("total_records", 0) > 0 else "WARNING"
         except Exception as e:
@@ -289,10 +309,11 @@ class LearningHealthMonitor:
             status=status,
             last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "feature_pipeline"),
-            last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "feature_pipeline"), None),
+            last_error=next(
+                (e["error"] for e in reversed(self._error_history) if e["module"] == "feature_pipeline"), None
+            ),
             uptime_hours=0,
         )
-
 
     def auto_heal(self, health_report: dict[str, Any] = None):
         """Otomatik onarım — hatalı modülleri onarmaya çalış.
@@ -342,6 +363,7 @@ class LearningHealthMonitor:
                 self.request_restart(module)
             elif action == "retrain":
                 from services.learning.retrain_engine import retrain_engine
+
                 retrain_engine._retrain_count = 0  # Reset
                 logger.info("Retrain triggered by auto-heal")
             elif action == "fallback":
@@ -354,7 +376,6 @@ class LearningHealthMonitor:
                 logger.info("Retry with backoff for", module=module)
         except Exception as e:
             logger.error("Healing action failed", module=module, action=action, error=str(e))
-
 
 
 # Singleton

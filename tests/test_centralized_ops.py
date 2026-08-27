@@ -27,15 +27,19 @@ from services.core.monitoring_security import JWTProvider
 # POLICY MANAGEMENT TESTS
 # =====================================================
 
+
 async def test_policy_update_via_api():
     """Policy API üzerinden güncellenebilmeli."""
     issues = []
 
     policy = AlertPolicy()
-    result = policy.update({
-        "escalation_timeouts": {"cash_negative": 999},
-        "notification_routing": {"CRITICAL": ["log"]},
-    }, actor="test")
+    result = policy.update(
+        {
+            "escalation_timeouts": {"cash_negative": 999},
+            "notification_routing": {"CRITICAL": ["log"]},
+        },
+        actor="test",
+    )
 
     if not result.get("success"):
         issues.append(f"Update başarısız: {result}")
@@ -210,6 +214,7 @@ async def test_policy_persist_to_file():
 # DB SILENCE TESTS
 # =====================================================
 
+
 async def test_silence_db_persist():
     """Silence DB'ye persist edilmeli."""
     issues = []
@@ -228,8 +233,11 @@ async def test_silence_db_persist():
 
     policy = AlertPolicy()
     policy.add_silence(
-        alert_type="test", duration_s=3600,
-        reason="maintenance", created_by="admin", db=db,
+        alert_type="test",
+        duration_s=3600,
+        reason="maintenance",
+        created_by="admin",
+        db=db,
     )
 
     # DB'den oku
@@ -264,7 +272,7 @@ async def test_silence_db_load():
     db.execute(
         "INSERT INTO alert_silences (alert_type, fingerprint, start_time, end_time, reason, created_by, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ("cash_negative", None, time.time(), time.time() + 3600, "test", "admin", time.time())
+        ("cash_negative", None, time.time(), time.time() + 3600, "test", "admin", time.time()),
     )
     db.commit()
 
@@ -334,12 +342,12 @@ async def test_silence_db_load_only_active():
     # Aktif silence
     db.execute(
         "INSERT INTO alert_silences (alert_type, start_time, end_time, reason) VALUES (?, ?, ?, ?)",
-        ("active", time.time(), time.time() + 3600, "active")
+        ("active", time.time(), time.time() + 3600, "active"),
     )
     # Süresi dolmuş silence
     db.execute(
         "INSERT INTO alert_silences (alert_type, start_time, end_time, reason) VALUES (?, ?, ?, ?)",
-        ("expired", time.time() - 3600, time.time() - 1, "expired")
+        ("expired", time.time() - 3600, time.time() - 1, "expired"),
     )
     db.commit()
 
@@ -384,6 +392,7 @@ async def test_silence_audit_trail():
 # JWKS KEY ROTATION TESTS
 # =====================================================
 
+
 async def test_jwks_key_rotation():
     """Key rotation durumunda eski key ile token reddedilmeli."""
     issues = []
@@ -398,8 +407,7 @@ async def test_jwks_key_rotation():
     provider = JWTProvider(secret=secret1, algorithm="HS256")
 
     token_v1 = pyjwt.encode(
-        {"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 3600},
-        secret1, algorithm="HS256"
+        {"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 3600}, secret1, algorithm="HS256"
     )
 
     result = await provider.verify(token_v1)
@@ -417,8 +425,7 @@ async def test_jwks_key_rotation():
 
     # Yeni key ile token kabul edilmeli
     token_v2 = pyjwt.encode(
-        {"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 3600},
-        secret2, algorithm="HS256"
+        {"sub": "u1", "roles": ["admin"], "exp": int(time.time()) + 3600}, secret2, algorithm="HS256"
     )
     result_new = await provider.verify(token_v2)
     if not result_new.authenticated:
@@ -432,9 +439,7 @@ async def test_jwks_cache_invalidation():
     issues = []
 
     provider = JWTProvider(
-        secret="test", algorithm="RS256",
-        jwks_url="https://example.com/.well-known/jwks.json",
-        jwks_cache_ttl_s=60
+        secret="test", algorithm="RS256", jwks_url="https://example.com/.well-known/jwks.json", jwks_cache_ttl_s=60
     )
 
     # Cache TTL kontrolü
@@ -471,7 +476,8 @@ async def test_jwks_provider_without_url():
 
     token = pyjwt.encode(
         {"sub": "u1", "roles": ["viewer"], "exp": int(time.time()) + 100},
-        secret, algorithm="HS256"  # HS256 ile imzala
+        secret,
+        algorithm="HS256",  # HS256 ile imzala
     )
 
     # RS256 provider ama secret fallback
@@ -495,10 +501,7 @@ async def test_jwt_token_with_expired_signature():
     provider = JWTProvider(secret=secret)
 
     # Expired token
-    expired = pyjwt.encode(
-        {"sub": "u", "roles": [], "exp": int(time.time()) - 3600},
-        secret, algorithm="HS256"
-    )
+    expired = pyjwt.encode({"sub": "u", "roles": [], "exp": int(time.time()) - 3600}, secret, algorithm="HS256")
 
     result = await provider.verify(expired)
     if result.authenticated:
@@ -507,10 +510,7 @@ async def test_jwt_token_with_expired_signature():
         issues.append(f"Error: {result.error}")
 
     # Geçerli token
-    valid = pyjwt.encode(
-        {"sub": "u", "roles": ["admin"], "exp": int(time.time()) + 3600},
-        secret, algorithm="HS256"
-    )
+    valid = pyjwt.encode({"sub": "u", "roles": ["admin"], "exp": int(time.time()) + 3600}, secret, algorithm="HS256")
 
     result2 = await provider.verify(valid)
     if not result2.authenticated:
@@ -522,6 +522,7 @@ async def test_jwt_token_with_expired_signature():
 # =====================================================
 # INTEGRATION TESTS
 # =====================================================
+
 
 async def test_alerting_with_policy_and_silence():
     """Alerting + policy + silence entegrasyonu."""
@@ -582,6 +583,7 @@ async def test_alerting_with_policy_and_silence():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

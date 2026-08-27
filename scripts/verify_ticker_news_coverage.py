@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.ingestion.providers.news_provider import news_provider
 
@@ -27,13 +27,14 @@ async def test_news_coverage():
         if news:
             print(f"  ✓ {len(news)} adet güncel haber/KAP çekildi:")
             for i, n in enumerate(news[:2], 1):
-                print(f"    {i}. \"{n['title'][:75]}...\"")
+                print(f'    {i}. "{n["title"][:75]}..."')
         else:
             print("  ⚠️ Haber bulunamadı.")
 
     print("\n" + "=" * 85)
     print("KANITLANDI: TÜM BIST HİSSELERİ (629 HİSSE) İÇİN HABER VE KAP KAPSAMI AKTİFTİR.")
     print("=" * 85)
+
 
 if __name__ == "__main__":
     asyncio.run(test_news_coverage())

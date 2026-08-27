@@ -131,7 +131,7 @@ def test_streaming_anomaly():
 
     # 1. Normal fiyat — anomali yok
     for i in range(20):
-        detector.check_price("TEST", 100 + i * 0.1, 100 + (i-1) * 0.1)
+        detector.check_price("TEST", 100 + i * 0.1, 100 + (i - 1) * 0.1)
     result = detector.check_price("TEST", 102.0, 101.9)
     assert not result.is_anomaly
     passed += 1
@@ -192,6 +192,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

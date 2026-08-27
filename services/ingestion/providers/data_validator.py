@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class ValidationResult:
     """Doğrulama sonucu."""
+
     ticker: str
     canonical_price: float
     sources: dict[str, float]  # source -> price
@@ -58,8 +59,12 @@ class DataValidator:
         """
         if not prices:
             return ValidationResult(
-                ticker=ticker, canonical_price=0, sources=prices,
-                is_consistent=False, max_deviation_pct=100, quality_score=0,
+                ticker=ticker,
+                canonical_price=0,
+                sources=prices,
+                is_consistent=False,
+                max_deviation_pct=100,
+                quality_score=0,
                 warnings=["No price data from any source"],
             )
 
@@ -84,9 +89,7 @@ class DataValidator:
         if not is_consistent:
             for source, dev in deviations.items():
                 if dev > self.MAX_DEVIATION_PCT:
-                    warnings.append(
-                        f"{source}: {dev:.2f}% deviation from canonical"
-                    )
+                    warnings.append(f"{source}: {dev:.2f}% deviation from canonical")
 
         if len(prices) < 2:
             warnings.append("Only single source available — no cross-validation")
@@ -114,9 +117,7 @@ class DataValidator:
 
         return weighted_sum / total_weight if total_weight > 0 else 0
 
-    def _compute_quality_score(
-        self, prices: dict[str, float], deviations: dict[str, float]
-    ) -> float:
+    def _compute_quality_score(self, prices: dict[str, float], deviations: dict[str, float]) -> float:
         """Kalite skoru (0-1)."""
         score = 1.0
 
@@ -139,9 +140,7 @@ class DataValidator:
 
         return score
 
-    def validate_batch(
-        self, data: dict[str, dict[str, float]]
-    ) -> dict[str, ValidationResult]:
+    def validate_batch(self, data: dict[str, dict[str, float]]) -> dict[str, ValidationResult]:
         """
         Toplu doğrulama.
 
@@ -155,16 +154,11 @@ class DataValidator:
             results[ticker] = self.validate_price(ticker, prices)
         return results
 
-    def get_quality_report(
-        self, results: dict[str, ValidationResult]
-    ) -> dict[str, Any]:
+    def get_quality_report(self, results: dict[str, ValidationResult]) -> dict[str, Any]:
         """Kalite raporu."""
         total = len(results)
         consistent = sum(1 for r in results.values() if r.is_consistent)
-        avg_quality = (
-            sum(r.quality_score for r in results.values()) / total
-            if total > 0 else 0
-        )
+        avg_quality = sum(r.quality_score for r in results.values()) / total if total > 0 else 0
         warnings = []
         for r in results.values():
             warnings.extend(r.warnings)

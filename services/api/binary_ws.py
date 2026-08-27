@@ -32,6 +32,7 @@ import structlog
 
 try:
     import websockets
+
     HAS_WEBSOCKETS = True
 except ImportError:
     HAS_WEBSOCKETS = False
@@ -39,6 +40,7 @@ except ImportError:
 # Protobuf imports — gRPC ile aynı generated kod
 try:
     from ..grpc.generated import market_pb2
+
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -58,15 +60,15 @@ class ProtobufMessage:
 
     # Mesaj tipi mapping (StreamMessage.MessageType enum)
     TYPE_MAP = {
-        "tick": 0,      # TICK
-        "ohlcv": 1,     # OHLCV
-        "signal": 2,    # SIGNAL
-        "portfolio": 3, # PORTFOLIO
-        "risk": 4,      # RISK
-        "regime": 5,    # REGIME
-        "event": 6,     # EVENT
-        "alert": 7,     # ALERT
-        "heartbeat": 8, # HEARTBEAT
+        "tick": 0,  # TICK
+        "ohlcv": 1,  # OHLCV
+        "signal": 2,  # SIGNAL
+        "portfolio": 3,  # PORTFOLIO
+        "risk": 4,  # RISK
+        "regime": 5,  # REGIME
+        "event": 6,  # EVENT
+        "alert": 7,  # ALERT
+        "heartbeat": 8,  # HEARTBEAT
     }
 
     _sequence: int = 0
@@ -77,13 +79,22 @@ class ProtobufMessage:
         return cls._sequence
 
     @classmethod
-    def encode_tick(cls, ticker: str, price: float, change: float,
-                    change_pct: float, volume: int, bid: float = 0,
-                    ask: float = 0, timestamp: int = 0) -> bytes:
+    def encode_tick(
+        cls,
+        ticker: str,
+        price: float,
+        change: float,
+        change_pct: float,
+        volume: int,
+        bid: float = 0,
+        ask: float = 0,
+        timestamp: int = 0,
+    ) -> bytes:
         """MarketTick → Protobuf binary."""
         if not HAS_PROTOBUF:
-            return cls._fallback_encode("tick", ticker=ticker, price=price,
-                                        change=change, volume=volume, timestamp=timestamp)
+            return cls._fallback_encode(
+                "tick", ticker=ticker, price=price, change=change, volume=volume, timestamp=timestamp
+            )
 
         tick = market_pb2.MarketTick(
             ticker=ticker,
@@ -104,13 +115,22 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_ohlcv(cls, ticker: str, open_p: float, high: float,
-                     low: float, close: float, volume: int,
-                     timeframe: str = "1m", timestamp: int = 0) -> bytes:
+    def encode_ohlcv(
+        cls,
+        ticker: str,
+        open_p: float,
+        high: float,
+        low: float,
+        close: float,
+        volume: int,
+        timeframe: str = "1m",
+        timestamp: int = 0,
+    ) -> bytes:
         """OHLCV → Protobuf binary."""
         if not HAS_PROTOBUF:
-            return cls._fallback_encode("ohlcv", ticker=ticker, open=open_p,
-                                        high=high, low=low, close=close, volume=volume)
+            return cls._fallback_encode(
+                "ohlcv", ticker=ticker, open=open_p, high=high, low=low, close=close, volume=volume
+            )
 
         ohlcv = market_pb2.OHLCV(
             ticker=ticker,
@@ -131,13 +151,21 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_signal(cls, ticker: str, direction: str, confidence: float,
-                      target_price: float, stop_loss: float,
-                      reason: str = "", timestamp: int = 0) -> bytes:
+    def encode_signal(
+        cls,
+        ticker: str,
+        direction: str,
+        confidence: float,
+        target_price: float,
+        stop_loss: float,
+        reason: str = "",
+        timestamp: int = 0,
+    ) -> bytes:
         """Signal → Protobuf binary."""
         if not HAS_PROTOBUF:
-            return cls._fallback_encode("signal", ticker=ticker, direction=direction,
-                                        confidence=confidence, timestamp=timestamp)
+            return cls._fallback_encode(
+                "signal", ticker=ticker, direction=direction, confidence=confidence, timestamp=timestamp
+            )
 
         direction_map = {"BUY": 0, "SELL": 1, "HOLD": 2}
         signal = market_pb2.Signal(
@@ -158,24 +186,32 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_portfolio(cls, total_value: float, cash: float,
-                         daily_pnl: float, daily_pnl_pct: float,
-                         positions: list = None, timestamp: int = 0) -> bytes:
+    def encode_portfolio(
+        cls,
+        total_value: float,
+        cash: float,
+        daily_pnl: float,
+        daily_pnl_pct: float,
+        positions: list = None,
+        timestamp: int = 0,
+    ) -> bytes:
         """PortfolioState → Protobuf binary."""
         if not HAS_PROTOBUF:
             return cls._fallback_encode("portfolio", total_value=total_value, cash=cash)
 
         proto_positions = []
-        for p in (positions or []):
-            proto_positions.append(market_pb2.Position(
-                ticker=p.get("ticker", ""),
-                quantity=int(p.get("quantity", 0)),
-                avg_price=float(p.get("avg_price", 0)),
-                current_price=float(p.get("current_price", 0)),
-                pnl=float(p.get("pnl", 0)),
-                pnl_pct=float(p.get("pnl_pct", 0)),
-                weight=float(p.get("weight", 0)),
-            ))
+        for p in positions or []:
+            proto_positions.append(
+                market_pb2.Position(
+                    ticker=p.get("ticker", ""),
+                    quantity=int(p.get("quantity", 0)),
+                    avg_price=float(p.get("avg_price", 0)),
+                    current_price=float(p.get("current_price", 0)),
+                    pnl=float(p.get("pnl", 0)),
+                    pnl_pct=float(p.get("pnl_pct", 0)),
+                    weight=float(p.get("weight", 0)),
+                )
+            )
 
         portfolio = market_pb2.PortfolioState(
             total_value=total_value,
@@ -194,9 +230,16 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_risk(cls, var_95: float, cvar_95: float, sharpe: float,
-                    max_drawdown: float, volatility: float, beta: float,
-                    timestamp: int = 0) -> bytes:
+    def encode_risk(
+        cls,
+        var_95: float,
+        cvar_95: float,
+        sharpe: float,
+        max_drawdown: float,
+        volatility: float,
+        beta: float,
+        timestamp: int = 0,
+    ) -> bytes:
         """RiskMetrics → Protobuf binary."""
         if not HAS_PROTOBUF:
             return cls._fallback_encode("risk", var_95=var_95, sharpe=sharpe)
@@ -219,15 +262,19 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_regime(cls, regime: str, confidence: float, vix: float = 0,
-                      breadth: float = 0, timestamp: int = 0) -> bytes:
+    def encode_regime(
+        cls, regime: str, confidence: float, vix: float = 0, breadth: float = 0, timestamp: int = 0
+    ) -> bytes:
         """MarketRegime → Protobuf binary."""
         if not HAS_PROTOBUF:
             return cls._fallback_encode("regime", regime=regime, confidence=confidence)
 
         regime_map = {
-            "BULL_TREND": 0, "BEAR_TREND": 1, "SIDEWAYS": 2,
-            "HIGH_VOLATILITY": 3, "CRISIS": 4,
+            "BULL_TREND": 0,
+            "BEAR_TREND": 1,
+            "SIDEWAYS": 2,
+            "HIGH_VOLATILITY": 3,
+            "CRISIS": 4,
         }
         proto_regime = market_pb2.MarketRegime(
             regime=regime_map.get(regime, 2),
@@ -245,16 +292,27 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_event(cls, event_type: str, ticker: str, title: str,
-                     summary: str = "", sentiment: float = 0,
-                     impact_score: float = 0, timestamp: int = 0) -> bytes:
+    def encode_event(
+        cls,
+        event_type: str,
+        ticker: str,
+        title: str,
+        summary: str = "",
+        sentiment: float = 0,
+        impact_score: float = 0,
+        timestamp: int = 0,
+    ) -> bytes:
         """MarketEvent → Protobuf binary."""
         if not HAS_PROTOBUF:
             return cls._fallback_encode("event", ticker=ticker, title=title)
 
         type_map = {
-            "KAP_ANNOUNCEMENT": 0, "NEWS": 1, "MACRO_DATA": 2,
-            "EARNINGS": 3, "DIVIDEND": 4, "ANALYST_RATING": 5,
+            "KAP_ANNOUNCEMENT": 0,
+            "NEWS": 1,
+            "MACRO_DATA": 2,
+            "EARNINGS": 3,
+            "DIVIDEND": 4,
+            "ANALYST_RATING": 5,
         }
         event = market_pb2.MarketEvent(
             type=type_map.get(event_type, 1),
@@ -274,9 +332,16 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def encode_alert(cls, alert_type: str, ticker: str, message: str,
-                     severity: str = "INFO", value: float = 0,
-                     threshold: float = 0, timestamp: int = 0) -> bytes:
+    def encode_alert(
+        cls,
+        alert_type: str,
+        ticker: str,
+        message: str,
+        severity: str = "INFO",
+        value: float = 0,
+        threshold: float = 0,
+        timestamp: int = 0,
+    ) -> bytes:
         """Alert → Protobuf binary."""
         if not HAS_PROTOBUF:
             return cls._fallback_encode("alert", ticker=ticker, message=message)
@@ -395,8 +460,7 @@ class ProtobufMessage:
                     "timestamp": msg.risk.timestamp,
                 }
             elif payload_field == "regime":
-                regime_map = {0: "BULL_TREND", 1: "BEAR_TREND", 2: "SIDEWAYS",
-                              3: "HIGH_VOLATILITY", 4: "CRISIS"}
+                regime_map = {0: "BULL_TREND", 1: "BEAR_TREND", 2: "SIDEWAYS", 3: "HIGH_VOLATILITY", 4: "CRISIS"}
                 result["data"] = {
                     "regime": regime_map.get(msg.regime.regime, "SIDEWAYS"),
                     "confidence": msg.regime.confidence,
@@ -405,8 +469,14 @@ class ProtobufMessage:
                     "timestamp": msg.regime.timestamp,
                 }
             elif payload_field == "event":
-                type_map = {0: "KAP_ANNOUNCEMENT", 1: "NEWS", 2: "MACRO_DATA",
-                            3: "EARNINGS", 4: "DIVIDEND", 5: "ANALYST_RATING"}
+                type_map = {
+                    0: "KAP_ANNOUNCEMENT",
+                    1: "NEWS",
+                    2: "MACRO_DATA",
+                    3: "EARNINGS",
+                    4: "DIVIDEND",
+                    5: "ANALYST_RATING",
+                }
                 result["data"] = {
                     "type": type_map.get(msg.event.type, "NEWS"),
                     "ticker": msg.event.ticker,
@@ -440,8 +510,17 @@ class ProtobufMessage:
     @classmethod
     def _type_name(cls, type_int: int) -> str:
         """MessageType enum → string."""
-        names = {0: "tick", 1: "ohlcv", 2: "signal", 3: "portfolio",
-                 4: "risk", 5: "regime", 6: "event", 7: "alert", 8: "heartbeat"}
+        names = {
+            0: "tick",
+            1: "ohlcv",
+            2: "signal",
+            3: "portfolio",
+            4: "risk",
+            5: "regime",
+            6: "event",
+            7: "alert",
+            8: "heartbeat",
+        }
         return names.get(type_int, "unknown")
 
     @classmethod
@@ -479,9 +558,11 @@ class BinaryWebSocket:
         """WebSocket bağlantı handler'ı."""
         self._clients.add(websocket)
         client_id = id(websocket)
-        logger.info("Binary WebSocket client connected",
-                     client_id=client_id,
-                     protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback")
+        logger.info(
+            "Binary WebSocket client connected",
+            client_id=client_id,
+            protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback",
+        )
 
         try:
             # Hoşgeldin mesajı
@@ -508,85 +589,122 @@ class BinaryWebSocket:
                     except Exception:
                         logger.warning("Caught Exception in handler", exc_info=True)
         except Exception as e:
-            logger.debug("WebSocket client disconnected",
-                         client_id=client_id, error=str(e))
+            logger.debug("WebSocket client disconnected", client_id=client_id, error=str(e))
         finally:
             self._clients.discard(websocket)
 
-    async def broadcast_tick(self, ticker: str, price: float, change: float,
-                             change_pct: float, volume: int, bid: float = 0,
-                             ask: float = 0):
+    async def broadcast_tick(
+        self, ticker: str, price: float, change: float, change_pct: float, volume: int, bid: float = 0, ask: float = 0
+    ):
         """Tüm istemcilere fiyat yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_tick(
-            ticker=ticker, price=price, change=change,
-            change_pct=change_pct, volume=volume, bid=bid, ask=ask,
+            ticker=ticker,
+            price=price,
+            change=change,
+            change_pct=change_pct,
+            volume=volume,
+            bid=bid,
+            ask=ask,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_ohlcv(self, ticker: str, open_p: float, high: float,
-                              low: float, close: float, volume: int,
-                              timeframe: str = "1m"):
+    async def broadcast_ohlcv(
+        self, ticker: str, open_p: float, high: float, low: float, close: float, volume: int, timeframe: str = "1m"
+    ):
         """Tüm istemcilere OHLCV yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_ohlcv(
-            ticker=ticker, open_p=open_p, high=high, low=low,
-            close=close, volume=volume, timeframe=timeframe,
+            ticker=ticker,
+            open_p=open_p,
+            high=high,
+            low=low,
+            close=close,
+            volume=volume,
+            timeframe=timeframe,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_signal(self, ticker: str, direction: str,
-                               confidence: float, target_price: float,
-                               stop_loss: float, reason: str = ""):
+    async def broadcast_signal(
+        self, ticker: str, direction: str, confidence: float, target_price: float, stop_loss: float, reason: str = ""
+    ):
         """Tüm istemcilere sinyal yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_signal(
-            ticker=ticker, direction=direction, confidence=confidence,
-            target_price=target_price, stop_loss=stop_loss, reason=reason,
+            ticker=ticker,
+            direction=direction,
+            confidence=confidence,
+            target_price=target_price,
+            stop_loss=stop_loss,
+            reason=reason,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_portfolio(self, total_value: float, cash: float,
-                                  daily_pnl: float, daily_pnl_pct: float,
-                                  positions: list = None):
+    async def broadcast_portfolio(
+        self, total_value: float, cash: float, daily_pnl: float, daily_pnl_pct: float, positions: list = None
+    ):
         """Tüm istemcilere portföy durumu yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_portfolio(
-            total_value=total_value, cash=cash, daily_pnl=daily_pnl,
-            daily_pnl_pct=daily_pnl_pct, positions=positions,
+            total_value=total_value,
+            cash=cash,
+            daily_pnl=daily_pnl,
+            daily_pnl_pct=daily_pnl_pct,
+            positions=positions,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_risk(self, var_95: float, cvar_95: float, sharpe: float,
-                             max_drawdown: float, volatility: float, beta: float):
+    async def broadcast_risk(
+        self, var_95: float, cvar_95: float, sharpe: float, max_drawdown: float, volatility: float, beta: float
+    ):
         """Tüm istemcilere risk metrikleri yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_risk(
-            var_95=var_95, cvar_95=cvar_95, sharpe=sharpe,
-            max_drawdown=max_drawdown, volatility=volatility, beta=beta,
+            var_95=var_95,
+            cvar_95=cvar_95,
+            sharpe=sharpe,
+            max_drawdown=max_drawdown,
+            volatility=volatility,
+            beta=beta,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_regime(self, regime: str, confidence: float,
-                               vix: float = 0, breadth: float = 0):
+    async def broadcast_regime(self, regime: str, confidence: float, vix: float = 0, breadth: float = 0):
         """Tüm istemcilere piyasa rejimi yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_regime(
-            regime=regime, confidence=confidence, vix=vix, breadth=breadth,
+            regime=regime,
+            confidence=confidence,
+            vix=vix,
+            breadth=breadth,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_event(self, event_type: str, ticker: str, title: str,
-                              summary: str = "", sentiment: float = 0,
-                              impact_score: float = 0):
+    async def broadcast_event(
+        self, event_type: str, ticker: str, title: str, summary: str = "", sentiment: float = 0, impact_score: float = 0
+    ):
         """Tüm istemcilere olay yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_event(
-            event_type=event_type, ticker=ticker, title=title,
-            summary=summary, sentiment=sentiment, impact_score=impact_score,
+            event_type=event_type,
+            ticker=ticker,
+            title=title,
+            summary=summary,
+            sentiment=sentiment,
+            impact_score=impact_score,
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_alert(self, alert_type: str, ticker: str, message_text: str,
-                              severity: str = "INFO", value: float = 0,
-                              threshold: float = 0):
+    async def broadcast_alert(
+        self,
+        alert_type: str,
+        ticker: str,
+        message_text: str,
+        severity: str = "INFO",
+        value: float = 0,
+        threshold: float = 0,
+    ):
         """Tüm istemcilere alarm yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_alert(
-            alert_type=alert_type, ticker=ticker, message=message_text,
-            severity=severity, value=value, threshold=threshold,
+            alert_type=alert_type,
+            ticker=ticker,
+            message=message_text,
+            severity=severity,
+            value=value,
+            threshold=threshold,
         )
         await self._broadcast_binary(message)
 
@@ -616,9 +734,12 @@ class BinaryWebSocket:
             return
 
         self._running = True
-        logger.info("Binary WebSocket server starting",
-                     host=host, port=port,
-                     protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback")
+        logger.info(
+            "Binary WebSocket server starting",
+            host=host,
+            port=port,
+            protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback",
+        )
 
         async with websockets.serve(self.handler, host, port):
             while self._running:

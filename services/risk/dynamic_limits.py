@@ -21,21 +21,23 @@ logger = structlog.get_logger()
 @dataclass
 class RiskLimits:
     """Risk limitleri."""
-    max_position_pct: float = 10.0       # Tek pozisyon max %
-    max_sector_pct: float = 30.0         # Sektör max %
-    max_exposure_pct: float = 95.0       # Toplam maruziyet max %
-    daily_loss_limit_pct: float = 5.0    # Günlük zarar limiti %
-    max_drawdown_pct: float = 20.0       # Max drawdown %
-    max_order_pct: float = 5.0           # Tek emir max %
-    min_confidence: float = 0.3          # Min güven eşiği
-    max_var_pct: float = 5.0             # Max VaR %
-    max_correlation: float = 0.8         # Max korelasyon
-    kelly_fraction: float = 0.5          # Kelly fraction
+
+    max_position_pct: float = 10.0  # Tek pozisyon max %
+    max_sector_pct: float = 30.0  # Sektör max %
+    max_exposure_pct: float = 95.0  # Toplam maruziyet max %
+    daily_loss_limit_pct: float = 5.0  # Günlük zarar limiti %
+    max_drawdown_pct: float = 20.0  # Max drawdown %
+    max_order_pct: float = 5.0  # Tek emir max %
+    min_confidence: float = 0.3  # Min güven eşiği
+    max_var_pct: float = 5.0  # Max VaR %
+    max_correlation: float = 0.8  # Max korelasyon
+    kelly_fraction: float = 0.5  # Kelly fraction
 
 
 @dataclass
 class LimitAdjustment:
     """Limit ayarlama kaydı."""
+
     reason: str
     original: float
     adjusted: float
@@ -54,32 +56,37 @@ class DynamicRiskLimits:
 
     # Rejim bazlı çarpanlar
     REGIME_MULTIPLIERS = {
-        "BULL":              {"position": 1.1, "exposure": 1.05, "kelly": 1.2, "confidence": 0.9},
-        "BEAR":              {"position": 0.7, "exposure": 0.8,  "kelly": 0.6, "confidence": 1.1},
-        "SIDEWAYS":          {"position": 1.0, "exposure": 1.0,  "kelly": 0.8, "confidence": 1.0},
-        "HIGH_VOLATILITY":   {"position": 0.6, "exposure": 0.7,  "kelly": 0.5, "confidence": 1.2},
-        "LOW_VOLATILITY":    {"position": 1.15, "exposure": 1.1, "kelly": 1.1, "confidence": 0.9},
-        "RISK_ON":           {"position": 1.1, "exposure": 1.05, "kelly": 1.1, "confidence": 0.95},
-        "RISK_OFF":          {"position": 0.5, "exposure": 0.6,  "kelly": 0.5, "confidence": 1.2},
-        "CRISIS":            {"position": 0.3, "exposure": 0.4,  "kelly": 0.3, "confidence": 1.5},
-        "RECOVERY":          {"position": 0.9, "exposure": 0.9,  "kelly": 0.9, "confidence": 1.0},
+        "BULL": {"position": 1.1, "exposure": 1.05, "kelly": 1.2, "confidence": 0.9},
+        "BEAR": {"position": 0.7, "exposure": 0.8, "kelly": 0.6, "confidence": 1.1},
+        "SIDEWAYS": {"position": 1.0, "exposure": 1.0, "kelly": 0.8, "confidence": 1.0},
+        "HIGH_VOLATILITY": {"position": 0.6, "exposure": 0.7, "kelly": 0.5, "confidence": 1.2},
+        "LOW_VOLATILITY": {"position": 1.15, "exposure": 1.1, "kelly": 1.1, "confidence": 0.9},
+        "RISK_ON": {"position": 1.1, "exposure": 1.05, "kelly": 1.1, "confidence": 0.95},
+        "RISK_OFF": {"position": 0.5, "exposure": 0.6, "kelly": 0.5, "confidence": 1.2},
+        "CRISIS": {"position": 0.3, "exposure": 0.4, "kelly": 0.3, "confidence": 1.5},
+        "RECOVERY": {"position": 0.9, "exposure": 0.9, "kelly": 0.9, "confidence": 1.0},
     }
 
     # Volatilite eşikleri (yıllık)
     VOL_THRESHOLDS = {
-        "very_low":  0.10,   # < %10 yıllık vol
-        "low":       0.15,   # %10-15
-        "normal":    0.20,   # %15-20
-        "high":      0.30,   # %20-30
-        "very_high": 0.50,   # > %30
+        "very_low": 0.10,  # < %10 yıllık vol
+        "low": 0.15,  # %10-15
+        "normal": 0.20,  # %15-20
+        "high": 0.30,  # %20-30
+        "very_high": 0.50,  # > %30
     }
 
     # Drawdown eşikleri ve aksiyonları
     DRAWDOWN_THRESHOLDS = [
-        {"threshold": 5.0,  "action": "REDUCE_SIZE",  "position_scale": 0.5, "description": "Pozisyon boyutunu %50 azalt"},
-        {"threshold": 10.0, "action": "STOP_NEW",     "position_scale": 0.0, "description": "Yeni pozisyon durdur"},
+        {
+            "threshold": 5.0,
+            "action": "REDUCE_SIZE",
+            "position_scale": 0.5,
+            "description": "Pozisyon boyutunu %50 azalt",
+        },
+        {"threshold": 10.0, "action": "STOP_NEW", "position_scale": 0.0, "description": "Yeni pozisyon durdur"},
         {"threshold": 15.0, "action": "CLOSE_POSITIONS", "position_scale": 0.0, "description": "Pozisyon kapat"},
-        {"threshold": 20.0, "action": "HALT_SYSTEM",  "position_scale": 0.0, "description": "Sistem durdur"},
+        {"threshold": 20.0, "action": "HALT_SYSTEM", "position_scale": 0.0, "description": "Sistem durdur"},
     ]
 
     def get_limits(
@@ -109,12 +116,14 @@ class DynamicRiskLimits:
         limits.max_sector_pct *= vol_scale
         limits.max_exposure_pct *= vol_scale
         limits.max_order_pct *= vol_scale
-        adjustments.append(LimitAdjustment(
-            reason=f"Volatility {annualized_volatility:.1%}",
-            original=self.BASE_LIMITS.max_position_pct,
-            adjusted=limits.max_position_pct,
-            scale_factor=vol_scale,
-        ))
+        adjustments.append(
+            LimitAdjustment(
+                reason=f"Volatility {annualized_volatility:.1%}",
+                original=self.BASE_LIMITS.max_position_pct,
+                adjusted=limits.max_position_pct,
+                scale_factor=vol_scale,
+            )
+        )
 
         # 2. Rejim bazlı ayarlama
         regime_mult = self.REGIME_MULTIPLIERS.get(regime, self.REGIME_MULTIPLIERS["SIDEWAYS"])
@@ -122,12 +131,14 @@ class DynamicRiskLimits:
         limits.max_exposure_pct *= regime_mult["exposure"]
         limits.kelly_fraction *= regime_mult["kelly"]
         limits.min_confidence *= regime_mult["confidence"]
-        adjustments.append(LimitAdjustment(
-            reason=f"Regime: {regime}",
-            original=limits.max_position_pct / regime_mult["position"],
-            adjusted=limits.max_position_pct,
-            scale_factor=regime_mult["position"],
-        ))
+        adjustments.append(
+            LimitAdjustment(
+                reason=f"Regime: {regime}",
+                original=limits.max_position_pct / regime_mult["position"],
+                adjusted=limits.max_position_pct,
+                scale_factor=regime_mult["position"],
+            )
+        )
 
         # 3. Drawdown bazlı ayarlama
         dd_scale = self._drawdown_scale(current_drawdown_pct)
@@ -135,12 +146,14 @@ class DynamicRiskLimits:
             limits.max_position_pct *= dd_scale
             limits.max_exposure_pct *= dd_scale
             limits.kelly_fraction *= dd_scale
-            adjustments.append(LimitAdjustment(
-                reason=f"Drawdown {current_drawdown_pct:.1f}%",
-                original=limits.max_position_pct / dd_scale,
-                adjusted=limits.max_position_pct,
-                scale_factor=dd_scale,
-            ))
+            adjustments.append(
+                LimitAdjustment(
+                    reason=f"Drawdown {current_drawdown_pct:.1f}%",
+                    original=limits.max_position_pct / dd_scale,
+                    adjusted=limits.max_position_pct,
+                    scale_factor=dd_scale,
+                )
+            )
 
         # 4. VIX bazlı ayarlama (global risk algısı)
         if vix_level is not None:
@@ -148,12 +161,14 @@ class DynamicRiskLimits:
             if vix_scale < 1.0:
                 limits.max_position_pct *= vix_scale
                 limits.max_exposure_pct *= vix_scale
-                adjustments.append(LimitAdjustment(
-                    reason=f"VIX {vix_level:.1f}",
-                    original=limits.max_position_pct / vix_scale,
-                    adjusted=limits.max_position_pct,
-                    scale_factor=vix_scale,
-                ))
+                adjustments.append(
+                    LimitAdjustment(
+                        reason=f"VIX {vix_level:.1f}",
+                        original=limits.max_position_pct / vix_scale,
+                        adjusted=limits.max_position_pct,
+                        scale_factor=vix_scale,
+                    )
+                )
 
         # Sınırla
         limits.max_position_pct = max(1.0, min(20.0, limits.max_position_pct))
@@ -164,9 +179,11 @@ class DynamicRiskLimits:
 
         # Log
         if adjustments:
-            logger.info("Dynamic limits adjusted",
-                       adjustments=[(a.reason, f"{a.scale_factor:.2f}x") for a in adjustments],
-                       final_position_limit=f"{limits.max_position_pct:.1f}%")
+            logger.info(
+                "Dynamic limits adjusted",
+                adjustments=[(a.reason, f"{a.scale_factor:.2f}x") for a in adjustments],
+                final_position_limit=f"{limits.max_position_pct:.1f}%",
+            )
 
         return limits
 
@@ -219,9 +236,9 @@ class DynamicRiskLimits:
     def _vix_scale(self, vix_level: float) -> float:
         """VIX bazlı çarpan (global risk algısı)."""
         if vix_level < 15:
-            return 1.1   # Düşük VIX → gevşet
+            return 1.1  # Düşük VIX → gevşet
         elif vix_level < 20:
-            return 1.0   # Normal
+            return 1.0  # Normal
         elif vix_level < 25:
             return 0.85  # Yüksek VIX → sıkılaştır
         elif vix_level < 35:

@@ -3,6 +3,7 @@
 Value, Momentum, Quality, Size, Low Vol, Dividend, Leverage, BIST-specific.
 Cross-sectional z-score normalization.
 """
+
 from typing import Any
 
 import numpy as np
@@ -89,9 +90,11 @@ def calculate_factor_scores(
                 # Percentile'a çevir (0-1)
                 try:
                     from scipy.stats import norm
+
                     percentile = float(norm.cdf(z))
                 except (ImportError, Exception):
                     import math
+
                     percentile = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
             else:
                 percentile = 0.5

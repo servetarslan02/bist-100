@@ -28,19 +28,21 @@ logger = structlog.get_logger()
 @dataclass
 class StressScenario:
     """Stres senaryosu."""
+
     name: str
     description: str
-    market_shock: float        # Piyasa şoku (%)
-    vol_spike: float           # Volatilite çarpanı
-    usd_shock: float           # USD/TRY şoku (%)
-    rate_shock: float          # Faiz şoku (bp)
+    market_shock: float  # Piyasa şoku (%)
+    vol_spike: float  # Volatilite çarpanı
+    usd_shock: float  # USD/TRY şoku (%)
+    rate_shock: float  # Faiz şoku (bp)
     sector_impacts: dict[str, float]  # Sektör bazlı etki
-    probability: float         # Olasılık (yıllık)
+    probability: float  # Olasılık (yıllık)
 
 
 @dataclass
 class StressResult:
     """Stres testi sonucu."""
+
     scenario: str
     portfolio_impact_pct: float
     portfolio_impact_amount: float
@@ -69,9 +71,14 @@ class EnhancedStressTestEngine:
             usd_shock=0.10,
             rate_shock=200,
             sector_impacts={
-                "BANKING": -0.25, "FINANCE": -0.22, "INDUSTRY": -0.18,
-                "TECHNOLOGY": -0.15, "CONSUMER": -0.20, "ENERGY": -0.22,
-                "REAL_ESTATE": -0.25, "OTHER": -0.20,
+                "BANKING": -0.25,
+                "FINANCE": -0.22,
+                "INDUSTRY": -0.18,
+                "TECHNOLOGY": -0.15,
+                "CONSUMER": -0.20,
+                "ENERGY": -0.22,
+                "REAL_ESTATE": -0.25,
+                "OTHER": -0.20,
             },
             probability=0.05,
         ),
@@ -83,9 +90,14 @@ class EnhancedStressTestEngine:
             usd_shock=0.30,
             rate_shock=500,
             sector_impacts={
-                "BANKING": -0.20, "ENERGY": -0.25, "AVIATION": -0.30,
-                "METAL": 0.10, "INDUSTRY": -0.10, "TECHNOLOGY": -0.15,
-                "CONSUMER": -0.20, "OTHER": -0.15,
+                "BANKING": -0.20,
+                "ENERGY": -0.25,
+                "AVIATION": -0.30,
+                "METAL": 0.10,
+                "INDUSTRY": -0.10,
+                "TECHNOLOGY": -0.15,
+                "CONSUMER": -0.20,
+                "OTHER": -0.15,
             },
             probability=0.03,
         ),
@@ -97,8 +109,12 @@ class EnhancedStressTestEngine:
             usd_shock=0.05,
             rate_shock=500,
             sector_impacts={
-                "BANKING": 0.05, "REAL_ESTATE": -0.20, "INDUSTRY": -0.12,
-                "TECHNOLOGY": -0.15, "CONSUMER": -0.10, "ENERGY": -0.08,
+                "BANKING": 0.05,
+                "REAL_ESTATE": -0.20,
+                "INDUSTRY": -0.12,
+                "TECHNOLOGY": -0.15,
+                "CONSUMER": -0.10,
+                "ENERGY": -0.08,
                 "OTHER": -0.10,
             },
             probability=0.08,
@@ -111,8 +127,12 @@ class EnhancedStressTestEngine:
             usd_shock=0.02,
             rate_shock=100,
             sector_impacts={
-                "TECHNOLOGY": -0.15, "BANKING": 0.05, "INDUSTRY": 0.03,
-                "CONSUMER": -0.08, "ENERGY": 0.02, "OTHER": -0.05,
+                "TECHNOLOGY": -0.15,
+                "BANKING": 0.05,
+                "INDUSTRY": 0.03,
+                "CONSUMER": -0.08,
+                "ENERGY": 0.02,
+                "OTHER": -0.05,
             },
             probability=0.15,
         ),
@@ -124,9 +144,14 @@ class EnhancedStressTestEngine:
             usd_shock=0.20,
             rate_shock=300,
             sector_impacts={
-                "BANKING": -0.35, "FINANCE": -0.30, "INDUSTRY": -0.28,
-                "TECHNOLOGY": -0.25, "CONSUMER": -0.30, "ENERGY": -0.32,
-                "REAL_ESTATE": -0.35, "OTHER": -0.28,
+                "BANKING": -0.35,
+                "FINANCE": -0.30,
+                "INDUSTRY": -0.28,
+                "TECHNOLOGY": -0.25,
+                "CONSUMER": -0.30,
+                "ENERGY": -0.32,
+                "REAL_ESTATE": -0.35,
+                "OTHER": -0.28,
             },
             probability=0.01,
         ),
@@ -138,9 +163,14 @@ class EnhancedStressTestEngine:
             usd_shock=0.15,
             rate_shock=400,
             sector_impacts={
-                "BANKING": -0.25, "FINANCE": -0.20, "INDUSTRY": -0.12,
-                "TECHNOLOGY": -0.10, "CONSUMER": -0.15, "ENERGY": -0.18,
-                "SMALL_CAP": -0.30, "OTHER": -0.15,
+                "BANKING": -0.25,
+                "FINANCE": -0.20,
+                "INDUSTRY": -0.12,
+                "TECHNOLOGY": -0.10,
+                "CONSUMER": -0.15,
+                "ENERGY": -0.18,
+                "SMALL_CAP": -0.30,
+                "OTHER": -0.15,
             },
             probability=0.04,
         ),
@@ -152,9 +182,14 @@ class EnhancedStressTestEngine:
             usd_shock=0.25,
             rate_shock=600,
             sector_impacts={
-                "BANKING": -0.10, "REAL_ESTATE": -0.20, "CONSUMER": -0.25,
-                "TECHNOLOGY": -0.15, "INDUSTRY": -0.12, "ENERGY": 0.05,
-                "FOOD": 0.03, "OTHER": -0.12,
+                "BANKING": -0.10,
+                "REAL_ESTATE": -0.20,
+                "CONSUMER": -0.25,
+                "TECHNOLOGY": -0.15,
+                "INDUSTRY": -0.12,
+                "ENERGY": 0.05,
+                "FOOD": 0.03,
+                "OTHER": -0.12,
             },
             probability=0.03,
         ),
@@ -166,8 +201,12 @@ class EnhancedStressTestEngine:
             usd_shock=0.10,
             rate_shock=200,
             sector_impacts={
-                "BANKING": -0.15, "FINANCE": -0.12, "INDUSTRY": -0.10,
-                "TECHNOLOGY": -0.18, "CONSUMER": -0.08, "ENERGY": -0.12,
+                "BANKING": -0.15,
+                "FINANCE": -0.12,
+                "INDUSTRY": -0.10,
+                "TECHNOLOGY": -0.18,
+                "CONSUMER": -0.08,
+                "ENERGY": -0.12,
                 "OTHER": -0.12,
             },
             probability=0.10,
@@ -214,9 +253,7 @@ class EnhancedStressTestEngine:
             usd_sensitivity = pos.get("usd_sensitivity", 0.5)
 
             # Sektör bazlı etki
-            sector_impact = scenario.sector_impacts.get(
-                sector, scenario.market_shock
-            )
+            sector_impact = scenario.sector_impacts.get(sector, scenario.market_shock)
 
             # Beta ayarlaması
             market_effect = scenario.market_shock * beta
@@ -232,15 +269,17 @@ class EnhancedStressTestEngine:
             loss = value * total_pos_impact
             total_impact += loss
 
-            position_impacts.append({
-                "ticker": ticker,
-                "sector": sector,
-                "value": value,
-                "impact_pct": round(total_pos_impact * 100, 2),
-                "loss": round(loss, 2),
-                "sector_impact_pct": round(sector_impact * 100, 2),
-                "usd_impact_pct": round(usd_effect * 100, 2),
-            })
+            position_impacts.append(
+                {
+                    "ticker": ticker,
+                    "sector": sector,
+                    "value": value,
+                    "impact_pct": round(total_pos_impact * 100, 2),
+                    "loss": round(loss, 2),
+                    "sector_impact_pct": round(sector_impact * 100, 2),
+                    "usd_impact_pct": round(usd_effect * 100, 2),
+                }
+            )
 
         # En kötü ve en iyi pozisyon
         worst = min(position_impacts, key=lambda x: x["loss"]) if position_impacts else {}
@@ -276,11 +315,13 @@ class EnhancedStressTestEngine:
         breaking = []
         for r in results:
             if abs(r.portfolio_impact_pct) >= max_loss_pct:
-                breaking.append({
-                    "scenario": r.scenario,
-                    "impact_pct": r.portfolio_impact_pct,
-                    "exceeds_by": abs(r.portfolio_impact_pct) - max_loss_pct,
-                })
+                breaking.append(
+                    {
+                        "scenario": r.scenario,
+                        "impact_pct": r.portfolio_impact_pct,
+                        "exceeds_by": abs(r.portfolio_impact_pct) - max_loss_pct,
+                    }
+                )
 
         return {
             "max_loss_pct": max_loss_pct,

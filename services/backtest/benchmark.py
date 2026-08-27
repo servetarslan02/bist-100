@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class BenchmarkComparison:
     """Benchmark karşılaştırma sonucu."""
+
     benchmark_name: str
     strategy_return_pct: float
     benchmark_return_pct: float
@@ -93,11 +94,18 @@ class BenchmarkComparator:
         if min_len < 2:
             return BenchmarkComparison(
                 benchmark_name=benchmark_name,
-                strategy_return_pct=0, benchmark_return_pct=0,
-                alpha_pct=0, beta=1, information_ratio=0,
-                tracking_error_pct=0, relative_return_pct=0,
-                up_capture_ratio=0, down_capture_ratio=0,
-                correlation=0, r_squared=0, num_observations=0,
+                strategy_return_pct=0,
+                benchmark_return_pct=0,
+                alpha_pct=0,
+                beta=1,
+                information_ratio=0,
+                tracking_error_pct=0,
+                relative_return_pct=0,
+                up_capture_ratio=0,
+                down_capture_ratio=0,
+                correlation=0,
+                r_squared=0,
+                num_observations=0,
             )
 
         # Total returns
@@ -122,7 +130,7 @@ class BenchmarkComparator:
 
         # Correlation and R-squared
         correlation = np.corrcoef(sr, br)[0, 1]
-        r_squared = correlation ** 2
+        r_squared = correlation**2
 
         # Tracking error
         active_returns = sr - br
@@ -131,7 +139,8 @@ class BenchmarkComparator:
         # Information ratio
         information_ratio = (
             (np.mean(active_returns) / np.std(active_returns, ddof=1) * np.sqrt(periods_per_year))
-            if np.std(active_returns, ddof=1) > 0 else 0
+            if np.std(active_returns, ddof=1) > 0
+            else 0
         )
 
         # Relative return
@@ -167,11 +176,13 @@ class BenchmarkComparator:
             num_observations=min_len,
         )
 
-        logger.info("Benchmark comparison complete",
-                    benchmark=benchmark_name,
-                    alpha=f"{alpha:.2f}%",
-                    beta=f"{beta:.2f}",
-                    info_ratio=f"{information_ratio:.2f}")
+        logger.info(
+            "Benchmark comparison complete",
+            benchmark=benchmark_name,
+            alpha=f"{alpha:.2f}%",
+            beta=f"{beta:.2f}",
+            info_ratio=f"{information_ratio:.2f}",
+        )
 
         return result
 
@@ -189,9 +200,7 @@ class BenchmarkComparator:
         strategy_returns = np.diff(strategy_values) / strategy_values[:-1]
         benchmark_returns = np.diff(benchmark_values) / benchmark_values[:-1]
 
-        return BenchmarkComparator.compare(
-            strategy_returns, benchmark_returns, benchmark_name
-        )
+        return BenchmarkComparator.compare(strategy_returns, benchmark_returns, benchmark_name)
 
     @staticmethod
     def generate_report(
@@ -215,9 +224,7 @@ class BenchmarkComparator:
                     "benchmark": best_ir.benchmark_name,
                     "ir": round(best_ir.information_ratio, 2),
                 },
-                "avg_correlation": round(
-                    np.mean([c.correlation for c in comparisons]), 4
-                ),
+                "avg_correlation": round(np.mean([c.correlation for c in comparisons]), 4),
             },
         }
 

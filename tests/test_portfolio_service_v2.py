@@ -15,6 +15,7 @@ async def reset_test_db():
     if dev_db._db is None:
         await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
 
 
@@ -53,6 +54,7 @@ async def make_service(capital: float = 100000) -> PortfolioService:
 # ============================================================
 # TESTS
 # ============================================================
+
 
 async def test_service_lifecycle():
     svc = await make_service()
@@ -264,6 +266,7 @@ async def test_commission_accounting():
 # ============================================================
 # RUN ALL TESTS
 # ============================================================
+
 
 async def run_all_tests():
     print("=" * 60)

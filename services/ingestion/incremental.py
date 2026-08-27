@@ -26,8 +26,9 @@ logger = structlog.get_logger()
 @dataclass
 class FetchState:
     """Ticker çekme durumu."""
+
     ticker: str
-    last_fetch_time: float          # Epoch time
+    last_fetch_time: float  # Epoch time
     last_fetch_timestamp: datetime | None = None
     fetch_count: int = 0
     last_error: str | None = None
@@ -37,6 +38,7 @@ class FetchState:
 @dataclass
 class IncrementalStats:
     """İstatistikler."""
+
     total_checks: int = 0
     total_fetches: int = 0
     total_skipped: int = 0
@@ -123,9 +125,7 @@ class IncrementalFetcher:
         if state and state.last_fetch_timestamp:
             return state.last_fetch_timestamp
 
-        return datetime.now(UTC) - timedelta(
-            hours=self._default_lookback_hours
-        )
+        return datetime.now(UTC) - timedelta(hours=self._default_lookback_hours)
 
     def get_fetch_count(self, ticker: str) -> int:
         """Bu ticker'ın kaç kez çekildiği."""
@@ -141,9 +141,7 @@ class IncrementalFetcher:
                 "fetch_count": state.fetch_count,
                 "last_success": state.last_success,
                 "last_error": state.last_error,
-                "seconds_since_fetch": round(
-                    time.time() - state.last_fetch_time, 1
-                ) if state.last_fetch_time else None,
+                "seconds_since_fetch": round(time.time() - state.last_fetch_time, 1) if state.last_fetch_time else None,
             }
             for ticker, state in self._states.items()
         }
@@ -155,9 +153,7 @@ class IncrementalFetcher:
             "total_fetches": self._stats.total_fetches,
             "total_skipped": self._stats.total_skipped,
             "total_errors": self._stats.total_errors,
-            "skip_rate": round(
-                self._stats.total_skipped / max(self._stats.total_checks, 1) * 100, 1
-            ),
+            "skip_rate": round(self._stats.total_skipped / max(self._stats.total_checks, 1) * 100, 1),
             "tracked_tickers": len(self._states),
         }
 

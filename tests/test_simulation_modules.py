@@ -16,11 +16,13 @@ import pytest
 # ENHANCED EXECUTION TESTS
 # =====================================================
 
+
 class TestSquareRootMarketImpact:
     """Square root market impact testleri."""
 
     def setup_method(self):
         from services.simulation.enhanced_execution import SquareRootMarketImpact
+
         self.model = SquareRootMarketImpact(eta=0.3)
 
     def test_small_order_low_impact(self):
@@ -62,6 +64,7 @@ class TestRegimeAwareSlippage:
 
     def setup_method(self):
         from services.simulation.enhanced_execution import RegimeAwareSlippage
+
         self.model = RegimeAwareSlippage()
 
     def test_bull_lower_slippage(self):
@@ -91,6 +94,7 @@ class TestEnhancedExecutionSimulator:
     def setup_method(self):
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.execution_simulator import Order, OrderSide, OrderType
+
         self.sim = EnhancedExecutionSimulator()
         self.LiquidityProfile = LiquidityProfile
         self.Order = Order
@@ -191,11 +195,13 @@ class TestEnhancedExecutionSimulator:
 # JUMP-DIFFUSION MONTE CARLO TESTS
 # =====================================================
 
+
 class TestJumpDiffusionMonteCarlo:
     """Jump-diffusion Monte Carlo testleri."""
 
     def setup_method(self):
         from services.simulation.monte_carlo_enhanced import JumpDiffusionMonteCarlo
+
         self.mc = JumpDiffusionMonteCarlo()
 
     def test_simulate(self):
@@ -237,8 +243,13 @@ class TestJumpDiffusionMonteCarlo:
     def test_daily_drift_is_accumulated_over_horizon(self):
         """daily_return günlük parametredir; yıllık gibi tekrar ölçeklenmemeli."""
         result = self.mc.simulate(
-            100.0, daily_return=0.001, daily_vol=0.0,
-            num_sims=100, horizon=20, jump_intensity=0, seed=42,
+            100.0,
+            daily_return=0.001,
+            daily_vol=0.0,
+            num_sims=100,
+            horizon=20,
+            jump_intensity=0,
+            seed=42,
         )
         expected_return_pct = (np.exp(0.001 * 20) - 1) * 100
         assert abs(result.expected_return_pct - expected_return_pct) < 0.01
@@ -248,11 +259,13 @@ class TestJumpDiffusionMonteCarlo:
 # CORRELATED MONTE CARLO TESTS
 # =====================================================
 
+
 class TestCorrelatedMonteCarlo:
     """Correlated Monte Carlo testleri."""
 
     def setup_method(self):
         from services.simulation.monte_carlo_enhanced import CorrelatedMonteCarlo
+
         self.mc = CorrelatedMonteCarlo()
 
     def test_portfolio_simulation(self):
@@ -280,9 +293,7 @@ class TestCorrelatedMonteCarlo:
         returns = np.random.normal(0.0004, 0.02, (100, 2))
         weights = np.array([0.6, 0.4])
 
-        result = self.mc.simulate_portfolio(
-            tickers, prices, returns, weights, 1000, 20, seed=42
-        )
+        result = self.mc.simulate_portfolio(tickers, prices, returns, weights, 1000, 20, seed=42)
         assert result["portfolio"]["var_95"] < 0
 
     def test_correlation_matrix_shape(self):
@@ -291,9 +302,7 @@ class TestCorrelatedMonteCarlo:
         returns = np.random.normal(0, 0.02, (100, 3))
         weights = np.array([0.33, 0.33, 0.34])
 
-        result = self.mc.simulate_portfolio(
-            tickers, prices, returns, weights, 500, 10, seed=42
-        )
+        result = self.mc.simulate_portfolio(tickers, prices, returns, weights, 500, 10, seed=42)
         corr = np.array(result["correlation_matrix"])
         assert corr.shape == (3, 3)
 
@@ -302,23 +311,21 @@ class TestCorrelatedMonteCarlo:
 # REGIME-CONDITIONED MONTE CARLO TESTS
 # =====================================================
 
+
 class TestRegimeConditionedMonteCarlo:
     """Regime-conditioned MC testleri."""
 
     def setup_method(self):
         from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
+
         self.mc = RegimeConditionedMonteCarlo()
 
     def test_bull_regime(self):
-        result = self.mc.simulate(
-            100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42
-        )
+        result = self.mc.simulate(100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42)
         assert "BULL" in result.model
 
     def test_panic_regime(self):
-        result = self.mc.simulate(
-            100.0, 0.0004, 0.02, "PANIC", 1000, 20, seed=42
-        )
+        result = self.mc.simulate(100.0, 0.0004, 0.02, "PANIC", 1000, 20, seed=42)
         assert "PANIC" in result.model
 
     def test_regime_affects_results(self):
@@ -332,11 +339,13 @@ class TestRegimeConditionedMonteCarlo:
 # ENHANCED STRESS TEST TESTS
 # =====================================================
 
+
 class TestEnhancedStressTest:
     """Enhanced stress test testleri."""
 
     def setup_method(self):
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
+
         self.engine = EnhancedStressTestEngine()
         self.portfolio = {
             "total_value": 1000000,
@@ -409,6 +418,7 @@ class TestEnhancedStressTest:
 # INTEGRATION TESTS
 # =====================================================
 
+
 class TestSimulationIntegration:
     """Entegrasyon testleri."""
 
@@ -466,11 +476,13 @@ class TestSimulationIntegration:
 # ORDER BOOK TESTS
 # =====================================================
 
+
 class TestOrderBook:
     """Order book simülasyon testleri."""
 
     def setup_method(self):
         from services.simulation.order_book import OrderBookSimulator
+
         self.sim = OrderBookSimulator()
 
     def test_generate_book(self):
@@ -541,6 +553,7 @@ class TestOrderBook:
 # INTEGRATION TESTS (updated)
 # =====================================================
 
+
 class TestSimulationIntegrationUpdated:
     """Entegrasyon testleri."""
 
@@ -560,8 +573,13 @@ class TestSimulationIntegrationUpdated:
         min(stress_results, key=lambda r: r.portfolio_impact_pct)
 
         order = Order(
-            order_id="stress_test", portfolio_id=1, instrument_id=1,
-            ticker="THYAO", side=OrderSide.SELL, order_type=OrderType.MARKET, quantity=1000,
+            order_id="stress_test",
+            portfolio_id=1,
+            instrument_id=1,
+            ticker="THYAO",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=1000,
         )
         liquidity = LiquidityProfile(avg_daily_volume=1000000, spread_pct=0.5)
         result = exec_sim.execute_order(order, 250.0, liquidity, "PANIC", 0.05)
@@ -570,6 +588,7 @@ class TestSimulationIntegrationUpdated:
     def test_monte_carlo_with_stress(self):
         """Monte Carlo + stress test entegrasyonu."""
         from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
+
         mc = RegimeConditionedMonteCarlo()
         normal = mc.simulate(100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42)
         crisis = mc.simulate(100.0, 0.0004, 0.02, "CRISIS", 1000, 20, seed=42)
@@ -589,15 +608,26 @@ class TestSimulationIntegrationUpdated:
 
         # Book'dan spread al, execution'a ver
         order = Order(
-            order_id="ob_test", portfolio_id=1, instrument_id=1,
-            ticker="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=500,
+            order_id="ob_test",
+            portfolio_id=1,
+            instrument_id=1,
+            ticker="TEST",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=500,
         )
         liquidity = LiquidityProfile(
-            avg_daily_volume=1000000, spread_pct=book.spread_pct,
+            avg_daily_volume=1000000,
+            spread_pct=book.spread_pct,
         )
         result = exec_sim.execute_order(
-            order, book.mid_price, liquidity, "RANGE", 0.02,
-            bid=book.best_bid, ask=book.best_ask,
+            order,
+            book.mid_price,
+            liquidity,
+            "RANGE",
+            0.02,
+            bid=book.best_bid,
+            ask=book.best_ask,
         )
         assert result["fill_price"] > 0
         assert result["slippage_pct"] > 0
@@ -605,6 +635,7 @@ class TestSimulationIntegrationUpdated:
     def test_order_book_large_order(self):
         """Büyük emir order book'da daha fazla slippage yapmalı."""
         from services.simulation.order_book import OrderBookSimulator
+
         sim = OrderBookSimulator()
         book = sim.generate_book(100.0, 1000000, 0.02, "RANGE")
 

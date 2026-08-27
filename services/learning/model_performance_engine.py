@@ -20,10 +20,10 @@ import structlog
 logger = structlog.get_logger()
 
 # Yasal BIST işlem maliyet oranları
-BIST_FEE_RATE = 0.000056    # %0.0056 BIST Pay Piyasası Takas Payı
-MKK_FEE_RATE = 0.0000109    # %0.00109 MKK Saklama
+BIST_FEE_RATE = 0.000056  # %0.0056 BIST Pay Piyasası Takas Payı
+MKK_FEE_RATE = 0.0000109  # %0.00109 MKK Saklama
 BROKER_COMMISSION = 0.0003  # %0.03 Aracı Kurum Komisyonu
-BSMV_TAX_RATE = 0.05        # %5 BSMV (Komisyon üzerinden)
+BSMV_TAX_RATE = 0.05  # %5 BSMV (Komisyon üzerinden)
 ROUNDTRIP_COST_PCT = 2 * (BIST_FEE_RATE + MKK_FEE_RATE + BROKER_COMMISSION * (1 + BSMV_TAX_RATE)) * 100
 # Yaklaşık %0.074 roundtrip işlem maliyeti
 
@@ -31,6 +31,7 @@ ROUNDTRIP_COST_PCT = 2 * (BIST_FEE_RATE + MKK_FEE_RATE + BROKER_COMMISSION * (1 
 @dataclass
 class PerformanceMetrics:
     """Tek model veya versiyon için hesaplanan detaylı metrikler."""
+
     model_id: str
     model_version: str
     total_samples: int
@@ -115,7 +116,7 @@ class ModelPerformanceEngine:
             horizon = p.get("prediction_horizon", "1-5D")
 
             # 1. Yön Doğruluğu & Confusion Matrix
-            is_correct = (pred_dir == act_dir)
+            is_correct = pred_dir == act_dir
             if is_correct:
                 correct_dirs += 1
 

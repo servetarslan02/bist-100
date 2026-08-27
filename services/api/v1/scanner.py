@@ -37,12 +37,14 @@ _SCAN_SIGNALS_TIME = 0.0
 def _get_scan_api():
     """Scan API singleton'ı al."""
     from ...scanner.scan_api import scan_api
+
     return scan_api
 
 
 def _get_engine():
     """Alpha engine singleton'ı al."""
     from ...scanner.alpha_engine import alpha_engine
+
     return alpha_engine
 
 
@@ -50,12 +52,11 @@ def _get_engine():
 # SIGNALS & OPPORTUNITIES
 # =====================================================
 
+
 @router.get("/signals")
 @router.get("/opportunities")
 async def scanner_signals(
-    limit: int = Query(50, ge=1, le=100),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    limit: int = Query(50, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ):
     """Canlı model sinyalleri ve piyasa fırsatları."""
     global _SCAN_SIGNALS_CACHE, _SCAN_SIGNALS_TIME
@@ -72,7 +73,7 @@ async def scanner_signals(
         radar_by_sym = {x.get("symbol"): x for x in radar_data if x.get("symbol")}
 
         preds = get_cached("phase18:predictions")
-        names = getattr(bist_universe, 'COMPANY_NAMES', {})
+        names = getattr(bist_universe, "COMPANY_NAMES", {})
 
         if preds and len(preds) > 0:
             top_preds = sorted(preds, key=lambda x: x.get("score", 0), reverse=True)
@@ -110,33 +111,35 @@ async def scanner_signals(
                 stop_l = round(price * 0.94, 2)
                 rr_ratio = round((target_1 - price) / max(price - stop_l, 0.01), 1)
 
-                signals.append({
-                    "ticker": ticker,
-                    "symbol": ticker,
-                    "name": names.get(ticker, f"{ticker} Sanayi"),
-                    "company_name": names.get(ticker, f"{ticker} Sanayi"),
-                    "price": price,
-                    "change_pct": chg,
-                    "score": ui_score,
-                    "confidence_score": ui_score,
-                    "direction": "LONG",
-                    "signal": "GÜÇLÜ AL" if ui_score >= 80 else "AL",
-                    "signal_type": sig_type,
-                    "spec_category": spec_cat,
-                    "spec_reason": spec_rsn,
-                    "risk_level": "Düşük" if ui_score >= 80 else "Orta",
-                    "horizon": "5-10 Gün",
-                    "expected_return_pct": round(max(5.0, (target_1 - price) / price * 100), 1),
-                    "target_price": target_1,
-                    "target_price_2": target_2,
-                    "stop_loss": stop_l,
-                    "risk_reward_ratio": rr_ratio,
-                    "rsi": round(rsi_val, 1),
-                    "volume_ratio": 2.1,
-                    "momentum_1m": round(chg * 4.2, 1),
-                    "momentum_3m": round(chg * 11.5, 1),
-                    "timestamp": "Şimdi"
-                })
+                signals.append(
+                    {
+                        "ticker": ticker,
+                        "symbol": ticker,
+                        "name": names.get(ticker, f"{ticker} Sanayi"),
+                        "company_name": names.get(ticker, f"{ticker} Sanayi"),
+                        "price": price,
+                        "change_pct": chg,
+                        "score": ui_score,
+                        "confidence_score": ui_score,
+                        "direction": "LONG",
+                        "signal": "GÜÇLÜ AL" if ui_score >= 80 else "AL",
+                        "signal_type": sig_type,
+                        "spec_category": spec_cat,
+                        "spec_reason": spec_rsn,
+                        "risk_level": "Düşük" if ui_score >= 80 else "Orta",
+                        "horizon": "5-10 Gün",
+                        "expected_return_pct": round(max(5.0, (target_1 - price) / price * 100), 1),
+                        "target_price": target_1,
+                        "target_price_2": target_2,
+                        "stop_loss": stop_l,
+                        "risk_reward_ratio": rr_ratio,
+                        "rsi": round(rsi_val, 1),
+                        "volume_ratio": 2.1,
+                        "momentum_1m": round(chg * 4.2, 1),
+                        "momentum_3m": round(chg * 11.5, 1),
+                        "timestamp": "Şimdi",
+                    }
+                )
             _SCAN_SIGNALS_CACHE = signals
             _SCAN_SIGNALS_TIME = now
             return {"signals": signals[:limit], "count": min(len(signals), limit)}
@@ -145,11 +148,141 @@ async def scanner_signals(
 
     # 2. Default Rich Opportunities Fallback
     default_signals = [
-        {"ticker": "THYAO", "symbol": "THYAO", "name": "Türk Hava Yolları", "company_name": "Türk Hava Yolları", "price": 318.5, "change_pct": 2.1, "score": 94, "confidence_score": 94, "direction": "LONG", "signal": "GÜÇLÜ AL", "signal_type": "VOLUME_BREAKOUT", "risk_level": "Düşük", "horizon": "Kısa Vade", "expected_return_pct": 14.5, "target_price": 364.5, "target_price_2": 395.0, "stop_loss": 298.0, "risk_reward_ratio": 2.2, "rsi": 58.4, "volume_ratio": 2.4, "momentum_1m": 12.5, "momentum_3m": 28.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "20G Direnç Kırılımı ve Kurumsal Para Girişi", "timestamp": "Şimdi"},
-        {"ticker": "ASELS", "symbol": "ASELS", "name": "Aselsan Elektronik", "company_name": "Aselsan", "price": 64.2, "change_pct": 1.8, "score": 91, "confidence_score": 91, "direction": "LONG", "signal": "GÜÇLÜ AL", "signal_type": "MOMENTUM_LEADER", "risk_level": "Düşük", "horizon": "Orta Vade", "expected_return_pct": 12.8, "target_price": 72.5, "target_price_2": 78.0, "stop_loss": 60.5, "risk_reward_ratio": 2.2, "rsi": 61.2, "volume_ratio": 1.9, "momentum_1m": 9.8, "momentum_3m": 34.0, "spec_category": "MOMENTUM_LEADER", "spec_reason": "Savunma Sanayi Yeni İhracat ve Büyüme Trendi", "timestamp": "Şimdi"},
-        {"ticker": "TUPRS", "symbol": "TUPRS", "name": "Tüpraş Rafineri", "company_name": "Tüpraş", "price": 156.4, "change_pct": -0.8, "score": 87, "confidence_score": 87, "direction": "LONG", "signal": "AL", "signal_type": "PULLBACK_BOUNCE", "risk_level": "Orta", "horizon": "Kısa Vade", "expected_return_pct": 11.2, "target_price": 174.0, "target_price_2": 188.0, "stop_loss": 147.0, "risk_reward_ratio": 1.9, "rsi": 36.5, "volume_ratio": 1.5, "momentum_1m": 6.4, "momentum_3m": 18.2, "spec_category": "PULLBACK_BOUNCE", "spec_reason": "50 Günlük Ortalama Destek Testi ve Dip Dönüşü", "timestamp": "Şimdi"},
-        {"ticker": "GARAN", "symbol": "GARAN", "name": "Garanti BBVA", "company_name": "Garanti BBVA", "price": 118.2, "change_pct": 3.4, "score": 89, "confidence_score": 89, "direction": "LONG", "signal": "GÜÇLÜ AL", "signal_type": "VOLUME_BREAKOUT", "risk_level": "Düşük", "horizon": "Kısa Vade", "expected_return_pct": 10.4, "target_price": 130.5, "target_price_2": 142.0, "stop_loss": 111.0, "risk_reward_ratio": 1.7, "rsi": 64.0, "volume_ratio": 2.8, "momentum_1m": 15.2, "momentum_3m": 42.0, "spec_category": "VOLUME_BREAKOUT", "spec_reason": "Bankacılık Rallisi ve Yabancı Takas Artışı", "timestamp": "Şimdi"},
-        {"ticker": "BIMAS", "symbol": "BIMAS", "name": "BİM Mağazalar", "company_name": "BİM", "price": 485.0, "change_pct": 0.5, "score": 84, "confidence_score": 84, "direction": "LONG", "signal": "AL", "signal_type": "MOMENTUM_LEADER", "risk_level": "Düşük", "horizon": "Uzun Vade", "expected_return_pct": 9.8, "target_price": 532.0, "target_price_2": 570.0, "stop_loss": 458.0, "risk_reward_ratio": 1.7, "rsi": 52.0, "volume_ratio": 1.2, "momentum_1m": 4.5, "momentum_3m": 22.0, "spec_category": "MOMENTUM_LEADER", "spec_reason": "Defansif Nakit Akışı ve İstikrarlı Büyüme", "timestamp": "Şimdi"},
+        {
+            "ticker": "THYAO",
+            "symbol": "THYAO",
+            "name": "Türk Hava Yolları",
+            "company_name": "Türk Hava Yolları",
+            "price": 318.5,
+            "change_pct": 2.1,
+            "score": 94,
+            "confidence_score": 94,
+            "direction": "LONG",
+            "signal": "GÜÇLÜ AL",
+            "signal_type": "VOLUME_BREAKOUT",
+            "risk_level": "Düşük",
+            "horizon": "Kısa Vade",
+            "expected_return_pct": 14.5,
+            "target_price": 364.5,
+            "target_price_2": 395.0,
+            "stop_loss": 298.0,
+            "risk_reward_ratio": 2.2,
+            "rsi": 58.4,
+            "volume_ratio": 2.4,
+            "momentum_1m": 12.5,
+            "momentum_3m": 28.0,
+            "spec_category": "HIGH_CONVICTION",
+            "spec_reason": "20G Direnç Kırılımı ve Kurumsal Para Girişi",
+            "timestamp": "Şimdi",
+        },
+        {
+            "ticker": "ASELS",
+            "symbol": "ASELS",
+            "name": "Aselsan Elektronik",
+            "company_name": "Aselsan",
+            "price": 64.2,
+            "change_pct": 1.8,
+            "score": 91,
+            "confidence_score": 91,
+            "direction": "LONG",
+            "signal": "GÜÇLÜ AL",
+            "signal_type": "MOMENTUM_LEADER",
+            "risk_level": "Düşük",
+            "horizon": "Orta Vade",
+            "expected_return_pct": 12.8,
+            "target_price": 72.5,
+            "target_price_2": 78.0,
+            "stop_loss": 60.5,
+            "risk_reward_ratio": 2.2,
+            "rsi": 61.2,
+            "volume_ratio": 1.9,
+            "momentum_1m": 9.8,
+            "momentum_3m": 34.0,
+            "spec_category": "MOMENTUM_LEADER",
+            "spec_reason": "Savunma Sanayi Yeni İhracat ve Büyüme Trendi",
+            "timestamp": "Şimdi",
+        },
+        {
+            "ticker": "TUPRS",
+            "symbol": "TUPRS",
+            "name": "Tüpraş Rafineri",
+            "company_name": "Tüpraş",
+            "price": 156.4,
+            "change_pct": -0.8,
+            "score": 87,
+            "confidence_score": 87,
+            "direction": "LONG",
+            "signal": "AL",
+            "signal_type": "PULLBACK_BOUNCE",
+            "risk_level": "Orta",
+            "horizon": "Kısa Vade",
+            "expected_return_pct": 11.2,
+            "target_price": 174.0,
+            "target_price_2": 188.0,
+            "stop_loss": 147.0,
+            "risk_reward_ratio": 1.9,
+            "rsi": 36.5,
+            "volume_ratio": 1.5,
+            "momentum_1m": 6.4,
+            "momentum_3m": 18.2,
+            "spec_category": "PULLBACK_BOUNCE",
+            "spec_reason": "50 Günlük Ortalama Destek Testi ve Dip Dönüşü",
+            "timestamp": "Şimdi",
+        },
+        {
+            "ticker": "GARAN",
+            "symbol": "GARAN",
+            "name": "Garanti BBVA",
+            "company_name": "Garanti BBVA",
+            "price": 118.2,
+            "change_pct": 3.4,
+            "score": 89,
+            "confidence_score": 89,
+            "direction": "LONG",
+            "signal": "GÜÇLÜ AL",
+            "signal_type": "VOLUME_BREAKOUT",
+            "risk_level": "Düşük",
+            "horizon": "Kısa Vade",
+            "expected_return_pct": 10.4,
+            "target_price": 130.5,
+            "target_price_2": 142.0,
+            "stop_loss": 111.0,
+            "risk_reward_ratio": 1.7,
+            "rsi": 64.0,
+            "volume_ratio": 2.8,
+            "momentum_1m": 15.2,
+            "momentum_3m": 42.0,
+            "spec_category": "VOLUME_BREAKOUT",
+            "spec_reason": "Bankacılık Rallisi ve Yabancı Takas Artışı",
+            "timestamp": "Şimdi",
+        },
+        {
+            "ticker": "BIMAS",
+            "symbol": "BIMAS",
+            "name": "BİM Mağazalar",
+            "company_name": "BİM",
+            "price": 485.0,
+            "change_pct": 0.5,
+            "score": 84,
+            "confidence_score": 84,
+            "direction": "LONG",
+            "signal": "AL",
+            "signal_type": "MOMENTUM_LEADER",
+            "risk_level": "Düşük",
+            "horizon": "Uzun Vade",
+            "expected_return_pct": 9.8,
+            "target_price": 532.0,
+            "target_price_2": 570.0,
+            "stop_loss": 458.0,
+            "risk_reward_ratio": 1.7,
+            "rsi": 52.0,
+            "volume_ratio": 1.2,
+            "momentum_1m": 4.5,
+            "momentum_3m": 22.0,
+            "spec_category": "MOMENTUM_LEADER",
+            "spec_reason": "Defansif Nakit Akışı ve İstikrarlı Büyüme",
+            "timestamp": "Şimdi",
+        },
     ]
     return {"signals": default_signals[:limit], "count": min(len(default_signals), limit)}
 
@@ -157,6 +290,7 @@ async def scanner_signals(
 # =====================================================
 # STATUS & DASHBOARD
 # =====================================================
+
 
 @router.get("/status")
 async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
@@ -256,15 +390,23 @@ async def scanner_performance(user=Depends(get_current_user), _=Depends(check_ra
 
 @router.get("/alerts")
 async def scanner_alerts(
-    limit: int = Query(20, ge=1, le=100),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ):
     """Tarayıcı alarmları ve bildirimleri."""
     return {
         "alerts": [
-            {"id": "ALT_01", "level": "INFO", "message": "BIST 100 Likidite Filtresi Aktif (Minimum 5M ₺ ADV)", "timestamp": "Şimdi"},
-            {"id": "ALT_02", "level": "SUCCESS", "message": "LambdaRank v3.0 Şampiyon Model Sinyal Üretimi Hazır", "timestamp": "Şimdi"},
+            {
+                "id": "ALT_01",
+                "level": "INFO",
+                "message": "BIST 100 Likidite Filtresi Aktif (Minimum 5M ₺ ADV)",
+                "timestamp": "Şimdi",
+            },
+            {
+                "id": "ALT_02",
+                "level": "SUCCESS",
+                "message": "LambdaRank v3.0 Şampiyon Model Sinyal Üretimi Hazır",
+                "timestamp": "Şimdi",
+            },
         ],
         "count": 2,
     }
@@ -309,6 +451,7 @@ async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_l
 # ACTIONS
 # =====================================================
 
+
 @router.post("/trigger")
 async def trigger_scan(
     scan_type: str = Query("manual", pattern="^(manual|batch|event)$"),
@@ -318,6 +461,7 @@ async def trigger_scan(
     """Manuel tarama tetikle."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
+
         asyncio.create_task(run_unified_daily_cycle())
         return {"status": "triggered", "scan_type": scan_type, "message": "Unified daily scan & trade cycle queued."}
     except Exception as e:

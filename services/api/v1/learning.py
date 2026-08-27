@@ -39,30 +39,37 @@ async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rat
     """
     try:
         from ...learning.model_memory_store import ModelMemoryStore
+
         store = ModelMemoryStore()
         latest = store.get_latest_metrics_all_models()
 
         if latest:
             models_list = []
             for model_id, metrics in latest.items():
-                models_list.append({
-                    "model_id": model_id,
-                    "model_version": metrics.get("version", "unknown"),
-                    "evaluated_samples": metrics.get("evaluated_samples", 0),
-                    "hit_rate_pct": metrics.get("hit_rate_pct", 0),
-                    "mean_return_pct": metrics.get("mean_return_pct", 0),
-                    "net_pnl": metrics.get("net_pnl", 0),
-                    "annualized_sharpe": metrics.get("annualized_sharpe", 0),
-                    "max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
-                    "brier_score": metrics.get("brier_score", 0),
-                    "reliability_score": metrics.get("reliability_score", 0),
-                    "trust_score": metrics.get("trust_score", 0),
-                    "recommended_fusion_weight": metrics.get("fusion_weight", 0),
-                })
+                models_list.append(
+                    {
+                        "model_id": model_id,
+                        "model_version": metrics.get("version", "unknown"),
+                        "evaluated_samples": metrics.get("evaluated_samples", 0),
+                        "hit_rate_pct": metrics.get("hit_rate_pct", 0),
+                        "mean_return_pct": metrics.get("mean_return_pct", 0),
+                        "net_pnl": metrics.get("net_pnl", 0),
+                        "annualized_sharpe": metrics.get("annualized_sharpe", 0),
+                        "max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
+                        "brier_score": metrics.get("brier_score", 0),
+                        "reliability_score": metrics.get("reliability_score", 0),
+                        "trust_score": metrics.get("trust_score", 0),
+                        "recommended_fusion_weight": metrics.get("fusion_weight", 0),
+                    }
+                )
 
             trust_scores = [
-                {"model_id": m["model_id"], "reliability_score": m["reliability_score"],
-                 "trust_score": m["trust_score"], "recommended_fusion_weight": m["recommended_fusion_weight"]}
+                {
+                    "model_id": m["model_id"],
+                    "reliability_score": m["reliability_score"],
+                    "trust_score": m["trust_score"],
+                    "recommended_fusion_weight": m["recommended_fusion_weight"],
+                }
                 for m in models_list
             ]
 
@@ -88,6 +95,7 @@ async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rat
 
 _cached_report = None
 
+
 @router.get("/report")
 async def performance_report(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """En son model ogrenme raporunu Markdown ve JSON olarak doner."""
@@ -106,15 +114,19 @@ async def performance_report(user=Depends(get_current_user), _=Depends(check_rat
                 "| :--- | :--- | :--- | :--- | :--- |",
             ]
             for m in latest:
-                lines.append(f"| {m.get('model_id')} | {m.get('sharpe_ratio', 1.8):.2f} | %{(m.get('direction_accuracy', 0.55)*100):.1f} | %{m.get('reliability_score', 85.0):.1f} | %{(m.get('recommended_fusion_weight', 0.25)*100):.1f} |")
+                lines.append(
+                    f"| {m.get('model_id')} | {m.get('sharpe_ratio', 1.8):.2f} | %{(m.get('direction_accuracy', 0.55) * 100):.1f} | %{m.get('reliability_score', 85.0):.1f} | %{(m.get('recommended_fusion_weight', 0.25) * 100):.1f} |"
+                )
 
-            lines.extend([
-                "",
-                "## 🎯 Sinyal Füzyon Kararı",
-                "- **En Yüksek Ağırlıklı Model:** CatBoost & LightGBM Alpha Modelleri",
-                "- **Drift / Kayma Durumu:** Düşük (< %2.1)",
-                "- **Öğrenme Döngüsü Durumu:** Optimize Edildi",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## 🎯 Sinyal Füzyon Kararı",
+                    "- **En Yüksek Ağırlıklı Model:** CatBoost & LightGBM Alpha Modelleri",
+                    "- **Drift / Kayma Durumu:** Düşük (< %2.1)",
+                    "- **Öğrenme Döngüsü Durumu:** Optimize Edildi",
+                ]
+            )
             md = "\n".join(lines)
             _cached_report = {
                 "success": True,
@@ -139,7 +151,7 @@ async def trigger_learning_cycle(
     regime: str = Query("BULL_MOMENTUM", description="Aktif piyasa rejimi"),
     background_tasks: BackgroundTasks = None,
     user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    _=Depends(check_rate_limit),
 ):
     """Manuel veya seans sonu otomatik model öğrenme döngüsünü tetikler (arka planda)."""
     if background_tasks:
@@ -162,9 +174,7 @@ def _run_learning_cycle(regime: str):
 
 @router.post("/record_prediction")
 async def record_prediction(
-    payload: dict[str, Any] = Body(...),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    payload: dict[str, Any] = Body(...), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ):
     """Yeni model tahminini kaydeder."""
     try:
@@ -186,9 +196,7 @@ async def record_prediction(
 
 @router.post("/record_outcome")
 async def record_outcome(
-    payload: dict[str, Any] = Body(...),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
+    payload: dict[str, Any] = Body(...), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ):
     """Tahmin sonucunu gerçek fiyatla bağlar."""
     try:
@@ -210,7 +218,9 @@ async def calibration(user=Depends(get_current_user), _=Depends(check_rate_limit
     return {
         "status": "ready",
         "models_calibrated": len(latest),
-        "metrics": [{"model_id": m["model_id"], "brier_score": m["brier_score"], "hit_rate": m["hit_rate_pct"]} for m in latest]
+        "metrics": [
+            {"model_id": m["model_id"], "brier_score": m["brier_score"], "hit_rate": m["hit_rate_pct"]} for m in latest
+        ],
     }
 
 
@@ -230,4 +240,3 @@ async def champion_challenger(user=Depends(get_current_user), _=Depends(check_ra
         "challengers": [m["model_id"] for m in latest[1:]] if len(latest) > 1 else [],
         "ranking": latest,
     }
-

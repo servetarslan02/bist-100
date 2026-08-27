@@ -3,6 +3,7 @@
 9 kriter, ağırlıklı, detaylı analiz.
 Her kriter için değer, eşik ve sonuç döndürür.
 """
+
 from typing import Any
 
 import structlog
@@ -61,7 +62,12 @@ def calculate_f_score(
     roa_prev = prev.get("roa", financials.get("roa_prev", 0))
     passed = roa_curr > roa_prev
     score += passed * w["roa_increasing"]
-    details["roa_increasing"] = {"current": roa_curr, "previous": roa_prev, "passed": passed, "weight": w["roa_increasing"]}
+    details["roa_increasing"] = {
+        "current": roa_curr,
+        "previous": roa_prev,
+        "passed": passed,
+        "weight": w["roa_increasing"],
+    }
 
     # 4. Cash flow > Net income (Kazanç kalitesi — düşük tahakkuk)
     # Orijinal Piotroski: CFO > NI. Negatif değerlerde anlamsız → sadece pozitif NI'da uygula
@@ -74,35 +80,60 @@ def calculate_f_score(
     lev_prev = prev.get("leverage", financials.get("leverage_prev", 0))
     passed = lev_curr < lev_prev
     score += passed * w["leverage_decreasing"]
-    details["leverage_decreasing"] = {"current": lev_curr, "previous": lev_prev, "passed": passed, "weight": w["leverage_decreasing"]}
+    details["leverage_decreasing"] = {
+        "current": lev_curr,
+        "previous": lev_prev,
+        "passed": passed,
+        "weight": w["leverage_decreasing"],
+    }
 
     # 6. Current ratio increasing (Likidite artışı)
     cr_curr = financials.get("current_ratio", 0)
     cr_prev = prev.get("current_ratio", financials.get("current_ratio_prev", 0))
     passed = cr_curr > cr_prev
     score += passed * w["current_ratio_increasing"]
-    details["current_ratio_increasing"] = {"current": cr_curr, "previous": cr_prev, "passed": passed, "weight": w["current_ratio_increasing"]}
+    details["current_ratio_increasing"] = {
+        "current": cr_curr,
+        "previous": cr_prev,
+        "passed": passed,
+        "weight": w["current_ratio_increasing"],
+    }
 
     # 7. No dilution (Seyreltme yok)
     shares_curr = financials.get("shares_outstanding", financials.get("shares_current", 0))
     shares_prev = prev.get("shares_outstanding", financials.get("shares_prev", 0))
     passed = shares_curr <= shares_prev and shares_curr > 0
     score += passed * w["no_dilution"]
-    details["no_dilution"] = {"current": shares_curr, "previous": shares_prev, "passed": passed, "weight": w["no_dilution"]}
+    details["no_dilution"] = {
+        "current": shares_curr,
+        "previous": shares_prev,
+        "passed": passed,
+        "weight": w["no_dilution"],
+    }
 
     # 8. Gross margin increasing (Marj artışı)
     gm_curr = financials.get("gross_margin", 0)
     gm_prev = prev.get("gross_margin", financials.get("gross_margin_prev", 0))
     passed = gm_curr > gm_prev
     score += passed * w["gross_margin_increasing"]
-    details["gross_margin_increasing"] = {"current": gm_curr, "previous": gm_prev, "passed": passed, "weight": w["gross_margin_increasing"]}
+    details["gross_margin_increasing"] = {
+        "current": gm_curr,
+        "previous": gm_prev,
+        "passed": passed,
+        "weight": w["gross_margin_increasing"],
+    }
 
     # 9. Asset turnover increasing (Verimlilik artışı)
     at_curr = financials.get("asset_turnover", 0)
     at_prev = prev.get("asset_turnover", financials.get("asset_turnover_prev", 0))
     passed = at_curr > at_prev
     score += passed * w["asset_turnover_increasing"]
-    details["asset_turnover_increasing"] = {"current": at_curr, "previous": at_prev, "passed": passed, "weight": w["asset_turnover_increasing"]}
+    details["asset_turnover_increasing"] = {
+        "current": at_curr,
+        "previous": at_prev,
+        "passed": passed,
+        "weight": w["asset_turnover_increasing"],
+    }
 
     # Normalize score to 0-9 range
     normalized_score = int(score * 9 / max_score + 0.5) if max_score > 0 else 0
@@ -119,8 +150,14 @@ def calculate_f_score(
         signal = "SELL"
 
     # Kriter grupları
-    profitability = sum(1 for k in ["net_income_positive", "operating_cf_positive", "roa_increasing", "cf_gt_ni"] if details[k]["passed"])
-    leverage_liquidity = sum(1 for k in ["leverage_decreasing", "current_ratio_increasing", "no_dilution"] if details[k]["passed"])
+    profitability = sum(
+        1
+        for k in ["net_income_positive", "operating_cf_positive", "roa_increasing", "cf_gt_ni"]
+        if details[k]["passed"]
+    )
+    leverage_liquidity = sum(
+        1 for k in ["leverage_decreasing", "current_ratio_increasing", "no_dilution"] if details[k]["passed"]
+    )
     efficiency = sum(1 for k in ["gross_margin_increasing", "asset_turnover_increasing"] if details[k]["passed"])
 
     result = {
@@ -132,7 +169,11 @@ def calculate_f_score(
         "details": details,
         "sub_scores": {
             "profitability": {"score": profitability, "max": 4, "pct": round(profitability / 4 * 100, 1)},
-            "leverage_liquidity": {"score": leverage_liquidity, "max": 3, "pct": round(leverage_liquidity / 3 * 100, 1)},
+            "leverage_liquidity": {
+                "score": leverage_liquidity,
+                "max": 3,
+                "pct": round(leverage_liquidity / 3 * 100, 1),
+            },
             "efficiency": {"score": efficiency, "max": 2, "pct": round(efficiency / 2 * 100, 1)},
         },
     }

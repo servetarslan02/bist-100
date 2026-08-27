@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 class CalibrationConfig(BaseModel):
     """Calibration ayarları."""
+
     check_interval_days: int = Field(default=7, description="Calibration kontrol sıklığı (gün)")
     brier_threshold: float = Field(default=0.25, description="Brier score eşik — üstü kötü")
     ece_threshold: float = Field(default=0.10, description="Expected Calibration Error eşik")
@@ -23,6 +24,7 @@ class CalibrationConfig(BaseModel):
 
 class DriftConfig(BaseModel):
     """Drift detection ayarları."""
+
     check_interval_days: int = Field(default=1, description="Drift kontrol sıklığı (gün)")
 
     # PSI
@@ -54,6 +56,7 @@ class DriftConfig(BaseModel):
 
 class RetrainConfig(BaseModel):
     """Retrain ayarları."""
+
     sharpe_threshold: float = Field(default=0.3, description="Sharpe retrain eşiği")
     winrate_threshold: float = Field(default=0.45, description="Win rate retrain eşiği")
     ic_threshold: float = Field(default=0.02, description="IC retrain eşiği")
@@ -74,6 +77,7 @@ class RetrainConfig(BaseModel):
 
 class ShadowConfig(BaseModel):
     """Shadow mode ayarları."""
+
     duration_days: int = Field(default=21, description="Shadow mode süresi (gün)")
     min_predictions: int = Field(default=50, description="Minimum prediction sayısı")
     promote_threshold_pct: float = Field(default=10.0, description="Promote için min iyileşme (%)")
@@ -83,6 +87,7 @@ class ShadowConfig(BaseModel):
 
 class FeatureImportanceConfig(BaseModel):
     """Feature importance ayarları."""
+
     track_interval_days: int = Field(default=1, description="Tracking sıklığı (gün)")
     trend_window_days: int = Field(default=30, description="Trend analizi penceresi (gün)")
     min_importance_threshold: float = Field(default=0.001, description="Min importance eşiği")
@@ -91,6 +96,7 @@ class FeatureImportanceConfig(BaseModel):
 
 class ModelRegistryConfig(BaseModel):
     """Model registry ayarları."""
+
     max_versions: int = Field(default=20, description="Maksimum model versiyon sayısı")
     auto_cleanup: bool = Field(default=True, description="Eski versiyonları otomatik temizle")
     archive_retired: bool = Field(default=True, description="Retired modelleri arşivle")
@@ -98,6 +104,7 @@ class ModelRegistryConfig(BaseModel):
 
 class MetaLearningConfig(BaseModel):
     """Meta-learning ayarları."""
+
     regime_performance_window: int = Field(default=10, description="Rejim performans penceresi")
     decay_trend_threshold: float = Field(default=-0.001, description="Decay trend eşiği")
     ensemble_min_models: int = Field(default=2, description="Minimum ensemble model sayısı")
@@ -105,6 +112,7 @@ class MetaLearningConfig(BaseModel):
 
 class HealthConfig(BaseModel):
     """Health monitoring ayarları."""
+
     check_interval_minutes: int = Field(default=60, description="Health check sıklığı (dakika)")
     max_healing_attempts: int = Field(default=3, description="Maksimum healing deneme sayısı")
     healing_backoff_seconds: int = Field(default=60, description="Healing backoff süresi (saniye)")
@@ -125,10 +133,7 @@ class LearningSettings(BaseModel):
 
     # Genel ayarlar
     log_level: str = Field(default="INFO", description="Log seviyesi")
-    state_persistence_path: str = Field(
-        default="data/central_state.db",
-        description="Learning state SQLite dosya yolu"
-    )
+    state_persistence_path: str = Field(default="data/central_state.db", description="Learning state SQLite dosya yolu")
     enable_event_bus: bool = Field(default=True, description="Event bus aktif mi")
     enable_self_healing: bool = Field(default=True, description="Self-healing aktif mi")
 
@@ -141,7 +146,7 @@ class LearningSettings(BaseModel):
         for key, value in os.environ.items():
             if key.startswith(prefix):
                 # Nested config path oluştur
-                parts = key[len(prefix):].lower().split("_")
+                parts = key[len(prefix) :].lower().split("_")
                 if len(parts) >= 2:
                     section = parts[0]
                     field = "_".join(parts[1:])

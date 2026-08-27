@@ -57,6 +57,7 @@ class ArrowPipeline:
         """Arrow Table'dan Polars DataFrame'e çevir."""
         try:
             import polars as pl
+
             return pl.from_arrow(table)
         except ImportError:
             logger.error("Polars not installed")
@@ -73,11 +74,13 @@ class ArrowPipeline:
             pq.write_table(table, str(full_path), compression=compression)
 
             size_mb = full_path.stat().st_size / (1024 * 1024)
-            logger.info("Parquet written",
-                       path=str(full_path),
-                       rows=table.num_rows,
-                       cols=table.num_columns,
-                       size_mb=round(size_mb, 2))
+            logger.info(
+                "Parquet written",
+                path=str(full_path),
+                rows=table.num_rows,
+                cols=table.num_columns,
+                size_mb=round(size_mb, 2),
+            )
 
             return str(full_path)
         except ImportError:
@@ -92,10 +95,7 @@ class ArrowPipeline:
             full_path = self.base_path / path
             table = pq.read_table(str(full_path), columns=columns)
 
-            logger.info("Parquet read",
-                       path=str(full_path),
-                       rows=table.num_rows,
-                       cols=table.num_columns)
+            logger.info("Parquet read", path=str(full_path), rows=table.num_rows, cols=table.num_columns)
 
             return table
         except ImportError:
@@ -133,10 +133,7 @@ class ArrowPipeline:
 
             pq.write_table(merged, str(output_full))
 
-            logger.info("Parquet merged",
-                       inputs=len(input_paths),
-                       output=str(output_full),
-                       rows=merged.num_rows)
+            logger.info("Parquet merged", inputs=len(input_paths), output=str(output_full), rows=merged.num_rows)
 
             return str(output_full)
         except ImportError:

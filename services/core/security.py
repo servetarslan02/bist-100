@@ -17,6 +17,7 @@ import secrets
 # passlib for better password hashing (optional, fallback to hashlib)
 try:
     from passlib.context import CryptContext
+
     _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     _USE_PASSLIB = True
 except ImportError:
@@ -25,6 +26,7 @@ except ImportError:
 # cryptography for encryption utilities (optional)
 try:
     from cryptography.fernet import Fernet
+
     _USE_CRYPTO = True
 except ImportError:
     _USE_CRYPTO = False
@@ -61,7 +63,13 @@ class Permission(StrEnum):
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.VIEWER: {Permission.READ_MARKET, Permission.READ_PORTFOLIO},
     Role.ANALYST: {Permission.READ_MARKET, Permission.READ_PORTFOLIO, Permission.RUN_BACKTEST, Permission.RUN_SCENARIO},
-    Role.OPERATOR: {Permission.READ_MARKET, Permission.READ_PORTFOLIO, Permission.RUN_BACKTEST, Permission.RUN_SCENARIO, Permission.CHANGE_CONFIG},
+    Role.OPERATOR: {
+        Permission.READ_MARKET,
+        Permission.READ_PORTFOLIO,
+        Permission.RUN_BACKTEST,
+        Permission.RUN_SCENARIO,
+        Permission.CHANGE_CONFIG,
+    },
     Role.ADMIN: {p for p in Permission},
     Role.SYSTEM: {p for p in Permission},
 }
@@ -70,6 +78,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
 @dataclass
 class User:
     """Kullanıcı."""
+
     user_id: str
     username: str
     role: Role
@@ -113,6 +122,7 @@ class AuthenticationService:
 
         # JWT token oluştur (jwt_manager ile)
         from .jwt_manager import TokenType, jwt_manager
+
         permissions = [p.value for p in ROLE_PERMISSIONS.get(user.role, set())]
         token = jwt_manager.generate_token(
             user_id=user.user_id,
@@ -131,6 +141,7 @@ class AuthenticationService:
     def validate_token(self, token: str) -> User | None:
         """JWT token doğrula."""
         from .jwt_manager import JWTError, jwt_manager
+
         try:
             claims = jwt_manager.validate_token(token)
         except JWTError:
@@ -149,7 +160,7 @@ class AuthenticationService:
             return _pwd_context.hash(password)
         # Fallback: hashlib PBKDF2
         salt = secrets.token_hex(16)
-        hash_val = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+        hash_val = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
         return f"{salt}:{hash_val.hex()}"
 
     def _verify_password(self, password: str, stored_hash: str) -> bool:
@@ -159,7 +170,7 @@ class AuthenticationService:
                 return _pwd_context.verify(password, stored_hash)
             # Fallback: hashlib PBKDF2
             salt, hash_hex = stored_hash.split(":")
-            hash_val = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+            hash_val = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
             return hmac.compare_digest(hash_val.hex(), hash_hex)
         except Exception:
             return False
@@ -190,10 +201,10 @@ class SecretRedaction:
     """Loglarda hassas bilgi gizleme."""
 
     PATTERNS = [
-        (r'(?i)(api[_-]?key|token|secret|password|auth)["\s:=]+["\']?([a-zA-Z0-9_\-\.]{8,})', r'\1=***REDACTED***'),
-        (r'(?i)bearer\s+[a-zA-Z0-9_\-\.]+', 'Bearer ***REDACTED***'),
-        (r'ghp_[a-zA-Z0-9]+', 'ghp_***REDACTED***'),
-        (r'sk-[a-zA-Z0-9]+', 'sk-***REDACTED***'),
+        (r'(?i)(api[_-]?key|token|secret|password|auth)["\s:=]+["\']?([a-zA-Z0-9_\-\.]{8,})', r"\1=***REDACTED***"),
+        (r"(?i)bearer\s+[a-zA-Z0-9_\-\.]+", "Bearer ***REDACTED***"),
+        (r"ghp_[a-zA-Z0-9]+", "ghp_***REDACTED***"),
+        (r"sk-[a-zA-Z0-9]+", "sk-***REDACTED***"),
     ]
 
     @classmethod
@@ -225,12 +236,14 @@ class SystemStateMachine:
 
         old_state = self._state
         self._state = new_state
-        self._history.append({
-            "from": old_state,
-            "to": new_state,
-            "reason": reason,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._history.append(
+            {
+                "from": old_state,
+                "to": new_state,
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
         logger.info("System state transition", from_state=old_state, to=new_state, reason=reason)
@@ -291,6 +304,7 @@ safety_governance = SafetyGovernance()
 
 
 # === Encryption Utilities (optional, requires cryptography) ===
+
 
 def encrypt_data(data: str, key: bytes | None = None) -> bytes:
     """Encrypt string data using Fernet (AES-128-CBC).

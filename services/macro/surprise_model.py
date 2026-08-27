@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class SurpriseResult:
     """Surprise sonucu."""
+
     indicator: str
     actual: float
     expected: float
@@ -43,6 +44,7 @@ class SurpriseResult:
 @dataclass
 class SurpriseImpact:
     """Surprise etki sonucu."""
+
     indicator: str
     surprise_pct: float
     sector_impacts: dict[str, float]  # sector → impact
@@ -57,8 +59,8 @@ class MacroSurpriseModel:
     # Beklenti kaynakları ve güvenilirlikleri
     EXPECTATION_SOURCES = {
         "TCMB_RATE": {
-            "primary": "tcmb_survey",       # TCMB Piyasa Katılımcıları Anketi
-            "fallback": "swap_pricing",      # TCMB faiz swapları
+            "primary": "tcmb_survey",  # TCMB Piyasa Katılımcıları Anketi
+            "fallback": "swap_pricing",  # TCMB faiz swapları
             "confidence": {"tcmb_survey": 0.9, "swap_pricing": 0.7, "trend": 0.4},
         },
         "CPI": {
@@ -111,8 +113,7 @@ class MacroSurpriseModel:
             "confidence": confidence,
             "timestamp": datetime.now(UTC).isoformat(),
         }
-        logger.info("Expectation set", indicator=indicator,
-                   expected=expected, source=source)
+        logger.info("Expectation set", indicator=indicator, expected=expected, source=source)
 
     def calculate_surprise(
         self,
@@ -197,9 +198,13 @@ class MacroSurpriseModel:
         self._active_surprises[indicator] = result
 
         if magnitude != "NONE":
-            logger.warning("Macro surprise detected",
-                         indicator=indicator, magnitude=magnitude,
-                         direction=direction, surprise_pct=round(surprise_pct, 4))
+            logger.warning(
+                "Macro surprise detected",
+                indicator=indicator,
+                magnitude=magnitude,
+                direction=direction,
+                surprise_pct=round(surprise_pct, 4),
+            )
 
         return result
 
@@ -223,19 +228,19 @@ class MacroSurpriseModel:
             prefix = indicator.lower()
             features[f"{prefix}_surprise"] = surprise.surprise
             features[f"{prefix}_surprise_pct"] = surprise.surprise_pct
-            features[f"{prefix}_surprise_magnitude"] = {
-                "NONE": 0.0, "SMALL": 1.0, "MEDIUM": 2.0, "LARGE": 3.0
-            }.get(surprise.magnitude, 0.0)
+            features[f"{prefix}_surprise_magnitude"] = {"NONE": 0.0, "SMALL": 1.0, "MEDIUM": 2.0, "LARGE": 3.0}.get(
+                surprise.magnitude, 0.0
+            )
 
             # Direction encoding
             if indicator in ("TCMB_RATE", "POLICY_RATE"):
-                features[f"{prefix}_surprise_direction"] = {
-                    "IN_LINE": 0.0, "HAWKISH": 1.0, "DOVISH": -1.0
-                }.get(surprise.direction, 0.0)
+                features[f"{prefix}_surprise_direction"] = {"IN_LINE": 0.0, "HAWKISH": 1.0, "DOVISH": -1.0}.get(
+                    surprise.direction, 0.0
+                )
             else:
-                features[f"{prefix}_surprise_direction"] = {
-                    "IN_LINE": 0.0, "HIGHER": 1.0, "LOWER": -1.0
-                }.get(surprise.direction, 0.0)
+                features[f"{prefix}_surprise_direction"] = {"IN_LINE": 0.0, "HIGHER": 1.0, "LOWER": -1.0}.get(
+                    surprise.direction, 0.0
+                )
 
         # Birikimli surprise (son 3 ay)
         cumulative = self._compute_cumulative_surprise()
@@ -249,9 +254,7 @@ class MacroSurpriseModel:
         surprises: dict[str, SurpriseResult],
     ) -> dict[str, float]:
         """Sektör bazlı surprise etkisi."""
-        sensitivity = self.SECTOR_SURPRISE_SENSITIVITY.get(
-            sector, self.SECTOR_SURPRISE_SENSITIVITY["OTHER"]
-        )
+        sensitivity = self.SECTOR_SURPRISE_SENSITIVITY.get(sector, self.SECTOR_SURPRISE_SENSITIVITY["OTHER"])
 
         impacts = {}
         total_impact = 0.0
@@ -272,9 +275,7 @@ class MacroSurpriseModel:
     ) -> float:
         """Surprise etkisinin decay sonrası kalan oranı."""
         cfg = macro_config.decay
-        half_life = cfg.half_life_by_shock_type.get(
-            indicator.lower(), cfg.default_half_life_days
-        )
+        half_life = cfg.half_life_by_shock_type.get(indicator.lower(), cfg.default_half_life_days)
         return round(0.5 ** (days_elapsed / half_life), 4)
 
     def get_surprise_report(self) -> dict[str, Any]:
@@ -290,10 +291,7 @@ class MacroSurpriseModel:
                 for k, v in self._active_surprises.items()
             },
             "total_surprises": len(self._surprise_history),
-            "expectations": {
-                k: {"value": v["value"], "source": v["source"]}
-                for k, v in self._expectations.items()
-            },
+            "expectations": {k: {"value": v["value"], "source": v["source"]} for k, v in self._expectations.items()},
         }
 
     def _compute_cumulative_surprise(self) -> dict[str, float]:

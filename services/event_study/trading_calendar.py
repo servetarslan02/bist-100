@@ -14,6 +14,7 @@ Bu modül:
 - Calendar ↔ Trading day dönüşümü yapar
 - Event window ve estimation window'ları trading day cinsinden hesaplar
 """
+
 import os
 from datetime import date, datetime, timedelta
 
@@ -25,13 +26,13 @@ logger = structlog.get_logger()
 
 # BIST sabit tatiller (her yıl tekrar eden, tarihi değişmeyen)
 _FIXED_HOLIDAYS_MD = [
-    (1, 1),   # Yılbaşı
+    (1, 1),  # Yılbaşı
     (4, 23),  # Ulusal Egemenlik ve Çocuk Bayramı
-    (5, 1),   # Emek ve Dayanışma Günü
+    (5, 1),  # Emek ve Dayanışma Günü
     (5, 19),  # Atatürk'ü Anma, Gençlik ve Spor Bayramı
     (7, 15),  # Demokrasi ve Millî Birlik Günü
     (8, 30),  # Zafer Bayramı
-    (10, 29), # Cumhuriyet Bayramı
+    (10, 29),  # Cumhuriyet Bayramı
 ]
 
 # Ramazan Bayramı (3 gün) ve Kurban Bayramı (4 gün) — her yıl değişir
@@ -60,9 +61,7 @@ class BISTTradingCalendar:
 
         # Değişken tatilleri yükle (holidays.json)
         if holidays_json_path is None:
-            holidays_json_path = os.path.join(
-                os.path.dirname(__file__), "..", "..", "config", "holidays.json"
-            )
+            holidays_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "holidays.json")
         self._load_variable_holidays(holidays_json_path)
 
         # Tüm tatilleri birleştir
@@ -281,9 +280,7 @@ class BISTTradingCalendar:
 
         # Trading day offset'leri hesapla
         target_offsets = list(range(start_offset, end_offset + 1))
-        target_dates = [
-            self.trading_day_offset(event_date_d, off) for off in target_offsets
-        ]
+        target_dates = [self.trading_day_offset(event_date_d, off) for off in target_offsets]
 
         # Return serisinden eşleştir
         aligned_returns = []

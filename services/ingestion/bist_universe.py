@@ -4,7 +4,6 @@ Borsa İstanbul'daki TÜM hisseleri (600+ hisse) canlı kaynaklardan dinamik ola
 Yeni halka arzlar ve değişiklikler otomatik olarak keşfedilir.
 """
 
-
 import structlog
 
 from .providers.universe_provider import universe_updater
@@ -54,13 +53,13 @@ class BISTUniverse:
     def COMPANY_NAMES(self) -> dict[str, str]:
         """Tüm hisselerin şirket isimleri."""
         uni = self._updater.get_universe()
-        return {t: getattr(info, 'name', t) for t, info in uni.items()}
+        return {t: getattr(info, "name", t) for t, info in uni.items()}
 
     def get_company_name(self, ticker: str) -> str:
         """Hissenin şirket adını döndür."""
         uni = self._updater.get_universe()
         info = uni.get(ticker.upper())
-        return getattr(info, 'name', ticker) if info else ticker
+        return getattr(info, "name", ticker) if info else ticker
 
     def get_ticker_sector(self, ticker: str) -> str:
         """Hissenin sektörünü döndür."""
@@ -91,8 +90,10 @@ bist_universe = BISTUniverse()
 BIST_STOCKS = bist_universe.BIST_100_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
 
+
 def get_sector(ticker: str) -> str:
     return bist_universe.get_ticker_sector(ticker)
+
 
 BIST_INDICES = {
     "XU100": "BIST 100",

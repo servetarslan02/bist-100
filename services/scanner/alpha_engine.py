@@ -43,6 +43,7 @@ class AlphaEngine:
         from .event_queue import event_queue
         from .event_scanner import event_scanner
         from .live_scanner import live_scanner
+
         self._live = live_scanner
         self._events = event_scanner
         self._queue = event_queue
@@ -54,6 +55,7 @@ class AlphaEngine:
         from .performance_tracker import performance_tracker
         from .scan_alerts import scan_alert_manager
         from .scan_persistence import scan_persistence
+
         self._dedup = scan_deduplicator
         self._persistence = scan_persistence
         self._perf_tracker = performance_tracker
@@ -73,8 +75,7 @@ class AlphaEngine:
     # Layer 1: Live Scanner (her tick'te)
     # =====================================================
 
-    def process_tick(self, ticker: str, price: float, volume: int,
-                     timestamp: datetime | None = None) -> dict | None:
+    def process_tick(self, ticker: str, price: float, volume: int, timestamp: datetime | None = None) -> dict | None:
         """
         Her tick'te çalışır. Çok düşük maliyetli.
         State update → candidate check → event score güncelle.
@@ -89,20 +90,20 @@ class AlphaEngine:
             # Live candidate alert kontrolü
             if result["score"] > 80:
                 self._alert_manager.check_scan_results(
-                    [{
-                        "ticker": ticker,
-                        "score": result["score"],
-                        "signal": result["reason"],
-                        "volume_zscore": result.get("vol_z", 0),
-                        "breakout_score": 0,
-                        "price": price,
-                    }],
+                    [
+                        {
+                            "ticker": ticker,
+                            "score": result["score"],
+                            "signal": result["reason"],
+                            "volume_zscore": result.get("vol_z", 0),
+                            "breakout_score": 0,
+                            "price": price,
+                        }
+                    ],
                     regime=self._market_regime,
                 )
 
-            logger.info("LIVE CANDIDATE",
-                       ticker=ticker, reason=result["reason"],
-                       score=result["score"])
+            logger.info("LIVE CANDIDATE", ticker=ticker, reason=result["reason"], score=result["score"])
 
         return result
 
@@ -118,8 +119,7 @@ class AlphaEngine:
         start = time.time()
         self._scan_count += 1
 
-        logger.info("=== BATCH SCAN START ===",
-                    scan_count=self._scan_count, universe=len(self._universe))
+        logger.info("=== BATCH SCAN START ===", scan_count=self._scan_count, universe=len(self._universe))
 
         # 1. Veri çek
         data = await self._fetch_all_data()
@@ -136,10 +136,7 @@ class AlphaEngine:
         self._ml_scores = self._compute_ml_scores()
 
         # 5. Event scores
-        self._event_scores = {
-            ticker: self._events.get_event_score(ticker)
-            for ticker in self._universe
-        }
+        self._event_scores = {ticker: self._events.get_event_score(ticker) for ticker in self._universe}
 
         # 6. Deduplication kontrolü — sadece tarama gereken hisseler
         universe_to_scan = []
@@ -153,6 +150,7 @@ class AlphaEngine:
 
         # 7. Scanner çalıştır
         from .alpha_scanner import alpha_scanner
+
         results = alpha_scanner.scan(
             universe=universe_to_scan,
             features_map=self._features_map,
@@ -164,19 +162,26 @@ class AlphaEngine:
         self._last_scan_results = results
 
         # 8. Custom filters uygula
-        result_dicts = [r.to_dict() if hasattr(r, 'to_dict') else {
-            "ticker": r.ticker, "score": r.opportunity_score,
-            "signal": r.signal_type, "direction": r.signal_direction,
-            "confidence": r.signal_confidence, "price": r.price,
-            "volume": r.volume, "volume_zscore": r.volume_zscore,
-            "breakout_score": r.breakout_score,
-        } for r in results]
+        result_dicts = [
+            r.to_dict()
+            if hasattr(r, "to_dict")
+            else {
+                "ticker": r.ticker,
+                "score": r.opportunity_score,
+                "signal": r.signal_type,
+                "direction": r.signal_direction,
+                "confidence": r.signal_confidence,
+                "price": r.price,
+                "volume": r.volume,
+                "volume_zscore": r.volume_zscore,
+                "breakout_score": r.breakout_score,
+            }
+            for r in results
+        ]
         filtered_results, filter_log = self._filter_engine.apply_filters(result_dicts)
 
         # 9. Alert kontrolü
-        new_alerts = self._alert_manager.check_scan_results(
-            filtered_results, regime=self._market_regime
-        )
+        new_alerts = self._alert_manager.check_scan_results(filtered_results, regime=self._market_regime)
 
         # 10. Persistence — sonuçları kaydet
         self._persistence.save_batch_results(
@@ -217,12 +222,14 @@ class AlphaEngine:
         summary["filtered_out"] = len(results) - len(filtered_results)
         self._last_scan_summary = summary
 
-        logger.info("=== BATCH SCAN COMPLETE ===",
-                    scanned=summary["total_scanned"],
-                    signals=summary["signals_generated"],
-                    elapsed=summary["elapsed_seconds"],
-                    alerts=len(new_alerts),
-                    filtered_out=summary["filtered_out"])
+        logger.info(
+            "=== BATCH SCAN COMPLETE ===",
+            scanned=summary["total_scanned"],
+            signals=summary["signals_generated"],
+            elapsed=summary["elapsed_seconds"],
+            alerts=len(new_alerts),
+            filtered_out=summary["filtered_out"],
+        )
 
         return summary
 
@@ -297,15 +304,13 @@ class AlphaEngine:
                         forced=True,
                     )
 
-                    logger.info("EVENT RESCAN", ticker=ticker,
-                               score=result.opportunity_score,
-                               signal=result.signal_type)
+                    logger.info(
+                        "EVENT RESCAN", ticker=ticker, score=result.opportunity_score, signal=result.signal_type
+                    )
 
         # 6. Alert kontrolü
         if results:
-            self._alert_manager.check_scan_results(
-                results, regime=self._market_regime
-            )
+            self._alert_manager.check_scan_results(results, regime=self._market_regime)
 
             # Persistence
             self._persistence.save_batch_results(
@@ -346,6 +351,7 @@ class AlphaEngine:
         import polars as pl
 
         from ..features.calculator import feature_calculator
+
         features_map = {}
 
         for ticker in self._universe:
@@ -355,8 +361,16 @@ class AlphaEngine:
                     continue
                 td = td.reset_index()
                 df = pl.from_pandas(td[["Date", "Open", "High", "Low", "Close", "Volume"]])
-                df = df.rename({"Date": "timestamp", "Open": "open", "High": "high",
-                               "Low": "low", "Close": "close", "Volume": "volume"})
+                df = df.rename(
+                    {
+                        "Date": "timestamp",
+                        "Open": "open",
+                        "High": "high",
+                        "Low": "low",
+                        "Close": "close",
+                        "Volume": "volume",
+                    }
+                )
                 df = df.drop_nulls(subset=["close"])
                 features = feature_calculator.compute_all_features(df)
                 if features:
@@ -376,27 +390,40 @@ class AlphaEngine:
 
         for _ticker, features in self._features_map.items():
             ret = features.get("return_1d", 0)
-            if ret > 0: advancing += 1
-            elif ret < 0: declining += 1
+            if ret > 0:
+                advancing += 1
+            elif ret < 0:
+                declining += 1
             vol = features.get("realized_vol_20d", 20)
-            if vol: volatilities.append(vol)
+            if vol:
+                volatilities.append(vol)
             mom = features.get("momentum_20d", 0)
-            if mom: momentums.append(mom)
+            if mom:
+                momentums.append(mom)
 
         total = advancing + declining
         breadth = (advancing / total * 100) if total > 0 else 50
         avg_vol = np.mean(volatilities) if volatilities else 20
         avg_mom = np.mean(momentums) if momentums else 0
 
-        if breadth < 20 and avg_vol > 40: return "PANIC", 0.9
-        elif breadth < 35: return "RISK-OFF", 0.8
-        elif avg_vol > 35: return "HIGH-VOLATILITY", 0.7
-        elif breadth > 70 and avg_mom > 5: return "MOMENTUM-EXPANSION", 0.8
-        elif breadth > 65 and avg_mom > 0: return "TRENDING-UP", 0.7
-        elif breadth < 40 and avg_mom < -5: return "TRENDING-DOWN", 0.7
-        elif 45 < breadth < 55 and avg_mom > 0: return "RECOVERY", 0.6
-        elif avg_vol < 12: return "LOW-VOLATILITY", 0.6
-        else: return "RANGE", 0.5
+        if breadth < 20 and avg_vol > 40:
+            return "PANIC", 0.9
+        elif breadth < 35:
+            return "RISK-OFF", 0.8
+        elif avg_vol > 35:
+            return "HIGH-VOLATILITY", 0.7
+        elif breadth > 70 and avg_mom > 5:
+            return "MOMENTUM-EXPANSION", 0.8
+        elif breadth > 65 and avg_mom > 0:
+            return "TRENDING-UP", 0.7
+        elif breadth < 40 and avg_mom < -5:
+            return "TRENDING-DOWN", 0.7
+        elif 45 < breadth < 55 and avg_mom > 0:
+            return "RECOVERY", 0.6
+        elif avg_vol < 12:
+            return "LOW-VOLATILITY", 0.6
+        else:
+            return "RANGE", 0.5
 
     def _compute_single_feature(self, ticker: str) -> dict[str, float] | None:
         """Tek hisse için hızlı feature hesaplama (event fallback)."""
@@ -409,8 +436,16 @@ class AlphaEngine:
                 return None
 
             df = pl.from_pandas(hist[["Date", "Open", "High", "Low", "Close", "Volume"]])
-            df = df.rename({"Date": "timestamp", "Open": "open", "High": "high",
-                           "Low": "low", "Close": "close", "Volume": "volume"})
+            df = df.rename(
+                {
+                    "Date": "timestamp",
+                    "Open": "open",
+                    "High": "high",
+                    "Low": "low",
+                    "Close": "close",
+                    "Volume": "volume",
+                }
+            )
             df = df.drop_nulls(subset=["close"])
 
             features = feature_calculator.compute_all_features(df)

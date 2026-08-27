@@ -57,6 +57,7 @@ class AsyncHTTPClient:
         if text:
             try:
                 import orjson
+
                 return orjson.loads(text)
             except Exception as e:
                 logger.warning("JSON parse error", url=url, error=str(e))
@@ -101,6 +102,7 @@ class AsyncHTTPClient:
                         text = await resp.text()
                         try:
                             import orjson
+
                             return orjson.loads(text)
                         except Exception as e:
                             logger.debug("json_parse_failed", url=url, error=str(e))

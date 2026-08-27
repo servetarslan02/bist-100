@@ -23,60 +23,60 @@ logger = structlog.get_logger()
 # Pozitif = artış şirket için olumlu, Negatif = artış şirket için olumsuz
 SECTOR_MACRO_SENSITIVITY = {
     "BANK": {
-        "usdtry": -0.3,      # Döviz artışı → negatif (risk)
-        "interest_rate": 0.9, # Faiz artışı → pozitif (faiz geliri)
-        "oil": -0.1,         # Petrol artışı → hafif negatif
-        "gold": 0.1,         # Altın artışı → hafif pozitif
-        "global": 0.5,       # Global pozitif → pozitif
-        "inflation": -0.7,   # Enflasyon artışı → negatif
+        "usdtry": -0.3,  # Döviz artışı → negatif (risk)
+        "interest_rate": 0.9,  # Faiz artışı → pozitif (faiz geliri)
+        "oil": -0.1,  # Petrol artışı → hafif negatif
+        "gold": 0.1,  # Altın artışı → hafif pozitif
+        "global": 0.5,  # Global pozitif → pozitif
+        "inflation": -0.7,  # Enflasyon artışı → negatif
     },
     "AVIATION": {
-        "usdtry": -0.8,      # Döviz artışı → negatif (yakıt maliyeti, döviz borcu)
-        "interest_rate": -0.5, # Faiz artışı → negatif (kredi maliyeti)
-        "oil": -0.9,         # Petrol artışı → negatif (yakıt)
-        "gold": 0.0,         # Yok
-        "global": 0.6,       # Global pozitif → pozitif
-        "inflation": -0.4,   # Enflasyon artışı → negatif
+        "usdtry": -0.8,  # Döviz artışı → negatif (yakıt maliyeti, döviz borcu)
+        "interest_rate": -0.5,  # Faiz artışı → negatif (kredi maliyeti)
+        "oil": -0.9,  # Petrol artışı → negatif (yakıt)
+        "gold": 0.0,  # Yok
+        "global": 0.6,  # Global pozitif → pozitif
+        "inflation": -0.4,  # Enflasyon artışı → negatif
     },
     "ENERGY": {
-        "usdtry": 0.5,       # Döviz artışı → pozitif (ihracat)
-        "interest_rate": -0.4, # Faiz artışı → negatif
-        "oil": 0.9,          # Petrol artışı → pozitif (üretici)
+        "usdtry": 0.5,  # Döviz artışı → pozitif (ihracat)
+        "interest_rate": -0.4,  # Faiz artışı → negatif
+        "oil": 0.9,  # Petrol artışı → pozitif (üretici)
         "gold": 0.1,
         "global": 0.7,
         "inflation": 0.3,
     },
     "TECH": {
-        "usdtry": 0.4,       # Döviz artışı → pozitif (ihracat geliri)
-        "interest_rate": -0.6, # Faiz artışı → negatif (büyüme şirketleri)
+        "usdtry": 0.4,  # Döviz artışı → pozitif (ihracat geliri)
+        "interest_rate": -0.6,  # Faiz artışı → negatif (büyüme şirketleri)
         "oil": -0.1,
         "gold": 0.0,
-        "global": 0.8,       # Global pozitif → pozitif
+        "global": 0.8,  # Global pozitif → pozitif
         "inflation": -0.3,
     },
     "RETAIL": {
-        "usdtry": -0.6,      # Döviz artışı → negatif (ithalat maliyeti)
-        "interest_rate": -0.5, # Faiz artışı → negatif (tüketici kredisi)
-        "oil": -0.3,         # Petrol artışı → negatif (lojistik)
+        "usdtry": -0.6,  # Döviz artışı → negatif (ithalat maliyeti)
+        "interest_rate": -0.5,  # Faiz artışı → negatif (tüketici kredisi)
+        "oil": -0.3,  # Petrol artışı → negatif (lojistik)
         "gold": 0.0,
         "global": 0.3,
-        "inflation": -0.8,   # Enflasyon artışı → negatif (tüketici baskısı)
+        "inflation": -0.8,  # Enflasyon artışı → negatif (tüketici baskısı)
     },
     "METAL": {
-        "usdtry": 0.4,       # Döviz artışı → pozitif (ihracat)
+        "usdtry": 0.4,  # Döviz artışı → pozitif (ihracat)
         "interest_rate": -0.3,
-        "oil": -0.5,         # Petrol artışı → negatif (üretim maliyeti)
-        "gold": 0.7,         # Altın artışı → pozitif
-        "global": 0.8,       # Global pozitif → pozitif
+        "oil": -0.5,  # Petrol artışı → negatif (üretim maliyeti)
+        "gold": 0.7,  # Altın artışı → pozitif
+        "global": 0.8,  # Global pozitif → pozitif
         "inflation": 0.3,
     },
     "CONSTR": {
-        "usdtry": -0.6,      # Döviz artışı → negatif (hammadde ithalatı)
-        "interest_rate": -0.8, # Faiz artışı → negatif (kredi maliyeti)
+        "usdtry": -0.6,  # Döviz artışı → negatif (hammadde ithalatı)
+        "interest_rate": -0.8,  # Faiz artışı → negatif (kredi maliyeti)
         "oil": -0.4,
         "gold": 0.1,
         "global": 0.3,
-        "inflation": -0.7,   # Enflasyon artışı → negatif
+        "inflation": -0.7,  # Enflasyon artışı → negatif
     },
     "FOOD": {
         "usdtry": -0.5,
@@ -208,7 +208,6 @@ class MacroSensitivityEngine:
 
         return self.compute_macro_impact(ticker, sector, macro_shocks)
 
-
     def update_dynamic(
         self,
         sector_returns: dict[str, float],
@@ -224,13 +223,13 @@ class MacroSensitivityEngine:
             if sector not in self._sector_returns:
                 self._sector_returns[sector] = []
             self._sector_returns[sector].append(ret)
-            self._sector_returns[sector] = self._sector_returns[sector][-self._window:]
+            self._sector_returns[sector] = self._sector_returns[sector][-self._window :]
 
         for var, val in macro_values.items():
             if var not in self._macro_values:
                 self._macro_values[var] = []
             self._macro_values[var].append(val)
-            self._macro_values[var] = self._macro_values[var][-self._window:]
+            self._macro_values[var] = self._macro_values[var][-self._window :]
 
         # Rolling korelasyon ile hassasiyet güncelle
         self._compute_dynamic_sensitivities()

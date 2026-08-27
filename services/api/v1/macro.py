@@ -41,8 +41,9 @@ _cached_macro_data: dict[str, Any] = {
     "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
     "macro_commentary": "Dolar ve CDS dengeli seviyelerde. Risk iştahı pozitif.",
-    "bist_macro_bias": "POZİTİF"
+    "bist_macro_bias": "POZİTİF",
 }
+
 
 def _fetch_live_macro_data() -> dict[str, Any]:
     global _last_macro_fetch, _cached_macro_data
@@ -96,8 +97,8 @@ def _fetch_live_macro_data() -> dict[str, Any]:
                 t = tickers.tickers.get(sym)
                 if t:
                     fi = t.fast_info
-                    last = getattr(fi, 'last_price', None) or getattr(fi, 'previous_close', None)
-                    prev = getattr(fi, 'previous_close', last)
+                    last = getattr(fi, "last_price", None) or getattr(fi, "previous_close", None)
+                    prev = getattr(fi, "previous_close", last)
                     if last is not None:
                         result[key] = round(float(last), 2 if key not in ["gold_ounce", "turkey_cds_5y"] else 1)
                         if prev and last:
@@ -125,17 +126,23 @@ def _fetch_live_macro_data() -> dict[str, Any]:
 
         commentary_parts = []
         if dxy_v > 103:
-            commentary_parts.append("Dolar küresel çapta güçlü (Gelişmekte olan piyasalara sermaye akışı baskı altında).")
+            commentary_parts.append(
+                "Dolar küresel çapta güçlü (Gelişmekte olan piyasalara sermaye akışı baskı altında)."
+            )
         else:
             commentary_parts.append("Dolar endeksi stabil (Gelişmekte olan piyasalar için nötr-pozitif ortam).")
 
         if cds_v < 280:
-            commentary_parts.append(f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) gerileme eğiliminde (Ülke risk primi olumlu).")
+            commentary_parts.append(
+                f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) gerileme eğiliminde (Ülke risk primi olumlu)."
+            )
         else:
             commentary_parts.append(f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) temkinli bölgede.")
 
         if brent_v > 90:
-            commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) yüksek (Cari denge ve sanayi marjları üzerinde maliyet baskısı).")
+            commentary_parts.append(
+                f"Brent petrol ({brent_v:.1f} $) yüksek (Cari denge ve sanayi marjları üzerinde maliyet baskısı)."
+            )
         else:
             commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) dengeli seviyelerde.")
 
@@ -168,8 +175,9 @@ async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(ch
     """Hisse bazlı makro etki ve duyarlılık analizi."""
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine
+
         engine = MacroSensitivityEngine()
-        result = engine.get_company_sensitivity(ticker) if hasattr(engine, 'get_company_sensitivity') else {}
+        result = engine.get_company_sensitivity(ticker) if hasattr(engine, "get_company_sensitivity") else {}
         if result:
             return {"ticker": ticker, "macro_available": True, **result}
     except Exception as e:
@@ -189,8 +197,9 @@ async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depe
     """Sektör makro duyarlılık katsayıları."""
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine
+
         engine = MacroSensitivityEngine()
-        result = engine.get_sector_sensitivity(sector) if hasattr(engine, 'get_sector_sensitivity') else {}
+        result = engine.get_sector_sensitivity(sector) if hasattr(engine, "get_sector_sensitivity") else {}
         if result:
             return {"sector": sector, "sensitivity": result, "source": "macro_sensitivity_engine"}
     except Exception as e:

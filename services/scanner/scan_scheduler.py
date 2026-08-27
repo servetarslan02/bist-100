@@ -26,21 +26,23 @@ logger = structlog.get_logger()
 
 class ScanMode(StrEnum):
     """Tarama modu."""
-    CONTINUOUS = "CONTINUOUS"      # Sürekli tarama (piyasa açık)
-    SCHEDULED = "SCHEDULED"        # Zamanlanmış tarama
+
+    CONTINUOUS = "CONTINUOUS"  # Sürekli tarama (piyasa açık)
+    SCHEDULED = "SCHEDULED"  # Zamanlanmış tarama
     EVENT_DRIVEN = "EVENT_DRIVEN"  # Event tetikli
-    PAUSED = "PAUSED"              # Duraklatılmış (piyasa kapalı)
-    MANUAL = "MANUAL"              # Manuel tetikleme
+    PAUSED = "PAUSED"  # Duraklatılmış (piyasa kapalı)
+    MANUAL = "MANUAL"  # Manuel tetikleme
 
 
 @dataclass
 class ScanInterval:
     """Tarama aralığı ayarları."""
-    base_seconds: int = 60           # 1 dakika
-    min_seconds: int = 10            # Minimum (event/acil)
-    max_seconds: int = 300           # Maximum (düşük volatilite)
-    volatility_scale: float = 1.0   # Volatilite çarpanı
-    regime_scale: float = 1.0       # Rejim çarpanı
+
+    base_seconds: int = 60  # 1 dakika
+    min_seconds: int = 10  # Minimum (event/acil)
+    max_seconds: int = 300  # Maximum (düşük volatilite)
+    volatility_scale: float = 1.0  # Volatilite çarpanı
+    regime_scale: float = 1.0  # Rejim çarpanı
 
 
 class AdaptiveScanScheduler:
@@ -51,31 +53,31 @@ class AdaptiveScanScheduler:
     """
 
     # BIST piyasa saatleri (Türkiye, UTC+3)
-    MARKET_OPEN = dt_time(10, 0)    # 10:00
-    MARKET_CLOSE = dt_time(18, 0)   # 18:00
-    PRE_MARKET = dt_time(9, 55)     # 09:55
-    POST_MARKET = dt_time(18, 5)    # 18:05
+    MARKET_OPEN = dt_time(10, 0)  # 10:00
+    MARKET_CLOSE = dt_time(18, 0)  # 18:00
+    PRE_MARKET = dt_time(9, 55)  # 09:55
+    POST_MARKET = dt_time(18, 5)  # 18:05
 
     # Volatilite eşikleri ve çarpanları
     VOLATILITY_INTERVALS = {
-        "very_low":  {"max_vol": 0.10, "scale": 2.0},   # Düşük vol → 2x yavaş
-        "low":       {"max_vol": 0.15, "scale": 1.5},
-        "normal":    {"max_vol": 0.20, "scale": 1.0},   # Normal
-        "high":      {"max_vol": 0.30, "scale": 0.5},   # Yüksek vol → 2x hızlı
+        "very_low": {"max_vol": 0.10, "scale": 2.0},  # Düşük vol → 2x yavaş
+        "low": {"max_vol": 0.15, "scale": 1.5},
+        "normal": {"max_vol": 0.20, "scale": 1.0},  # Normal
+        "high": {"max_vol": 0.30, "scale": 0.5},  # Yüksek vol → 2x hızlı
         "very_high": {"max_vol": 1.00, "scale": 0.25},  # Ekstrem → 4x hızlı
     }
 
     # Rejim bazlı çarpanlar
     REGIME_SCALES = {
-        "PANIC":               0.2,   # 5x hızlı
-        "RISK-OFF":            0.3,   # 3.3x hızlı
-        "HIGH-VOLATILITY":     0.4,   # 2.5x hızlı
-        "TRENDING-UP":         0.7,   # 1.4x hızlı
-        "TRENDING-DOWN":       0.7,
-        "MOMENTUM-EXPANSION":  0.6,   # 1.7x hızlı
-        "RECOVERY":            0.8,
-        "RANGE":               1.0,   # Normal
-        "LOW-VOLATILITY":      1.5,   # 1.5x yavaş
+        "PANIC": 0.2,  # 5x hızlı
+        "RISK-OFF": 0.3,  # 3.3x hızlı
+        "HIGH-VOLATILITY": 0.4,  # 2.5x hızlı
+        "TRENDING-UP": 0.7,  # 1.4x hızlı
+        "TRENDING-DOWN": 0.7,
+        "MOMENTUM-EXPANSION": 0.6,  # 1.7x hızlı
+        "RECOVERY": 0.8,
+        "RANGE": 1.0,  # Normal
+        "LOW-VOLATILITY": 1.5,  # 1.5x yavaş
     }
 
     def __init__(
@@ -172,8 +174,7 @@ class AdaptiveScanScheduler:
             return
 
         self._running = True
-        logger.info("Scan scheduler started",
-                    base_interval=f"{self._base_interval}s")
+        logger.info("Scan scheduler started", base_interval=f"{self._base_interval}s")
 
         # Ana döngü
         while self._running:
@@ -205,13 +206,15 @@ class AdaptiveScanScheduler:
                         logger.error("Scan callback error", error=str(e))
 
                 # Interval geçmişine kaydet
-                self._interval_history.append({
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "interval": interval,
-                    "mode": self._current_mode.value,
-                    "volatility": self._current_volatility,
-                    "regime": self._current_regime,
-                })
+                self._interval_history.append(
+                    {
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "interval": interval,
+                        "mode": self._current_mode.value,
+                        "volatility": self._current_volatility,
+                        "regime": self._current_regime,
+                    }
+                )
                 if len(self._interval_history) > 1000:
                     self._interval_history = self._interval_history[-1000:]
                 # Son 100 kaydı tut
@@ -234,8 +237,7 @@ class AdaptiveScanScheduler:
         """Scheduler'ı durdur."""
         self._running = False
         self._current_mode = ScanMode.PAUSED
-        logger.info("Scan scheduler stopped",
-                    total_scans=self._total_scans)
+        logger.info("Scan scheduler stopped", total_scans=self._total_scans)
 
     def trigger_event_scan(self, tickers: list = None):
         """Event-driven tarama tetikle.
@@ -247,9 +249,7 @@ class AdaptiveScanScheduler:
         self._event_cooldown_until = time.time() + 60
         self._total_events_triggered += 1
 
-        logger.info("Event scan triggered",
-                    tickers=tickers,
-                    total_events=self._total_events_triggered)
+        logger.info("Event scan triggered", tickers=tickers, total_events=self._total_events_triggered)
 
     def trigger_manual_scan(self):
         """Manuel tarama tetikle."""
@@ -328,9 +328,9 @@ class AdaptiveScanScheduler:
             "market_open": self._is_market_hours(),
             "total_scans": self._total_scans,
             "total_events_triggered": self._total_events_triggered,
-            "last_scan_time": datetime.fromtimestamp(
-                self._last_scan_time, tz=UTC
-            ).isoformat() if self._last_scan_time else None,
+            "last_scan_time": datetime.fromtimestamp(self._last_scan_time, tz=UTC).isoformat()
+            if self._last_scan_time
+            else None,
         }
 
     def get_interval_history(self, limit: int = 20) -> list:

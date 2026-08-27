@@ -9,7 +9,9 @@ os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 import mlflow
 
 # Direct local tracking URI
-mlflow.set_tracking_uri(os.environ.get("MLFLOW_BACKEND_STORE_URI", "postgresql://alpha:alpha@localhost:5432/alpha_bist"))
+mlflow.set_tracking_uri(
+    os.environ.get("MLFLOW_BACKEND_STORE_URI", "postgresql://alpha:alpha@localhost:5432/alpha_bist")
+)
 
 MODELS = [
     {
@@ -20,7 +22,7 @@ MODELS = [
             "asset_class": "BIST-100",
             "environment": "production",
             "framework": "LightGBM 4.3",
-            "status": "ACTIVE_FUSION"
+            "status": "ACTIVE_FUSION",
         },
         "params": {
             "n_estimators": 350,
@@ -45,7 +47,7 @@ MODELS = [
             "calmar_ratio": 12.75,
             "trust_score": 92.5,
             "fusion_weight": 0.32,
-        }
+        },
     },
     {
         "experiment_name": "bist_alpha_ranking",
@@ -55,7 +57,7 @@ MODELS = [
             "asset_class": "BIST-100",
             "environment": "production",
             "framework": "CatBoost 1.2",
-            "status": "ACTIVE_FUSION"
+            "status": "ACTIVE_FUSION",
         },
         "params": {
             "iterations": 500,
@@ -78,7 +80,7 @@ MODELS = [
             "calmar_ratio": 10.36,
             "trust_score": 89.0,
             "fusion_weight": 0.28,
-        }
+        },
     },
     {
         "experiment_name": "bist_alpha_ranking",
@@ -88,7 +90,7 @@ MODELS = [
             "asset_class": "BIST-100",
             "environment": "production",
             "framework": "XGBoost 2.0",
-            "status": "ACTIVE_FUSION"
+            "status": "ACTIVE_FUSION",
         },
         "params": {
             "n_estimators": 400,
@@ -110,7 +112,7 @@ MODELS = [
             "calmar_ratio": 8.10,
             "trust_score": 85.5,
             "fusion_weight": 0.20,
-        }
+        },
     },
     {
         "experiment_name": "hyper_momentum_holy_grail",
@@ -120,7 +122,7 @@ MODELS = [
             "asset_class": "BIST-100 & PPF Money Market",
             "environment": "production",
             "framework": "ALPHA Quant Core v4.0",
-            "status": "CHAMPION_STRATEGY"
+            "status": "CHAMPION_STRATEGY",
         },
         "params": {
             "lookback_fast_days": 21,
@@ -140,7 +142,7 @@ MODELS = [
             "calmar_ratio": 10.75,
             "trust_score": 96.0,
             "win_rate_pct": 78.5,
-        }
+        },
     },
     {
         "experiment_name": "ai_sentiment_kap_extraction",
@@ -150,7 +152,7 @@ MODELS = [
             "asset_class": "BIST Disclosures & KAP",
             "environment": "production",
             "framework": "Google Gemini 3.7 Flash API",
-            "status": "ACTIVE_EXTRACTION"
+            "status": "ACTIVE_EXTRACTION",
         },
         "params": {
             "model_name": "gemini-3.7-flash",
@@ -165,9 +167,10 @@ MODELS = [
             "false_positive_rate_pct": 2.8,
             "average_inference_time_ms": 580.0,
             "trust_score": 94.0,
-        }
-    }
+        },
+    },
 ]
+
 
 def sync_to_mlflow():
     print("Writing models directly into MLflow database (PostgreSQL)...")
@@ -185,6 +188,7 @@ def sync_to_mlflow():
             print(f"  ✓ Logged '{item['run_name']}' in experiment '{exp_name}'")
 
     print("\nAll models and experiments successfully written to MLflow!")
+
 
 if __name__ == "__main__":
     sync_to_mlflow()

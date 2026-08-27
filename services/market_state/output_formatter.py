@@ -196,8 +196,14 @@ class MarketStateFormatter:
     ) -> str:
         """JSON string olarak formatla."""
         import orjson
+
         output = self.format(
-            breadth, components, ensemble, transition,
-            risk_appetite, risk_appetite_state, multi_tf,
+            breadth,
+            components,
+            ensemble,
+            transition,
+            risk_appetite,
+            risk_appetite_state,
+            multi_tf,
         )
         return orjson.dumps(output.to_dict(), default=str).decode()

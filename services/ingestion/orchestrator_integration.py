@@ -40,6 +40,7 @@ logger = structlog.get_logger()
 @dataclass
 class IngestionResult:
     """Ingestion sonuç raporu."""
+
     ticker: str
     market_data: ProviderResult | None = None
     fundamental_data: dict | None = None
@@ -57,6 +58,7 @@ class IngestionResult:
 @dataclass
 class PipelineReport:
     """Tam pipeline raporu."""
+
     total_tickers: int = 0
     successful: int = 0
     failed: int = 0
@@ -97,31 +99,41 @@ class IngestionOrchestrator:
         """Provider'ları kaydet."""
         # Market data providers
         self._pm.register(
-            "market_price", "yfinance",
+            "market_price",
+            "yfinance",
             lambda **kw: yfinance_provider.fetch_current_price(kw.get("ticker", "")),
-            priority=0, timeout_s=20,
+            priority=0,
+            timeout_s=20,
         )
         self._pm.register(
-            "market_price", "bist",
+            "market_price",
+            "bist",
             lambda **kw: bist_provider.fetch_stock_price(kw.get("ticker", "")),
-            priority=1, timeout_s=15,
+            priority=1,
+            timeout_s=15,
         )
         self._pm.register(
-            "market_price", "matriks",
+            "market_price",
+            "matriks",
             lambda **kw: matriks_provider.fetch_stock_price(kw.get("ticker", "")),
-            priority=2, timeout_s=15,
+            priority=2,
+            timeout_s=15,
         )
 
         # Fundamental providers
         self._pm.register(
-            "fundamental", "yfinance",
+            "fundamental",
+            "yfinance",
             lambda **kw: fundamental_provider.fetch_fundamentals(kw.get("ticker", "")),
-            priority=0, timeout_s=20,
+            priority=0,
+            timeout_s=20,
         )
         self._pm.register(
-            "fundamental", "kap",
+            "fundamental",
+            "kap",
             lambda **kw: kap_provider.fetch_financial_data(kw.get("ticker", "")),
-            priority=1, timeout_s=15,
+            priority=1,
+            timeout_s=15,
         )
 
     async def run_full_ingestion(
@@ -164,14 +176,16 @@ class IngestionOrchestrator:
                 if not self._incremental.should_fetch(ticker, min_interval_seconds=60):
                     report.skipped += 1
                     continue
-                market_tasks.append(self._ingest_single(
-                    ticker,
-                    include_fundamental=include_fundamental,
-                    include_kap=include_kap,
-                    include_news=include_news,
-                    include_social=include_social,
-                    use_reconciliation=use_reconciliation,
-                ))
+                market_tasks.append(
+                    self._ingest_single(
+                        ticker,
+                        include_fundamental=include_fundamental,
+                        include_kap=include_kap,
+                        include_news=include_news,
+                        include_social=include_social,
+                        use_reconciliation=use_reconciliation,
+                    )
+                )
 
             results = await asyncio.gather(*market_tasks, return_exceptions=True)
 
@@ -191,9 +205,7 @@ class IngestionOrchestrator:
         # Raporu tamamla
         report.total_elapsed_s = round(time.time() - start_time, 2)
         quality_scores = [r.quality_score for r in report.results.values() if r.quality_score > 0]
-        report.avg_quality_score = round(
-            sum(quality_scores) / len(quality_scores) if quality_scores else 0, 1
-        )
+        report.avg_quality_score = round(sum(quality_scores) / len(quality_scores) if quality_scores else 0, 1)
 
         # Metrics
         report.metrics = {
@@ -203,12 +215,14 @@ class IngestionOrchestrator:
             "incremental": self._incremental.get_stats(),
         }
 
-        logger.info("Ingestion completed",
-                    total=report.total_tickers,
-                    successful=report.successful,
-                    failed=report.failed,
-                    skipped=report.skipped,
-                    elapsed=report.total_elapsed_s)
+        logger.info(
+            "Ingestion completed",
+            total=report.total_tickers,
+            successful=report.successful,
+            failed=report.failed,
+            skipped=report.skipped,
+            elapsed=report.total_elapsed_s,
+        )
 
         return report
 
@@ -286,8 +300,9 @@ class IngestionOrchestrator:
         """Makro verileri çek."""
         try:
             from ..core.config import settings
-            tcmb_key = getattr(settings, 'tcmb_evds_api_key', None)
-            fred_key = getattr(settings, 'fred_api_key', None)
+
+            tcmb_key = getattr(settings, "tcmb_evds_api_key", None)
+            fred_key = getattr(settings, "fred_api_key", None)
         except Exception:
             tcmb_key = None
             fred_key = None

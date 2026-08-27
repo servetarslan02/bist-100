@@ -74,19 +74,21 @@ T: Vade (yıl)
 import numpy as np
 from scipy.stats import norm
 
+
 def black_scholes(S, K, T, r, sigma, option_type="call"):
-    d1 = (np.log(S/K) + (r + sigma**2/2) * T) / (sigma * np.sqrt(T))
+    d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
-    
+
     if option_type == "call":
-        price = S * norm.cdf(d1) - K * np.exp(-r*T) * norm.cdf(d2)
+        price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
     else:
-        price = K * np.exp(-r*T) * norm.cdf(-d2) - S * norm.cdf(-d1)
-    
+        price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+
     return price
 
+
 # THYAO opsiyonu
-call_price = black_scholes(S=305.25, K=310, T=30/365, r=0.42, sigma=0.25, option_type="call")
+call_price = black_scholes(S=305.25, K=310, T=30 / 365, r=0.42, sigma=0.25, option_type="call")
 # call_price = 4.85 TL
 ```
 
@@ -124,22 +126,20 @@ Yorum: Volatilite değişimine duyarlılık
 ```python
 # services/viop/greeks.py
 def calculate_greeks(S, K, T, r, sigma, option_type="call"):
-    d1 = (np.log(S/K) + (r + sigma**2/2) * T) / (sigma * np.sqrt(T))
+    d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
-    
+
     if option_type == "call":
         delta = norm.cdf(d1)
-        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))) - \
-                (r * K * np.exp(-r*T) * norm.cdf(d2))
+        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))) - (r * K * np.exp(-r * T) * norm.cdf(d2))
     else:
         delta = norm.cdf(d1) - 1
-        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))) + \
-                (r * K * np.exp(-r*T) * norm.cdf(-d2))
-    
+        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))) + (r * K * np.exp(-r * T) * norm.cdf(-d2))
+
     gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
     vega = S * np.sqrt(T) * norm.pdf(d1)
-    rho = K * T * np.exp(-r*T) * (norm.cdf(d2) if option_type == "call" else -norm.cdf(-d2))
-    
+    rho = K * T * np.exp(-r * T) * (norm.cdf(d2) if option_type == "call" else -norm.cdf(-d2))
+
     return {"delta": delta, "gamma": gamma, "theta": theta, "vega": vega, "rho": rho}
 ```
 
@@ -183,7 +183,7 @@ def create_covered_call(spot_price, call_strike, call_premium, shares):
     max_profit = (call_strike - spot_price + call_premium) * shares
     max_loss = (spot_price - call_premium) * shares  # Hisse sıfır olursa
     breakeven = spot_price - call_premium
-    
+
     return {
         "strategy": "Covered Call",
         "spot_price": spot_price,
@@ -192,14 +192,15 @@ def create_covered_call(spot_price, call_strike, call_premium, shares):
         "max_profit": max_profit,
         "max_loss": max_loss,
         "breakeven": breakeven,
-        "profit_zone": f"Spot > {breakeven} and Spot < {call_strike}"
+        "profit_zone": f"Spot > {breakeven} and Spot < {call_strike}",
     }
+
 
 def create_protective_put(spot_price, put_strike, put_premium, shares):
     max_loss = (spot_price - put_strike + put_premium) * shares
-    max_profit = float('inf')  # Yukarı potansiyel sınırsız
+    max_profit = float("inf")  # Yukarı potansiyel sınırsız
     breakeven = spot_price + put_premium
-    
+
     return {
         "strategy": "Protective Put",
         "spot_price": spot_price,
@@ -208,7 +209,7 @@ def create_protective_put(spot_price, put_strike, put_premium, shares):
         "max_loss": max_loss,
         "max_profit": max_profit,
         "breakeven": breakeven,
-        "profit_zone": f"Spot > {breakeven}"
+        "profit_zone": f"Spot > {breakeven}",
     }
 ```
 
@@ -235,15 +236,15 @@ T: Vade
 def check_put_call_parity(call_price, put_price, spot_price, strike, r, T):
     lhs = call_price - put_price
     rhs = spot_price - strike * np.exp(-r * T)
-    
+
     deviation = abs(lhs - rhs)
-    
+
     return {
         "parity_holds": deviation < 0.01,
         "deviation": deviation,
         "lhs": lhs,
         "rhs": rhs,
-        "arbitrage_opportunity": deviation > 0.05
+        "arbitrage_opportunity": deviation > 0.05,
     }
 ```
 
@@ -286,15 +287,15 @@ def calculate_span_margin(positions):
 def hedge_portfolio(portfolio_value, beta, futures_price, multiplier=100):
     # Hedge ratio
     hedge_ratio = beta * portfolio_value / (futures_price * multiplier)
-    
+
     # Kaç kontrat gerekli
     contracts_needed = round(hedge_ratio)
-    
+
     return {
         "hedge_ratio": hedge_ratio,
         "contracts_needed": contracts_needed,
         "hedge_type": "SHORT" if beta > 0 else "LONG",
-        "coverage": contracts_needed * futures_price * multiplier / portfolio_value
+        "coverage": contracts_needed * futures_price * multiplier / portfolio_value,
     }
 ```
 

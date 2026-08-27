@@ -28,20 +28,121 @@ from services.market_state.transition_tracker import RegimeTransitionTracker
 # Fixtures
 # =====================================================
 
+
 @pytest.fixture
 def sample_instrument_states():
     """Örnek hisse state'leri — 10 hisse."""
     return [
-        {"ticker": "THYAO", "change_pct": 2.5, "volume": 50000, "rsi": 62, "momentum": 3.0, "volatility": 0.02, "volume_zscore": 1.2, "anomaly_score": 0.1, "spread": 0.005},
-        {"ticker": "GARAN", "change_pct": 1.8, "volume": 80000, "rsi": 58, "momentum": 2.0, "volatility": 0.018, "volume_zscore": 0.8, "anomaly_score": 0.05, "spread": 0.003},
-        {"ticker": "ASELS", "change_pct": -0.5, "volume": 30000, "rsi": 45, "momentum": -1.0, "volatility": 0.025, "volume_zscore": -0.3, "anomaly_score": 0.2, "spread": 0.008},
-        {"ticker": "SISE", "change_pct": 3.2, "volume": 60000, "rsi": 68, "momentum": 4.5, "volatility": 0.022, "volume_zscore": 1.5, "anomaly_score": 0.15, "spread": 0.004},
-        {"ticker": "TUPRS", "change_pct": -1.2, "volume": 25000, "rsi": 38, "momentum": -2.0, "volatility": 0.03, "volume_zscore": -0.5, "anomaly_score": 0.3, "spread": 0.01},
-        {"ticker": "KCHOL", "change_pct": 0.8, "volume": 45000, "rsi": 52, "momentum": 0.5, "volatility": 0.015, "volume_zscore": 0.2, "anomaly_score": 0.05, "spread": 0.004},
-        {"ticker": "SAHOL", "change_pct": 1.5, "volume": 40000, "rsi": 55, "momentum": 1.5, "volatility": 0.016, "volume_zscore": 0.5, "anomaly_score": 0.08, "spread": 0.005},
-        {"ticker": "AKBNK", "change_pct": -0.3, "volume": 55000, "rsi": 48, "momentum": -0.5, "volatility": 0.02, "volume_zscore": 0.1, "anomaly_score": 0.1, "spread": 0.006},
-        {"ticker": "EREGL", "change_pct": 2.0, "volume": 35000, "rsi": 60, "momentum": 2.8, "volatility": 0.019, "volume_zscore": 0.9, "anomaly_score": 0.12, "spread": 0.005},
-        {"ticker": "BIMAS", "change_pct": -2.0, "volume": 20000, "rsi": 32, "momentum": -3.0, "volatility": 0.028, "volume_zscore": -0.8, "anomaly_score": 0.4, "spread": 0.012},
+        {
+            "ticker": "THYAO",
+            "change_pct": 2.5,
+            "volume": 50000,
+            "rsi": 62,
+            "momentum": 3.0,
+            "volatility": 0.02,
+            "volume_zscore": 1.2,
+            "anomaly_score": 0.1,
+            "spread": 0.005,
+        },
+        {
+            "ticker": "GARAN",
+            "change_pct": 1.8,
+            "volume": 80000,
+            "rsi": 58,
+            "momentum": 2.0,
+            "volatility": 0.018,
+            "volume_zscore": 0.8,
+            "anomaly_score": 0.05,
+            "spread": 0.003,
+        },
+        {
+            "ticker": "ASELS",
+            "change_pct": -0.5,
+            "volume": 30000,
+            "rsi": 45,
+            "momentum": -1.0,
+            "volatility": 0.025,
+            "volume_zscore": -0.3,
+            "anomaly_score": 0.2,
+            "spread": 0.008,
+        },
+        {
+            "ticker": "SISE",
+            "change_pct": 3.2,
+            "volume": 60000,
+            "rsi": 68,
+            "momentum": 4.5,
+            "volatility": 0.022,
+            "volume_zscore": 1.5,
+            "anomaly_score": 0.15,
+            "spread": 0.004,
+        },
+        {
+            "ticker": "TUPRS",
+            "change_pct": -1.2,
+            "volume": 25000,
+            "rsi": 38,
+            "momentum": -2.0,
+            "volatility": 0.03,
+            "volume_zscore": -0.5,
+            "anomaly_score": 0.3,
+            "spread": 0.01,
+        },
+        {
+            "ticker": "KCHOL",
+            "change_pct": 0.8,
+            "volume": 45000,
+            "rsi": 52,
+            "momentum": 0.5,
+            "volatility": 0.015,
+            "volume_zscore": 0.2,
+            "anomaly_score": 0.05,
+            "spread": 0.004,
+        },
+        {
+            "ticker": "SAHOL",
+            "change_pct": 1.5,
+            "volume": 40000,
+            "rsi": 55,
+            "momentum": 1.5,
+            "volatility": 0.016,
+            "volume_zscore": 0.5,
+            "anomaly_score": 0.08,
+            "spread": 0.005,
+        },
+        {
+            "ticker": "AKBNK",
+            "change_pct": -0.3,
+            "volume": 55000,
+            "rsi": 48,
+            "momentum": -0.5,
+            "volatility": 0.02,
+            "volume_zscore": 0.1,
+            "anomaly_score": 0.1,
+            "spread": 0.006,
+        },
+        {
+            "ticker": "EREGL",
+            "change_pct": 2.0,
+            "volume": 35000,
+            "rsi": 60,
+            "momentum": 2.8,
+            "volatility": 0.019,
+            "volume_zscore": 0.9,
+            "anomaly_score": 0.12,
+            "spread": 0.005,
+        },
+        {
+            "ticker": "BIMAS",
+            "change_pct": -2.0,
+            "volume": 20000,
+            "rsi": 32,
+            "momentum": -3.0,
+            "volatility": 0.028,
+            "volume_zscore": -0.8,
+            "anomaly_score": 0.4,
+            "spread": 0.012,
+        },
     ]
 
 
@@ -98,6 +199,7 @@ def formatter():
 # Breadth Engine Tests
 # =====================================================
 
+
 class TestBreadthEngine:
     """Market Breadth Engine testleri."""
 
@@ -125,12 +227,8 @@ class TestBreadthEngine:
 
     def test_breadth_state_broad(self, breadth_engine):
         """Breadth state = BROAD (yüksek katılımlı yükseliş)."""
-        states = [
-            {"ticker": f"H{i}", "change_pct": 2.0, "volume": 50000}
-            for i in range(80)
-        ] + [
-            {"ticker": f"H{i}", "change_pct": -1.0, "volume": 50000}
-            for i in range(80, 100)
+        states = [{"ticker": f"H{i}", "change_pct": 2.0, "volume": 50000} for i in range(80)] + [
+            {"ticker": f"H{i}", "change_pct": -1.0, "volume": 50000} for i in range(80, 100)
         ]
         result = breadth_engine.compute(states)
         assert result.breadth_state == "BROAD"
@@ -138,12 +236,8 @@ class TestBreadthEngine:
 
     def test_breadth_state_narrow(self, breadth_engine):
         """Breadth state = NARROW (düşük katılımlı)."""
-        states = [
-            {"ticker": f"H{i}", "change_pct": -3.0, "volume": 50000}
-            for i in range(75)
-        ] + [
-            {"ticker": f"H{i}", "change_pct": 0.5, "volume": 50000}
-            for i in range(75, 100)
+        states = [{"ticker": f"H{i}", "change_pct": -3.0, "volume": 50000} for i in range(75)] + [
+            {"ticker": f"H{i}", "change_pct": 0.5, "volume": 50000} for i in range(75, 100)
         ]
         result = breadth_engine.compute(states)
         assert result.breadth_state == "NARROW"
@@ -151,12 +245,8 @@ class TestBreadthEngine:
     def test_alert_critical(self, breadth_engine):
         """Alert = CRITICAL (crash sinyali — pct < 15 ve trin > 2.0)."""
         # Düşen hacmi yüksek, yükselen hacmi düşük → trin > 2
-        states = [
-            {"ticker": f"H{i}", "change_pct": -3.0, "volume": 100000}
-            for i in range(92)
-        ] + [
-            {"ticker": f"H{i}", "change_pct": 0.5, "volume": 1000}
-            for i in range(92, 100)
+        states = [{"ticker": f"H{i}", "change_pct": -3.0, "volume": 100000} for i in range(92)] + [
+            {"ticker": f"H{i}", "change_pct": 0.5, "volume": 1000} for i in range(92, 100)
         ]
         result = breadth_engine.compute(states)
         assert result.alert_level == "CRITICAL"
@@ -164,11 +254,16 @@ class TestBreadthEngine:
     def test_sector_breadth(self, breadth_engine, sample_instrument_states):
         """Sektörel breadth hesaplama."""
         sector_map = {
-            "THYAO": "HAVACILIK", "GARAN": "BANKACILIK",
-            "ASELS": "TEKNOLOJI", "SISE": "SANAYI",
-            "TUPRS": "ENERJI", "KCHOL": "HOLDING",
-            "SAHOL": "HOLDING", "AKBNK": "BANKACILIK",
-            "EREGL": "SANAYI", "BIMAS": "PERAKENDE",
+            "THYAO": "HAVACILIK",
+            "GARAN": "BANKACILIK",
+            "ASELS": "TEKNOLOJI",
+            "SISE": "SANAYI",
+            "TUPRS": "ENERJI",
+            "KCHOL": "HOLDING",
+            "SAHOL": "HOLDING",
+            "AKBNK": "BANKACILIK",
+            "EREGL": "SANAYI",
+            "BIMAS": "PERAKENDE",
         }
         result = breadth_engine.compute(sample_instrument_states, sector_map=sector_map)
         assert "HAVACILIK" in result.sector_breadth
@@ -203,6 +298,7 @@ class TestBreadthEngine:
 # Component States Tests
 # =====================================================
 
+
 class TestComponentStates:
     """Component States Engine testleri."""
 
@@ -221,9 +317,15 @@ class TestComponentStates:
     def test_momentum_state_positive(self, component_engine):
         """Pozitif momentum ağırlıklı → POSITIVE."""
         states = [
-            {"momentum": 3.0}, {"momentum": 2.0}, {"momentum": 4.0},
-            {"momentum": 1.0}, {"momentum": 5.0}, {"momentum": -1.0},
-            {"momentum": 2.5}, {"momentum": 3.5}, {"momentum": 1.5},
+            {"momentum": 3.0},
+            {"momentum": 2.0},
+            {"momentum": 4.0},
+            {"momentum": 1.0},
+            {"momentum": 5.0},
+            {"momentum": -1.0},
+            {"momentum": 2.5},
+            {"momentum": 3.5},
+            {"momentum": 1.5},
             {"momentum": 4.5},
         ]
         result = component_engine.compute_all(states)
@@ -232,9 +334,15 @@ class TestComponentStates:
     def test_momentum_state_negative(self, component_engine):
         """Negatif momentum ağırlıklı → NEGATIVE."""
         states = [
-            {"momentum": -3.0}, {"momentum": -2.0}, {"momentum": -4.0},
-            {"momentum": -1.0}, {"momentum": -5.0}, {"momentum": 1.0},
-            {"momentum": -2.5}, {"momentum": -3.5}, {"momentum": -1.5},
+            {"momentum": -3.0},
+            {"momentum": -2.0},
+            {"momentum": -4.0},
+            {"momentum": -1.0},
+            {"momentum": -5.0},
+            {"momentum": 1.0},
+            {"momentum": -2.5},
+            {"momentum": -3.5},
+            {"momentum": -1.5},
             {"momentum": -4.5},
         ]
         result = component_engine.compute_all(states)
@@ -249,9 +357,16 @@ class TestComponentStates:
     def test_rsi_state_oversold(self, component_engine):
         """RSI < 30 yaygın → OVERSOLD (>30% hisse RSI < 30)."""
         states = [
-            {"rsi": 25}, {"rsi": 28}, {"rsi": 22}, {"rsi": 27},
-            {"rsi": 35}, {"rsi": 40}, {"rsi": 45},
-            {"rsi": 50}, {"rsi": 55}, {"rsi": 60},
+            {"rsi": 25},
+            {"rsi": 28},
+            {"rsi": 22},
+            {"rsi": 27},
+            {"rsi": 35},
+            {"rsi": 40},
+            {"rsi": 45},
+            {"rsi": 50},
+            {"rsi": 55},
+            {"rsi": 60},
         ]
         result = component_engine.compute_all(states)
         assert result.rsi_state == "OVERSOLD"
@@ -265,8 +380,10 @@ class TestComponentStates:
     def test_anomaly_state(self, component_engine):
         """Anomaly tespit."""
         states = [
-            {"anomaly_score": 0.9}, {"anomaly_score": 0.85},
-            {"anomaly_score": 0.95}, {"anomaly_score": 0.1},
+            {"anomaly_score": 0.9},
+            {"anomaly_score": 0.85},
+            {"anomaly_score": 0.95},
+            {"anomaly_score": 0.1},
         ]
         result = component_engine.compute_all(states)
         assert result.anomaly_count == 3
@@ -295,6 +412,7 @@ class TestComponentStates:
 # =====================================================
 # Ensemble Regime Tests
 # =====================================================
+
 
 class TestEnsembleRegime:
     """Ensemble Regime Detection testleri."""
@@ -361,6 +479,7 @@ class TestEnsembleRegime:
 # =====================================================
 # Transition Tracker Tests
 # =====================================================
+
 
 class TestTransitionTracker:
     """Regime Transition Tracker testleri."""
@@ -438,6 +557,7 @@ class TestTransitionTracker:
 # Risk Appetite Tests
 # =====================================================
 
+
 class TestRiskAppetite:
     """Risk Appetite Engine testleri."""
 
@@ -501,6 +621,7 @@ class TestRiskAppetite:
 # =====================================================
 # Multi-Timeframe Tests
 # =====================================================
+
 
 class TestMultiTimeframe:
     """Multi-Timeframe Engine testleri."""
@@ -573,6 +694,7 @@ class TestMultiTimeframe:
 # Output Formatter Tests
 # =====================================================
 
+
 class TestOutputFormatter:
     """Market State Output Formatter testleri."""
 
@@ -586,12 +708,14 @@ class TestOutputFormatter:
         """Tam input ile format."""
         breadth = MarketBreadthEngine().compute(sample_instrument_states)
         components = ComponentStateEngine().compute_all(sample_instrument_states)
-        ensemble = EnsembleRegimeDetector().detect({
-            "breadth_pct": breadth.pct_advancing,
-            "momentum_avg": components.avg_momentum,
-            "volatility_avg": components.avg_volatility,
-            "rsi_avg": components.avg_rsi,
-        })
+        ensemble = EnsembleRegimeDetector().detect(
+            {
+                "breadth_pct": breadth.pct_advancing,
+                "momentum_avg": components.avg_momentum,
+                "volatility_avg": components.avg_volatility,
+                "rsi_avg": components.avg_rsi,
+            }
+        )
         transition = RegimeTransitionTracker()
         transition.record(ensemble.regime, ensemble.confidence)
         transition_stats = transition.get_stats()
@@ -623,6 +747,7 @@ class TestOutputFormatter:
 # =====================================================
 # Integration Tests
 # =====================================================
+
 
 class TestIntegration:
     """Entegrasyon testleri — tüm modüller birlikte."""

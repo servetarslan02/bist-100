@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 @dataclass
 class StockInfo:
     """Hisse bilgisi."""
+
     ticker: str
     name: str
     sector: str = "DIGER"
@@ -43,11 +44,13 @@ class LiveUniverseScraper:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-        })
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            }
+        )
         self.timeout = 10
 
     def discover_all_bist_stocks(self) -> dict[str, StockInfo]:
@@ -80,7 +83,7 @@ class LiveUniverseScraper:
             url = "https://bigpara.hurriyet.com.tr/borsa/canli-borsa/"
             resp = self.session.get(url, timeout=self.timeout)
             if resp.status_code == 200:
-                matches = re.findall(r'/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/', resp.text)
+                matches = re.findall(r"/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/", resp.text)
                 for sym in matches:
                     ticker = sym.upper().strip()
                     if 2 <= len(ticker) <= 6 and not ticker.isdigit() and ticker not in discovered:
@@ -119,7 +122,10 @@ class LiveUniverseScraper:
     def _guess_sector(self, ticker: str, name: str) -> str:
         """Hisse sembolü veya isminden sektörü tahmin et / eşle."""
         name_u = (name + " " + ticker).upper()
-        if any(w in name_u for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]):
+        if any(
+            w in name_u
+            for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]
+        ):
             return "BANKACILIK"
         if any(w in name_u for w in ["GYO", "GAYRIMENKUL", "KONUT"]):
             return "GAYRIMENKUL"
@@ -127,9 +133,15 @@ class LiveUniverseScraper:
             return "HAVACILIK"
         if any(w in name_u for w in ["SAVUNMA", "ASELS", "SDTTR"]):
             return "SAVUNMA"
-        if any(w in name_u for w in ["YAZILIM", "TEKNOLOJI", "BILISIM", "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET"]):
+        if any(
+            w in name_u
+            for w in ["YAZILIM", "TEKNOLOJI", "BILISIM", "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET"]
+        ):
             return "TEKNOLOJI"
-        if any(w in name_u for w in ["ENERJI", "ELEKTRIK", "SOLAR", "PETROL", "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR"]):
+        if any(
+            w in name_u
+            for w in ["ENERJI", "ELEKTRIK", "SOLAR", "PETROL", "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR"]
+        ):
             return "ENERJI"
         if any(w in name_u for w in ["DEMIR", "CELIK", "SANAYI", "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA"]):
             return "SANAYI"
@@ -197,23 +209,151 @@ class UniverseAutoUpdater:
     def _refresh_index_compositions(self):
         """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirle."""
         BIST_100_BENCHMARK = [
-            "AEFES", "AGHOL", "AHGAZ", "AKBNK", "AKCNS", "AKFGY", "AKFYE", "AKSA", "AKSEN", "ALARK",
-            "ALBRK", "ALFAS", "ANHYT", "ANSGR", "ARCLK", "ARDYZ", "ASELS", "ASTOR", "BERA", "BIMAS",
-            "BINHO", "BIOEN", "BOBET", "BRSAN", "BRYAT", "BTCIM", "CANTE", "CCOLA", "CIMSA", "CLEBI",
-            "CWENE", "DOAS", "DOHOL", "ECILC", "ECZYT", "EGEEN", "EKGYO", "ENERY", "ENJSA", "ENKAI",
-            "EREGL", "EUPWR", "EUREN", "FROTO", "GARAN", "GENIL", "GESAN", "GOLTS", "GUBRF", "GWIND",
-            "HALKB", "HEKTS", "IPEKE", "ISCTR", "ISDMR", "ISGYO", "ISMEN", "IZENR", "KARSAN", "KCAER",
-            "KCHOL", "KLSER", "KMPUR", "KONTR", "KONYA", "KORDS", "KOZAA", "KOZAL", "KRDMD", "KZBGY",
-            "MAVI", "MGROS", "MIATK", "OBAMS", "ODAS", "OTKAR", "OYAKC", "PASEU", "PETKM", "PGSUS",
-            "QUAGR", "REEDR", "SAHOL", "SASA", "SAYAS", "SDTTR", "SISE", "SKBNK", "SMRTG", "SOKM",
-            "TABGD", "TAVHL", "TCELL", "THYAO", "TKFEN", "TOASO", "TSKB", "TTKOM", "TTRAK", "TUKAS",
-            "TUPRS", "TURSG", "ULKER", "VAKBN", "VESBE", "VESTL", "YEOTK", "YKBNK", "YYLGD", "ZOREN"
+            "AEFES",
+            "AGHOL",
+            "AHGAZ",
+            "AKBNK",
+            "AKCNS",
+            "AKFGY",
+            "AKFYE",
+            "AKSA",
+            "AKSEN",
+            "ALARK",
+            "ALBRK",
+            "ALFAS",
+            "ANHYT",
+            "ANSGR",
+            "ARCLK",
+            "ARDYZ",
+            "ASELS",
+            "ASTOR",
+            "BERA",
+            "BIMAS",
+            "BINHO",
+            "BIOEN",
+            "BOBET",
+            "BRSAN",
+            "BRYAT",
+            "BTCIM",
+            "CANTE",
+            "CCOLA",
+            "CIMSA",
+            "CLEBI",
+            "CWENE",
+            "DOAS",
+            "DOHOL",
+            "ECILC",
+            "ECZYT",
+            "EGEEN",
+            "EKGYO",
+            "ENERY",
+            "ENJSA",
+            "ENKAI",
+            "EREGL",
+            "EUPWR",
+            "EUREN",
+            "FROTO",
+            "GARAN",
+            "GENIL",
+            "GESAN",
+            "GOLTS",
+            "GUBRF",
+            "GWIND",
+            "HALKB",
+            "HEKTS",
+            "IPEKE",
+            "ISCTR",
+            "ISDMR",
+            "ISGYO",
+            "ISMEN",
+            "IZENR",
+            "KARSAN",
+            "KCAER",
+            "KCHOL",
+            "KLSER",
+            "KMPUR",
+            "KONTR",
+            "KONYA",
+            "KORDS",
+            "KOZAA",
+            "KOZAL",
+            "KRDMD",
+            "KZBGY",
+            "MAVI",
+            "MGROS",
+            "MIATK",
+            "OBAMS",
+            "ODAS",
+            "OTKAR",
+            "OYAKC",
+            "PASEU",
+            "PETKM",
+            "PGSUS",
+            "QUAGR",
+            "REEDR",
+            "SAHOL",
+            "SASA",
+            "SAYAS",
+            "SDTTR",
+            "SISE",
+            "SKBNK",
+            "SMRTG",
+            "SOKM",
+            "TABGD",
+            "TAVHL",
+            "TCELL",
+            "THYAO",
+            "TKFEN",
+            "TOASO",
+            "TSKB",
+            "TTKOM",
+            "TTRAK",
+            "TUKAS",
+            "TUPRS",
+            "TURSG",
+            "ULKER",
+            "VAKBN",
+            "VESBE",
+            "VESTL",
+            "YEOTK",
+            "YKBNK",
+            "YYLGD",
+            "ZOREN",
         ]
         BIST_30_BENCHMARK = [
-            "AKBNK", "ALARK", "ARCLK", "ASELS", "ASTOR", "BIMAS", "BRSAN", "DOAS", "EKGYO", "ENKAI",
-            "EREGL", "FROTO", "GARAN", "GUBRF", "HALKB", "HEKTS", "ISCTR", "KCHOL", "KONTR", "KOZAL",
-            "KRDMD", "OYAKC", "PETKM", "PGSUS", "SAHOL", "SASA", "SISE", "TAVHL", "TCELL", "THYAO",
-            "TOASO", "TUPRS", "YKBNK"
+            "AKBNK",
+            "ALARK",
+            "ARCLK",
+            "ASELS",
+            "ASTOR",
+            "BIMAS",
+            "BRSAN",
+            "DOAS",
+            "EKGYO",
+            "ENKAI",
+            "EREGL",
+            "FROTO",
+            "GARAN",
+            "GUBRF",
+            "HALKB",
+            "HEKTS",
+            "ISCTR",
+            "KCHOL",
+            "KONTR",
+            "KOZAL",
+            "KRDMD",
+            "OYAKC",
+            "PETKM",
+            "PGSUS",
+            "SAHOL",
+            "SASA",
+            "SISE",
+            "TAVHL",
+            "TCELL",
+            "THYAO",
+            "TOASO",
+            "TUPRS",
+            "YKBNK",
         ]
 
         all_syms = set(self._universe.keys())
@@ -313,20 +453,26 @@ class UniverseAutoUpdater:
 # Singleton
 universe_updater = UniverseAutoUpdater()
 
+
 def get_current_universe() -> dict[str, StockInfo]:
     return universe_updater.get_universe()
+
 
 def get_bist_100() -> list[str]:
     return universe_updater.get_index_members("XU100")
 
+
 def get_bist_30() -> list[str]:
     return universe_updater.get_index_members("XU030")
+
 
 def get_bist_50() -> list[str]:
     return universe_updater.get_index_members("XU050")
 
+
 def get_all_tickers() -> list[str]:
     return list(universe_updater.get_universe().keys())
+
 
 def get_sector(ticker: str) -> str:
     universe = universe_updater.get_universe()

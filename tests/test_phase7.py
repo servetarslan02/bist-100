@@ -107,7 +107,9 @@ def test_agent_system():
     assert "SYNTHESIS" in orch_result["results"]
     assert orch_result["overall_direction"] in ["LONG", "SHORT", "NEUTRAL"]
     passed += 1
-    print(f"  ✓ Agent orchestrator (direction={orch_result['overall_direction']}, confidence={orch_result['overall_confidence']:.2f})")
+    print(
+        f"  ✓ Agent orchestrator (direction={orch_result['overall_direction']}, confidence={orch_result['overall_confidence']:.2f})"
+    )
 
     # 9. Prompt versioning
     agent = BaseAgent(AgentRole.RESEARCH, model_version="gemma4:12b", prompt_version="v1.2")
@@ -135,6 +137,7 @@ def main():
     except Exception as e:
         print(f"  ✗ Test crashed: {e}")
         import traceback
+
         traceback.print_exc()
         total_failed += 1
 

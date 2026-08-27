@@ -45,24 +45,27 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 # Market Phases
 # =====================================================
 
+
 class MarketPhase(StrEnum):
     """BIST piyasa fazları (2015 BISTECH sonrası tek seans — Eylül 2025 güncel)."""
-    CLOSED = "CLOSED"            # Piyasa kapalı (gece, hafta sonu, tatil)
-    PRE_MARKET = "PRE_MARKET"    # 09:40-10:00 (açılış seansı emir toplama)
-    CONTINUOUS = "CONTINUOUS"    # 10:00-18:00 (sürekli müzayede — tek seans)
-    CLOSING = "CLOSING"          # 18:01-18:10 (kapanış seansı)
+
+    CLOSED = "CLOSED"  # Piyasa kapalı (gece, hafta sonu, tatil)
+    PRE_MARKET = "PRE_MARKET"  # 09:40-10:00 (açılış seansı emir toplama)
+    CONTINUOUS = "CONTINUOUS"  # 10:00-18:00 (sürekli müzayede — tek seans)
+    CLOSING = "CLOSING"  # 18:01-18:10 (kapanış seansı)
     POST_MARKET = "POST_MARKET"  # 18:10-18:30
     AFTER_HOURS = "AFTER_HOURS"  # 18:30-23:00
-    NIGHT = "NIGHT"              # 23:00-09:40
+    NIGHT = "NIGHT"  # 23:00-09:40
     # Geriye uyumluluk alias'ları
-    SEANS_1 = "CONTINUOUS"       # Eski kod uyumluluğu
-    SEANS_2 = "CONTINUOUS"       # Eski kod uyumluluğu
-    BREAK = "CLOSED"             # Artık ara yok
+    SEANS_1 = "CONTINUOUS"  # Eski kod uyumluluğu
+    SEANS_2 = "CONTINUOUS"  # Eski kod uyumluluğu
+    BREAK = "CLOSED"  # Artık ara yok
 
 
 # =====================================================
 # Holiday Provider (Dinamik + Fallback)
 # =====================================================
+
 
 class HolidayProvider:
     """BIST tatil günleri sağlayıcısı.
@@ -74,33 +77,85 @@ class HolidayProvider:
     """
 
     # Hardcoded fallback — sadece dinamik kaynak yoksa kullanılır
-    _FALLBACK_HOLIDAYS: set = frozenset({
-        # 2026
-        date(2026, 1, 1), date(2026, 4, 23), date(2026, 5, 1), date(2026, 5, 19),
-        date(2026, 7, 15), date(2026, 8, 30), date(2026, 10, 29),
-        date(2026, 3, 29), date(2026, 3, 30), date(2026, 3, 31),  # Ramazan
-        date(2026, 6, 6), date(2026, 6, 7), date(2026, 6, 8), date(2026, 6, 9),  # Kurban
-        # 2027
-        date(2027, 1, 1), date(2027, 4, 23), date(2027, 5, 1), date(2027, 5, 19),
-        date(2027, 7, 15), date(2027, 8, 30), date(2027, 10, 29),
-        date(2027, 3, 19), date(2027, 3, 20), date(2027, 3, 21),  # Ramazan (tahmini)
-        date(2027, 5, 26), date(2027, 5, 27), date(2027, 5, 28), date(2027, 5, 29),  # Kurban (tahmini)
-        # 2028
-        date(2028, 1, 1), date(2028, 4, 23), date(2028, 5, 1), date(2028, 5, 19),
-        date(2028, 7, 15), date(2028, 8, 30), date(2028, 10, 29),
-        date(2028, 3, 8), date(2028, 3, 9), date(2028, 3, 10),  # Ramazan (tahmini)
-        date(2028, 5, 15), date(2028, 5, 16), date(2028, 5, 17), date(2028, 5, 18),  # Kurban (tahmini)
-        # 2029
-        date(2029, 1, 1), date(2029, 4, 23), date(2029, 5, 1), date(2029, 5, 19),
-        date(2029, 7, 15), date(2029, 8, 30), date(2029, 10, 29),
-        date(2029, 2, 26), date(2029, 2, 27), date(2029, 2, 28),  # Ramazan (tahmini)
-        date(2029, 5, 4), date(2029, 5, 5), date(2029, 5, 6), date(2029, 5, 7),  # Kurban (tahmini)
-        # 2030
-        date(2030, 1, 1), date(2030, 4, 23), date(2030, 5, 1), date(2030, 5, 19),
-        date(2030, 7, 15), date(2030, 8, 30), date(2030, 10, 29),
-        date(2030, 2, 15), date(2030, 2, 16), date(2030, 2, 17),  # Ramazan (tahmini)
-        date(2030, 4, 23), date(2030, 4, 24), date(2030, 4, 25), date(2030, 4, 26),  # Kurban (tahmini)
-    })
+    _FALLBACK_HOLIDAYS: set = frozenset(
+        {
+            # 2026
+            date(2026, 1, 1),
+            date(2026, 4, 23),
+            date(2026, 5, 1),
+            date(2026, 5, 19),
+            date(2026, 7, 15),
+            date(2026, 8, 30),
+            date(2026, 10, 29),
+            date(2026, 3, 29),
+            date(2026, 3, 30),
+            date(2026, 3, 31),  # Ramazan
+            date(2026, 6, 6),
+            date(2026, 6, 7),
+            date(2026, 6, 8),
+            date(2026, 6, 9),  # Kurban
+            # 2027
+            date(2027, 1, 1),
+            date(2027, 4, 23),
+            date(2027, 5, 1),
+            date(2027, 5, 19),
+            date(2027, 7, 15),
+            date(2027, 8, 30),
+            date(2027, 10, 29),
+            date(2027, 3, 19),
+            date(2027, 3, 20),
+            date(2027, 3, 21),  # Ramazan (tahmini)
+            date(2027, 5, 26),
+            date(2027, 5, 27),
+            date(2027, 5, 28),
+            date(2027, 5, 29),  # Kurban (tahmini)
+            # 2028
+            date(2028, 1, 1),
+            date(2028, 4, 23),
+            date(2028, 5, 1),
+            date(2028, 5, 19),
+            date(2028, 7, 15),
+            date(2028, 8, 30),
+            date(2028, 10, 29),
+            date(2028, 3, 8),
+            date(2028, 3, 9),
+            date(2028, 3, 10),  # Ramazan (tahmini)
+            date(2028, 5, 15),
+            date(2028, 5, 16),
+            date(2028, 5, 17),
+            date(2028, 5, 18),  # Kurban (tahmini)
+            # 2029
+            date(2029, 1, 1),
+            date(2029, 4, 23),
+            date(2029, 5, 1),
+            date(2029, 5, 19),
+            date(2029, 7, 15),
+            date(2029, 8, 30),
+            date(2029, 10, 29),
+            date(2029, 2, 26),
+            date(2029, 2, 27),
+            date(2029, 2, 28),  # Ramazan (tahmini)
+            date(2029, 5, 4),
+            date(2029, 5, 5),
+            date(2029, 5, 6),
+            date(2029, 5, 7),  # Kurban (tahmini)
+            # 2030
+            date(2030, 1, 1),
+            date(2030, 4, 23),
+            date(2030, 5, 1),
+            date(2030, 5, 19),
+            date(2030, 7, 15),
+            date(2030, 8, 30),
+            date(2030, 10, 29),
+            date(2030, 2, 15),
+            date(2030, 2, 16),
+            date(2030, 2, 17),  # Ramazan (tahmini)
+            date(2030, 4, 23),
+            date(2030, 4, 24),
+            date(2030, 4, 25),
+            date(2030, 4, 26),  # Kurban (tahmini)
+        }
+    )
 
     def __init__(self):
         self._dynamic_holidays: set | None = None
@@ -125,7 +180,7 @@ class HolidayProvider:
 
     def is_holiday(self, dt: datetime) -> bool:
         """Belirli bir gün tatil mi?"""
-        d = dt.date() if hasattr(dt, 'date') else dt
+        d = dt.date() if hasattr(dt, "date") else dt
         # Dinamik + fallback birleşimine bak
         all_holidays = self.get_holidays()
         return d in all_holidays
@@ -151,9 +206,9 @@ class HolidayProvider:
         # 1. Config dosyasından oku
         try:
             import os
+
             config_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "config", "holidays.json"
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "holidays.json"
             )
             if os.path.exists(config_path):
                 with open(config_path) as f:
@@ -175,6 +230,7 @@ class HolidayProvider:
 # =====================================================
 # Market Session Manager
 # =====================================================
+
 
 class MarketSessionManager:
     """BIST piyasa saatleri yöneticisi (2015 BISTECH sonrası tek seans — Eylül 2025 güncel).
@@ -252,11 +308,7 @@ class MarketSessionManager:
 
         for phase_time, _ in self.PHASE_TIMES:
             if current_time < phase_time:
-                target = now.replace(
-                    hour=phase_time.hour,
-                    minute=phase_time.minute,
-                    second=0, microsecond=0
-                )
+                target = now.replace(hour=phase_time.hour, minute=phase_time.minute, second=0, microsecond=0)
                 return max(0, (target - now).total_seconds())
 
         # Gece — bir sonraki günün ilk fazı
@@ -288,9 +340,7 @@ class MarketSessionManager:
 
     def _on_phase_change(self, old: MarketPhase | None, new: MarketPhase):
         """Faz değişikliği callback."""
-        logger.info("Market phase changed",
-                   old=old.value if old else None,
-                   new=new.value)
+        logger.info("Market phase changed", old=old.value if old else None, new=new.value)
 
         callbacks = self._phase_callbacks.get(new, [])
         for cb in callbacks:
@@ -313,8 +363,10 @@ class MarketSessionManager:
 # Job Types
 # =====================================================
 
+
 class JobType(StrEnum):
     """Job türleri."""
+
     # Data
     MARKET_DATA_UPDATE = "market_data_update"
     FEATURE_CALCULATION = "feature_calculation"
@@ -349,13 +401,15 @@ class JobType(StrEnum):
 # Job Configuration
 # =====================================================
 
+
 @dataclass
 class JobConfig:
     """Job konfigürasyonu."""
+
     job_type: str
     interval_seconds: int
-    trading_only: bool = True       # Sadece piyasa açıkken çalışsın
-    priority: int = 5               # 1=en yüksek, 10=en düşük
+    trading_only: bool = True  # Sadece piyasa açıkken çalışsın
+    priority: int = 5  # 1=en yüksek, 10=en düşük
     enabled: bool = True
     max_retries: int = 3
     timeout_seconds: int = 300
@@ -386,7 +440,6 @@ DEFAULT_JOB_CONFIGS = {
         priority=8,
         description="Universe yenileme",
     ),
-
     # Active trading (yüksek-orta öncelik)
     JobType.LIVE_SCANNING: JobConfig(
         job_type=JobType.LIVE_SCANNING,
@@ -423,7 +476,6 @@ DEFAULT_JOB_CONFIGS = {
         priority=9,
         description="Sistem sağlık kontrolü",
     ),
-
     # Post-market
     JobType.PERSISTENCE: JobConfig(
         job_type=JobType.PERSISTENCE,
@@ -446,7 +498,6 @@ DEFAULT_JOB_CONFIGS = {
         priority=7,
         description="Performans atıf analizi",
     ),
-
     # After-hours (düşük öncelik)
     JobType.LEARNING_CYCLE: JobConfig(
         job_type=JobType.LEARNING_CYCLE,
@@ -483,7 +534,6 @@ DEFAULT_JOB_CONFIGS = {
         priority=9,
         description="Calibration güncelleme",
     ),
-
     # Night
     JobType.BACKUP: JobConfig(
         job_type=JobType.BACKUP,
@@ -499,11 +549,13 @@ DEFAULT_JOB_CONFIGS = {
 # Job Result
 # =====================================================
 
+
 @dataclass
 class JobResult:
     """Job çalıştırma sonucu."""
+
     job_type: str
-    status: str           # SUCCESS, FAILED, TIMEOUT, RETRY
+    status: str  # SUCCESS, FAILED, TIMEOUT, RETRY
     duration_ms: float
     timestamp: str
     error: str | None = None
@@ -515,6 +567,7 @@ class JobResult:
 # =====================================================
 # DB-Backed Job Tracker
 # =====================================================
+
 
 class DBJobTracker:
     """Job geçmişini DB'ye persist eder.
@@ -533,6 +586,7 @@ class DBJobTracker:
         if self._is_db_available():
             try:
                 from services.core.database import pg_execute
+
                 await asyncio.wait_for(
                     pg_execute(
                         """INSERT INTO system_jobs
@@ -550,22 +604,23 @@ class DBJobTracker:
                 )
                 return True
             except Exception as e:
-                logger.warning("DB job record failed, falling back to memory",
-                             error=str(e)[:100])
+                logger.warning("DB job record failed, falling back to memory", error=str(e)[:100])
                 self._db_available = False
 
         # In-memory fallback
-        self._memory_history.append({
-            "job_type": result.job_type,
-            "status": result.status,
-            "duration_ms": result.duration_ms,
-            "timestamp": result.timestamp,
-            "error": result.error,
-            "retry_count": result.retry_count,
-            "triggered_by": result.triggered_by,
-        })
+        self._memory_history.append(
+            {
+                "job_type": result.job_type,
+                "status": result.status,
+                "duration_ms": result.duration_ms,
+                "timestamp": result.timestamp,
+                "error": result.error,
+                "retry_count": result.retry_count,
+                "triggered_by": result.triggered_by,
+            }
+        )
         if len(self._memory_history) > self._max_memory:
-            self._memory_history = self._memory_history[-self._max_memory:]
+            self._memory_history = self._memory_history[-self._max_memory :]
         return True
 
     async def get_job_history(self, job_type: str = None, limit: int = 50) -> list[dict]:
@@ -573,6 +628,7 @@ class DBJobTracker:
         if self._is_db_available():
             try:
                 from services.core.database import pg_fetch
+
                 if job_type:
                     rows = await asyncio.wait_for(
                         pg_fetch(
@@ -581,7 +637,8 @@ class DBJobTracker:
                                FROM system_jobs
                                WHERE job_type = $1
                                ORDER BY completed_at DESC LIMIT $2""",
-                            job_type, limit,
+                            job_type,
+                            limit,
                         ),
                         timeout=3.0,
                     )
@@ -611,6 +668,7 @@ class DBJobTracker:
         if self._is_db_available():
             try:
                 from services.core.database import pg_fetchrow
+
                 row = await asyncio.wait_for(
                     pg_fetchrow(
                         """SELECT
@@ -631,8 +689,7 @@ class DBJobTracker:
 
         # In-memory fallback
         cutoff = time.time() - (window_hours * 3600)
-        recent = [h for h in self._memory_history
-                  if datetime.fromisoformat(h["timestamp"]).timestamp() > cutoff]
+        recent = [h for h in self._memory_history if datetime.fromisoformat(h["timestamp"]).timestamp() > cutoff]
         total = len(recent)
         failed = sum(1 for h in recent if h["status"] == "FAILED")
         return {
@@ -650,6 +707,7 @@ class DBJobTracker:
             import socket
 
             from services.core.config import settings
+
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
             result = s.connect_ex((settings.postgres_host, settings.postgres_port))
@@ -664,6 +722,7 @@ class DBJobTracker:
 # =====================================================
 # Unified Scheduler
 # =====================================================
+
 
 class UnifiedScheduler:
     """Tek canonical scheduler — tüm job'ları yönetir.
@@ -774,8 +833,7 @@ class UnifiedScheduler:
             except NotImplementedError:
                 logger.warning("Error in start: NotImplementedError", exc_info=True)
 
-        logger.info("=== UNIFIED SCHEDULER STARTING ===",
-                    phase=self._market.current_phase().value)
+        logger.info("=== UNIFIED SCHEDULER STARTING ===", phase=self._market.current_phase().value)
 
         # Startup sequence
         await self._startup_sequence()
@@ -813,8 +871,7 @@ class UnifiedScheduler:
         logger.info("Holiday calendar loaded", count=holiday_count)
 
         # Registered handlers
-        logger.info("Registered handlers", count=len(self._handlers),
-                    handlers=list(self._handlers.keys()))
+        logger.info("Registered handlers", count=len(self._handlers), handlers=list(self._handlers.keys()))
 
         # Job configs
         enabled = sum(1 for c in self._configs.values() if c.enabled)
@@ -837,12 +894,8 @@ class UnifiedScheduler:
         """Manuel tetikleme queue'sunu tüket."""
         while self._running:
             try:
-                job_type, handler, config = await asyncio.wait_for(
-                    self._trigger_queue.get(), timeout=5.0
-                )
-                await self._execute_with_retry(
-                    job_type, handler, config, triggered_by="manual"
-                )
+                job_type, handler, config = await asyncio.wait_for(self._trigger_queue.get(), timeout=5.0)
+                await self._execute_with_retry(job_type, handler, config, triggered_by="manual")
             except TimeoutError:
                 continue
             except asyncio.CancelledError:
@@ -963,26 +1016,24 @@ class UnifiedScheduler:
                 await self._record_job(job_result)
 
                 if attempt > 0:
-                    logger.info("Job succeeded after retry",
-                               job_type=job_type, attempt=attempt)
+                    logger.info("Job succeeded after retry", job_type=job_type, attempt=attempt)
 
                 return result
 
             except TimeoutError:
                 last_error = f"Timeout after {config.timeout_seconds}s"
                 if attempt < config.max_retries:
-                    delay = 1.0 * (2 ** attempt)
-                    logger.warning("Job timeout, retrying",
-                                 job_type=job_type, attempt=attempt, delay=delay)
+                    delay = 1.0 * (2**attempt)
+                    logger.warning("Job timeout, retrying", job_type=job_type, attempt=attempt, delay=delay)
                     await asyncio.sleep(delay)
 
             except Exception as e:
                 last_error = str(e)
                 if attempt < config.max_retries:
-                    delay = 1.0 * (2 ** attempt)
-                    logger.warning("Job failed, retrying",
-                                 job_type=job_type, attempt=attempt,
-                                 delay=delay, error=str(e))
+                    delay = 1.0 * (2**attempt)
+                    logger.warning(
+                        "Job failed, retrying", job_type=job_type, attempt=attempt, delay=delay, error=str(e)
+                    )
                     await asyncio.sleep(delay)
 
         # Tüm retry'lar başarısız
@@ -998,8 +1049,7 @@ class UnifiedScheduler:
         )
         await self._record_job(job_result)
 
-        logger.error("Job failed after all retries",
-                    job_type=job_type, error=last_error)
+        logger.error("Job failed after all retries", job_type=job_type, error=last_error)
 
     async def _record_job(self, result: JobResult):
         """Job sonucunu kaydet (DB + memory)."""
@@ -1009,7 +1059,7 @@ class UnifiedScheduler:
         # In-memory history (monitor için)
         self._job_history.append(result)
         if len(self._job_history) > self._max_history:
-            self._job_history = self._job_history[-self._max_history:]
+            self._job_history = self._job_history[-self._max_history :]
 
     def get_status(self) -> dict[str, Any]:
         """Scheduler durumu."""
@@ -1022,8 +1072,7 @@ class UnifiedScheduler:
             "total_jobs_run": len(self._job_history),
             "trigger_queue_size": self._trigger_queue.qsize(),
             "last_runs": {
-                job_type: datetime.fromtimestamp(ts, tz=UTC).isoformat()
-                for job_type, ts in self._last_run.items()
+                job_type: datetime.fromtimestamp(ts, tz=UTC).isoformat() for job_type, ts in self._last_run.items()
             },
         }
 
@@ -1046,10 +1095,7 @@ class UnifiedScheduler:
             "success_rate": round((total - failed) / total, 4) if total > 0 else 0,
             "avg_duration_ms": round(sum(durations) / len(durations), 2),
             "max_duration_ms": round(max(durations), 2),
-            "last_failure": next(
-                (h.timestamp for h in reversed(history) if h.status == "FAILED"),
-                None
-            ),
+            "last_failure": next((h.timestamp for h in reversed(history) if h.status == "FAILED"), None),
         }
 
     def get_job_history(self, limit: int = 50) -> list[dict[str, Any]]:
@@ -1095,6 +1141,7 @@ class UnifiedScheduler:
         from pathlib import Path
 
         import duckdb
+
         Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
         conn = duckdb.connect(self._state_db_path)
         conn.execute("""
@@ -1117,24 +1164,34 @@ class UnifiedScheduler:
     def save_state(self):
         """Scheduler durumunu SQLite'a kaydet."""
         import duckdb
+
         now_iso = datetime.now(UTC).isoformat()
         try:
             conn = duckdb.connect(self._state_db_path)
             # Job run'ları kaydet
             for job_type, ts in self._last_run.items():
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO job_runs (job_type, last_run_ts, updated_at)
                     VALUES (?, ?, ?)
-                """, (job_type, ts, now_iso))
+                """,
+                    (job_type, ts, now_iso),
+                )
             # Genel state
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO scheduler_state (key, value, updated_at)
                 VALUES ('saved_at', ?, ?)
-            """, (now_iso, now_iso))
-            conn.execute("""
+            """,
+                (now_iso, now_iso),
+            )
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO scheduler_state (key, value, updated_at)
                 VALUES ('running', ?, ?)
-            """, (str(self._running), now_iso))
+            """,
+                (str(self._running), now_iso),
+            )
             conn.commit()
             conn.close()
             logger.debug("Scheduler state saved (SQLite)", last_runs=len(self._last_run))
@@ -1146,6 +1203,7 @@ class UnifiedScheduler:
         from pathlib import Path
 
         import duckdb
+
         try:
             if not Path(self._state_db_path).exists():
                 return
@@ -1154,14 +1212,10 @@ class UnifiedScheduler:
             rows = conn.execute("SELECT job_type, last_run_ts FROM job_runs").fetchall()
             self._last_run = {row["job_type"]: row["last_run_ts"] for row in rows}
             # Saved_at bilgisini al
-            saved_row = conn.execute(
-                "SELECT value FROM scheduler_state WHERE key = 'saved_at'"
-            ).fetchone()
+            saved_row = conn.execute("SELECT value FROM scheduler_state WHERE key = 'saved_at'").fetchone()
             saved_at = saved_row["value"] if saved_row else "unknown"
             conn.close()
-            logger.info("Scheduler state loaded (SQLite)",
-                       last_runs=len(self._last_run),
-                       saved_at=saved_at)
+            logger.info("Scheduler state loaded (SQLite)", last_runs=len(self._last_run), saved_at=saved_at)
         except Exception as e:
             logger.warning("Failed to load scheduler state", error=str(e))
 

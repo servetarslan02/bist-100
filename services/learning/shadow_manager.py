@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class ShadowPrediction:
     """Shadow prediction kaydı."""
+
     ticker: str
     champion_prediction: dict
     challenger_prediction: dict
@@ -36,6 +37,7 @@ class ShadowPrediction:
 @dataclass
 class ShadowResult:
     """Shadow mode değerlendirme sonucu."""
+
     champion_sharpe: float
     challenger_sharpe: float
     champion_winrate: float
@@ -70,8 +72,7 @@ class ShadowModeManager:
         self._champion_returns = deque(maxlen=5000)
         self._challenger_returns = deque(maxlen=5000)
 
-        logger.info("Shadow mode started",
-                   champion=champion_id, challenger=challenger_id)
+        logger.info("Shadow mode started", champion=champion_id, challenger=challenger_id)
 
     def record_prediction(
         self,
@@ -83,12 +84,14 @@ class ShadowModeManager:
         if not self._shadow_active:
             return
 
-        self._predictions.append(ShadowPrediction(
-            ticker=ticker,
-            champion_prediction=champion_pred,
-            challenger_prediction=challenger_pred,
-            timestamp=datetime.now(UTC).isoformat(),
-        ))
+        self._predictions.append(
+            ShadowPrediction(
+                ticker=ticker,
+                champion_prediction=champion_pred,
+                challenger_prediction=challenger_pred,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
 
     def record_outcome(self, ticker: str, actual_return: float):
         """Outcome kaydet — her iki model için."""
@@ -131,22 +134,30 @@ class ShadowModeManager:
         # Minimum bekleme süresi
         days_elapsed = (datetime.now(UTC) - self._start_date).days
         if days_elapsed < cfg.duration_days:
-            logger.info("Shadow mode: not enough time",
-                       elapsed=days_elapsed, required=cfg.duration_days)
+            logger.info("Shadow mode: not enough time", elapsed=days_elapsed, required=cfg.duration_days)
             return None
 
         # Minimum prediction sayısı
         if len(self._champion_returns) < cfg.min_predictions:
-            logger.info("Shadow mode: not enough predictions",
-                       count=len(self._champion_returns), required=cfg.min_predictions)
+            logger.info(
+                "Shadow mode: not enough predictions", count=len(self._champion_returns), required=cfg.min_predictions
+            )
             return None
 
         # Metrikler
         champion_sharpe = StatisticalTests.sharpe_ratio(np.array(self._champion_returns))
         challenger_sharpe = StatisticalTests.sharpe_ratio(np.array(self._challenger_returns))
 
-        champion_wr = sum(1 for r in self._champion_returns if r > 0) / len(self._champion_returns) if self._champion_returns else 0
-        challenger_wr = sum(1 for r in self._challenger_returns if r > 0) / len(self._challenger_returns) if self._challenger_returns else 0
+        champion_wr = (
+            sum(1 for r in self._champion_returns if r > 0) / len(self._champion_returns)
+            if self._champion_returns
+            else 0
+        )
+        challenger_wr = (
+            sum(1 for r in self._challenger_returns if r > 0) / len(self._challenger_returns)
+            if self._challenger_returns
+            else 0
+        )
 
         # Statistical test
         t_result = StatisticalTests.welch_t_test(
@@ -179,20 +190,24 @@ class ShadowModeManager:
             prediction_count=len(self._champion_returns),
         )
 
-        logger.info("Shadow mode evaluated",
-                   recommendation=recommendation,
-                   improvement=round(improvement, 2),
-                   p_value=t_result.p_value)
+        logger.info(
+            "Shadow mode evaluated",
+            recommendation=recommendation,
+            improvement=round(improvement, 2),
+            p_value=t_result.p_value,
+        )
 
         return result
 
     def stop_shadow(self):
         """Shadow mode durdur."""
         self._shadow_active = False
-        logger.info("Shadow mode stopped",
-                   champion=self._champion_id,
-                   challenger=self._challenger_id,
-                   predictions=len(self._predictions))
+        logger.info(
+            "Shadow mode stopped",
+            champion=self._champion_id,
+            challenger=self._challenger_id,
+            predictions=len(self._predictions),
+        )
 
     def get_status(self) -> dict[str, Any]:
         """Shadow mode durumu."""

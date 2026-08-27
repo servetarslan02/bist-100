@@ -172,7 +172,7 @@ Bandwidth = (Upper - Lower) / SMA20
 ```python
 def compute_volatility_features(prices, highs, lows, closes):
     features = {}
-    
+
     # ATR
     tr1 = highs - lows
     tr2 = abs(highs - closes.shift(1))
@@ -180,7 +180,7 @@ def compute_volatility_features(prices, highs, lows, closes):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     features["atr_14"] = tr.rolling(14).mean()
     features["atr_pct"] = features["atr_14"] / prices * 100
-    
+
     # Bollinger Bands
     sma20 = prices.rolling(20).mean()
     std20 = prices.rolling(20).std()
@@ -188,15 +188,15 @@ def compute_volatility_features(prices, highs, lows, closes):
     features["bb_lower"] = sma20 - 2 * std20
     features["bb_bandwidth"] = (features["bb_upper"] - features["bb_lower"]) / sma20
     features["bb_pct"] = (prices - features["bb_lower"]) / (features["bb_upper"] - features["bb_lower"])
-    
+
     # Historical volatility
     returns = prices.pct_change()
-    features["volatility_20"] = returns.rolling(20).std() * (252 ** 0.5)
-    features["volatility_60"] = returns.rolling(60).std() * (252 ** 0.5)
-    
+    features["volatility_20"] = returns.rolling(20).std() * (252**0.5)
+    features["volatility_60"] = returns.rolling(60).std() * (252**0.5)
+
     # Volatility ratio
     features["vol_ratio"] = features["volatility_20"] / features["volatility_60"]
-    
+
     return features
 ```
 
@@ -318,15 +318,15 @@ def compute_fundamental_features(fundamentals):
 # services/features/feature_selector.py
 import shap
 
+
 def select_features_shap(model, X_train, y_train, top_n=20):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_train)
-    
-    importance = pd.DataFrame({
-        "feature": X_train.columns,
-        "importance": np.abs(shap_values).mean(axis=0)
-    }).sort_values("importance", ascending=False)
-    
+
+    importance = pd.DataFrame({"feature": X_train.columns, "importance": np.abs(shap_values).mean(axis=0)}).sort_values(
+        "importance", ascending=False
+    )
+
     return importance.head(top_n)["feature"].tolist()
 ```
 
@@ -353,12 +353,16 @@ Feature'ları tekrar tekrar hesaplamak yerine saklar:
 from services.features.feature_store import feature_store
 
 # Feature kaydet
-feature_store.save("THYAO", "2026-08-16", {
-    "rsi_14": 55.3,
-    "macd_histogram": 1.2,
-    "bb_pct": 0.65,
-    "volume_zscore": 2.1,
-})
+feature_store.save(
+    "THYAO",
+    "2026-08-16",
+    {
+        "rsi_14": 55.3,
+        "macd_histogram": 1.2,
+        "bb_pct": 0.65,
+        "volume_zscore": 2.1,
+    },
+)
 
 # Feature oku
 features = feature_store.get("THYAO", "2026-08-16")

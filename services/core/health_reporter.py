@@ -51,6 +51,7 @@ class HealthReporter:
         # 1. Bağlantı durumu
         try:
             from .connectivity import connectivity_monitor
+
             report["components"]["connectivity"] = connectivity_monitor.get_status()
             if connectivity_monitor.is_offline:
                 report["overall_health"] = "DEGRADED"
@@ -61,16 +62,18 @@ class HealthReporter:
         # 2. Downtime durumu
         try:
             from .downtime_tracker import downtime_tracker
+
             report["components"]["downtime"] = downtime_tracker.get_status()
             dt = downtime_tracker.get_downtime_seconds()
             if dt > 3600:
-                report["issues"].append(f"Son downtime: {dt/3600:.1f} saat")
+                report["issues"].append(f"Son downtime: {dt / 3600:.1f} saat")
         except Exception:
             report["components"]["downtime"] = {"status": "unknown"}
 
         # 3. Veri bütünlüğü
         try:
             from .data_integrity import data_integrity_validator
+
             report["components"]["data_integrity"] = data_integrity_validator.get_status()
         except Exception:
             report["components"]["data_integrity"] = {"status": "unknown"}
@@ -78,6 +81,7 @@ class HealthReporter:
         # 4. DLQ durumu
         try:
             from .persistent_dlq import persistent_dlq
+
             dlq_stats = await persistent_dlq.get_stats()
             report["components"]["dlq"] = dlq_stats
             pending = dlq_stats.get("total_entries", 0)
@@ -90,6 +94,7 @@ class HealthReporter:
         # 5. Offline queue durumu
         try:
             from .offline_queue import offline_queue
+
             oq_stats = await offline_queue.get_stats()
             report["components"]["offline_queue"] = oq_stats
             pending = oq_stats.get("pending_entries", 0)
@@ -101,6 +106,7 @@ class HealthReporter:
         # 6. Backfill durumu
         try:
             from ..ingestion.backfill import backfill_manager
+
             report["components"]["backfill"] = backfill_manager.get_stats()
         except Exception:
             report["components"]["backfill"] = {"status": "unknown"}
@@ -164,7 +170,7 @@ class HealthReporter:
         self._last_report = report
         self._report_history.append(report)
         if len(self._report_history) > self._max_history:
-            self._report_history = self._report_history[-self._max_history:]
+            self._report_history = self._report_history[-self._max_history :]
 
         return report
 
@@ -172,6 +178,7 @@ class HealthReporter:
         """Process uptime bilgisi."""
         try:
             import psutil
+
             proc = psutil.Process()
             uptime_seconds = time.time() - proc.create_time()
             return {

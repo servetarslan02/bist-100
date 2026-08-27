@@ -36,9 +36,12 @@ Monte Carlo → Binlerce Olası Gelecek → Fiyat Dağılımı → Getiri Dağı
 from services.intelligence.monte_carlo import monte_carlo_engine
 
 result = monte_carlo_engine.simulate_price_paths(
-    ticker="THYAO", current_price=305.25,
-    expected_return_annual=0.15, volatility_annual=0.25,
-    horizon_days=20, num_simulations=10000,
+    ticker="THYAO",
+    current_price=305.25,
+    expected_return_annual=0.15,
+    volatility_annual=0.25,
+    horizon_days=20,
+    num_simulations=10000,
 )
 # P10: 280.50, P50: 315.20, P90: 355.80
 # P(pozitif): 62%, P(+5%): 41%, P(-5%): 18%
@@ -56,8 +59,7 @@ result = monte_carlo_engine.simulate_price_paths(
 from services.intelligence.scenario import scenario_engine, PREDEFINED_SCENARIOS
 
 positions = [{"ticker": "THYAO", "sector": "AVIATION", "value": 10000, "price": 305}]
-result = scenario_engine.run_scenario(
-    PREDEFINED_SCENARIOS["USDTRY_10_PCT"], positions)
+result = scenario_engine.run_scenario(PREDEFINED_SCENARIOS["USDTRY_10_PCT"], positions)
 # portfolio_impact_pct: -5.78%
 ```
 

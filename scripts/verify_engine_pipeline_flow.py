@@ -16,7 +16,7 @@ import yfinance as yf
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 print("=" * 85)
 print("ALPHA BIST — VERİDEN KARARA UÇTAN UCA MOTOR & MODEL DOĞRULAMA KANITI")
@@ -48,7 +48,9 @@ try:
             last_v = float(df_t["Volume"].iloc[-1])
             prev_c = float(df_t["Close"].iloc[-2])
             chg = ((last_c - prev_c) / prev_c) * 100
-            print(f"  ✓ {sym:<6} -> Son Fiyat: ₺{last_c:.2f} | Günlük Değişim: %{chg:+.2f} | Hacim: {last_v:,.0f} | Veri Noktası: {len(df_t)} gün")
+            print(
+                f"  ✓ {sym:<6} -> Son Fiyat: ₺{last_c:.2f} | Günlük Değişim: %{chg:+.2f} | Hacim: {last_v:,.0f} | Veri Noktası: {len(df_t)} gün"
+            )
 
     df_index = df_all["XU100.IS"].dropna()
     print(f"  ✓ XU100.IS -> BIST 100 Endeks Kapanış: {float(df_index['Close'].iloc[-1]):,.2f}")
@@ -77,7 +79,9 @@ for sym in raw_data:
     vol_zscore = feats.get("volume_zscore", 0.0)
     bb_pos = feats.get("bb_position", 0.5)
 
-    print(f"  ✓ {sym:<6} -> RSI(14): {rsi:.1f} | ATR: {atr:.2f} ₺ | MACD Hist: {macd:+.3f} | Trend Slope: {trend_slope:+.3f} | Hacim Z-Skor: {vol_zscore:+.2f} | Bollinger Poz: %{bb_pos*100:.1f}")
+    print(
+        f"  ✓ {sym:<6} -> RSI(14): {rsi:.1f} | ATR: {atr:.2f} ₺ | MACD Hist: {macd:+.3f} | Trend Slope: {trend_slope:+.3f} | Hacim Z-Skor: {vol_zscore:+.2f} | Bollinger Poz: %{bb_pos * 100:.1f}"
+    )
 
 # -------------------------------------------------------------
 # ADIM 3 & 4: MODELE İLETİM VE MODEL TAHMİNİ (INFERENCE & SHAP)
@@ -94,9 +98,11 @@ ranking_result = ranking_model.rank(
 model_outputs = {}
 for opp in ranking_result.scores:
     model_outputs[opp.ticker] = opp
-    print(f"  ✓ {opp.ticker:<6} -> Sıra: #{opp.rank} | Model Yönü: {opp.direction:<5} | Bileşik Skor: {opp.score*100:.1f}/100 | Model Güveni: %{opp.confidence*100:.1f}")
+    print(
+        f"  ✓ {opp.ticker:<6} -> Sıra: #{opp.rank} | Model Yönü: {opp.direction:<5} | Bileşik Skor: {opp.score * 100:.1f}/100 | Model Güveni: %{opp.confidence * 100:.1f}"
+    )
     if opp.model_contribution:
-        comp_str = " | ".join([f"{k}: {v*100:.1f}" for k, v in opp.model_contribution.items()])
+        comp_str = " | ".join([f"{k}: {v * 100:.1f}" for k, v in opp.model_contribution.items()])
         print(f"         └─ Alt Model Katkıları: [{comp_str}]")
 
 # -------------------------------------------------------------
@@ -138,9 +144,15 @@ for sym in raw_data:
 
     target_str = f"₺{decision.target_price:.2f}" if decision.target_price > 0 else "N/A"
     stop_str = f"₺{decision.stop_price:.2f}" if decision.stop_price > 0 else "N/A"
-    rr_ratio = f"{(decision.target_price - last_price)/(last_price - decision.stop_price):.2f}" if (decision.target_price > last_price and decision.stop_price > 0 and decision.stop_price < last_price) else "N/A"
+    rr_ratio = (
+        f"{(decision.target_price - last_price) / (last_price - decision.stop_price):.2f}"
+        if (decision.target_price > last_price and decision.stop_price > 0 and decision.stop_price < last_price)
+        else "N/A"
+    )
 
-    print(f"  ✓ {sym:<6} -> Nihai Karar: {decision.action:<9} | Conviction: {decision.conviction:<6} | Hedef: {target_str:<8} | Stop: {stop_str:<8} | R:R Oranı: {rr_ratio}")
+    print(
+        f"  ✓ {sym:<6} -> Nihai Karar: {decision.action:<9} | Conviction: {decision.conviction:<6} | Hedef: {target_str:<8} | Stop: {stop_str:<8} | R:R Oranı: {rr_ratio}"
+    )
     if decision.reasons:
         print(f"         └─ Karar Gerekçesi: {decision.reasons[0]}")
 

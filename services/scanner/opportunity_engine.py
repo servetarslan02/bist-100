@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class OpportunityScore:
     """Fırsat skoru — çok boyutlu."""
+
     ticker: str
     timestamp: datetime
 
@@ -423,9 +424,9 @@ class OpportunityDiscoveryEngine:
         for i, r in enumerate(results):
             r.rank = i + 1
 
-        logger.info("Universe scan completed",
-                    total=len(results),
-                    top_score=results[0].risk_adjusted_score if results else 0)
+        logger.info(
+            "Universe scan completed", total=len(results), top_score=results[0].risk_adjusted_score if results else 0
+        )
 
         return results
 
@@ -468,8 +469,9 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
     results = []
     try:
         from .alpha_engine import AlphaEngine
+
         alpha = AlphaEngine()
-        if hasattr(alpha, 'scan'):
+        if hasattr(alpha, "scan"):
             scan_result = alpha.scan(universe, market_data)
             results.append({"engine": "alpha", "status": "ok", "results": scan_result})
         else:
@@ -480,8 +482,9 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
         logger.warning("Failed to load module", module="AlphaEngine", error=str(e))
     try:
         from .alpha_scanner import AlphaScanner
+
         scanner = AlphaScanner()
-        if hasattr(scanner, 'scan'):
+        if hasattr(scanner, "scan"):
             scan_result = scanner.scan(universe, market_data or {})
             results.append({"engine": "alpha_scanner", "status": "ok", "results": scan_result})
         else:
@@ -492,8 +495,9 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
         logger.warning("Failed to load module", module="AlphaScanner", error=str(e))
     try:
         from .event_scanner import EventScanner
+
         scanner = EventScanner()
-        if hasattr(scanner, 'scan'):
+        if hasattr(scanner, "scan"):
             scan_result = scanner.scan(universe, market_data)
             results.append({"engine": "event_scanner", "status": "ok", "results": scan_result})
         else:
@@ -504,8 +508,9 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
         logger.warning("Failed to load module", module="EventScanner", error=str(e))
     try:
         from .live_scanner import LiveScanner
+
         scanner = LiveScanner()
-        if hasattr(scanner, 'scan'):
+        if hasattr(scanner, "scan"):
             scan_result = scanner.scan(universe, market_data)
             results.append({"engine": "live_scanner", "status": "ok", "results": scan_result})
         else:
@@ -516,8 +521,9 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
         logger.warning("Failed to load module", module="LiveScanner", error=str(e))
     try:
         from .tiered_scanner import TieredScanner
+
         scanner = TieredScanner()
-        if hasattr(scanner, 'scan'):
+        if hasattr(scanner, "scan"):
             scan_result = scanner.scan(universe, market_data)
             results.append({"engine": "tiered_scanner", "status": "ok", "results": scan_result})
         else:
@@ -528,6 +534,7 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
         logger.warning("Failed to load module", module="TieredScanner", error=str(e))
     try:
         from .event_queue import EventQueue
+
         EventQueue()
         results.append({"engine": "event_queue", "status": "available"})
     except ImportError:

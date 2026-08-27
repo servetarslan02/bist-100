@@ -65,7 +65,8 @@ class GoogleTrendsAdapter(BaseAdapter):
         if self._pytrends is None:
             try:
                 from pytrends.request import TrendReq
-                self._pytrends = TrendReq(hl='tr-TR', tz=180)
+
+                self._pytrends = TrendReq(hl="tr-TR", tz=180)
             except ImportError:
                 logger.warning("pytrends not installed. Install with: pip install pytrends")
                 return None
@@ -95,8 +96,8 @@ class GoogleTrendsAdapter(BaseAdapter):
         try:
             pytrends.build_payload(
                 search_terms[:5],  # max 5 terim
-                timeframe='today 3-m',
-                geo='TR',
+                timeframe="today 3-m",
+                geo="TR",
             )
 
             interest = pytrends.interest_over_time()

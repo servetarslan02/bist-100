@@ -42,8 +42,7 @@ class CovarianceEstimator:
         n_samples, n_assets = returns.shape
 
         if n_samples < n_assets:
-            logger.warning("Sample size < assets, strong shrinkage needed",
-                         samples=n_samples, assets=n_assets)
+            logger.warning("Sample size < assets, strong shrinkage needed", samples=n_samples, assets=n_assets)
 
         # Sample covariance
         sample_cov = np.cov(returns, rowvar=False, bias=False)
@@ -82,10 +81,12 @@ class CovarianceEstimator:
         shrunk_std = np.sqrt(np.diag(shrunk_cov))
         shrunk_corr = shrunk_cov / np.outer(shrunk_std, shrunk_std)
 
-        logger.info("Covariance estimated",
-                   shrinkage=round(delta, 4),
-                   condition_number=round(condition_number, 2),
-                   assets=n_assets)
+        logger.info(
+            "Covariance estimated",
+            shrinkage=round(delta, 4),
+            condition_number=round(condition_number, 2),
+            assets=n_assets,
+        )
 
         return {
             "covariance": shrunk_cov,
@@ -106,7 +107,7 @@ class CovarianceEstimator:
 
         # Pi: Sample covariance variance (vektörize)
         # diff[i,j] = sum_t (r_ti * r_tj - cov[i,j])^2
-        outer_products = np.einsum('ti,tj->tij', returns, returns)  # (n_samples, n_assets, n_assets)
+        outer_products = np.einsum("ti,tj->tij", returns, returns)  # (n_samples, n_assets, n_assets)
         diff_sq = (outer_products - sample_cov) ** 2  # (n_samples, n_assets, n_assets)
         pi = float(np.sum(diff_sq)) / n_samples
 
@@ -114,7 +115,7 @@ class CovarianceEstimator:
         rho = np.sum((target - sample_cov) ** 2)
 
         # Gamma: Target variance
-        np.sum(target ** 2)
+        np.sum(target**2)
 
         # Optimal shrinkage
         delta = max(0, min(1, pi / (pi + rho))) if pi + rho > 0 else 0.0

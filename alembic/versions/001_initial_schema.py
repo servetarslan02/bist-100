@@ -4,6 +4,7 @@ Revision ID: 001_initial
 Revises: None
 Create Date: 2026-08-25
 """
+
 import sqlalchemy as sa
 
 from alembic import op
@@ -203,8 +204,17 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Drop all tables."""
     tables = [
-        "learning_history", "audit_log", "alerts", "signals", "ml_models",
-        "trades", "positions", "portfolios", "instruments", "companies", "sectors",
+        "learning_history",
+        "audit_log",
+        "alerts",
+        "signals",
+        "ml_models",
+        "trades",
+        "positions",
+        "portfolios",
+        "instruments",
+        "companies",
+        "sectors",
     ]
     for table in tables:
         op.drop_table(table)

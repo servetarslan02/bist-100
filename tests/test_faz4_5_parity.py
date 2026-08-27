@@ -16,21 +16,22 @@ import polars as pl
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):
     rng = np.random.RandomState(seed)
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
+    dates = pl.date_range(
+        date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days * 2), timedelta(days=1), eager=True
+    ).head(n_days)
     close = start_price + np.cumsum(rng.randn(n_days) * 1.5)
     close = np.maximum(close, 1.0)
     high = close * (1 + rng.uniform(0, 0.03, n_days))
     low = close * (1 - rng.uniform(0, 0.03, n_days))
     open_ = close * (1 + rng.uniform(-0.01, 0.01, n_days))
     volume = rng.randint(100000, 5000000, n_days).astype(float)
-    return pl.DataFrame({
-        "Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume
-    }, index=dates)
+    return pl.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume}, index=dates)
 
 
 # ────────────────────────────────────────────────────────────
 # 1. Canonical Feature Registry (no regex)
 # ────────────────────────────────────────────────────────────
+
 
 def test_canonical_feature_registry():
     """Feature registry regex yerine statik listeden türetilmeli."""
@@ -43,9 +44,16 @@ def test_canonical_feature_registry():
 
     # Temel feature'lar listede olmalı
     critical = [
-        "rsi_14", "momentum_20d", "volume_zscore", "atr_pct",
-        "rs_vs_bist_5d", "fcf_yield_pct", "kap_sentiment_avg",
-        "roc_5d", "trend_slope_20d", "adx",
+        "rsi_14",
+        "momentum_20d",
+        "volume_zscore",
+        "atr_pct",
+        "rs_vs_bist_5d",
+        "fcf_yield_pct",
+        "kap_sentiment_avg",
+        "roc_5d",
+        "trend_slope_20d",
+        "adx",
     ]
     for f in critical:
         assert f in features, f"Missing critical feature: {f}"
@@ -69,6 +77,7 @@ def test_canonical_feature_registry():
 # 2. get_canonical_features walk_forward_runner'dan erişilebilir
 # ────────────────────────────────────────────────────────────
 
+
 def test_walk_forward_uses_registry():
     """Walk-forward runner _get_canonical_feature_names registry kullanmalı."""
     from services.core.canonical_scoring import get_canonical_features
@@ -81,11 +90,11 @@ def test_walk_forward_uses_registry():
 
     # Walk-forward runner'ın _get_canonical_feature_names'i aynı şeyi döndürmeli
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     runner = WalkForwardBacktestRunner.__new__(WalkForwardBacktestRunner)
     wf_features = runner._get_canonical_feature_names()
 
-    assert wf_features == features, \
-        f"Feature mismatch: WF has {len(wf_features)}, registry has {len(features)}"
+    assert wf_features == features, f"Feature mismatch: WF has {len(wf_features)}, registry has {len(features)}"
 
     print(f"  ✓ Walk-forward uses registry: {len(wf_features)} features match")
     passed += 1
@@ -96,6 +105,7 @@ def test_walk_forward_uses_registry():
 # ────────────────────────────────────────────────────────────
 # 3. Multi-horizon model activation
 # ────────────────────────────────────────────────────────────
+
 
 def test_multi_horizon_model():
     """MultiHorizonModel birden fazla horizon modeli tutmalı."""
@@ -114,7 +124,9 @@ def test_multi_horizon_model():
     returns = {}
     date_groups = {}
     feature_names = [f"feat_{i}" for i in range(10)]
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(30)
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(
+        30
+    )
 
     for i in range(200):
         ticker = f"SYM{i % 10:02d}"
@@ -169,8 +181,7 @@ def test_multi_horizon_model():
     # Available horizons
     assert multi.available_horizons == sorted(multi.horizon_models.keys())
 
-    print(f"  ✓ Multi-horizon: {multi.available_horizons}, primary={multi.primary_horizon}, "
-          f"predictions={all_preds}")
+    print(f"  ✓ Multi-horizon: {multi.available_horizons}, primary={multi.primary_horizon}, predictions={all_preds}")
     passed += 1
 
     return passed, failed
@@ -179,6 +190,7 @@ def test_multi_horizon_model():
 # ────────────────────────────────────────────────────────────
 # 4. Horizon-aware purge gap
 # ────────────────────────────────────────────────────────────
+
 
 def test_horizon_aware_purge():
     """Her horizon kendi purge gap'ini kullanmalı (purge >= horizon)."""
@@ -192,7 +204,9 @@ def test_horizon_aware_purge():
     returns = {}
     date_groups = {}
     feature_names = [f"feat_{i}" for i in range(5)]
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(30)
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(
+        30
+    )
 
     for i in range(300):
         ticker = f"SYM{i % 10:02d}"
@@ -220,8 +234,9 @@ def test_horizon_aware_purge():
 
     if model_20d is not None:
         # 20d purge 20 gün → daha az train sample
-        assert model_20d.train_samples <= (model_1d.train_samples if model_1d else 999), \
+        assert model_20d.train_samples <= (model_1d.train_samples if model_1d else 999), (
             "20d should have fewer train samples (larger purge)"
+        )
         print(f"  ✓ 20d: train={model_20d.train_samples} (≤ 1d={model_1d.train_samples if model_1d else 'N/A'})")
         passed += 1
     else:
@@ -236,6 +251,7 @@ def test_horizon_aware_purge():
 # 5. Feature parity: training ve inference aynı feature sırası
 # ────────────────────────────────────────────────────────────
 
+
 def test_feature_parity():
     """Model hangi feature'ları bekliyorsa inference aynı sırada üretmeli."""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, validate_feature_contract
@@ -248,7 +264,9 @@ def test_feature_parity():
     features_map = {}
     returns = {}
     date_groups = {}
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(30)
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(
+        30
+    )
 
     for i in range(200):
         ticker = f"SYM{i % 10:02d}"
@@ -267,8 +285,9 @@ def test_feature_parity():
         return 0, 0
 
     # Model feature_names ile inference feature_names aynı olmalı
-    assert model.feature_names == feature_names, \
+    assert model.feature_names == feature_names, (
         f"Feature names mismatch: model={model.feature_names[:3]}... vs expected={feature_names[:3]}..."
+    )
 
     # Feature contract validation
     ok, violations = validate_feature_contract(features_map, model.feature_names)
@@ -284,8 +303,10 @@ def test_feature_parity():
     pred_partial = model.predict(partial_sample)
     assert np.isfinite(pred_partial), f"Partial prediction not finite: {pred_partial}"
 
-    print(f"  ✓ Feature parity: {len(feature_names)} features match, contract valid, "
-          f"prediction works with full and partial features")
+    print(
+        f"  ✓ Feature parity: {len(feature_names)} features match, contract valid, "
+        f"prediction works with full and partial features"
+    )
     passed += 1
 
     return passed, failed
@@ -294,6 +315,7 @@ def test_feature_parity():
 # ────────────────────────────────────────────────────────────
 # 6. MultiHorizonModel backward compatibility
 # ────────────────────────────────────────────────────────────
+
 
 def test_multi_horizon_backward_compat():
     """MultiHorizonModel canonical_scoring.predict() ile uyumlu olmalı."""
@@ -308,7 +330,9 @@ def test_multi_horizon_backward_compat():
     features_map = {}
     returns = {}
     date_groups = {}
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(30)
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=60), timedelta(days=1), eager=True).head(
+        30
+    )
 
     for i in range(200):
         ticker = f"SYM{i % 10:02d}"
@@ -331,16 +355,13 @@ def test_multi_horizon_backward_compat():
     multi.horizon_models[5] = model
 
     sample_features = {f: float(rng.randn()) for f in feature_names}
-    score = canonical_scoring.compute_canonical_score(
-        "TEST", sample_features, "BULL", ml_model=multi
-    )
+    score = canonical_scoring.compute_canonical_score("TEST", sample_features, "BULL", ml_model=multi)
 
     assert isinstance(score, CanonicalScore), f"Expected CanonicalScore, got {type(score)}"
     assert score.ml_score is not None, "ML score should not be None"
     assert np.isfinite(score.ml_score), f"ML score not finite: {score.ml_score}"
 
-    print(f"  ✓ Backward compat: canonical_scoring works with MultiHorizonModel, "
-          f"ml_score={score.ml_score:.2f}")
+    print(f"  ✓ Backward compat: canonical_scoring works with MultiHorizonModel, ml_score={score.ml_score:.2f}")
     passed += 1
 
     return passed, failed
@@ -349,6 +370,7 @@ def test_multi_horizon_backward_compat():
 # ────────────────────────────────────────────────────────────
 # 7. Fallback: yetersiz veride horizon atlanır
 # ────────────────────────────────────────────────────────────
+
 
 def test_horizon_fallback():
     """Yetersiz veride o horizon modeli üretilmemeli."""
@@ -362,10 +384,14 @@ def test_horizon_fallback():
 
     # Simüle: sadece 1d ve 5d modelleri var
     from services.ml.lightgbm_trainer import TrainedModel
+
     dummy_model = TrainedModel(
-        model=None, feature_names=[], train_samples=100,
+        model=None,
+        feature_names=[],
+        train_samples=100,
         validation_metrics={"ic": 0.05, "directional_accuracy": 0.55},
-        confidence_score=0.5, target_horizon=5,
+        confidence_score=0.5,
+        target_horizon=5,
     )
     multi.horizon_models[5] = dummy_model
 
@@ -382,6 +408,7 @@ def test_horizon_fallback():
 # ────────────────────────────────────────────────────────────
 # 8. CS normalizer inference'da aynı matematik
 # ────────────────────────────────────────────────────────────
+
 
 def test_cs_normalizer_parity():
     """CS normalizer training ve inference'da aynı sonucu vermeli."""
@@ -432,6 +459,7 @@ def test_cs_normalizer_parity():
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
 
+
 def run_all():
     tests = [
         ("Canonical feature registry (no regex)", test_canonical_feature_registry),
@@ -461,6 +489,7 @@ def run_all():
                 print(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
+
             print(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1

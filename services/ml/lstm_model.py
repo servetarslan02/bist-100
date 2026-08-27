@@ -3,6 +3,7 @@
 PyTorch LSTM — multi-layer, bidirectional, attention mechanism,
 multi-horizon prediction, walk-forward desteği, proper training loop.
 """
+
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -16,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class LSTMConfig:
     """LSTM konfigürasyonu."""
+
     input_size: int = 65
     hidden_size: int = 128
     num_layers: int = 2
@@ -38,6 +40,7 @@ class AttentionLayer:
     def __init__(self, hidden_size: int):
         try:
             import torch.nn as nn
+
             self.attention = nn.Linear(hidden_size, 1)
             self.softmax = nn.Softmax(dim=1)
         except ImportError:
@@ -47,6 +50,7 @@ class AttentionLayer:
         if self.attention is None:
             return lstm_output[:, -1, :]
         import torch
+
         # lstm_output: (batch, seq_len, hidden)
         weights = self.attention(lstm_output)  # (batch, seq_len, 1)
         weights = self.softmax(weights)
@@ -167,14 +171,16 @@ class StockLSTM:
                     logger.info("lstm_early_stopping", epoch=epoch)
                     break
 
-            history.append({
-                "epoch": epoch,
-                "train_loss": round(train_loss, 6),
-                "val_loss": round(val_loss, 6),
-            })
+            history.append(
+                {
+                    "epoch": epoch,
+                    "train_loss": round(train_loss, 6),
+                    "val_loss": round(val_loss, 6),
+                }
+            )
 
         # Best model yükle
-        if 'best_state' in locals():
+        if "best_state" in locals():
             self._model.load_state_dict(best_state)
 
         self._is_trained = True
@@ -198,10 +204,15 @@ class StockLSTM:
         if X_val_seq is not None:
             val_pred = self.predict(X_val)
             from sklearn.metrics import mean_squared_error
+
             try:
-                metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val[self._config.sequence_length:], val_pred))), 6)
+                metrics["val_rmse"] = round(
+                    float(np.sqrt(mean_squared_error(y_val[self._config.sequence_length :], val_pred))), 6
+                )
                 if len(np.unique(val_pred)) > 1:
-                    metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val[self._config.sequence_length:])[0, 1]), 4)
+                    metrics["val_ic"] = round(
+                        float(np.corrcoef(val_pred, y_val[self._config.sequence_length :])[0, 1]), 4
+                    )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="lstm_model.py:207")
 
@@ -215,6 +226,7 @@ class StockLSTM:
 
         try:
             import torch
+
             X_seq, _ = self._create_sequences(X, np.zeros(len(X)))
             if len(X_seq) == 0:
                 return np.zeros(len(X))
@@ -236,13 +248,14 @@ class StockLSTM:
         X_seq = []
         y_seq = []
         for i in range(len(X) - self._config.sequence_length):
-            X_seq.append(X[i:i + self._config.sequence_length])
+            X_seq.append(X[i : i + self._config.sequence_length])
             y_seq.append(y[i + self._config.sequence_length])
 
         return np.array(X_seq), np.array(y_seq)
 
     def _build_model(self, torch, nn):
         """PyTorch LSTM model oluştur."""
+
         class LSTMModel(nn.Module):
             def __init__(self_cfg, torch_mod, nn_mod):
                 super().__init__()
@@ -278,11 +291,15 @@ class StockLSTM:
         try:
             os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
             import torch
-            torch.save({
-                "model_state": self._model.state_dict(),
-                "config": self._config,
-                "training_history": self._training_history,
-            }, path)
+
+            torch.save(
+                {
+                    "model_state": self._model.state_dict(),
+                    "config": self._config,
+                    "training_history": self._training_history,
+                },
+                path,
+            )
             return True
         except Exception as e:
             logger.error("lstm_save_failed", error=str(e))
@@ -292,6 +309,7 @@ class StockLSTM:
         """Modeli yükle."""
         try:
             import torch
+
             data = torch.load(path, map_location=self._config.device)
             self._config = data.get("config", self._config)
             self._training_history = data.get("training_history", [])

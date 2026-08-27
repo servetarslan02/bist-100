@@ -43,8 +43,9 @@ REGIME_ENCODING = {
 @dataclass
 class MarketStateMetrics:
     """Prometheus metrikleri."""
+
     # Regime
-    regime_value: int = 0           # Encoded regime
+    regime_value: int = 0  # Encoded regime
     regime_confidence: float = 0.0
     regime_consensus: bool = False
 
@@ -176,7 +177,7 @@ class MarketStateMonitor:
         # History
         self._history.append(self._metrics)
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
 
     def get_prometheus_metrics(self) -> str:
         """Prometheus text format."""
@@ -228,53 +229,73 @@ class MarketStateMonitor:
                         "title": "Breadth % Advancing",
                         "type": "timeseries",
                         "targets": [{"expr": "market_state_breadth_pct"}],
-                        "fieldConfig": {"defaults": {"min": 0, "max": 100, "thresholds": {
-                            "steps": [
-                                {"value": 0, "color": "red"},
-                                {"value": 35, "color": "yellow"},
-                                {"value": 65, "color": "green"},
-                            ]
-                        }}},
+                        "fieldConfig": {
+                            "defaults": {
+                                "min": 0,
+                                "max": 100,
+                                "thresholds": {
+                                    "steps": [
+                                        {"value": 0, "color": "red"},
+                                        {"value": 35, "color": "yellow"},
+                                        {"value": 65, "color": "green"},
+                                    ]
+                                },
+                            }
+                        },
                         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
                     },
                     {
                         "title": "McClellan Oscillator",
                         "type": "timeseries",
                         "targets": [{"expr": "market_state_breadth_mcclellan"}],
-                        "fieldConfig": {"defaults": {"thresholds": {
-                            "steps": [
-                                {"value": -100, "color": "red"},
-                                {"value": -50, "color": "yellow"},
-                                {"value": 50, "color": "green"},
-                                {"value": 100, "color": "yellow"},
-                            ]
-                        }}},
+                        "fieldConfig": {
+                            "defaults": {
+                                "thresholds": {
+                                    "steps": [
+                                        {"value": -100, "color": "red"},
+                                        {"value": -50, "color": "yellow"},
+                                        {"value": 50, "color": "green"},
+                                        {"value": 100, "color": "yellow"},
+                                    ]
+                                }
+                            }
+                        },
                         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
                     },
                     {
                         "title": "TRIN (Arms Index)",
                         "type": "timeseries",
                         "targets": [{"expr": "market_state_breadth_trin"}],
-                        "fieldConfig": {"defaults": {"thresholds": {
-                            "steps": [
-                                {"value": 0, "color": "green"},
-                                {"value": 1.0, "color": "yellow"},
-                                {"value": 1.5, "color": "red"},
-                            ]
-                        }}},
+                        "fieldConfig": {
+                            "defaults": {
+                                "thresholds": {
+                                    "steps": [
+                                        {"value": 0, "color": "green"},
+                                        {"value": 1.0, "color": "yellow"},
+                                        {"value": 1.5, "color": "red"},
+                                    ]
+                                }
+                            }
+                        },
                         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
                     },
                     {
                         "title": "Breadth Thrust",
                         "type": "timeseries",
                         "targets": [{"expr": "market_state_breadth_thrust"}],
-                        "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {
-                            "steps": [
-                                {"value": 0, "color": "red"},
-                                {"value": 0.5, "color": "yellow"},
-                                {"value": 0.615, "color": "green"},
-                            ]
-                        }}},
+                        "fieldConfig": {
+                            "defaults": {
+                                "min": 0,
+                                "max": 1,
+                                "thresholds": {
+                                    "steps": [
+                                        {"value": 0, "color": "red"},
+                                        {"value": 0.5, "color": "yellow"},
+                                        {"value": 0.615, "color": "green"},
+                                    ]
+                                },
+                            }
+                        },
                         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
                     },
                     {
@@ -287,9 +308,11 @@ class MarketStateMonitor:
                         "title": "Alerts",
                         "type": "stat",
                         "targets": [{"expr": "market_state_alerts"}],
-                        "fieldConfig": {"defaults": {"thresholds": {
-                            "steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}]
-                        }}},
+                        "fieldConfig": {
+                            "defaults": {
+                                "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 1, "color": "red"}]}
+                            }
+                        },
                         "gridPos": {"h": 4, "w": 6, "x": 6, "y": 20},
                     },
                     {

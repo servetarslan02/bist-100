@@ -17,6 +17,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 class LearningToRankModel:
     """LightGBM Ranker ile hisse sıralama."""
 
@@ -25,20 +26,38 @@ class LearningToRankModel:
         self._is_trained = False
         self._feature_names = [
             # Teknik
-            "roc_5d", "roc_20d", "momentum_20d", "rsi_14",
-            "volume_zscore", "volume_trend", "bb_position",
-            "price_vs_sma20", "price_vs_sma50", "adx",
-            "stoch_k", "stoch_d", "atr_pct",
+            "roc_5d",
+            "roc_20d",
+            "momentum_20d",
+            "rsi_14",
+            "volume_zscore",
+            "volume_trend",
+            "bb_position",
+            "price_vs_sma20",
+            "price_vs_sma50",
+            "adx",
+            "stoch_k",
+            "stoch_d",
+            "atr_pct",
             # Cross-sectional
-            "momentum_20d_sector_zscore", "momentum_20d_bist_pct",
-            "roc_5d_sector_ratio", "avg_peer_correlation",
+            "momentum_20d_sector_zscore",
+            "momentum_20d_bist_pct",
+            "roc_5d_sector_ratio",
+            "avg_peer_correlation",
             # Temporal
-            "trend_slope", "trend_r2", "momentum_acceleration",
-            "volatility_trend", "volume_trend_pct",
+            "trend_slope",
+            "trend_r2",
+            "momentum_acceleration",
+            "volatility_trend",
+            "volume_trend_pct",
             # Fundamental
-            "fundamental_score", "pe_ratio", "pb_ratio", "roe",
+            "fundamental_score",
+            "pe_ratio",
+            "pb_ratio",
+            "roe",
             # Sentiment
-            "sentiment_score", "sentiment_momentum",
+            "sentiment_score",
+            "sentiment_momentum",
         ]
         logger.info("LearningToRankModel initialized")
 
@@ -119,21 +138,18 @@ class LearningToRankModel:
             # Feature importance
             importance = self._model.feature_importances_
             self._feature_importance = {
-                name: float(imp)
-                for name, imp in zip(self._feature_names, importance, strict=False)
+                name: float(imp) for name, imp in zip(self._feature_names, importance, strict=False)
             }
 
-            logger.info("Ranker trained successfully",
-                samples=len(X), groups=len(groups))
+            logger.info("Ranker trained successfully", samples=len(X), groups=len(groups))
 
             return {
                 "success": True,
                 "samples": len(X),
                 "groups": len(groups),
-                "feature_importance": dict(sorted(
-                    self._feature_importance.items(),
-                    key=lambda x: x[1], reverse=True
-                )[:10]),
+                "feature_importance": dict(
+                    sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True)[:10]
+                ),
             }
 
         except ImportError:
@@ -174,10 +190,7 @@ class LearningToRankModel:
         predictions = self._model.predict(np.array(X))
 
         # Sırala (düşük tahmin = üst sıra)
-        ranked = sorted(
-            zip(tickers, predictions, strict=False),
-            key=lambda x: x[1]
-        )
+        ranked = sorted(zip(tickers, predictions, strict=False), key=lambda x: x[1])
 
         return [
             {
@@ -229,11 +242,9 @@ class LearningToRankModel:
     def get_feature_importance(self) -> dict[str, float]:
         """Feature importance."""
         if self._is_trained:
-            return dict(sorted(
-                self._feature_importance.items(),
-                key=lambda x: x[1], reverse=True
-            ))
+            return dict(sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True))
         return {}
+
 
 # Singleton
 ranker_model = LearningToRankModel()

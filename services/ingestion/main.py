@@ -59,9 +59,7 @@ class IngestionService:
         await self._load_instrument_map()
 
         self._running = True
-        logger.info("Ingestion Service started",
-                    instruments=len(self._instrument_map),
-                    universe_size=len(BIST_ALL))
+        logger.info("Ingestion Service started", instruments=len(self._instrument_map), universe_size=len(BIST_ALL))
 
         # Start loops in the background
         self._tasks = [
@@ -69,7 +67,7 @@ class IngestionService:
             asyncio.create_task(self._kap_loop()),
             asyncio.create_task(self._macro_loop()),
             asyncio.create_task(self._news_loop()),
-            asyncio.create_task(self._social_loop())
+            asyncio.create_task(self._social_loop()),
         ]
 
         # Keep the service running
@@ -84,9 +82,7 @@ class IngestionService:
             bist_universe.refresh()
             BIST_STOCKS = bist_universe.BIST_100_TICKERS
             BIST_ALL = bist_universe.BIST_ALL_TICKERS
-            logger.info("BIST universe refreshed",
-                        bist_100=len(BIST_STOCKS),
-                        bist_all=len(BIST_ALL))
+            logger.info("BIST universe refreshed", bist_100=len(BIST_STOCKS), bist_all=len(BIST_ALL))
         except Exception as e:
             logger.warning("Universe refresh failed, using cached/static", error=str(e))
 
@@ -131,37 +127,50 @@ class IngestionService:
         sectors = set(get_sector(t) for t in BIST_STOCKS)
 
         for sector_code in sectors:
-            await pg_execute("""
+            await pg_execute(
+                """
                 INSERT INTO sectors (code, name)
                 VALUES ($1, $1)
                 ON CONFLICT (code) DO NOTHING
-            """, sector_code)
+            """,
+                sector_code,
+            )
 
         # Then, create companies and instruments
         for ticker in BIST_STOCKS:
             sector = get_sector(ticker)
 
             # Get sector_id
-            await pg_execute("""
+            await pg_execute(
+                """
                 SELECT id FROM sectors WHERE code = $1
-            """, sector)
+            """,
+                sector,
+            )
 
             # Create company
-            await pg_execute("""
+            await pg_execute(
+                """
                 INSERT INTO companies (ticker, name, sector_id, active)
                 VALUES ($1, $1, (SELECT id FROM sectors WHERE code = $2), TRUE)
                 ON CONFLICT (ticker) DO NOTHING
-            """, ticker, sector)
+            """,
+                ticker,
+                sector,
+            )
 
             # Create instrument
-            await pg_execute("""
+            await pg_execute(
+                """
                 INSERT INTO instruments (company_id, symbol, instrument_type, exchange, active)
                 VALUES (
                     (SELECT id FROM companies WHERE ticker = $1),
                     $1, 'EQUITY', 'BIST', TRUE
                 )
                 ON CONFLICT (symbol) DO NOTHING
-            """, ticker)
+            """,
+                ticker,
+            )
 
         logger.info("Instruments seeded", count=len(BIST_STOCKS))
 
@@ -195,7 +204,7 @@ class IngestionService:
                 for i in range(0, len(BIST_STOCKS), CHUNK_SIZE):
                     if not self._running:
                         break
-                    chunk = BIST_STOCKS[i:i + CHUNK_SIZE]
+                    chunk = BIST_STOCKS[i : i + CHUNK_SIZE]
                     for ticker in chunk:
                         if not self._running:
                             break
@@ -251,6 +260,7 @@ class IngestionService:
 
                 flush_producer()
                 import gc
+
                 gc.collect()
                 logger.info("Market data fetch cycle completed")
 
@@ -394,7 +404,7 @@ class IngestionService:
                 # Also fetch official KAP and TCMB news feeds
                 try:
                     official_kap = await news_provider.fetch_official_kap_disclosures()
-                    for article in (official_kap or []):
+                    for article in official_kap or []:
                         event = CanonicalEvent(
                             event_type=EventType.NEWS_RAW,
                             source="official_kap",
@@ -430,11 +440,11 @@ class IngestionService:
                 logger.info("Starting social media fetch cycle")
 
                 # Fetch from X (Twitter)
-                if hasattr(settings, 'x_api_key') and settings.x_api_key:
+                if hasattr(settings, "x_api_key") and settings.x_api_key:
                     social_provider.x_api_key = settings.x_api_key
                     try:
                         mentions = await social_provider.fetch_x_mentions()
-                        for mention in (mentions or []):
+                        for mention in mentions or []:
                             event = CanonicalEvent(
                                 event_type=EventType.SOCIAL_EVENT,
                                 source="x",
@@ -461,6 +471,7 @@ class IngestionService:
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -469,10 +480,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "ingestion"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -480,6 +491,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the ingestion service."""

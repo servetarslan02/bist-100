@@ -31,6 +31,7 @@ logger = structlog.get_logger(__name__)
 # MOCK WEBHOOK SERVER
 # =====================================================
 
+
 class MockWebhookServer:
     """Test amaçlı mock HTTP server."""
 
@@ -73,6 +74,7 @@ class MockWebhookServer:
 # =====================================================
 # LOCK AUTO-RELEASE TESTS
 # =====================================================
+
 
 async def test_lock_auto_release_expired():
     """Süresi dolmuş kilit otomatik temizlenmeli."""
@@ -151,6 +153,7 @@ async def test_lock_not_released_if_active():
 # PARALLEL POLICY EDIT TESTS
 # =====================================================
 
+
 async def test_parallel_edits_version_conflict():
     """Paralel düzenlemeler version conflict üretmeli."""
     issues = []
@@ -161,15 +164,13 @@ async def test_parallel_edits_version_conflict():
     # User1 okur (v1)
     # User2 okur (v1)
     # User1 yazar (v1→v2)
-    r1 = policy.update({"escalation_timeouts": {"cash_negative": 100}},
-                       actor="user1", expected_version=1)
+    r1 = policy.update({"escalation_timeouts": {"cash_negative": 100}}, actor="user1", expected_version=1)
     if not r1.get("success"):
         issues.append(f"user1 başarısız: {r1}")
 
     # User2 eski version ile yazar → conflict
     try:
-        policy.update({"escalation_timeouts": {"cash_negative": 200}},
-                      actor="user2", expected_version=1)
+        policy.update({"escalation_timeouts": {"cash_negative": 200}}, actor="user2", expected_version=1)
         issues.append("Conflict yakalanmadı")
     except VersionConflictError:
         logger.warning("Error in test_parallel_edits_version_conflict: VersionConflictError", exc_info=True)
@@ -222,6 +223,7 @@ async def test_parallel_edits_after_lock_release():
 # THREE-WAY DIFF TESTS
 # =====================================================
 
+
 async def test_three_way_diff_no_conflict():
     """Üçlü diff: farklı alanlarda değişiklik conflict olmamalı."""
     issues = []
@@ -233,10 +235,13 @@ async def test_three_way_diff_no_conflict():
     # v2: sadece escalation_timeouts değişti
     policy.update({"escalation_timeouts": {"cash_negative": 120}}, actor="v2")
     # v3: sadece notification_routing değişti (farklı alan)
-    policy.update({
-        "escalation_timeouts": {"cash_negative": 60},
-        "notification_routing": {"CRITICAL": ["log", "webhook", "slack"]}
-    }, actor="v3")
+    policy.update(
+        {
+            "escalation_timeouts": {"cash_negative": 60},
+            "notification_routing": {"CRITICAL": ["log", "webhook", "slack"]},
+        },
+        actor="v3",
+    )
 
     result = policy.three_way_diff(base_version=1, version_a=2, version_b=3)
 
@@ -330,6 +335,7 @@ async def test_three_way_diff_identical_changes():
 # WEBHOOK TESTS
 # =====================================================
 
+
 async def test_webhook_success():
     """Başarlı webhook gönderimi."""
     issues = []
@@ -404,6 +410,7 @@ async def test_webhook_failure_audit():
 # BATCH SILENCE LIMIT TESTS
 # =====================================================
 
+
 async def test_batch_within_limit():
     """Limit dahilinde batch başarılı olmalı."""
     issues = []
@@ -457,15 +464,23 @@ async def test_batch_transaction_rollback():
 
     # Hatalı DB (commit çalışmasın)
     class BrokenDB:
-        def execute(self, *args): pass
-        def commit(self): raise duckdb.OperationalError("disk full")
-        def rollback(self): pass
+        def execute(self, *args):
+            pass
+
+        def commit(self):
+            raise duckdb.OperationalError("disk full")
+
+        def rollback(self):
+            pass
 
     policy = AlertPolicy()
-    results = policy.batch_add_silences([
-        {"alert_type": "test1", "duration_s": 60},
-        {"alert_type": "test2", "duration_s": 60},
-    ], db=BrokenDB())
+    results = policy.batch_add_silences(
+        [
+            {"alert_type": "test1", "duration_s": 60},
+            {"alert_type": "test2", "duration_s": 60},
+        ],
+        db=BrokenDB(),
+    )
 
     success = sum(1 for r in results if r.get("success"))
     if success != 0:
@@ -481,6 +496,7 @@ async def test_batch_transaction_rollback():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

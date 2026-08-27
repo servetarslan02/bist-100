@@ -122,10 +122,18 @@ class ModelMemoryStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
                 """,
                 (
-                    prediction_id, model_id, model_version, ticker, now,
-                    predicted_direction, confidence, market_regime, prediction_horizon,
-                    entry_price, orjson.dumps(features or {}).decode()
-                )
+                    prediction_id,
+                    model_id,
+                    model_version,
+                    ticker,
+                    now,
+                    predicted_direction,
+                    confidence,
+                    market_regime,
+                    prediction_horizon,
+                    entry_price,
+                    orjson.dumps(features or {}).decode(),
+                ),
             )
 
     def save_batch_records(self, records: list[dict[str, Any]]):
@@ -152,10 +160,9 @@ class ModelMemoryStore:
             entry_p = float(r.get("entry_price", 100.0))
             features = orjson.dumps(r.get("features", {})).decode()
 
-            pred_tuples.append((
-                p_id, m_id, m_ver, ticker, t_stamp, pred_dir, conf,
-                regime, horizon, entry_p, features, 'EVALUATED'
-            ))
+            pred_tuples.append(
+                (p_id, m_id, m_ver, ticker, t_stamp, pred_dir, conf, regime, horizon, entry_p, features, "EVALUATED")
+            )
 
             if "actual_price" in r:
                 act_p = float(r["actual_price"])
@@ -169,10 +176,23 @@ class ModelMemoryStore:
                 cost = pos_val * (cost_pct / 100.0)
                 net_pnl = gross_pnl - cost
 
-                outcome_tuples.append((
-                    p_id, m_id, m_ver, ticker, eval_at, act_p, entry_p,
-                    actual_ret, act_dir, is_corr, gross_pnl, net_pnl, cost
-                ))
+                outcome_tuples.append(
+                    (
+                        p_id,
+                        m_id,
+                        m_ver,
+                        ticker,
+                        eval_at,
+                        act_p,
+                        entry_p,
+                        actual_ret,
+                        act_dir,
+                        is_corr,
+                        gross_pnl,
+                        net_pnl,
+                        cost,
+                    )
+                )
 
         with self._get_conn() as conn:
             conn.execute("BEGIN TRANSACTION;")
@@ -184,7 +204,7 @@ class ModelMemoryStore:
                     entry_price, features_json, status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                pred_tuples
+                pred_tuples,
             )
             conn.executemany(
                 """
@@ -194,7 +214,7 @@ class ModelMemoryStore:
                     is_correct, gross_pnl, net_pnl, transaction_cost
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                outcome_tuples
+                outcome_tuples,
             )
             conn.commit()
 
@@ -239,10 +259,20 @@ class ModelMemoryStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    prediction_id, row["model_id"], row["model_version"], row["ticker"],
-                    now, actual_price, entry_price, actual_ret, act_dir,
-                    is_correct, gross_pnl, net_pnl, cost
-                )
+                    prediction_id,
+                    row["model_id"],
+                    row["model_version"],
+                    row["ticker"],
+                    now,
+                    actual_price,
+                    entry_price,
+                    actual_ret,
+                    act_dir,
+                    is_correct,
+                    gross_pnl,
+                    net_pnl,
+                    cost,
+                ),
             )
 
             conn.execute("UPDATE predictions SET status = 'EVALUATED' WHERE prediction_id = ?", (prediction_id,))
@@ -275,7 +305,7 @@ class ModelMemoryStore:
                 ORDER BY o.evaluated_at DESC
                 LIMIT ?
                 """,
-                (model_id, limit)
+                (model_id, limit),
             )
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
@@ -301,13 +331,21 @@ class ModelMemoryStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    model_id, model_version, now, metrics.get("evaluated_samples", 0),
-                    metrics.get("direction_accuracy", 0.5), metrics.get("hit_rate_pct", 50.0),
-                    metrics.get("net_pnl", 0.0), metrics.get("annualized_sharpe", 0.0),
-                    metrics.get("max_drawdown_pct", 0.0), metrics.get("brier_score", 0.25),
-                    metrics.get("rank_ic", 0.0), reliability_score, fusion_weight,
-                    orjson.dumps(metrics).decode()
-                )
+                    model_id,
+                    model_version,
+                    now,
+                    metrics.get("evaluated_samples", 0),
+                    metrics.get("direction_accuracy", 0.5),
+                    metrics.get("hit_rate_pct", 50.0),
+                    metrics.get("net_pnl", 0.0),
+                    metrics.get("annualized_sharpe", 0.0),
+                    metrics.get("max_drawdown_pct", 0.0),
+                    metrics.get("brier_score", 0.25),
+                    metrics.get("rank_ic", 0.0),
+                    reliability_score,
+                    fusion_weight,
+                    orjson.dumps(metrics).decode(),
+                ),
             )
 
     def record_fusion_weights(self, weights: dict[str, float], market_regime: str):
@@ -316,7 +354,7 @@ class ModelMemoryStore:
         with self._get_conn() as conn:
             conn.execute(
                 "INSERT INTO fusion_weights_history (timestamp, market_regime, weights_json) VALUES (?, ?, ?)",
-                (now, market_regime, orjson.dumps(weights).decode())
+                (now, market_regime, orjson.dumps(weights).decode()),
             )
 
     def get_latest_metrics_all_models(self) -> list[dict[str, Any]]:
@@ -348,5 +386,5 @@ class ModelMemoryStore:
                     LIMIT max(0, (SELECT COUNT(*) FROM predictions WHERE status = 'EVALUATED') - ?)
                 )
                 """,
-                (max_records_per_model,)
+                (max_records_per_model,),
             )

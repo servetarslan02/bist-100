@@ -8,6 +8,7 @@ BIST vergi oranları (2025-2026):
 
 Kaynak: GVK, SPK mevzuatı
 """
+
 from dataclasses import dataclass
 
 import structlog
@@ -17,23 +18,23 @@ logger = structlog.get_logger()
 # BIST vergi oranları (2025-2026)
 # Hisse senedi kâr vergisi: Gelir vergisi dilimine göre değişir
 INCOME_TAX_BRACKETS = [
-    (110_000, 0.15),   # 110.000 TL'ye kadar %15
-    (230_000, 0.20),   # 110.001-230.000 arası %20
-    (580_000, 0.27),   # 230.001-580.000 arası %27
-    (3_000_000, 0.35), # 580.001-3.000.000 arası %35
-    (float('inf'), 0.40),  # 3.000.001 üzeri %40
+    (110_000, 0.15),  # 110.000 TL'ye kadar %15
+    (230_000, 0.20),  # 110.001-230.000 arası %20
+    (580_000, 0.27),  # 230.001-580.000 arası %27
+    (3_000_000, 0.35),  # 580.001-3.000.000 arası %35
+    (float("inf"), 0.40),  # 3.000.001 üzeri %40
 ]
 
 # Stopaj oranları
 TAX_RATES = {
     "stock": {
         "short_term": None,  # Gelir vergisi dilimine göre (aşağıda hesaplanır)
-        "long_term": None,   # Gelir vergisi dilimine göre (aşağıda hesaplanır)
+        "long_term": None,  # Gelir vergisi dilimine göre (aşağıda hesaplanır)
     },
-    "dividend": 0.15,       # Temettü stopajı (%15)
-    "bond": 0.10,           # Tahvil/faiz stopajı (%10)
-    "fund": 0.00,           # Yatırım fonu katılma payları (muaf)
-    "repo": 0.10,           # Repo stopajı (%10)
+    "dividend": 0.15,  # Temettü stopajı (%15)
+    "bond": 0.10,  # Tahvil/faiz stopajı (%10)
+    "fund": 0.00,  # Yatırım fonu katılma payları (muaf)
+    "repo": 0.10,  # Repo stopajı (%10)
 }
 
 # Uzun vadeli holding eşiği (6 ay = 180 gün)
@@ -91,11 +92,11 @@ def calculate_tax(
             taxable_income = annual_income + profit
 
         rate = _get_income_tax_rate(taxable_income)
-        tax_bracket = f"{rate*100:.0f}% dilim"
+        tax_bracket = f"{rate * 100:.0f}% dilim"
     else:
         # Stopaj oranları
         rate = TAX_RATES.get(asset_type, 0.15)
-        tax_bracket = f"Stopaj {rate*100:.0f}%"
+        tax_bracket = f"Stopaj {rate * 100:.0f}%"
 
     tax = max(0, profit * rate)
 

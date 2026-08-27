@@ -15,15 +15,18 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 class Action(Enum):
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
     NO_ACTION = "NO_ACTION"
 
+
 @dataclass
 class DecisionInput:
     """Karar motoru girdisi (ATR eklendi)."""
+
     ticker: str
     price: float
     features: dict[str, Any] = field(default_factory=dict)
@@ -62,9 +65,11 @@ class DecisionInput:
     avg_volume: float = 0.0
     spread_pct: float = 0.0
 
+
 @dataclass
 class Decision:
     """Karar çıktısı."""
+
     ticker: str
     action: str  # BUY, SELL, HOLD, NO_ACTION
     direction: str  # LONG, SHORT
@@ -80,6 +85,7 @@ class Decision:
     conviction: str = "LOW"  # Geriye uyumlu
     # LLM Ajan Türkçe Açıklama
     llm_narrative: str = ""  # LLM Agent tarafından üretilen karar özeti
+
 
 class DecisionEngine:
     """Karar motoru."""
@@ -118,7 +124,9 @@ class DecisionEngine:
                 direction="NEUTRAL",
                 confidence=inp.ml_confidence,
                 score=score,
-                reasons=[f"Skor ({score:.1f} < {min_score}) veya güven ({inp.ml_confidence:.2f} < {min_conf}) rejim eşiğinin altında ({inp.regime})"],
+                reasons=[
+                    f"Skor ({score:.1f} < {min_score}) veya güven ({inp.ml_confidence:.2f} < {min_conf}) rejim eşiğinin altında ({inp.regime})"
+                ],
             )
 
         # 3. Yön belirle
@@ -386,19 +394,23 @@ class DecisionEngine:
         rsi = f.get("rsi_14", 50)
 
         # SİMETRİK eşikler (BUY bias kaldırıldı)
-        bullish_signals = sum([
-            momentum > 0,
-            roc > 0,
-            rsi > 52,   # Eski: 55 → Yeni: 52 (simetrik)
-            inp.ml_score > 55,  # Eski: 60 → Yeni: 55 (simetrik)
-        ])
+        bullish_signals = sum(
+            [
+                momentum > 0,
+                roc > 0,
+                rsi > 52,  # Eski: 55 → Yeni: 52 (simetrik)
+                inp.ml_score > 55,  # Eski: 60 → Yeni: 55 (simetrik)
+            ]
+        )
 
-        bearish_signals = sum([
-            momentum < 0,
-            roc < 0,
-            rsi < 48,   # Eski: 45 → Yeni: 48 (simetrik)
-            inp.ml_score < 45,  # Eski: 40 → Yeni: 45 (simetrik)
-        ])
+        bearish_signals = sum(
+            [
+                momentum < 0,
+                roc < 0,
+                rsi < 48,  # Eski: 45 → Yeni: 48 (simetrik)
+                inp.ml_score < 45,  # Eski: 40 → Yeni: 45 (simetrik)
+            ]
+        )
 
         if bullish_signals >= 3:
             return "LONG"

@@ -11,7 +11,7 @@ import time
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.data.historical_warehouse import historical_warehouse
 
@@ -40,6 +40,7 @@ def main():
     print("=" * 80)
     print("✅ ARTIK TÜM TESTLERDE İNTERNETTEN TEKRAR İNDİRMEDEN 0.05 SANİYEDE KULLANILABİLİR!")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     main()

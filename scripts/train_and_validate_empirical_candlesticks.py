@@ -15,22 +15,42 @@ import numpy as np
 import polars as pl
 import yfinance as yf
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.intelligence.candle_patterns import candle_engine
 from services.intelligence.trend_rider import trend_rider
 from services.ml.candle_feature_engineer import candle_feature_engineer
 
 BIST_CORE_STOCKS = [
-    "THYAO.IS", "GARAN.IS", "AKBNK.IS", "ISCTR.IS", "YKBNK.IS",
-    "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS", "SISE.IS",
-    "ARCLK.IS", "FROTO.IS", "TOASO.IS", "ENKAI.IS", "PETKM.IS",
-    "CCOLA.IS", "AEFES.IS", "TCELL.IS", "VAKBN.IS", "HALKB.IS",
-    "BIMAS.IS", "ASELS.IS", "PGSUS.IS", "TTKOM.IS", "MGROS.IS"
+    "THYAO.IS",
+    "GARAN.IS",
+    "AKBNK.IS",
+    "ISCTR.IS",
+    "YKBNK.IS",
+    "KCHOL.IS",
+    "SAHOL.IS",
+    "TUPRS.IS",
+    "EREGL.IS",
+    "SISE.IS",
+    "ARCLK.IS",
+    "FROTO.IS",
+    "TOASO.IS",
+    "ENKAI.IS",
+    "PETKM.IS",
+    "CCOLA.IS",
+    "AEFES.IS",
+    "TCELL.IS",
+    "VAKBN.IS",
+    "HALKB.IS",
+    "BIMAS.IS",
+    "ASELS.IS",
+    "PGSUS.IS",
+    "TTKOM.IS",
+    "MGROS.IS",
 ]
 
 BENCHMARK_TICKER = "XU100.IS"
@@ -68,7 +88,15 @@ def main():
     edge_table = candle_feature_engineer.compute_empirical_edge_table(stock_dict, forward_days=10)
 
     if not edge_table.empty:
-        cols_to_print = ["Formasyon", "BIST Örneklem Sayısı", "Kazanma Oranı (Win Rate)", "Ort. 10G Getiri %", "Kâr / Zarar Çarpanı (PF)", "Beklenen Değer (Expectancy %)", "Model Öneri Derecesi"]
+        cols_to_print = [
+            "Formasyon",
+            "BIST Örneklem Sayısı",
+            "Kazanma Oranı (Win Rate)",
+            "Ort. 10G Getiri %",
+            "Kâr / Zarar Çarpanı (PF)",
+            "Beklenen Değer (Expectancy %)",
+            "Model Öneri Derecesi",
+        ]
         print(edge_table[cols_to_print].to_string(index=False))
     print("-" * 85)
 
@@ -81,9 +109,15 @@ def main():
 
     X_list, y_list = [], []
     feature_names = [
-        "feat_buyer_pressure", "feat_candle_score", "feat_has_bull_engulfing",
-        "feat_has_hammer", "feat_has_morning_star", "feat_has_soldiers",
-        "feat_has_fvg", "feat_has_shooting_star", "feat_has_crows"
+        "feat_buyer_pressure",
+        "feat_candle_score",
+        "feat_has_bull_engulfing",
+        "feat_has_hammer",
+        "feat_has_morning_star",
+        "feat_has_soldiers",
+        "feat_has_fvg",
+        "feat_has_shooting_star",
+        "feat_has_crows",
     ]
 
     for ticker, df in stock_dict.items():
@@ -109,7 +143,7 @@ def main():
         "boosting_type": "gbdt",
         "learning_rate": 0.05,
         "num_leaves": 31,
-        "verbose": -1
+        "verbose": -1,
     }
     model = lgb.train(params, train_ds, num_boost_round=100)
 
@@ -158,7 +192,7 @@ def main():
 
         if year != current_year:
             year_ret_pct = ((capital - year_start_equity) / year_start_equity) * 100
-            bm_year_price = float(bm_df["Close"].iloc[day_idx-1])
+            bm_year_price = float(bm_df["Close"].iloc[day_idx - 1])
             bm_ret_pct = ((bm_year_price - year_start_bm) / year_start_bm) * 100
 
             yearly_stats[current_year] = {
@@ -171,7 +205,7 @@ def main():
             year_start_bm = float(bm_df["Close"].iloc[day_idx])
 
         # Rejim
-        bm_closes = bm_df["Close"].iloc[max(0, day_idx-200):day_idx+1].values
+        bm_closes = bm_df["Close"].iloc[max(0, day_idx - 200) : day_idx + 1].values
         bm_now = float(bm_closes[-1])
         bm_sma50 = float(np.mean(bm_closes[-50:])) if len(bm_closes) >= 50 else bm_now
         bm_sma200 = float(np.mean(bm_closes[-200:])) if len(bm_closes) >= 200 else bm_sma50
@@ -200,13 +234,9 @@ def main():
                 capital += (p_real_exit * pos["shares"]) - (p_real_exit * pos["shares"] * COMMISSION_RATE)
 
                 ret_pct = ((p_real_exit - pos["entry_price"]) / pos["entry_price"]) * 100
-                trade_logs.append({
-                    "ticker": ticker,
-                    "pnl": net_pnl,
-                    "ret_pct": ret_pct,
-                    "reason": exit_reason,
-                    "date": current_date
-                })
+                trade_logs.append(
+                    {"ticker": ticker, "pnl": net_pnl, "ret_pct": ret_pct, "reason": exit_reason, "date": current_date}
+                )
                 closed_tickers.append(ticker)
 
         for t in closed_tickers:
@@ -233,16 +263,21 @@ def main():
                     continue
 
                 # Model skoru & formasyon
-                has_bull = any(p in {"BULLISH_ENGULFING", "HAMMER_PINBAR", "MORNING_STAR", "THREE_WHITE_SOLDIERS", "BULLISH_FVG"} for p in c_res.patterns_detected)
+                has_bull = any(
+                    p in {"BULLISH_ENGULFING", "HAMMER_PINBAR", "MORNING_STAR", "THREE_WHITE_SOLDIERS", "BULLISH_FVG"}
+                    for p in c_res.patterns_detected
+                )
                 if (has_bull or c_res.candle_score >= 65) and c_res.buyer_pressure_pct >= 52:
-                    candidates.append({
-                        "ticker": ticker,
-                        "price": p_now,
-                        "score": c_res.candle_score,
-                    })
+                    candidates.append(
+                        {
+                            "ticker": ticker,
+                            "price": p_now,
+                            "score": c_res.candle_score,
+                        }
+                    )
 
             candidates.sort(key=lambda x: x["score"], reverse=True)
-            for cand in candidates[:max_positions - len(positions)]:
+            for cand in candidates[: max_positions - len(positions)]:
                 total_port = capital + sum(p["shares"] * p["entry_price"] for p in positions.values())
                 invest_amount = min(capital * 0.90, total_port * (0.10 if is_bull_regime else 0.05))
                 if invest_amount > 100:
@@ -258,7 +293,7 @@ def main():
                             "entry_price": entry_p,
                             "peak_price": entry_p,
                             "stop_loss": entry_p * 0.93,
-                            "entry_date": current_date
+                            "entry_date": current_date,
                         }
 
         # Portföy anlık değeri
@@ -319,7 +354,9 @@ def main():
     print(f"{'Kar / Zarar Çarpanı (Profit Factor)':<38} | {'—':<20} | {pf:<20}")
     print(f"{'+%50 Üzeri Mega Trend İşlemleri':<38} | {'—':<20} | {len(mega_winners)} Adet Mega Trend")
     if best_trade is not None:
-        print(f"{'En Yüksek Tekil İşlem Kârı':<38} | {'—':<20} | {best_trade['ticker']} (+%{best_trade['ret_pct']:.1f})")
+        print(
+            f"{'En Yüksek Tekil İşlem Kârı':<38} | {'—':<20} | {best_trade['ticker']} (+%{best_trade['ret_pct']:.1f})"
+        )
     print("=" * 85)
 
 

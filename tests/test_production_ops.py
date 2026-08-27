@@ -46,6 +46,7 @@ from services.core.monitoring_security import (
 # WEBHOOK TESTS
 # =====================================================
 
+
 async def test_webhook_payload_format():
     """Webhook payload doğru formatta olmalı."""
     issues = []
@@ -110,6 +111,7 @@ async def test_log_provider():
 # RETRY TESTS
 # =====================================================
 
+
 async def test_retry_config():
     """Retry yapılandırması doğru olmalı."""
     issues = []
@@ -152,10 +154,13 @@ async def test_retry_with_failing_provider():
     class FailingProvider:
         def __init__(self):
             self.attempts = 0
+
         def name(self):
             return "failing"
+
         def min_severity(self):
             return "INFO"
+
         async def send(self, alert):
             self.attempts += 1
             return False
@@ -186,8 +191,10 @@ async def test_retry_with_succeeding_provider():
     class SucceedingProvider:
         def name(self):
             return "succeeding"
+
         def min_severity(self):
             return "INFO"
+
         async def send(self, alert):
             return True
 
@@ -208,6 +215,7 @@ async def test_retry_with_succeeding_provider():
 # =====================================================
 # DEDUPLICATION TESTS
 # =====================================================
+
 
 async def test_alert_deduplication():
     """Aynı alert tekrar üretilmemeli (dedup window içinde)."""
@@ -261,16 +269,13 @@ async def test_fingerprint_stability():
     """Aynı koşullar aynı fingerprint üretmeli."""
     issues = []
 
-    a1 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL",
-               message="test", details={"cash": -100})
-    a2 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL",
-               message="test2", details={"cash": -100})
+    a1 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL", message="test", details={"cash": -100})
+    a2 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL", message="test2", details={"cash": -100})
 
     if a1.fingerprint != a2.fingerprint:
         issues.append(f"Fingerprint farklı: {a1.fingerprint} != {a2.fingerprint}")
 
-    a3 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL",
-               message="test", details={"cash": -200})
+    a3 = Alert(alert_type=AlertType.CASH_NEGATIVE, severity="CRITICAL", message="test", details={"cash": -200})
 
     if a1.fingerprint == a3.fingerprint:
         issues.append("Farklı detaylar aynı fingerprint üretti")
@@ -282,14 +287,20 @@ async def test_fingerprint_stability():
 # FAILED NOTIFICATION TESTS
 # =====================================================
 
+
 async def test_failed_notification_logging():
     """Başarısız bildirimler kaydedilmeli."""
     issues = []
 
     class FailProvider:
-        def name(self): return "fail"
-        def min_severity(self): return "INFO"
-        async def send(self, alert): return False
+        def name(self):
+            return "fail"
+
+        def min_severity(self):
+            return "INFO"
+
+        async def send(self, alert):
+            return False
 
     alerting = AlertingSystem()
     alerting._router._providers.append(FailProvider())
@@ -309,9 +320,14 @@ async def test_notification_log():
     issues = []
 
     class OkProvider:
-        def name(self): return "ok"
-        def min_severity(self): return "INFO"
-        async def send(self, alert): return True
+        def name(self):
+            return "ok"
+
+        def min_severity(self):
+            return "INFO"
+
+        async def send(self, alert):
+            return True
 
     alerting = AlertingSystem()
     alerting._router._providers.append(OkProvider())
@@ -329,6 +345,7 @@ async def test_notification_log():
 # =====================================================
 # GRAFANA PROVISIONING TESTS
 # =====================================================
+
 
 async def test_datasource_config():
     """Datasource config doğru payload üretmeli."""
@@ -376,10 +393,15 @@ async def test_dashboard_version_tracking():
     provisioner = GrafanaProvisioner()
 
     # Manuel versiyon ekleme
-    provisioner._versions.append(DashboardVersion(
-        uid="test123", title="Test Dashboard", version=1,
-        provisioned_at="2026-01-01T00:00:00Z", file_path="/test.json",
-    ))
+    provisioner._versions.append(
+        DashboardVersion(
+            uid="test123",
+            title="Test Dashboard",
+            version=1,
+            provisioned_at="2026-01-01T00:00:00Z",
+            file_path="/test.json",
+        )
+    )
     provisioner._provisioned_dashboards["test123"] = 1
 
     history = provisioner.get_version_history()
@@ -398,8 +420,7 @@ async def test_dashboard_json_valid():
     issues = []
 
     dashboard_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "monitoring", "grafana_dashboard.json"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "monitoring", "grafana_dashboard.json"
     )
 
     if not os.path.exists(dashboard_path):
@@ -427,14 +448,17 @@ async def test_dashboard_json_valid():
 # AUTH INTERFACE TESTS
 # =====================================================
 
+
 async def test_static_token_provider():
     """Static token provider doğru çalışmalı."""
     issues = []
 
-    provider = StaticTokenProvider(tokens={
-        "admin_token": ["admin", "viewer"],
-        "metrics_token": ["viewer"],
-    })
+    provider = StaticTokenProvider(
+        tokens={
+            "admin_token": ["admin", "viewer"],
+            "metrics_token": ["viewer"],
+        }
+    )
 
     # Doğru token
     result = await provider.verify("admin_token")
@@ -519,6 +543,7 @@ async def test_auth_result_roles():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

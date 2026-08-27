@@ -20,7 +20,7 @@ async def data_sources(user=Depends(get_current_user), _=Depends(check_rate_limi
     return {
         "sources": ["google_trends", "kap_rss", "financial_news", "social_sentiment", "macro_commodities"],
         "count": 5,
-        "status": "ok"
+        "status": "ok",
     }
 
 
@@ -36,6 +36,7 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
 
     try:
         from ...ingestion.providers.news_provider import news_provider
+
         news = await news_provider.fetch_news_for_ticker(sym, max_items=10)
 
         pos_words = ["artış", "büyüme", "kâr", "rekor", "ihale", "anlaşma", "yüksek", "temettü", "başarı", "onay"]
@@ -63,7 +64,7 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
             "bias": bias,
             "news_count": len(news),
             "sample_headlines": [n.get("title") for n in news[:3]],
-            "status": "active"
+            "status": "active",
         }
         _SENTIMENT_CACHE[sym] = (now, res)
         return res
@@ -75,7 +76,7 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
             "polarity": 0.25,
             "bias": "BULLISH",
             "news_count": 5,
-            "status": "fallback"
+            "status": "fallback",
         }
         _SENTIMENT_CACHE[sym] = (now, fallback)
         return fallback
@@ -95,6 +96,7 @@ async def live_news(limit: int = Query(default=20, le=50)):
 
     try:
         from ...ingestion.providers.news_provider import news_provider
+
         news_items = await news_provider.fetch_financial_news_rss(max_items=limit)
         _NEWS_CACHE = (now, news_items)
         return {
@@ -119,6 +121,7 @@ async def live_macro():
 
     try:
         from ...ingestion.providers.macro_provider import MacroProvider
+
         macro_prov = MacroProvider()
         data = await macro_prov.fetch_yahoo_macro()
         _MACRO_CACHE = (now, data)

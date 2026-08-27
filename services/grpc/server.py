@@ -16,6 +16,7 @@ import structlog
 
 try:
     from grpc import aio
+
     HAS_GRPC = True
 except ImportError:
     HAS_GRPC = False
@@ -23,6 +24,7 @@ except ImportError:
 # Generated protobuf imports
 try:
     from .generated import market_pb2, market_pb2_grpc
+
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -42,6 +44,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
             while True:
                 try:
                     from ..core.redis_helper import get_cached
+
                     for ticker in tickers:
                         data = get_cached(f"price:{ticker}")
                         if data:
@@ -66,6 +69,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
         """Tek seferlik fiyat (Protobuf)."""
         ticker = request.tickers[0] if request.tickers else ""
         from ..core.redis_helper import get_cached
+
         data = get_cached(f"price:{ticker}")
         if data:
             return market_pb2.MarketTick(
@@ -84,12 +88,13 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 
     def StreamSignals(self, request, context):
         """Sinyal stream'i (Protobuf binary)."""
-        min_confidence = request.min_confidence if hasattr(request, 'min_confidence') else 0.5
+        min_confidence = request.min_confidence if hasattr(request, "min_confidence") else 0.5
 
         async def _generate():
             while True:
                 try:
                     from ..core.redis_helper import get_cached
+
                     signals = get_cached("signals:latest") or []
                     for s in signals:
                         if s.get("confidence", 0) >= min_confidence:
@@ -113,21 +118,24 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
     def GetRecentSignals(self, request, context):
         """Son sinyalleri al (Protobuf)."""
         from ..core.redis_helper import get_cached
+
         signals = get_cached("signals:latest") or []
-        min_conf = request.min_confidence if hasattr(request, 'min_confidence') else 0.5
+        min_conf = request.min_confidence if hasattr(request, "min_confidence") else 0.5
         direction_map = {"BUY": 0, "SELL": 1, "HOLD": 2}
         proto_signals = []
         for s in signals:
             if s.get("confidence", 0) >= min_conf:
-                proto_signals.append(market_pb2.Signal(
-                    ticker=s.get("ticker", ""),
-                    direction=direction_map.get(s.get("direction", "HOLD"), 2),
-                    confidence=float(s.get("confidence", 0)),
-                    target_price=float(s.get("target_price", 0)),
-                    stop_loss=float(s.get("stop_loss", 0)),
-                    reason=s.get("reason", ""),
-                    timestamp=int(time.time() * 1000),
-                ))
+                proto_signals.append(
+                    market_pb2.Signal(
+                        ticker=s.get("ticker", ""),
+                        direction=direction_map.get(s.get("direction", "HOLD"), 2),
+                        confidence=float(s.get("confidence", 0)),
+                        target_price=float(s.get("target_price", 0)),
+                        stop_loss=float(s.get("stop_loss", 0)),
+                        reason=s.get("reason", ""),
+                        timestamp=int(time.time() * 1000),
+                    )
+                )
         return market_pb2.SignalList(signals=proto_signals)
 
 
@@ -141,6 +149,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
             while True:
                 try:
                     from ..core.redis_helper import get_cached
+
                     pf = get_cached("portfolio:state")
                     if pf:
                         positions = [
@@ -173,6 +182,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
     def GetPortfolio(self, request, context):
         """Anlık portföy durumu (Protobuf)."""
         from ..core.redis_helper import get_cached
+
         pf = get_cached("portfolio:state") or {}
         positions = [
             market_pb2.Position(
@@ -205,6 +215,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
             while True:
                 try:
                     from ..core.redis_helper import get_cached
+
                     risk = get_cached("risk:metrics")
                     if risk:
                         yield market_pb2.RiskMetrics(
@@ -226,6 +237,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
     def GetRisk(self, request, context):
         """Anlık risk durumu (Protobuf)."""
         from ..core.redis_helper import get_cached
+
         risk = get_cached("risk:metrics") or {}
         return market_pb2.RiskMetrics(
             var_95=float(risk.get("var_95", 0)),
@@ -265,6 +277,7 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     # Health check servisi (gRPC health checking protocol)
     try:
         from grpc_health.v1 import health, health_pb2_grpc
+
         health_servicer = health.HealthServicer()
         health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
         logger.debug("gRPC health check service registered")
@@ -276,6 +289,7 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     # Reflection servisi (grpcurl ile test edilebilir)
     try:
         from grpc_reflection.v1alpha import reflection
+
         SERVICE_NAMES = (
             market_pb2_grpc.DESCRIPTOR.services_by_name["MarketService"].full_name,
             market_pb2_grpc.DESCRIPTOR.services_by_name["SignalService"].full_name,
@@ -292,22 +306,35 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     # mTLS desteği — sertifikalar varsa TLS ile başlat
     try:
         from ..core.mtls import get_grpc_server_credentials
+
         server_credentials = get_grpc_server_credentials()
         if server_credentials:
             server.add_secure_port(f"{host}:{port}", server_credentials)
-            logger.info("gRPC server started with mTLS", host=host, port=port,
-                        services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
-                        tls="mTLS")
+            logger.info(
+                "gRPC server started with mTLS",
+                host=host,
+                port=port,
+                services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+                tls="mTLS",
+            )
         else:
             server.add_insecure_port(f"{host}:{port}")
-            logger.info("gRPC server started (insecure)", host=host, port=port,
-                        services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
-                        tls="none")
+            logger.info(
+                "gRPC server started (insecure)",
+                host=host,
+                port=port,
+                services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+                tls="none",
+            )
     except ImportError:
         server.add_insecure_port(f"{host}:{port}")
-        logger.info("gRPC server started (insecure)", host=host, port=port,
-                    services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
-                    tls="none")
+        logger.info(
+            "gRPC server started (insecure)",
+            host=host,
+            port=port,
+            services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+            tls="none",
+        )
     except Exception as e:
         server.add_insecure_port(f"{host}:{port}")
         logger.warning("gRPC mTLS setup failed, using insecure", error=str(e))
@@ -316,6 +343,7 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
 
 
 if __name__ == "__main__":
+
     async def main():
         server = await start_grpc_server()
         if server:

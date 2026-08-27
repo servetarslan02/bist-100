@@ -138,8 +138,10 @@ class MarketStateService:
         self._consumer = EventConsumer(
             group_id="market-state-v2",
             topics=[
-                "feature.updated", "market.tick",
-                "world_state.changed", "news.event",
+                "feature.updated",
+                "market.tick",
+                "world_state.changed",
+                "news.event",
             ],
             auto_offset_reset="latest",
         )
@@ -208,6 +210,7 @@ class MarketStateService:
         """Load instrument mapping — BIST universe."""
         try:
             from ..ingestion.bist_universe import bist_universe
+
             tickers = bist_universe.get_tickers()
         except Exception as e:
             logger.error("Failed to load BIST universe", error=str(e))
@@ -281,14 +284,16 @@ class MarketStateService:
                 return
 
             if instrument_id in self._instrument_states:
-                self._instrument_states[instrument_id].update({
-                    "rsi": features.get("rsi_14", 50),
-                    "momentum": features.get("momentum_20d", 0),
-                    "volatility": features.get("realized_vol_20d", 0),
-                    "volume_zscore": features.get("volume_zscore", 0),
-                    "anomaly_score": features.get("anomaly_score", 0),
-                    "spread": features.get("spread", 0),
-                })
+                self._instrument_states[instrument_id].update(
+                    {
+                        "rsi": features.get("rsi_14", 50),
+                        "momentum": features.get("momentum_20d", 0),
+                        "volatility": features.get("realized_vol_20d", 0),
+                        "volume_zscore": features.get("volume_zscore", 0),
+                        "anomaly_score": features.get("anomaly_score", 0),
+                        "spread": features.get("spread", 0),
+                    }
+                )
 
                 # Volatility history (HMM için)
                 vol = features.get("realized_vol_20d", 0)
@@ -373,10 +378,12 @@ class MarketStateService:
             weekly_instruments = self._compute_weekly_aggregate(states)
             daily_data = {"instruments": states, "features": features}
             weekly_data = {"instruments": weekly_instruments, "features": features}
-            multi_tf = self._multi_tf.compute_all_timeframes({
-                "daily": daily_data,
-                "weekly": weekly_data,
-            })
+            multi_tf = self._multi_tf.compute_all_timeframes(
+                {
+                    "daily": daily_data,
+                    "weekly": weekly_data,
+                }
+            )
 
             # 7. Format output
             market_state = self._formatter.format(
@@ -400,21 +407,33 @@ class MarketStateService:
 
             # 9. Store in ClickHouse
             try:
-                ch_insert("market_states", [[
-                    datetime.now(UTC),
-                    ensemble.regime,
-                    float(ensemble.confidence),
-                    float(components.avg_momentum),
-                    float(breadth.pct_advancing),
-                    float(components.avg_volatility),
-                    components.liquidity_state,
-                    float(risk_appetite),
-                    market_state.to_dict(),
-                ]], column_names=[
-                    "timestamp", "regime", "regime_confidence", "trend_score",
-                    "breadth_pct", "volatility_regime", "liquidity_level",
-                    "risk_appetite", "details",
-                ])
+                ch_insert(
+                    "market_states",
+                    [
+                        [
+                            datetime.now(UTC),
+                            ensemble.regime,
+                            float(ensemble.confidence),
+                            float(components.avg_momentum),
+                            float(breadth.pct_advancing),
+                            float(components.avg_volatility),
+                            components.liquidity_state,
+                            float(risk_appetite),
+                            market_state.to_dict(),
+                        ]
+                    ],
+                    column_names=[
+                        "timestamp",
+                        "regime",
+                        "regime_confidence",
+                        "trend_score",
+                        "breadth_pct",
+                        "volatility_regime",
+                        "liquidity_level",
+                        "risk_appetite",
+                        "details",
+                    ],
+                )
             except Exception as e:
                 logger.debug("ClickHouse insert failed", error=str(e))
 
@@ -457,6 +476,7 @@ class MarketStateService:
             # Prometheus metrics
             try:
                 from services.core.observability import prometheus_metrics
+
                 prometheus_metrics.set_gauge("market_state_regime", 1, {"regime": ensemble.regime})
                 prometheus_metrics.set_gauge("market_state_regime_confidence", ensemble.confidence)
                 prometheus_metrics.set_gauge("market_state_breadth_pct", breadth.pct_advancing)
@@ -621,6 +641,7 @@ class MarketStateService:
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -629,10 +650,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "market_state"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -640,6 +661,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the market state service."""

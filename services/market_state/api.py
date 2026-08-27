@@ -108,13 +108,15 @@ def register_market_state_routes(app, market_state_service):
             # Breadth alerts
             breadth = market_state_service.get_breadth()
             if breadth and hasattr(breadth, "alert_level") and breadth.alert_level != "NORMAL":
-                alerts.append({
-                    "type": "BREADTH_ALERT",
-                    "severity": breadth.alert_level,
-                    "message": f"Breadth seviyesi: {breadth.breadth_state} (pct: {breadth.pct_advancing:.1f}%)",
-                    "breadth_state": breadth.breadth_state,
-                    "pct_advancing": breadth.pct_advancing,
-                })
+                alerts.append(
+                    {
+                        "type": "BREADTH_ALERT",
+                        "severity": breadth.alert_level,
+                        "message": f"Breadth seviyesi: {breadth.breadth_state} (pct: {breadth.pct_advancing:.1f}%)",
+                        "breadth_state": breadth.breadth_state,
+                        "pct_advancing": breadth.pct_advancing,
+                    }
+                )
 
             return {
                 "alerts": alerts,

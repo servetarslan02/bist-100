@@ -14,10 +14,13 @@ def print_banner(text):
     print(f"  {text}")
     print("=" * 78)
 
+
 def audit_containers():
     print_banner("1. DOCKER KONTEYNER VE MIKROSERVIS DURUM DENETIMI")
     try:
-        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True)
+        res = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True
+        )
         lines = res.stdout.strip().split("\n")
         expected = ["alpha-api", "alpha-dashboard", "alpha-postgres", "alpha-clickhouse", "alpha-redis", "alpha-nats"]
         for exp in expected:
@@ -29,6 +32,7 @@ def audit_containers():
                 print(f"  [--] Konteyner: {exp:<18} | Durum: BULUNAMADI")
     except Exception as e:
         print(f"  [--] Docker sorgusu yapilamadi: {e}")
+
 
 def audit_warehouse():
     print_banner("2. 30 YILLIK TARIHSEL VERI AMBARI & DEPO DENETIMI")
@@ -43,10 +47,13 @@ def audit_warehouse():
         n_bm, min_b, max_b = cur.fetchone()
         conn.close()
         print(f"  [OK] DuckDB Ambar Dosyasi   : {wh_path} ({size_mb:.2f} MB)")
-        print(f"  [OK] BIST Hisse Mum Verisi  : {n_stocks} Hisse | {n_candles:,} Gunluk Bar ({min_s[:10]} -> {max_s[:10]})")
+        print(
+            f"  [OK] BIST Hisse Mum Verisi  : {n_stocks} Hisse | {n_candles:,} Gunluk Bar ({min_s[:10]} -> {max_s[:10]})"
+        )
         print(f"  [OK] XU100 Benchmark Verisi : {n_bm:,} Gunluk Bar ({min_b[:10]} -> {max_b[:10]})")
     else:
         print("  [--] Warehouse veritabani bulunamadi!")
+
 
 def audit_ml_models():
     print_banner("3. EGITILMIS MAKINE OGRENIMI ENSEMBLE MODELLERI & CIKARIM (INFERENCE)")
@@ -67,11 +74,14 @@ def audit_ml_models():
                 # Test inference
                 pred = m.predict(dummy_features)
                 pred_val = float(pred[0]) if hasattr(pred, "__iter__") else float(pred)
-                print(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Cikarim Testi: {pred_val:+.4f} (Calisiyor)")
+                print(
+                    f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Cikarim Testi: {pred_val:+.4f} (Calisiyor)"
+                )
             except Exception:
                 print(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Yuklendi")
         else:
             print(f"  [--] {name:<12} | Dosya eksik: {path}")
+
 
 def audit_backend_apis():
     print_banner("4. BACKEND CANLI API UÇ NOKTALARI VE DINAMIK YANITLAR (FastAPI :8000)")
@@ -98,6 +108,7 @@ def audit_backend_apis():
                 print(f"  [OK 200] {ep:<45} | {desc:<30} | '{key}': {count_info}")
         except Exception as e:
             print(f"  [FAIL]   {ep:<45} | {desc:<30} | HATA: {e}")
+
 
 def audit_frontend_pages():
     print_banner("5. FRONTEND 17 SAYFA ERISIM VE ZERO-MOCK RENDER KONTROLU (Next.js :3000)")
@@ -128,6 +139,7 @@ def audit_frontend_pages():
                 print(f"  [OK 200] {p:<25} | {name:<30} | {len(html):,} bytes HTML")
         except Exception as e:
             print(f"  [FAIL]   {p:<25} | {name:<30} | HATA: {e}")
+
 
 if __name__ == "__main__":
     audit_containers()

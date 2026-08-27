@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class WalkForwardMetrics:
     """Walk-forward metrikleri."""
+
     avg_correlation: float
     std_correlation: float
     avg_direction_accuracy: float
@@ -42,6 +43,7 @@ class WalkForwardMetrics:
 @dataclass
 class RetrainResult:
     """Retrain sonucu."""
+
     success: bool
     version_id: str
     reason: str
@@ -91,30 +93,40 @@ class RetrainEngine:
         version_id = self._generate_version_id()
 
         # 1. Walk-forward validation
-        wf_metrics = self._run_walk_forward(
-            model_fn, features_map, returns, dates, feature_fn, cfg
-        )
+        wf_metrics = self._run_walk_forward(model_fn, features_map, returns, dates, feature_fn, cfg)
 
         if wf_metrics is None:
             return RetrainResult(
-                success=False, version_id="", reason="Walk-forward validation failed",
-                wf_metrics=None, shadow_started=False,
+                success=False,
+                version_id="",
+                reason="Walk-forward validation failed",
+                wf_metrics=None,
+                shadow_started=False,
                 timestamp=datetime.now(UTC).isoformat(),
-                training_samples=0, regime=regime,
+                training_samples=0,
+                regime=regime,
             )
 
         # 2. Model kabul/red kararı
         accepted, reason = self._evaluate_wf_metrics(wf_metrics, cfg)
 
         if not accepted:
-            logger.warning("Retrain rejected", reason=reason,
-                         correlation=wf_metrics.avg_correlation,
-                         accuracy=wf_metrics.avg_direction_accuracy)
+            logger.warning(
+                "Retrain rejected",
+                reason=reason,
+                correlation=wf_metrics.avg_correlation,
+                accuracy=wf_metrics.avg_direction_accuracy,
+            )
             return RetrainResult(
-                success=False, version_id=version_id, reason=reason,
-                wf_metrics=wf_metrics, shadow_started=False,
+                success=False,
+                version_id=version_id,
+                reason=reason,
+                wf_metrics=wf_metrics,
+                shadow_started=False,
                 timestamp=datetime.now(UTC).isoformat(),
-                training_samples=sum(len(v) for v in features_map.values()) if isinstance(next(iter(features_map.values())), np.ndarray) else 0,
+                training_samples=sum(len(v) for v in features_map.values())
+                if isinstance(next(iter(features_map.values())), np.ndarray)
+                else 0,
                 regime=regime,
             )
 
@@ -122,7 +134,7 @@ class RetrainEngine:
         try:
             model = model_fn()
             X = self._prepare_features(features_map, feature_fn)
-            y = np.array([returns.get(d.strftime("%Y-%m-%d") if hasattr(d, 'strftime') else str(d), 0) for d in dates])
+            y = np.array([returns.get(d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d), 0) for d in dates])
 
             # NaN temizle
             mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
@@ -130,22 +142,28 @@ class RetrainEngine:
 
             if len(X) < cfg.min_samples:
                 return RetrainResult(
-                    success=False, version_id=version_id,
+                    success=False,
+                    version_id=version_id,
                     reason=f"Insufficient training data: {len(X)} < {cfg.min_samples}",
-                    wf_metrics=wf_metrics, shadow_started=False,
+                    wf_metrics=wf_metrics,
+                    shadow_started=False,
                     timestamp=datetime.now(UTC).isoformat(),
-                    training_samples=len(X), regime=regime,
+                    training_samples=len(X),
+                    regime=regime,
                 )
 
             model.fit(X, y)
             self._retrain_count += 1
 
             result = RetrainResult(
-                success=True, version_id=version_id,
+                success=True,
+                version_id=version_id,
                 reason="Walk-forward validation passed",
-                wf_metrics=wf_metrics, shadow_started=True,
+                wf_metrics=wf_metrics,
+                shadow_started=True,
                 timestamp=datetime.now(UTC).isoformat(),
-                training_samples=len(X), regime=regime,
+                training_samples=len(X),
+                regime=regime,
             )
 
             self._retrain_history.append(result)
@@ -153,22 +171,28 @@ class RetrainEngine:
                 self._retrain_history = self._retrain_history[-1000:]
             self._last_retrain = result
 
-            logger.info("Retrain completed",
-                       version=version_id, samples=len(X),
-                       wf_correlation=wf_metrics.avg_correlation,
-                       wf_accuracy=wf_metrics.avg_direction_accuracy,
-                       deflated_sharpe=wf_metrics.deflated_sharpe)
+            logger.info(
+                "Retrain completed",
+                version=version_id,
+                samples=len(X),
+                wf_correlation=wf_metrics.avg_correlation,
+                wf_accuracy=wf_metrics.avg_direction_accuracy,
+                deflated_sharpe=wf_metrics.deflated_sharpe,
+            )
 
             return result
 
         except Exception as e:
             logger.error("Retrain failed", error=str(e))
             return RetrainResult(
-                success=False, version_id=version_id,
+                success=False,
+                version_id=version_id,
                 reason=f"Training error: {str(e)}",
-                wf_metrics=wf_metrics, shadow_started=False,
+                wf_metrics=wf_metrics,
+                shadow_started=False,
                 timestamp=datetime.now(UTC).isoformat(),
-                training_samples=0, regime=regime,
+                training_samples=0,
+                regime=regime,
             )
 
     def get_retrain_report(self) -> dict[str, Any]:
@@ -193,7 +217,9 @@ class RetrainEngine:
                 "avg_direction_accuracy": r.wf_metrics.avg_direction_accuracy if r.wf_metrics else None,
                 "deflated_sharpe": r.wf_metrics.deflated_sharpe if r.wf_metrics else None,
                 "pass_rate": r.wf_metrics.pass_rate if r.wf_metrics else None,
-            } if r.wf_metrics else None,
+            }
+            if r.wf_metrics
+            else None,
             "total_retrains": self._retrain_count,
             "history_count": len(self._retrain_history),
         }
@@ -214,12 +240,15 @@ class RetrainEngine:
             # Tarihleri datetime'a çevir
             if dates and isinstance(dates[0], str):
                 from datetime import datetime as dt
+
                 dates = [dt.strptime(d, "%Y-%m-%d") for d in dates]
 
             if len(dates) < cfg.wf_train_size + cfg.wf_test_size:
-                logger.warning("Insufficient data for walk-forward",
-                             available=len(dates),
-                             required=cfg.wf_train_size + cfg.wf_test_size)
+                logger.warning(
+                    "Insufficient data for walk-forward",
+                    available=len(dates),
+                    required=cfg.wf_train_size + cfg.wf_test_size,
+                )
                 return None
 
             # Split'ler oluştur
@@ -235,9 +264,7 @@ class RetrainEngine:
 
             for i, split in enumerate(splits):
                 try:
-                    metrics = self._evaluate_split(
-                        model_fn, features_map, returns, dates, split, feature_fn
-                    )
+                    metrics = self._evaluate_split(model_fn, features_map, returns, dates, split, feature_fn)
                     if metrics:
                         correlations.append(metrics["correlation"])
                         accuracies.append(metrics["direction_accuracy"])
@@ -293,12 +320,14 @@ class RetrainEngine:
             test_end = min(start_idx + cfg.wf_test_size, total)
 
             if train_end > train_start and test_end > test_start:
-                splits.append({
-                    "train_start": train_start,
-                    "train_end": train_end,
-                    "test_start": test_start,
-                    "test_end": test_end,
-                })
+                splits.append(
+                    {
+                        "train_start": train_start,
+                        "train_end": train_end,
+                        "test_start": test_start,
+                        "test_end": test_end,
+                    }
+                )
 
             start_idx += cfg.wf_step_size
 
@@ -337,8 +366,12 @@ class RetrainEngine:
         # Getirileri hazırla
         train_dates = dates[train_start:train_end]
         test_dates = dates[test_start:test_end]
-        y_train = np.array([returns.get(d.strftime("%Y-%m-%d") if hasattr(d, 'strftime') else str(d), 0) for d in train_dates])
-        y_test = np.array([returns.get(d.strftime("%Y-%m-%d") if hasattr(d, 'strftime') else str(d), 0) for d in test_dates])
+        y_train = np.array(
+            [returns.get(d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d), 0) for d in train_dates]
+        )
+        y_test = np.array(
+            [returns.get(d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d), 0) for d in test_dates]
+        )
 
         # NaN temizle
         train_mask = np.isfinite(X_train).all(axis=1) & np.isfinite(y_train)
@@ -406,7 +439,7 @@ class RetrainEngine:
         try:
             X = self._prepare_features(features_map, feature_fn)
             # Basit: ilk N satırı al (gerçek implementasyonda tarih bazlı filtreleme)
-            return X[:len(dates)] if len(X) >= len(dates) else X
+            return X[: len(dates)] if len(X) >= len(dates) else X
         except Exception:
             return None
 
@@ -416,7 +449,10 @@ class RetrainEngine:
             return False, f"Correlation too low: {metrics.avg_correlation} < {cfg.wf_min_correlation}"
 
         if metrics.avg_direction_accuracy < cfg.wf_min_direction_accuracy:
-            return False, f"Direction accuracy too low: {metrics.avg_direction_accuracy} < {cfg.wf_min_direction_accuracy}"
+            return (
+                False,
+                f"Direction accuracy too low: {metrics.avg_direction_accuracy} < {cfg.wf_min_direction_accuracy}",
+            )
 
         if metrics.pass_rate < 0.5:
             return False, f"Pass rate too low: {metrics.pass_rate} < 0.5"
@@ -427,6 +463,7 @@ class RetrainEngine:
         """Versiyon ID oluştur."""
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         import hashlib
+
         random_hash = hashlib.md5(str(np.random.random()).encode()).hexdigest()[:6]
         return f"retrain_{timestamp}_{random_hash}"
 

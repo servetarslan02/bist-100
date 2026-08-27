@@ -63,7 +63,7 @@ async def _sse_generator(
 
             if channel == "ticks":
                 data = {}
-                for ticker in (tickers or []):
+                for ticker in tickers or []:
                     tick = get_cached(f"price:{ticker}")
                     if tick:
                         data[ticker] = tick

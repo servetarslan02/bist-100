@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class ReconciliationReport:
     """Uzlaştırma raporu."""
+
     ticker: str
     consensus_direction: str  # LONG, SHORT, NEUTRAL
     consensus_score: float  # -1 ile +1
@@ -123,11 +124,13 @@ class CrossSourceReconciler:
                 values = list(scores.values())
                 max_diff = max(values) - min(values)
                 if max_diff > self.DISCREPANCY_THRESHOLD:
-                    discrepancies.append({
-                        "category": category,
-                        "max_difference": round(max_diff, 4),
-                        "sources": {k: round(v, 4) for k, v in scores.items()},
-                    })
+                    discrepancies.append(
+                        {
+                            "category": category,
+                            "max_difference": round(max_diff, 4),
+                            "sources": {k: round(v, 4) for k, v in scores.items()},
+                        }
+                    )
                     warnings.append(f"{category}: Kaynaklar arası büyük fark ({max_diff:.2f})")
 
         # 7. Güvenilirlik skoru
@@ -165,7 +168,9 @@ class CrossSourceReconciler:
         mean_val = np.mean(values)
 
         # Aynı yönde olan kaynaklar
-        agreeing = sum(1 for v in values if (v > 0 and mean_val > 0) or (v < 0 and mean_val < 0) or (v == 0 and mean_val == 0))
+        agreeing = sum(
+            1 for v in values if (v > 0 and mean_val > 0) or (v < 0 and mean_val < 0) or (v == 0 and mean_val == 0)
+        )
         disagreeing = len(values) - agreeing
 
         # Confidence: kaynak sayısı + tutarlılık

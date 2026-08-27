@@ -20,11 +20,13 @@ import pytest
 # HOLIDAY PROVIDER TESTS
 # =====================================================
 
+
 class TestHolidayProvider:
     """Holiday provider testleri."""
 
     def setup_method(self):
         from services.scheduler.unified_scheduler import HolidayProvider
+
         self.provider = HolidayProvider()
 
     def test_fallback_holidays_loaded(self):
@@ -61,18 +63,27 @@ class TestHolidayProvider:
 # MARKET SESSION MANAGER TESTS
 # =====================================================
 
+
 class TestMarketSessionManager:
     """Market session testleri."""
 
     def setup_method(self):
         from services.scheduler.unified_scheduler import MarketSessionManager
+
         self.market = MarketSessionManager()
 
     def test_current_phase(self):
         phase = self.market.current_phase()
         assert phase.value in [
-            "CLOSED", "PRE_MARKET", "SEANS_1", "BREAK",
-            "SEANS_2", "CLOSING", "POST_MARKET", "AFTER_HOURS", "NIGHT"
+            "CLOSED",
+            "PRE_MARKET",
+            "SEANS_1",
+            "BREAK",
+            "SEANS_2",
+            "CLOSING",
+            "POST_MARKET",
+            "AFTER_HOURS",
+            "NIGHT",
         ]
 
     def test_is_trading_hours(self):
@@ -116,11 +127,13 @@ class TestMarketSessionManager:
 # UNIFIED SCHEDULER TESTS
 # =====================================================
 
+
 class TestUnifiedScheduler:
     """Unified scheduler testleri."""
 
     def setup_method(self):
         from services.scheduler.unified_scheduler import UnifiedScheduler
+
         self.scheduler = UnifiedScheduler()
 
     def test_register_handler(self):
@@ -200,15 +213,15 @@ class TestUnifiedScheduler:
 
     def test_trigger_job_with_handler(self):
         """Handler varsa queue'ya eklenmeli."""
+
         async def dummy():
             return "ok"
 
         self.scheduler.register_handler("test_trigger", dummy)
         # Config ekle
         from services.scheduler.unified_scheduler import JobConfig
-        self.scheduler._configs["test_trigger"] = JobConfig(
-            job_type="test_trigger", interval_seconds=60
-        )
+
+        self.scheduler._configs["test_trigger"] = JobConfig(job_type="test_trigger", interval_seconds=60)
 
         result = asyncio.run(self.scheduler.trigger_job("test_trigger"))
         assert result["status"] == "QUEUED"
@@ -218,19 +231,21 @@ class TestUnifiedScheduler:
 # DB JOB TRACKER TESTS
 # =====================================================
 
+
 class TestDBJobTracker:
     """DB job tracker testleri."""
 
     def setup_method(self):
         from services.scheduler.unified_scheduler import DBJobTracker
+
         self.tracker = DBJobTracker()
 
     def test_record_job_memory_fallback(self):
         """DB yoksa memory'ye yazmalı."""
         from services.scheduler.unified_scheduler import JobResult
+
         result = JobResult(
-            job_type="test", status="SUCCESS",
-            duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
+            job_type="test", status="SUCCESS", duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
         )
         success = asyncio.run(self.tracker.record_job(result))
         assert success is True
@@ -239,10 +254,10 @@ class TestDBJobTracker:
     def test_get_job_history_memory(self):
         """Memory'den job geçmişi alabilmeli."""
         from services.scheduler.unified_scheduler import JobResult
+
         for i in range(5):
             result = JobResult(
-                job_type=f"test_{i}", status="SUCCESS",
-                duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
+                job_type=f"test_{i}", status="SUCCESS", duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
             )
             asyncio.run(self.tracker.record_job(result))
 
@@ -252,17 +267,25 @@ class TestDBJobTracker:
     def test_get_failure_stats_memory(self):
         """Memory'den failure stats alabilmeli."""
         from services.scheduler.unified_scheduler import JobResult
+
         # Başarılı
-        asyncio.run(self.tracker.record_job(JobResult(
-            job_type="test", status="SUCCESS",
-            duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
-        )))
+        asyncio.run(
+            self.tracker.record_job(
+                JobResult(job_type="test", status="SUCCESS", duration_ms=100.0, timestamp=datetime.now(UTC).isoformat())
+            )
+        )
         # Başarısız
-        asyncio.run(self.tracker.record_job(JobResult(
-            job_type="test", status="FAILED",
-            duration_ms=50.0, timestamp=datetime.now(UTC).isoformat(),
-            error="test error"
-        )))
+        asyncio.run(
+            self.tracker.record_job(
+                JobResult(
+                    job_type="test",
+                    status="FAILED",
+                    duration_ms=50.0,
+                    timestamp=datetime.now(UTC).isoformat(),
+                    error="test error",
+                )
+            )
+        )
 
         stats = asyncio.run(self.tracker.get_failure_stats(1))
         assert stats["total"] == 2
@@ -273,11 +296,13 @@ class TestDBJobTracker:
 # JOB MONITOR TESTS
 # =====================================================
 
+
 class TestJobMonitor:
     """Job monitor testleri."""
 
     def setup_method(self):
         from services.scheduler.job_monitor import JobMonitor
+
         self.monitor = JobMonitor()
 
     def test_record_success(self):
@@ -297,7 +322,7 @@ class TestJobMonitor:
         self.monitor.record_job("test", "FAILED", 100.0)
 
         rate = self.monitor.get_failure_rate("test")
-        assert rate == pytest.approx(1/3, abs=0.01)
+        assert rate == pytest.approx(1 / 3, abs=0.01)
 
     def test_consecutive_failures_alert(self):
         callback_called = []
@@ -319,6 +344,7 @@ class TestJobMonitor:
 
     def test_slow_job_alert(self):
         from services.scheduler.job_monitor import JobMonitor
+
         monitor = JobMonitor(slow_threshold_ms=1000)
         callback_called = []
         monitor.register_callback(lambda a: callback_called.append(a))
@@ -372,11 +398,13 @@ class TestJobMonitor:
 # DAILY WORKFLOW TESTS
 # =====================================================
 
+
 class TestDailyWorkflow:
     """Daily workflow testleri."""
 
     def setup_method(self):
         from services.scheduler.daily_workflow import DailyWorkflow
+
         self.workflow = DailyWorkflow()
 
     def test_phases_defined(self):
@@ -429,6 +457,7 @@ class TestDailyWorkflow:
     def test_phase_map_complete(self):
         """Tüm market phase'leri workflow phase'e map'lenmeli."""
         from services.scheduler.unified_scheduler import MarketPhase
+
         for mp in MarketPhase:
             assert mp.value in self.workflow._PHASE_MAP or mp.value in ["SEANS_1", "SEANS_2"]
 
@@ -437,11 +466,13 @@ class TestDailyWorkflow:
 # LEARNING SCHEDULER TESTS
 # =====================================================
 
+
 class TestLearningScheduler:
     """Learning scheduler testleri."""
 
     def setup_method(self):
         from services.scheduler.learning_scheduler import LearningScheduler
+
         self.scheduler = LearningScheduler()
 
     def test_default_jobs(self):
@@ -458,6 +489,7 @@ class TestLearningScheduler:
 
     def test_register_sync_handler_wrapped(self):
         """Sync handler async'e wrap'lenmeli."""
+
         def sync_dummy():
             return "ok"
 
@@ -467,6 +499,7 @@ class TestLearningScheduler:
 
     def test_register_unknown_job_type(self):
         """Bilinmeyen job type uyarı loglamalı."""
+
         async def dummy():
             return "ok"
 
@@ -506,6 +539,7 @@ class TestLearningScheduler:
     def test_get_pending_jobs(self):
         async def dummy():
             return "ok"
+
         self.scheduler.register_handler("learning_cycle", dummy)
         pending = self.scheduler.get_pending_jobs()
         assert len(pending) >= 0
@@ -515,11 +549,13 @@ class TestLearningScheduler:
 # SCHEDULER API TESTS
 # =====================================================
 
+
 class TestSchedulerAPI:
     """Scheduler API testleri."""
 
     def setup_method(self):
         from services.scheduler.scheduler_api import SchedulerAPI
+
         self.api = SchedulerAPI()
 
     def test_get_status(self):
@@ -584,17 +620,20 @@ class TestSchedulerAPI:
 # INTEGRATION TESTS
 # =====================================================
 
+
 class TestSchedulerRateLimiter:
     """Rate limiter testleri."""
 
     def test_rate_limiter_allows_normal(self):
         from services.scheduler.scheduler_api import _RateLimiter
-        limiter = _RateLimiter(max_tokens=5, refill_rate=5/60)
+
+        limiter = _RateLimiter(max_tokens=5, refill_rate=5 / 60)
         for _ in range(5):
             assert limiter.allow() is True
 
     def test_rate_limiter_blocks_excess(self):
         from services.scheduler.scheduler_api import _RateLimiter
+
         limiter = _RateLimiter(max_tokens=3, refill_rate=0)
         for _ in range(3):
             limiter.allow()
@@ -602,13 +641,15 @@ class TestSchedulerRateLimiter:
 
     def test_rate_limiter_remaining(self):
         from services.scheduler.scheduler_api import _RateLimiter
-        limiter = _RateLimiter(max_tokens=5, refill_rate=5/60)
+
+        limiter = _RateLimiter(max_tokens=5, refill_rate=5 / 60)
         limiter.allow()
         limiter.allow()
         assert limiter.remaining == 3
 
     def test_trigger_rate_limited(self):
         from services.scheduler.scheduler_api import SchedulerAPI
+
         api = SchedulerAPI()
         # Rate limiter'ı tüket
         api._trigger_limiter._tokens = 0
@@ -620,6 +661,7 @@ class TestSchedulerRateLimiter:
 # =====================================================
 # INTEGRATION TESTS
 # =====================================================
+
 
 class TestSchedulerIntegration:
     """Entegrasyon testleri."""

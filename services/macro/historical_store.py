@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class MacroDataPoint:
     """Tek veri noktası."""
+
     date: str
     indicator: str
     value: float
@@ -131,12 +132,14 @@ class MacroHistoricalStore:
         for date, entries in sorted(indicator_data.items()):
             if start_date <= date <= end_date:
                 latest = entries[-1]
-                result.append({
-                    "date": date,
-                    "indicator": indicator,
-                    "value": latest["value"],
-                    "source": latest["source"],
-                })
+                result.append(
+                    {
+                        "date": date,
+                        "indicator": indicator,
+                        "value": latest["value"],
+                        "source": latest["source"],
+                    }
+                )
 
         return result
 
@@ -202,10 +205,7 @@ class MacroHistoricalStore:
     def get_report(self) -> dict[str, Any]:
         """Rapor."""
         indicators = self.get_available_indicators()
-        total_points = sum(
-            sum(len(entries) for entries in ind_data.values())
-            for ind_data in self._data.values()
-        )
+        total_points = sum(sum(len(entries) for entries in ind_data.values()) for ind_data in self._data.values())
 
         return {
             "indicators": len(indicators),
@@ -222,9 +222,7 @@ class MacroHistoricalStore:
             try:
                 with open(self._storage_path) as f:
                     self._data = orjson.loads(f.read())
-                logger.info("Historical store loaded",
-                           indicators=len(self._data),
-                           path=self._storage_path)
+                logger.info("Historical store loaded", indicators=len(self._data), path=self._storage_path)
             except Exception as e:
                 logger.error("Failed to load historical store", error=str(e))
                 self._data = {}

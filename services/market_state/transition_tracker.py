@@ -26,6 +26,7 @@ logger = structlog.get_logger()
 @dataclass
 class TransitionRecord:
     """Tek bir rejim geçiş kaydı."""
+
     from_regime: str
     to_regime: str
     timestamp: datetime
@@ -37,6 +38,7 @@ class TransitionRecord:
 @dataclass
 class TransitionStats:
     """Rejim geçiş istatistikleri."""
+
     total_observations: int = 0
     total_transitions: int = 0
     regime_distribution: dict[str, int] = field(default_factory=dict)
@@ -103,17 +105,19 @@ class RegimeTransitionTracker:
             timestamp = datetime.now(UTC)
 
         # History'ye ekle
-        self._history.append({
-            "regime": regime,
-            "confidence": confidence,
-            "timestamp": timestamp.isoformat(),
-        })
+        self._history.append(
+            {
+                "regime": regime,
+                "confidence": confidence,
+                "timestamp": timestamp.isoformat(),
+            }
+        )
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
 
         # History boyut kontrolü
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
 
         # Geçiş tespit
         if self._current_regime is not None and self._current_regime != regime:
@@ -141,7 +145,7 @@ class RegimeTransitionTracker:
 
             # Transition history boyut kontrolü
             if len(self._transitions) > self._max_history:
-                self._transitions = self._transitions[-self._max_history:]
+                self._transitions = self._transitions[-self._max_history :]
 
             logger.info(
                 "Regime transition",
@@ -267,10 +271,7 @@ class RegimeTransitionTracker:
         for from_regime, to_counts in self._transition_counts.items():
             total = sum(to_counts.values())
             if total > 0:
-                matrix[from_regime] = {
-                    to_regime: round(count / total, 4)
-                    for to_regime, count in to_counts.items()
-                }
+                matrix[from_regime] = {to_regime: round(count / total, 4) for to_regime, count in to_counts.items()}
 
         return matrix
 
@@ -331,70 +332,84 @@ class RegimeTransitionTracker:
 
             if hours_since < 1:
                 severity = "WARNING" if last.to_regime in ("CRISIS", "BEAR", "RISK_OFF") else "INFO"
-                alerts.append({
-                    "type": "REGIME_TRANSITION",
-                    "severity": severity,
-                    "message": f"Rejim değişimi: {last.from_regime} → {last.to_regime} (süre: {last.duration_days:.1f} gün)",
-                    "from_regime": last.from_regime,
-                    "to_regime": last.to_regime,
-                    "duration_days": round(last.duration_days, 1),
-                    "timestamp": last.timestamp.isoformat(),
-                })
+                alerts.append(
+                    {
+                        "type": "REGIME_TRANSITION",
+                        "severity": severity,
+                        "message": f"Rejim değişimi: {last.from_regime} → {last.to_regime} (süre: {last.duration_days:.1f} gün)",
+                        "from_regime": last.from_regime,
+                        "to_regime": last.to_regime,
+                        "duration_days": round(last.duration_days, 1),
+                        "timestamp": last.timestamp.isoformat(),
+                    }
+                )
 
         # 2. Kararlılık uyarısı
         stability = self._compute_stability()
         if stability < 0.3:
-            alerts.append({
-                "type": "LOW_STABILITY",
-                "severity": "WARNING",
-                "message": f"Piyasa çok kararsız — stability skoru: {stability:.2f}",
-                "stability_score": round(stability, 4),
-            })
+            alerts.append(
+                {
+                    "type": "LOW_STABILITY",
+                    "severity": "WARNING",
+                    "message": f"Piyasa çok kararsız — stability skoru: {stability:.2f}",
+                    "stability_score": round(stability, 4),
+                }
+            )
         elif stability < 0.5:
-            alerts.append({
-                "type": "LOW_STABILITY",
-                "severity": "INFO",
-                "message": f"Piyasa kararsız — stability skoru: {stability:.2f}",
-                "stability_score": round(stability, 4),
-            })
+            alerts.append(
+                {
+                    "type": "LOW_STABILITY",
+                    "severity": "INFO",
+                    "message": f"Piyasa kararsız — stability skoru: {stability:.2f}",
+                    "stability_score": round(stability, 4),
+                }
+            )
 
         # 3. Beklenmedik geçiş (CRISIS → BULL gibi)
         if self._transitions:
             last = self._transitions[-1]
             unexpected_pairs = {
-                ("CRISIS", "BULL"), ("CRISIS", "RISK_ON"),
-                ("BEAR", "BULL"), ("RISK_OFF", "RISK_ON"),
+                ("CRISIS", "BULL"),
+                ("CRISIS", "RISK_ON"),
+                ("BEAR", "BULL"),
+                ("RISK_OFF", "RISK_ON"),
                 ("MOMENTUM_CONTRACTION", "MOMENTUM_EXPANSION"),
             }
             pair = (last.from_regime, last.to_regime)
             if pair in unexpected_pairs:
-                alerts.append({
-                    "type": "UNEXPECTED_TRANSITION",
-                    "severity": "WARNING",
-                    "message": f"Beklenmedik geçiş: {last.from_regime} → {last.to_regime} — doğrulama gerekli",
-                    "from_regime": last.from_regime,
-                    "to_regime": last.to_regime,
-                })
+                alerts.append(
+                    {
+                        "type": "UNEXPECTED_TRANSITION",
+                        "severity": "WARNING",
+                        "message": f"Beklenmedik geçiş: {last.from_regime} → {last.to_regime} — doğrulama gerekli",
+                        "from_regime": last.from_regime,
+                        "to_regime": last.to_regime,
+                    }
+                )
 
         # 4. Confidence trend uyarısı
         trend = self._compute_confidence_trend()
         if trend == "DECREASING":
-            alerts.append({
-                "type": "CONFIDENCE_DECLINING",
-                "severity": "INFO",
-                "message": "Rejim confidence'ı düşüyor — kararlılık azalıyor",
-            })
+            alerts.append(
+                {
+                    "type": "CONFIDENCE_DECLINING",
+                    "severity": "INFO",
+                    "message": "Rejim confidence'ı düşüyor — kararlılık azalıyor",
+                }
+            )
 
         # 5. Uzun süren rejim uyarısı (30+ gün aynı rejim)
         current_duration = self.get_current_regime_duration()
         if current_duration > 30:
-            alerts.append({
-                "type": "LONG_REGIME",
-                "severity": "INFO",
-                "message": f"{self._current_regime} rejimi {current_duration:.0f} gündür devam ediyor — değişim yaklaşıyor olabilir",
-                "regime": self._current_regime,
-                "duration_days": round(current_duration, 1),
-            })
+            alerts.append(
+                {
+                    "type": "LONG_REGIME",
+                    "severity": "INFO",
+                    "message": f"{self._current_regime} rejimi {current_duration:.0f} gündür devam ediyor — değişim yaklaşıyor olabilir",
+                    "regime": self._current_regime,
+                    "duration_days": round(current_duration, 1),
+                }
+            )
 
         return alerts
 

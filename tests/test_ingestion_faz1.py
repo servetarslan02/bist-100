@@ -18,6 +18,7 @@ from services.ingestion.reconciliation import SourceReconciler
 # Reconciliation Tests
 # =====================================================
 
+
 @pytest.mark.asyncio
 class TestSourceReconciler:
     """Cross-source reconciliation testleri."""
@@ -34,11 +35,14 @@ class TestSourceReconciler:
     async def test_consistent_sources(self):
         """Tutarlı kaynaklar — yüksek kalite."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 308.50,
-            "bist_official": 308.50,
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 308.50,
+                "bist_official": 308.50,
+            },
+        )
         assert result.conflict is False
         assert result.quality_score > 0.8
         assert result.source == "reconciled"
@@ -46,29 +50,38 @@ class TestSourceReconciler:
     async def test_small_deviation_no_conflict(self):
         """Küçük sapma — çakışma yok."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 308.60,  # %0.03 sapma
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 308.60,  # %0.03 sapma
+            },
+        )
         assert result.conflict is False
 
     async def test_large_deviation_conflict(self):
         """Büyük sapma — çakışma var."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 312.00,  # ~%1.1 sapma
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 312.00,  # ~%1.1 sapma
+            },
+        )
         assert result.conflict is True
         assert len(result.warnings) > 0
 
     async def test_weighted_canonical(self):
         """Ağırlıklı canonical price."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "bist_official": 100.0,  # weight 1.0
-            "yfinance": 110.0,       # weight 0.85
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "bist_official": 100.0,  # weight 1.0
+                "yfinance": 110.0,  # weight 0.85
+            },
+        )
         # Ağırlıklı ortalama: (100*1.0 + 110*0.85) / (1.0+0.85) = 193.5/1.85 ≈ 104.59
         assert 104.0 < result.canonical_price < 105.0
 
@@ -82,10 +95,12 @@ class TestSourceReconciler:
     async def test_batch_reconcile(self):
         """Toplu uzlaştırma."""
         reconciler = SourceReconciler()
-        results = await reconciler.reconcile_batch({
-            "THYAO": {"yfinance": 308.50, "matriks": 308.50},
-            "ASELS": {"yfinance": 381.00, "matriks": 381.00},
-        })
+        results = await reconciler.reconcile_batch(
+            {
+                "THYAO": {"yfinance": 308.50, "matriks": 308.50},
+                "ASELS": {"yfinance": 381.00, "matriks": 381.00},
+            }
+        )
         assert len(results) == 2
         assert "THYAO" in results
         assert "ASELS" in results
@@ -93,10 +108,12 @@ class TestSourceReconciler:
     async def test_quality_report(self):
         """Kalite raporu."""
         reconciler = SourceReconciler()
-        results = await reconciler.reconcile_batch({
-            "THYAO": {"yfinance": 308.50, "matriks": 308.50},
-            "ASELS": {"yfinance": 381.00, "matriks": 385.00},  # Çakışma
-        })
+        results = await reconciler.reconcile_batch(
+            {
+                "THYAO": {"yfinance": 308.50, "matriks": 308.50},
+                "ASELS": {"yfinance": 381.00, "matriks": 385.00},  # Çakışma
+            }
+        )
         report = reconciler.get_quality_report(results)
         assert report["total_tickers"] == 2
         assert "avg_quality_score" in report
@@ -105,6 +122,7 @@ class TestSourceReconciler:
 # =====================================================
 # Point-in-Time Tests
 # =====================================================
+
 
 class TestPointInTimeValidator:
     """Point-in-time validation testleri."""
@@ -207,6 +225,7 @@ class TestPointInTimeValidator:
 # Deduplication Tests
 # =====================================================
 
+
 class TestEventDeduplicator:
     """Event deduplication testleri."""
 
@@ -228,7 +247,7 @@ class TestEventDeduplicator:
         dedup = EventDeduplicator()
         event = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
         assert dedup.check_and_mark(event) is False  # İlk kez → unique
-        assert dedup.check_and_mark(event) is True   # İkinci kez → duplicate
+        assert dedup.check_and_mark(event) is True  # İkinci kez → duplicate
 
     def test_different_events_not_duplicate(self):
         """Farklı event'ler duplicate değil."""
@@ -269,6 +288,7 @@ class TestEventDeduplicator:
 # =====================================================
 # Incremental Fetcher Tests
 # =====================================================
+
 
 class TestIncrementalFetcher:
     """Incremental fetcher testleri."""

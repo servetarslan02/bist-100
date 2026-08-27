@@ -38,6 +38,7 @@ from services.core.monitoring_security import (
 # ALERT LIFECYCLE TESTS
 # =====================================================
 
+
 async def test_alert_lifecycle_states():
     """Alert lifecycle doğru geçişleri yapmalı."""
     issues = []
@@ -81,10 +82,7 @@ async def test_alert_serialization():
     """Alert serialization doğru olmalı."""
     issues = []
 
-    alert = Alert(
-        alert_type=AlertType.INVARIANT_FAILURE, severity="CRITICAL",
-        message="test", details={"cash": -100}
-    )
+    alert = Alert(alert_type=AlertType.INVARIANT_FAILURE, severity="CRITICAL", message="test", details={"cash": -100})
 
     d = alert.to_dict()
     if d.get("status") != "CREATED":
@@ -117,6 +115,7 @@ async def test_escalation_timeout():
     issues = []
 
     from services.core.alert_policy import AlertPolicy
+
     policy = AlertPolicy()
     policy.escalation_timeouts["health_change"] = 0  # Anında escalation
 
@@ -151,6 +150,7 @@ async def test_acknowledge_stops_escalation():
     issues = []
 
     from services.core.alert_policy import AlertPolicy
+
     policy = AlertPolicy()
     policy.escalation_timeouts["health_change"] = 0
 
@@ -185,9 +185,11 @@ async def test_acknowledge_stops_escalation():
 # DB PERSISTENCE TESTS
 # =====================================================
 
+
 async def test_alert_db_persistence():
     """Alert DB'ye persist edilmeli."""
     import duckdb
+
     issues = []
 
     db = duckdb.connect(":memory:")
@@ -214,6 +216,7 @@ async def test_alert_db_persistence():
 async def test_alert_restart_recovery():
     """Restart sonrası alert'ler geri yüklenmeli."""
     import duckdb
+
     issues = []
 
     db = duckdb.connect(":memory:")
@@ -241,12 +244,13 @@ async def test_alert_restart_recovery():
 # NOTIFICATION ROUTING TESTS
 # =====================================================
 
+
 async def test_notification_routing():
     """Notification routing severity'ye göre doğru provider seçmeli."""
     issues = []
 
     router = NotificationRouter()
-    router.add_provider(LogProvider())       # min=INFO
+    router.add_provider(LogProvider())  # min=INFO
     router.add_provider(WebhookProvider(url="https://test"))  # min=WARNING
     router.add_provider(SlackProvider(webhook_url="https://test"))  # min=CRITICAL
 
@@ -342,6 +346,7 @@ async def test_log_provider_notification():
 # JWT TESTS
 # =====================================================
 
+
 async def test_jwt_validation():
     """JWT token doğrulama doğru çalışmalı."""
     issues = []
@@ -380,8 +385,9 @@ async def test_jwt_validation():
         issues.append(f"Expired error: {result.error}")
 
     # Yanlış secret
-    wrong_token = pyjwt.encode({"sub": "x", "roles": [], "exp": int(time.time()) + 100},
-                                "wrong_secret", algorithm="HS256")
+    wrong_token = pyjwt.encode(
+        {"sub": "x", "roles": [], "exp": int(time.time()) + 100}, "wrong_secret", algorithm="HS256"
+    )
     result = await provider.verify(wrong_token)
     if result.authenticated:
         issues.append("Yanlış secret ile token kabul edildi")
@@ -409,16 +415,16 @@ async def test_jwt_role_extraction():
     secret = "test_secret"
 
     # Array roles
-    token = pyjwt.encode({"sub": "u1", "roles": ["admin", "viewer"], "exp": int(time.time()) + 100},
-                          secret, algorithm="HS256")
+    token = pyjwt.encode(
+        {"sub": "u1", "roles": ["admin", "viewer"], "exp": int(time.time()) + 100}, secret, algorithm="HS256"
+    )
     provider = JWTProvider(secret=secret)
     result = await provider.verify(token)
     if set(result.roles) != {"admin", "viewer"}:
         issues.append(f"Array roles: {result.roles}")
 
     # String role (tekil)
-    token2 = pyjwt.encode({"sub": "u2", "roles": "operator", "exp": int(time.time()) + 100},
-                           secret, algorithm="HS256")
+    token2 = pyjwt.encode({"sub": "u2", "roles": "operator", "exp": int(time.time()) + 100}, secret, algorithm="HS256")
     result2 = await provider.verify(token2)
     if result2.roles != ["operator"]:
         issues.append(f"String role: {result2.roles}")
@@ -429,6 +435,7 @@ async def test_jwt_role_extraction():
 # =====================================================
 # RBAC TESTS
 # =====================================================
+
 
 async def test_role_permissions():
     """Role permission mapping doğru olmalı."""
@@ -541,6 +548,7 @@ async def test_auth_manager_multi_provider():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

@@ -14,7 +14,9 @@ if os.path.exists(db_path):
             cur.execute(f"DELETE FROM {tbl}")
             print(f"Tablo temizlendi: {tbl}")
     if "portfolios" in tables:
-        cur.execute("UPDATE portfolios SET cash_balance = 10000000.0, current_capital = 10000000.0, initial_capital = 10000000.0, total_pnl = 0.0")
+        cur.execute(
+            "UPDATE portfolios SET cash_balance = 10000000.0, current_capital = 10000000.0, initial_capital = 10000000.0, total_pnl = 0.0"
+        )
         print("Portföy sıfırlandı: ₺10,000,000 Nakit")
     conn.commit()
     conn.close()

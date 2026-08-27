@@ -91,10 +91,13 @@ class TestPriceLimits:
         r = m.check_price_limit("THYAO", 105, 100)
         assert not r.limit_hit
 
-    @pytest.mark.parametrize("price,expected_direction", [
-        (110, "UP"),
-        (90, "DOWN"),
-    ])
+    @pytest.mark.parametrize(
+        "price,expected_direction",
+        [
+            (110, "UP"),
+            (90, "DOWN"),
+        ],
+    )
     def test_price_limit_hit_direction(self, price, expected_direction):
         m = PriceLimitMonitor()
         r = m.check_price_limit("THYAO", price, 100)
@@ -188,11 +191,14 @@ class TestVIOPMonitor:
 
 
 class TestCompliance:
-    @pytest.mark.parametrize("amount,expected_action,expected_flag", [
-        (10000, "OK", None),
-        (60000, "NOTIFY", "notification_required"),
-        (110000, "BLOCK", "violation"),
-    ])
+    @pytest.mark.parametrize(
+        "amount,expected_action,expected_flag",
+        [
+            (10000, "OK", None),
+            (60000, "NOTIFY", "notification_required"),
+            (110000, "BLOCK", "violation"),
+        ],
+    )
     def test_spk_compliance_thresholds(self, amount, expected_action, expected_flag):
         c = ComplianceChecker()
         r = c.check_spk_compliance("BUY", "THYAO", amount, 1000000, 0)

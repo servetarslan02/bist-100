@@ -28,6 +28,7 @@ def test_init():
 def test_singleton():
     """Singleton doğru mu?"""
     from services.learning.meta_learner import meta_learner
+
     assert meta_learner is not None
     print("✅ Singleton")
 
@@ -138,7 +139,7 @@ def test_ensemble_weights_equal():
 
     # Eşit ağırlık
     for w in weights.values():
-        assert abs(w - 1/3) < 0.01
+        assert abs(w - 1 / 3) < 0.01
     print(f"✅ Ensemble weights equal: {weights}")
 
 
@@ -148,7 +149,7 @@ def test_ensemble_weights_normalize():
 
     m = MetaLearner()
     for i in range(5):
-        m.record_performance(f"m{i}", "BULL", {"sharpe": float(i+1), "win_rate": 0.5, "ic": 0.01})
+        m.record_performance(f"m{i}", "BULL", {"sharpe": float(i + 1), "win_rate": 0.5, "ic": 0.01})
 
     weights = m.calculate_ensemble_weights([f"m{i}" for i in range(5)], "BULL")
     total = sum(weights.values())
@@ -175,11 +176,15 @@ def test_decay_prediction_declining():
 
     m = MetaLearner()
     for i in range(40):
-        m.record_performance("m1", "BULL", {
-            "sharpe": 2.0 - i * 0.05,  # Sürekli azalan
-            "win_rate": 0.6,
-            "ic": 0.05,
-        })
+        m.record_performance(
+            "m1",
+            "BULL",
+            {
+                "sharpe": 2.0 - i * 0.05,  # Sürekli azalan
+                "win_rate": 0.6,
+                "ic": 0.05,
+            },
+        )
 
     result = m.predict_decay("m1")
     assert result["decay_predicted"] is True
@@ -193,11 +198,15 @@ def test_decay_prediction_stable():
 
     m = MetaLearner()
     for _i in range(40):
-        m.record_performance("m1", "BULL", {
-            "sharpe": 1.5 + np.random.randn() * 0.01,  # Stabil
-            "win_rate": 0.6,
-            "ic": 0.05,
-        })
+        m.record_performance(
+            "m1",
+            "BULL",
+            {
+                "sharpe": 1.5 + np.random.randn() * 0.01,  # Stabil
+                "win_rate": 0.6,
+                "ic": 0.05,
+            },
+        )
 
     result = m.predict_decay("m1")
     assert result["decay_predicted"] is False
@@ -273,6 +282,7 @@ def test_current_regime():
 
 # ===================== MAIN =====================
 
+
 def run_all_tests():
     tests = [
         test_init,
@@ -309,9 +319,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 7 TEST SONUÇLARI (Meta Learner)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

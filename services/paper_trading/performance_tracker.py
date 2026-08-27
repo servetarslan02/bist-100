@@ -96,7 +96,12 @@ class PerformanceTracker:
             self._daily_perf_cache = self._daily_perf_cache[-1000:]
         return perf
 
-    def compute_full_metrics(self, equity_curve: list[dict[str, Any]], trades: list[dict[str, Any]], benchmark_returns: list[float] | None = None) -> dict[str, Any]:
+    def compute_full_metrics(
+        self,
+        equity_curve: list[dict[str, Any]],
+        trades: list[dict[str, Any]],
+        benchmark_returns: list[float] | None = None,
+    ) -> dict[str, Any]:
         """Tum metrikleri hesapla."""
         if not equity_curve:
             return {"error": "No equity curve data"}
@@ -114,8 +119,8 @@ class PerformanceTracker:
         # Daily returns
         returns = []
         for i in range(1, len(equities)):
-            if equities[i-1] > 0:
-                returns.append(equities[i] / equities[i-1] - 1)
+            if equities[i - 1] > 0:
+                returns.append(equities[i] / equities[i - 1] - 1)
 
         returns_arr = np.array(returns) if returns else np.array([0])
 
@@ -138,7 +143,11 @@ class PerformanceTracker:
             avg_win = np.mean([t["realized_pnl"] for t in wins]) if wins else 0
             losses = [t for t in trades if t.get("realized_pnl", 0) < 0]
             avg_loss = np.mean([abs(t["realized_pnl"]) for t in losses]) if losses else 0
-            profit_factor = sum(t["realized_pnl"] for t in wins) / sum(abs(t["realized_pnl"]) for t in losses) if losses else float('inf')
+            profit_factor = (
+                sum(t["realized_pnl"] for t in wins) / sum(abs(t["realized_pnl"]) for t in losses)
+                if losses
+                else float("inf")
+            )
             expectancy = np.mean([t["realized_pnl"] for t in trades])
             avg_holding = np.mean([t.get("holding_days", 0) for t in trades])
         else:
@@ -190,6 +199,7 @@ class PerformanceTracker:
             return 0.0
         try:
             from scipy import stats
+
             corr, _ = stats.spearmanr(predictions, actuals)
             return float(corr) if not np.isnan(corr) else 0.0
         except Exception:
@@ -257,7 +267,9 @@ class PerformanceTracker:
     def _compute_daily_turnover(self, orders: list[dict[str, Any]], portfolio_value: float) -> float:
         if portfolio_value <= 0:
             return 0.0
-        total_value = sum(o.get("quantity", 0) * o.get("execution_price", 0) for o in orders if o.get("execution_price", 0) > 0)
+        total_value = sum(
+            o.get("quantity", 0) * o.get("execution_price", 0) for o in orders if o.get("execution_price", 0) > 0
+        )
         return (total_value / portfolio_value) * 100
 
     def _alpha_beta(self, returns: np.ndarray, benchmark: np.ndarray) -> tuple:

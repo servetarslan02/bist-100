@@ -27,9 +27,10 @@ logger = structlog.get_logger()
 @dataclass
 class BacktestTrade:
     """Backtest işlem kaydı."""
+
     trade_id: int
     ticker: str
-    side: str          # BUY | SELL
+    side: str  # BUY | SELL
     entry_date: str
     exit_date: str
     entry_price: float
@@ -44,6 +45,7 @@ class BacktestTrade:
 @dataclass
 class BacktestMetrics:
     """Backtest performans metrikleri."""
+
     total_return_pct: float
     cagr_pct: float
     sharpe_ratio: float
@@ -65,6 +67,7 @@ class BacktestMetrics:
 @dataclass
 class BacktestResult:
     """Backtest sonucu."""
+
     strategy_name: str
     start_date: str
     end_date: str
@@ -128,7 +131,19 @@ class BacktestEngine:
             return True, max_shares  # Kısmi execution
         return True, quantity
 
-    def _execute_pending_orders(self, pending_orders, positions, capital, trades, trade_id, day_prices, _cm, slippage_pct, dump_ledger, trades_writer):
+    def _execute_pending_orders(
+        self,
+        pending_orders,
+        positions,
+        capital,
+        trades,
+        trade_id,
+        day_prices,
+        _cm,
+        slippage_pct,
+        dump_ledger,
+        trades_writer,
+    ):
         """T+1 bekleyen emirleri execute et."""
         for order in pending_orders:
             ticker = order["ticker"]
@@ -148,12 +163,17 @@ class BacktestEngine:
             if exec_price <= 0:
                 continue
 
-            effective_slippage = self._compute_dynamic_slippage(exec_price, signal_volume if signal_volume > 0 else 100000, 100, slippage_pct)
+            effective_slippage = self._compute_dynamic_slippage(
+                exec_price, signal_volume if signal_volume > 0 else 100000, 100, slippage_pct
+            )
 
             if action == "BUY" and ticker not in positions:
                 fill_price = exec_price * (1 + effective_slippage / 100)
                 adjusted_weight = weight * regime_mult
-                position_value = (capital + sum(p["qty"] * day_prices.get(t, {}).get("open", p["avg_cost"]) for t, p in positions.items())) * adjusted_weight
+                position_value = (
+                    capital
+                    + sum(p["qty"] * day_prices.get(t, {}).get("open", p["avg_cost"]) for t, p in positions.items())
+                ) * adjusted_weight
                 shares = int(position_value / fill_price)
                 if signal_volume > 0:
                     shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
@@ -162,17 +182,45 @@ class BacktestEngine:
                     commission = _cm.calculate(cost)
                     if capital >= (cost + commission):
                         cash_before = capital
-                        capital -= (cost + commission)
-                        positions[ticker] = {"qty": shares, "avg_cost": fill_price, "entry_date": order["signal_date"], "peak_price": fill_price, "commission": commission}
+                        capital -= cost + commission
+                        positions[ticker] = {
+                            "qty": shares,
+                            "avg_cost": fill_price,
+                            "entry_date": order["signal_date"],
+                            "peak_price": fill_price,
+                            "commission": commission,
+                        }
                         if dump_ledger:
-                            trades_writer.writerow([trade_id, ticker, 'BUY', signal_date, order["signal_date"], signal_price, fill_price, shares, cost, effective_slippage, commission, 0.0, cash_before, capital, capital + cost, capital + cost, '0', 'T+1_OPEN_SIGNAL', ''])
+                            trades_writer.writerow(
+                                [
+                                    trade_id,
+                                    ticker,
+                                    "BUY",
+                                    signal_date,
+                                    order["signal_date"],
+                                    signal_price,
+                                    fill_price,
+                                    shares,
+                                    cost,
+                                    effective_slippage,
+                                    commission,
+                                    0.0,
+                                    cash_before,
+                                    capital,
+                                    capital + cost,
+                                    capital + cost,
+                                    "0",
+                                    "T+1_OPEN_SIGNAL",
+                                    "",
+                                ]
+                            )
 
             elif action == "SELL" and ticker in positions:
                 fill_price = exec_price * (1 - effective_slippage / 100)
                 pos = positions[ticker]
                 revenue = pos["qty"] * fill_price
                 commission = _cm.calculate(revenue)
-                capital += (revenue - commission)
+                capital += revenue - commission
                 pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
                 pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
                 trade_id += 1
@@ -182,14 +230,63 @@ class BacktestEngine:
                     _holding = max(1, (_d2 - _d1).days)
                 except Exception:
                     _holding = 1
-                trades.append(BacktestTrade(trade_id=trade_id, ticker=ticker, side="BUY-SELL", entry_date=pos["entry_date"], exit_date=order["signal_date"], entry_price=pos["avg_cost"], exit_price=fill_price, quantity=pos["qty"], pnl=round(pnl, 2), pnl_pct=round(pnl_pct, 2), holding_days=_holding, commission=round(pos["commission"] + commission, 2)))
+                trades.append(
+                    BacktestTrade(
+                        trade_id=trade_id,
+                        ticker=ticker,
+                        side="BUY-SELL",
+                        entry_date=pos["entry_date"],
+                        exit_date=order["signal_date"],
+                        entry_price=pos["avg_cost"],
+                        exit_price=fill_price,
+                        quantity=pos["qty"],
+                        pnl=round(pnl, 2),
+                        pnl_pct=round(pnl_pct, 2),
+                        holding_days=_holding,
+                        commission=round(pos["commission"] + commission, 2),
+                    )
+                )
                 del positions[ticker]
                 if dump_ledger:
-                    trades_writer.writerow([trade_id, ticker, 'SELL', signal_date, order["signal_date"], signal_price, fill_price, pos["qty"], revenue, effective_slippage, commission, 0.0, capital - revenue, capital, capital, capital, '0', 'T+1_OPEN_SIGNAL', 'EXIT'])
+                    trades_writer.writerow(
+                        [
+                            trade_id,
+                            ticker,
+                            "SELL",
+                            signal_date,
+                            order["signal_date"],
+                            signal_price,
+                            fill_price,
+                            pos["qty"],
+                            revenue,
+                            effective_slippage,
+                            commission,
+                            0.0,
+                            capital - revenue,
+                            capital,
+                            capital,
+                            capital,
+                            "0",
+                            "T+1_OPEN_SIGNAL",
+                            "EXIT",
+                        ]
+                    )
 
         return capital, trade_id
 
-    def _check_stops_and_sell(self, positions, capital, trades, trade_id, day_prices, _cm, stop_loss_pct, trailing_stop_pct, current_date, all_dates):
+    def _check_stops_and_sell(
+        self,
+        positions,
+        capital,
+        trades,
+        trade_id,
+        day_prices,
+        _cm,
+        stop_loss_pct,
+        trailing_stop_pct,
+        current_date,
+        all_dates,
+    ):
         """Stop-loss ve trailing stop kontrolü, satışlar."""
         total_market_value = 0.0
         to_sell = []
@@ -204,7 +301,10 @@ class BacktestEngine:
             is_trailing_stop = low_price <= p["peak_price"] * (1 - trailing_stop_pct)
 
             if is_stop_loss or is_trailing_stop:
-                stop_level = min(close_price, p["avg_cost"] * (1 - stop_loss_pct) if is_stop_loss else p["peak_price"] * (1 - trailing_stop_pct))
+                stop_level = min(
+                    close_price,
+                    p["avg_cost"] * (1 - stop_loss_pct) if is_stop_loss else p["peak_price"] * (1 - trailing_stop_pct),
+                )
                 to_sell.append((t, stop_level))
             else:
                 total_market_value += p["qty"] * close_price
@@ -214,8 +314,23 @@ class BacktestEngine:
             qty = p["qty"]
             gross = qty * exit_price
             comm = _cm.calculate(gross)
-            capital += (gross - comm)
-            trades.append(BacktestTrade(trade_id=trade_id, ticker=t, side="STOP_SELL", entry_date=p["entry_date"], exit_date=current_date, entry_price=p["avg_cost"], exit_price=exit_price, quantity=qty, pnl=(gross - comm) - (qty * p["avg_cost"]), pnl_pct=(exit_price / p["avg_cost"]) - 1.0, holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]), commission=comm))
+            capital += gross - comm
+            trades.append(
+                BacktestTrade(
+                    trade_id=trade_id,
+                    ticker=t,
+                    side="STOP_SELL",
+                    entry_date=p["entry_date"],
+                    exit_date=current_date,
+                    entry_price=p["avg_cost"],
+                    exit_price=exit_price,
+                    quantity=qty,
+                    pnl=(gross - comm) - (qty * p["avg_cost"]),
+                    pnl_pct=(exit_price / p["avg_cost"]) - 1.0,
+                    holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]),
+                    commission=comm,
+                )
+            )
             trade_id += 1
             del positions[t]
 
@@ -229,16 +344,32 @@ class BacktestEngine:
         for signal in day_sigs:
             action = signal.get("action", "HOLD")
             if action in ["BUY", "SELL"]:
-                pending_orders.append({
-                    "ticker": signal.get("ticker", ""),
-                    "action": action,
-                    "signal_price": signal.get("price", day_prices.get(signal.get("ticker", ""), {}).get("close", 0.0)),
-                    "signal_date": current_date,
-                    "weight": signal.get("weight", 0.10),
-                    "market_regime": market_regime,
-                })
+                pending_orders.append(
+                    {
+                        "ticker": signal.get("ticker", ""),
+                        "action": action,
+                        "signal_price": signal.get(
+                            "price", day_prices.get(signal.get("ticker", ""), {}).get("close", 0.0)
+                        ),
+                        "signal_date": current_date,
+                        "weight": signal.get("weight", 0.10),
+                        "market_regime": market_regime,
+                    }
+                )
 
-    def _end_of_day_accounting(self, positions, day_prices, capital, peak_equity, prev_equity, equity_curve, exposure_history, dump_ledger, daily_writer, current_date):
+    def _end_of_day_accounting(
+        self,
+        positions,
+        day_prices,
+        capital,
+        peak_equity,
+        prev_equity,
+        equity_curve,
+        exposure_history,
+        dump_ledger,
+        daily_writer,
+        current_date,
+    ):
         """Gün sonu muhasebeleştirme."""
         total_market_value = 0.0
         for t, p in positions.items():
@@ -253,7 +384,19 @@ class BacktestEngine:
         daily_return = (end_of_day_equity / prev_equity - 1.0) if prev_equity > 0 else 0.0
 
         if dump_ledger:
-            daily_writer.writerow([current_date, capital, total_market_value, total_market_value, total_market_value, end_of_day_equity, daily_return, drawdown, '0'])
+            daily_writer.writerow(
+                [
+                    current_date,
+                    capital,
+                    total_market_value,
+                    total_market_value,
+                    total_market_value,
+                    end_of_day_equity,
+                    daily_return,
+                    drawdown,
+                    "0",
+                ]
+            )
 
         equity_curve.append(end_of_day_equity)
         exposure_history.append(total_market_value / end_of_day_equity if end_of_day_equity > 0 else 0)
@@ -278,10 +421,20 @@ class BacktestEngine:
 
         """Backtest calistir (CANONICAL ENGINE)."""
         if not signals:
-            return BacktestResult(strategy_name, "", "", initial_capital, initial_capital, self._compute_metrics([], [], initial_capital, []), [], [], [])
+            return BacktestResult(
+                strategy_name,
+                "",
+                "",
+                initial_capital,
+                initial_capital,
+                self._compute_metrics([], [], initial_capital, []),
+                [],
+                [],
+                [],
+            )
 
         if commission_rate is not None:
-            _cm = CommissionModel(broker_rate=commission_rate/2, exchange_rate=commission_rate/2)
+            _cm = CommissionModel(broker_rate=commission_rate / 2, exchange_rate=commission_rate / 2)
         else:
             _cm = CommissionModel()
 
@@ -298,19 +451,53 @@ class BacktestEngine:
         daily_file = None
 
         if dump_ledger:
-            os.makedirs('data/ledgers', exist_ok=True)
-            trades_csv_path = 'data/ledgers/continuous_oos_trades.csv'
-            daily_csv_path = 'data/ledgers/continuous_oos_daily.csv'
+            os.makedirs("data/ledgers", exist_ok=True)
+            trades_csv_path = "data/ledgers/continuous_oos_trades.csv"
+            daily_csv_path = "data/ledgers/continuous_oos_daily.csv"
 
             # For continuous OOS, we want to overwrite cleanly
-            trades_file = open(trades_csv_path, 'w', newline='', encoding='utf-8')
-            daily_file = open(daily_csv_path, 'w', newline='', encoding='utf-8')
+            trades_file = open(trades_csv_path, "w", newline="", encoding="utf-8")
+            daily_file = open(daily_csv_path, "w", newline="", encoding="utf-8")
 
             trades_writer = csv.writer(trades_file)
             daily_writer = csv.writer(daily_file)
 
-            trades_writer.writerow(['trade_id', 'ticker', 'side', 'signal_timestamp', 'execution_timestamp', 'signal_price', 'execution_price', 'quantity', 'gross_value', 'slippage', 'commission', 'other_cost', 'cash_before', 'cash_after', 'equity_before', 'equity_after', 'fold_id', 'reason', 'exit_reason'])
-            daily_writer.writerow(['date', 'cash', 'market_value', 'gross_exposure', 'net_exposure', 'equity', 'daily_return', 'drawdown', 'fold_id'])
+            trades_writer.writerow(
+                [
+                    "trade_id",
+                    "ticker",
+                    "side",
+                    "signal_timestamp",
+                    "execution_timestamp",
+                    "signal_price",
+                    "execution_price",
+                    "quantity",
+                    "gross_value",
+                    "slippage",
+                    "commission",
+                    "other_cost",
+                    "cash_before",
+                    "cash_after",
+                    "equity_before",
+                    "equity_after",
+                    "fold_id",
+                    "reason",
+                    "exit_reason",
+                ]
+            )
+            daily_writer.writerow(
+                [
+                    "date",
+                    "cash",
+                    "market_value",
+                    "gross_exposure",
+                    "net_exposure",
+                    "equity",
+                    "daily_return",
+                    "drawdown",
+                    "fold_id",
+                ]
+            )
         # Tarihleri normalize et (YYYY-MM-DD string)
         all_dates = set()
         price_lookup = {}
@@ -344,23 +531,51 @@ class BacktestEngine:
             day_prices = price_lookup.get(current_date, {})
 
             capital, trade_id = self._execute_pending_orders(
-                pending_orders, positions, capital, trades, trade_id,
-                day_prices, _cm, slippage_pct, dump_ledger, trades_writer,
+                pending_orders,
+                positions,
+                capital,
+                trades,
+                trade_id,
+                day_prices,
+                _cm,
+                slippage_pct,
+                dump_ledger,
+                trades_writer,
             )
             pending_orders = []
 
             capital, trade_id, total_market_value = self._check_stops_and_sell(
-                positions, capital, trades, trade_id, day_prices, _cm,
-                stop_loss_pct, trailing_stop_pct, current_date, all_dates,
+                positions,
+                capital,
+                trades,
+                trade_id,
+                day_prices,
+                _cm,
+                stop_loss_pct,
+                trailing_stop_pct,
+                current_date,
+                all_dates,
             )
 
             self._queue_day_signals(
-                current_date, signals_by_date, day_prices, pending_orders, market_regime,
+                current_date,
+                signals_by_date,
+                day_prices,
+                pending_orders,
+                market_regime,
             )
 
             capital, peak_equity, prev_equity = self._end_of_day_accounting(
-                positions, day_prices, capital, peak_equity, prev_equity,
-                equity_curve, exposure_history, dump_ledger, daily_writer, current_date,
+                positions,
+                day_prices,
+                capital,
+                peak_equity,
+                prev_equity,
+                equity_curve,
+                exposure_history,
+                dump_ledger,
+                daily_writer,
+                current_date,
             )
 
         if dump_ledger:
@@ -370,19 +585,43 @@ class BacktestEngine:
         metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
 
         return BacktestResult(
-            strategy_name=strategy_name, start_date=all_dates[0] if all_dates else "", end_date=all_dates[-1] if all_dates else "",
-            initial_capital=initial_capital, final_capital=round(equity_curve[-1] if equity_curve else initial_capital, 2),
-            metrics=metrics, trades=trades, equity_curve=equity_curve, drawdown_curve=self._compute_drawdown_curve(equity_curve),
+            strategy_name=strategy_name,
+            start_date=all_dates[0] if all_dates else "",
+            end_date=all_dates[-1] if all_dates else "",
+            initial_capital=initial_capital,
+            final_capital=round(equity_curve[-1] if equity_curve else initial_capital, 2),
+            metrics=metrics,
+            trades=trades,
+            equity_curve=equity_curve,
+            drawdown_curve=self._compute_drawdown_curve(equity_curve),
         )
 
-    def _compute_metrics(self, trades: list[BacktestTrade], equity_curve: list[float], initial_capital: float, exposure_history: list[float] | None = None) -> BacktestMetrics:
+    def _compute_metrics(
+        self,
+        trades: list[BacktestTrade],
+        equity_curve: list[float],
+        initial_capital: float,
+        exposure_history: list[float] | None = None,
+    ) -> BacktestMetrics:
         """Performans metrikleri hesapla."""
         if not trades:
             return BacktestMetrics(
-                total_return_pct=0, cagr_pct=0, sharpe_ratio=0, sortino_ratio=0,
-                calmar_ratio=0, max_drawdown_pct=0, max_drawdown_duration_days=0,
-                win_rate=0, profit_factor=0, avg_win=0, avg_loss=0, expectancy=0,
-                total_trades=0, total_fees=0, avg_holding_days=0, exposure_pct=0,
+                total_return_pct=0,
+                cagr_pct=0,
+                sharpe_ratio=0,
+                sortino_ratio=0,
+                calmar_ratio=0,
+                max_drawdown_pct=0,
+                max_drawdown_duration_days=0,
+                win_rate=0,
+                profit_factor=0,
+                avg_win=0,
+                avg_loss=0,
+                expectancy=0,
+                total_trades=0,
+                total_fees=0,
+                avg_holding_days=0,
+                exposure_pct=0,
             )
 
         final = equity_curve[-1] if equity_curve else initial_capital
@@ -394,7 +633,7 @@ class BacktestEngine:
         win_rate = len(wins) / len(trades) if trades else 0
         avg_win = np.mean([t.pnl for t in wins]) if wins else 0
         avg_loss = np.mean([abs(t.pnl) for t in losses]) if losses else 0
-        profit_factor = sum(t.pnl for t in wins) / sum(abs(t.pnl) for t in losses) if losses else float('inf')
+        profit_factor = sum(t.pnl for t in wins) / sum(abs(t.pnl) for t in losses) if losses else float("inf")
         expectancy = np.mean([t.pnl for t in trades]) if trades else 0
 
         # Drawdown
@@ -408,7 +647,7 @@ class BacktestEngine:
 
             # Sortino: downside deviation sadece negatif getirilerden hesaplanır
             negative_returns = returns[returns < 0]
-            downside_std = np.sqrt(np.mean(negative_returns ** 2)) if len(negative_returns) > 0 else 0
+            downside_std = np.sqrt(np.mean(negative_returns**2)) if len(negative_returns) > 0 else 0
             sortino = (np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0
         else:
             sharpe = 0
@@ -424,7 +663,11 @@ class BacktestEngine:
             _years = max((_end - _start).days / 365.25, 0.01)
             _cagr = round(((final / initial_capital) ** (1 / _years) - 1) * 100, 2) if final > 0 else 0
         except Exception:
-            _cagr = round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0
+            _cagr = (
+                round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2)
+                if final > 0
+                else 0
+            )
 
         # Max drawdown duration hesapla
         _max_dd_dur = 0
@@ -486,6 +729,7 @@ def get_backtest_systems() -> dict[str, Any]:
     systems = {}
     try:
         from .engine_v4 import BacktestEngineV4
+
         systems["engine_v4"] = BacktestEngineV4
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -493,6 +737,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="BacktestEngineV4", error=str(e))
     try:
         from .enhanced_walk_forward import PurgeEmbargoWalkForward
+
         systems["enhanced_wf"] = PurgeEmbargoWalkForward
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -500,6 +745,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="PurgeEmbargoWalkForward", error=str(e))
     try:
         from .portfolio_sim import PortfolioSimulator
+
         systems["portfolio_sim"] = PortfolioSimulator
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -507,6 +753,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="PortfolioSimulator", error=str(e))
     try:
         from .walk_forward import WalkForwardEngine
+
         systems["walk_forward"] = WalkForwardEngine
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -514,6 +761,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="WalkForwardEngine", error=str(e))
     try:
         from .walk_forward_runner import WalkForwardRunner
+
         systems["wf_runner"] = WalkForwardRunner
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -521,6 +769,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="WalkForwardRunner", error=str(e))
     try:
         from .canonical_adapter import CanonicalBacktestAdapter
+
         systems["canonical_adapter"] = CanonicalBacktestAdapter
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
@@ -528,6 +777,7 @@ def get_backtest_systems() -> dict[str, Any]:
         logger.warning("Failed to load module", module="CanonicalBacktestAdapter", error=str(e))
     try:
         from .persistence import BacktestPersistence
+
         systems["persistence"] = BacktestPersistence
     except ImportError:
         logger.debug("Optional import not available in get_backtest_systems", exc_info=True)

@@ -85,7 +85,7 @@ class EksiSozlukAdapter(BaseAdapter):
 
             # URL-safe topic adı
             topic_slug = topic.lower().replace(" ", "-")
-            topic_slug = re.sub(r'[^a-z0-9ğüşıöç-]', '', topic_slug)
+            topic_slug = re.sub(r"[^a-z0-9ğüşıöç-]", "", topic_slug)
             url = f"https://eksisozluk.com/{topic_slug}--sayfa=1"
 
             headers = {
@@ -99,10 +99,10 @@ class EksiSozlukAdapter(BaseAdapter):
                         return []
 
                     html = await resp.text()
-                    soup = BeautifulSoup(html, 'html.parser')
+                    soup = BeautifulSoup(html, "html.parser")
 
                     entries = []
-                    entry_items = soup.select('.content, .entry-content, [data-entry-id]')
+                    entry_items = soup.select(".content, .entry-content, [data-entry-id]")
 
                     for item in entry_items[:30]:  # Max 30 entry
                         text = item.get_text(strip=True)
@@ -110,22 +110,24 @@ class EksiSozlukAdapter(BaseAdapter):
                             continue
 
                         # Favori sayısı
-                        fav_elem = item.select_one('.favorite-count, .fav-count')
+                        fav_elem = item.select_one(".favorite-count, .fav-count")
                         fav_count = 0
                         if fav_elem:
-                            fav_match = re.search(r'(\d+)', fav_elem.text)
+                            fav_match = re.search(r"(\d+)", fav_elem.text)
                             if fav_match:
                                 fav_count = int(fav_match.group(1))
 
                         # Tarih
-                        date_elem = item.select_one('.entry-date, time, .date')
+                        date_elem = item.select_one(".entry-date, time, .date")
                         entry_date = date_elem.text.strip() if date_elem else ""
 
-                        entries.append({
-                            "text": text[:500],  # İlk 500 karakter
-                            "favorites": fav_count,
-                            "date": entry_date,
-                        })
+                        entries.append(
+                            {
+                                "text": text[:500],  # İlk 500 karakter
+                                "favorites": fav_count,
+                                "date": entry_date,
+                            }
+                        )
 
                     return entries
 
@@ -172,15 +174,45 @@ class EksiSozlukAdapter(BaseAdapter):
         words = text_lower.split()
 
         positive_words = [
-            "güzel", "harika", "mükemmel", "başarılı", "iyi", "yükseliş",
-            "artış", "kâr", "büyüme", "kazanç", "olumlu", "destek",
-            "güçlü", "parlak", "muhteşem", "süper", "devam", "potansiyel",
+            "güzel",
+            "harika",
+            "mükemmel",
+            "başarılı",
+            "iyi",
+            "yükseliş",
+            "artış",
+            "kâr",
+            "büyüme",
+            "kazanç",
+            "olumlu",
+            "destek",
+            "güçlü",
+            "parlak",
+            "muhteşem",
+            "süper",
+            "devam",
+            "potansiyel",
         ]
 
         negative_words = [
-            "kötü", "berbat", "başarısız", "düşüş", "kayıp", "zarar",
-            "olumsuz", "zayıf", "tehlike", "risk", "batmak", "çökmek",
-            "iflas", "skandal", "düzenleme", "sorun", "kriz", "çöküş",
+            "kötü",
+            "berbat",
+            "başarısız",
+            "düşüş",
+            "kayıp",
+            "zarar",
+            "olumsuz",
+            "zayıf",
+            "tehlike",
+            "risk",
+            "batmak",
+            "çökmek",
+            "iflas",
+            "skandal",
+            "düzenleme",
+            "sorun",
+            "kriz",
+            "çöküş",
         ]
 
         pos_count = 0

@@ -19,7 +19,6 @@ Endpoints:
 - POST /risk/tail-hedge/analyze — Tail hedge analizi
 """
 
-
 import numpy as np
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -35,54 +34,65 @@ router = APIRouter()
 # HELPERS
 # =====================================================
 
+
 def _get_dynamic_limits():
     from ...risk.dynamic_limits import dynamic_limits
+
     return dynamic_limits
 
 
 def _get_drawdown_system():
     from ...risk.drawdown_response import drawdown_system
+
     return drawdown_system
 
 
 def _get_var_calculator():
     from ...risk.var_cvar import var_calculator
+
     return var_calculator
 
 
 def _get_stress_engine():
     from ...risk.stress_test import stress_test_engine
+
     return stress_test_engine
 
 
 def _get_tail_hedger():
     from ...risk.tail_hedge import tail_hedger
+
     return tail_hedger
 
 
 def _get_risk_parity():
     from ...risk.risk_parity import risk_parity_optimizer
+
     return risk_parity_optimizer
 
 
 def _get_monitor():
     from ...risk.monitoring import risk_monitor
+
     return risk_monitor
 
 
 def _get_calibrator():
     from ...risk.calibration import calibrator
+
     return calibrator
 
 
 def _get_position_sizer():
     from ...risk.position_sizing import position_sizer
+
     return position_sizer
 
 
 # =====================================================
 # OVERVIEW & DASHBOARD
 # =====================================================
+
 
 @router.get("/overview")
 @router.get("/summary")
@@ -185,7 +195,9 @@ async def risk_dashboard(
             "stress_test": {
                 "risk_score": stress_report.risk_score,
                 "worst_scenario": stress_report.worst_scenario.scenario_name if stress_report.worst_scenario else "N/A",
-                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct if stress_report.worst_scenario else 0,
+                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct
+                if stress_report.worst_scenario
+                else 0,
                 "avg_impact_pct": stress_report.avg_impact_pct,
                 "recommendations": stress_report.recommendations,
             },
@@ -207,6 +219,7 @@ async def risk_dashboard(
 # VAR/CVAR
 # =====================================================
 
+
 @router.get("/var")
 async def var_report(
     portfolio_value: float = Query(100000, description="Portföy değeri"),
@@ -221,9 +234,21 @@ async def var_report(
         np.random.seed(42)
         returns = np.random.normal(0.0008, 0.015, 252)
 
-        param_var = calc.calculate_parametric_var(returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days)
-        hist_var = calc.calculate_historical_var(returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days) if hasattr(calc, 'calculate_historical_var') else param_var * 0.98
-        cvar = calc.calculate_cvar(returns, confidence=confidence, portfolio_value=portfolio_value) if hasattr(calc, 'calculate_cvar') else param_var * 1.35
+        param_var = calc.calculate_parametric_var(
+            returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days
+        )
+        hist_var = (
+            calc.calculate_historical_var(
+                returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days
+            )
+            if hasattr(calc, "calculate_historical_var")
+            else param_var * 0.98
+        )
+        cvar = (
+            calc.calculate_cvar(returns, confidence=confidence, portfolio_value=portfolio_value)
+            if hasattr(calc, "calculate_cvar")
+            else param_var * 1.35
+        )
 
         return {
             "portfolio_value": portfolio_value,
@@ -258,6 +283,7 @@ async def portfolio_risk(
             import numpy as np
 
             from ...risk.var_cvar import VaRCalculator
+
             calc = VaRCalculator()
             # Demo return history — gerçek veri kaynağı bağlandığında değiştirilmeli
             demo_returns = np.random.normal(0.0005, 0.015, 252)
@@ -265,7 +291,11 @@ async def portfolio_risk(
                 returns=demo_returns,
                 portfolio_value=portfolio_value,
             )
-            return {"portfolio_risk": report, "source": "var_calculator", "note": "Using simulated returns. Connect real data source for accurate results."}
+            return {
+                "portfolio_risk": report,
+                "source": "var_calculator",
+                "note": "Using simulated returns. Connect real data source for accurate results.",
+            }
         except Exception as calc_err:
             return {"portfolio_risk": {}, "error": str(calc_err), "note": "Risk calculation failed."}
     except Exception as e:
@@ -275,6 +305,7 @@ async def portfolio_risk(
 # =====================================================
 # LIMITS & DRAWDOWN
 # =====================================================
+
 
 @router.get("/limits")
 async def risk_limits(
@@ -376,6 +407,7 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
 # STRESS TEST
 # =====================================================
 
+
 @router.get("/stress-test/scenarios")
 async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Mevcut stres testi senaryoları.
@@ -391,8 +423,7 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
             for k, v in engine.HISTORICAL_SCENARIOS.items()
         ]
         hypothetical = [
-            {"key": k, "name": v["name"], "type": "hypothetical"}
-            for k, v in engine.HYPOTHETICAL_SCENARIOS.items()
+            {"key": k, "name": v["name"], "type": "hypothetical"} for k, v in engine.HYPOTHETICAL_SCENARIOS.items()
         ]
 
         return {
@@ -453,11 +484,15 @@ async def run_stress_test(
                     "name": report.worst_scenario.scenario_name,
                     "impact_pct": float(report.worst_scenario.total_impact_pct),
                     "impact_amount": float(report.worst_scenario.total_impact_amount),
-                } if report.worst_scenario else None,
+                }
+                if report.worst_scenario
+                else None,
                 "best_scenario": {
                     "name": report.best_scenario.scenario_name,
                     "impact_pct": float(report.best_scenario.total_impact_pct),
-                } if report.best_scenario else None,
+                }
+                if report.best_scenario
+                else None,
                 "recommendations": report.recommendations,
                 "breaking_point": float(breaking) if breaking is not None else None,
                 "scenarios_count": len(report.scenarios),
@@ -488,6 +523,7 @@ async def run_stress_test(
 # TAIL HEDGE
 # =====================================================
 
+
 @router.get("/tail-hedge")
 async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Tail risk hedge stratejileri ve VIX seviyeleri.
@@ -499,8 +535,12 @@ async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate
         hedger = _get_tail_hedger()
         return {
             "strategies": {
-                k: {"name": v["name"], "description": v["description"],
-                     "cost_range": v["cost_range"], "protection": v["protection"]}
+                k: {
+                    "name": v["name"],
+                    "description": v["description"],
+                    "cost_range": v["cost_range"],
+                    "protection": v["protection"],
+                }
                 for k, v in hedger.STRATEGIES.items()
             },
             "vix_levels": hedger.VIX_LEVELS,
@@ -554,6 +594,7 @@ async def analyze_tail_hedge(
 # RISK PARITY
 # =====================================================
 
+
 @router.get("/risk-parity")
 async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Risk parity optimizasyon bilgisi.
@@ -599,6 +640,7 @@ async def optimize_risk_parity(
 
         # Ledoit-Wolf covariance
         from ...risk.covariance import covariance_estimator
+
         cov_result = covariance_estimator.estimate(returns, tickers)
         cov_matrix = cov_result["covariance"]
 
@@ -621,6 +663,7 @@ async def optimize_risk_parity(
 # =====================================================
 # MONITORING & ALERTS
 # =====================================================
+
 
 @router.get("/monitoring")
 async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_limit)):
@@ -676,6 +719,7 @@ async def risk_alerts(
         monitor = _get_monitor()
 
         from ...risk.monitoring import AlertSeverity
+
         sev_filter = None
         if severity:
             try:
@@ -714,6 +758,7 @@ async def risk_alerts(
 # CALIBRATION
 # =====================================================
 
+
 @router.get("/calibration")
 async def calibration_quality(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Kalibrasyon kalitesi — Brier score + calibration curve.
@@ -741,6 +786,7 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
 # =====================================================
 # PRE-TRADE CHECK
 # =====================================================
+
 
 @router.post("/check")
 async def pre_trade_check(
@@ -773,12 +819,14 @@ async def pre_trade_check(
 
         # 1. Drawdown check
         if not dd.is_trading_allowed():
-            checks.append({
-                "name": "drawdown_response",
-                "passed": False,
-                "severity": "BLOCK",
-                "details": f"Trading disabled: {dd_state.description}",
-            })
+            checks.append(
+                {
+                    "name": "drawdown_response",
+                    "passed": False,
+                    "severity": "BLOCK",
+                    "details": f"Trading disabled: {dd_state.description}",
+                }
+            )
         else:
             checks.append({"name": "drawdown_response", "passed": True, "severity": "INFO"})
 
@@ -787,22 +835,26 @@ async def pre_trade_check(
         assumed_value = 100000
         position_pct = (amount / assumed_value * 100) if assumed_value > 0 else 0
         if position_pct > limits.max_position_pct:
-            checks.append({
-                "name": "dynamic_position_limit",
-                "passed": False,
-                "severity": "BLOCK",
-                "details": f"Position {position_pct:.1f}% > limit {limits.max_position_pct:.1f}%",
-            })
+            checks.append(
+                {
+                    "name": "dynamic_position_limit",
+                    "passed": False,
+                    "severity": "BLOCK",
+                    "details": f"Position {position_pct:.1f}% > limit {limits.max_position_pct:.1f}%",
+                }
+            )
         else:
             checks.append({"name": "dynamic_position_limit", "passed": True, "severity": "INFO"})
 
         # 3. Kelly fraction
-        checks.append({
-            "name": "kelly_fraction",
-            "passed": True,
-            "severity": "INFO",
-            "details": f"Regime-adjusted Kelly: {limits.kelly_fraction:.3f}",
-        })
+        checks.append(
+            {
+                "name": "kelly_fraction",
+                "passed": True,
+                "severity": "INFO",
+                "details": f"Regime-adjusted Kelly: {limits.kelly_fraction:.3f}",
+            }
+        )
 
         all_passed = all(c["passed"] for c in checks)
 
@@ -830,6 +882,7 @@ async def pre_trade_check(
 # =====================================================
 # COMPLIANCE
 # =====================================================
+
 
 @router.get("/compliance")
 async def compliance(
@@ -887,12 +940,14 @@ async def compliance(
 
 _cached_daily_returns = None
 
+
 def _get_historical_returns():
     global _cached_daily_returns
     if _cached_daily_returns is not None:
         return _cached_daily_returns
     try:
         from ...data.historical_warehouse import HistoricalDataWarehouse
+
         wh = HistoricalDataWarehouse()
         bm_df, _ = wh.load_30y_data()
         if bm_df is not None and not bm_df.empty:
@@ -1000,9 +1055,9 @@ async def run_stress_test_quick(
         histogram = [
             {
                 "bin_start": round(float(bin_edges[i]), 1),
-                "bin_end": round(float(bin_edges[i+1]), 1),
+                "bin_end": round(float(bin_edges[i + 1]), 1),
                 "count": int(hist_counts[i]),
-                "is_loss": bool(bin_edges[i+1] < 0),
+                "is_loss": bool(bin_edges[i + 1] < 0),
             }
             for i in range(len(hist_counts))
         ]
@@ -1032,4 +1087,3 @@ async def run_stress_test_quick(
         }
     except Exception as e:
         raise HTTPException(500, f"Stress test calculation error: {e}") from e
-

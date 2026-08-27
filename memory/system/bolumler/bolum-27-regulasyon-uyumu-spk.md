@@ -47,10 +47,10 @@ Bildirim: 2 iş günü içinde
 def check_notification_requirement(action, ticker, quantity, portfolio):
     total_shares = get_total_shares(ticker)
     current_pct = portfolio.holding(ticker) / total_shares * 100
-    
+
     if action == "BUY":
         new_pct = (portfolio.holding(ticker) + quantity) / total_shares * 100
-        
+
         # %5 eşiği aşıldı mı?
         if current_pct < 5.0 and new_pct >= 5.0:
             return {
@@ -58,18 +58,18 @@ def check_notification_requirement(action, ticker, quantity, portfolio):
                 "authority": "SPK",
                 "deadline": "2 business days",
                 "form": "Özel Durum Açıklaması",
-                "action": "NOTIFY_BEFORE_TRADING"
+                "action": "NOTIFY_BEFORE_TRADING",
             }
-        
+
         # Her %1 artış
         if new_pct >= 5.0 and int(new_pct) > int(current_pct):
             return {
                 "notification_required": True,
                 "authority": "SPK",
                 "deadline": "2 business days",
-                "form": "Pay Alım Bildirimi"
+                "form": "Pay Alım Bildirimi",
             }
-    
+
     return {"notification_required": False}
 ```
 
@@ -93,38 +93,26 @@ def check_notification_requirement(action, ticker, quantity, portfolio):
 # services/core/manipulation_detector.py
 def detect_manipulation(trade_history, order_history):
     alerts = []
-    
+
     # Wash trading kontrolü
     for trade in trade_history:
         if trade.buyer == trade.seller:
-            alerts.append({
-                "type": "WASH_TRADING",
-                "severity": "HIGH",
-                "details": trade
-            })
-    
+            alerts.append({"type": "WASH_TRADING", "severity": "HIGH", "details": trade})
+
     # Spoofing kontrolü
     cancelled_orders = [o for o in order_history if o.status == "CANCELLED"]
     cancel_rate = len(cancelled_orders) / len(order_history) if order_history else 0
-    
+
     if cancel_rate > 0.8:  # %80'den fazla iptal
-        alerts.append({
-            "type": "POTENTIAL_SPOOFING",
-            "severity": "MEDIUM",
-            "cancel_rate": cancel_rate
-        })
-    
+        alerts.append({"type": "POTENTIAL_SPOOFING", "severity": "MEDIUM", "cancel_rate": cancel_rate})
+
     # Volume manipulation
     avg_volume = np.mean([t.volume for t in trade_history[-20:]])
     recent_volume = np.mean([t.volume for t in trade_history[-3:]])
-    
+
     if recent_volume > avg_volume * 5:  # 5x ortalama hacim
-        alerts.append({
-            "type": "VOLUME_ANOMALY",
-            "severity": "MEDIUM",
-            "volume_ratio": recent_volume / avg_volume
-        })
-    
+        alerts.append({"type": "VOLUME_ANOMALY", "severity": "MEDIUM", "volume_ratio": recent_volume / avg_volume})
+
     return alerts
 ```
 
@@ -152,24 +140,23 @@ Yakın çevreye bilgi sızdırmak
 # services/core/insider_detector.py
 def detect_insider_pattern(trades, kap_events):
     alerts = []
-    
+
     for event in kap_events:
         # KAP açıklamasından 3 gün önce
-        pre_event_trades = [
-            t for t in trades
-            if event.date - timedelta(days=3) <= t.date < event.date
-        ]
-        
+        pre_event_trades = [t for t in trades if event.date - timedelta(days=3) <= t.date < event.date]
+
         for trade in pre_event_trades:
             if trade.volume > trade.avg_volume * 3:  # Olağandışı hacim
-                alerts.append({
-                    "type": "POTENTIAL_INSIDER_TRADING",
-                    "severity": "CRITICAL",
-                    "trade": trade,
-                    "event": event,
-                    "days_before": (event.date - trade.date).days
-                })
-    
+                alerts.append(
+                    {
+                        "type": "POTENTIAL_INSIDER_TRADING",
+                        "severity": "CRITICAL",
+                        "trade": trade,
+                        "event": event,
+                        "days_before": (event.date - trade.date).days,
+                    }
+                )
+
     return alerts
 ```
 
@@ -204,7 +191,7 @@ def generate_algo_notification(strategy):
             "max_drawdown": "-18%",
         },
         "emergency_contact": "...",
-        "submission_date": datetime.now().isoformat()
+        "submission_date": datetime.now().isoformat(),
     }
 ```
 
@@ -249,7 +236,7 @@ def generate_daily_report(portfolio, trades, risk_metrics):
             "max_drawdown": risk_metrics["max_drawdown"],
             "concentration": risk_metrics["concentration"],
         },
-        "compliance_status": "COMPLIANT"
+        "compliance_status": "COMPLIANT",
     }
 ```
 
@@ -284,21 +271,16 @@ def generate_daily_report(portfolio, trades, risk_metrics):
 def calculate_tax(trade):
     if trade.type == "STOCK_SALE":
         holding_days = (trade.sell_date - trade.buy_date).days
-        
+
         if holding_days > 730:  # 2 yıldan fazla
             tax_rate = 0.0
         else:
             tax_rate = 0.10  # %10
-        
+
         profit = (trade.sell_price - trade.buy_price) * trade.quantity
         tax = max(profit * tax_rate, 0)
-        
-        return {
-            "profit": profit,
-            "tax_rate": tax_rate,
-            "tax": tax,
-            "holding_days": holding_days
-        }
+
+        return {"profit": profit, "tax_rate": tax_rate, "tax": tax, "holding_days": holding_days}
 ```
 
 ---

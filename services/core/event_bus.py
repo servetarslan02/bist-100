@@ -57,8 +57,7 @@ def ensure_topics(subjects: list[str] | None = None):
     sadece loglama ve doğrulama yapar.
     """
     target_subjects = subjects or DEFAULT_SUBJECTS
-    logger.info("NATS subjects ensured", count=len(target_subjects),
-                subjects=target_subjects[:5])
+    logger.info("NATS subjects ensured", count=len(target_subjects), subjects=target_subjects[:5])
     return True
 
 
@@ -78,6 +77,7 @@ async def flush_producer():
 # =====================================================
 # Internal Event Bus (Redis Pub/Sub — Push-Based)
 # =====================================================
+
 
 class InternalEventBus:
     """
@@ -100,6 +100,7 @@ class InternalEventBus:
         if self._redis is None or self._redis_loop is not current_loop:
             try:
                 import redis.asyncio as aioredis
+
                 self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
                 self._redis_loop = current_loop
             except (ImportError, Exception):
@@ -116,7 +117,7 @@ class InternalEventBus:
         except Exception as e:
             logger.warning("Publish failed, using in-memory", error=str(e))
             # In-memory fallback
-            if hasattr(r, 'publish_local'):
+            if hasattr(r, "publish_local"):
                 r.publish_local(channel, event)
 
     async def subscribe(self, channel: str, handler: Callable):
@@ -157,6 +158,7 @@ class InternalEventBus:
                             # DLQ'ya düşür (event kaybını önle)
                             try:
                                 from .dead_letter_queue import dead_letter_queue
+
                                 await dead_letter_queue.push(
                                     event_id=event.event_id,
                                     event_type=event.event_type,
@@ -165,7 +167,9 @@ class InternalEventBus:
                                     retry_count=0,
                                 )
                             except Exception as e:
-                                logger.warning("Operation failed", context="DLQ bile çalışamıyorsa log yeterli", error=str(e))
+                                logger.warning(
+                                    "Operation failed", context="DLQ bile çalışamıyorsa log yeterli", error=str(e)
+                                )
             except Exception as e:
                 logger.warning("PubSub listen error", error=str(e))
                 await asyncio.sleep(0.1)
@@ -182,6 +186,7 @@ class InternalEventBus:
 
 class InMemoryRedis:
     """In-memory Redis fallback (Docker yokken veya test ortamında)."""
+
     def __init__(self):
         self._data = {}
         self._pubsub_handlers = {}
@@ -267,8 +272,7 @@ def publish_event(event: CanonicalEvent):
     # Schema validation
     missing = event.validate_payload()
     if missing:
-        logger.warning("Event payload validation failed",
-                      event_type=event.event_type, missing=missing)
+        logger.warning("Event payload validation failed", event_type=event.event_type, missing=missing)
         return
 
     # NATS (primary) — yüksek throughput, düşük gecikme
@@ -304,13 +308,17 @@ async def _publish_to_nats(event: CanonicalEvent):
     """NATS'a publish et — kritik event'ler için JetStream, diğerleri için normal publish."""
     try:
         from ..nats.client import nats_client
+
         subject = f"alpha.{event.event_type}"
 
         # Kritik event tipleri → JetStream (disk-based, persistent, restart-safe)
         CRITICAL_EVENT_TYPES = {
-            "signal.generated", "signal.executed",
-            "portfolio.trade", "portfolio.updated",
-            "risk.alert", "risk.breach",
+            "signal.generated",
+            "signal.executed",
+            "portfolio.trade",
+            "portfolio.updated",
+            "risk.alert",
+            "risk.breach",
             "regime.changed",
         }
 
@@ -326,6 +334,7 @@ async def subscribe_nats(subject: str, handler: Callable):
     """NATS konusuna abone ol."""
     try:
         from ..nats.client import nats_client
+
         await nats_client.subscribe(subject, handler=handler)
         logger.info("NATS subscribed", subject=subject)
     except Exception as e:
@@ -365,6 +374,7 @@ async def _get_redis():
     if _redis_conn is None or _redis_loop is not current_loop:
         try:
             import redis.asyncio as aioredis
+
             _redis_conn = aioredis.from_url(settings.redis_url, decode_responses=True)
             _redis_loop = current_loop
         except (ImportError, Exception):
@@ -390,14 +400,13 @@ async def _check_and_mark_published(event_id: str) -> bool:
     # 2. PostgreSQL dene
     try:
         from services.core.database import pg_execute, pg_fetchrow
-        existing = await pg_fetchrow(
-            "SELECT event_id FROM event_ledger WHERE event_id = $1", event_id
-        )
+
+        existing = await pg_fetchrow("SELECT event_id FROM event_ledger WHERE event_id = $1", event_id)
         if existing:
             return False
         await pg_execute(
             "INSERT INTO event_ledger (event_id, published_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
-            event_id
+            event_id,
         )
         return True
     except Exception as e:
@@ -415,12 +424,16 @@ async def _publish_to_stream(event: CanonicalEvent):
     try:
         r = await _get_redis()
         stream_key = f"alpha:events:{event.event_type}"
-        await r.xadd(stream_key, {
-            "event_id": event.event_id,
-            "event_type": event.event_type,
-            "data": event.to_json(),
-            "timestamp": event.timestamp.isoformat(),
-        }, maxlen=10000)
+        await r.xadd(
+            stream_key,
+            {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "data": event.to_json(),
+                "timestamp": event.timestamp.isoformat(),
+            },
+            maxlen=10000,
+        )
         return
     except Exception as e:
         logger.warning("Redis Stream write failed", error=str(e), context="event_bus.py:311")
@@ -428,9 +441,12 @@ async def _publish_to_stream(event: CanonicalEvent):
     # 2. PostgreSQL dene
     try:
         from services.core.database import pg_execute
+
         await pg_execute(
             "INSERT INTO event_ledger (event_id, event_type, payload, published_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
-            event.event_id, event.event_type, event.to_json()
+            event.event_id,
+            event.event_type,
+            event.to_json(),
         )
         return
     except Exception as e:
@@ -440,6 +456,7 @@ async def _publish_to_stream(event: CanonicalEvent):
 # =====================================================
 # EventConsumer (At-least-once + Idempotent)
 # =====================================================
+
 
 class EventConsumer:
     """Push-based consumer — Redis Pub/Sub ile çalışır."""
@@ -483,6 +500,7 @@ class EventConsumer:
                 # DLQ'ya düşür
                 try:
                     from .dead_letter_queue import dead_letter_queue
+
                     await dead_letter_queue.push(
                         event_id=event.event_id,
                         event_type=event.event_type,

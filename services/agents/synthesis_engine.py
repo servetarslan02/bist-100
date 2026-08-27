@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class SynthesisResult:
     """Sentez sonucu."""
+
     ticker: str
     final_direction: str  # LONG, SHORT, NEUTRAL, NO_TRADE
     final_confidence: float
@@ -120,8 +121,12 @@ class SynthesisEngine:
         llm_risks = []
         if llm_client:
             llm_result = await self._llm_synthesize(
-                ticker, agent_results, debate_result, resolution,
-                risk_approved, llm_client,
+                ticker,
+                agent_results,
+                debate_result,
+                resolution,
+                risk_approved,
+                llm_client,
             )
             llm_reasoning = llm_result.get("reasoning", "")
             llm_reasons = llm_result.get("reasons", [])
@@ -176,9 +181,7 @@ class SynthesisEngine:
 
         return result
 
-    def _create_agent_summary(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> dict[str, Any]:
+    def _create_agent_summary(self, results: dict[AgentRole, AgentResult]) -> dict[str, Any]:
         """Agent özetini oluştur."""
         summary = {}
         for role, result in results.items():
@@ -192,9 +195,7 @@ class SynthesisEngine:
             }
         return summary
 
-    def _analyze_conflicts(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> dict[str, Any]:
+    def _analyze_conflicts(self, results: dict[AgentRole, AgentResult]) -> dict[str, Any]:
         """Çelişki analizi."""
         valid = {r: res for r, res in results.items() if res.success}
         directions = {}
@@ -216,9 +217,7 @@ class SynthesisEngine:
             "is_unanimous": len(directions) == 1,
         }
 
-    def _weighted_score(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> float:
+    def _weighted_score(self, results: dict[AgentRole, AgentResult]) -> float:
         """Confidence-weighted ortalama skor."""
         valid = {r: res for r, res in results.items() if res.success}
         if not valid:
@@ -234,9 +233,7 @@ class SynthesisEngine:
 
         return weighted_sum / total_weight if total_weight > 0 else 50.0
 
-    def _simple_majority(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> str:
+    def _simple_majority(self, results: dict[AgentRole, AgentResult]) -> str:
         """Basit çoğunluk oyu."""
         valid = {r: res for r, res in results.items() if res.success}
         directions = {}
@@ -253,18 +250,14 @@ class SynthesisEngine:
             return max_dir
         return "NEUTRAL"
 
-    def _simple_confidence(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> float:
+    def _simple_confidence(self, results: dict[AgentRole, AgentResult]) -> float:
         """Basit ortalama güven."""
         valid = [res for r, res in results.items() if res.success]
         if not valid:
             return 0.0
         return sum(r.confidence for r in valid) / len(valid)
 
-    def _collect_reasons(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> list[str]:
+    def _collect_reasons(self, results: dict[AgentRole, AgentResult]) -> list[str]:
         """Tüm nedenleri topla."""
         reasons = []
         for role, result in results.items():
@@ -273,9 +266,7 @@ class SynthesisEngine:
                     reasons.append(f"[{role.value}] {reason}")
         return reasons[:10]
 
-    def _collect_risks(
-        self, results: dict[AgentRole, AgentResult]
-    ) -> list[str]:
+    def _collect_risks(self, results: dict[AgentRole, AgentResult]) -> list[str]:
         """Tüm riskleri topla."""
         risks = []
         for role, result in results.items():
@@ -328,6 +319,7 @@ class SynthesisEngine:
 
             if response.success:
                 from .llm_client import parse_llm_json
+
                 parsed = parse_llm_json(response.content)
                 if parsed:
                     return parsed

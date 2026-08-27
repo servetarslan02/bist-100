@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class SettlementInfo:
     """Takas bilgisi."""
+
     trade_date: date
     settlement_date: date
     settlement_days: int  # T+N

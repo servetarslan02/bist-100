@@ -24,7 +24,8 @@ logger = structlog.get_logger()
 @dataclass
 class TimeframeState:
     """Tek bir timeframe için market state."""
-    timeframe: str              # intraday / daily / weekly / monthly
+
+    timeframe: str  # intraday / daily / weekly / monthly
     regime: str = "UNKNOWN"
     confidence: float = 0.0
     breadth_pct: float = 50.0
@@ -49,10 +50,11 @@ class TimeframeState:
 @dataclass
 class MultiTimeframeResult:
     """Çoklu timeframe sonucu."""
+
     states: dict[str, TimeframeState] = field(default_factory=dict)
-    alignment_score: float = 1.0            # 1 = tam uyum, 0 = tam çelişki
+    alignment_score: float = 1.0  # 1 = tam uyum, 0 = tam çelişki
     divergences: list[str] = field(default_factory=list)
-    dominant_timeframe: str = "daily"       # En güvenilir timeframe
+    dominant_timeframe: str = "daily"  # En güvenilir timeframe
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -227,19 +229,21 @@ class MultiTimeframeEngine:
         bear_tfs = [tf for tf, r in regimes.items() if r in ("BEAR", "RISK_OFF")]
 
         if bull_tfs and bear_tfs:
-            divergences.append(
-                f"BULL/BEAR divergence: {', '.join(bull_tfs)} vs {', '.join(bear_tfs)}"
-            )
+            divergences.append(f"BULL/BEAR divergence: {', '.join(bull_tfs)} vs {', '.join(bear_tfs)}")
 
         # Short-term vs long-term
         short_tf = regimes.get("intraday", regimes.get("daily"))
         long_tf = regimes.get("weekly", regimes.get("monthly"))
 
-        if short_tf and long_tf and ((short_tf in ("BULL", "RISK_ON") and long_tf in ("BEAR", "RISK_OFF")) or \
-               (short_tf in ("BEAR", "RISK_OFF") and long_tf in ("BULL", "RISK_ON"))):
-            divergences.append(
-                f"Short/Long term divergence: short={short_tf}, long={long_tf}"
+        if (
+            short_tf
+            and long_tf
+            and (
+                (short_tf in ("BULL", "RISK_ON") and long_tf in ("BEAR", "RISK_OFF"))
+                or (short_tf in ("BEAR", "RISK_OFF") and long_tf in ("BULL", "RISK_ON"))
             )
+        ):
+            divergences.append(f"Short/Long term divergence: short={short_tf}, long={long_tf}")
 
         return divergences
 

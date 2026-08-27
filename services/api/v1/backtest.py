@@ -19,7 +19,13 @@ async def run_backtest(
 ):
     """Backtest çalıştır - engine servisi."""
     try:
-        return {"status": "started", "ticker": ticker, "period": period, "strategy": strategy, "message": "Backtest queued"}
+        return {
+            "status": "started",
+            "ticker": ticker,
+            "period": period,
+            "strategy": strategy,
+            "message": "Backtest queued",
+        }
     except Exception as e:
         raise HTTPException(500, str(e)) from e
 
@@ -29,6 +35,7 @@ async def get_result(backtest_id: str, user=Depends(get_current_user), _=Depends
     """Backtest sonucu."""
     try:
         from ...core.database import pg_fetchrow
+
         row = await pg_fetchrow("SELECT * FROM backtests WHERE id = $1", backtest_id)
         if row:
             return dict(row)
@@ -42,6 +49,7 @@ async def list_backtests(limit: int = Query(20), user=Depends(get_current_user),
     """Backtest listesi."""
     try:
         from ...core.database import pg_fetch
+
         rows = await pg_fetch("SELECT * FROM backtests ORDER BY created_at DESC LIMIT $1", limit)
         return {"backtests": [dict(r) for r in rows], "count": len(rows)}
     except Exception as e:
@@ -73,6 +81,7 @@ async def deflated_sharpe(
     """Deflated Sharpe Ratio - deflated_sharpe servisi."""
     try:
         from ...backtest.deflated_sharpe import DeflatedSharpeCalculator
+
         calc = DeflatedSharpeCalculator()
         result = calc.compute_deflated_sharpe(observed_sharpe=sharpe, n_trials=n_trials, T=T)
         return result if isinstance(result, dict) else {"deflated_sharpe": result}
@@ -88,6 +97,7 @@ async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_l
     """
     try:
         from ...core.database import get_pg_pool
+
         pool = await get_pg_pool()
         if pool:
             async with pool.acquire() as conn:
@@ -98,6 +108,7 @@ async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_l
                 """)
                 if row:
                     import orjson
+
                     result = orjson.loads(row["result_json"]) if row.get("result_json") else {}
                     return {
                         "summary": result.get("summary", {}),
@@ -126,6 +137,7 @@ async def transaction_costs(
     """İşlem maliyetleri - transaction_costs servisi."""
     try:
         from ...backtest.transaction_costs import BISTFeeStructure
+
         fees = BISTFeeStructure()
         return {
             "amount": amount,

@@ -2,6 +2,7 @@
 
 Event type'a göre özelleştirilmiş ağırlıklarla etki skoru hesaplama.
 """
+
 from typing import Any
 
 import structlog
@@ -62,7 +63,7 @@ def calculate_event_impact(
         stat_score = 10
     else:
         stat_score = 0
-    stat_score *= (weights["statistical"] / 0.25)
+    stat_score *= weights["statistical"] / 0.25
 
     # 4. Magnitude score — max 15
     magnitude_score = min(abs(car) * 50, 15) * (weights["magnitude"] / 0.25)
@@ -102,6 +103,7 @@ def calculate_event_impact(
     # Decay analizi (AR serisi varsa)
     if ar_series is not None and len(ar_series) > 1:
         from .event_decay import EventImpactDecay
+
         decay = EventImpactDecay()
         result["decay_analysis"] = decay.calculate_decay(ar_series)
 

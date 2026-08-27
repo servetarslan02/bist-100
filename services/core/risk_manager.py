@@ -8,16 +8,17 @@ class RiskManager:
     """
     Phase 17 - Dinamik Pozisyon ve Risk Yonetimi (Polars-Native)
     """
+
     def __init__(self):
         # Risk parametreleri
-        self.max_position_pct = 0.10       # Tek hisse max %10
-        self.max_sector_pct = 0.25         # Tek sektör max %25
-        self.max_drawdown_pct = 0.15       # Max drawdown %15
-        self.stop_loss_pct = 0.07          # Stop loss %7
-        self.trailing_stop_pct = 0.05      # Trailing stop %5
-        self.max_open_positions = 15       # Max açık pozisyon
-        self.min_cash_ratio = 0.10         # Min nakit oranı %10
-        self.volatility_cap = 0.50         # Max volatilite %50
+        self.max_position_pct = 0.10  # Tek hisse max %10
+        self.max_sector_pct = 0.25  # Tek sektör max %25
+        self.max_drawdown_pct = 0.15  # Max drawdown %15
+        self.stop_loss_pct = 0.07  # Stop loss %7
+        self.trailing_stop_pct = 0.05  # Trailing stop %5
+        self.max_open_positions = 15  # Max açık pozisyon
+        self.min_cash_ratio = 0.10  # Min nakit oranı %10
+        self.volatility_cap = 0.50  # Max volatilite %50
         self.correlation_threshold = 0.70  # Korelasyon eşiği
         self._risk_state = {
             "current_drawdown": 0.0,
@@ -26,7 +27,9 @@ class RiskManager:
             "sector_exposure": {},
         }
 
-    def calculate_weights(self, predictions: list[dict[str, Any]], method: str = "equal", max_weight: float = 0.20) -> dict[str, float]:
+    def calculate_weights(
+        self, predictions: list[dict[str, Any]], method: str = "equal", max_weight: float = 0.20
+    ) -> dict[str, float]:
         """
         Tahmin edilen TOP N hisse icin agirlik (weight) hesaplar.
         """

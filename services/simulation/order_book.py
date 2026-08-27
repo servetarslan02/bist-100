@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class OrderBookLevel:
     """Tek bir order book seviyesi."""
+
     price: float
     quantity: int
     side: str  # "bid" / "ask"
@@ -30,6 +31,7 @@ class OrderBookLevel:
 @dataclass
 class OrderBookSnapshot:
     """Order book anlık görüntüsü."""
+
     ticker: str
     timestamp: float
     bids: list[OrderBookLevel]  # En yüksekten en düşüğe
@@ -121,8 +123,13 @@ class OrderBookSimulator:
         """
         # Spread: volatilite ve rejime göre
         regime_mult = {
-            "BULL": 0.8, "BEAR": 1.3, "PANIC": 2.0, "CRISIS": 2.5,
-            "HIGH-VOLATILITY": 1.5, "LOW-VOLATILITY": 0.7, "RANGE": 1.0,
+            "BULL": 0.8,
+            "BEAR": 1.3,
+            "PANIC": 2.0,
+            "CRISIS": 2.5,
+            "HIGH-VOLATILITY": 1.5,
+            "LOW-VOLATILITY": 0.7,
+            "RANGE": 1.0,
         }.get(regime, 1.0)
 
         # base_spread_pct zaten temel spread, volatilite ile ayarla
@@ -270,7 +277,7 @@ class OrderBookSimulator:
         depth_score = min(100, book.total_depth / 100)  # Derinlik yüksek → yüksek skor
         imbalance_penalty = abs(book.imbalance) * 20  # Dengesizlik ceza
 
-        score = (spread_score * 0.4 + depth_score * 0.4 + (100 - imbalance_penalty) * 0.2)
+        score = spread_score * 0.4 + depth_score * 0.4 + (100 - imbalance_penalty) * 0.2
         score = max(0, min(100, score))
 
         return {
@@ -287,4 +294,3 @@ class OrderBookSimulator:
 # Singleton
 order_book_sim = OrderBookSimulator()
 OrderBook = OrderBookSimulator
-

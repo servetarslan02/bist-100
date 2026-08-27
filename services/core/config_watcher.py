@@ -92,8 +92,9 @@ class ConfigWatcher:
         if self._task and not self._task.done():
             self._task.cancel()
             self._task = None
-        logger.info("Config watcher stopped", path=self._config_path,
-                   reloads=self._reload_count, errors=self._error_count)
+        logger.info(
+            "Config watcher stopped", path=self._config_path, reloads=self._reload_count, errors=self._error_count
+        )
 
     async def _watch_loop(self):
         """Periyodik dosya değişiklik kontrolü."""
@@ -119,8 +120,7 @@ class ConfigWatcher:
         if current_mtime <= self._last_mtime:
             return
 
-        logger.info("Config file changed", path=self._config_path,
-                   old_mtime=self._last_mtime, new_mtime=current_mtime)
+        logger.info("Config file changed", path=self._config_path, old_mtime=self._last_mtime, new_mtime=current_mtime)
 
         # Eski config'i sakla
         old_config = self._last_config
@@ -136,14 +136,16 @@ class ConfigWatcher:
                 errors = self._validate_fn(new_config)
                 if errors:
                     self._error_count += 1
-                    self._audit_log.append(ConfigAuditEntry(
-                        timestamp=time.time(), action="validation_failed",
-                        config_path=self._config_path,
-                        old_version=old_version,
-                        error=str(errors),
-                    ))
-                    logger.error("Config validation failed, keeping old config",
-                               errors=errors)
+                    self._audit_log.append(
+                        ConfigAuditEntry(
+                            timestamp=time.time(),
+                            action="validation_failed",
+                            config_path=self._config_path,
+                            old_version=old_version,
+                            error=str(errors),
+                        )
+                    )
+                    logger.error("Config validation failed, keeping old config", errors=errors)
                     # mtime güncelle (tekrar denemeyi engelle)
                     self._last_mtime = current_mtime
                     return
@@ -156,14 +158,17 @@ class ConfigWatcher:
 
             new_version = new_config.get("version") if isinstance(new_config, dict) else None
 
-            self._audit_log.append(ConfigAuditEntry(
-                timestamp=time.time(), action="reload",
-                config_path=self._config_path,
-                old_version=old_version, new_version=new_version,
-            ))
+            self._audit_log.append(
+                ConfigAuditEntry(
+                    timestamp=time.time(),
+                    action="reload",
+                    config_path=self._config_path,
+                    old_version=old_version,
+                    new_version=new_version,
+                )
+            )
 
-            logger.info("Config reloaded successfully",
-                       version=new_version, total_reloads=self._reload_count)
+            logger.info("Config reloaded successfully", version=new_version, total_reloads=self._reload_count)
 
             # Callback
             if self._on_change:
@@ -174,20 +179,27 @@ class ConfigWatcher:
 
         except orjson.JSONDecodeError as e:
             self._error_count += 1
-            self._audit_log.append(ConfigAuditEntry(
-                timestamp=time.time(), action="reload_failed",
-                config_path=self._config_path, error=f"JSON error: {e}",
-            ))
-            logger.error("Config reload failed (invalid JSON), keeping old config",
-                        error=str(e))
+            self._audit_log.append(
+                ConfigAuditEntry(
+                    timestamp=time.time(),
+                    action="reload_failed",
+                    config_path=self._config_path,
+                    error=f"JSON error: {e}",
+                )
+            )
+            logger.error("Config reload failed (invalid JSON), keeping old config", error=str(e))
             self._last_mtime = current_mtime
 
         except Exception as e:
             self._error_count += 1
-            self._audit_log.append(ConfigAuditEntry(
-                timestamp=time.time(), action="reload_failed",
-                config_path=self._config_path, error=str(e),
-            ))
+            self._audit_log.append(
+                ConfigAuditEntry(
+                    timestamp=time.time(),
+                    action="reload_failed",
+                    config_path=self._config_path,
+                    error=str(e),
+                )
+            )
             logger.error("Config reload failed, keeping old config", error=str(e))
             self._last_mtime = current_mtime
 
@@ -211,15 +223,22 @@ class ConfigWatcher:
         try:
             self._reload_fn()
             self._reload_count += 1
-            self._audit_log.append(ConfigAuditEntry(
-                timestamp=time.time(), action="force_reload",
-                config_path=self._config_path,
-            ))
+            self._audit_log.append(
+                ConfigAuditEntry(
+                    timestamp=time.time(),
+                    action="force_reload",
+                    config_path=self._config_path,
+                )
+            )
             return True
         except Exception as e:
             self._error_count += 1
-            self._audit_log.append(ConfigAuditEntry(
-                timestamp=time.time(), action="reload_failed",
-                config_path=self._config_path, error=str(e),
-            ))
+            self._audit_log.append(
+                ConfigAuditEntry(
+                    timestamp=time.time(),
+                    action="reload_failed",
+                    config_path=self._config_path,
+                    error=str(e),
+                )
+            )
             return False

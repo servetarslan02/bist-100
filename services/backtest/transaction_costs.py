@@ -29,23 +29,26 @@ logger = structlog.get_logger()
 
 class MarketCapCategory(Enum):
     """Piyasa değeri kategorileri."""
-    LARGE_CAP = "large"      # > 10B TL
-    MID_CAP = "mid"          # 2-10B TL
-    SMALL_CAP = "small"      # 500M-2B TL
-    MICRO_CAP = "micro"      # < 500M TL
+
+    LARGE_CAP = "large"  # > 10B TL
+    MID_CAP = "mid"  # 2-10B TL
+    SMALL_CAP = "small"  # 500M-2B TL
+    MICRO_CAP = "micro"  # < 500M TL
 
 
 class LiquidityTier(Enum):
     """Likidite katmanları."""
-    TIER_1 = "tier_1"    # En likit (THYAO, GARAN, AKBNK vb.)
-    TIER_2 = "tier_2"    # Orta likit
-    TIER_3 = "tier_3"    # Düşük likit
-    TIER_4 = "tier_4"    # Çok düşük likit
+
+    TIER_1 = "tier_1"  # En likit (THYAO, GARAN, AKBNK vb.)
+    TIER_2 = "tier_2"  # Orta likit
+    TIER_3 = "tier_3"  # Düşük likit
+    TIER_4 = "tier_4"  # Çok düşük likit
 
 
 @dataclass
 class BISTFeeStructure:
     """BIST işlem ücretleri yapısı."""
+
     # Broker komisyonu (değişken, genel piyasa ortalaması)
     broker_commission_pct: float = 0.03  # %0.03
 
@@ -86,11 +89,12 @@ class SpreadModel:
     Gerçek piyasa verisiyle kalibre edilmeli.
     Likidite katmanına göre spread tahmini.
     """
+
     # Spread baz değerleri (bps - basis points)
-    tier_1_spread_bps: float = 5.0    # 5 bps = %0.05
-    tier_2_spread_bps: float = 15.0   # 15 bps = %0.15
-    tier_3_spread_bps: float = 30.0   # 30 bps = %0.30
-    tier_4_spread_bps: float = 75.0   # 75 bps = %0.75
+    tier_1_spread_bps: float = 5.0  # 5 bps = %0.05
+    tier_2_spread_bps: float = 15.0  # 15 bps = %0.15
+    tier_3_spread_bps: float = 30.0  # 30 bps = %0.30
+    tier_4_spread_bps: float = 75.0  # 75 bps = %0.75
 
     # Volatilite çarpanı (yüksek vol → daha geniş spread)
     volatility_multiplier: float = 1.5
@@ -129,7 +133,7 @@ class SpreadModel:
 
         # Hacim ayarlaması
         if volume_ratio < 1.0:
-            vol_adj *= (1.0 + (1.0 - volume_ratio) * self.volume_decay_factor)
+            vol_adj *= 1.0 + (1.0 - volume_ratio) * self.volume_decay_factor
 
         return base_spread * vol_adj
 
@@ -142,6 +146,7 @@ class SlippageModel:
     Emrin gerçekleştiği fiyat ile karar anındaki fiyat arasındaki fark.
     Volatilite, hacim ve emir boyutuna bağlı.
     """
+
     # Baz slippage (bps)
     base_slippage_bps: float = 5.0  # 5 bps = %0.05
 
@@ -208,6 +213,7 @@ class MarketImpactModel:
     V: günlük ortalama hacim
     eta: sabit (akışkanlık parametresi)
     """
+
     # Akışkanlık parametresi
     eta: float = 0.5  # Genel piyasa ortalaması
 
@@ -322,11 +328,17 @@ class TransactionCostEngine:
         # Savunma: negatif veya sifir fiyat/adet
         if price <= 0 or quantity <= 0:
             return {
-                "ticker": ticker, "side": side, "price": 0, "quantity": 0,
-                "notional": 0, "liquidity_tier": "tier_4",
+                "ticker": ticker,
+                "side": side,
+                "price": 0,
+                "quantity": 0,
+                "notional": 0,
+                "liquidity_tier": "tier_4",
                 "costs": {k: 0 for k in ["commission", "bsmv", "spread", "slippage", "market_impact", "stopaj"]},
                 "cost_pcts": {k: 0 for k in ["commission_pct", "spread_pct", "slippage_pct", "impact_pct"]},
-                "total_cost": 0, "total_cost_pct": 0, "execution_price": 0,
+                "total_cost": 0,
+                "total_cost_pct": 0,
+                "execution_price": 0,
             }
 
         notional = price * quantity
@@ -343,16 +355,14 @@ class TransactionCostEngine:
 
         # 3. Spread
         liquidity = self.classify_liquidity(avg_daily_volume, market_cap)
-        spread_pct = self.spread.estimate_spread(
-            liquidity, volatility_ratio, volume_ratio
-        )
+        spread_pct = self.spread.estimate_spread(liquidity, volatility_ratio, volume_ratio)
 
         # Devre kesici sonrası spread genişleme
-        if kwargs.get('post_circuit_breaker', False):
+        if kwargs.get("post_circuit_breaker", False):
             spread_pct *= 1.5  # Devre kesici sonrası spread %50 genişler
 
         # Brüt takaslı hisselerde spread genişleme
-        if kwargs.get('is_gross_settlement', False):
+        if kwargs.get("is_gross_settlement", False):
             spread_pct *= 1.3  # Brüt takasta spread %30 genişler
 
         spread_cost = notional * spread_pct / 2  # Yarısı alış, yarısı satış
@@ -362,16 +372,13 @@ class TransactionCostEngine:
         if avg_daily_volume > 0:
             order_size_pct = (quantity * price) / avg_daily_volume
 
-        slippage_pct = self.slippage.estimate_slippage(
-            side, volatility_ratio, volume_ratio, order_size_pct
-        )
+        slippage_pct = self.slippage.estimate_slippage(side, volatility_ratio, volume_ratio, order_size_pct)
         slippage_cost = notional * slippage_pct
 
         # 5. Market Impact
         volatility = 0.02 * volatility_ratio  # Günlük volatilite tahmini
         impact_pct, permanent_impact_pct = self.impact.estimate_impact(
-            quantity, int(avg_daily_volume) if avg_daily_volume > 0 else 1000000,
-            volatility, price
+            quantity, int(avg_daily_volume) if avg_daily_volume > 0 else 1000000, volatility, price
         )
         impact_cost = notional * impact_pct
 
@@ -409,15 +416,10 @@ class TransactionCostEngine:
             },
             "total_cost": round(total_cost, 2),
             "total_cost_pct": round(total_pct, 4),
-            "execution_price": round(
-                price * (1 + slippage_pct) if side == "BUY" else price * (1 - slippage_pct),
-                4
-            ),
+            "execution_price": round(price * (1 + slippage_pct) if side == "BUY" else price * (1 - slippage_pct), 4),
         }
 
-        logger.debug("Transaction cost calculated",
-                     ticker=ticker, side=side,
-                     total_pct=f"{total_pct:.4f}%")
+        logger.debug("Transaction cost calculated", ticker=ticker, side=side, total_pct=f"{total_pct:.4f}%")
 
         return result
 
@@ -435,18 +437,11 @@ class TransactionCostEngine:
         Returns:
             Giriş ve çıkış maliyetleri + toplam round-trip
         """
-        buy_cost = self.calculate_total_cost(
-            "BUY", entry_price, quantity, ticker,
-            avg_daily_volume, volatility_ratio
-        )
-        sell_cost = self.calculate_total_cost(
-            "SELL", entry_price, quantity, ticker,
-            avg_daily_volume, volatility_ratio
-        )
+        buy_cost = self.calculate_total_cost("BUY", entry_price, quantity, ticker, avg_daily_volume, volatility_ratio)
+        sell_cost = self.calculate_total_cost("SELL", entry_price, quantity, ticker, avg_daily_volume, volatility_ratio)
 
         total_round_trip = buy_cost["total_cost"] + sell_cost["total_cost"]
-        total_rt_pct = (total_round_trip / buy_cost["notional"] * 100
-                       if buy_cost["notional"] > 0 else 0)
+        total_rt_pct = total_round_trip / buy_cost["notional"] * 100 if buy_cost["notional"] > 0 else 0
 
         return {
             "buy": buy_cost,

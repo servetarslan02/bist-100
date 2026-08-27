@@ -28,17 +28,23 @@ logger = structlog.get_logger()
 DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "config" / "alert_policy.json"
 
 FALLBACK_ESCALATION_TIMEOUT_S = {
-    "health_change": 300, "invariant_failure": 60, "lock_deadlock": 120,
-    "lock_timeout_spike": 300, "cash_negative": 30, "drawdown_breach": 180,
+    "health_change": 300,
+    "invariant_failure": 60,
+    "lock_deadlock": 120,
+    "lock_timeout_spike": 300,
+    "cash_negative": 30,
+    "drawdown_breach": 180,
 }
 
 FALLBACK_NOTIFICATION_ROUTING = {
-    "INFO": ["log"], "WARNING": ["log", "webhook"],
+    "INFO": ["log"],
+    "WARNING": ["log", "webhook"],
     "CRITICAL": ["log", "webhook", "slack", "discord", "pagerduty", "email"],
 }
 
 FALLBACK_SEVERITY_THRESHOLDS = {
-    "drawdown_warning_pct": 10.0, "drawdown_critical_pct": 15.0,
+    "drawdown_warning_pct": 10.0,
+    "drawdown_critical_pct": 15.0,
     "lock_timeout_spike_count": 3,
 }
 
@@ -51,9 +57,11 @@ WEBHOOK_RETRY_DELAY_S = 1.0
 # POLICY DIFF
 # =====================================================
 
+
 @dataclass
 class PolicyDiff:
     """Policy değişiklik farkı."""
+
     changed_fields: list[str] = field(default_factory=list)
     added_keys: list[str] = field(default_factory=list)
     removed_keys: list[str] = field(default_factory=list)
@@ -98,8 +106,10 @@ class PolicyAuditEntry:
         result = {
             "timestamp": self.timestamp,
             "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
-            "action": self.action, "version": self.version,
-            "actor": self.actor, "details": self.details,
+            "action": self.action,
+            "version": self.version,
+            "actor": self.actor,
+            "details": self.details,
         }
         if self.diff:
             result["diff"] = self.diff
@@ -109,6 +119,7 @@ class PolicyAuditEntry:
 # =====================================================
 # SILENCE RULE
 # =====================================================
+
 
 @dataclass
 class SilenceRule:
@@ -138,11 +149,17 @@ class SilenceRule:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "alert_type": self.alert_type, "fingerprint": self.fingerprint,
-            "start_time": self.start_time, "end_time": self.end_time,
-            "start_iso": self._ts_iso(self.start_time), "end_iso": self._ts_iso(self.end_time),
-            "reason": self.reason, "created_by": self.created_by,
-            "created_at": self.created_at, "is_active": self.is_active, "is_expired": self.is_expired,
+            "alert_type": self.alert_type,
+            "fingerprint": self.fingerprint,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "start_iso": self._ts_iso(self.start_time),
+            "end_iso": self._ts_iso(self.end_time),
+            "reason": self.reason,
+            "created_by": self.created_by,
+            "created_at": self.created_at,
+            "is_active": self.is_active,
+            "is_expired": self.is_expired,
         }
 
     @staticmethod
@@ -153,6 +170,7 @@ class SilenceRule:
 # =====================================================
 # ALERT POLICY
 # =====================================================
+
 
 class VersionConflictError(Exception):
     """Optimistic locking conflict."""
@@ -225,8 +243,7 @@ class AlertPolicy:
     # POLICY UPDATE (with optimistic locking)
     # =====================================================
 
-    def update(self, new_config: dict[str, Any], actor: str = "api",
-               expected_version: int = 0) -> dict[str, Any]:
+    def update(self, new_config: dict[str, Any], actor: str = "api", expected_version: int = 0) -> dict[str, Any]:
         """Policy güncelle (optimistic locking ile).
 
         Args:
@@ -265,10 +282,15 @@ class AlertPolicy:
         diff = self._compute_diff(old_dict, self.to_dict())
 
         # Audit
-        self._add_audit("update", {
-            "actor": actor, "changes": list(new_config.keys()),
-            "expected_version": expected_version,
-        }, diff)
+        self._add_audit(
+            "update",
+            {
+                "actor": actor,
+                "changes": list(new_config.keys()),
+                "expected_version": expected_version,
+            },
+            diff,
+        )
 
         # Persist
         self._save_to_file()
@@ -332,8 +354,10 @@ class AlertPolicy:
         ver_b = self._get_history_version(version_b)
 
         if not base or not ver_a or not ver_b:
-            return {"error": "One or more versions not found",
-                    "found": {"base": base is not None, "a": ver_a is not None, "b": ver_b is not None}}
+            return {
+                "error": "One or more versions not found",
+                "found": {"base": base is not None, "a": ver_a is not None, "b": ver_b is not None},
+            }
 
         diff_a = self._compute_diff(base, ver_a)
         diff_b = self._compute_diff(base, ver_b)
@@ -400,10 +424,14 @@ class AlertPolicy:
             old_owner = self._lock_owner
             self._lock_owner = None
             self._lock_expires = 0.0
-            self._add_audit("lock_expired_recovery", {
-                "old_owner": old_owner, "new_owner": owner,
-                "expired_at": self._lock_expires,
-            })
+            self._add_audit(
+                "lock_expired_recovery",
+                {
+                    "old_owner": old_owner,
+                    "new_owner": owner,
+                    "expired_at": self._lock_expires,
+                },
+            )
         self._lock_owner = owner
         self._lock_expires = now + timeout_s
         self._add_audit("lock_acquired", {"owner": owner, "timeout_s": timeout_s})
@@ -428,7 +456,9 @@ class AlertPolicy:
             "locked": self.is_locked(),
             "owner": self._lock_owner,
             "expires_at": self._lock_expires,
-            "expires_iso": datetime.fromtimestamp(self._lock_expires, tz=UTC).isoformat() if self._lock_expires else None,
+            "expires_iso": datetime.fromtimestamp(self._lock_expires, tz=UTC).isoformat()
+            if self._lock_expires
+            else None,
         }
 
     # =====================================================
@@ -504,63 +534,81 @@ class AlertPolicy:
     async def _send_webhook(self, url: str, payload: dict[str, Any]):
         """Webhook gönder (retry ile)."""
         import aiohttp
+
         last_error = None
         for attempt in range(WEBHOOK_RETRY_COUNT):
             try:
-                async with aiohttp.ClientSession() as session, session.post(
-                    url, json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.post(
+                        url,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as resp,
+                ):
                     if resp.status < 400:
-                        logger.info("Policy webhook sent", url=url, status=resp.status,
-                                   attempt=attempt + 1)
+                        logger.info("Policy webhook sent", url=url, status=resp.status, attempt=attempt + 1)
                         return True
                     else:
                         last_error = f"HTTP {resp.status}"
-                        logger.warning("Policy webhook failed", url=url, status=resp.status,
-                                     attempt=attempt + 1)
+                        logger.warning("Policy webhook failed", url=url, status=resp.status, attempt=attempt + 1)
             except Exception as e:
                 last_error = str(e)
-                logger.warning("Policy webhook error", url=url, error=str(e),
-                             attempt=attempt + 1)
+                logger.warning("Policy webhook error", url=url, error=str(e), attempt=attempt + 1)
 
             if attempt < WEBHOOK_RETRY_COUNT - 1:
                 await asyncio.sleep(WEBHOOK_RETRY_DELAY_S * (attempt + 1))
 
-        self._add_audit("webhook_failed", {"url": url, "error": last_error,
-                                           "attempts": WEBHOOK_RETRY_COUNT})
+        self._add_audit("webhook_failed", {"url": url, "error": last_error, "attempts": WEBHOOK_RETRY_COUNT})
         return False
 
     # =====================================================
     # SILENCE MANAGEMENT (DB-backed + batch)
     # =====================================================
 
-    def add_silence(self, alert_type: str = None, fingerprint: str = None,
-                    duration_s: float = 3600, reason: str = "",
-                    created_by: str = "system", db=None) -> SilenceRule:
+    def add_silence(
+        self,
+        alert_type: str = None,
+        fingerprint: str = None,
+        duration_s: float = 3600,
+        reason: str = "",
+        created_by: str = "system",
+        db=None,
+    ) -> SilenceRule:
         rule = SilenceRule(
-            alert_type=alert_type, fingerprint=fingerprint,
-            start_time=time.time(), end_time=time.time() + duration_s,
-            reason=reason, created_by=created_by,
+            alert_type=alert_type,
+            fingerprint=fingerprint,
+            start_time=time.time(),
+            end_time=time.time() + duration_s,
+            reason=reason,
+            created_by=created_by,
         )
         self.silence_rules.append(rule)
         self._cleanup_expired_silences()
-        self._add_audit("silence_add", {
-            "alert_type": alert_type, "fingerprint": fingerprint,
-            "duration_s": duration_s, "reason": reason, "created_by": created_by,
-        })
+        self._add_audit(
+            "silence_add",
+            {
+                "alert_type": alert_type,
+                "fingerprint": fingerprint,
+                "duration_s": duration_s,
+                "reason": reason,
+                "created_by": created_by,
+            },
+        )
         if db:
             self._persist_silence_to_db(rule, db)
         return rule
 
-    def batch_add_silences(self, rules_config: list[dict[str, Any]],
-                           created_by: str = "system", db=None) -> list[dict[str, Any]]:
+    def batch_add_silences(
+        self, rules_config: list[dict[str, Any]], created_by: str = "system", db=None
+    ) -> list[dict[str, Any]]:
         """Toplu susturma ekleme (transaction, batch limit ile)."""
         # Batch size limit
         if len(rules_config) > MAX_BATCH_SILENCE_SIZE:
-            return [{"success": False,
-                     "error": f"Batch size {len(rules_config)} exceeds limit {MAX_BATCH_SILENCE_SIZE}"}]
+            return [
+                {"success": False, "error": f"Batch size {len(rules_config)} exceeds limit {MAX_BATCH_SILENCE_SIZE}"}
+            ]
 
         results = []
         created_rules = []
@@ -592,14 +640,17 @@ class AlertPolicy:
                         self.silence_rules.remove(rule)
                 results = [{"success": False, "error": str(e)} for _ in rules_config]
 
-        self._add_audit("batch_silence_add", {
-            "count": len(rules_config), "created_by": created_by,
-            "success_count": sum(1 for r in results if r.get("success")),
-        })
+        self._add_audit(
+            "batch_silence_add",
+            {
+                "count": len(rules_config),
+                "created_by": created_by,
+                "success_count": sum(1 for r in results if r.get("success")),
+            },
+        )
         return results
 
-    def batch_remove_silences(self, filters: list[dict[str, str]],
-                              actor: str = "api", db=None) -> dict[str, int]:
+    def batch_remove_silences(self, filters: list[dict[str, str]], actor: str = "api", db=None) -> dict[str, int]:
         """Toplu susturma kaldırma (transaction)."""
         removed_count = 0
         removed_rules = []
@@ -607,10 +658,7 @@ class AlertPolicy:
         for f in filters:
             fp = f.get("fingerprint")
             at = f.get("alert_type")
-            to_remove = [
-                r for r in self.silence_rules
-                if (fp and r.fingerprint == fp) or (at and r.alert_type == at)
-            ]
+            to_remove = [r for r in self.silence_rules if (fp and r.fingerprint == fp) or (at and r.alert_type == at)]
             for rule in to_remove:
                 self.silence_rules.remove(rule)
                 removed_rules.append(rule)
@@ -628,27 +676,38 @@ class AlertPolicy:
                 self.silence_rules.extend(removed_rules)
                 removed_count = 0
 
-        self._add_audit("batch_silence_remove", {
-            "filters": filters, "actor": actor, "removed_count": removed_count,
-        })
+        self._add_audit(
+            "batch_silence_remove",
+            {
+                "filters": filters,
+                "actor": actor,
+                "removed_count": removed_count,
+            },
+        )
         return {"removed": removed_count}
 
-    def remove_silence(self, fingerprint: str = None, alert_type: str = None,
-                       actor: str = "api", db=None) -> int:
+    def remove_silence(self, fingerprint: str = None, alert_type: str = None, actor: str = "api", db=None) -> int:
         before = len(self.silence_rules)
-        removed_rules = [r for r in self.silence_rules
-                        if (fingerprint and r.fingerprint == fingerprint) or
-                           (alert_type and r.alert_type == alert_type)]
+        removed_rules = [
+            r
+            for r in self.silence_rules
+            if (fingerprint and r.fingerprint == fingerprint) or (alert_type and r.alert_type == alert_type)
+        ]
         self.silence_rules = [
-            r for r in self.silence_rules
-            if not ((fingerprint and r.fingerprint == fingerprint) or
-                    (alert_type and r.alert_type == alert_type))
+            r
+            for r in self.silence_rules
+            if not ((fingerprint and r.fingerprint == fingerprint) or (alert_type and r.alert_type == alert_type))
         ]
         removed = before - len(self.silence_rules)
         if removed:
-            self._add_audit("silence_remove", {
-                "fingerprint": fingerprint, "alert_type": alert_type, "actor": actor,
-            })
+            self._add_audit(
+                "silence_remove",
+                {
+                    "fingerprint": fingerprint,
+                    "alert_type": alert_type,
+                    "actor": actor,
+                },
+            )
             if db:
                 for rule in removed_rules:
                     self._remove_silence_from_db(rule, db)
@@ -664,15 +723,16 @@ class AlertPolicy:
 
     def load_silences_from_db(self, db):
         try:
-            rows = db.execute(
-                "SELECT * FROM alert_silences WHERE end_time > ?", (time.time(),)
-            ).fetchall()
+            rows = db.execute("SELECT * FROM alert_silences WHERE end_time > ?", (time.time(),)).fetchall()
             self.silence_rules = []
             for row in rows:
                 rule = SilenceRule(
-                    alert_type=row["alert_type"], fingerprint=row["fingerprint"],
-                    start_time=row["start_time"], end_time=row["end_time"],
-                    reason=row["reason"] or "", created_by=row["created_by"] or "system",
+                    alert_type=row["alert_type"],
+                    fingerprint=row["fingerprint"],
+                    start_time=row["start_time"],
+                    end_time=row["end_time"],
+                    reason=row["reason"] or "",
+                    created_by=row["created_by"] or "system",
                     created_at=row["created_at"] or time.time(),
                 )
                 self.silence_rules.append(rule)
@@ -685,8 +745,15 @@ class AlertPolicy:
                 "INSERT OR IGNORE INTO alert_silences "
                 "(alert_type, fingerprint, start_time, end_time, reason, created_by, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (rule.alert_type, rule.fingerprint, rule.start_time, rule.end_time,
-                 rule.reason, rule.created_by, rule.created_at)
+                (
+                    rule.alert_type,
+                    rule.fingerprint,
+                    rule.start_time,
+                    rule.end_time,
+                    rule.reason,
+                    rule.created_by,
+                    rule.created_at,
+                ),
             )
         except Exception as e:
             logger.warning("Silence DB persist failed", error=str(e))
@@ -740,20 +807,26 @@ class AlertPolicy:
     # =====================================================
 
     def _save_history(self):
-        self._history.append({
-            "version": self._version, "timestamp": time.time(),
-            "escalation_timeouts": dict(self.escalation_timeouts),
-            "notification_routing": dict(self.notification_routing),
-            "severity_thresholds": dict(self.severity_thresholds),
-        })
+        self._history.append(
+            {
+                "version": self._version,
+                "timestamp": time.time(),
+                "escalation_timeouts": dict(self.escalation_timeouts),
+                "notification_routing": dict(self.notification_routing),
+                "severity_thresholds": dict(self.severity_thresholds),
+            }
+        )
         if len(self._history) > 50:
             self._history = self._history[-50:]
 
     def _add_audit(self, action: str, details: dict[str, Any], diff: PolicyDiff = None):
         entry = PolicyAuditEntry(
-            timestamp=time.time(), action=action,
-            version=self._version, actor=details.get("actor", "system"),
-            details=details, diff=diff.to_dict() if diff else None,
+            timestamp=time.time(),
+            action=action,
+            version=self._version,
+            actor=details.get("actor", "system"),
+            details=details,
+            diff=diff.to_dict() if diff else None,
         )
         self._audit_log.append(entry)
         if len(self._audit_log) > 500:

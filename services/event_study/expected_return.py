@@ -10,6 +10,7 @@ v2.0 Yenilikler:
 - Newey-West HAC standard errors (otokorelasyon düzeltmesi)
 - Factor verisi yoksa otomatik fallback (Market Model)
 """
+
 from typing import Literal
 
 import numpy as np
@@ -55,13 +56,21 @@ def calculate_expected_return(
     try:
         if model == "fama_french_3":
             return _fama_french_3(
-                stock_returns, market_returns, smb_returns, hml_returns,
+                stock_returns,
+                market_returns,
+                smb_returns,
+                hml_returns,
                 hac_lags=hac_lags,
             )
         elif model == "fama_french_5":
             return _fama_french_5(
-                stock_returns, market_returns, smb_returns, hml_returns,
-                rmw_returns, cma_returns, hac_lags=hac_lags,
+                stock_returns,
+                market_returns,
+                smb_returns,
+                hml_returns,
+                rmw_returns,
+                cma_returns,
+                hac_lags=hac_lags,
             )
         else:
             return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
@@ -71,7 +80,9 @@ def calculate_expected_return(
 
 
 def _market_model(
-    stock_returns: np.ndarray, market_returns: np.ndarray, hac_lags: int = 0,
+    stock_returns: np.ndarray,
+    market_returns: np.ndarray,
+    hac_lags: int = 0,
 ) -> dict[str, float]:
     """Basit Market Model: E[R] = α + β × R_m."""
     X = np.column_stack([np.ones(len(market_returns)), market_returns])
@@ -125,12 +136,14 @@ def _fama_french_3(
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
 
     n = min(len(stock_returns), len(market_returns), len(smb_returns), len(hml_returns))
-    X = np.column_stack([
-        np.ones(n),
-        market_returns[:n],
-        smb_returns[:n],
-        hml_returns[:n],
-    ])
+    X = np.column_stack(
+        [
+            np.ones(n),
+            market_returns[:n],
+            smb_returns[:n],
+            hml_returns[:n],
+        ]
+    )
     y = stock_returns[:n]
 
     betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
@@ -178,23 +191,26 @@ def _fama_french_5(
     if smb_returns is None or hml_returns is None:
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
     if rmw_returns is None or cma_returns is None:
-        return _fama_french_3(
-            stock_returns, market_returns, smb_returns, hml_returns, hac_lags=hac_lags
-        )
+        return _fama_french_3(stock_returns, market_returns, smb_returns, hml_returns, hac_lags=hac_lags)
 
     n = min(
-        len(stock_returns), len(market_returns),
-        len(smb_returns), len(hml_returns),
-        len(rmw_returns), len(cma_returns),
+        len(stock_returns),
+        len(market_returns),
+        len(smb_returns),
+        len(hml_returns),
+        len(rmw_returns),
+        len(cma_returns),
     )
-    X = np.column_stack([
-        np.ones(n),
-        market_returns[:n],
-        smb_returns[:n],
-        hml_returns[:n],
-        rmw_returns[:n],
-        cma_returns[:n],
-    ])
+    X = np.column_stack(
+        [
+            np.ones(n),
+            market_returns[:n],
+            smb_returns[:n],
+            hml_returns[:n],
+            rmw_returns[:n],
+            cma_returns[:n],
+        ]
+    )
     y = stock_returns[:n]
 
     betas, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
@@ -229,9 +245,7 @@ def _fama_french_5(
     return result
 
 
-def _newey_west_se(
-    X: np.ndarray, residuals: np.ndarray, lags: int
-) -> dict[str, float]:
+def _newey_west_se(X: np.ndarray, residuals: np.ndarray, lags: int) -> dict[str, float]:
     """Newey-West HAC (Heteroskedasticity and Autocorrelation Consistent) standard errors.
 
     Otokorelasyon ve heteroskedastisite olduğunda OLS standard errors bias'lıdır.
@@ -326,9 +340,7 @@ def _default_params(model: ModelType) -> dict[str, float]:
 
 
 # Backward compatibility — eski API
-def calculate_expected_return_simple(
-    stock_returns: np.ndarray, market_returns: np.ndarray
-) -> tuple[float, float]:
+def calculate_expected_return_simple(stock_returns: np.ndarray, market_returns: np.ndarray) -> tuple[float, float]:
     """Eski API uyumluluğu — (alpha, beta) döndür."""
     result = calculate_expected_return(stock_returns, market_returns, model="market")
     return result["alpha"], result["beta_market"]

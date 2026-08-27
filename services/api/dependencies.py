@@ -120,6 +120,7 @@ async def check_rate_limit(
 
 async def require_role(required_roles: list[Role]):
     """Belirli roller gerektiren dependency."""
+
     async def checker(
         user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
@@ -130,12 +131,14 @@ async def require_role(required_roles: list[Role]):
                 detail=f"Required roles: {[r.value for r in required_roles]}",
             )
         return user
+
     return checker
 
 
 async def get_service_orchestrator():
     """Orchestrator servisini getir."""
     from services.core.orchestrator import MasterOrchestrator
+
     orch = MasterOrchestrator()
     if not orch._initialized:
         await orch.initialize()

@@ -70,7 +70,9 @@ def test_portfolio_enhancements():
     assert "allocation_effect" in result
     assert "selection_effect" in result
     passed += 1
-    print(f"  ✓ Attribution: allocation={result['allocation_effect']:.2f}%, selection={result['selection_effect']:.2f}%")
+    print(
+        f"  ✓ Attribution: allocation={result['allocation_effect']:.2f}%, selection={result['selection_effect']:.2f}%"
+    )
 
     # 7. Multi-currency
     try_amount = multi_currency.convert(1000, "USD", "TRY")
@@ -110,18 +112,14 @@ def test_universe_enhancements():
     print(f"  ✓ Listing status: {status}")
 
     # 3. Cross-source reconciliation
-    result = cross_source_reconciliation.reconcile_price(
-        {"yfinance": 305.25, "kap": 305.30, "matriks": 305.20}
-    )
+    result = cross_source_reconciliation.reconcile_price({"yfinance": 305.25, "kap": 305.30, "matriks": 305.20})
     assert result["status"] == "CONSISTENT"
     assert result["consensus_price"] > 0
     passed += 1
     print(f"  ✓ Reconciliation: {result['status']}, price={result['consensus_price']:.2f}")
 
     # 4. Reconciliation with conflict
-    result2 = cross_source_reconciliation.reconcile_price(
-        {"yfinance": 305.25, "kap": 350.00}
-    )
+    result2 = cross_source_reconciliation.reconcile_price({"yfinance": 305.25, "kap": 350.00})
     assert result2["status"] in ["MINOR_CONFLICT", "MAJOR_CONFLICT"]
     passed += 1
     print(f"  ✓ Conflict detection: {result2['status']}")
@@ -213,7 +211,7 @@ def test_security():
     print("  ✓ Admin has all permissions")
 
     # 7. Secret redaction
-    text = 'API_KEY=ghp_abc123def456 and Bearer sk-proj-xyz789'
+    text = "API_KEY=ghp_abc123def456 and Bearer sk-proj-xyz789"
     redacted = secret_redaction.redact(text)
     assert "ghp_abc123" not in redacted
     assert "sk-proj-xyz789" not in redacted
@@ -263,6 +261,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

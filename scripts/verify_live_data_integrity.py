@@ -9,9 +9,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 os.environ.setdefault("JWT_SECRET", "alpha-bist-test-secret-key-32-chars-minimum")
+
 
 async def audit_all_live_data():
     print("=" * 85)
@@ -20,15 +21,17 @@ async def audit_all_live_data():
 
     # 1. Canlı KAP ve Finans Haberleri
     from services.ingestion.providers.news_provider import news_provider
+
     news = await news_provider.fetch_financial_news_rss(max_items=5)
     print("\n[1. KAYNAK: KAP & Finans Haberleri]")
     print("  • Veri Türü: Canlı RSS / Web Feed (Dinamik)")
     if news:
-        print(f"  • Alınan Son Haber: \"{news[0].get('title', '')}\"")
+        print(f'  • Alınan Son Haber: "{news[0].get("title", "")}"')
         print(f"  • Kaynak: {news[0].get('source', '')} | Eşleşen Hisse: {news[0].get('matched_ticker')}")
 
     # 2. Canlı Küresel Makro
     from services.ingestion.providers.macro_provider import MacroProvider
+
     macro = await MacroProvider().fetch_yahoo_macro()
     print("\n[2. KAYNAK: Küresel Makro & Emtialar]")
     print("  • Veri Türü: Canlı Borsa & FX Verisi (Dinamik)")
@@ -39,6 +42,7 @@ async def audit_all_live_data():
 
     # 3. Canlı BIST Fiyatları ve BIST Evreni
     from services.ingestion.bist_universe import bist_universe
+
     tickers = bist_universe.get_tickers()
     print("\n[3. KAYNAK: BIST Hisse Evreni]")
     print("  • Veri Türü: Dinamik BIST Hisseleri Listesi")
@@ -48,6 +52,7 @@ async def audit_all_live_data():
 
     # 4. Canlı Temel Analiz Verileri
     from services.ingestion.providers.fundamental_provider import FundamentalProvider
+
     fund = await FundamentalProvider().fetch_fundamentals("THYAO")
     print("\n[4. KAYNAK: Canlı Şirket Rasyoları (THYAO)]")
     print(f"  • F/K (P/E): {fund.get('pe_ratio')}")
@@ -58,6 +63,7 @@ async def audit_all_live_data():
     print("SONUÇ: HİÇBİR VERİ ELLE YAZILMIŞ (STATİK/MOCK) DEĞİLDİR.")
     print("TÜMÜ CANLI SAĞLAYICILARDAN DİNAMİK OLARAK ANLIK ÇEKİLMEKTEDİR.")
     print("=" * 85)
+
 
 if __name__ == "__main__":
     asyncio.run(audit_all_live_data())

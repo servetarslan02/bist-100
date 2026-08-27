@@ -3,6 +3,7 @@
 IC, Precision@K, Hit Rate, Sharpe Ratio, Max Drawdown, Calibration Score.
 Faz 2 gereksinimleri: kapsamlı model karşılaştırma.
 """
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -16,17 +17,18 @@ logger = structlog.get_logger()
 @dataclass
 class ModelResult:
     """Model karşılaştırma sonucu."""
+
     name: str
     accuracy: float = 0.0
     precision: float = 0.0
     recall: float = 0.0
     f1: float = 0.0
-    ic: float = 0.0               # Information Coefficient (Spearman correlation)
-    precision_at_k: float = 0.0   # Top-K'taki isabet oranı
-    hit_rate: float = 0.0         # Yön doğruluğu
-    sharpe_ratio: float = 0.0     # Risk-ayarlı getiri
-    max_drawdown: float = 0.0     # Maksimum düşüş
-    calibration_score: float = 0.0 # Brier score (düşük = iyi)
+    ic: float = 0.0  # Information Coefficient (Spearman correlation)
+    precision_at_k: float = 0.0  # Top-K'taki isabet oranı
+    hit_rate: float = 0.0  # Yön doğruluğu
+    sharpe_ratio: float = 0.0  # Risk-ayarlı getiri
+    max_drawdown: float = 0.0  # Maksimum düşüş
+    calibration_score: float = 0.0  # Brier score (düşük = iyi)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -141,6 +143,7 @@ class ModelComparator:
         if len(np.unique(preds)) > 1 and len(np.unique(y_test)) > 1:
             try:
                 from scipy.stats import spearmanr
+
                 ic_val, _ = spearmanr(preds, y_test)
                 ic = float(ic_val) if not np.isnan(ic_val) else 0.0
             except Exception:
@@ -260,6 +263,7 @@ class ModelComparator:
         """Brier score — kalibrasyon kalitesi (düşük = iyi)."""
         try:
             from sklearn.metrics import brier_score_loss
+
             return float(brier_score_loss(y_true, y_prob))
         except Exception:
             return 0.5  # Varsayılan: kötü kalibrasyon

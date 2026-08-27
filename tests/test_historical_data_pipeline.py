@@ -21,94 +21,122 @@ def _make_repo_with_fixtures():
 
     # === FUNDAMENTAL SNAPSHOTS ===
     # THYAO Q2 2025 — açıklandı 2025-08-14
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO",
-        period_end="2025-06-30",
-        available_at="2025-08-14",
-        values={
-            "pe_ratio": 8.5, "pb_ratio": 1.2, "roe": 0.18,
-            "profit_margin": 0.14, "fcf_yield": 0.06,
-            "free_cash_flow": 5e9, "revenue": 60e9, "market_cap": 200e9,
-            "total_assets": 100e9, "debt_to_equity": 0.3,
-            "current_ratio": 2.5, "roa": 0.10,
-        },
-        source="yfinance",
-        status="FRESH",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-06-30",
+            available_at="2025-08-14",
+            values={
+                "pe_ratio": 8.5,
+                "pb_ratio": 1.2,
+                "roe": 0.18,
+                "profit_margin": 0.14,
+                "fcf_yield": 0.06,
+                "free_cash_flow": 5e9,
+                "revenue": 60e9,
+                "market_cap": 200e9,
+                "total_assets": 100e9,
+                "debt_to_equity": 0.3,
+                "current_ratio": 2.5,
+                "roa": 0.10,
+            },
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     # THYAO Q1 2025 — açıklandı 2025-05-10
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO",
-        period_end="2025-03-31",
-        available_at="2025-05-10",
-        values={
-            "pe_ratio": 9.0, "pb_ratio": 1.3, "roe": 0.16,
-            "profit_margin": 0.12, "fcf_yield": 0.05,
-            "free_cash_flow": 4e9, "revenue": 55e9, "market_cap": 190e9,
-            "total_assets": 95e9, "debt_to_equity": 0.35,
-            "current_ratio": 2.3, "roa": 0.09,
-        },
-        source="yfinance",
-        status="FRESH",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2025-03-31",
+            available_at="2025-05-10",
+            values={
+                "pe_ratio": 9.0,
+                "pb_ratio": 1.3,
+                "roe": 0.16,
+                "profit_margin": 0.12,
+                "fcf_yield": 0.05,
+                "free_cash_flow": 4e9,
+                "revenue": 55e9,
+                "market_cap": 190e9,
+                "total_assets": 95e9,
+                "debt_to_equity": 0.35,
+                "current_ratio": 2.3,
+                "roa": 0.09,
+            },
+            source="yfinance",
+            status="FRESH",
+        )
+    )
 
     # === KAP EVENTS ===
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="KAP-001",
-        ticker="THYAO",
-        published_at="2025-08-10T10:00:00",
-        event_type="FINANCIAL_REPORT",
-        title="2025 Q2 Finansal Rapor Açıklandı",
-        sentiment=0.5,
-        importance=1.0,
-        source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="KAP-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="2025 Q2 Finansal Rapor Açıklandı",
+            sentiment=0.5,
+            importance=1.0,
+            source="kap",
+        )
+    )
 
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="KAP-002",
-        ticker="THYAO",
-        published_at="2025-07-15T14:00:00",
-        event_type="DIVIDEND",
-        title="Temettü Dağıtım Kararı",
-        sentiment=0.3,
-        importance=0.8,
-        source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="KAP-002",
+            ticker="THYAO",
+            published_at="2025-07-15T14:00:00",
+            event_type="DIVIDEND",
+            title="Temettü Dağıtım Kararı",
+            sentiment=0.3,
+            importance=0.8,
+            source="kap",
+        )
+    )
 
     # === NEWS EVENTS ===
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="NEWS-001",
-        ticker="THYAO",
-        published_at="2025-08-12T08:30:00",
-        event_type="NEWS",
-        title="THYAO Yeni Hat Açıkladı",
-        sentiment=0.4,
-        importance=0.6,
-        source="news",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="NEWS-001",
+            ticker="THYAO",
+            published_at="2025-08-12T08:30:00",
+            event_type="NEWS",
+            title="THYAO Yeni Hat Açıkladı",
+            sentiment=0.4,
+            importance=0.6,
+            source="news",
+        )
+    )
 
     # === CATALYST SNAPSHOTS ===
     # Açıklandı 2025-08-10, gerçekleşecek 2025-08-20
-    repo.add_catalyst_snapshot(CatalystSnapshot(
-        event_id="CAT-001",
-        ticker="THYAO",
-        announcement_date="2025-08-10",
-        event_date="2025-08-20",
-        catalyst_type="EARNINGS",
-        importance=0.9,
-        source="kap",
-    ))
+    repo.add_catalyst_snapshot(
+        CatalystSnapshot(
+            event_id="CAT-001",
+            ticker="THYAO",
+            announcement_date="2025-08-10",
+            event_date="2025-08-20",
+            catalyst_type="EARNINGS",
+            importance=0.9,
+            source="kap",
+        )
+    )
 
     # Açıklandı 2025-07-01, gerçekleşti 2025-07-15
-    repo.add_catalyst_snapshot(CatalystSnapshot(
-        event_id="CAT-002",
-        ticker="THYAO",
-        announcement_date="2025-07-01",
-        event_date="2025-07-15",
-        catalyst_type="DIVIDEND_DATE",
-        importance=0.6,
-        source="kap",
-    ))
+    repo.add_catalyst_snapshot(
+        CatalystSnapshot(
+            event_id="CAT-002",
+            ticker="THYAO",
+            announcement_date="2025-07-01",
+            event_date="2025-07-15",
+            catalyst_type="DIVIDEND_DATE",
+            importance=0.6,
+            source="kap",
+        )
+    )
 
     return repo
 
@@ -117,9 +145,11 @@ def _make_repo_with_fixtures():
 # 1. FUNDAMENTAL PUBLICATION PIT
 # =====================================================
 
+
 def test_fundamental_publication_pit():
     """Fundamental veri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -147,9 +177,11 @@ def test_fundamental_publication_pit():
 # 2. FUNDAMENTAL PERIOD SELECTION
 # =====================================================
 
+
 def test_fundamental_period_selection():
     """Birden fazla snapshot varsa en güncel olanı seçilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -176,9 +208,11 @@ def test_fundamental_period_selection():
 # 3. FUNDAMENTAL FUTURE REJECTION
 # =====================================================
 
+
 def test_fundamental_future_rejection():
     """Gelecekteki fundamental veri reddedilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -196,9 +230,11 @@ def test_fundamental_future_rejection():
 # 4. FUNDAMENTAL LATEST-KNOWN SNAPSHOT
 # =====================================================
 
+
 def test_fundamental_latest_known():
     """En son bilinen snapshot kullanılmalı (eksik dönem olsa bile)."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -218,9 +254,11 @@ def test_fundamental_latest_known():
 # 5. KAP PUBLICATION PIT
 # =====================================================
 
+
 def test_kap_publication_pit():
     """KAP event'leri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -245,23 +283,27 @@ def test_kap_publication_pit():
 # 6. KAP DUPLICATE EVENT
 # =====================================================
 
+
 def test_kap_duplicate_event():
     """Aynı KAP event'i tekrar eklenmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
+
     issues = []
 
     repo = InMemoryHistoricalRepository()
     # Aynı event'i iki kez ekle
     for _ in range(2):
-        repo.add_event_snapshot(EventSnapshot(
-            event_id="KAP-DUP",
-            ticker="THYAO",
-            published_at="2025-08-10T10:00:00",
-            event_type="FINANCIAL_REPORT",
-            title="Test",
-            source="kap",
-        ))
+        repo.add_event_snapshot(
+            EventSnapshot(
+                event_id="KAP-DUP",
+                ticker="THYAO",
+                published_at="2025-08-10T10:00:00",
+                event_type="FINANCIAL_REPORT",
+                title="Test",
+                source="kap",
+            )
+        )
 
     adapter = HistoricalDataAdapter(repo)
     events = adapter.get_kap_events("THYAO", "2025-08-15")
@@ -279,9 +321,11 @@ def test_kap_duplicate_event():
 # 7. KAP TICKER VALIDATION
 # =====================================================
 
+
 def test_kap_ticker_validation():
     """KAP event'leri doğru ticker ile eşleşmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -305,9 +349,11 @@ def test_kap_ticker_validation():
 # 8. NEWS PUBLICATION PIT
 # =====================================================
 
+
 def test_news_publication_pit():
     """Haber event'leri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -332,9 +378,11 @@ def test_news_publication_pit():
 # 9. NEWS TICKER MATCHING
 # =====================================================
 
+
 def test_news_ticker_matching():
     """Haberler doğru ticker ile eşleşmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -352,22 +400,26 @@ def test_news_ticker_matching():
 # 10. NEWS DUPLICATE EVENT
 # =====================================================
 
+
 def test_news_duplicate_event():
     """Aynı haber tekrar eklenmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
+
     issues = []
 
     repo = InMemoryHistoricalRepository()
     for _ in range(2):
-        repo.add_event_snapshot(EventSnapshot(
-            event_id="NEWS-DUP",
-            ticker="THYAO",
-            published_at="2025-08-10T08:00:00",
-            event_type="NEWS",
-            title="Duplicate Test",
-            source="news",
-        ))
+        repo.add_event_snapshot(
+            EventSnapshot(
+                event_id="NEWS-DUP",
+                ticker="THYAO",
+                published_at="2025-08-10T08:00:00",
+                event_type="NEWS",
+                title="Duplicate Test",
+                source="news",
+            )
+        )
 
     adapter = HistoricalDataAdapter(repo)
     news = adapter.get_news_events("THYAO", "2025-08-15")
@@ -382,9 +434,11 @@ def test_news_duplicate_event():
 # 11. SENTIMENT DETERMINISTIC
 # =====================================================
 
+
 def test_sentiment_deterministic():
     """Aynı event'ler → aynı sentiment (deterministic)."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -407,9 +461,11 @@ def test_sentiment_deterministic():
 # 12. CATALYST ANNOUNCEMENT PIT
 # =====================================================
 
+
 def test_catalyst_announcement_pit():
     """Catalyst sadece announcement tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -434,9 +490,11 @@ def test_catalyst_announcement_pit():
 # 13. CATALYST FUTURE REJECTION
 # =====================================================
 
+
 def test_catalyst_future_rejection():
     """Gelecekteki announcement reddedilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -454,9 +512,11 @@ def test_catalyst_future_rejection():
 # 14. HISTORICAL SNAPSHOT DETERMINISTIC
 # =====================================================
 
+
 def test_historical_snapshot_deterministic():
     """Aynı snapshot → aynı feature (deterministic)."""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -476,23 +536,27 @@ def test_historical_snapshot_deterministic():
 # 15. FUTURE MUTATION INVARIANCE
 # =====================================================
 
+
 def test_future_mutation_invariance():
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
+
     issues = []
 
     repo = InMemoryHistoricalRepository()
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="EVT-001",
-        ticker="THYAO",
-        published_at="2025-08-10T10:00:00",
-        event_type="FINANCIAL_REPORT",
-        title="Q2 Report",
-        sentiment=0.5,
-        importance=1.0,
-        source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="EVT-001",
+            ticker="THYAO",
+            published_at="2025-08-10T10:00:00",
+            event_type="FINANCIAL_REPORT",
+            title="Q2 Report",
+            sentiment=0.5,
+            importance=1.0,
+            source="kap",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
 
@@ -500,14 +564,16 @@ def test_future_mutation_invariance():
     events_before = adapter.get_kap_events("THYAO", "2025-08-05")
 
     # Gelecekteki event ekle
-    repo.add_event_snapshot(EventSnapshot(
-        event_id="EVT-FUTURE",
-        ticker="THYAO",
-        published_at="2025-09-01T10:00:00",
-        event_type="DIVIDEND",
-        title="Future Event",
-        source="kap",
-    ))
+    repo.add_event_snapshot(
+        EventSnapshot(
+            event_id="EVT-FUTURE",
+            ticker="THYAO",
+            published_at="2025-09-01T10:00:00",
+            event_type="DIVIDEND",
+            title="Future Event",
+            source="kap",
+        )
+    )
 
     # 2025-08-05 snapshot hâlâ aynı olmalı
     events_after = adapter.get_kap_events("THYAO", "2025-08-05")
@@ -522,10 +588,12 @@ def test_future_mutation_invariance():
 # 16. MISSING DATA BEHAVIOR
 # =====================================================
 
+
 def test_missing_data_behavior():
     """Eksik veri durumunda boş dict dönmeli (50 ile doldurma)."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import InMemoryHistoricalRepository
+
     issues = []
 
     repo = InMemoryHistoricalRepository()
@@ -542,21 +610,25 @@ def test_missing_data_behavior():
 # 17. STALE DATA BEHAVIOR
 # =====================================================
 
+
 def test_stale_data_behavior():
     """Eski veri STALE olarak işaretlenmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import FundamentalSnapshot, InMemoryHistoricalRepository
+
     issues = []
 
     repo = InMemoryHistoricalRepository()
-    repo.add_fundamental_snapshot(FundamentalSnapshot(
-        ticker="THYAO",
-        period_end="2024-03-31",
-        available_at="2024-05-10",
-        values={"pe_ratio": 10.0},
-        source="yfinance",
-        status="STALE",
-    ))
+    repo.add_fundamental_snapshot(
+        FundamentalSnapshot(
+            ticker="THYAO",
+            period_end="2024-03-31",
+            available_at="2024-05-10",
+            values={"pe_ratio": 10.0},
+            source="yfinance",
+            status="STALE",
+        )
+    )
 
     adapter = HistoricalDataAdapter(repo)
     feats = adapter.get_fundamental_features("THYAO", "2025-01-01")
@@ -572,9 +644,11 @@ def test_stale_data_behavior():
 # 18. COMPLETE HISTORICAL SNAPSHOT
 # =====================================================
 
+
 def test_complete_historical_snapshot():
     """Tam historical snapshot çalışıyor mu?"""
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -609,10 +683,12 @@ def test_complete_historical_snapshot():
 # 19-21. CANONICAL SCORE INTEGRATION
 # =====================================================
 
+
 def test_canonical_fundamental_score():
     """Historical fundamental veri canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -638,6 +714,7 @@ def test_canonical_news_score():
     """Historical news sentiment canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -665,6 +742,7 @@ def test_canonical_catalyst_score():
     """Historical catalyst canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
+
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -690,6 +768,7 @@ def test_canonical_catalyst_score():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -736,6 +815,7 @@ def run_all():
         except Exception as e:
             name, ok, issues = test_func.__name__, False, [f"Exception: {e}"]
             import traceback
+
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"

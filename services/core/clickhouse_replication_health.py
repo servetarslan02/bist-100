@@ -61,13 +61,9 @@ def check_replication_health() -> dict:
                         f"{replica_info['table']}: Replikasyon gecikmesi {replica_info['absolute_delay']}s"
                     )
                 if replica_info["is_readonly"]:
-                    health["errors"].append(
-                        f"{replica_info['table']}: Salt-okunur modda"
-                    )
+                    health["errors"].append(f"{replica_info['table']}: Salt-okunur modda")
                 if replica_info["queue_size"] > 100:
-                    health["errors"].append(
-                        f"{replica_info['table']}: Kuyruk boyutu {replica_info['queue_size']}"
-                    )
+                    health["errors"].append(f"{replica_info['table']}: Kuyruk boyutu {replica_info['queue_size']}")
 
             if not health["errors"]:
                 health["status"] = "healthy"
@@ -104,5 +100,6 @@ def get_replication_metrics() -> dict:
 
 if __name__ == "__main__":
     import orjson
+
     health = check_replication_health()
     print(orjson.dumps(health, option=orjson.OPT_INDENT_2).decode())

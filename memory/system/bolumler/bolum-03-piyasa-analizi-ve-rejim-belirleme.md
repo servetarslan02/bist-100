@@ -52,12 +52,12 @@ Anomali Kontrolü → MARKET REGIME
 from services.intelligence.regime import regime_engine
 
 features = {
-    "breadth_pct": 72,        # %72 hisse yükseliyor
-    "momentum_avg": 5.0,      # Ortalama momentum pozitif
-    "volatility_avg": 18,     # Düşük volatilite
-    "rsi_avg": 62,            # RSI ortalaması
-    "risk_appetite": 0.7,     # Yüksek risk iştahı
-    "vix_level": 14,          # Düşük VIX
+    "breadth_pct": 72,  # %72 hisse yükseliyor
+    "momentum_avg": 5.0,  # Ortalama momentum pozitif
+    "volatility_avg": 18,  # Düşük volatilite
+    "rsi_avg": 62,  # RSI ortalaması
+    "risk_appetite": 0.7,  # Yüksek risk iştahı
+    "vix_level": 14,  # Düşük VIX
 }
 
 result = regime_engine.detect_regime(features)
@@ -83,8 +83,10 @@ from services.features.cross_sectional import CrossSectionalEngine
 
 engine = CrossSectionalEngine()
 universe = {
-    "THYAO": {"return_1d": 2.0}, "ASELS": {"return_1d": -1.5},
-    "GARAN": {"return_1d": 1.0}, "AKBNK": {"return_1d": -0.5},
+    "THYAO": {"return_1d": 2.0},
+    "ASELS": {"return_1d": -1.5},
+    "GARAN": {"return_1d": 1.0},
+    "AKBNK": {"return_1d": -0.5},
 }
 breadth = engine.compute_market_breadth_features(universe)
 # market_breadth: 0.6 (3 yükselen / 5 toplam)
@@ -133,7 +135,9 @@ from services.features.seven_motors import RelativeStrengthMotor
 
 motor = RelativeStrengthMotor()
 features = motor.compute(
-    "THYAO", stock_close, benchmark_close,
+    "THYAO",
+    stock_close,
+    benchmark_close,
     sector_close=sector_close,
     peer_closes={"ASELS": asels_close, "PGSUS": pgsus_close},
 )
@@ -204,8 +208,8 @@ def compute_tcmb_regime(tcmb_data):
 ### USDTRY volatilitesi:
 ```python
 def compute_fx_regime(usdtry_data):
-    vol_20d = usdtry_data.pct_change().rolling(20).std() * (252 ** 0.5)
-    
+    vol_20d = usdtry_data.pct_change().rolling(20).std() * (252**0.5)
+
     if vol_20d > 0.30:
         return "HIGH_VOLATILITY"
     elif vol_20d > 0.15:
@@ -234,9 +238,11 @@ Bu bölümün rejim tespiti, Bölüm 24'teki 63 feature'dan girdi alır:
 
 ```python
 from services.features.technical_features import (
-    compute_trend_features, compute_momentum_features,
-    compute_volatility_features, compute_volume_features,
-    compute_bist_specific_features
+    compute_trend_features,
+    compute_momentum_features,
+    compute_volatility_features,
+    compute_volume_features,
+    compute_bist_specific_features,
 )
 
 features = {

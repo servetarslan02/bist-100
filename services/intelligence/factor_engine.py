@@ -23,19 +23,21 @@ logger = structlog.get_logger()
 @dataclass
 class FactorScore:
     """Faktör skoru."""
+
     ticker: str
-    value_score: float = 0.0       # 0-100
-    momentum_score: float = 0.0    # 0-100
-    quality_score: float = 0.0     # 0-100
-    size_score: float = 0.0        # 0-100
-    low_vol_score: float = 0.0     # 0-100
-    composite_score: float = 0.0   # Ağırlıklı toplam
+    value_score: float = 0.0  # 0-100
+    momentum_score: float = 0.0  # 0-100
+    quality_score: float = 0.0  # 0-100
+    size_score: float = 0.0  # 0-100
+    low_vol_score: float = 0.0  # 0-100
+    composite_score: float = 0.0  # Ağırlıklı toplam
 
 
 @dataclass
 class FactorExposure:
     """Portföy faktör maruziyeti."""
-    value_exposure: float = 0.0    # -1 (short) ile +1 (long) arası
+
+    value_exposure: float = 0.0  # -1 (short) ile +1 (long) arası
     momentum_exposure: float = 0.0
     quality_exposure: float = 0.0
     size_exposure: float = 0.0
@@ -268,7 +270,7 @@ class FactorEngine:
 
         # Concentration risk (HHI)
         weights = [p.get("value", 0) / total_value for p in positions if total_value > 0]
-        exposure.concentration_risk = sum(w ** 2 for w in weights)
+        exposure.concentration_risk = sum(w**2 for w in weights)
 
         return exposure
 
@@ -287,6 +289,7 @@ def compute_financial_scores(financials: dict[str, Any]) -> dict[str, Any]:
         from services.factors.altman import calculate_z_score
         from services.factors.beneish import calculate_m_score
         from services.factors.piotroski import calculate_f_score
+
         f_result = calculate_f_score(financials)
         m_result = calculate_m_score(financials)
         z_result = calculate_z_score(financials)

@@ -4,6 +4,7 @@ XGBoost entegrasyonu — custom adjusted loss, multi-horizon prediction,
 walk-forward entegrasyonu, SHAP feature importance, regime-aware training,
 overfitting detection, feature interaction.
 """
+
 import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -18,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class XGBoostConfig:
     """XGBoost model konfigürasyonu."""
+
     max_depth: int = 6
     learning_rate: float = 0.1
     n_estimators: int = 200
@@ -36,9 +38,9 @@ class XGBoostConfig:
     target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20, 60])
     # Regime-aware
     regime_aware: bool = False
-    regime_weights: dict[str, float] = field(default_factory=lambda: {
-        "BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0
-    })
+    regime_weights: dict[str, float] = field(
+        default_factory=lambda: {"BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0}
+    )
     # Custom loss
     use_adjusted_loss: bool = False
     wrong_direction_penalty: float = 11.0
@@ -227,9 +229,12 @@ class XGBoostModel:
             y_val = y_val_dict.get(horizon) if y_val_dict else None
 
             metrics = self.train(
-                X_train=X_train, y_train=y_train,
-                X_val=X_val, y_val=y_val,
-                feature_names=feature_names, horizon=horizon,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                feature_names=feature_names,
+                horizon=horizon,
             )
             all_metrics[horizon] = metrics
 
@@ -248,6 +253,7 @@ class XGBoostModel:
 
         try:
             import xgboost as xgb
+
             if isinstance(model, xgb.Booster):
                 dmat = xgb.DMatrix(X, feature_names=self._feature_names)
                 preds = model.predict(dmat)
@@ -290,6 +296,7 @@ class XGBoostModel:
 
         try:
             import xgboost as xgb
+
             if isinstance(model, xgb.Booster):
                 importance = model.get_score(importance_type=importance_type)
                 if self._feature_names:
@@ -312,6 +319,7 @@ class XGBoostModel:
         try:
             import shap
             import xgboost as xgb
+
             if isinstance(model, xgb.Booster):
                 dmat = xgb.DMatrix(X, feature_names=self._feature_names)
                 explainer = shap.TreeExplainer(model)
@@ -381,10 +389,15 @@ class XGBoostModel:
         if model is not None:
             try:
                 import xgboost as xgb
+
                 if isinstance(model, xgb.Booster):
-                    metrics["best_iteration"] = model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
+                    metrics["best_iteration"] = (
+                        model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
+                    )
                 else:
-                    metrics["best_iteration"] = model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
+                    metrics["best_iteration"] = (
+                        model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
+                    )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="xgboost_model.py:388")
 
@@ -393,6 +406,7 @@ class XGBoostModel:
 
             if is_classifier:
                 from sklearn.metrics import accuracy_score, roc_auc_score
+
                 try:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
@@ -400,6 +414,7 @@ class XGBoostModel:
                     logger.debug("Handled exception", error=str(e), context="xgboost_model.py:399")
             else:
                 from sklearn.metrics import mean_absolute_error, mean_squared_error
+
                 try:
                     metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val, val_pred))), 6)
                     metrics["val_mae"] = round(float(mean_absolute_error(y_val, val_pred)), 6)
@@ -424,6 +439,7 @@ class XGBoostModel:
         try:
             import shap
             import xgboost as xgb
+
             if isinstance(model, xgb.Booster):
                 dmat = xgb.DMatrix(X, feature_names=feature_names)
                 explainer = shap.TreeExplainer(model)
@@ -474,16 +490,20 @@ class XGBoostModel:
             return False
         try:
             from services.core.safe_pickle import safe_pickle_dump
+
             os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
-            safe_pickle_dump({
-                "models": self._models,
-                "config": self._config,
-                "metrics": self._training_metrics,
-                "feature_names": self._feature_names,
-                "shap_values": self._shap_values,
-                "feature_importance_cache": self._feature_importance_cache,
-                "saved_at": datetime.now(UTC).isoformat(),
-            }, path)
+            safe_pickle_dump(
+                {
+                    "models": self._models,
+                    "config": self._config,
+                    "metrics": self._training_metrics,
+                    "feature_names": self._feature_names,
+                    "shap_values": self._shap_values,
+                    "feature_importance_cache": self._feature_importance_cache,
+                    "saved_at": datetime.now(UTC).isoformat(),
+                },
+                path,
+            )
             return True
         except Exception as e:
             logger.error("xgboost_save_failed", error=str(e))
@@ -493,6 +513,7 @@ class XGBoostModel:
         """Modeli yükle (SHA256 doğrulamalı)."""
         try:
             from services.core.safe_pickle import safe_pickle_load
+
             data = safe_pickle_load(path)
             self._models = data.get("models", {})
             self._config = data.get("config", self._config)

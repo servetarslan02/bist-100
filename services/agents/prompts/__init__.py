@@ -425,6 +425,7 @@ Sadece JSON formatında yanıt ver."""
 # PROMPT FACTORY
 # =====================================================
 
+
 class PromptFactory:
     """Prompt şablonu fabrikası."""
 
@@ -523,7 +524,8 @@ class PromptFactory:
             )
             # Eksik anahtarları boş string ile doldur ve tekrar dene
             import re
-            all_keys = set(re.findall(r'\{(\w+)\}', template["system"] + template["user"]))
+
+            all_keys = set(re.findall(r"\{(\w+)\}", template["system"] + template["user"]))
             for k in all_keys:
                 format_vars.setdefault(k, "")
             system_prompt = template["system"].format(**format_vars)

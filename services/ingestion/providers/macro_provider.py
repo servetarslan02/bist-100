@@ -84,6 +84,7 @@ class MacroProvider:
 
         async def _fetch_one(name: str, symbol: str) -> tuple:
             try:
+
                 def _get():
                     t = yf.Ticker(symbol)
                     info = t.info
@@ -93,6 +94,7 @@ class MacroProvider:
                         "source": "yahoo",
                         "timestamp": datetime.now(UTC).isoformat(),
                     }
+
                 result = await asyncio.wait_for(
                     loop.run_in_executor(executor, _get),
                     timeout=15,
@@ -293,9 +295,11 @@ class MacroProvider:
         indicators["timestamp"] = datetime.now(UTC).isoformat()
         indicators["source"] = "composite"
 
-        logger.info("BIST macro indicators computed",
-                    risk_appetite=indicators.get("risk_appetite"),
-                    dollar_strength=indicators.get("dollar_strength"))
+        logger.info(
+            "BIST macro indicators computed",
+            risk_appetite=indicators.get("risk_appetite"),
+            dollar_strength=indicators.get("dollar_strength"),
+        )
 
         return indicators
 

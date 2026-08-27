@@ -22,21 +22,23 @@ logger = structlog.get_logger()
 @dataclass
 class ScenarioInput:
     """Senaryo girdisi."""
+
     name: str
     description: str = ""
-    usdtry_change: float = 0.0       # ör: 0.10 = %10 artış
-    interest_rate_change: float = 0.0 # ör: 0.05 = 500bp
-    bist_change: float = 0.0         # ör: -0.15 = %15 düşüş
-    vix_change: float = 0.0          # ör: 0.50 = %50 artış
-    oil_change: float = 0.0          # ör: 0.20 = %20 artış
-    gold_change: float = 0.0         # ör: 0.10 = %10 artış
-    inflation_change: float = 0.0    # ör: 0.05 = %5 artış
-    global_change: float = 0.0       # ör: -0.10 = %10 düşüş
+    usdtry_change: float = 0.0  # ör: 0.10 = %10 artış
+    interest_rate_change: float = 0.0  # ör: 0.05 = 500bp
+    bist_change: float = 0.0  # ör: -0.15 = %15 düşüş
+    vix_change: float = 0.0  # ör: 0.50 = %50 artış
+    oil_change: float = 0.0  # ör: 0.20 = %20 artış
+    gold_change: float = 0.0  # ör: 0.10 = %10 artış
+    inflation_change: float = 0.0  # ör: 0.05 = %5 artış
+    global_change: float = 0.0  # ör: -0.10 = %10 düşüş
 
 
 @dataclass
 class AssetImpact:
     """Tek bir varlık üzerindeki etki."""
+
     ticker: str
     sector: str
     current_price: float
@@ -48,6 +50,7 @@ class AssetImpact:
 @dataclass
 class ScenarioResult:
     """Senaryo sonucu."""
+
     scenario: ScenarioInput
     portfolio_impact_pct: float
     portfolio_impact_value: float
@@ -59,18 +62,20 @@ class ScenarioResult:
 @dataclass
 class StressTestResult:
     """Stres testi sonucu."""
+
     scenario_name: str
     portfolio_loss_pct: float
     portfolio_loss_value: float
     worst_position: str
     worst_position_loss_pct: float
-    var_breach: bool     # VaR aşıldı mı?
-    recovery_days: int   # Tahmini toparlanma süresi
+    var_breach: bool  # VaR aşıldı mı?
+    recovery_days: int  # Tahmini toparlanma süresi
 
 
 @dataclass
 class BreakingPoint:
     """Kırılma noktası."""
+
     variable: str
     current_value: float
     breaking_value: float
@@ -191,14 +196,16 @@ class ScenarioEngine:
 
             estimated_price = price * (1 + total_impact) if price > 0 else 0
 
-            asset_impacts.append(AssetImpact(
-                ticker=ticker,
-                sector=sector,
-                current_price=price,
-                estimated_impact_pct=round(total_impact * 100, 2),
-                estimated_price=round(estimated_price, 2),
-                impact_breakdown=macro_shocks,
-            ))
+            asset_impacts.append(
+                AssetImpact(
+                    ticker=ticker,
+                    sector=sector,
+                    current_price=price,
+                    estimated_impact_pct=round(total_impact * 100, 2),
+                    estimated_price=round(estimated_price, 2),
+                    impact_breakdown=macro_shocks,
+                )
+            )
 
             # Sektör bazlı etki
             if sector not in sector_impacts:
@@ -271,15 +278,17 @@ class ScenarioEngine:
             # En kötü pozisyon
             worst = min(scenario_result.asset_impacts, key=lambda a: a.estimated_impact_pct)
 
-            results.append(StressTestResult(
-                scenario_name=name,
-                portfolio_loss_pct=round(scenario_result.portfolio_impact_pct, 2),
-                portfolio_loss_value=round(abs(scenario_result.portfolio_impact_value), 2),
-                worst_position=worst.ticker,
-                worst_position_loss_pct=worst.estimated_impact_pct,
-                var_breach=abs(scenario_result.portfolio_impact_pct) > 5,  # %5 VaR eşiği
-                recovery_days=int(abs(scenario_result.portfolio_impact_pct) * 10),  # Tahmini
-            ))
+            results.append(
+                StressTestResult(
+                    scenario_name=name,
+                    portfolio_loss_pct=round(scenario_result.portfolio_impact_pct, 2),
+                    portfolio_loss_value=round(abs(scenario_result.portfolio_impact_value), 2),
+                    worst_position=worst.ticker,
+                    worst_position_loss_pct=worst.estimated_impact_pct,
+                    var_breach=abs(scenario_result.portfolio_impact_pct) > 5,  # %5 VaR eşiği
+                    recovery_days=int(abs(scenario_result.portfolio_impact_pct) * 10),  # Tahmini
+                )
+            )
 
         return results
 

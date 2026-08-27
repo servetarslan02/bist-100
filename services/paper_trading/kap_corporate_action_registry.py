@@ -17,9 +17,10 @@ logger = structlog.get_logger()
 @dataclass
 class CorporateActionRecord:
     """Zaman damgalı KAP bildirim/tedbir kaydı."""
+
     ticker: str
-    action_type: str            # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "DIVIDEND" | "SPLIT"
-    effective_date: str         # YYYY-MM-DD
+    action_type: str  # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "DIVIDEND" | "SPLIT"
+    effective_date: str  # YYYY-MM-DD
     end_date: str | None = None
     details: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
@@ -61,8 +62,7 @@ class KAPCorporateActionRegistry:
         elif action_type == "VBTS_SHORT_BAN":
             self._short_ban_tickers.add(ticker)
 
-        logger.info("KAP Corporate Action Registered",
-                    ticker=ticker, action=action_type, effective=effective_date)
+        logger.info("KAP Corporate Action Registered", ticker=ticker, action=action_type, effective=effective_date)
 
     def is_halted(self, ticker: str, date: str) -> bool:
         """Hisse belirtilen tarihte durdurulmuş mu?"""

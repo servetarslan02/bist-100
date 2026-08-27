@@ -41,6 +41,7 @@ class AlertType(StrEnum):
 @dataclass
 class Alert:
     """Risk alert."""
+
     alert_id: str
     alert_type: AlertType
     severity: AlertSeverity
@@ -61,6 +62,7 @@ class Alert:
 @dataclass
 class AlertRule:
     """Alert kuralı."""
+
     rule_id: str
     name: str
     alert_type: AlertType
@@ -77,6 +79,7 @@ class AlertRule:
 @dataclass
 class RiskMetricsSnapshot:
     """Anlık risk metrikleri."""
+
     timestamp: str
     portfolio_value: float
     var_95: float
@@ -224,7 +227,18 @@ class RiskMonitor:
 
             # Koşul kontrolü
             triggered = False
-            if rule.condition == "gt" and value > rule.threshold or rule.condition == "lt" and value < rule.threshold or rule.condition == "gte" and value >= rule.threshold or rule.condition == "lte" and value <= rule.threshold or rule.condition == "eq" and abs(value - rule.threshold) < 0.001:
+            if (
+                rule.condition == "gt"
+                and value > rule.threshold
+                or rule.condition == "lt"
+                and value < rule.threshold
+                or rule.condition == "gte"
+                and value >= rule.threshold
+                or rule.condition == "lte"
+                and value <= rule.threshold
+                or rule.condition == "eq"
+                and abs(value - rule.threshold) < 0.001
+            ):
                 triggered = True
 
             if triggered:
@@ -253,11 +267,13 @@ class RiskMonitor:
                 new_alerts.append(alert)
                 rule.last_fired = now
 
-                logger.warning("Risk alert fired",
-                             rule=rule.rule_id,
-                             severity=rule.severity.value,
-                             value=round(value, 2),
-                             threshold=rule.threshold)
+                logger.warning(
+                    "Risk alert fired",
+                    rule=rule.rule_id,
+                    severity=rule.severity.value,
+                    value=round(value, 2),
+                    threshold=rule.threshold,
+                )
 
         self._alerts.extend(new_alerts)
 
@@ -328,7 +344,7 @@ class RiskMonitor:
     def ingest_pipeline_metrics(self, ticker: str, metrics: dict[str, Any]):
         """Pipeline'dan gelen risk metriklerini monitoring'e besle."""
         try:
-            if not hasattr(self, '_latest_metrics'):
+            if not hasattr(self, "_latest_metrics"):
                 self._latest_metrics: dict[str, dict] = {}
             self._latest_metrics[ticker] = {
                 "var_95": metrics.get("var_95"),

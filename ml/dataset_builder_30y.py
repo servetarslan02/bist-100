@@ -39,7 +39,9 @@ class DatasetBuilder30Y:
         bm_sma50 = pl.Series(bm_closes, index=bm_dates).rolling(50).mean().to_numpy()
         bm_sma200 = pl.Series(bm_closes, index=bm_dates).rolling(200).mean().to_numpy()
         bm_returns_5d = pl.Series(bm_closes, index=bm_dates).pct_change(5).to_numpy() * 100.0
-        bm_vol_20d = pl.Series(bm_closes, index=bm_dates).pct_change().rolling(20).std().to_numpy() * np.sqrt(252) * 100.0
+        bm_vol_20d = (
+            pl.Series(bm_closes, index=bm_dates).pct_change().rolling(20).std().to_numpy() * np.sqrt(252) * 100.0
+        )
 
         all_rows = []
 
@@ -62,7 +64,7 @@ class DatasetBuilder30Y:
             tr = np.maximum(tr1, np.maximum(tr2, tr3))
             atr14 = np.zeros(len(df), dtype=np.float64)
             for i in range(14, len(df)):
-                atr14[i] = np.mean(tr[max(0, i-14):i])
+                atr14[i] = np.mean(tr[max(0, i - 14) : i])
             atr_pct = np.where(closes > 0, (atr14 / closes) * 100.0, 0.0)
 
             # RSI 14
@@ -71,8 +73,8 @@ class DatasetBuilder30Y:
             losses = np.where(diff < 0, -diff, 0)
             rsi14 = np.full(len(df), 50.0, dtype=np.float64)
             for i in range(14, len(df)):
-                avg_g = np.mean(gains[max(0, i-14):i])
-                avg_l = np.mean(losses[max(0, i-14):i])
+                avg_g = np.mean(gains[max(0, i - 14) : i])
+                avg_l = np.mean(losses[max(0, i - 14) : i])
                 if avg_l == 0:
                     rsi14[i] = 100.0
                 else:
@@ -89,14 +91,14 @@ class DatasetBuilder30Y:
             buyer_pressure = np.zeros(len(df), dtype=np.float64)
 
             for i in range(20, len(df)):
-                ret_1d[i] = ((closes[i] - closes[i-1]) / max(closes[i-1], 1e-4)) * 100.0
-                ret_5d[i] = ((closes[i] - closes[i-5]) / max(closes[i-5], 1e-4)) * 100.0
-                ret_20d[i] = ((closes[i] - closes[i-20]) / max(closes[i-20], 1e-4)) * 100.0
+                ret_1d[i] = ((closes[i] - closes[i - 1]) / max(closes[i - 1], 1e-4)) * 100.0
+                ret_5d[i] = ((closes[i] - closes[i - 5]) / max(closes[i - 5], 1e-4)) * 100.0
+                ret_20d[i] = ((closes[i] - closes[i - 20]) / max(closes[i - 20], 1e-4)) * 100.0
 
-                avg_vol20 = np.mean(volumes[max(0, i-20):i])
+                avg_vol20 = np.mean(volumes[max(0, i - 20) : i])
                 vol_surge[i] = volumes[i] / max(avg_vol20, 1.0)
 
-                max_h20 = np.max(highs[max(0, i-20):i])
+                max_h20 = np.max(highs[max(0, i - 20) : i])
                 high_20d[i] = max_h20
                 near_20d_high[i] = 1.0 if closes[i] >= (max_h20 * 0.98) else 0.0
 
@@ -115,8 +117,8 @@ class DatasetBuilder30Y:
                 bm_idx = bm_dates.get_loc(dt)
 
                 # Forward $t+1$ to $t+5$ return
-                entry_p = opens[i+1] * 1.0010  # slippage
-                exit_p = closes[i+5] * 0.9990  # slippage
+                entry_p = opens[i + 1] * 1.0010  # slippage
+                exit_p = closes[i + 5] * 0.9990  # slippage
                 fwd_ret_5d = ((exit_p - entry_p) / entry_p) * 100.0
 
                 # Risk ayarlı hedef (Winsorize edilmiş -10.0 ile +10.0 arası normalize getiri)
@@ -141,8 +143,12 @@ class DatasetBuilder30Y:
                     "vol_surge": vol_surge[i],
                     "buyer_pressure": buyer_pressure[i],
                     "near_20d_high": near_20d_high[i],
-                    "breakout_setup": 1.0 if (near_20d_high[i] == 1.0 and vol_surge[i] >= 1.10 and rsi14[i] >= 55.0) else 0.0,
-                    "dip_setup": 1.0 if (buyer_pressure[i] >= 50.0 and (rsi14[i] <= 30.0 or vol_surge[i] >= 1.20)) else 0.0,
+                    "breakout_setup": 1.0
+                    if (near_20d_high[i] == 1.0 and vol_surge[i] >= 1.10 and rsi14[i] >= 55.0)
+                    else 0.0,
+                    "dip_setup": 1.0
+                    if (buyer_pressure[i] >= 50.0 and (rsi14[i] <= 30.0 or vol_surge[i] >= 1.20))
+                    else 0.0,
                     # Rejim Özellikleri
                     "bm_is_bull": is_bull_bm,
                     "bm_dist_sma200": bm_dist_sma200,
@@ -152,7 +158,7 @@ class DatasetBuilder30Y:
                     # Hedefler
                     "target_return_5d": fwd_ret_5d,
                     "target_risk_adj": risk_adj_target,
-                    "target_direction": 1 if fwd_ret_5d > 1.5 else 0
+                    "target_direction": 1 if fwd_ret_5d > 1.5 else 0,
                 }
                 all_rows.append(row)
 
@@ -160,8 +166,8 @@ class DatasetBuilder30Y:
         logger.info(f"Toplam {len(full_df):,} seans satırı üretildi.")
 
         # Train (1997-2023) ve OOS (2024-2026) Ayrımı
-        train_df = full_df.filter(pl.col('year') <= 2023)
-        oos_df = full_df.filter(pl.col('year') >= 2024)
+        train_df = full_df.filter(pl.col("year") <= 2023)
+        oos_df = full_df.filter(pl.col("year") >= 2024)
 
         logger.info(f"Train Seti: {len(train_df):,} satır (1997-2023)")
         logger.info(f"OOS Holdout Seti: {len(oos_df):,} satır (2024-2026)")

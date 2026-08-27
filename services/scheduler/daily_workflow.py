@@ -29,6 +29,7 @@ logger = structlog.get_logger()
 @dataclass
 class WorkflowPhase:
     """Workflow fazı."""
+
     name: str
     start_time: str
     end_time: str
@@ -39,6 +40,7 @@ class WorkflowPhase:
 @dataclass
 class WorkflowStatus:
     """Workflow durumu."""
+
     current_phase: str
     next_phase: str
     next_phase_in_seconds: float
@@ -164,22 +166,24 @@ class DailyWorkflow:
             except Exception as e:
                 results[job_type] = {"status": "FAILED", "error": str(e)}
                 self._jobs_failed_today += 1
-                logger.error("Workflow job failed",
-                           phase=phase_name, job=job_type, error=str(e))
+                logger.error("Workflow job failed", phase=phase_name, job=job_type, error=str(e))
 
         if phase_name == "post_market":
             self._daily_report_generated = True
 
-        logger.info("Workflow phase completed",
-                    phase=phase_name,
-                    jobs=len(phase.jobs),
-                    successful=sum(1 for r in results.values() if r.get("status") == "SUCCESS"))
+        logger.info(
+            "Workflow phase completed",
+            phase=phase_name,
+            jobs=len(phase.jobs),
+            successful=sum(1 for r in results.values() if r.get("status") == "SUCCESS"),
+        )
 
         return results
 
     def get_status(self) -> WorkflowStatus:
         """Workflow durumu."""
         from .unified_scheduler import MarketSessionManager
+
         market = MarketSessionManager()
         phase = market.current_phase()
 
@@ -219,6 +223,7 @@ class DailyWorkflow:
         self._daily_report_generated = False
         try:
             from services.core.risk_gate import risk_gate
+
             risk_gate.reset_daily()
         except Exception:
             logger.warning("Caught Exception in reset_daily_counters", exc_info=True)

@@ -33,6 +33,7 @@ default_baseline = {
 def _load_baseline_config() -> dict:
     """Load baseline values from config file, falling back to defaults."""
     import orjson as _json
+
     config_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "tcmb_baseline.json")
     config_path = os.path.normpath(config_path)
     try:
@@ -71,6 +72,7 @@ class TCMBProvider:
 
     def __init__(self, api_key: str | None = None):
         import os
+
         self.api_key = api_key or os.getenv("TCMB_API_KEY") or os.getenv("EVDS_API_KEY")
         self._client = get_client("tcmb", timeout=10.0, max_retries=2)
         self._warned_no_key = False
@@ -131,7 +133,9 @@ class TCMBProvider:
 
                 if data and len(data) > 0:
                     latest = data[-1]
-                    val = float(latest.get("value", 0)) if latest.get("value") is not None else baseline_values.get(name)
+                    val = (
+                        float(latest.get("value", 0)) if latest.get("value") is not None else baseline_values.get(name)
+                    )
                     result[name] = {
                         "value": val,
                         "date": latest.get("date", now_str),
@@ -142,7 +146,8 @@ class TCMBProvider:
                 else:
                     logger.warning(
                         "Using baseline value (not live data)",
-                        series=name, baseline_value=baseline_values.get(name),
+                        series=name,
+                        baseline_value=baseline_values.get(name),
                     )
                     result[name] = {
                         "value": baseline_values.get(name),
@@ -155,7 +160,8 @@ class TCMBProvider:
             except Exception as e:
                 logger.warning(
                     "Failed to fetch macro series, using baseline",
-                    series=name, error=str(e),
+                    series=name,
+                    error=str(e),
                 )
                 result[name] = {
                     "value": baseline_values.get(name),

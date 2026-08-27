@@ -108,7 +108,10 @@ class BacktestPersistence:
                     config_json, metrics_json)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    run_id, start_date, end_date, initial_capital,
+                    run_id,
+                    start_date,
+                    end_date,
+                    initial_capital,
                     metrics.get("final_equity", 0),
                     metrics.get("total_return_pct", 0),
                     metrics.get("sharpe_ratio", 0),
@@ -136,11 +139,17 @@ class BacktestPersistence:
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     (
-                        run_id, t.get("trade_id", 0), t.get("ticker", ""),
-                        t.get("side", ""), t.get("date", ""),
-                        t.get("quantity", 0), t.get("price", 0),
-                        t.get("commission", 0), t.get("slippage", 0),
-                        t.get("pnl", 0), t.get("pnl_pct", 0),
+                        run_id,
+                        t.get("trade_id", 0),
+                        t.get("ticker", ""),
+                        t.get("side", ""),
+                        t.get("date", ""),
+                        t.get("quantity", 0),
+                        t.get("price", 0),
+                        t.get("commission", 0),
+                        t.get("slippage", 0),
+                        t.get("pnl", 0),
+                        t.get("pnl_pct", 0),
                         t.get("holding_days", 0),
                     )
                     for t in trades
@@ -163,9 +172,13 @@ class BacktestPersistence:
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     (
-                        run_id, s.get("date", ""), s.get("equity", 0),
-                        s.get("cash", 0), s.get("market_value", 0),
-                        s.get("positions", 0), s.get("drawdown", 0),
+                        run_id,
+                        s.get("date", ""),
+                        s.get("equity", 0),
+                        s.get("cash", 0),
+                        s.get("market_value", 0),
+                        s.get("positions", 0),
+                        s.get("drawdown", 0),
                         s.get("daily_return", 0),
                     )
                     for s in curve
@@ -180,9 +193,7 @@ class BacktestPersistence:
         """Run metadata getir."""
         conn = duckdb.connect(self._db_path)
         try:
-            row = conn.execute(
-                "SELECT * FROM backtest_runs WHERE run_id = ?", (run_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM backtest_runs WHERE run_id = ?", (run_id,)).fetchone()
             if row:
                 result = dict(row)
                 if result.get("metrics_json"):

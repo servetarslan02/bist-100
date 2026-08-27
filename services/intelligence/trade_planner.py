@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class TradePlan:
     """Tek bir işlem planı."""
+
     ticker: str
     timestamp: datetime
 
@@ -90,22 +91,16 @@ class TradePlanner:
         """Bir hisse için kapsamlı işlem planı oluştur."""
 
         # Karar belirle
-        action, conviction, direction = self._determine_action(
-            spec_score, spec_category, features, market_regime
-        )
+        action, conviction, direction = self._determine_action(spec_score, spec_category, features, market_regime)
 
         # Giriş fiyatı
         entry_price, entry_type = self._determine_entry(price, features)
 
         # Hedef fiyatlar
-        target1, target2, target3 = self._determine_targets(
-            price, features, spec_score
-        )
+        target1, target2, target3 = self._determine_targets(price, features, spec_score)
 
         # Stop loss
-        stop_loss, stop_type = self._determine_stop_loss(
-            price, features, action
-        )
+        stop_loss, stop_type = self._determine_stop_loss(price, features, action)
 
         # Beklenti
         expected_return, expected_loss, risk_reward = self._calculate_expectations(
@@ -159,8 +154,7 @@ class TradePlanner:
         )
 
     def _determine_action(
-        self, spec_score: float, spec_category: str,
-        features: dict, regime: str
+        self, spec_score: float, spec_category: str, features: dict, regime: str
     ) -> tuple[str, str, str]:
         """Al/Sat/Karar belirle."""
 
@@ -223,9 +217,7 @@ class TradePlanner:
         entry = price - atr * 0.5
         return round(entry, 2), "LIMIT"
 
-    def _determine_targets(
-        self, price: float, features: dict, spec_score: float
-    ) -> tuple[float, float, float]:
+    def _determine_targets(self, price: float, features: dict, spec_score: float) -> tuple[float, float, float]:
         """Hedef fiyatlar belirle."""
 
         atr_raw = features.get("atr_14")
@@ -264,9 +256,7 @@ class TradePlanner:
 
         return round(target1, 2), round(target2, 2), round(target3, 2)
 
-    def _determine_stop_loss(
-        self, price: float, features: dict, action: str
-    ) -> tuple[float, str]:
+    def _determine_stop_loss(self, price: float, features: dict, action: str) -> tuple[float, str]:
         """Stop loss belirle."""
 
         atr_raw = features.get("atr_14")
@@ -348,8 +338,7 @@ class TradePlanner:
         }
 
     def _calculate_position_size(
-        self, portfolio: float, entry: float, stop: float,
-        max_position: float, max_risk: float
+        self, portfolio: float, entry: float, stop: float, max_position: float, max_risk: float
     ) -> tuple[float, float]:
         """Pozisyon büyüklüğü hesapla (Kelly Criterion basitleştirilmiş)."""
 
@@ -375,9 +364,7 @@ class TradePlanner:
 
         return round(position_pct, 2), round(max_loss_pct, 2)
 
-    def _generate_reasons(
-        self, features: dict, spec_score: float, regime: str
-    ) -> list[str]:
+    def _generate_reasons(self, features: dict, spec_score: float, regime: str) -> list[str]:
         """Alım gerekçeleri."""
         reasons = []
 
@@ -422,9 +409,7 @@ class TradePlanner:
 
         return risks
 
-    def _determine_horizon(
-        self, spec_score: float, features: dict
-    ) -> tuple[str, str]:
+    def _determine_horizon(self, spec_score: float, features: dict) -> tuple[str, str]:
         """Zaman ufku belirle."""
 
         mom5 = abs(features.get("roc_5d", 0))
@@ -442,9 +427,9 @@ def format_trade_plan(plan: TradePlan) -> str:
     """İşlem planını okunabilir formata çevir."""
 
     lines = []
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
     lines.append(f"🎯 {plan.ticker} — İŞLEM PLANI")
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
     lines.append("")
     lines.append(f"📌 KARAR: {plan.action} ({plan.conviction})")
     lines.append(f"📌 YÖN: {plan.direction}")
@@ -455,12 +440,18 @@ def format_trade_plan(plan: TradePlan) -> str:
     lines.append(f"   Tip: {plan.entry_type}")
     lines.append("")
     lines.append("🎯 HEDEFLER")
-    lines.append(f"   Kısa vade: ₺{plan.target_price_1:.2f} (+{(plan.target_price_1/plan.entry_price-1)*100:.1f}%)")
-    lines.append(f"   Orta vade: ₺{plan.target_price_2:.2f} (+{(plan.target_price_2/plan.entry_price-1)*100:.1f}%)")
-    lines.append(f"   Uzun vade: ₺{plan.target_price_3:.2f} (+{(plan.target_price_3/plan.entry_price-1)*100:.1f}%)")
+    lines.append(
+        f"   Kısa vade: ₺{plan.target_price_1:.2f} (+{(plan.target_price_1 / plan.entry_price - 1) * 100:.1f}%)"
+    )
+    lines.append(
+        f"   Orta vade: ₺{plan.target_price_2:.2f} (+{(plan.target_price_2 / plan.entry_price - 1) * 100:.1f}%)"
+    )
+    lines.append(
+        f"   Uzun vade: ₺{plan.target_price_3:.2f} (+{(plan.target_price_3 / plan.entry_price - 1) * 100:.1f}%)"
+    )
     lines.append("")
     lines.append("🛑 STOP LOSS")
-    lines.append(f"   Fiyat: ₺{plan.stop_loss:.2f} ({(plan.stop_loss/plan.entry_price-1)*100:.1f}%)")
+    lines.append(f"   Fiyat: ₺{plan.stop_loss:.2f} ({(plan.stop_loss / plan.entry_price - 1) * 100:.1f}%)")
     lines.append(f"   Tip: {plan.stop_type}")
     lines.append("")
     lines.append("📊 BEKLENTİ")
@@ -473,9 +464,15 @@ def format_trade_plan(plan: TradePlan) -> str:
     lines.append(f"   Maks zarar: %{plan.max_loss_pct}")
     lines.append("")
     lines.append("📈 SENARYOLAR")
-    lines.append(f"   🟢 Boğa (%{plan.scenario_bull['probability']}): ₺{plan.scenario_bull['price_target']:.2f} ({plan.scenario_bull['return_pct']:+.1f}%)")
-    lines.append(f"   ⚪ Baz (%{plan.scenario_base['probability']}): ₺{plan.scenario_base['price_target']:.2f} ({plan.scenario_base['return_pct']:+.1f}%)")
-    lines.append(f"   🔴 Ayı (%{plan.scenario_bear['probability']}): ₺{plan.scenario_bear['price_target']:.2f} ({plan.scenario_bear['return_pct']:+.1f}%)")
+    lines.append(
+        f"   🟢 Boğa (%{plan.scenario_bull['probability']}): ₺{plan.scenario_bull['price_target']:.2f} ({plan.scenario_bull['return_pct']:+.1f}%)"
+    )
+    lines.append(
+        f"   ⚪ Baz (%{plan.scenario_base['probability']}): ₺{plan.scenario_base['price_target']:.2f} ({plan.scenario_base['return_pct']:+.1f}%)"
+    )
+    lines.append(
+        f"   🔴 Ayı (%{plan.scenario_bear['probability']}): ₺{plan.scenario_bear['price_target']:.2f} ({plan.scenario_bear['return_pct']:+.1f}%)"
+    )
     lines.append("")
     lines.append("✅ GEREKÇELER")
     for r in plan.reasons:
@@ -484,7 +481,7 @@ def format_trade_plan(plan: TradePlan) -> str:
     lines.append("⚠️ RİSKLER")
     for r in plan.risks:
         lines.append(f"   • {r}")
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
 
     return "\n".join(lines)
 

@@ -14,7 +14,7 @@ import optuna
 import polars as pl
 import structlog
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 logger = structlog.get_logger()
@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class StrategyParameters:
     """Taranan strateji parametre kümesi."""
+
     min_buyer_pressure: float = 52.0
     min_candle_score: float = 70.0
     dynamic_edge_threshold: float = 50.0
@@ -88,7 +89,7 @@ class BayesianMetricOptimizer:
             tr = np.maximum(tr1, np.maximum(tr2, tr3))
             atr14 = np.zeros(len(df), dtype=np.float64)
             for i in range(14, len(df)):
-                atr14[i] = np.mean(tr[max(0, i-14):i])
+                atr14[i] = np.mean(tr[max(0, i - 14) : i])
 
             # RSI 14
             diff = np.diff(closes)
@@ -96,8 +97,8 @@ class BayesianMetricOptimizer:
             losses = np.where(diff < 0, -diff, 0)
             rsi14 = np.full(len(df), 50.0, dtype=np.float64)
             for i in range(14, len(df)):
-                avg_g = np.mean(gains[max(0, i-14):i])
-                avg_l = np.mean(losses[max(0, i-14):i])
+                avg_g = np.mean(gains[max(0, i - 14) : i])
+                avg_l = np.mean(losses[max(0, i - 14) : i])
                 if avg_l == 0:
                     rsi14[i] = 100.0
                 else:
@@ -107,7 +108,7 @@ class BayesianMetricOptimizer:
             # 20 günlük ortalama hacim
             vol_avg20 = np.zeros(len(df), dtype=np.float64)
             for i in range(20, len(df)):
-                vol_avg20[i] = np.mean(volumes[max(0, i-20):i])
+                vol_avg20[i] = np.mean(volumes[max(0, i - 20) : i])
 
             self.tech_cache[ticker] = {
                 "atr14": atr14,
@@ -118,10 +119,18 @@ class BayesianMetricOptimizer:
                 "lows": lows,
                 "volumes": volumes,
                 "vol_avg20": vol_avg20,
-                "dates": df.index
+                "dates": df.index,
             }
 
-    def simulate_fast(self, params: StrategyParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0, commission_rate: float = 0.0015, slippage_rate: float = 0.0010) -> OptimizationTrialResult:
+    def simulate_fast(
+        self,
+        params: StrategyParameters,
+        start_year: int = 1997,
+        end_year: int = 2026,
+        initial_capital: float = 100000.0,
+        commission_rate: float = 0.0015,
+        slippage_rate: float = 0.0010,
+    ) -> OptimizationTrialResult:
         """C-hızında saf NumPy simülasyonu."""
         COMMISSION_RATE = commission_rate
         SLIPPAGE_RATE = slippage_rate
@@ -180,20 +189,20 @@ class BayesianMetricOptimizer:
                         shares = int(invest_amount / cost_with_fee)
 
                         if shares > 0 and capital >= (shares * cost_with_fee):
-                            capital -= (shares * cost_with_fee)
+                            capital -= shares * cost_with_fee
                             positions[t] = {
                                 "shares": shares,
                                 "entry_price": entry_p,
                                 "peak_price": entry_p,
                                 "stop_loss": entry_p - (cdata["atr14"][d_idx] * params.atr_initial_stop_mult),
-                                "breakeven_hit": False
+                                "breakeven_hit": False,
                             }
             pending_buy_orders = []
 
             # 3. Rejim
             bm_now = bm_closes[global_idx]
-            bm_sma50 = np.mean(bm_closes[max(0, global_idx-params.regime_sma_fast):global_idx+1])
-            bm_sma200 = np.mean(bm_closes[max(0, global_idx-params.regime_sma_slow):global_idx+1])
+            bm_sma50 = np.mean(bm_closes[max(0, global_idx - params.regime_sma_fast) : global_idx + 1])
+            bm_sma200 = np.mean(bm_closes[max(0, global_idx - params.regime_sma_slow) : global_idx + 1])
             is_bull = bm_now >= bm_sma50
             is_crisis = bm_now < (bm_sma200 * params.crisis_exit_buffer)
 
@@ -208,14 +217,14 @@ class BayesianMetricOptimizer:
                 atr_val = cdata["atr14"][d_idx]
 
                 if high_p > pos["peak_price"]:
-                    pos['peak_price'] = high_p
+                    pos["peak_price"] = high_p
 
                 if close_p >= pos["entry_price"] + (atr_val * params.atr_breakeven_mult):
-                    pos['breakeven_hit'] = True
+                    pos["breakeven_hit"] = True
 
                 if pos["breakeven_hit"]:
                     new_stop = pos["peak_price"] - (atr_val * params.atr_trailing_mult)
-                    pos['stop_loss'] = max(pos['stop_loss'], new_stop, pos['entry_price'])
+                    pos["stop_loss"] = max(pos["stop_loss"], new_stop, pos["entry_price"])
 
                 if close_p <= pos["stop_loss"] or is_crisis:
                     pending_sell_orders.append({"ticker": ticker})
@@ -249,7 +258,9 @@ class BayesianMetricOptimizer:
                     body = abs(close_p - open_p) if close_p >= open_p else 0
                     buyer_press = ((lower_wick + body) / total_range) * 100.0
 
-                    if buyer_press >= params.min_buyer_pressure and (vol_v >= vol_avg * params.volume_surge_mult or rsi_v <= params.rsi_oversold):
+                    if buyer_press >= params.min_buyer_pressure and (
+                        vol_v >= vol_avg * params.volume_surge_mult or rsi_v <= params.rsi_oversold
+                    ):
                         candidates.append({"ticker": ticker, "score": buyer_press})
 
                 candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -261,8 +272,11 @@ class BayesianMetricOptimizer:
                         pending_buy_orders.append({"ticker": cand["ticker"], "amount": pos_val})
 
             # Gün Sonu Portföy
-            curr_pos_val = sum(p["shares"] * self.tech_cache[t]["closes"][self.tech_cache[t]["dates"].get_loc(current_date)]
-                               for t, p in positions.items() if current_date in self.tech_cache[t]["dates"])
+            curr_pos_val = sum(
+                p["shares"] * self.tech_cache[t]["closes"][self.tech_cache[t]["dates"].get_loc(current_date)]
+                for t, p in positions.items()
+                if current_date in self.tech_cache[t]["dates"]
+            )
             equity_curve.append(capital + curr_pos_val)
 
         final_eq = equity_curve[-1] if equity_curve else initial_capital
@@ -276,10 +290,10 @@ class BayesianMetricOptimizer:
 
         df_t = pl.DataFrame(trade_logs)
         t_cnt = len(df_t)
-        w_cnt = len(df_t.filter(pl.col('pnl') > 0)) if t_cnt > 0 else 0
+        w_cnt = len(df_t.filter(pl.col("pnl") > 0)) if t_cnt > 0 else 0
         w_rate = (w_cnt / t_cnt * 100) if t_cnt > 0 else 0.0
-        w_sum = df_t.filter(pl.col('pnl') > 0)["pnl"].sum() if t_cnt > 0 else 0
-        l_sum = abs(df_t.filter(pl.col('pnl') < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
+        w_sum = df_t.filter(pl.col("pnl") > 0)["pnl"].sum() if t_cnt > 0 else 0
+        l_sum = abs(df_t.filter(pl.col("pnl") < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
         pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
 
         returns = df_eq.pct_change().dropna()
@@ -298,13 +312,15 @@ class BayesianMetricOptimizer:
             win_rate=round(w_rate, 1),
             max_drawdown=round(max_dd, 2),
             total_trades=t_cnt,
-            fitness_score=round(fitness, 3)
+            fitness_score=round(fitness, 3),
         )
 
     def run_bayesian_study(self, n_trials: int = 500) -> tuple[StrategyParameters, list[OptimizationTrialResult]]:
         """Tüm CPU çekirdeklerini kullanarak paralel Optuna optimizasyonu yapar."""
         num_cores = max(1, os.cpu_count() or 4)
-        logger.info(f"Yüksek hızlı Bayesian optimizasyon başlatılıyor... ({n_trials} Deneme, {num_cores} CPU Çekirdeği)")
+        logger.info(
+            f"Yüksek hızlı Bayesian optimizasyon başlatılıyor... ({n_trials} Deneme, {num_cores} CPU Çekirdeği)"
+        )
         trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
@@ -319,7 +335,7 @@ class BayesianMetricOptimizer:
                 atr_trailing_mult=trial.suggest_float("atr_trailing_mult", 2.5, 5.0, step=0.25),
                 crisis_exit_buffer=trial.suggest_float("crisis_exit_buffer", 0.90, 0.98, step=0.01),
                 max_positions_bull=trial.suggest_int("max_positions_bull", 5, 12),
-                position_alloc_bull=trial.suggest_float("position_alloc_bull", 0.08, 0.15, step=0.01)
+                position_alloc_bull=trial.suggest_float("position_alloc_bull", 0.08, 0.15, step=0.01),
             )
 
             res = self.simulate_fast(params, start_year=1997, end_year=2023)
@@ -327,7 +343,9 @@ class BayesianMetricOptimizer:
             trial_results.append(res)
 
             if trial.number % 50 == 0:
-                print(f"  [İlerleme] Deneme #{trial.number}/{n_trials} | En İyi Fitness: {res.fitness_score:.2f} | Getiri: %{res.total_return_pct:+,.1f}")
+                print(
+                    f"  [İlerleme] Deneme #{trial.number}/{n_trials} | En İyi Fitness: {res.fitness_score:.2f} | Getiri: %{res.total_return_pct:+,.1f}"
+                )
 
             return res.fitness_score
 
@@ -346,7 +364,7 @@ class BayesianMetricOptimizer:
             atr_trailing_mult=best_trial.params.get("atr_trailing_mult", 3.0),
             crisis_exit_buffer=best_trial.params.get("crisis_exit_buffer", 0.95),
             max_positions_bull=best_trial.params.get("max_positions_bull", 10),
-            position_alloc_bull=best_trial.params.get("position_alloc_bull", 0.10)
+            position_alloc_bull=best_trial.params.get("position_alloc_bull", 0.10),
         )
 
         return best_params, trial_results

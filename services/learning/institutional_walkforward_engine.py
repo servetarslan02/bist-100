@@ -36,10 +36,26 @@ logger = structlog.get_logger(__name__)
 
 
 BIST_TICKERS = [
-    "THYAO.IS", "ASELS.IS", "GARAN.IS", "KCHOL.IS", "TUPRS.IS",
-    "BIMAS.IS", "AKBNK.IS", "SISE.IS", "FROTO.IS", "PGSUS.IS",
-    "SAHOL.IS", "TCELL.IS", "MGROS.IS", "EREGL.IS", "YKBNK.IS",
-    "VAKBN.IS", "ISCTR.IS", "PETKM.IS", "ENJSA.IS", "ASTOR.IS"
+    "THYAO.IS",
+    "ASELS.IS",
+    "GARAN.IS",
+    "KCHOL.IS",
+    "TUPRS.IS",
+    "BIMAS.IS",
+    "AKBNK.IS",
+    "SISE.IS",
+    "FROTO.IS",
+    "PGSUS.IS",
+    "SAHOL.IS",
+    "TCELL.IS",
+    "MGROS.IS",
+    "EREGL.IS",
+    "YKBNK.IS",
+    "VAKBN.IS",
+    "ISCTR.IS",
+    "PETKM.IS",
+    "ENJSA.IS",
+    "ASTOR.IS",
 ]
 
 
@@ -48,7 +64,7 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     if yf_df is None or len(yf_df) == 0:
         return pl.DataFrame()
     df = yf_df.reset_index()
-    if isinstance(df.columns, __import__('pandas').MultiIndex):
+    if isinstance(df.columns, __import__("pandas").MultiIndex):
         df.columns = df.columns.get_level_values(0)
     return pl.from_pandas(df)
 
@@ -84,42 +100,38 @@ def extract_point_in_time_features(df: pl.DataFrame) -> pl.DataFrame:
 
     feats = df.select([])
 
-    feats = feats.with_columns(((close / close.shift(5) - 1.0) * 100.0).alias('roc_5d'))
-    feats = feats.with_columns(((close / close.shift(20) - 1.0) * 100.0).alias('roc_20d'))
-    feats = feats.with_columns(feats['roc_20d'].alias('momentum_20d'))
+    feats = feats.with_columns(((close / close.shift(5) - 1.0) * 100.0).alias("roc_5d"))
+    feats = feats.with_columns(((close / close.shift(20) - 1.0) * 100.0).alias("roc_20d"))
+    feats = feats.with_columns(feats["roc_20d"].alias("momentum_20d"))
 
     sma20 = close.rolling_mean(20)
     sma50 = close.rolling_mean(50)
     sma200 = close.rolling_mean(200)
-    feats = feats.with_columns(((close / sma20 - 1.0) * 100.0).alias('price_vs_sma20'))
-    feats = feats.with_columns(((close / sma50 - 1.0) * 100.0).alias('price_vs_sma50'))
-    feats = feats.with_columns(((close / sma200 - 1.0) * 100.0).alias('price_vs_sma200'))
+    feats = feats.with_columns(((close / sma20 - 1.0) * 100.0).alias("price_vs_sma20"))
+    feats = feats.with_columns(((close / sma50 - 1.0) * 100.0).alias("price_vs_sma50"))
+    feats = feats.with_columns(((close / sma200 - 1.0) * 100.0).alias("price_vs_sma200"))
 
     # ATR & Volatilite
-    tr = pl.max_horizontal(
-        high - low,
-        (high - close.shift(1)).abs(),
-        (low - close.shift(1)).abs()
-    )
-    feats = feats.with_columns(((tr.rolling_mean(14) / close) * 100.0).alias('atr_pct'))
-    feats = feats.with_columns((close.pct_change().rolling_std(20) * np.sqrt(252) * 100.0).alias('volatility_20d'))
+    tr = pl.max_horizontal(high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs())
+    feats = feats.with_columns(((tr.rolling_mean(14) / close) * 100.0).alias("atr_pct"))
+    feats = feats.with_columns((close.pct_change().rolling_std(20) * np.sqrt(252) * 100.0).alias("volatility_20d"))
 
     # Hacim Z-Score
     vol_mean = volume.rolling_mean(20)
     vol_std = volume.rolling_std(20).replace(0, 1.0)
-    feats = feats.with_columns(((volume - vol_mean) / vol_std).alias('volume_zscore'))
+    feats = feats.with_columns(((volume - vol_mean) / vol_std).alias("volume_zscore"))
 
     # Bollinger Bands
     bb_std = close.rolling_std(20)
     bb_upper = sma20 + 2 * bb_std
     bb_lower = sma20 - 2 * bb_std
     bb_range = (bb_upper - bb_lower).replace(0, 1.0)
-    feats = feats.with_columns(((close - bb_lower) / bb_range).alias('bb_position'))
+    feats = feats.with_columns(((close - bb_lower) / bb_range).alias("bb_position"))
 
     # 5 günlük gelecek getiri
-    feats = feats.with_columns(((close.shift(-5) / close - 1.0) * 100.0).alias('target_5d_ret'))
-    feats = feats.with_columns((feats['target_5d_ret'] > 0).cast(pl.Int32).alias('target_5d_bin'))
-    feats = feats.with_columns(close.alias('close'))
+    feats = feats.with_columns(((close.shift(-5) / close - 1.0) * 100.0).alias("target_5d_ret"))
+    feats = feats.with_columns((feats["target_5d_ret"] > 0).cast(pl.Int32).alias("target_5d_bin"))
+    feats = feats.with_columns(close.alias("close"))
 
     # Date sütunu varsa koru
     if "Date" in df.columns:
@@ -170,27 +182,44 @@ class ModelTrainer:
         # 1. LightGBM Regressor
         train_data = lgb.Dataset(X, label=y_reg)
         params_lgb = {
-            "objective": "regression", "metric": "rmse",
-            "learning_rate": 0.05, "num_leaves": 15,
-            "min_data_in_leaf": 10, "verbose": -1, "seed": 42, "num_threads": 2,
+            "objective": "regression",
+            "metric": "rmse",
+            "learning_rate": 0.05,
+            "num_leaves": 15,
+            "min_data_in_leaf": 10,
+            "verbose": -1,
+            "seed": 42,
+            "num_threads": 2,
         }
         self.lgb_model = lgb.train(params_lgb, train_data, num_boost_round=40)
 
         # 2. CatBoost Classifier
         self.cat_model = CatBoostClassifier(
-            iterations=40, depth=4, learning_rate=0.06,
-            verbose=0, random_seed=42, thread_count=2, allow_writing_files=False,
+            iterations=40,
+            depth=4,
+            learning_rate=0.06,
+            verbose=0,
+            random_seed=42,
+            thread_count=2,
+            allow_writing_files=False,
         )
         self.cat_model.fit(X, y_cls)
 
         # 3. XGBoost Classifier
         self.xgb_model = xgb.XGBClassifier(
-            n_estimators=40, max_depth=4, learning_rate=0.05,
-            eval_metric="logloss", random_state=42, verbosity=0, n_jobs=2,
+            n_estimators=40,
+            max_depth=4,
+            learning_rate=0.05,
+            eval_metric="logloss",
+            random_state=42,
+            verbosity=0,
+            n_jobs=2,
         )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers: list[str], features_list: list[dict[str, float]]) -> dict[str, dict[str, float]]:
+    def predict_batch_day(
+        self, tickers: list[str], features_list: list[dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
         """Tüm hisseler için tek seferde batch tahmin üretir."""
         X_mat = np.array([[f.get(col, 0.0) for col in self.feature_cols] for f in features_list])
         n = len(tickers)
@@ -238,9 +267,16 @@ def run_institutional_walkforward_backtest():
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
 
     # Her hisse için feature matrisi
@@ -266,8 +302,14 @@ def run_institutional_walkforward_backtest():
     logger.info(f"📊 Toplam Değerlendirme Günü: {len(eval_dates)}")
     logger.info(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)}")
 
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model",
-              "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "XGBoost_Model",
+        "Cross_Sectional_Momentum",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+    ]
 
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
@@ -312,7 +354,11 @@ def run_institutional_walkforward_backtest():
         if "Date" in fdf.columns:
             row_df = fdf.filter(pl.col("Date") == date_val)
             if len(row_df) > 0:
-                return {col: float(row_df[col][0]) for col in row_df.columns if row_df[col].dtype in (pl.Float64, pl.Int64, pl.Int32)}
+                return {
+                    col: float(row_df[col][0])
+                    for col in row_df.columns
+                    if row_df[col].dtype in (pl.Float64, pl.Int64, pl.Int32)
+                }
         return {}
 
     def _get_close(fdf: pl.DataFrame, date_val) -> float:
@@ -346,7 +392,9 @@ def run_institutional_walkforward_backtest():
             if train_rows:
                 combined_train = pl.concat(train_rows, how="diagonal").drop_nulls(subset=["target_5d_ret"])
                 trainer.retrain_fold(combined_train)
-                logger.info(f"  • [Fold {current_fold:02d}] Retrain ({date_str}, {len(combined_train)} satır)", flush=True)
+                logger.info(
+                    f"  • [Fold {current_fold:02d}] Retrain ({date_str}, {len(combined_train)} satır)", flush=True
+                )
 
         # 2. Piyasa rejimi tespiti
         current_regime = detect_market_regime(xu100_close, current_date)
@@ -375,19 +423,25 @@ def run_institutional_walkforward_backtest():
             row = day_rows[i]
             signals = batch_signals[tk]
             composite_score = sum(norm_weights[m] * signals[m] for m in models)
-            candidate_scores.append({
-                "ticker": tk, "composite_score": composite_score,
-                "close_price": float(row.get("close", 0.0)),
-                "signals": signals,
-                "actual_ret_5d": float(row.get("target_5d_ret", 0.0)),
-            })
+            candidate_scores.append(
+                {
+                    "ticker": tk,
+                    "composite_score": composite_score,
+                    "close_price": float(row.get("close", 0.0)),
+                    "signals": signals,
+                    "actual_ret_5d": float(row.get("target_5d_ret", 0.0)),
+                }
+            )
             for m in models:
                 pred_sign = 1 if signals[m] > 0 else -1
                 act_sign = 1 if row.get("target_5d_ret", 0.0) > 0 else -1
-                pending_evaluations.append({
-                    "eval_date": current_date + timedelta(days=7),
-                    "model": m, "is_correct": (pred_sign == act_sign),
-                })
+                pending_evaluations.append(
+                    {
+                        "eval_date": current_date + timedelta(days=7),
+                        "model": m,
+                        "is_correct": (pred_sign == act_sign),
+                    }
+                )
 
         # 5. Stop-loss / Take-profit / Time-exit
         closed_tickers = []
@@ -431,7 +485,9 @@ def run_institutional_walkforward_backtest():
         max_positions = 5
         open_slots = max_positions - len(positions)
         if open_slots > 0 and len(top_candidates) > 0 and portfolio_cash > 200_000:
-            current_positions_value = sum(p["shares"] * _get_close(features_by_ticker[t], current_date) for t, p in positions.items())
+            current_positions_value = sum(
+                p["shares"] * _get_close(features_by_ticker[t], current_date) for t, p in positions.items()
+            )
             total_equity = portfolio_cash + current_positions_value
             target_alloc = min(portfolio_cash / open_slots, total_equity * 0.20)
 
@@ -444,15 +500,20 @@ def run_institutional_walkforward_backtest():
                 if shares > 0:
                     cost = shares * cur_p
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash -= (cost + friction)
+                    portfolio_cash -= cost + friction
                     total_transaction_costs += friction
                     positions[cand["ticker"]] = {
-                        "shares": shares, "entry_price": cur_p,
-                        "entry_date": current_date, "days_held": 0, "regime": current_regime,
+                        "shares": shares,
+                        "entry_price": cur_p,
+                        "entry_date": current_date,
+                        "days_held": 0,
+                        "regime": current_regime,
                     }
 
         # 7. Günlük portföy değeri
-        current_positions_value = sum(p["shares"] * _get_close(features_by_ticker[t], current_date) for t, p in positions.items())
+        current_positions_value = sum(
+            p["shares"] * _get_close(features_by_ticker[t], current_date) for t, p in positions.items()
+        )
         current_equity = portfolio_cash + current_positions_value
         portfolio_equity_curve.append({"date": date_str, "equity": current_equity})
 
@@ -470,13 +531,14 @@ def run_institutional_walkforward_backtest():
         equal_weight_equity_curve.append({"date": date_str, "equity": ew_eq})
 
         if len(portfolio_equity_curve) > 1:
-            d_ret = (portfolio_equity_curve[-1]["equity"] / portfolio_equity_curve[-2]["equity"] - 1.0)
+            d_ret = portfolio_equity_curve[-1]["equity"] / portfolio_equity_curve[-2]["equity"] - 1.0
             daily_returns_strategy.append(d_ret)
             if month_key not in monthly_performance:
                 monthly_performance[month_key] = {
                     "strat_start": portfolio_equity_curve[-2]["equity"],
                     "xu100_start": benchmark_equity_curve[-2]["equity"],
-                    "strat_end": current_equity, "xu100_end": xu100_equity,
+                    "strat_end": current_equity,
+                    "xu100_end": xu100_equity,
                 }
             else:
                 monthly_performance[month_key]["strat_end"] = current_equity
@@ -525,10 +587,14 @@ def run_institutional_walkforward_backtest():
     logger.info(f"💸 Toplam Komisyon: ₺{total_transaction_costs:,.2f}")
 
     return {
-        "cagr_strat": cagr_strat, "total_return_strat": total_return_strat,
-        "total_return_bench": total_return_bench, "sharpe_strat": sharpe_strat,
-        "max_dd_strat": max_dd_strat, "win_rate": win_rate,
-        "profit_factor": profit_factor, "net_pnl": final_strat - INITIAL_CAPITAL,
+        "cagr_strat": cagr_strat,
+        "total_return_strat": total_return_strat,
+        "total_return_bench": total_return_bench,
+        "sharpe_strat": sharpe_strat,
+        "max_dd_strat": max_dd_strat,
+        "win_rate": win_rate,
+        "profit_factor": profit_factor,
+        "net_pnl": final_strat - INITIAL_CAPITAL,
     }
 
 

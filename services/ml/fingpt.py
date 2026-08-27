@@ -3,6 +3,7 @@
 Finansal NLP sentiment analizi — transformer-based,
 multi-source (KAP, haber, sosyal medya), confidence scoring.
 """
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -16,6 +17,7 @@ logger = structlog.get_logger()
 @dataclass
 class SentimentResult:
     """Sentiment analiz sonucu."""
+
     text: str
     sentiment: str  # POSITIVE, NEGATIVE, NEUTRAL
     score: float  # -1 ile 1 arası
@@ -28,6 +30,7 @@ class SentimentResult:
 @dataclass
 class AggregatedSentiment:
     """Bir hisse için toplu sentiment."""
+
     ticker: str
     avg_score: float
     weighted_score: float
@@ -58,7 +61,7 @@ class FinGPTSentiment:
         self._tokenizer = None
         self._sentiment_history: dict[str, list[SentimentResult]] = {}
         self._source_weights = {
-            "kap": 1.0,      # KAP en güvenilir
+            "kap": 1.0,  # KAP en güvenilir
             "news": 0.7,
             "social": 0.3,
         }
@@ -125,10 +128,11 @@ class FinGPTSentiment:
 
         # Son N saat
         now = datetime.now(UTC)
-        recent = [
-            r for r in history
-            if (now - datetime.fromisoformat(r.timestamp)).total_seconds() < window_hours * 3600
-        ] if history[0].timestamp else history
+        recent = (
+            [r for r in history if (now - datetime.fromisoformat(r.timestamp)).total_seconds() < window_hours * 3600]
+            if history[0].timestamp
+            else history
+        )
 
         if not recent:
             return None
@@ -143,7 +147,10 @@ class FinGPTSentiment:
             weighted_scores.append(r.score * w * r.confidence)
 
         avg_score = float(np.mean(scores))
-        weighted_score = float(np.sum(weighted_scores) / max(sum(self._source_weights.get(r.source, 0.5) * r.confidence for r in recent), 1e-8))
+        weighted_score = float(
+            np.sum(weighted_scores)
+            / max(sum(self._source_weights.get(r.source, 0.5) * r.confidence for r in recent), 1e-8)
+        )
 
         # Sentiment
         if weighted_score > 0.1:
@@ -224,7 +231,19 @@ class FinGPTSentiment:
         """Rule-based sentiment analizi (fallback)."""
         text_lower = text.lower()
 
-        positive_words = ["yükseliş", "artış", "kâr", "büyüme", "rekor", "güçlü", "olumlu", "pozitif", "buy", "güzel", "iyi"]
+        positive_words = [
+            "yükseliş",
+            "artış",
+            "kâr",
+            "büyüme",
+            "rekor",
+            "güçlü",
+            "olumlu",
+            "pozitif",
+            "buy",
+            "güzel",
+            "iyi",
+        ]
         negative_words = ["düşüş", "kayıp", "zarar", "azalma", "zayıf", "olumsuz", "negatif", "sell", "kötü", "risk"]
 
         pos_count = sum(1 for w in positive_words if w in text_lower)

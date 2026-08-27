@@ -2,6 +2,7 @@
 
 Faktör getiri serisi hesaplama, trend analizi, mevsimsellik.
 """
+
 from typing import Any
 
 import numpy as np
@@ -75,7 +76,7 @@ def analyze_factor_trend(
         direction = "FLAT"
 
     # Trend gücü (R²)
-    strength = float(r_value ** 2)
+    strength = float(r_value**2)
 
     return {
         "trend_direction": direction,
@@ -139,7 +140,7 @@ def detect_seasonality(
     # Aylık getiri (yaklaşık 21 gün/ay)
     monthly_returns = []
     for i in range(0, n - 20, 21):
-        month_ret = float(np.prod(1 + r[i:i + 21]) - 1)
+        month_ret = float(np.prod(1 + r[i : i + 21]) - 1)
         monthly_returns.append(month_ret)
 
     if len(monthly_returns) < 3:

@@ -28,8 +28,9 @@ logger = structlog.get_logger()
 @dataclass
 class MaskResult:
     """Mask sonucu."""
+
     ticker: str
-    mask: np.ndarray        # 1 = valid, 0 = invalid
+    mask: np.ndarray  # 1 = valid, 0 = invalid
     reason: dict[int, str]  # index → neden invalid
     valid_count: int
     total_count: int
@@ -149,10 +150,7 @@ class TradabilityMask:
         valid_pct = valid_count / n * 100 if n > 0 else 0
 
         if valid_pct < 80:
-            logger.warning("Low valid data percentage",
-                         ticker=ticker,
-                         valid_pct=f"{valid_pct:.1f}%",
-                         total=n)
+            logger.warning("Low valid data percentage", ticker=ticker, valid_pct=f"{valid_pct:.1f}%", total=n)
 
         return MaskResult(
             ticker=ticker,

@@ -47,14 +47,14 @@ class CacheWarmer:
 
         duration = (time.monotonic() - start) * 1000
         self._warmed = True
-        logger.info("Cache warming completed",
-                    success=f"{success}/{total}", duration_ms=round(duration, 1))
+        logger.info("Cache warming completed", success=f"{success}/{total}", duration_ms=round(duration, 1))
 
     async def _warm_bist_universe(self) -> bool:
         """BIST hisse listesini yükle."""
         try:
             from ..core.redis_helper import set_cached
             from ..ingestion.bist_universe import get_bist_universe
+
             universe = get_bist_universe()
             if universe:
                 set_cached("bist:universe", universe, ttl=86400)  # 24 saat
@@ -69,6 +69,7 @@ class CacheWarmer:
         try:
             from ..core.market_calendar import get_market_calendar
             from ..core.redis_helper import set_cached
+
             calendar = get_market_calendar()
             if calendar:
                 set_cached("market:calendar", calendar, ttl=86400)
@@ -82,6 +83,7 @@ class CacheWarmer:
         """Son fiyatları yükle (radar cache)."""
         try:
             from ..core.redis_helper import get_cached
+
             # Mevcut radar verisi varsa tazele
             radar = get_cached("radar:data")
             if radar:
@@ -89,6 +91,7 @@ class CacheWarmer:
                 return True
             # Yoksa TradingView'den çek
             from ..api.v1.market import _fetch_radar_fresh
+
             await _fetch_radar_fresh(limit=500)
             logger.debug("Warmed latest prices from TradingView")
             return True
@@ -100,6 +103,7 @@ class CacheWarmer:
         """Aktif sinyalleri yükle."""
         try:
             from ..core.redis_helper import get_cached
+
             signals = get_cached("signals:latest")
             if signals:
                 logger.debug("Signals cache already warm", count=len(signals))
@@ -112,6 +116,7 @@ class CacheWarmer:
         """Portföy durumunu yükle."""
         try:
             from ..core.redis_helper import get_cached
+
             pf = get_cached("portfolio:state")
             if pf:
                 logger.debug("Portfolio cache already warm")
@@ -124,6 +129,7 @@ class CacheWarmer:
         """Risk metriklerini yükle."""
         try:
             from ..core.redis_helper import get_cached
+
             risk = get_cached("risk:metrics")
             if risk:
                 logger.debug("Risk cache already warm")

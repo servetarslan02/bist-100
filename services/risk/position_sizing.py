@@ -59,11 +59,17 @@ class PositionSizer:
     ) -> list[PositionSize]:
         """Tum pozisyon buyukluklerini hesapla."""
 
-        logger.debug("debug_output", message=f"\n[POSITION SIZING v4.0] opportunities={len(opportunities)}, portfolio={portfolio_value:,.0f}, regime={regime}")
+        logger.debug(
+            "debug_output",
+            message=f"\n[POSITION SIZING v4.0] opportunities={len(opportunities)}, portfolio={portfolio_value:,.0f}, regime={regime}",
+        )
 
         # Volatilite targeting kaldirac orani
         leverage = self._volatility_leverage(current_volatility)
-        logger.debug("debug_output", message=f"  leverage={leverage:.4f} (target_vol={self.target_volatility}, current_vol={current_volatility:.4f})")
+        logger.debug(
+            "debug_output",
+            message=f"  leverage={leverage:.4f} (target_vol={self.target_volatility}, current_vol={current_volatility:.4f})",
+        )
 
         # Rejim bazli ayarlar
         if regime == "BEAR":
@@ -81,7 +87,10 @@ class PositionSizer:
         hist_avg_win, hist_avg_loss = (0.05, 0.05)
         if calibrator:
             hist_avg_win, hist_avg_loss = calibrator.get_avg_win_loss()
-            logger.debug("debug_output", message=f"  historical_avg_win={hist_avg_win:.4f}, historical_avg_loss={hist_avg_loss:.4f}")
+            logger.debug(
+                "debug_output",
+                message=f"  historical_avg_win={hist_avg_win:.4f}, historical_avg_loss={hist_avg_loss:.4f}",
+            )
 
         positions = []
         total_weight = 0
@@ -93,7 +102,10 @@ class PositionSizer:
             expected_return = opp.get("expected_return", 0)
             volatility = opp.get("volatility", 0.2)
 
-            logger.debug("debug_output", message=f"\n  [{ticker}] score={score:.4f}, conf={confidence:.4f}, exp_ret={expected_return:.4f}, vol={volatility:.4f}")
+            logger.debug(
+                "debug_output",
+                message=f"\n  [{ticker}] score={score:.4f}, conf={confidence:.4f}, exp_ret={expected_return:.4f}, vol={volatility:.4f}",
+            )
 
             # NaN/Inf/Zero kontrolu
             if not self._is_valid(score) or not self._is_valid(confidence) or not self._is_valid(volatility):
@@ -111,7 +123,9 @@ class PositionSizer:
                 win_prob = 1.0 / (1.0 + np.exp(-0.08 * (score - 50)))
                 win_prob = float(np.clip(win_prob, 0.05, 0.95))
 
-            logger.debug("debug_output", message=f"    win_probability={win_prob:.4f} (calibrated from score={score:.4f})")
+            logger.debug(
+                "debug_output", message=f"    win_probability={win_prob:.4f} (calibrated from score={score:.4f})"
+            )
 
             # === HISTORICAL OOS: avg_win, avg_loss ===
             # Ticker-spesifik historical performance (varsa)
@@ -136,7 +150,9 @@ class PositionSizer:
                 logger.debug("debug_output", message=f"    kelly={kelly:.4f} (regime={regime})")
 
                 if kelly <= 0:
-                    logger.debug("debug_output", message="    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
+                    logger.debug(
+                        "debug_output", message="    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)"
+                    )
                     continue
 
                 base_weight = kelly
@@ -178,19 +194,21 @@ class PositionSizer:
             # Risk yuzdesi
             risk_pct = weight * volatility * 2
 
-            positions.append(PositionSize(
-                ticker=ticker,
-                weight=round(weight, 4),
-                shares=0,
-                notional=round(weight * portfolio_value, 2),
-                risk_pct=round(risk_pct * 100, 2),
-                kelly_fraction=round(kelly, 4),
-                win_probability=round(win_prob, 4),
-                avg_win=round(ticker_avg_win, 4),
-                avg_loss=round(ticker_avg_loss, 4),
-                vol_adjusted=round(vol_adj, 4),
-                max_position_pct=round(max_pos, 4),
-            ))
+            positions.append(
+                PositionSize(
+                    ticker=ticker,
+                    weight=round(weight, 4),
+                    shares=0,
+                    notional=round(weight * portfolio_value, 2),
+                    risk_pct=round(risk_pct * 100, 2),
+                    kelly_fraction=round(kelly, 4),
+                    win_probability=round(win_prob, 4),
+                    avg_win=round(ticker_avg_win, 4),
+                    avg_loss=round(ticker_avg_loss, 4),
+                    vol_adjusted=round(vol_adj, 4),
+                    max_position_pct=round(max_pos, 4),
+                )
+            )
 
             total_weight += weight
 
@@ -212,28 +230,30 @@ class PositionSizer:
 
     # Rejime göre Kelly fraction (SSRN Regime-Conditioned Kelly 2026)
     REGIME_KELLY_FRACTIONS = {
-        "BULL": 0.6,              # Agresif
-        "BEAR": 0.3,              # Muhafazakar
-        "SIDEWAYS": 0.4,          # Orta
+        "BULL": 0.6,  # Agresif
+        "BEAR": 0.3,  # Muhafazakar
+        "SIDEWAYS": 0.4,  # Orta
         "HIGH_VOLATILITY": 0.25,  # Çok muhafazakar
-        "LOW_VOLATILITY": 0.5,    # Normal
-        "RISK_ON": 0.55,          # Biraz agresif
-        "RISK_OFF": 0.3,          # Muhafazakar
-        "CRISIS": 0.15,           # Çok muhafazakar
-        "RECOVERY": 0.45,         # Orta-agresif
+        "LOW_VOLATILITY": 0.5,  # Normal
+        "RISK_ON": 0.55,  # Biraz agresif
+        "RISK_OFF": 0.3,  # Muhafazakar
+        "CRISIS": 0.15,  # Çok muhafazakar
+        "RECOVERY": 0.45,  # Orta-agresif
         "MOMENTUM_EXPANSION": 0.55,
         "MOMENTUM_CONTRACTION": 0.25,
         "PANIC": 0.15,
     }
 
-    def _fractional_kelly(self, win_prob: float, avg_win: float, avg_loss: float,
-                          regime: str = "SIDEWAYS") -> float:
+    def _fractional_kelly(self, win_prob: float, avg_win: float, avg_loss: float, regime: str = "SIDEWAYS") -> float:
         """Fractional Kelly: f* = (p*b - q) / b * fraction.
 
         Regime-conditioned: fraction rejime göre değişir.
         SSRN Regime-Conditioned Kelly (2026) araştırmasına dayalı.
         """
-        logger.debug("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}")
+        logger.debug(
+            "debug_output",
+            message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}",
+        )
 
         if avg_loss <= 0:
             logger.debug("debug_output", message="      -> avg_loss<=0, kelly=0")
@@ -260,7 +280,10 @@ class PositionSizer:
         # Regime-conditioned fraction (SSRN 2026)
         regime_fraction = self.REGIME_KELLY_FRACTIONS.get(regime, self.kelly_fraction)
         fractional = kelly * regime_fraction
-        logger.debug("debug_output", message=f"      [KELLY] clamped={kelly:.4f}, regime_fraction={regime_fraction}, fractional={fractional:.4f}")
+        logger.debug(
+            "debug_output",
+            message=f"      [KELLY] clamped={kelly:.4f}, regime_fraction={regime_fraction}, fractional={fractional:.4f}",
+        )
 
         return fractional
 
@@ -301,6 +324,7 @@ class PositionSizer:
         """
         try:
             from services.risk.var_cvar import VaRCalculator
+
             calc = VaRCalculator()
             return calc.calculate_var_based_position_limit(
                 returns=returns,
@@ -311,6 +335,7 @@ class PositionSizer:
         except ImportError:
             # Fallback: basit VaR bazlı limit
             from scipy.stats import norm
+
             sigma = np.std(returns, ddof=1) if len(returns) > 1 else 0.2
             if sigma <= 0:
                 return portfolio_value * (max_var_pct / 100)
@@ -324,6 +349,7 @@ class PositionSizer:
 @dataclass
 class _CalcResult:
     """Geriye uyumlu calculate() sonuç tipi."""
+
     shares: int = 0
     position_value: float = 0.0
     position_pct: float = 0.0

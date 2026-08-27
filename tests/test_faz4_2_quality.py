@@ -13,16 +13,16 @@ import polars as pl
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):
     rng = np.random.RandomState(seed)
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
+    dates = pl.date_range(
+        date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days * 2), timedelta(days=1), eager=True
+    ).head(n_days)
     close = start_price + np.cumsum(rng.randn(n_days) * 1.5)
     close = np.maximum(close, 1.0)
     high = close * (1 + rng.uniform(0, 0.03, n_days))
     low = close * (1 - rng.uniform(0, 0.03, n_days))
     open_ = close * (1 + rng.uniform(-0.01, 0.01, n_days))
     volume = rng.randint(100000, 5000000, n_days).astype(float)
-    return pl.DataFrame({
-        "Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume
-    }, index=dates)
+    return pl.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume}, index=dates)
 
 
 def _make_features_map(n_samples=100, n_features=10, seed=42):
@@ -49,6 +49,7 @@ def _make_features_map(n_samples=100, n_features=10, seed=42):
 # ────────────────────────────────────────────────────────────
 # TEST 1: Sample metadata doğruluğu
 # ────────────────────────────────────────────────────────────
+
 
 def test_sample_metadata():
     """Key formatı, ticker, feature_date doğruluğu."""
@@ -82,6 +83,7 @@ def test_sample_metadata():
 # TEST 2: Target = T+5 forward return doğrulaması
 # ────────────────────────────────────────────────────────────
 
+
 def test_target_t5_forward_return():
     """Target'ın gerçekten T+5 forward return olduğunu doğrula."""
     from services.ml.training_validator import TrainingDatasetValidator
@@ -108,6 +110,7 @@ def test_target_t5_forward_return():
 # ────────────────────────────────────────────────────────────
 # TEST 3: Train/test leakage tespiti
 # ────────────────────────────────────────────────────────────
+
 
 def test_train_test_leakage_detection():
     """Train ve test tarihleri arasında overlap var mı?"""
@@ -141,6 +144,7 @@ def test_train_test_leakage_detection():
 # ────────────────────────────────────────────────────────────
 # TEST 4: Cross-ticker sample oluşturma
 # ────────────────────────────────────────────────────────────
+
 
 def test_cross_ticker_samples():
     """Aynı tarihte farklı hisselerin sample'ları doğru oluşuyor mu?"""
@@ -176,6 +180,7 @@ def test_cross_ticker_samples():
 # TEST 5: NaN/inf/outlier tespiti
 # ────────────────────────────────────────────────────────────
 
+
 def test_nan_inf_outlier_detection():
     """Feature'larda NaN, inf ve outlier tespiti."""
     from services.ml.training_validator import TrainingDatasetValidator
@@ -189,17 +194,16 @@ def test_nan_inf_outlier_detection():
     returns = {}
     date_groups = {}
     for i in range(50):
-        key = f"SYM{i%5:02d}::2022-01-{i+1:02d}"
+        key = f"SYM{i % 5:02d}::2022-01-{i + 1:02d}"
         features_map[key] = {
             "feat_nan": float("nan") if i < 10 else 1.0,  # %20 NaN
-            "feat_inf": float("inf") if i < 5 else 1.0,    # %10 inf
+            "feat_inf": float("inf") if i < 5 else 1.0,  # %10 inf
             "feat_normal": float(i),
         }
         returns[key] = float(i)
-        date_groups[key] = f"2022-01-{i+1:02d}"
+        date_groups[key] = f"2022-01-{i + 1:02d}"
 
-    report = v.validate_dataset(features_map, returns, date_groups,
-                                ["feat_nan", "feat_inf", "feat_normal"])
+    report = v.validate_dataset(features_map, returns, date_groups, ["feat_nan", "feat_inf", "feat_normal"])
 
     assert "feat_nan" in report.nan_features, "NaN not detected"
     assert "feat_inf" in report.inf_features, "inf not detected"
@@ -216,6 +220,7 @@ def test_nan_inf_outlier_detection():
 # TEST 6: Feature temizliği (inf → NaN, outlier clamp)
 # ────────────────────────────────────────────────────────────
 
+
 def test_feature_cleaning():
     """inf → NaN dönüşümü ve outlier clamp doğruluğu."""
     from services.ml.training_validator import TrainingDatasetValidator
@@ -226,7 +231,7 @@ def test_feature_cleaning():
 
     features_map = {}
     for i in range(50):
-        key = f"SYM{i%5:02d}::2022-01-{i+1:02d}"
+        key = f"SYM{i % 5:02d}::2022-01-{i + 1:02d}"
         features_map[key] = {
             "feat_inf": float("inf") if i == 0 else 1.0,
             "feat_outlier": 1000.0 if i == 0 else 1.0,  # Outlier
@@ -250,6 +255,7 @@ def test_feature_cleaning():
 # TEST 7: Target dağılımı ve sample dengesi
 # ────────────────────────────────────────────────────────────
 
+
 def test_target_distribution():
     """Target dağılım analizi (mean, std, skew, balance)."""
     from services.ml.training_validator import TrainingDatasetValidator
@@ -262,9 +268,11 @@ def test_target_distribution():
     features_map = {}
     returns = {}
     date_groups = {}
-    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=400), timedelta(days=1), eager=True).head(200)
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=400), timedelta(days=1), eager=True).head(
+        200
+    )
     for i in range(200):
-        ticker = f"SYM{i%10:02d}"
+        ticker = f"SYM{i % 10:02d}"
         date_str = str(dates[i].date())
         key = f"{ticker}::{date_str}"
         features_map[key] = {"feat_0": float(rng.randn())}
@@ -277,8 +285,10 @@ def test_target_distribution():
     assert abs(report.target_mean) < 2.0, f"Target mean out of range: {report.target_mean}"
     assert report.target_std > 1.0, f"Target std too low: {report.target_std}"
     assert 0.3 < report.target_positive_pct < 0.7, f"Target imbalance: {report.target_positive_pct}"
-    print(f"  ✓ Distribution: mean={report.target_mean:.2f}, std={report.target_std:.2f}, "
-          f"pos={report.target_positive_pct:.0%}, skew={report.target_skew:.2f}")
+    print(
+        f"  ✓ Distribution: mean={report.target_mean:.2f}, std={report.target_std:.2f}, "
+        f"pos={report.target_positive_pct:.0%}, skew={report.target_skew:.2f}"
+    )
     passed += 1
 
     return passed, failed
@@ -287,6 +297,7 @@ def test_target_distribution():
 # ────────────────────────────────────────────────────────────
 # TEST 8: Validation metrikleri (MAE, RMSE, R², directional accuracy)
 # ────────────────────────────────────────────────────────────
+
 
 def test_validation_metrics():
     """Model validation metrikleri doğru hesaplanıyor mu?"""
@@ -331,6 +342,7 @@ def test_validation_metrics():
 # TEST 9: Kalite skoru hesaplama
 # ────────────────────────────────────────────────────────────
 
+
 def test_quality_score():
     """Kalite skoru doğru hesaplanıyor mu?"""
     from services.ml.training_validator import TrainingDatasetValidator
@@ -360,6 +372,7 @@ def test_quality_score():
 # TEST 10: LightGBM validation metrikleri entegrasyonu
 # ────────────────────────────────────────────────────────────
 
+
 def test_lightgbm_validation_metrics():
     """LightGBM trainer'ın validation metriklerini döndürmesi."""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
@@ -374,10 +387,10 @@ def test_lightgbm_validation_metrics():
     feature_names = [f"feat_{i}" for i in range(10)]
 
     for i in range(200):
-        key = f"SYM{i%10:02d}::2022-{(i//20)%12+1:02d}-{(i%20)+1:02d}"
+        key = f"SYM{i % 10:02d}::2022-{(i // 20) % 12 + 1:02d}-{(i % 20) + 1:02d}"
         features_map[key] = {f: float(rng.randn()) for f in feature_names}
         returns[key] = float(rng.randn() * 5)
-        date_groups[key] = f"2022-{(i//20)%12+1:02d}-{(i%20)+1:02d}"
+        date_groups[key] = f"2022-{(i // 20) % 12 + 1:02d}-{(i % 20) + 1:02d}"
 
     trainer = LightGBMTrainer(MLModelConfig(num_boost_round=10, early_stopping_rounds=3))
     model = trainer.train(features_map, returns, date_groups, feature_names=feature_names)
@@ -400,8 +413,10 @@ def test_lightgbm_validation_metrics():
     assert vm["rmse"] >= 0, f"RMSE should be >=0: {vm['rmse']}"
     assert 0 <= vm["directional_accuracy"] <= 1, f"DirAcc out of range: {vm['directional_accuracy']}"
 
-    print(f"  ✓ LightGBM metrics: MAE={vm['mae']:.4f}, RMSE={vm['rmse']:.4f}, "
-          f"R²={vm['r_squared']:.4f}, DirAcc={vm['directional_accuracy']:.4f}, IC={vm['ic']:.4f}")
+    print(
+        f"  ✓ LightGBM metrics: MAE={vm['mae']:.4f}, RMSE={vm['rmse']:.4f}, "
+        f"R²={vm['r_squared']:.4f}, DirAcc={vm['directional_accuracy']:.4f}, IC={vm['ic']:.4f}"
+    )
     passed += 1
 
     return passed, failed
@@ -410,6 +425,7 @@ def test_lightgbm_validation_metrics():
 # ────────────────────────────────────────────────────────────
 # TEST 11: Rule-based fallback (model başarısız olduğunda)
 # ────────────────────────────────────────────────────────────
+
 
 def test_rule_based_fallback():
     """Model None döndüğünde rule-based fallback çalışıyor mu?"""
@@ -437,6 +453,7 @@ def test_rule_based_fallback():
 
     # Rule-based score'un çalıştığını doğrula (RankingModel)
     from services.ml.ranking_model import RankingModel
+
     rm = RankingModel()
     score = rm._rule_based_score({"momentum_20d": 5.0, "roc_5d": 2.0, "rs_vs_bist_5d": 1.0}, "BULL")
     assert 0 <= score <= 100, f"Rule-based score out of range: {score}"
@@ -449,6 +466,7 @@ def test_rule_based_fallback():
 # ────────────────────────────────────────────────────────────
 # TEST 12: Full pipeline entegrasyonu (train + validate + clean)
 # ────────────────────────────────────────────────────────────
+
 
 def test_full_pipeline_integration():
     """Train → validate → clean → train pipeline entegrasyonu."""
@@ -466,7 +484,7 @@ def test_full_pipeline_integration():
     returns = {}
     date_groups = {}
     for i in range(200):
-        key = f"SYM{i%10:02d}::2022-{(i//20)%12+1:02d}-{(i%20)+1:02d}"
+        key = f"SYM{i % 10:02d}::2022-{(i // 20) % 12 + 1:02d}-{(i % 20) + 1:02d}"
         feats = {f: float(rng.randn()) for f in feature_names}
         if i % 20 == 0:
             feats["feat_0"] = float("inf")  # inf ekle
@@ -474,7 +492,7 @@ def test_full_pipeline_integration():
             feats["feat_1"] = 999.0  # Outlier ekle
         features_map[key] = feats
         returns[key] = float(rng.randn() * 5)
-        date_groups[key] = f"2022-{(i//20)%12+1:02d}-{(i%20)+1:02d}"
+        date_groups[key] = f"2022-{(i // 20) % 12 + 1:02d}-{(i % 20) + 1:02d}"
 
     # 1. Validate
     v = TrainingDatasetValidator()
@@ -508,6 +526,7 @@ def test_full_pipeline_integration():
 # ────────────────────────────────────────────────────────────
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
+
 
 def run_all():
     tests = [

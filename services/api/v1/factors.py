@@ -38,7 +38,7 @@ async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(c
             "liquidity": round(liquidity, 1),
             "size": round(size, 1),
         },
-        "bias": "BULLISH_MOMENTUM" if momentum > 60 else "NEUTRAL_VALUE"
+        "bias": "BULLISH_MOMENTUM" if momentum > 60 else "NEUTRAL_VALUE",
     }
 
 
@@ -66,6 +66,7 @@ async def factor_exposure(ticker: str, user=Depends(get_current_user), _=Depends
 async def portfolio_exposure(portfolio_id: int = Query(1), user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Tüm portföyün ağırlıklı faktör maruziyeti."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
+
     positions = paper_orchestrator.portfolio.get_all_positions()
     total_val = paper_orchestrator.portfolio.get_total_value()
 
@@ -74,7 +75,7 @@ async def portfolio_exposure(portfolio_id: int = Query(1), user=Depends(get_curr
             "portfolio_id": portfolio_id,
             "factors": {"momentum": 72.5, "value": 68.0, "quality": 78.4, "volatility": 34.2, "liquidity": 85.0},
             "fama_french_betas": {"mkt_rf": 1.02, "smb": 0.15, "hml": 0.10, "rmw": 0.22, "cma": 0.18},
-            "num_positions": 0
+            "num_positions": 0,
         }
 
     weighted_mom = 0.0
@@ -110,5 +111,5 @@ async def portfolio_exposure(portfolio_id: int = Query(1), user=Depends(get_curr
             "cma": 0.21,
         },
         "num_positions": len(positions),
-        "status": "active"
+        "status": "active",
     }

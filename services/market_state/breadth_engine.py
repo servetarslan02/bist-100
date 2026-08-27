@@ -33,6 +33,7 @@ logger = structlog.get_logger()
 @dataclass
 class BreadthResult:
     """Market breadth sonucu — 7 gösterge + state."""
+
     timestamp: datetime
 
     # Temel breadth
@@ -42,19 +43,19 @@ class BreadthResult:
     total: int = 0
 
     # Göstergeler
-    ad_line: int = 0                        # Advance-Decline Line (cumulative)
-    ad_ratio: float = 1.0                   # Advancing / Declining
-    pct_advancing: float = 50.0             # % Advancing
-    mcclellan_osc: float = 0.0             # McClellan Oscillator
-    mcclellan_summation: float = 0.0       # McClellan Summation Index
-    trin: float = 1.0                       # TRIN / Arms Index
-    new_highs: int = 0                      # 52-week new highs
-    new_lows: int = 0                       # 52-week new lows
-    breadth_thrust: float = 0.5            # Breadth Thrust
+    ad_line: int = 0  # Advance-Decline Line (cumulative)
+    ad_ratio: float = 1.0  # Advancing / Declining
+    pct_advancing: float = 50.0  # % Advancing
+    mcclellan_osc: float = 0.0  # McClellan Oscillator
+    mcclellan_summation: float = 0.0  # McClellan Summation Index
+    trin: float = 1.0  # TRIN / Arms Index
+    new_highs: int = 0  # 52-week new highs
+    new_lows: int = 0  # 52-week new lows
+    breadth_thrust: float = 0.5  # Breadth Thrust
 
     # State
-    breadth_state: str = "NEUTRAL"          # BROAD / NEUTRAL / NARROW
-    alert_level: str = "NORMAL"             # NORMAL / WARNING / ALERT / CRITICAL
+    breadth_state: str = "NEUTRAL"  # BROAD / NEUTRAL / NARROW
+    alert_level: str = "NORMAL"  # NORMAL / WARNING / ALERT / CRITICAL
 
     # Sektörel breadth (opsiyonel)
     sector_breadth: dict[str, float] = field(default_factory=dict)
@@ -137,10 +138,7 @@ class MarketBreadthEngine:
             BreadthResult
         """
         # Düşük likiditeli hisseleri filtrele
-        valid_states = [
-            s for s in instrument_states
-            if s.get("volume", 0) >= self._volume_min
-        ]
+        valid_states = [s for s in instrument_states if s.get("volume", 0) >= self._volume_min]
 
         if not valid_states:
             logger.warning("No valid instruments for breadth calculation")
@@ -180,14 +178,10 @@ class MarketBreadthEngine:
         breadth_thrust = advancing / total if total > 0 else 0.5
 
         # 9. Breadth State
-        breadth_state = self._determine_breadth_state(
-            pct_advancing, mcclellan_osc, trin, breadth_thrust
-        )
+        breadth_state = self._determine_breadth_state(pct_advancing, mcclellan_osc, trin, breadth_thrust)
 
         # 10. Alert Level
-        alert_level = self._determine_alert_level(
-            pct_advancing, mcclellan_osc, trin, ad_ratio, breadth_thrust
-        )
+        alert_level = self._determine_alert_level(pct_advancing, mcclellan_osc, trin, ad_ratio, breadth_thrust)
 
         # 11. Döviz izolasyonu — BIST-specific
         #     USD/TRY yükseldiğinde hisseler düşer ama bu gerçek bearishlik değil.
@@ -250,7 +244,7 @@ class MarketBreadthEngine:
             # Yeterli veri yoksa basit ortalama
             if len(history) == 0:
                 return 0.0
-            return float(np.mean(history[-min(len(history), self._mcclellan_short):]))
+            return float(np.mean(history[-min(len(history), self._mcclellan_short) :]))
 
         # EMA hesapla
         short_ema = self._ema(history, self._mcclellan_short)
@@ -283,12 +277,8 @@ class MarketBreadthEngine:
         TRIN > 1 → bearish (düşen hacim güçlü)
         TRIN = 1 → nötr
         """
-        advancing_vol = sum(
-            s.get("volume", 0) for s in states if s.get("change_pct", 0) > 0
-        )
-        declining_vol = sum(
-            s.get("volume", 0) for s in states if s.get("change_pct", 0) < 0
-        )
+        advancing_vol = sum(s.get("volume", 0) for s in states if s.get("change_pct", 0) > 0)
+        declining_vol = sum(s.get("volume", 0) for s in states if s.get("change_pct", 0) < 0)
 
         ad_ratio = advancing / max(declining, 1)
         vol_ratio = advancing_vol / max(declining_vol, 1)

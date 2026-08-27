@@ -1,4 +1,5 @@
 """Test configuration and shared fixtures."""
+
 import logging
 import os
 
@@ -8,8 +9,12 @@ logger = logging.getLogger(__name__)
 
 # Test veritabanı tabloları — temizlik sırasında kullanılacak
 TEST_TABLES = [
-    'daily_pnl', 'equity_snapshots', 'position_history',
-    'cash_ledger', 'positions', 'portfolios',
+    "daily_pnl",
+    "equity_snapshots",
+    "position_history",
+    "cash_ledger",
+    "positions",
+    "portfolios",
 ]
 
 
@@ -18,7 +23,7 @@ async def safe_cleanup_tables(dev_db):
 
     except Exception: pass yerine kullanılır.
     """
-    _TABLE_NOT_FOUND = ('does not exist', 'undefined table', 'no such table')
+    _TABLE_NOT_FOUND = ("does not exist", "undefined table", "no such table")
     for t in TEST_TABLES:
         try:
             await dev_db.pg_execute(f"DELETE FROM {t}")
@@ -55,6 +60,7 @@ def tmp_data_path(tmp_path):
 def sample_ohlcv():
     """Örnek OHLCV verisi."""
     import numpy as np
+
     n = 100
     np.random.seed(42)
     close = 100 + np.cumsum(np.random.randn(n) * 0.5)

@@ -21,6 +21,7 @@ router = APIRouter()
 # Binary WebSocket desteği (Protobuf native)
 try:
     from ..binary_ws import ProtobufMessage
+
     HAS_BINARY_WS = True
 except ImportError:
     HAS_BINARY_WS = False
@@ -49,7 +50,9 @@ class ConnectionManager:
             self.active_connections[channel] = set()
         self.active_connections[channel].add(websocket)
         self._client_format[websocket] = fmt
-        logger.debug(f"WS client connected to channel: {channel} format: {fmt} (Total: {len(self.active_connections[channel])})")
+        logger.debug(
+            f"WS client connected to channel: {channel} format: {fmt} (Total: {len(self.active_connections[channel])})"
+        )
 
     def disconnect(self, websocket: WebSocket, channel: str):
         if channel in self.active_connections and websocket in self.active_connections[channel]:
@@ -145,6 +148,7 @@ class ConnectionManager:
             logger.warning("Protobuf encode failed, using orjson", error=str(e))
             return orjson.dumps(message, default=str)
 
+
 manager = ConnectionManager()
 
 
@@ -179,6 +183,7 @@ async def websocket_live(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket, "live")
 
+
 @router.websocket("/radar")
 async def websocket_radar(websocket: WebSocket):
     fmt = _get_ws_format(websocket)
@@ -202,6 +207,7 @@ async def websocket_radar(websocket: WebSocket):
         manager.disconnect(websocket, "radar")
     except Exception:
         manager.disconnect(websocket, "radar")
+
 
 @router.websocket("/events")
 async def websocket_events(websocket: WebSocket):

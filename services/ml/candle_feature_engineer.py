@@ -6,7 +6,6 @@ ALPHA BIST — Mum Formasyonları Ampirik Başarı Karnesi & ML Özellik Mühend
 modeline beslenecek yüksek değerli özellik matrislerini (Feature Vectors) üretir.
 """
 
-
 import numpy as np
 import polars as pl
 import structlog
@@ -37,7 +36,7 @@ class CandleFeatureEngineer:
             n = len(df)
 
             for i in range(30, n - forward_days):
-                sub_df = df[:i+1]
+                sub_df = df[: i + 1]
                 c_res = candle_engine.analyze_dataframe(sub_df[-30:], ticker)
 
                 p_entry = float(closes[i])
@@ -45,13 +44,15 @@ class CandleFeatureEngineer:
                 fwd_ret = (p_exit - p_entry) / p_entry * 100
 
                 for pat in c_res.patterns_detected:
-                    records.append({
-                        "ticker": ticker,
-                        "pattern": pat,
-                        "fwd_ret": fwd_ret,
-                        "is_win": fwd_ret > 0,
-                        "buyer_pressure": c_res.buyer_pressure_pct
-                    })
+                    records.append(
+                        {
+                            "ticker": ticker,
+                            "pattern": pat,
+                            "fwd_ret": fwd_ret,
+                            "is_win": fwd_ret > 0,
+                            "buyer_pressure": c_res.buyer_pressure_pct,
+                        }
+                    )
 
         if not records:
             return pl.DataFrame()
@@ -64,8 +65,8 @@ class CandleFeatureEngineer:
             win_rate = (grp["is_win"].sum() / count) * 100
             avg_ret = grp["fwd_ret"].mean()
 
-            wins = grp.filter(pl.col('fwd_ret') > 0)["fwd_ret"]
-            losses = abs(grp.filter(pl.col('fwd_ret') < 0)["fwd_ret"])
+            wins = grp.filter(pl.col("fwd_ret") > 0)["fwd_ret"]
+            losses = abs(grp.filter(pl.col("fwd_ret") < 0)["fwd_ret"])
 
             avg_win = wins.mean() if len(wins) > 0 else 0.0
             avg_loss = losses.mean() if len(losses) > 0 else 1e-9
@@ -76,16 +77,20 @@ class CandleFeatureEngineer:
             # Beklenen Değer (Expectancy = (Win% * AvgWin) - (Loss% * AvgLoss))
             expectancy = ((win_rate / 100) * avg_win) - (((100 - win_rate) / 100) * avg_loss)
 
-            summary.append({
-                "Formasyon": pat,
-                "BIST Örneklem Sayısı": count,
-                "Kazanma Oranı (Win Rate)": round(win_rate, 1),
-                "Ort. 10G Getiri %": round(avg_ret, 2),
-                "Kâr / Zarar Çarpanı (PF)": profit_factor,
-                "Kazanç/Kayıp Oranı (Payoff)": payoff_ratio,
-                "Beklenen Değer (Expectancy %)": round(expectancy, 2),
-                "Model Öneri Derecesi": "⭐⭐⭐⭐⭐ (Güçlü Al)" if expectancy > 1.0 and win_rate >= 50 else ("⭐⭐⭐ (Nötr/Teyitli)" if expectancy > 0 else "⚠️ (Filtrelenmeli)")
-            })
+            summary.append(
+                {
+                    "Formasyon": pat,
+                    "BIST Örneklem Sayısı": count,
+                    "Kazanma Oranı (Win Rate)": round(win_rate, 1),
+                    "Ort. 10G Getiri %": round(avg_ret, 2),
+                    "Kâr / Zarar Çarpanı (PF)": profit_factor,
+                    "Kazanç/Kayıp Oranı (Payoff)": payoff_ratio,
+                    "Beklenen Değer (Expectancy %)": round(expectancy, 2),
+                    "Model Öneri Derecesi": "⭐⭐⭐⭐⭐ (Güçlü Al)"
+                    if expectancy > 1.0 and win_rate >= 50
+                    else ("⭐⭐⭐ (Nötr/Teyitli)" if expectancy > 0 else "⚠️ (Filtrelenmeli)"),
+                }
+            )
 
         df_summary = pl.DataFrame(summary).sort(by="Beklenen Değer (Expectancy %)", ascending=False)
         return df_summary
@@ -109,30 +114,37 @@ class CandleFeatureEngineer:
         col_has_crows = np.zeros(n)
 
         for i in range(3, n):
-            sub_df = df[max(0, i-30):i+1]
+            sub_df = df[max(0, i - 30) : i + 1]
             c_res = candle_engine.analyze_dataframe(sub_df, ticker)
 
             col_buyer_pressure[i] = c_res.buyer_pressure_pct
             col_candle_score[i] = c_res.candle_score
 
             pats = set(c_res.patterns_detected)
-            if "BULLISH_ENGULFING" in pats: col_has_engulfing[i] = 1.0
-            if "HAMMER_PINBAR" in pats: col_has_hammer[i] = 1.0
-            if "MORNING_STAR" in pats: col_has_morning_star[i] = 1.0
-            if "THREE_WHITE_SOLDIERS" in pats: col_has_soldiers[i] = 1.0
-            if "BULLISH_FVG" in pats: col_has_fvg[i] = 1.0
-            if "SHOOTING_STAR" in pats or "BEARISH_ENGULFING" in pats: col_has_shooting_star[i] = 1.0
-            if "THREE_BLACK_CROWS" in pats: col_has_crows[i] = 1.0
+            if "BULLISH_ENGULFING" in pats:
+                col_has_engulfing[i] = 1.0
+            if "HAMMER_PINBAR" in pats:
+                col_has_hammer[i] = 1.0
+            if "MORNING_STAR" in pats:
+                col_has_morning_star[i] = 1.0
+            if "THREE_WHITE_SOLDIERS" in pats:
+                col_has_soldiers[i] = 1.0
+            if "BULLISH_FVG" in pats:
+                col_has_fvg[i] = 1.0
+            if "SHOOTING_STAR" in pats or "BEARISH_ENGULFING" in pats:
+                col_has_shooting_star[i] = 1.0
+            if "THREE_BLACK_CROWS" in pats:
+                col_has_crows[i] = 1.0
 
-        df_feat = df_feat.with_columns(pl.lit(col_buyer_pressure).alias('feat_buyer_pressure'))
-        df_feat = df_feat.with_columns(pl.lit(col_candle_score).alias('feat_candle_score'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_engulfing).alias('feat_has_bull_engulfing'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_hammer).alias('feat_has_hammer'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_morning_star).alias('feat_has_morning_star'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_soldiers).alias('feat_has_soldiers'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_fvg).alias('feat_has_fvg'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_shooting_star).alias('feat_has_shooting_star'))
-        df_feat = df_feat.with_columns(pl.lit(col_has_crows).alias('feat_has_crows'))
+        df_feat = df_feat.with_columns(pl.lit(col_buyer_pressure).alias("feat_buyer_pressure"))
+        df_feat = df_feat.with_columns(pl.lit(col_candle_score).alias("feat_candle_score"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_engulfing).alias("feat_has_bull_engulfing"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_hammer).alias("feat_has_hammer"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_morning_star).alias("feat_has_morning_star"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_soldiers).alias("feat_has_soldiers"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_fvg).alias("feat_has_fvg"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_shooting_star).alias("feat_has_shooting_star"))
+        df_feat = df_feat.with_columns(pl.lit(col_has_crows).alias("feat_has_crows"))
 
         return df_feat
 

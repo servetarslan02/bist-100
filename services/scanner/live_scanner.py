@@ -28,8 +28,7 @@ class LiveScanner:
         self._scan_count: int = 0
         self._candidates: dict[str, float] = {}  # ticker -> score
 
-    def process_tick(self, ticker: str, price: float, volume: int,
-                     timestamp: datetime | None = None) -> dict | None:
+    def process_tick(self, ticker: str, price: float, volume: int, timestamp: datetime | None = None) -> dict | None:
         """
         Tick işle → state güncelle → aday mı?
 
@@ -40,10 +39,16 @@ class LiveScanner:
         # State yoksa oluştur
         if ticker not in self._states:
             self._states[ticker] = {
-                "price": 0, "prev_price": 0, "volume": 0,
-                "change_pct": 0, "vol_z": 0, "momentum": 0,
-                "last_update": None, "tick_count": 0,
-                "prices": [], "volumes": [],
+                "price": 0,
+                "prev_price": 0,
+                "volume": 0,
+                "change_pct": 0,
+                "vol_z": 0,
+                "momentum": 0,
+                "last_update": None,
+                "tick_count": 0,
+                "prices": [],
+                "volumes": [],
             }
 
         state = self._states[ticker]

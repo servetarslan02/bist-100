@@ -2,6 +2,7 @@
 
 Rejime göre faktör rotasyonu, momentum-based rotation, dynamic weighting.
 """
+
 from typing import Any
 
 import numpy as np

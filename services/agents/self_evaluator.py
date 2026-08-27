@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class EvalReport:
     """Değerlendirme raporu."""
+
     agent_role: str
     accuracy: float
     recent_accuracy: float  # Son 50 görev
@@ -149,11 +150,11 @@ class AgentSelfEvaluator:
             return False
 
         # Son N outcome
-        recent = outcomes[-self.min_samples:]
+        recent = outcomes[-self.min_samples :]
         recent_acc = sum(1 for o in recent if o["correct"]) / len(recent)
 
         # Önceki N outcome
-        previous = outcomes[-self.min_samples * 2:-self.min_samples]
+        previous = outcomes[-self.min_samples * 2 : -self.min_samples]
         previous_acc = sum(1 for o in previous if o["correct"]) / len(previous)
 
         drift = abs(recent_acc - previous_acc) > self.drift_threshold
@@ -235,22 +236,10 @@ class AgentSelfEvaluator:
             "total": len(list(outcomes)),
             "correct": sum(1 for o in outcomes if o["correct"]),
             "wrong": sum(1 for o in outcomes if not o["correct"]),
-            "long_correct": sum(
-                1 for o in outcomes
-                if o["predicted"] == "LONG" and o["correct"]
-            ),
-            "long_wrong": sum(
-                1 for o in outcomes
-                if o["predicted"] == "LONG" and not o["correct"]
-            ),
-            "short_correct": sum(
-                1 for o in outcomes
-                if o["predicted"] == "SHORT" and o["correct"]
-            ),
-            "short_wrong": sum(
-                1 for o in outcomes
-                if o["predicted"] == "SHORT" and not o["correct"]
-            ),
+            "long_correct": sum(1 for o in outcomes if o["predicted"] == "LONG" and o["correct"]),
+            "long_wrong": sum(1 for o in outcomes if o["predicted"] == "LONG" and not o["correct"]),
+            "short_correct": sum(1 for o in outcomes if o["predicted"] == "SHORT" and o["correct"]),
+            "short_wrong": sum(1 for o in outcomes if o["predicted"] == "SHORT" and not o["correct"]),
         }
 
 
@@ -274,12 +263,14 @@ class MultiAgentEvaluator:
 
             # Alarm gerekli mi?
             if report.recommendation != "OK":
-                alerts.append({
-                    "agent": role_name,
-                    "recommendation": report.recommendation,
-                    "accuracy": report.accuracy,
-                    "drift_detected": report.drift_detected,
-                })
+                alerts.append(
+                    {
+                        "agent": role_name,
+                        "recommendation": report.recommendation,
+                        "accuracy": report.accuracy,
+                        "drift_detected": report.drift_detected,
+                    }
+                )
 
         # Genel sistem sağlığı (double-evaluation'ı önlemek için
         # zaten hesaplanmış report'ları kullan)
@@ -300,9 +291,6 @@ class MultiAgentEvaluator:
                 "total_agents": len(reports),
                 "healthy": sum(1 for r in reports.values() if r["recommendation"] == "OK"),
                 "needs_attention": sum(1 for r in reports.values() if r["recommendation"] != "OK"),
-                "avg_accuracy": round(
-                    sum(r["accuracy"] for r in reports.values()) / len(reports) if reports else 0,
-                    4
-                ),
+                "avg_accuracy": round(sum(r["accuracy"] for r in reports.values()) / len(reports) if reports else 0, 4),
             },
         }

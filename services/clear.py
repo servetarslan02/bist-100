@@ -6,6 +6,7 @@ from services.core.database import init_databases, pg_execute
 
 logger = structlog.get_logger(__name__)
 
+
 async def run():
     await init_databases()
     # Tum kisisel portfoy ve gecmis tablolari temizleniyor
@@ -16,6 +17,7 @@ async def run():
     await pg_execute("TRUNCATE TABLE cash_ledger")
     await pg_execute("TRUNCATE TABLE positions")
     logger.info("Tum DB temizlendi")
+
 
 if __name__ == "__main__":
     asyncio.run(run())

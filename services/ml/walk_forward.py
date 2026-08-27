@@ -19,9 +19,11 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 @dataclass
 class WFResult:
     """Walk-forward sonuç."""
+
     train_start: datetime
     train_end: datetime
     test_start: datetime
@@ -32,24 +34,24 @@ class WFResult:
     predictions: list[dict]
     actuals: list[float]
 
+
 class WalkForwardValidation:
     """Walk-forward validasyon motoru."""
 
     def __init__(
         self,
         train_size: int = 252,  # 1 yıl günlük
-        test_size: int = 21,    # 1 ay günlük
-        purge_size: int = 5,    # Train/test arası boşluk
+        test_size: int = 21,  # 1 ay günlük
+        purge_size: int = 5,  # Train/test arası boşluk
         embargo_size: int = 5,  # Test sonrası boşluk
-        step_size: int = 21,    # Her adımda ilerleme
+        step_size: int = 21,  # Her adımda ilerleme
     ):
         self._train_size = train_size
         self._test_size = test_size
         self._purge_size = purge_size
         self._embargo_size = embargo_size
         self._step_size = step_size
-        logger.info("WalkForwardValidation initialized",
-            train=train_size, test=test_size, purge=purge_size)
+        logger.info("WalkForwardValidation initialized", train=train_size, test=test_size, purge=purge_size)
 
     def generate_splits(
         self,
@@ -102,19 +104,13 @@ class WalkForwardValidation:
         results = []
 
         for i, split in enumerate(splits):
-            logger.info(f"Evaluating split {i+1}/{len(splits)}")
+            logger.info(f"Evaluating split {i + 1}/{len(splits)}")
 
             # Train verisi
-            train_data = {
-                k: v[split["train_start"]:split["train_end"]]
-                for k, v in data.items() if k != "dates"
-            }
+            train_data = {k: v[split["train_start"] : split["train_end"]] for k, v in data.items() if k != "dates"}
 
             # Test verisi
-            test_data = {
-                k: v[split["test_start"]:split["test_end"]]
-                for k, v in data.items() if k != "dates"
-            }
+            test_data = {k: v[split["test_start"] : split["test_end"]] for k, v in data.items() if k != "dates"}
 
             # Feature hesapla
             train_features = feature_fn(train_data)
@@ -127,9 +123,9 @@ class WalkForwardValidation:
                     for key in train_features:
                         val = train_features[key]
                         if isinstance(val, np.ndarray) and len(val) > self._purge_size:
-                            train_features[key] = val[:-self._purge_size]
+                            train_features[key] = val[: -self._purge_size]
                 elif isinstance(train_features, np.ndarray) and len(train_features) > self._purge_size:
-                    train_features = train_features[:-self._purge_size]
+                    train_features = train_features[: -self._purge_size]
 
             # Model eğit
             model = model_fn()
@@ -206,6 +202,7 @@ class WalkForwardValidation:
             "avg_train_size": round(np.mean([r.train_size for r in results]), 0),
             "avg_test_size": round(np.mean([r.test_size for r in results]), 0),
         }
+
 
 # Singleton
 wf_validator = WalkForwardValidation()

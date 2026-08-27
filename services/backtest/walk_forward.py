@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class WalkForwardFold:
     """Tek bir walk-forward fold sonucu."""
+
     fold_id: int
     train_start: str
     train_end: str
@@ -50,6 +51,7 @@ class WalkForwardFold:
 @dataclass
 class WalkForwardResult:
     """Walk-forward validation sonucu."""
+
     total_folds: int
     avg_test_return: float
     avg_test_sharpe: float
@@ -86,10 +88,15 @@ class WalkForwardEngine:
         self.step_days = step_days
         self.expanding_window = expanding_window  # F-009
 
-        logger.info("WalkForwardEngine v3.0 initialized",
-                   purge=purge_days, embargo=embargo_days,
-                   train=train_days, test=test_days, step=step_days,
-                   expanding_window=expanding_window)
+        logger.info(
+            "WalkForwardEngine v3.0 initialized",
+            purge=purge_days,
+            embargo=embargo_days,
+            train=train_days,
+            test=test_days,
+            step=step_days,
+            expanding_window=expanding_window,
+        )
 
     def create_folds(
         self,
@@ -124,16 +131,18 @@ class WalkForwardEngine:
             if test_end_idx >= len(dates):
                 break
 
-            folds.append({
-                "train_start": dates[train_start_idx],
-                "train_end": dates[train_end_idx],
-                "purge_start": dates[purge_start_idx] if purge_start_idx < len(dates) else dates[-1],
-                "purge_end": dates[purge_end_idx] if purge_end_idx < len(dates) else dates[-1],
-                "test_start": dates[test_start_idx],
-                "test_end": dates[test_end_idx],
-                "embargo_start": dates[embargo_start_idx] if embargo_start_idx < len(dates) else dates[-1],
-                "embargo_end": dates[embargo_end_idx] if embargo_end_idx < len(dates) else dates[-1],
-            })
+            folds.append(
+                {
+                    "train_start": dates[train_start_idx],
+                    "train_end": dates[train_end_idx],
+                    "purge_start": dates[purge_start_idx] if purge_start_idx < len(dates) else dates[-1],
+                    "purge_end": dates[purge_end_idx] if purge_end_idx < len(dates) else dates[-1],
+                    "test_start": dates[test_start_idx],
+                    "test_end": dates[test_end_idx],
+                    "embargo_start": dates[embargo_start_idx] if embargo_start_idx < len(dates) else dates[-1],
+                    "embargo_end": dates[embargo_end_idx] if embargo_end_idx < len(dates) else dates[-1],
+                }
+            )
 
             i += self.step_days
 
@@ -177,12 +186,14 @@ class WalkForwardEngine:
                 d = s.get("date", "")
                 ticker = s.get("ticker", "TEST")
                 pnl_pct = s.get("pnl_pct", 0)
-                predictions.append({
-                    "date": d,
-                    "ticker": ticker,
-                    "score": s.get("score", 50),
-                    "predicted_return": pnl_pct,
-                })
+                predictions.append(
+                    {
+                        "date": d,
+                        "ticker": ticker,
+                        "score": s.get("score", 50),
+                        "predicted_return": pnl_pct,
+                    }
+                )
                 if d not in actual_returns:
                     actual_returns[d] = {}
                 actual_returns[d][ticker] = pnl_pct / 100 if pnl_pct else 0
@@ -204,16 +215,10 @@ class WalkForwardEngine:
 
         for fold_id, fold in enumerate(folds, 1):
             # Train seti (purge ÖNCESİ)
-            train_preds = [
-                p for p in predictions
-                if fold["train_start"] <= p.get("date", "") <= fold["train_end"]
-            ]
+            train_preds = [p for p in predictions if fold["train_start"] <= p.get("date", "") <= fold["train_end"]]
 
             # Test seti (purge SONRASI, embargo ÖNCESİ)
-            test_preds = [
-                p for p in predictions
-                if fold["test_start"] <= p.get("date", "") <= fold["test_end"]
-            ]
+            test_preds = [p for p in predictions if fold["test_start"] <= p.get("date", "") <= fold["test_end"]]
 
             # Train metrikleri
             train_metrics = self._calculate_fold_metrics(
@@ -421,17 +426,25 @@ class WalkForwardEngine:
                 "test_days": self.test_days,
                 "step_days": self.step_days,
                 "total_predictions": sum(f.trades for f in folds),
-            }
+            },
         )
 
     def _empty_result(self) -> WalkForwardResult:
         return WalkForwardResult(
-            total_folds=0, avg_test_return=0, avg_test_sharpe=0,
-            avg_test_drawdown=0, avg_win_rate=0,
-            avg_precision_at_5=0, avg_precision_at_10=0, avg_precision_at_20=0,
-            avg_ic=0, stability_score=0,
-            worst_fold_return=0, best_fold_return=0,
-            deflated_sharpe=0, folds=[],
+            total_folds=0,
+            avg_test_return=0,
+            avg_test_sharpe=0,
+            avg_test_drawdown=0,
+            avg_win_rate=0,
+            avg_precision_at_5=0,
+            avg_precision_at_10=0,
+            avg_precision_at_20=0,
+            avg_ic=0,
+            stability_score=0,
+            worst_fold_return=0,
+            best_fold_return=0,
+            deflated_sharpe=0,
+            folds=[],
         )
 
 

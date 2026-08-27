@@ -78,5 +78,6 @@ def verify_all():
         print("  DENETİM SONUCU: BAZI SERVİSLERDE EKSİKLER TESPİT EDİLDİ.")
     print("=" * 75)
 
+
 if __name__ == "__main__":
     verify_all()

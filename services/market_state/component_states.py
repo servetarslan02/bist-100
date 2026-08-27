@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class ComponentStates:
     """Tüm bileşen state'lerinin birleşimi."""
+
     timestamp: datetime
     momentum_state: str = "NEUTRAL"
     volatility_state: str = "NORMAL"
@@ -117,16 +118,12 @@ class ComponentStateEngine:
         volume_state = self._compute_volume_state(volume_zscores, avg_volume_zscore)
         rsi_state = self._compute_rsi_state(rsis, avg_rsi)
         liquidity_state = self._compute_liquidity_state(spreads, avg_spread, volume_zscores, market_depth)
-        sentiment_state = self._compute_sentiment_state(
-            news_sentiment, social_sentiment, put_call_ratio, vix_level
-        )
+        sentiment_state = self._compute_sentiment_state(news_sentiment, social_sentiment, put_call_ratio, vix_level)
         macro_state = self._compute_macro_state(world_state)
         anomaly_count, anomaly_severity = self._compute_anomaly_state(anomaly_scores)
 
         # Sentiment score (composite — fear/greed)
-        sentiment_score = self._compute_fear_greed_score(
-            news_sentiment, social_sentiment, put_call_ratio, vix_level
-        )
+        sentiment_score = self._compute_fear_greed_score(news_sentiment, social_sentiment, put_call_ratio, vix_level)
 
         # Macro score
         macro_score = self._compute_macro_score(world_state)
@@ -311,9 +308,7 @@ class ComponentStateEngine:
         POSITIVE: Piyasa iyimser (greed)
         EUPHORIA: Aşırı iyimserlik (dikkat)
         """
-        score = self._compute_fear_greed_score(
-            news_sentiment, social_sentiment, put_call_ratio, vix_level
-        )
+        score = self._compute_fear_greed_score(news_sentiment, social_sentiment, put_call_ratio, vix_level)
 
         if score < -0.3:
             return "NEGATIVE"
@@ -439,11 +434,7 @@ class ComponentStateEngine:
         geopolitical = world_state.get("geopolitical_risk", 0.5)
 
         # Risk-on: yüksek risk_appetite, düşük turkey_risk, düşük geopolitical
-        score = (
-            risk_appetite * 0.5 +
-            (1 - turkey_risk) * 0.3 +
-            (1 - geopolitical) * 0.2
-        )
+        score = risk_appetite * 0.5 + (1 - turkey_risk) * 0.3 + (1 - geopolitical) * 0.2
 
         return float(np.clip(score, 0, 1))
 

@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from services.core.decision_engine import DecisionEngine, DecisionInput
 
@@ -32,7 +32,7 @@ inp_consensus = DecisionInput(
     regime="BULL",
     ml_score=85.0,
     ml_confidence=0.85,
-    news_sentiment=0.70, # KAP & Haber çok olumlu
+    news_sentiment=0.70,  # KAP & Haber çok olumlu
     macro_regime="RISK_ON",
     macro_stance=0.6,
     features={
@@ -50,7 +50,9 @@ inp_consensus = DecisionInput(
     sim_var_95=-4.0,
 )
 dec_1 = engine.decide(inp_consensus)
-print(f"  ✓ Karar: {dec_1.action} | Yön: {dec_1.direction} | Conviction: {dec_1.conviction} | Skor: {dec_1.score:.1f}/100")
+print(
+    f"  ✓ Karar: {dec_1.action} | Yön: {dec_1.direction} | Conviction: {dec_1.conviction} | Skor: {dec_1.score:.1f}/100"
+)
 print(f"  ✓ Hedef Fiyat: ₺{dec_1.target_price:.2f} | Stop Fiyat: ₺{dec_1.stop_price:.2f} (R:R 2.0x)")
 assert dec_1.action == "BUY", "Test 1 Başarısız!"
 print("  [BAŞARILI] Tüm motorlar dinlendi, tam uyumla AL kararı verildi.")
@@ -63,15 +65,15 @@ inp_conflict = DecisionInput(
     ticker="XYZ_SPEK",
     price=100.0,
     regime="BULL",
-    ml_score=35.0, # ML temeli ve riski beğenmedi
+    ml_score=35.0,  # ML temeli ve riski beğenmedi
     ml_confidence=0.70,
-    news_sentiment=-0.80, # KAP'ta ağır ceza/zarar haberi var
+    news_sentiment=-0.80,  # KAP'ta ağır ceza/zarar haberi var
     features={
-        "momentum_20d": 15.0, # Fiyat spekülatif şişmiş
+        "momentum_20d": 15.0,  # Fiyat spekülatif şişmiş
         "roc_5d": 8.0,
-        "rsi_14": 74.0, # Aşırı alım
-        "pe_ratio": 85.0, # Aşırı pahalı
-        "roe": -15.0, # Zarar eden şirket
+        "rsi_14": 74.0,  # Aşırı alım
+        "pe_ratio": 85.0,  # Aşırı pahalı
+        "roe": -15.0,  # Zarar eden şirket
     },
     atr=5.0,
     atr_pct=5.0,
@@ -89,9 +91,9 @@ print("\n[TEST 3] Rejim ve Makro Veto Testi (Hisse İyi Ama Piyasa Rejimi Çök�
 inp_bear = DecisionInput(
     ticker="ASELS",
     price=400.0,
-    regime="BEAR", # Ayı piyasası
-    ml_score=62.0, # Normalde 60 barajını geçerdi
-    ml_confidence=0.62, # Ama ayı piyasasında eşik 68 / 0.70'e yükselir
+    regime="BEAR",  # Ayı piyasası
+    ml_score=62.0,  # Normalde 60 barajını geçerdi
+    ml_confidence=0.62,  # Ama ayı piyasasında eşik 68 / 0.70'e yükselir
     macro_regime="RISK_OFF",
     macro_stance=-0.7,
     features={"rsi_14": 54.0, "momentum_20d": 1.0},
@@ -114,8 +116,8 @@ inp_var = DecisionInput(
     regime="BULL",
     ml_score=70.0,
     ml_confidence=0.75,
-    sim_var_95=-25.0, # %25 aşırı kuyruk riski (VaR)
-    sim_prob_positive=0.35, # Kazanma olasılığı düşük
+    sim_var_95=-25.0,  # %25 aşırı kuyruk riski (VaR)
+    sim_prob_positive=0.35,  # Kazanma olasılığı düşük
     features={"rsi_14": 55.0},
 )
 dec_4 = engine.decide(inp_var)

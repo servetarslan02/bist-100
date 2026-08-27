@@ -32,12 +32,15 @@ from services.core.observability import DEFAULT_BUCKETS, PrometheusMetrics
 # AUTHENTICATION TESTS
 # =====================================================
 
+
 async def test_metrics_token_auth():
     """Metrics endpoint token doğrulama."""
-    auth = MonitoringAuth(AuthConfig(
-        metrics_token="test_metrics_token",
-        admin_token="test_admin_token",
-    ))
+    auth = MonitoringAuth(
+        AuthConfig(
+            metrics_token="test_metrics_token",
+            admin_token="test_admin_token",
+        )
+    )
     issues = []
 
     # Doğru token
@@ -57,10 +60,12 @@ async def test_metrics_token_auth():
 
 async def test_admin_token_auth():
     """Admin endpoint token doğrulama."""
-    auth = MonitoringAuth(AuthConfig(
-        metrics_token="test_metrics",
-        admin_token="test_admin",
-    ))
+    auth = MonitoringAuth(
+        AuthConfig(
+            metrics_token="test_metrics",
+            admin_token="test_admin",
+        )
+    )
     issues = []
 
     if not auth.verify_admin_token("test_admin"):
@@ -132,7 +137,7 @@ async def test_rate_limiting():
     # 5 istek başarılı olmalı
     for i in range(5):
         if not auth.check_rate_limit(client_ip):
-            issues.append(f"İstek {i+1} reddedildi (limit: 5)")
+            issues.append(f"İstek {i + 1} reddedildi (limit: 5)")
 
     # 6. istek reddedilmeli
     if auth.check_rate_limit(client_ip):
@@ -173,6 +178,7 @@ async def test_failed_attempt_tracking():
 # =====================================================
 # PROMETHEUS HISTOGRAM TESTS
 # =====================================================
+
 
 async def test_histogram_buckets():
     """Histogram bucket desteği doğru çalışmalı."""
@@ -252,6 +258,7 @@ async def test_timed_context_manager():
 # =====================================================
 # ALERTING TESTS
 # =====================================================
+
 
 async def test_health_change_alert():
     """Health değişikliği alert üretmeli."""
@@ -411,13 +418,13 @@ async def test_alert_resolve():
 # DASHBOARD TEST
 # =====================================================
 
+
 async def test_dashboard_json():
     """Grafana dashboard JSON geçerli olmalı."""
     issues = []
 
     dashboard_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "monitoring", "grafana_dashboard.json"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "monitoring", "grafana_dashboard.json"
     )
 
     if not os.path.exists(dashboard_path):
@@ -452,6 +459,7 @@ async def test_dashboard_json():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

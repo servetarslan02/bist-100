@@ -38,6 +38,7 @@ class Regime(StrEnum):
 @dataclass
 class RegimeState:
     """Rejim durumu."""
+
     regime: Regime
     confidence: float
     features_used: dict[str, float]
@@ -53,14 +54,14 @@ class RegimeEngine:
 
     # Regime-feature ağırlıkları
     REGIME_FEATURES = {
-        "breadth_pct": 0.20,          # Piyasa genişliği
-        "momentum_avg": 0.15,         # Ortalama momentum
-        "volatility_avg": 0.15,       # Ortalama volatilite
-        "rsi_avg": 0.10,              # Ortalama RSI
-        "risk_appetite": 0.15,        # Risk iştahı
-        "usdtry_momentum": 0.10,      # Döviz momentum
-        "vix_level": 0.10,            # VIX seviyesi
-        "global_momentum": 0.05,      # Global piyasa momentum
+        "breadth_pct": 0.20,  # Piyasa genişliği
+        "momentum_avg": 0.15,  # Ortalama momentum
+        "volatility_avg": 0.15,  # Ortalama volatilite
+        "rsi_avg": 0.10,  # Ortalama RSI
+        "risk_appetite": 0.15,  # Risk iştahı
+        "usdtry_momentum": 0.10,  # Döviz momentum
+        "vix_level": 0.10,  # VIX seviyesi
+        "global_momentum": 0.05,  # Global piyasa momentum
     }
 
     def __init__(self, use_hmm: bool = True):
@@ -70,10 +71,11 @@ class RegimeEngine:
         self._use_hmm = use_hmm
         self._hmm_detector = None
         self._return_history: deque = deque(maxlen=252)  # Gerçek rolling return serisi
-        self._vol_history: deque = deque(maxlen=252)      # Gerçek rolling volatilite serisi
+        self._vol_history: deque = deque(maxlen=252)  # Gerçek rolling volatilite serisi
         if use_hmm:
             try:
                 from .hmm_regime import HMMRegimeDetector
+
                 self._hmm_detector = HMMRegimeDetector(n_regimes=4, rolling_window=63)
             except Exception:
                 self._hmm_detector = None
@@ -144,6 +146,7 @@ class RegimeEngine:
         # Macro regime entegrasyonu
         try:
             from services.macro.regime_detector import macro_regime_detector
+
             macro_regime = macro_regime_detector.detect_regime(features)
             if macro_regime.confidence > 0.3:
                 # Macro regime skorlarını mevcut skorlarla birleştir
@@ -392,15 +395,69 @@ class RegimeEngine:
         weights = {
             Regime.BULL: {"momentum": 0.35, "breakout": 0.25, "value": 0.15, "mean_reversion": 0.10, "defensive": 0.15},
             Regime.BEAR: {"momentum": 0.10, "breakout": 0.10, "value": 0.20, "mean_reversion": 0.25, "defensive": 0.35},
-            Regime.SIDEWAYS: {"momentum": 0.15, "breakout": 0.15, "value": 0.25, "mean_reversion": 0.30, "defensive": 0.15},
-            Regime.HIGH_VOLATILITY: {"momentum": 0.15, "breakout": 0.20, "value": 0.15, "mean_reversion": 0.20, "defensive": 0.30},
-            Regime.LOW_VOLATILITY: {"momentum": 0.30, "breakout": 0.25, "value": 0.20, "mean_reversion": 0.15, "defensive": 0.10},
-            Regime.RISK_ON: {"momentum": 0.35, "breakout": 0.25, "value": 0.15, "mean_reversion": 0.10, "defensive": 0.15},
-            Regime.RISK_OFF: {"momentum": 0.10, "breakout": 0.10, "value": 0.20, "mean_reversion": 0.20, "defensive": 0.40},
-            Regime.CRISIS: {"momentum": 0.05, "breakout": 0.05, "value": 0.15, "mean_reversion": 0.15, "defensive": 0.60},
-            Regime.RECOVERY: {"momentum": 0.25, "breakout": 0.20, "value": 0.25, "mean_reversion": 0.15, "defensive": 0.15},
-            Regime.MOMENTUM_EXPANSION: {"momentum": 0.40, "breakout": 0.25, "value": 0.10, "mean_reversion": 0.10, "defensive": 0.15},
-            Regime.MOMENTUM_CONTRACTION: {"momentum": 0.10, "breakout": 0.10, "value": 0.25, "mean_reversion": 0.25, "defensive": 0.30},
+            Regime.SIDEWAYS: {
+                "momentum": 0.15,
+                "breakout": 0.15,
+                "value": 0.25,
+                "mean_reversion": 0.30,
+                "defensive": 0.15,
+            },
+            Regime.HIGH_VOLATILITY: {
+                "momentum": 0.15,
+                "breakout": 0.20,
+                "value": 0.15,
+                "mean_reversion": 0.20,
+                "defensive": 0.30,
+            },
+            Regime.LOW_VOLATILITY: {
+                "momentum": 0.30,
+                "breakout": 0.25,
+                "value": 0.20,
+                "mean_reversion": 0.15,
+                "defensive": 0.10,
+            },
+            Regime.RISK_ON: {
+                "momentum": 0.35,
+                "breakout": 0.25,
+                "value": 0.15,
+                "mean_reversion": 0.10,
+                "defensive": 0.15,
+            },
+            Regime.RISK_OFF: {
+                "momentum": 0.10,
+                "breakout": 0.10,
+                "value": 0.20,
+                "mean_reversion": 0.20,
+                "defensive": 0.40,
+            },
+            Regime.CRISIS: {
+                "momentum": 0.05,
+                "breakout": 0.05,
+                "value": 0.15,
+                "mean_reversion": 0.15,
+                "defensive": 0.60,
+            },
+            Regime.RECOVERY: {
+                "momentum": 0.25,
+                "breakout": 0.20,
+                "value": 0.25,
+                "mean_reversion": 0.15,
+                "defensive": 0.15,
+            },
+            Regime.MOMENTUM_EXPANSION: {
+                "momentum": 0.40,
+                "breakout": 0.25,
+                "value": 0.10,
+                "mean_reversion": 0.10,
+                "defensive": 0.15,
+            },
+            Regime.MOMENTUM_CONTRACTION: {
+                "momentum": 0.10,
+                "breakout": 0.10,
+                "value": 0.25,
+                "mean_reversion": 0.25,
+                "defensive": 0.30,
+            },
         }
         return weights.get(regime, weights[Regime.SIDEWAYS])
 
@@ -469,9 +526,7 @@ class RegimeEngine:
         # Enum doğrulaması
         regime_map = {r.value: r for r in Regime}
         # Hem değer hem ad ile eşleştir
-        target = regime_map.get(new_regime) or regime_map.get(
-            new_regime.replace("_", "-").upper()
-        )
+        target = regime_map.get(new_regime) or regime_map.get(new_regime.replace("_", "-").upper())
         if not target:
             # String olarak dene
             try:

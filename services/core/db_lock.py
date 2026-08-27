@@ -36,9 +36,11 @@ logger = structlog.get_logger()
 # METRICS
 # =====================================================
 
+
 @dataclass
 class LockMetrics:
     """Lock performans metrikleri."""
+
     total_acquisitions: int = 0
     total_releases: int = 0
     total_timeouts: int = 0
@@ -166,6 +168,7 @@ LOCK_ORDER = {
 # DATABASE LOCK
 # =====================================================
 
+
 class DatabaseLock:
     """Database-agnostic advisory lock with production features.
 
@@ -240,9 +243,9 @@ class DatabaseLock:
                     wait_ms = (self._acquire_time - start) * 1000
                     metrics.record_acquisition(wait_ms)
                     if wait_ms > 1000:
-                        logger.warning("Slow lock acquisition",
-                                     key=self._key, wait_ms=round(wait_ms, 1),
-                                     attempt=attempt + 1)
+                        logger.warning(
+                            "Slow lock acquisition", key=self._key, wait_ms=round(wait_ms, 1), attempt=attempt + 1
+                        )
                     # Lease renewal başlat
                     self._start_renewal()
                     return True
@@ -257,8 +260,7 @@ class DatabaseLock:
                 metrics.record_error()
                 if "deadlock" in error_msg:
                     metrics.record_deadlock()
-                    logger.warning("Possible deadlock detected",
-                                 key=self._key, attempt=attempt + 1)
+                    logger.warning("Possible deadlock detected", key=self._key, attempt=attempt + 1)
                     if attempt < self._max_retries - 1:
                         delay_s = self._calc_backoff(attempt) * 2  # Deadlock'ta daha uzun bekle
                         await asyncio.sleep(delay_s)
@@ -266,14 +268,12 @@ class DatabaseLock:
                 raise
 
         metrics.record_timeout()
-        logger.error("Lock acquisition timeout",
-                    key=self._key, timeout_ms=self._timeout_ms,
-                    retries=self._max_retries)
+        logger.error("Lock acquisition timeout", key=self._key, timeout_ms=self._timeout_ms, retries=self._max_retries)
         return False
 
     def _calc_backoff(self, attempt: int) -> float:
         """Exponential backoff hesapla (jitter ile)."""
-        base = self._base_retry_ms * (2 ** attempt)
+        base = self._base_retry_ms * (2**attempt)
         capped = min(base, self._max_retry_ms)
         jitter = random.uniform(0.5, 1.5)
         return (capped * jitter) / 1000
@@ -364,9 +364,7 @@ class DatabaseLock:
                 self._db.execute("RELEASE SAVEPOINT lock_renewal")
             else:
                 # PostgreSQL: pg_advisory_lock tekrar çağrılabilir (idempotent)
-                await self._db.fetchrow(
-                    "SELECT pg_advisory_lock($1)", self._key_id
-                )
+                await self._db.fetchrow("SELECT pg_advisory_lock($1)", self._key_id)
             get_lock_metrics(self._key).record_renewal()
         except Exception as e:
             logger.warning("Lock lease renewal failed", key=self._key, error=str(e))
@@ -412,11 +410,14 @@ class DatabaseLock:
         """PostgreSQL: Stale advisory lock'ları kontrol et ve kurtar."""
         try:
             # pg_locks tablosundan advisory lock'ları kontrol et
-            rows = await self._db.fetch("""
+            rows = await self._db.fetch(
+                """
                 SELECT pid, locktype, mode, granted
                 FROM pg_locks
                 WHERE locktype = 'advisory' AND objid = $1
-            """, self._key_id)
+            """,
+                self._key_id,
+            )
 
             if not rows:
                 return False
@@ -424,16 +425,13 @@ class DatabaseLock:
             for row in rows:
                 # Aktif process var mı?
                 pid = row["pid"]
-                active = await self._db.fetchrow(
-                    "SELECT pid FROM pg_stat_activity WHERE pid = $1", pid
-                )
+                active = await self._db.fetchrow("SELECT pid FROM pg_stat_activity WHERE pid = $1", pid)
                 if not active:
                     # Process öldü — lock'ı temizle
                     try:
                         await self._db.execute("SELECT pg_advisory_unlock($1)", self._key_id)
                         get_lock_metrics(self._key).record_crash_recovery()
-                        logger.warning("Recovered stale PG lock",
-                                     key=self._key, dead_pid=pid)
+                        logger.warning("Recovered stale PG lock", key=self._key, dead_pid=pid)
                         return True
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="db_lock.py:437")
@@ -480,10 +478,7 @@ class DatabaseLock:
     async def _acquire_pg(self) -> bool:
         """PostgreSQL: pg_try_advisory_lock (non-blocking)."""
         try:
-            row = await self._db.fetchrow(
-                "SELECT pg_try_advisory_lock($1) as locked",
-                self._key_id
-            )
+            row = await self._db.fetchrow("SELECT pg_try_advisory_lock($1) as locked", self._key_id)
             return bool(row and row["locked"])
         except Exception as e:
             if "deadlock" in str(e).lower():
@@ -493,10 +488,7 @@ class DatabaseLock:
     async def _release_pg(self):
         """PostgreSQL: pg_advisory_unlock."""
         try:
-            await self._db.execute(
-                "SELECT pg_advisory_unlock($1)",
-                self._key_id
-            )
+            await self._db.execute("SELECT pg_advisory_unlock($1)", self._key_id)
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:499")
 
@@ -529,11 +521,11 @@ class DatabaseLock:
 # COORDINATED LOCK (asyncio + DB)
 # =====================================================
 
+
 class CoordinatedLock:
     """In-process asyncio lock + DB-level lock koordinasyonu."""
 
-    def __init__(self, db, dialect: str = "sqlite", key: str = "default",
-                 timeout_ms: int = 5000):
+    def __init__(self, db, dialect: str = "sqlite", key: str = "default", timeout_ms: int = 5000):
         self._asyncio_lock = asyncio.Lock()
         self._db_lock = DatabaseLock(db, dialect=dialect, key=key, timeout_ms=timeout_ms)
         self._key = key

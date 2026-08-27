@@ -65,6 +65,7 @@ from services.backtest.transaction_costs import (
 # Phase 1 Tests: Bias Detection
 # =====================================================
 
+
 class TestLookAheadBiasDetector:
     """Look-ahead bias detection testleri."""
 
@@ -73,10 +74,12 @@ class TestLookAheadBiasDetector:
 
     def test_validate_feature_timestamps_no_leakage(self):
         """Feature'larda gelecek veri yoksa temiz rapor dönmeli."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True),
-            "feature_1": np.random.randn(10),
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True),
+                "feature_1": np.random.randn(10),
+            }
+        )
         decision_time = pl.Date("2024-01-10")
         report = self.detector.validate_feature_timestamps(df, "feature_1", decision_time)
         assert report.critical_count == 0
@@ -84,10 +87,12 @@ class TestLookAheadBiasDetector:
 
     def test_validate_feature_timestamps_with_leakage(self):
         """Feature'larda gelecek veri varsa critical ihlal bulmalı."""
-        df = pl.DataFrame({
-            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 20), timedelta(days=1), eager=True),
-            "feature_1": np.random.randn(20),
-        })
+        df = pl.DataFrame(
+            {
+                "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 20), timedelta(days=1), eager=True),
+                "feature_1": np.random.randn(20),
+            }
+        )
         decision_time = pl.Date("2024-01-10")  # 10 gün sonra veri var
         report = self.detector.validate_feature_timestamps(df, "feature_1", decision_time)
         assert report.critical_count > 0
@@ -153,29 +158,29 @@ class TestSurvivorshipBiasHandler:
 
     def test_get_universe_before_delisting(self):
         """Delisting öncesi evren tüm hisseleri içermeli."""
-        self.handler.register_delisting(DelistingEvent(
-            ticker="HISSE1",
-            delisting_date=datetime(2023, 6, 1),
-            reason="bankruptcy",
-        ))
-        all_tickers = {"HISSE1", "HISSE2", "HISSE3"}
-        universe = self.handler.get_universe_at_date(
-            datetime(2023, 1, 1), all_tickers
+        self.handler.register_delisting(
+            DelistingEvent(
+                ticker="HISSE1",
+                delisting_date=datetime(2023, 6, 1),
+                reason="bankruptcy",
+            )
         )
+        all_tickers = {"HISSE1", "HISSE2", "HISSE3"}
+        universe = self.handler.get_universe_at_date(datetime(2023, 1, 1), all_tickers)
         assert "HISSE1" in universe
         assert len(universe) == 3
 
     def test_get_universe_after_delisting(self):
         """Delisting sonrası evren o hisseyi içermemeli."""
-        self.handler.register_delisting(DelistingEvent(
-            ticker="HISSE1",
-            delisting_date=datetime(2023, 6, 1),
-            reason="bankruptcy",
-        ))
-        all_tickers = {"HISSE1", "HISSE2", "HISSE3"}
-        universe = self.handler.get_universe_at_date(
-            datetime(2024, 1, 1), all_tickers
+        self.handler.register_delisting(
+            DelistingEvent(
+                ticker="HISSE1",
+                delisting_date=datetime(2023, 6, 1),
+                reason="bankruptcy",
+            )
         )
+        all_tickers = {"HISSE1", "HISSE2", "HISSE3"}
+        universe = self.handler.get_universe_at_date(datetime(2024, 1, 1), all_tickers)
         assert "HISSE1" not in universe
         assert len(universe) == 2
 
@@ -184,9 +189,7 @@ class TestSurvivorshipBiasHandler:
         full_returns = pl.DataFrame({"return": [0.01, -0.02, 0.03, -0.01, 0.02]})
         survivor_returns = pl.DataFrame({"return": [0.01, 0.03, 0.02, 0.01, 0.03]})
 
-        result = self.handler.calculate_survivorship_bias_magnitude(
-            full_returns, survivor_returns
-        )
+        result = self.handler.calculate_survivorship_bias_magnitude(full_returns, survivor_returns)
         assert "bias_magnitude" in result
         assert "bias_percentage" in result
         assert result["survivor_only_mean_return"] > result["full_universe_mean_return"]
@@ -207,15 +210,11 @@ class TestPointInTimeValidator:
         )
 
         # Yayın öncesi - veri yok
-        available = self.validator.get_available_data_at(
-            "THYAO", datetime(2024, 4, 15)
-        )
+        available = self.validator.get_available_data_at("THYAO", datetime(2024, 4, 15))
         assert len(available) == 0
 
         # Yayın sonrası - veri var
-        available = self.validator.get_available_data_at(
-            "THYAO", datetime(2024, 5, 1)
-        )
+        available = self.validator.get_available_data_at("THYAO", datetime(2024, 5, 1))
         assert len(available) == 1
 
     def test_validate_fundamental_access_future_data(self):
@@ -250,6 +249,7 @@ class TestPointInTimeValidator:
 # =====================================================
 # Phase 2 Tests: Transaction Costs
 # =====================================================
+
 
 class TestTransactionCostEngine:
     """Transaction cost testleri."""
@@ -286,12 +286,8 @@ class TestTransactionCostEngine:
 
     def test_low_liquidity_higher_cost(self):
         """Düşük likidite daha yüksek maliyet üretmeli."""
-        high_liq = self.engine.calculate_total_cost(
-            "BUY", 100.0, 1000, "HISSE", avg_daily_volume=1_000_000_000
-        )
-        low_liq = self.engine.calculate_total_cost(
-            "BUY", 100.0, 1000, "HISSE", avg_daily_volume=10_000_000
-        )
+        high_liq = self.engine.calculate_total_cost("BUY", 100.0, 1000, "HISSE", avg_daily_volume=1_000_000_000)
+        low_liq = self.engine.calculate_total_cost("BUY", 100.0, 1000, "HISSE", avg_daily_volume=10_000_000)
         assert low_liq["total_cost_pct"] > high_liq["total_cost_pct"]
 
     def test_round_trip_cost(self):
@@ -336,6 +332,7 @@ class TestSpreadModel:
 # Phase 3 Tests: Multi-Asset, Event Replay, Deterministic
 # =====================================================
 
+
 class TestMultiAssetBacktestEngine:
     """Multi-asset backtest testleri."""
 
@@ -351,21 +348,25 @@ class TestMultiAssetBacktestEngine:
             base_price = np.random.uniform(50, 200)
             for dt in dates:
                 price = base_price * (1 + np.random.randn() * 0.02)
-                market_data.append({
-                    "date": dt,
-                    "ticker": ticker,
-                    "open": price * 0.99,
-                    "high": price * 1.02,
-                    "low": price * 0.98,
-                    "close": price,
-                    "volume": np.random.randint(1_000_000, 10_000_000),
-                })
-                signal_data.append({
-                    "date": dt,
-                    "ticker": ticker,
-                    "score": np.random.uniform(30, 90),
-                    "confidence": np.random.uniform(0.3, 0.9),
-                })
+                market_data.append(
+                    {
+                        "date": dt,
+                        "ticker": ticker,
+                        "open": price * 0.99,
+                        "high": price * 1.02,
+                        "low": price * 0.98,
+                        "close": price,
+                        "volume": np.random.randint(1_000_000, 10_000_000),
+                    }
+                )
+                signal_data.append(
+                    {
+                        "date": dt,
+                        "ticker": ticker,
+                        "score": np.random.uniform(30, 90),
+                        "confidence": np.random.uniform(0.3, 0.9),
+                    }
+                )
 
         market_df = pl.DataFrame(market_data)
         signal_df = pl.DataFrame(signal_data)
@@ -449,22 +450,19 @@ class TestDeterministicRecovery:
         portfolio = {"cash": 100_000, "positions": {}}
 
         checkpoint = self.recovery.create_checkpoint(config, portfolio)
-        restored_config, restored_portfolio, seed = self.recovery.restore_checkpoint(
-            checkpoint.checkpoint_id
-        )
+        restored_config, restored_portfolio, seed = self.recovery.restore_checkpoint(checkpoint.checkpoint_id)
 
         assert restored_config == config
         assert restored_portfolio == portfolio
 
     def test_determinism_validation(self):
         """Determinizm doğrulanmalı."""
+
         def deterministic_func(x):
             np.random.seed(42)
             return np.random.randn(x)
 
-        is_det, result = self.recovery.validate_determinism(
-            deterministic_func, (10,), deterministic_func(10)
-        )
+        is_det, result = self.recovery.validate_determinism(deterministic_func, (10,), deterministic_func(10))
         assert is_det
 
     def test_idempotency_guard(self):
@@ -488,6 +486,7 @@ class TestDeterministicRecovery:
 # =====================================================
 # Phase 4 Tests: Deflated Sharpe & Benchmark
 # =====================================================
+
 
 class TestDeflatedSharpe:
     """Deflated Sharpe testleri."""
@@ -524,9 +523,7 @@ class TestDeflatedSharpe:
     def test_from_returns(self):
         """Getiri serisinden hesaplama çalışmalı."""
         returns = np.random.randn(252) * 0.01 + 0.0005  # ~%12 yıllık getiri
-        result = DeflatedSharpeCalculator.from_returns(
-            returns, num_strategies=10
-        )
+        result = DeflatedSharpeCalculator.from_returns(returns, num_strategies=10)
         assert result.observed_sharpe != 0
         assert 0 <= result.p_value <= 1
 
@@ -574,11 +571,18 @@ class TestBenchmarkComparator:
         """Rapor oluşturulmalı."""
         comp1 = BenchmarkComparison(
             benchmark_name="BIST100",
-            strategy_return_pct=20, benchmark_return_pct=15,
-            alpha_pct=5, beta=1.1, information_ratio=0.8,
-            tracking_error_pct=5, relative_return_pct=5,
-            up_capture_ratio=110, down_capture_ratio=90,
-            correlation=0.85, r_squared=0.72, num_observations=252,
+            strategy_return_pct=20,
+            benchmark_return_pct=15,
+            alpha_pct=5,
+            beta=1.1,
+            information_ratio=0.8,
+            tracking_error_pct=5,
+            relative_return_pct=5,
+            up_capture_ratio=110,
+            down_capture_ratio=90,
+            correlation=0.85,
+            r_squared=0.72,
+            num_observations=252,
         )
         report = BenchmarkComparator.generate_report([comp1])
         assert "benchmarks" in report
@@ -589,6 +593,7 @@ class TestBenchmarkComparator:
 # Phase 5 Tests: Scanner Parity
 # =====================================================
 
+
 class TestBacktestScannerParity:
     """Scanner parity testleri."""
 
@@ -597,6 +602,7 @@ class TestBacktestScannerParity:
 
     def test_feature_parity_same_data(self):
         """Aynı veriyle feature parity sağlanmalı."""
+
         def mock_feature_engine(data, ticker, timestamp):
             return {"feature_1": 0.5, "feature_2": 1.2}
 
@@ -606,13 +612,12 @@ class TestBacktestScannerParity:
         )
 
         data = pl.DataFrame({"close": [100, 101, 102]})
-        result = self.parity.verify_feature_parity(
-            data, "TEST", datetime.now()
-        )
+        result = self.parity.verify_feature_parity(data, "TEST", datetime.now())
         assert result.is_parity
 
     def test_full_parity_check(self):
         """Tam parity kontrolü çalışmalı."""
+
         def mock_feature_engine(data, ticker, timestamp):
             return {"f1": 0.5}
 
@@ -624,14 +629,14 @@ class TestBacktestScannerParity:
             signal_engine=mock_signal_engine,
         )
 
-        data = pl.DataFrame({
-            "ticker": ["TEST1"] * 5,
-            "close": [100, 101, 102, 103, 104],
-        })
-
-        report = self.parity.run_full_parity_check(
-            data, ["TEST1"], datetime.now()
+        data = pl.DataFrame(
+            {
+                "ticker": ["TEST1"] * 5,
+                "close": [100, 101, 102, 103, 104],
+            }
         )
+
+        report = self.parity.run_full_parity_check(data, ["TEST1"], datetime.now())
         assert report.is_full_parity
 
 
@@ -662,6 +667,7 @@ class TestFeatureVersionLock:
 # =====================================================
 # Integration Tests
 # =====================================================
+
 
 class TestIntegration:
     """Entegrasyon testleri."""

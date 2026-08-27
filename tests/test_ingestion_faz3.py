@@ -27,6 +27,7 @@ logger = structlog.get_logger(__name__)
 # Integration Tests — Full Pipeline
 # =====================================================
 
+
 @pytest.mark.asyncio
 class TestFullPipeline:
     """Full pipeline integration testleri."""
@@ -96,8 +97,7 @@ class TestFullPipeline:
         async def failing(**kwargs):
             raise ConnectionError("down")
 
-        manager.register("test", "provider", failing,
-                        circuit_breaker_config={"failure_threshold": 3})
+        manager.register("test", "provider", failing, circuit_breaker_config={"failure_threshold": 3})
 
         # 3 kez dene → circuit breaker açılmalı
         for _ in range(3):
@@ -129,6 +129,7 @@ class TestFullPipeline:
 # Reconciliation Advanced Tests
 # =====================================================
 
+
 @pytest.mark.asyncio
 class TestReconciliationAdvanced:
     """Gelişmiş reconciliation testleri."""
@@ -136,40 +137,52 @@ class TestReconciliationAdvanced:
     async def test_three_source_consensus(self):
         """3 kaynak konsensüs."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 308.50,
-            "bist_official": 308.50,
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 308.50,
+                "bist_official": 308.50,
+            },
+        )
         assert result.conflict is False
         assert result.quality_score > 0.8
 
     async def test_two_source_one_outlier(self):
         """2 kaynak, 1 aykırı."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 315.00,  # ~%2 sapma
-        })
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 315.00,  # ~%2 sapma
+            },
+        )
         assert result.conflict is True
 
     async def test_custom_max_deviation(self):
         """Özel max sapma eşiği."""
         reconciler = SourceReconciler()
-        result = await reconciler.reconcile_price("THYAO", {
-            "yfinance": 308.50,
-            "matriks": 312.00,  # ~%1.1 sapma
-        }, max_deviation_pct=0.5)
+        result = await reconciler.reconcile_price(
+            "THYAO",
+            {
+                "yfinance": 308.50,
+                "matriks": 312.00,  # ~%1.1 sapma
+            },
+            max_deviation_pct=0.5,
+        )
         assert result.conflict is True
 
     async def test_quality_report_aggregation(self):
         """Kalite raporu toplama."""
         reconciler = SourceReconciler()
-        results = await reconciler.reconcile_batch({
-            "A": {"yfinance": 100, "matriks": 100},
-            "B": {"yfinance": 200, "matriks": 205},
-            "C": {"yfinance": 300, "matriks": 310},
-        })
+        results = await reconciler.reconcile_batch(
+            {
+                "A": {"yfinance": 100, "matriks": 100},
+                "B": {"yfinance": 200, "matriks": 205},
+                "C": {"yfinance": 300, "matriks": 310},
+            }
+        )
         report = reconciler.get_quality_report(results)
         assert report["total_tickers"] == 3
         assert "avg_quality_score" in report
@@ -178,6 +191,7 @@ class TestReconciliationAdvanced:
 # =====================================================
 # Point-in-Time Advanced Tests
 # =====================================================
+
 
 class TestPITAdvanced:
     """Gelişmiş PIT testleri."""
@@ -228,6 +242,7 @@ class TestPITAdvanced:
 # Deduplication Advanced Tests
 # =====================================================
 
+
 class TestDedupAdvanced:
     """Gelişmiş dedup testleri."""
 
@@ -261,6 +276,7 @@ class TestDedupAdvanced:
 # =====================================================
 # Incremental Advanced Tests
 # =====================================================
+
 
 class TestIncrementalAdvanced:
     """Gelişmiş incremental testleri."""
@@ -306,6 +322,7 @@ class TestIncrementalAdvanced:
 # Metrics Tests
 # =====================================================
 
+
 class TestIngestionMetrics:
     """Metrics testleri."""
 
@@ -323,15 +340,15 @@ class TestIngestionMetrics:
         metrics.record_incremental_fetch("THYAO")
         metrics.record_incremental_skip("THYAO")
         # Verify metrics object is still functional after all calls
-        assert hasattr(metrics, 'record_provider_request')
-        assert hasattr(metrics, 'record_circuit_breaker_failure')
-        assert hasattr(metrics, 'record_rate_limit_wait')
-        assert hasattr(metrics, 'record_quality_score')
-        assert hasattr(metrics, 'record_reconciliation_conflict')
-        assert hasattr(metrics, 'record_dedup_duplicate')
-        assert hasattr(metrics, 'record_pit_violation')
-        assert hasattr(metrics, 'record_incremental_fetch')
-        assert hasattr(metrics, 'record_incremental_skip')
+        assert hasattr(metrics, "record_provider_request")
+        assert hasattr(metrics, "record_circuit_breaker_failure")
+        assert hasattr(metrics, "record_rate_limit_wait")
+        assert hasattr(metrics, "record_quality_score")
+        assert hasattr(metrics, "record_reconciliation_conflict")
+        assert hasattr(metrics, "record_dedup_duplicate")
+        assert hasattr(metrics, "record_pit_violation")
+        assert hasattr(metrics, "record_incremental_fetch")
+        assert hasattr(metrics, "record_incremental_skip")
 
     def test_track_pipeline_context(self):
         """Pipeline tracking context manager."""
@@ -339,7 +356,7 @@ class TestIngestionMetrics:
         with metrics.track_pipeline("test"):
             time.sleep(0.01)
         assert metrics is not None
-        assert hasattr(metrics, 'track_pipeline')
+        assert hasattr(metrics, "track_pipeline")
 
     def test_track_provider_context(self):
         """Provider tracking context manager."""
@@ -347,7 +364,7 @@ class TestIngestionMetrics:
         with metrics.track_provider("yfinance", "market_price"):
             pass
         assert metrics is not None
-        assert hasattr(metrics, 'track_provider')
+        assert hasattr(metrics, "track_provider")
 
     def test_track_provider_on_failure(self):
         """Provider failure tracking."""
@@ -358,12 +375,13 @@ class TestIngestionMetrics:
         except ValueError:
             logger.warning("Data error in test_track_provider_on_failure: ValueError", exc_info=True)
         assert metrics is not None
-        assert hasattr(metrics, 'track_provider')
+        assert hasattr(metrics, "track_provider")
 
 
 # =====================================================
 # Circuit Breaker Advanced Tests
 # =====================================================
+
 
 class TestCircuitBreakerAdvanced:
     """Gelişmiş circuit breaker testleri."""
@@ -409,6 +427,7 @@ class TestCircuitBreakerAdvanced:
 # Rate Limiter Advanced Tests
 # =====================================================
 
+
 @pytest.mark.asyncio
 class TestRateLimiterAdvanced:
     """Gelişmiş rate limiter testleri."""
@@ -436,6 +455,7 @@ class TestRateLimiterAdvanced:
 # =====================================================
 # Provider Manager Advanced Tests
 # =====================================================
+
 
 @pytest.mark.asyncio
 class TestProviderManagerAdvanced:

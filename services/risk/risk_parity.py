@@ -22,7 +22,8 @@ logger = structlog.get_logger()
 @dataclass
 class RiskParityResult:
     """Risk parity sonucu."""
-    weights: dict[str, float]        # ticker → weight
+
+    weights: dict[str, float]  # ticker → weight
     risk_contributions: dict[str, float]  # ticker → risk katkısı (%)
     portfolio_volatility: float
     diversification_ratio: float
@@ -61,9 +62,12 @@ class RiskParityOptimizer:
 
         if n_assets == 0:
             return RiskParityResult(
-                weights={}, risk_contributions={},
-                portfolio_volatility=0, diversification_ratio=0,
-                optimization_success=False, iterations=0,
+                weights={},
+                risk_contributions={},
+                portfolio_volatility=0,
+                diversification_ratio=0,
+                optimization_success=False,
+                iterations=0,
             )
 
         if n_assets == 1:
@@ -72,17 +76,15 @@ class RiskParityOptimizer:
                 risk_contributions={tickers[0]: 100.0},
                 portfolio_volatility=np.sqrt(cov_matrix[0, 0]),
                 diversification_ratio=1.0,
-                optimization_success=True, iterations=0,
+                optimization_success=True,
+                iterations=0,
             )
 
         # Hedef risk katkıları (eşit)
         if target_risk_contributions is None:
             target_rc = np.ones(n_assets) / n_assets
         else:
-            target_rc = np.array([
-                target_risk_contributions.get(t, 1.0 / n_assets)
-                for t in tickers
-            ])
+            target_rc = np.array([target_risk_contributions.get(t, 1.0 / n_assets) for t in tickers])
             target_rc = target_rc / target_rc.sum()  # Normalize
 
         # Optimizasyon
@@ -226,10 +228,10 @@ class RiskParityOptimizer:
                 "volatility": ew_vol,
                 "risk_contributions": ew_rc_dict,
                 "diversification_ratio": float(np.sum(ew_weights * np.sqrt(np.diag(cov_matrix))) / ew_vol)
-                if ew_vol > 0 else 0,
+                if ew_vol > 0
+                else 0,
             },
-            "volatility_reduction": round((1 - rp_result.portfolio_volatility / ew_vol) * 100, 2)
-            if ew_vol > 0 else 0,
+            "volatility_reduction": round((1 - rp_result.portfolio_volatility / ew_vol) * 100, 2) if ew_vol > 0 else 0,
         }
 
 

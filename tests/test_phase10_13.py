@@ -22,13 +22,22 @@ def test_execution_simulator():
 
     # 1. Market buy order
     order = Order(
-        order_id="ORD-001", portfolio_id=1, instrument_id=1,
-        ticker="THYAO", side=OrderSide.BUY, order_type=OrderType.MARKET,
+        order_id="ORD-001",
+        portfolio_id=1,
+        instrument_id=1,
+        ticker="THYAO",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
         quantity=100,
     )
     result = execution_simulator.execute_order(
-        order, market_price=305.25, bid=305.20, ask=305.30,
-        avg_volume=1000000, volatility=0.25, spread_pct=0.1,
+        order,
+        market_price=305.25,
+        bid=305.20,
+        ask=305.30,
+        avg_volume=1000000,
+        volatility=0.25,
+        spread_pct=0.1,
     )
     assert result.status == OrderStatus.FILLED
     assert result.filled_quantity == 100
@@ -40,8 +49,12 @@ def test_execution_simulator():
 
     # 2. Market sell order
     order2 = Order(
-        order_id="ORD-002", portfolio_id=1, instrument_id=1,
-        ticker="THYAO", side=OrderSide.SELL, order_type=OrderType.MARKET,
+        order_id="ORD-002",
+        portfolio_id=1,
+        instrument_id=1,
+        ticker="THYAO",
+        side=OrderSide.SELL,
+        order_type=OrderType.MARKET,
         quantity=100,
     )
     result2 = execution_simulator.execute_order(order2, market_price=310.0)
@@ -52,12 +65,18 @@ def test_execution_simulator():
 
     # 3. Large order → partial fill
     order3 = Order(
-        order_id="ORD-003", portfolio_id=1, instrument_id=1,
-        ticker="THYAO", side=OrderSide.BUY, order_type=OrderType.MARKET,
+        order_id="ORD-003",
+        portfolio_id=1,
+        instrument_id=1,
+        ticker="THYAO",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
         quantity=200000,  # 200K lot
     )
     result3 = execution_simulator.execute_order(
-        order3, market_price=305.25, avg_volume=1000000,
+        order3,
+        market_price=305.25,
+        avg_volume=1000000,
     )
     assert result3.status == OrderStatus.PARTIALLY_FILLED
     assert result3.filled_quantity == 100000  # %10 limit
@@ -138,7 +157,7 @@ def test_portfolio_metrics():
     # 4. Profit factor
     gross_profit = sum(t for t in trades if t > 0)
     gross_loss = abs(sum(t for t in trades if t < 0))
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
     assert profit_factor > 0
     passed += 1
     print(f"  ✓ Profit factor: {profit_factor:.2f}")
@@ -163,11 +182,22 @@ def test_e2e_pipeline():
 
     # 1. Feature → Opportunity → Signal Fusion → Decision → Execution
     features = {
-        "price": 305.25, "return_1d": 1.5, "roc_5d": 5.0, "roc_20d": 12.0,
-        "momentum_20d": 12.0, "volume_zscore": 3.0, "volume_ratio_20d": 2.5,
-        "rsi_14": 62, "macd_histogram": 0.5, "bb_position": 0.8, "adx": 30,
-        "atr_14_pct": 2.0, "realized_vol_20d": 18, "amihud_illiquidity": 0.001,
-        "correlation_to_index": 0.6, "trend_slope_20d": 1.5,
+        "price": 305.25,
+        "return_1d": 1.5,
+        "roc_5d": 5.0,
+        "roc_20d": 12.0,
+        "momentum_20d": 12.0,
+        "volume_zscore": 3.0,
+        "volume_ratio_20d": 2.5,
+        "rsi_14": 62,
+        "macd_histogram": 0.5,
+        "bb_position": 0.8,
+        "adx": 30,
+        "atr_14_pct": 2.0,
+        "realized_vol_20d": 18,
+        "amihud_illiquidity": 0.001,
+        "correlation_to_index": 0.6,
+        "trend_slope_20d": 1.5,
         "price_acceleration": 2.0,
     }
 
@@ -196,13 +226,23 @@ def test_e2e_pipeline():
     # Decision
     engine = DecisionEngine()
     inp = DecisionInput(
-        ticker="THYAO", price=305.25,
-        ml_return_5d=5, ml_return_20d=12, ml_confidence=fused.fused_confidence,
-        spec_score=opp.opportunity_score, world_alignment=0.5,
-        sim_expected_return=8, sim_var_95=-5, sim_prob_positive=65,
-        ai_direction=fused.fused_direction, ai_confidence=fused.fused_confidence,
-        max_position_pct=10, current_position_pct=0,
-        portfolio_drawdown=2, avg_volume=1000000, spread_pct=0.1,
+        ticker="THYAO",
+        price=305.25,
+        ml_return_5d=5,
+        ml_return_20d=12,
+        ml_confidence=fused.fused_confidence,
+        spec_score=opp.opportunity_score,
+        world_alignment=0.5,
+        sim_expected_return=8,
+        sim_var_95=-5,
+        sim_prob_positive=65,
+        ai_direction=fused.fused_direction,
+        ai_confidence=fused.fused_confidence,
+        max_position_pct=10,
+        current_position_pct=0,
+        portfolio_drawdown=2,
+        avg_volume=1000000,
+        spread_pct=0.1,
     )
     decision = engine.decide(inp)
     assert decision.action in ["BUY", "SELL", "HOLD"]
@@ -212,8 +252,12 @@ def test_e2e_pipeline():
     # Execution (eğer BUY ise)
     if decision.action == "BUY":
         order = Order(
-            order_id="E2E-001", portfolio_id=1, instrument_id=1,
-            ticker="THYAO", side=OrderSide.BUY, order_type=OrderType.MARKET,
+            order_id="E2E-001",
+            portfolio_id=1,
+            instrument_id=1,
+            ticker="THYAO",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
             quantity=100,
         )
         result = execution_simulator.execute_order(order, market_price=305.25)
@@ -251,6 +295,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

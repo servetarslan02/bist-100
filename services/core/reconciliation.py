@@ -22,12 +22,13 @@ logger = structlog.get_logger()
 @dataclass
 class ReconciledData:
     """Uzlaştırılmış veri."""
+
     value: float
     source: str
-    confidence: float          # 0-1
-    quality_score: float       # 0-100
+    confidence: float  # 0-1
+    quality_score: float  # 0-100
     all_sources: dict[str, float]
-    discrepancy_pct: float     # Kaynaklar arası fark %
+    discrepancy_pct: float  # Kaynaklar arası fark %
     is_consistent: bool
     anomaly_detected: bool
 
@@ -53,9 +54,9 @@ class CrossSourceReconciliation:
     }
 
     # Uyuşmazlık eşikleri
-    TOLERANCE_PCT = 0.5     # %0.5 — normal
-    WARNING_PCT = 2.0       # %2 — uyarı
-    ANOMALY_PCT = 5.0       # %5 — anomali
+    TOLERANCE_PCT = 0.5  # %0.5 — normal
+    WARNING_PCT = 2.0  # %2 — uyarı
+    ANOMALY_PCT = 5.0  # %5 — anomali
 
     def reconcile_price(
         self,
@@ -69,8 +70,13 @@ class CrossSourceReconciliation:
         """
         if not sources:
             return ReconciledData(
-                value=0, source="none", confidence=0, quality_score=0,
-                all_sources={}, discrepancy_pct=0, is_consistent=False,
+                value=0,
+                source="none",
+                confidence=0,
+                quality_score=0,
+                all_sources={},
+                discrepancy_pct=0,
+                is_consistent=False,
                 anomaly_detected=True,
             )
 
@@ -102,14 +108,10 @@ class CrossSourceReconciliation:
         best_source = self._select_best_source(sources, mean_val)
 
         # Quality score
-        quality_score = self._compute_quality_score(
-            discrepancy_pct, anomaly_detected, len(sources), std_val
-        )
+        quality_score = self._compute_quality_score(discrepancy_pct, anomaly_detected, len(sources), std_val)
 
         # Confidence
-        confidence = self._compute_confidence(
-            discrepancy_pct, anomaly_detected, len(sources)
-        )
+        confidence = self._compute_confidence(discrepancy_pct, anomaly_detected, len(sources))
 
         return ReconciledData(
             value=round(best_source[1], 4),

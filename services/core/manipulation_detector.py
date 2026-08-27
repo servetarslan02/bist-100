@@ -7,6 +7,7 @@ Geliştirmeler:
 - Price clustering: Benford analizi
 - Layering: birden fazla seviyede emir manipülasyonu
 """
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,14 +16,18 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 @dataclass
 class ManipulationAlert:
-    alert_type: str   # WASH_TRADING, SPOOFING, LAYERING, VOLUME_MANIP, PRICE_CLUSTER
-    severity: str     # LOW, MEDIUM, HIGH, CRITICAL
+    alert_type: str  # WASH_TRADING, SPOOFING, LAYERING, VOLUME_MANIP, PRICE_CLUSTER
+    severity: str  # LOW, MEDIUM, HIGH, CRITICAL
     description: str
     details: dict[str, Any] = None
+
     def __post_init__(self):
-        if self.details is None: self.details = {}
+        if self.details is None:
+            self.details = {}
+
 
 class ManipulationDetector:
     """Manipülasyon tespit motoru — istatistiksel testler ile."""
@@ -39,24 +44,37 @@ class ManipulationDetector:
 
         # Adjacent wash trading
         for i in range(1, len(trades)):
-            if (trades[i].get("price") == trades[i-1].get("price") and
-                trades[i].get("volume") == trades[i-1].get("volume") and
-                trades[i].get("buyer") == trades[i-1].get("seller")):
-                alerts.append(ManipulationAlert("WASH_TRADING", "HIGH",
-                    "Olası wash trading (bitişik trade)",
-                    {"index": i, "price": trades[i].get("price")}))
+            if (
+                trades[i].get("price") == trades[i - 1].get("price")
+                and trades[i].get("volume") == trades[i - 1].get("volume")
+                and trades[i].get("buyer") == trades[i - 1].get("seller")
+            ):
+                alerts.append(
+                    ManipulationAlert(
+                        "WASH_TRADING",
+                        "HIGH",
+                        "Olası wash trading (bitişik trade)",
+                        {"index": i, "price": trades[i].get("price")},
+                    )
+                )
 
         # Pencere bazlı: aynı fiyat/hacim kombinasyonu anomalisi
         if len(trades) >= window:
             recent = trades[-window:]
             price_vol_pairs = [(t.get("price", 0), t.get("volume", 0)) for t in recent]
             from collections import Counter
+
             pair_counts = Counter(price_vol_pairs)
             for pair, count in pair_counts.items():
                 if count >= 3 and count / window > 0.3:  # %30'dan fazla aynı kombinasyon
-                    alerts.append(ManipulationAlert("WASH_TRADING", "MEDIUM",
-                        f"Tekrarlayan fiyat/hacim kombinasyonu: {count}/{window}",
-                        {"pair": pair, "count": count, "window": window}))
+                    alerts.append(
+                        ManipulationAlert(
+                            "WASH_TRADING",
+                            "MEDIUM",
+                            f"Tekrarlayan fiyat/hacim kombinasyonu: {count}/{window}",
+                            {"pair": pair, "count": count, "window": window},
+                        )
+                    )
 
         return alerts
 
@@ -88,17 +106,27 @@ class ManipulationDetector:
         if total_count > 10:
             cancel_rate = cancel_count / total_count
             if cancel_rate > 0.7:  # %70+ iptal oranı
-                alerts.append(ManipulationAlert("SPOOFING", "HIGH",
-                    f"Yüksek iptal oranı: %{cancel_rate*100:.0f}",
-                    {"cancel_rate": cancel_rate, "total": total_count}))
+                alerts.append(
+                    ManipulationAlert(
+                        "SPOOFING",
+                        "HIGH",
+                        f"Yüksek iptal oranı: %{cancel_rate * 100:.0f}",
+                        {"cancel_rate": cancel_rate, "total": total_count},
+                    )
+                )
 
         # Büyük emir iptal anomalisi
         if large_order_count > 3:
             large_cancel_rate = large_cancel_count / large_order_count
             if large_cancel_rate > 0.6:
-                alerts.append(ManipulationAlert("SPOOFING", "CRITICAL",
-                    f"Büyük emir iptal anomalisi: {large_cancel_count}/{large_order_count}",
-                    {"large_cancel_rate": large_cancel_rate}))
+                alerts.append(
+                    ManipulationAlert(
+                        "SPOOFING",
+                        "CRITICAL",
+                        f"Büyük emir iptal anomalisi: {large_cancel_count}/{large_order_count}",
+                        {"large_cancel_rate": large_cancel_rate},
+                    )
+                )
 
         return alerts
 
@@ -121,16 +149,26 @@ class ManipulationDetector:
         # Z-score > 3 → anormal hacim
         if z_score > 3.0:
             severity = "CRITICAL" if z_score > 5.0 else "HIGH"
-            alerts.append(ManipulationAlert("VOLUME_MANIP", severity,
-                f"Anormal hacim (Z={z_score:.1f}): {latest:.0f} vs ortalama {mean_vol:.0f}",
-                {"z_score": round(z_score, 2), "latest": latest, "mean": mean_vol}))
+            alerts.append(
+                ManipulationAlert(
+                    "VOLUME_MANIP",
+                    severity,
+                    f"Anormal hacim (Z={z_score:.1f}): {latest:.0f} vs ortalama {mean_vol:.0f}",
+                    {"z_score": round(z_score, 2), "latest": latest, "mean": mean_vol},
+                )
+            )
 
         # Percentil bazlı
         percentile = float(np.percentile(arr, 95))
         if latest > percentile * 2:
-            alerts.append(ManipulationAlert("VOLUME_MANIP", "MEDIUM",
-                f"Hacim %95 percentilin 2x üstünde: {latest:.0f} vs p95={percentile:.0f}",
-                {"percentile_95": percentile, "latest": latest}))
+            alerts.append(
+                ManipulationAlert(
+                    "VOLUME_MANIP",
+                    "MEDIUM",
+                    f"Hacim %95 percentilin 2x üstünde: {latest:.0f} vs p95={percentile:.0f}",
+                    {"percentile_95": percentile, "latest": latest},
+                )
+            )
 
         return alerts
 
@@ -156,14 +194,24 @@ class ManipulationDetector:
 
         round_rate = round_count / len(recent)
         if round_rate > 0.5:  # %50+ yuvarlak fiyat
-            alerts.append(ManipulationAlert("PRICE_CLUSTER", "LOW",
-                f"Fiyat kümeleme anomalisi: %{round_rate*100:.0f} yuvarlak fiyat",
-                {"round_rate": round(round_rate, 2), "window": window}))
+            alerts.append(
+                ManipulationAlert(
+                    "PRICE_CLUSTER",
+                    "LOW",
+                    f"Fiyat kümeleme anomalisi: %{round_rate * 100:.0f} yuvarlak fiyat",
+                    {"round_rate": round(round_rate, 2), "window": window},
+                )
+            )
 
         return alerts
 
-    def detect_all(self, trades: list[dict] = None, orders: list[dict] = None,
-                   volumes: list[float] = None, prices: list[float] = None) -> list[ManipulationAlert]:
+    def detect_all(
+        self,
+        trades: list[dict] = None,
+        orders: list[dict] = None,
+        volumes: list[float] = None,
+        prices: list[float] = None,
+    ) -> list[ManipulationAlert]:
         """Tüm tespitleri çalıştır."""
         all_alerts = []
         if trades:
@@ -175,5 +223,6 @@ class ManipulationDetector:
         if prices:
             all_alerts.extend(self.detect_price_clustering(prices))
         return all_alerts
+
 
 manipulation_detector = ManipulationDetector()

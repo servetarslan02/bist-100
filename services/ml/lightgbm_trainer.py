@@ -26,9 +26,11 @@ logger = structlog.get_logger()
 # CONFIGURATION
 # =====================================================
 
+
 @dataclass
 class MLModelConfig:
     """LightGBM model konfigürasyonu."""
+
     objective: str = "regression"
     metric: str = "rmse"
     ndcg_eval_at: list[int] = field(default_factory=lambda: [5, 10, 20])
@@ -57,9 +59,11 @@ class MLModelConfig:
 # TRAINED MODEL
 # =====================================================
 
+
 @dataclass
 class TrainedModel:
     """Eğitilmiş model wrapper'ı."""
+
     model: Any
     feature_names: list[str]
     scaler_mean: np.ndarray | None = None
@@ -114,12 +118,14 @@ class TrainedModel:
 
     def save(self, path: str):
         from services.core.safe_pickle import safe_pickle_dump
+
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         safe_pickle_dump(self, path)
 
     @classmethod
     def load(cls, path: str) -> "TrainedModel":
         from services.core.safe_pickle import safe_pickle_load
+
         return safe_pickle_load(path)
 
 
@@ -131,6 +137,7 @@ class MultiHorizonModel:
     predict() varsayılan horizon'a (primary) delegasyon yapar.
     horizon_models dict'i ile tüm horizon'lara erişilebilir.
     """
+
     horizon_models: dict[int, TrainedModel] = field(default_factory=dict)
     primary_horizon: int = 5
     cs_features: list[str] = field(default_factory=list)
@@ -209,6 +216,7 @@ class MultiHorizonModel:
 # MULTI-HORIZON TARGET
 # =====================================================
 
+
 @dataclass
 class TargetSpec:
     horizon: int = 5
@@ -248,16 +256,25 @@ def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> float | Non
 # VALIDATION METRICS
 # =====================================================
 
+
 def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     defaults = {
-        "mae": 0.0, "rmse": 0.0, "r_squared": 0.0,
-        "directional_accuracy": 0.0, "ic": 0.0,
-        "ic_stability": 0.0, "prediction_std": 0.0,
-        "target_std": 0.0, "rank_correlation": 0.0,
-        "hit_rate": 0.0, "worst_error": 0.0,
+        "mae": 0.0,
+        "rmse": 0.0,
+        "r_squared": 0.0,
+        "directional_accuracy": 0.0,
+        "ic": 0.0,
+        "ic_stability": 0.0,
+        "prediction_std": 0.0,
+        "target_std": 0.0,
+        "rank_correlation": 0.0,
+        "hit_rate": 0.0,
+        "worst_error": 0.0,
         "validation_samples": 0.0,
-        "top10_avg_return": 0.0, "top20_avg_return": 0.0,
-        "bottom10_avg_return": 0.0, "long_short_spread": 0.0,
+        "top10_avg_return": 0.0,
+        "top20_avg_return": 0.0,
+        "bottom10_avg_return": 0.0,
+        "long_short_spread": 0.0,
         "rank_ic": 0.0,
     }
     mask = np.isfinite(y_true) & np.isfinite(y_pred)
@@ -286,6 +303,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dic
 
     try:
         from scipy.stats import spearmanr
+
         if np.std(yt) > 0 and np.std(yp) > 0:
             ic, _ = spearmanr(yt, yp)
             defaults["ic"] = float(ic) if np.isfinite(ic) else 0.0
@@ -299,6 +317,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dic
         half = n // 2
         try:
             from scipy.stats import spearmanr
+
             ic1 = ic2 = 0.0
             if np.std(yt[:half]) > 0 and np.std(yp[:half]) > 0:
                 r, _ = spearmanr(yt[:half], yp[:half])
@@ -319,9 +338,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dic
         defaults["top10_avg_return"] = float(np.mean(yt[top10_idx]))
         defaults["top20_avg_return"] = float(np.mean(yt[top20_idx]))
         defaults["bottom10_avg_return"] = float(np.mean(yt[bottom10_idx]))
-        defaults["long_short_spread"] = float(
-            defaults["top10_avg_return"] - defaults["bottom10_avg_return"]
-        )
+        defaults["long_short_spread"] = float(defaults["top10_avg_return"] - defaults["bottom10_avg_return"])
         defaults["rank_ic"] = defaults["ic"]
 
     return defaults
@@ -330,6 +347,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dic
 # =====================================================
 # MODEL CONFIDENCE
 # =====================================================
+
 
 def compute_model_confidence(
     validation_metrics: dict[str, float],
@@ -376,9 +394,7 @@ def compute_model_confidence(
 
     if current_regime != "UNKNOWN" and train_regime != "UNKNOWN" and current_regime != train_regime:
         confidence *= 0.8
-        details["degradation_reasons"].append(
-            f"regime_mismatch:train={train_regime},current={current_regime}"
-        )
+        details["degradation_reasons"].append(f"regime_mismatch:train={train_regime},current={current_regime}")
 
     if feature_count < 10:
         confidence *= 0.7
@@ -395,6 +411,7 @@ def compute_model_confidence(
 # =====================================================
 # TRAINER v3.0
 # =====================================================
+
 
 class LightGBMTrainer:
     """LightGBM training pipeline v3.0 — date-space purge, multi-horizon."""
@@ -430,9 +447,7 @@ class LightGBMTrainer:
                 all_features.update(f.keys())
             feature_names = sorted(all_features)
 
-        X, y, groups, tickers = self._prepare_data(
-            features_map, returns, date_groups, feature_names
-        )
+        X, y, groups, tickers = self._prepare_data(features_map, returns, date_groups, feature_names)
 
         if len(X) < 50:
             logger.warning("Insufficient training data", samples=len(X))
@@ -468,13 +483,17 @@ class LightGBMTrainer:
             train_date_end_idx = n_dates - val_date_count - effective_purge
 
         if train_date_end_idx < 5:
-            logger.warning("Insufficient dates for train/val split",
-                          total_dates=n_dates, val_dates=val_date_count, purge=effective_purge)
+            logger.warning(
+                "Insufficient dates for train/val split",
+                total_dates=n_dates,
+                val_dates=val_date_count,
+                purge=effective_purge,
+            )
             return None
 
         # Train ve val tarih kümeleri (date-space, sample-space değil)
         train_dates = set(unique_dates[:train_date_end_idx])
-        val_dates = set(unique_dates[train_date_end_idx + effective_purge:])
+        val_dates = set(unique_dates[train_date_end_idx + effective_purge :])
 
         if not val_dates:
             logger.warning("No validation dates after purge")
@@ -492,8 +511,9 @@ class LightGBMTrainer:
             # purge aralığındaki tarihler → atlanır (ne train ne val)
 
         if len(train_indices) < 20 or len(val_indices) < 5:
-            logger.warning("Insufficient samples after date-space split",
-                          train=len(train_indices), val=len(val_indices))
+            logger.warning(
+                "Insufficient samples after date-space split", train=len(train_indices), val=len(val_indices)
+            )
             return None
 
         # Scaler SADECE TRAIN split'inden öğrenilir
@@ -531,13 +551,15 @@ class LightGBMTrainer:
 
         # LightGBM Dataset
         train_data = lgb.Dataset(
-            X_train_scaled, label=y_rank_train, group=train_groups,
-            feature_name=feature_names, free_raw_data=False
+            X_train_scaled, label=y_rank_train, group=train_groups, feature_name=feature_names, free_raw_data=False
         )
         val_data = lgb.Dataset(
-            X_val_scaled, label=y_rank_val, group=val_groups,
-            feature_name=feature_names, free_raw_data=False,
-            reference=train_data
+            X_val_scaled,
+            label=y_rank_val,
+            group=val_groups,
+            feature_name=feature_names,
+            free_raw_data=False,
+            reference=train_data,
         )
 
         params = {
@@ -562,7 +584,8 @@ class LightGBMTrainer:
 
         try:
             model = lgb.train(
-                params, train_data,
+                params,
+                train_data,
                 num_boost_round=self._config.num_boost_round,
                 valid_sets=[val_data],
                 callbacks=callbacks,
@@ -607,15 +630,18 @@ class LightGBMTrainer:
             target_horizon=self._config.target_horizon,
         )
 
-        logger.info("LightGBM model trained v3",
-                   train=len(train_indices), val=len(val_indices),
-                   purge_dates=effective_purge,
-                   train_date_range=date_range,
-                   val_score=round(val_score, 4),
-                   features=len(feature_names),
-                   ic=round(validation_metrics.get("ic", 0), 4),
-                   dir_acc=round(validation_metrics.get("directional_accuracy", 0), 4),
-                   confidence=confidence)
+        logger.info(
+            "LightGBM model trained v3",
+            train=len(train_indices),
+            val=len(val_indices),
+            purge_dates=effective_purge,
+            train_date_range=date_range,
+            val_score=round(val_score, 4),
+            features=len(feature_names),
+            ic=round(validation_metrics.get("ic", 0), 4),
+            dir_acc=round(validation_metrics.get("directional_accuracy", 0), 4),
+            confidence=confidence,
+        )
 
         return trained
 
@@ -699,8 +725,8 @@ class LightGBMTrainer:
             if g < 2:
                 idx += g
                 continue
-            true_g = y_true[idx:idx+g]
-            pred_g = y_pred[idx:idx+g]
+            true_g = y_true[idx : idx + g]
+            pred_g = y_pred[idx : idx + g]
             ideal = np.sort(true_g)[::-1]
             pred_order = np.argsort(pred_g)[::-1]
             pred_sorted = true_g[pred_order]
@@ -715,6 +741,7 @@ class LightGBMTrainer:
 # =====================================================
 # FEATURE CONTRACT VALIDATION
 # =====================================================
+
 
 def validate_feature_contract(
     features_map: dict[str, dict],

@@ -35,6 +35,7 @@ logger = structlog.get_logger()
 @dataclass
 class SystemHealth:
     """Sistem sağlık durumu."""
+
     timestamp: str
     overall_status: str  # HEALTHY, WARNING, CRITICAL
     module_status: dict[str, str]  # {module: status}
@@ -49,6 +50,7 @@ class SystemHealth:
 @dataclass
 class ModelVersion:
     """Model versiyon bilgisi."""
+
     version_id: str
     created_at: str
     regime: str
@@ -63,6 +65,7 @@ class ModelVersion:
 @dataclass
 class ABTestResult:
     """A/B test sonucu."""
+
     test_id: str
     champion_version: str
     challenger_version: str
@@ -112,9 +115,7 @@ class SuperIntelligenceEngine:
         self._ab_test_results: deque = deque(maxlen=50)
 
         # Meta-learning
-        self._regime_model_performance: dict[str, dict[str, list[float]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
+        self._regime_model_performance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
 
         # Health monitoring
         self._health_status = SystemHealth(
@@ -133,9 +134,11 @@ class SuperIntelligenceEngine:
         self._healing_queue: deque = deque(maxlen=500)
         self._lock = threading.Lock()
 
-        logger.info("SuperIntelligenceEngine v3.0 initialized",
-                   retrain_sharpe=retrain_threshold_sharpe,
-                   drift_threshold=drift_threshold)
+        logger.info(
+            "SuperIntelligenceEngine v3.0 initialized",
+            retrain_sharpe=retrain_threshold_sharpe,
+            drift_threshold=drift_threshold,
+        )
 
     # === SELF-HEALING ===
 
@@ -176,8 +179,7 @@ class SuperIntelligenceEngine:
             if len(self._healing_queue) > 100:
                 self._healing_queue = self._healing_queue[-100:]
 
-        logger.warning("Self-healing triggered",
-                      module=module_name, action=healing_action, error=error_msg)
+        logger.warning("Self-healing triggered", module=module_name, action=healing_action, error=error_msg)
 
         return healing_record
 
@@ -230,16 +232,11 @@ class SuperIntelligenceEngine:
         win_rate = recent_performance.get("win_rate", 0)
 
         # Çoklu kriter
-        needs_retrain = (
-            sharpe < self.retrain_threshold_sharpe or
-            ic < self.retrain_threshold_ic or
-            win_rate < 0.45
-        )
+        needs_retrain = sharpe < self.retrain_threshold_sharpe or ic < self.retrain_threshold_ic or win_rate < 0.45
 
         if needs_retrain:
             self._health_status.retrain_needed = True
-            logger.warning("Retrain needed",
-                          sharpe=sharpe, ic=ic, win_rate=win_rate)
+            logger.warning("Retrain needed", sharpe=sharpe, ic=ic, win_rate=win_rate)
 
         return needs_retrain
 
@@ -286,7 +283,7 @@ class SuperIntelligenceEngine:
 
         # Eski versiyonları temizle
         if len(self._model_versions) > self.max_models_history:
-            self._model_versions = self._model_versions[-self.max_models_history:]
+            self._model_versions = self._model_versions[-self.max_models_history :]
 
         # A/B test başlat
         self._start_ab_test(
@@ -346,17 +343,19 @@ class SuperIntelligenceEngine:
 
         if overall_drift:
             self._health_status.drift_detected = True
-            self._drift_alerts.append({
-                "timestamp": datetime.now(UTC).isoformat(),
-                "affected_tickers": list(drift_results.keys()),
-                "details": drift_results,
-            })
+            self._drift_alerts.append(
+                {
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "affected_tickers": list(drift_results.keys()),
+                    "details": drift_results,
+                }
+            )
             if len(self._drift_alerts) > 500:
                 self._drift_alerts = self._drift_alerts[-500:]
 
-            logger.warning("Drift detected",
-                          tickers=len(drift_results),
-                          features=sum(len(v) for v in drift_results.values()))
+            logger.warning(
+                "Drift detected", tickers=len(drift_results), features=sum(len(v) for v in drift_results.values())
+            )
 
         return {
             "drift_detected": overall_drift,
@@ -409,7 +408,11 @@ class SuperIntelligenceEngine:
         improvement = (challenger_sharpe - champion_sharpe) / abs(champion_sharpe) * 100 if champion_sharpe != 0 else 0
         is_significant = p_value < 0.05
 
-        winner = self._ab_test_challenger if (challenger_sharpe > champion_sharpe and is_significant) else self._ab_test_champion
+        winner = (
+            self._ab_test_challenger
+            if (challenger_sharpe > champion_sharpe and is_significant)
+            else self._ab_test_champion
+        )
 
         result = ABTestResult(
             test_id=self._generate_version_id(),
@@ -432,11 +435,9 @@ class SuperIntelligenceEngine:
         if winner == self._ab_test_challenger:
             self._champion_model_version = winner
             for v in self._model_versions:
-                v.is_champion = (v.version_id == winner)
+                v.is_champion = v.version_id == winner
 
-        logger.info("A/B test completed",
-                   winner=winner, improvement=round(improvement, 2),
-                   significant=is_significant)
+        logger.info("A/B test completed", winner=winner, improvement=round(improvement, 2), significant=is_significant)
 
         return result
 
@@ -565,9 +566,12 @@ class SuperIntelligenceEngine:
                 if healing["status"] == "PENDING":
                     self.execute_healing(healing)
 
-        logger.info("Daily cycle completed", regime=regime,
-                   drift=drift["drift_detected"],
-                   retrain=results.get("retrain_needed", False))
+        logger.info(
+            "Daily cycle completed",
+            regime=regime,
+            drift=drift["drift_detected"],
+            retrain=results.get("retrain_needed", False),
+        )
 
         return results
 
@@ -628,6 +632,7 @@ class SuperIntelligenceEngine:
         logger.info("Retrain triggered by self-healing")
         try:
             from services.learning.continuous_learning import continuous_learning
+
             continuous_learning._drift_detected = True
             self._health_status.retrain_needed = True
         except Exception as e:
@@ -638,6 +643,7 @@ class SuperIntelligenceEngine:
         logger.info("Data refresh triggered by self-healing")
         try:
             from services.core.event_bus import EventType, publish_event
+
             publish_event(
                 EventType.DATA_REFRESH_REQUESTED,
                 source="super_intelligence",
@@ -652,6 +658,7 @@ class SuperIntelligenceEngine:
         self.update_module_status(module, "RESTARTING")
         try:
             from services.learning.health_monitor import learning_health_monitor
+
             learning_health_monitor.request_restart(module)
         except ImportError:
             logger.warning("Health monitor not available for restart", module=module)
@@ -660,7 +667,7 @@ class SuperIntelligenceEngine:
         """Backoff ile tekrar dene."""
         attempt = healing_record.get("attempt", 0)
         backoff = learning_settings.health.healing_backoff_seconds
-        wait_time = backoff * (2 ** attempt)
+        wait_time = backoff * (2**attempt)
         logger.info("Retry with backoff", attempt=attempt, wait_seconds=wait_time)
         time.sleep(min(wait_time, 300))
 

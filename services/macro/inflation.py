@@ -86,18 +86,14 @@ def compute_inflation_features(inflation_data: dict[str, Any]) -> dict[str, floa
             surprise = float(cpi_yoy) - float(cpi_expected)
             features["inf_surprise"] = round(surprise, 4)
             features["inf_surprise_pct"] = round(surprise / max(abs(float(cpi_expected)), 0.01), 4)
-            features["inf_surprise_direction"] = (
-                1.0 if surprise > 0.5 else (-1.0 if surprise < -0.5 else 0.0)
-            )
+            features["inf_surprise_direction"] = 1.0 if surprise > 0.5 else (-1.0 if surprise < -0.5 else 0.0)
 
         # Enflasyon trendi
         cpi_previous = inflation_data.get("cpi_previous")
         if cpi_yoy is not None and cpi_previous is not None:
             trend = float(cpi_yoy) - float(cpi_previous)
             features["inf_trend"] = round(trend, 4)
-            features["inf_trend_direction"] = (
-                1.0 if trend > 0.5 else (-1.0 if trend < -0.5 else 0.0)
-            )
+            features["inf_trend_direction"] = 1.0 if trend > 0.5 else (-1.0 if trend < -0.5 else 0.0)
 
     except Exception as e:
         logger.error("Inflation feature computation failed", error=str(e))

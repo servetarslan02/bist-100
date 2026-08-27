@@ -17,7 +17,6 @@ from services.paper_trading.state_store import PaperStateStore
 
 
 class TestUnifiedPipeline(unittest.TestCase):
-
     def setUp(self):
         self.tmp_dir = tempfile.mkdtemp()
         self.db_path = os.path.join(self.tmp_dir, "test_unified.db")
@@ -33,23 +32,39 @@ class TestUnifiedPipeline(unittest.TestCase):
         market_data = {}
         for t in tickers:
             prices = 100.0 + np.cumsum(np.random.randn(len(dates)) * 1.5)
-            df = pl.DataFrame({
-                'Open': prices * 0.995,
-                'High': prices * 1.015,
-                'Low': prices * 0.985,
-                'Close': prices,
-                'Volume': np.random.randint(1_000_000, 5_000_000, len(dates)),
-            }.Series(dates))
+            df = pl.DataFrame(
+                {
+                    "Open": prices * 0.995,
+                    "High": prices * 1.015,
+                    "Low": prices * 0.985,
+                    "Close": prices,
+                    "Volume": np.random.randint(1_000_000, 5_000_000, len(dates)),
+                }.Series(dates)
+            )
             market_data[t] = df
         return market_data
 
     def test_eod_signal_queuing_does_not_execute_immediately(self):
         """18:15 EOD anında sinyal üretildiğinde hemen kapanıştan işlem yapılmaz, beklemeye alınır."""
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
-            {"ticker": "GARAN", "direction": "LONG", "rank": 2, "score": 8.5,
-             "confidence": 0.80, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 9.5,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
+            {
+                "ticker": "GARAN",
+                "direction": "LONG",
+                "rank": 2,
+                "score": 8.5,
+                "confidence": 0.80,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
         ]
 
         # 1. 18:15 EOD Sinyalleri kuyruğa al
@@ -74,10 +89,24 @@ class TestUnifiedPipeline(unittest.TestCase):
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik"}
 
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
-            {"ticker": "GARAN", "direction": "LONG", "rank": 2, "score": 8.5,
-             "confidence": 0.80, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 9.5,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
+            {
+                "ticker": "GARAN",
+                "direction": "LONG",
+                "rank": 2,
+                "score": 8.5,
+                "confidence": 0.80,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
         ]
         self.orch.queue_pending_signals(signals, "2024-01-01")
 
@@ -103,8 +132,15 @@ class TestUnifiedPipeline(unittest.TestCase):
     def test_blocking_pre_trade_risk_gate_blocks_excessive_order(self):
         """Risk kapısı shadow modda değildir; kural ihlalinde emri derhal engeller."""
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 9.5,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
         ]
         self.orch.queue_pending_signals(signals, "2024-01-01")
 
@@ -139,8 +175,15 @@ class TestUnifiedPipeline(unittest.TestCase):
 
         # Cuma akşamı sinyal üretildi
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 9.5,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
         ]
         self.orch.queue_pending_signals(signals, "2024-01-05")
 
@@ -162,8 +205,15 @@ class TestUnifiedPipeline(unittest.TestCase):
     def test_pending_signals_retained_on_failed_morning_run(self):
         """Sabah yürütmesi veri kalitesi / kesinti nedeniyle başarısız olursa bekleyen sinyaller silinmez."""
         signals = [
-            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
-             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+            {
+                "ticker": "THYAO",
+                "direction": "LONG",
+                "rank": 1,
+                "score": 9.5,
+                "confidence": 0.85,
+                "model_version": "LambdaRank_v3_LOCKED",
+                "target_weight": 0.10,
+            },
         ]
         self.orch.queue_pending_signals(signals, "2024-01-05")
 

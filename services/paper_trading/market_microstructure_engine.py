@@ -36,9 +36,9 @@ class MarketMicrostructureEngine:
 
     def __init__(
         self,
-        commission_rate: float = 0.0003,      # %0.03 aracı kurum
+        commission_rate: float = 0.0003,  # %0.03 aracı kurum
         exchange_fee_rate: float = 0.000056,  # %0.0056 BIST borsa payı
-        bsmv_rate: float = 0.05,              # BSMV %5
+        bsmv_rate: float = 0.05,  # BSMV %5
         min_commission: float = 1.0,
         slippage_base_pct: float = 0.05,
         slippage_max_pct: float = 0.5,
@@ -66,9 +66,9 @@ class MarketMicrostructureEngine:
         self,
         date: str,
         ticker: str,
-        side: str,                  # "BUY" | "SELL" | "SHORT"
+        side: str,  # "BUY" | "SELL" | "SHORT"
         quantity: int,
-        order_type: str = "MARKET", # "MARKET" | "LIMIT" | "TRADE_AT_CLOSE"
+        order_type: str = "MARKET",  # "MARKET" | "LIMIT" | "TRADE_AT_CLOSE"
         price: float = 0.0,
         reference_price: float = 0.0,
         portfolio_cash: float = float("inf"),
@@ -118,12 +118,18 @@ class MarketMicrostructureEngine:
         if not risk_result.is_valid:
             order_record["status"] = "REJECTED"
             order_record["rejection_reason"] = f"{risk_result.rejection_code}: {risk_result.rejection_reason}"
-            logger.warning("Order rejected by PreTradeRiskEngine", ticker=ticker, reason=order_record["rejection_reason"])
+            logger.warning(
+                "Order rejected by PreTradeRiskEngine", ticker=ticker, reason=order_record["rejection_reason"]
+            )
             return order_record
 
         # 2. SEANS FAZINA GÖRE İŞLEME ALMA
         # A) Açık Artırma Emir Toplama Fazları
-        if current_phase in {BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.CLOSING_AUCTION_COLLECTION, BISTMarketPhase.CIRCUIT_BREAKER_AUCTION}:
+        if current_phase in {
+            BISTMarketPhase.OPENING_AUCTION_COLLECTION,
+            BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+            BISTMarketPhase.CIRCUIT_BREAKER_AUCTION,
+        }:
             auc_order = AuctionOrder(
                 order_id=order_id,
                 ticker=ticker,
@@ -135,7 +141,9 @@ class MarketMicrostructureEngine:
             )
             self._auction_pools[ticker].append(auc_order)
             order_record["status"] = "PENDING_AUCTION"
-            logger.info("Order queued for Call Auction", ticker=ticker, side=side, qty=quantity, phase=current_phase.value)
+            logger.info(
+                "Order queued for Call Auction", ticker=ticker, side=side, qty=quantity, phase=current_phase.value
+            )
             return order_record
 
         # B) Sürekli Müzayede (CONTINUOUS_AUCTION)
@@ -179,10 +187,16 @@ class MarketMicrostructureEngine:
             order_record["status"] = "PARTIAL_FILL" if walk_result["is_partial"] else "FILLED"
 
             self._daily_turnover += amount
-            logger.info("Continuous Auction Order Executed (Walk-the-Book)",
-                        ticker=ticker, side=side, fill_price=fill_price, qty=filled_qty,
-                        slippage=slippage_pct, levels=walk_result["levels_consumed"],
-                        scenario=scenario_enum.value)
+            logger.info(
+                "Continuous Auction Order Executed (Walk-the-Book)",
+                ticker=ticker,
+                side=side,
+                fill_price=fill_price,
+                qty=filled_qty,
+                slippage=slippage_pct,
+                levels=walk_result["levels_consumed"],
+                scenario=scenario_enum.value,
+            )
             return order_record
 
         # C) Kapanış Fiyatından İşlemler (CLOSING_PRICE_TRADING)
@@ -206,7 +220,9 @@ class MarketMicrostructureEngine:
             return {"matched_volume": 0, "equilibrium_price": reference_price, "trades": []}
 
         result = call_auction_engine.calculate_equilibrium(orders, reference_price)
-        logger.info("Call Auction Finished", ticker=ticker, eq_price=result.equilibrium_price, matched_vol=result.matched_volume)
+        logger.info(
+            "Call Auction Finished", ticker=ticker, eq_price=result.equilibrium_price, matched_vol=result.matched_volume
+        )
         return {
             "equilibrium_price": result.equilibrium_price,
             "matched_volume": result.matched_volume,

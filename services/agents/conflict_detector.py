@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class ConflictReport:
     """Çelişki raporu."""
+
     has_conflict: bool
     is_unanimous: bool
     long_agents: list[AgentRole] = field(default_factory=list)
@@ -95,10 +96,7 @@ class ConflictDetector:
         exclude = set(exclude_roles or [AgentRole.SYNTHESIS, AgentRole.RISK])
 
         # Geçerli sonuçları filtrele
-        valid_results = {
-            role: result for role, result in results.items()
-            if result.success and role not in exclude
-        }
+        valid_results = {role: result for role, result in results.items() if result.success and role not in exclude}
 
         if not valid_results:
             return ConflictReport(
@@ -126,10 +124,7 @@ class ConflictDetector:
 
         # Çelişki analizi
         has_conflict = len(long_agents) > 0 and len(short_agents) > 0
-        is_unanimous = (
-            len(long_agents) == len(valid_results) or
-            len(short_agents) == len(valid_results)
-        )
+        is_unanimous = len(long_agents) == len(valid_results) or len(short_agents) == len(valid_results)
 
         # Çelişki skoru (0-1)
         total = len(valid_results)
@@ -187,18 +182,19 @@ class ConflictDetector:
                 dir_b = valid[role_b].output.get("direction", "NEUTRAL")
 
                 # LONG vs SHORT veya SHORT vs LONG
-                if (dir_a == "LONG" and dir_b == "SHORT") or \
-                   (dir_a == "SHORT" and dir_b == "LONG"):
-                    conflicts.append({
-                        "agent_a": role_a.value,
-                        "direction_a": dir_a,
-                        "confidence_a": valid[role_a].confidence,
-                        "reasoning_a": valid[role_a].reasoning[:200],
-                        "agent_b": role_b.value,
-                        "direction_b": dir_b,
-                        "confidence_b": valid[role_b].confidence,
-                        "reasoning_b": valid[role_b].reasoning[:200],
-                        "type": "direction_conflict",
-                    })
+                if (dir_a == "LONG" and dir_b == "SHORT") or (dir_a == "SHORT" and dir_b == "LONG"):
+                    conflicts.append(
+                        {
+                            "agent_a": role_a.value,
+                            "direction_a": dir_a,
+                            "confidence_a": valid[role_a].confidence,
+                            "reasoning_a": valid[role_a].reasoning[:200],
+                            "agent_b": role_b.value,
+                            "direction_b": dir_b,
+                            "confidence_b": valid[role_b].confidence,
+                            "reasoning_b": valid[role_b].reasoning[:200],
+                            "type": "direction_conflict",
+                        }
+                    )
 
         return conflicts

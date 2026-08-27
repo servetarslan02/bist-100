@@ -159,11 +159,15 @@ class LearningPipeline:
         self.store.record_fusion_weights(fusion_weights, current_regime)
 
         # Otomatik rapor üret
-        window_comp = {
-            "250": window_250_metrics,
-            "500": window_500_metrics,
-            "all": all_metrics,
-        } if window_250_metrics else None
+        window_comp = (
+            {
+                "250": window_250_metrics,
+                "500": window_500_metrics,
+                "all": all_metrics,
+            }
+            if window_250_metrics
+            else None
+        )
 
         report_md = self.reporter.generate_markdown_report(
             metrics_list=all_metrics,
@@ -190,10 +194,7 @@ class LearningPipeline:
     ) -> dict[str, Any]:
         """Look-ahead bias olmadan kronolojik walk-forward öğrenme simülasyonu."""
         # Tahminleri zamana göre sırala (Zero look-ahead bias)
-        sorted_events = sorted(
-            historical_predictions_stream,
-            key=lambda x: x.get("timestamp", "")
-        )
+        sorted_events = sorted(historical_predictions_stream, key=lambda x: x.get("timestamp", ""))
 
         pred_ids = []
         for evt in sorted_events:

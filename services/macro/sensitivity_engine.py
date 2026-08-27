@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class SensitivityResult:
     """Sektör hassasiyet sonucu."""
+
     sector: str
     usdtry_sensitivity: float
     rate_sensitivity: float
@@ -60,6 +61,7 @@ class SensitivityResult:
 @dataclass
 class CompanySensitivity:
     """Şirket bazlı hassasiyet override."""
+
     ticker: str
     sector: str
     # Override ağırlıkları (1.0 = sektör hassasiyeti kullan, >1 = daha hassas, <1 = daha az)
@@ -101,7 +103,7 @@ class DynamicSensitivityEngine:
 
         # Rolling data
         self._sector_returns: dict[str, list[float]] = {}  # sector → returns
-        self._macro_values: dict[str, list[float]] = {}    # macro_var → values
+        self._macro_values: dict[str, list[float]] = {}  # macro_var → values
 
         # Company overrides
         self._company_overrides: dict[str, CompanySensitivity] = {}
@@ -124,7 +126,7 @@ class DynamicSensitivityEngine:
             self._sector_returns[sector].append(ret)
             # Rolling window
             if len(self._sector_returns[sector]) > self._window * 2:
-                self._sector_returns[sector] = self._sector_returns[sector][-self._window:]
+                self._sector_returns[sector] = self._sector_returns[sector][-self._window :]
 
         # Macro values
         for var, val in macro_values.items():
@@ -132,7 +134,7 @@ class DynamicSensitivityEngine:
                 self._macro_values[var] = []
             self._macro_values[var].append(val)
             if len(self._macro_values[var]) > self._window * 2:
-                self._macro_values[var] = self._macro_values[var][-self._window:]
+                self._macro_values[var] = self._macro_values[var][-self._window :]
 
         # Cache invalidation
         self._last_cache_update = None
@@ -295,8 +297,7 @@ class DynamicSensitivityEngine:
         return {
             "n_sectors": len(all_sens),
             "usdtry_most_sensitive": [
-                {"sector": s, "sensitivity": round(r.usdtry_sensitivity, 4)}
-                for s, r in usdtry_ranking[:3]
+                {"sector": s, "sensitivity": round(r.usdtry_sensitivity, 4)} for s, r in usdtry_ranking[:3]
             ],
             "n_company_overrides": len(self._company_overrides),
             "window_days": self._window,
@@ -347,6 +348,7 @@ class DynamicSensitivityEngine:
                 t_stat = corr * np.sqrt((n_obs - 2) / (1 - corr**2))
                 # Basit p-value approximation
                 from scipy import stats
+
                 p_value = float(2 * stats.t.sf(abs(t_stat), n_obs - 2))
             else:
                 p_value = 1.0
@@ -389,9 +391,17 @@ class DynamicSensitivityEngine:
 
     def _get_default_sensitivity(self, sector: str) -> SensitivityResult:
         """Varsayılan hassasiyet (rolling data yoksa)."""
-        defaults = self.DEFAULT_SENSITIVITIES.get(sector.upper(), {
-            "usdtry": -0.4, "rate": -0.4, "inflation": -0.3, "vix": -0.4, "oil": -0.1, "gold": 0.1,
-        })
+        defaults = self.DEFAULT_SENSITIVITIES.get(
+            sector.upper(),
+            {
+                "usdtry": -0.4,
+                "rate": -0.4,
+                "inflation": -0.3,
+                "vix": -0.4,
+                "oil": -0.1,
+                "gold": 0.1,
+            },
+        )
 
         return SensitivityResult(
             sector=sector,

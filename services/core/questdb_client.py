@@ -33,6 +33,7 @@ except ImportError:
 
 try:
     import httpx
+
     HAS_HTTPX = True
 except ImportError:
     HAS_HTTPX = False
@@ -95,14 +96,10 @@ class QuestDBClient:
         ts_ns = int(ts.timestamp() * 1_000_000_000)
 
         # ILP format: measurement,tag=value field=value timestamp
-        line = (
-            f"market_ticks,ticker={ticker} "
-            f"price={price},volume={volume},bid={bid},ask={ask} "
-            f"{ts_ns}\n"
-        )
+        line = f"market_ticks,ticker={ticker} price={price},volume={volume},bid={bid},ask={ask} {ts_ns}\n"
 
         try:
-            self._ilp_socket.sendall(line.encode('utf-8'))
+            self._ilp_socket.sendall(line.encode("utf-8"))
             return True
         except Exception as e:
             logger.warning("QuestDB ILP write failed", error=str(e))
@@ -127,7 +124,7 @@ class QuestDBClient:
             lines.append(line)
 
         try:
-            self._ilp_socket.sendall(''.join(lines).encode('utf-8'))
+            self._ilp_socket.sendall("".join(lines).encode("utf-8"))
             return True
         except Exception as e:
             logger.warning("QuestDB batch write failed", error=str(e))
@@ -159,7 +156,7 @@ class QuestDBClient:
         )
 
         try:
-            self._ilp_socket.sendall(line.encode('utf-8'))
+            self._ilp_socket.sendall(line.encode("utf-8"))
             return True
         except Exception as e:
             logger.warning("QuestDB OHLCV write failed", error=str(e))
@@ -189,13 +186,13 @@ class QuestDBClient:
 
         line = (
             f"events,event_type={event_type},ticker={ticker} "
-            f"title=\"{title_escaped}\",sentiment={sentiment},"
-            f"importance={importance},body=\"{body_escaped}\" "
+            f'title="{title_escaped}",sentiment={sentiment},'
+            f'importance={importance},body="{body_escaped}" '
             f"{ts_ns}\n"
         )
 
         try:
-            self._ilp_socket.sendall(line.encode('utf-8'))
+            self._ilp_socket.sendall(line.encode("utf-8"))
             return True
         except Exception as e:
             logger.warning("QuestDB event write failed", error=str(e))
@@ -230,6 +227,7 @@ class QuestDBClient:
     async def query_df(self, sql: str):
         """SQL sorgusu çalıştır ve Polars DataFrame döndür."""
         import polars as pl
+
         rows = await self.query(sql)
         if not rows:
             return pl.DataFrame()

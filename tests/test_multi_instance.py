@@ -18,13 +18,22 @@ async def setup_db():
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
+
     await safe_cleanup_tables(dev_db)
     # Instruments
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO' ON CONFLICT (symbol) DO NOTHING")
-    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO' ON CONFLICT (symbol) DO NOTHING"
+    )
+    await dev_db.pg_execute(
+        "INSERT INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN' ON CONFLICT (symbol) DO NOTHING"
+    )
 
 
 async def get_iid(symbol: str) -> int:
@@ -57,13 +66,17 @@ async def test_parallel_buys():
         issues.append("Her iki alım da başarısız")
 
     # DB'deki toplam pozisyon tutarlı olmalı
-    pf_row = await dev_db.pg_fetchrow("SELECT cash_balance, initial_capital FROM portfolios WHERE id = ?", svc1._portfolio_id)
+    pf_row = await dev_db.pg_fetchrow(
+        "SELECT cash_balance, initial_capital FROM portfolios WHERE id = ?", svc1._portfolio_id
+    )
     if pf_row:
         cash = float(pf_row["cash_balance"])
         initial = float(pf_row["initial_capital"])
         # Toplam harcanan: her iki alımın toplamı
         # Ama sadece başarılı olanlar harcama yaptı
-        positions = await dev_db.pg_fetch("SELECT SUM(quantity) as qty FROM positions WHERE portfolio_id = ? AND status = 'OPEN'", svc1._portfolio_id)
+        positions = await dev_db.pg_fetch(
+            "SELECT SUM(quantity) as qty FROM positions WHERE portfolio_id = ? AND status = 'OPEN'", svc1._portfolio_id
+        )
         total_qty = int(positions[0]["qty"] or 0) if positions else 0
 
         # Cash + pozisyon maliyeti = initial capital olmalı (komisyon hariç approximate)
@@ -107,8 +120,7 @@ async def test_concurrent_buy_sell():
 
     # Pozisyon kapanmış olmalı
     positions = await dev_db.pg_fetch(
-        "SELECT * FROM positions WHERE portfolio_id = ? AND status = 'OPEN'",
-        svc1._portfolio_id
+        "SELECT * FROM positions WHERE portfolio_id = ? AND status = 'OPEN'", svc1._portfolio_id
     )
     total_qty = sum(int(p["quantity"]) for p in positions) if positions else 0
     if total_qty > 0:
@@ -229,6 +241,7 @@ async def test_cash_never_negative():
 # ============================================================
 # RUN
 # ============================================================
+
 
 async def run_all():
     print("=" * 60)

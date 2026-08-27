@@ -15,6 +15,7 @@ Calendar day kullanmanın sorunları:
 
 Çözüm: Tüm offset'ler trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
+
 from datetime import datetime
 
 import numpy as np
@@ -49,6 +50,7 @@ EVENT_WINDOWS = {
 def _get_calendar():
     """Trading calendar'ı lazy import et (circular dependency önleme)."""
     from .trading_calendar import get_trading_calendar
+
     return get_trading_calendar()
 
 
@@ -72,9 +74,7 @@ class EventWindowManager:
         start, end = self.get_window(event_type)
         return end - start + 1
 
-    def get_window_dates(
-        self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> tuple[datetime, datetime]:
+    def get_window_dates(self, event_date: datetime, event_type: str = "DEFAULT") -> tuple[datetime, datetime]:
         """Event window tarih aralığını döndür (TRADING DAY bazlı).
 
         Calendar day yerine BIST trading calendar kullanır.
@@ -135,10 +135,7 @@ class EventWindowManager:
         window_dates = dates[mask]
 
         # Sadece trading günleri filtrele
-        trading_mask = np.array([
-            cal.is_trading_day(d.date() if isinstance(d, datetime) else d)
-            for d in window_dates
-        ])
+        trading_mask = np.array([cal.is_trading_day(d.date() if isinstance(d, datetime) else d) for d in window_dates])
         window_returns = window_returns[trading_mask]
         window_dates = window_dates[trading_mask]
 
@@ -187,9 +184,7 @@ class EventWindowManager:
 
         return aligned
 
-    def get_sub_windows(
-        self, event_type: str = "DEFAULT"
-    ) -> dict[str, tuple[int, int]]:
+    def get_sub_windows(self, event_type: str = "DEFAULT") -> dict[str, tuple[int, int]]:
         """Alt pencereleri döndür (pre-event, event-day, post-event).
 
         Returns:
@@ -203,9 +198,7 @@ class EventWindowManager:
             "full": (start, end),
         }
 
-    def get_window_calendar_days(
-        self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> int:
+    def get_window_calendar_days(self, event_date: datetime, event_type: str = "DEFAULT") -> int:
         """Event window'un takvim günleri cinsinden uzunluğunu döndür.
 
         Trading day → calendar day dönüşümü (bilgi amaçlı).

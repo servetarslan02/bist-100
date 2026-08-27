@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 @dataclass
 class DataEvent:
     """Yakalanan veri olayı."""
+
     source: str
     event_type: str
     data: dict[str, Any]
@@ -243,13 +244,14 @@ class RealTimeDataEngine:
         Lisanslı feed ile gerçek streaming olur.
         """
         from ..bist_universe import BIST_STOCKS
-        watchlist = BIST_STOCKS # FULL UNIVERSE
+
+        watchlist = BIST_STOCKS  # FULL UNIVERSE
 
         while self._running:
             try:
                 # Batch download in chunks of 50
                 for i in range(0, len(watchlist), 50):
-                    chunk = watchlist[i:i+50]
+                    chunk = watchlist[i : i + 50]
                     tickers_str = " ".join([f"{t}.IS" for t in chunk])
                     data = yf.download(
                         tickers_str,
@@ -276,13 +278,13 @@ class RealTimeDataEngine:
                                             "price": float(latest["Close"]),
                                             "volume": int(latest.get("Volume", 0)),
                                             "vwap": float(latest["Close"]),
-                                            "timestamp": datetime.now(UTC).isoformat(), # yf is 15-min delayed
+                                            "timestamp": datetime.now(UTC).isoformat(),  # yf is 15-min delayed
                                         },
                                     )
                                     await self._dispatch(event)
                             except KeyError:
                                 logger.warning("Data error in _listen_market_stream: KeyError", exc_info=True)
-                    await asyncio.sleep(1) # rate limit protection
+                    await asyncio.sleep(1)  # rate limit protection
 
             except Exception as e:
                 logger.warning("yfinance realtime error", error=str(e))

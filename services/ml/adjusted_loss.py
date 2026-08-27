@@ -8,11 +8,11 @@ ROADMAP v3.0: Yanlış yön tahminleri 11x ceza
 KURAL: Yanlış yön tahminler çok pahalı!
 """
 
-
 import numpy as np
 import structlog
 
 logger = structlog.get_logger()
+
 
 class AdjustedMSELoss:
     """Asimetrik MSE Loss fonksiyonu."""
@@ -106,6 +106,7 @@ class AdjustedMSELoss:
         gradient[wrong_direction] *= self._penalty
 
         return gradient
+
 
 # Singleton
 adjusted_loss = AdjustedMSELoss()

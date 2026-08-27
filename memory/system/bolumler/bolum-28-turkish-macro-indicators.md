@@ -45,25 +45,25 @@ Faiz düşüşü → Kısa vadede BIST yükseliş (likidite artar)
 # services/macro/tcmb.py
 def compute_tcmb_features(tcmb_data):
     features = {}
-    
+
     # Faiz seviyesi
     features["tcmb_rate"] = tcmb_data["policy_rate"]
     features["tcmb_rate_change"] = tcmb_data["policy_rate"].diff()
     features["tcmb_rate_change_3m"] = tcmb_data["policy_rate"].diff(3)
-    
+
     # Reel faiz
     features["real_rate"] = tcmb_data["policy_rate"] - tcmb_data["inflation"]
     features["real_rate_change"] = features["real_rate"].diff()
-    
+
     # Faiz beklentisi
     features["rate_expectation"] = tcmb_data["rate_expectation_survey"]
     features["rate_surprise"] = tcmb_data["policy_rate"] - tcmb_data["rate_expectation"]
-    
+
     # Para politikası sinyali
-    features["policy_stance"] = 1 if features["tcmb_rate_change"] > 0 else (
-        -1 if features["tcmb_rate_change"] < 0 else 0
+    features["policy_stance"] = (
+        1 if features["tcmb_rate_change"] > 0 else (-1 if features["tcmb_rate_change"] < 0 else 0)
     )
-    
+
     return features
 ```
 
@@ -143,26 +143,22 @@ Nötr: İçe dönük şirketler (perakende, gıda)
 # services/macro/fx.py
 def compute_fx_features(fx_data, stock_data):
     features = {}
-    
+
     # Kur seviyesi
     features["usdtry"] = fx_data["usdtry"]
     features["usdtry_change_1d"] = fx_data["usdtry"].pct_change(1)
     features["usdtry_change_5d"] = fx_data["usdtry"].pct_change(5)
     features["usdtry_change_20d"] = fx_data["usdtry"].pct_change(20)
-    
+
     # Kur volatilitesi
-    features["usdtry_volatility"] = fx_data["usdtry"].pct_change().rolling(20).std() * (252 ** 0.5)
-    
+    features["usdtry_volatility"] = fx_data["usdtry"].pct_change().rolling(20).std() * (252**0.5)
+
     # BIST ile korelasyon
-    features["usdtry_bist_corr"] = (
-        fx_data["usdtry"].pct_change().rolling(60).corr(
-            stock_data["bist100"].pct_change()
-        )
-    )
-    
+    features["usdtry_bist_corr"] = fx_data["usdtry"].pct_change().rolling(60).corr(stock_data["bist100"].pct_change())
+
     # Sepet kur (EURTRY + USDTRY)
     features["basket_rate"] = (fx_data["eurtry"] + fx_data["usdtry"]) / 2
-    
+
     return features
 ```
 
@@ -297,25 +293,17 @@ GSYH: Çeyreklik
 # services/macro/calendar.py
 def get_macro_events(date):
     events = []
-    
+
     # TCMB PPK
     if is_ppk_meeting_day(date):
-        events.append({
-            "type": "TCMB_PPK",
-            "importance": "HIGH",
-            "expected_impact": "FX + BIST",
-            "time": "14:00"
-        })
-    
+        events.append({"type": "TCMB_PPK", "importance": "HIGH", "expected_impact": "FX + BIST", "time": "14:00"})
+
     # TÜFE
     if is_cpi_release_day(date):
-        events.append({
-            "type": "CPI_RELEASE",
-            "importance": "HIGH",
-            "expected_impact": "BIST + FX + Bonds",
-            "time": "10:00"
-        })
-    
+        events.append(
+            {"type": "CPI_RELEASE", "importance": "HIGH", "expected_impact": "BIST + FX + Bonds", "time": "10:00"}
+        )
+
     return events
 ```
 

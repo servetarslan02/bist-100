@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 @dataclass
 class RateLimitConfig:
     """Rate limit yapılandırması."""
+
     max_requests: int
     window_seconds: int
 
@@ -47,10 +48,12 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self):
-        self._buckets: dict[str, dict[str, any]] = defaultdict(lambda: {
-            "tokens": 100,
-            "last_refill": time.monotonic(),
-        })
+        self._buckets: dict[str, dict[str, any]] = defaultdict(
+            lambda: {
+                "tokens": 100,
+                "last_refill": time.monotonic(),
+            }
+        )
         self._lock = asyncio.Lock()
 
     async def check(
@@ -77,10 +80,7 @@ class InMemoryRateLimiter:
             # Token yenile
             elapsed = now - bucket["last_refill"]
             refill_rate = config.max_requests / config.window_seconds
-            bucket["tokens"] = min(
-                config.max_requests,
-                bucket["tokens"] + elapsed * refill_rate
-            )
+            bucket["tokens"] = min(config.max_requests, bucket["tokens"] + elapsed * refill_rate)
             bucket["last_refill"] = now
 
             if bucket["tokens"] >= 1:
@@ -122,10 +122,7 @@ class InMemoryRateLimiter:
     def cleanup_stale(self, max_age_seconds: float = 3600):
         """Son 1 saatten eski bucket'ları temizle (memory leak önleme)."""
         now = time.monotonic()
-        stale_keys = [
-            k for k, v in self._buckets.items()
-            if now - v.get("last_refill", 0) > max_age_seconds
-        ]
+        stale_keys = [k for k, v in self._buckets.items() if now - v.get("last_refill", 0) > max_age_seconds]
         for k in stale_keys:
             del self._buckets[k]
         if stale_keys:

@@ -16,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class PropagationRule:
     """Tek bir yayılım kuralı."""
+
     source_event: str
     target: str
     impact: float  # -1.0 ile +1.0 arası
@@ -27,6 +28,7 @@ class PropagationRule:
 @dataclass
 class PropagationResult:
     """Yayılım sonucu."""
+
     source_event_type: str
     source_event_id: str
     timestamp: datetime
@@ -47,21 +49,17 @@ PROPAGATION_RULES: list[PropagationRule] = [
     PropagationRule("FED_RATE_HIKE", "BIST_TECH", -0.3, 2, 0.6),
     PropagationRule("FED_RATE_HIKE", "GOLD", +0.5, 0, 0.7),
     PropagationRule("FED_RATE_HIKE", "US_10Y", +0.6, 0, 0.85),
-
     PropagationRule("FED_RATE_CUT", "USD_INDEX", -0.6, 0, 0.85),
     PropagationRule("FED_RATE_CUT", "EM_RISK", +0.5, 0, 0.8),
     PropagationRule("FED_RATE_CUT", "BIST_BANK", +0.6, 1, 0.75),
     PropagationRule("FED_RATE_CUT", "GOLD", +0.4, 0, 0.7),
-
     # === TCMB ===
     PropagationRule("TCMB_RATE_CUT", "USD_TRY", +0.4, 0, 0.85),
     PropagationRule("TCMB_RATE_CUT", "BIST_BANK", +0.6, 1, 0.8),
     PropagationRule("TCMB_RATE_CUT", "BIST_REAL_ESTATE", +0.5, 2, 0.7),
     PropagationRule("TCMB_RATE_CUT", "BIST_RETAIL", +0.3, 2, 0.6),
-
     PropagationRule("TCMB_RATE_HIKE", "USD_TRY", -0.3, 0, 0.8),
     PropagationRule("TCMB_RATE_HIKE", "BIST_BANK", -0.4, 1, 0.75),
-
     # === OIL ===
     PropagationRule("OIL_SHOCK_UP", "TUPRS", +0.8, 0, 0.9),
     PropagationRule("OIL_SHOCK_UP", "THYAO", -0.6, 0, 0.85),
@@ -69,49 +67,40 @@ PROPAGATION_RULES: list[PropagationRule] = [
     PropagationRule("OIL_SHOCK_UP", "BIST_ENERGY", +0.5, 0, 0.8),
     PropagationRule("OIL_SHOCK_UP", "BIST_AVIATION", -0.5, 0, 0.8),
     PropagationRule("OIL_SHOCK_UP", "TURKEY_MACRO", -0.3, 1, 0.7),
-
     PropagationRule("OIL_SHOCK_DOWN", "TUPRS", -0.6, 0, 0.85),
     PropagationRule("OIL_SHOCK_DOWN", "THYAO", +0.5, 0, 0.8),
     PropagationRule("OIL_SHOCK_DOWN", "BIST_ENERGY", -0.4, 0, 0.75),
-
     # === USD ===
     PropagationRule("USD_STRENGTHEN", "BIST_EXPORTERS", +0.3, 1, 0.7),
     PropagationRule("USD_STRENGTHEN", "BIST_IMPORTERS", -0.3, 1, 0.7),
     PropagationRule("USD_STRENGTHEN", "GOLD_TRY", +0.4, 0, 0.8),
     PropagationRule("USD_STRENGTHEN", "TURKEY_MACRO", -0.2, 2, 0.6),
-
     PropagationRule("USD_WEAKEN", "BIST_EXPORTERS", -0.2, 1, 0.65),
     PropagationRule("USD_WEAKEN", "BIST_IMPORTERS", +0.2, 1, 0.65),
-
     # === GEOPOLITICAL ===
     PropagationRule("GEOPOLITICAL_TENSION", "VIX", +0.7, 0, 0.85),
     PropagationRule("GEOPOLITICAL_TENSION", "EM_RISK", -0.6, 0, 0.8),
     PropagationRule("GEOPOLITICAL_TENSION", "BIST", -0.5, 0, 0.75),
     PropagationRule("GEOPOLITICAL_TENSION", "GOLD", +0.6, 0, 0.8),
     PropagationRule("GEOPOLITICAL_TENSION", "OIL", +0.4, 0, 0.7),
-
     # === INFLATION ===
     PropagationRule("INFLATION_HIGH", "TCMB_RATE_EXPECTATION", +0.6, 0, 0.8),
     PropagationRule("INFLATION_HIGH", "BIST_BANK", -0.4, 1, 0.7),
     PropagationRule("INFLATION_HIGH", "BIST_RETAIL", -0.3, 2, 0.65),
     PropagationRule("INFLATION_HIGH", "GOLD", +0.5, 0, 0.75),
-
     # === COMPANY EVENTS ===
     PropagationRule("KAP_POSITIVE", "STOCK", +0.6, 0, 0.8),
     PropagationRule("KAP_NEGATIVE", "STOCK", -0.6, 0, 0.8),
     PropagationRule("KAP_INVESTMENT", "STOCK", +0.4, 0, 0.7),
     PropagationRule("KAP_FINANCIAL_BEAT", "STOCK", +0.7, 0, 0.85),
     PropagationRule("KAP_FINANCIAL_MISS", "STOCK", -0.7, 0, 0.85),
-
     # === SECTOR ===
     PropagationRule("SECTOR_ROTATION_IN", "SECTOR_STOCKS", +0.4, 0, 0.7),
     PropagationRule("SECTOR_ROTATION_OUT", "SECTOR_STOCKS", -0.4, 0, 0.7),
-
     # === VIX ===
     PropagationRule("VIX_SPIKE", "BIST", -0.5, 0, 0.8),
     PropagationRule("VIX_SPIKE", "BIST_BANK", -0.6, 0, 0.8),
     PropagationRule("VIX_SPIKE", "GOLD", +0.4, 0, 0.7),
-
     # === BIST INDEX ===
     PropagationRule("BIST_CRASH", "ALL_STOCKS", -0.8, 0, 0.9),
     PropagationRule("BIST_SURGE", "ALL_STOCKS", +0.6, 0, 0.8),
@@ -174,8 +163,14 @@ class ImpactEngine:
 
             # World state update
             if rule.target in [
-                "USD_INDEX", "EM_RISK", "GOLD", "US_10Y", "VIX",
-                "TURKEY_MACRO", "USD_TRY", "TCMB_RATE_EXPECTATION",
+                "USD_INDEX",
+                "EM_RISK",
+                "GOLD",
+                "US_10Y",
+                "VIX",
+                "TURKEY_MACRO",
+                "USD_TRY",
+                "TCMB_RATE_EXPECTATION",
             ]:
                 world_delta[rule.target] = world_delta.get(rule.target, 0) + impact_magnitude
 
@@ -184,55 +179,65 @@ class ImpactEngine:
                 # Direct stock impact (KAP events)
                 ticker = event_data.get("ticker", "")
                 if ticker:
-                    affected.append({
-                        "ticker": ticker,
-                        "instrument_id": event_data.get("instrument_id"),
-                        "impact": impact_magnitude,
-                        "lag_hours": rule.lag_hours,
-                        "confidence": rule.confidence,
-                        "source_rule": rule.source_event,
-                    })
+                    affected.append(
+                        {
+                            "ticker": ticker,
+                            "instrument_id": event_data.get("instrument_id"),
+                            "impact": impact_magnitude,
+                            "lag_hours": rule.lag_hours,
+                            "confidence": rule.confidence,
+                            "source_rule": rule.source_event,
+                        }
+                    )
 
             elif rule.target.startswith("BIST_"):
                 # Sector impact
                 sector = rule.target.replace("BIST_", "")
                 for ticker in self._sector_stocks.get(sector, []):
-                    affected.append({
-                        "ticker": ticker,
-                        "impact": impact_magnitude,
-                        "lag_hours": rule.lag_hours,
-                        "confidence": rule.confidence,
-                        "source_rule": rule.source_event,
-                    })
+                    affected.append(
+                        {
+                            "ticker": ticker,
+                            "impact": impact_magnitude,
+                            "lag_hours": rule.lag_hours,
+                            "confidence": rule.confidence,
+                            "source_rule": rule.source_event,
+                        }
+                    )
 
             elif rule.target == "ALL_STOCKS":
                 # Market-wide impact
                 for ticker in self._instrument_sector_map:
-                    affected.append({
-                        "ticker": ticker,
+                    affected.append(
+                        {
+                            "ticker": ticker,
+                            "impact": impact_magnitude,
+                            "lag_hours": rule.lag_hours,
+                            "confidence": rule.confidence,
+                            "source_rule": rule.source_event,
+                        }
+                    )
+
+            elif rule.target in ["TUPRS", "THYAO", "PETKM", "AKBNK", "GARAN", "YKBNK"]:
+                # Specific stock
+                affected.append(
+                    {
+                        "ticker": rule.target,
                         "impact": impact_magnitude,
                         "lag_hours": rule.lag_hours,
                         "confidence": rule.confidence,
                         "source_rule": rule.source_event,
-                    })
+                    }
+                )
 
-            elif rule.target in ["TUPRS", "THYAO", "PETKM", "AKBNK", "GARAN", "YKBNK"]:
-                # Specific stock
-                affected.append({
-                    "ticker": rule.target,
-                    "impact": impact_magnitude,
+            chain.append(
+                {
+                    "source": event_type,
+                    "target": rule.target,
+                    "impact": rule.impact,
                     "lag_hours": rule.lag_hours,
                     "confidence": rule.confidence,
-                    "source_rule": rule.source_event,
-                })
-
-            chain.append({
-                "source": event_type,
-                "target": rule.target,
-                "impact": rule.impact,
-                "lag_hours": rule.lag_hours,
-                "confidence": rule.confidence,
-            })
+                }
+            )
 
         # Aggregate affected instruments (same ticker can appear multiple times)
         aggregated = {}
@@ -249,9 +254,7 @@ class ImpactEngine:
                     "count": 0,
                 }
             aggregated[ticker]["total_impact"] += a["impact"]
-            aggregated[ticker]["max_lag_hours"] = max(
-                aggregated[ticker]["max_lag_hours"], a["lag_hours"]
-            )
+            aggregated[ticker]["max_lag_hours"] = max(aggregated[ticker]["max_lag_hours"], a["lag_hours"])
             aggregated[ticker]["rules"].append(a["source_rule"])
             aggregated[ticker]["count"] += 1
 
@@ -286,6 +289,7 @@ def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, mark
 
         from services.event_study.impact import calculate_event_impact
         from services.event_study.kap_event import analyze_kap_event_simple
+
         result = analyze_kap_event_simple(
             ticker=ticker,
             event_description=event_type,

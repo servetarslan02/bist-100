@@ -23,25 +23,28 @@ logger = structlog.get_logger()
 # Signal Types
 # =====================================================
 
+
 class SignalType:
-    MOMENTUM = "MOMENTUM"          # Güçlü yükseliş devamı
-    BREAKOUT = "BREAKOUT"          # Sıkışma → kırılım
+    MOMENTUM = "MOMENTUM"  # Güçlü yükseliş devamı
+    BREAKOUT = "BREAKOUT"  # Sıkışma → kırılım
     VOLUME_ANOMALY = "VOLUME_ANOMALY"  # Olağandışı hacim
     ACCUMULATION = "ACCUMULATION"  # Fiyat sakin ama hacim/flow değişiyor
-    EVENT = "EVENT"                # KAP/haber kaynaklı
+    EVENT = "EVENT"  # KAP/haber kaynaklı
     MACRO_IMPACT = "MACRO_IMPACT"  # Dünya/makro etkisi
-    REGIME = "REGIME"              # Rejim avantajı
-    SPEC = "SPEC"                  # Normal modellerin yakalayamadığı anomali
-    REVERSAL = "REVERSAL"          # Aşırı hareket sonrası dönüş
+    REGIME = "REGIME"  # Rejim avantajı
+    SPEC = "SPEC"  # Normal modellerin yakalayamadığı anomali
+    REVERSAL = "REVERSAL"  # Aşırı hareket sonrası dönüş
 
 
 # =====================================================
 # Scanner Result
 # =====================================================
 
+
 @dataclass
 class ScannerResult:
     """Tek hisse için scanner sonucu."""
+
     ticker: str
     timestamp: datetime
 
@@ -85,6 +88,7 @@ class ScannerResult:
 # =====================================================
 # Alpha Scanner
 # =====================================================
+
 
 class AlphaScanner(ScannerInterface):
     """
@@ -148,15 +152,19 @@ class AlphaScanner(ScannerInterface):
         self._last_scan = datetime.now(UTC)
         self._scan_count += 1
 
-        logger.info("Alpha scan completed",
-                    stocks=len(results),
-                    elapsed=f"{elapsed:.1f}s",
-                    regime=market_regime,
-                    scan_count=self._scan_count)
+        logger.info(
+            "Alpha scan completed",
+            stocks=len(results),
+            elapsed=f"{elapsed:.1f}s",
+            regime=market_regime,
+            scan_count=self._scan_count,
+        )
 
         return results
 
-    def _scan_single(self, ticker: str, f: dict[str, float], ml_score: float = 50.0, event_score: float = 50.0) -> ScannerResult:
+    def _scan_single(
+        self, ticker: str, f: dict[str, float], ml_score: float = 50.0, event_score: float = 50.0
+    ) -> ScannerResult:
         """Tek hisse için quant scan."""
         r = ScannerResult(ticker=ticker, timestamp=datetime.now(UTC))
 
@@ -213,7 +221,7 @@ class AlphaScanner(ScannerInterface):
         """Hacim ivmesi."""
         vol_z = f.get("volume_zscore", 0)
         vol_ratio = f.get("volume_ratio_20d", 1)
-        return (vol_z * 30 + (vol_ratio - 1) * 20)
+        return vol_z * 30 + (vol_ratio - 1) * 20
 
     def _calc_regime_fit(self, f: dict) -> float:
         """Rejim uyumu."""
@@ -334,10 +342,12 @@ class AlphaScanner(ScannerInterface):
         else:
             # SPEC = residual anomaly (diğer modellerin açıklayamadığı)
             # Kriterler: volume anomaly + fiyat sapması + cross-sectional deviation
-            if (r.volume_zscore > 2.0
+            if (
+                r.volume_zscore > 2.0
                 and abs(r.roc_5d) > 2.0
                 and r.breakout_score < 50  # Breakout değil
-                and r.market_regime_fit < 60):  # Regime uyumu düşük
+                and r.market_regime_fit < 60
+            ):  # Regime uyumu düşük
                 r.signal_type = SignalType.SPEC
                 r.signal_score = score
             else:

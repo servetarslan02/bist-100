@@ -31,6 +31,7 @@ from services.core.transaction_helper import TransactionHelper
 # Phase 1: Dead Letter Queue
 # =====================================================
 
+
 class TestDeadLetterQueue:
     """DLQ testleri."""
 
@@ -83,9 +84,7 @@ class TestDeadLetterQueue:
         self.dlq.register_retry_handler("test_event", handler)
 
         # Entry'yi manuel olarak ready yap (next_retry_at = now)
-        entry = await self.dlq.push(
-            "evt_retry", "test_event", '{"data": 1}', "error"
-        )
+        entry = await self.dlq.push("evt_retry", "test_event", '{"data": 1}', "error")
         entry.next_retry_at = datetime.now(UTC) - timedelta(seconds=1)
 
         result = await self.dlq.retry_failed()
@@ -124,6 +123,7 @@ class TestDeadLetterQueue:
 # =====================================================
 # Phase 1: JWT Token Manager
 # =====================================================
+
 
 class TestJWTManager:
     """JWT testleri."""
@@ -173,7 +173,9 @@ class TestJWTManager:
     def test_refresh_token(self):
         """Refresh token ile yeni access token oluştur."""
         refresh = self.jwt.generate_token(
-            "user1", "ADMIN", ["READ"],
+            "user1",
+            "ADMIN",
+            ["READ"],
             token_type=TokenType.REFRESH,
         )
 
@@ -194,9 +196,7 @@ class TestJWTManager:
 
     def test_api_key_generation(self):
         """API key oluştur."""
-        api_key = self.jwt.generate_api_key(
-            "user1", "ADMIN", ["READ", "WRITE"], name="test-key"
-        )
+        api_key = self.jwt.generate_api_key("user1", "ADMIN", ["READ", "WRITE"], name="test-key")
         assert api_key.startswith("ak_")
 
         claims = self.jwt.validate_token(api_key.replace("ak_", ""))
@@ -205,7 +205,9 @@ class TestJWTManager:
     def test_custom_claims(self):
         """Custom claims eklenebilmeli."""
         token = self.jwt.generate_token(
-            "user1", "ADMIN", ["READ"],
+            "user1",
+            "ADMIN",
+            ["READ"],
             custom_claims={"department": "trading"},
         )
         claims = self.jwt.validate_token(token)
@@ -216,6 +218,7 @@ class TestJWTManager:
 # =====================================================
 # Phase 1: Transaction Helper
 # =====================================================
+
 
 class TestTransactionHelper:
     """Transaction helper testleri."""
@@ -244,6 +247,7 @@ class TestTransactionHelper:
 # Phase 2: Circuit Breaker Metrics
 # =====================================================
 
+
 class TestCircuitBreakerMetrics:
     """Circuit breaker metrics testleri."""
 
@@ -252,6 +256,7 @@ class TestCircuitBreakerMetrics:
 
     def test_export_prometheus(self):
         """Prometheus format export."""
+
         # Create a mock breaker
         class MockBreaker:
             name = "test_provider"
@@ -274,6 +279,7 @@ class TestCircuitBreakerMetrics:
 
     def test_export_json(self):
         """JSON format export."""
+
         class MockBreaker:
             name = "test"
             state = type("State", (), {"value": "CLOSED"})()
@@ -306,12 +312,14 @@ class TestCircuitBreakerMetrics:
 # Phase 2: Config Hot-Reload
 # =====================================================
 
+
 class TestConfigHotReload:
     """Config hot-reload testleri."""
 
     def setup_method(self, tmp_path=None):
         import os
         import tempfile
+
         self.tmp_dir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.tmp_dir, "test_config.json")
 
@@ -343,6 +351,7 @@ class TestConfigHotReload:
 # =====================================================
 # Phase 2: Immutable Audit Log
 # =====================================================
+
 
 class TestImmutableAuditLog:
     """Audit log testleri."""
@@ -415,6 +424,7 @@ class TestImmutableAuditLog:
 # =====================================================
 # Phase 3: Distributed Tracing
 # =====================================================
+
 
 class TestDistributedTracing:
     """Tracing testleri."""
@@ -489,6 +499,7 @@ class TestDistributedTracing:
 # Phase 4: System Governor
 # =====================================================
 
+
 class TestSystemGovernor:
     """System governor testleri."""
 
@@ -518,7 +529,7 @@ class TestSystemGovernor:
 
         assert not self.governor.is_allowed(FeatureFlag.NEW_POSITIONS)
         assert not self.governor.is_allowed(FeatureFlag.LIVE_TRADING)
-        assert self.governor.is_allowed(FeatureFlag.READ_MARKET) if hasattr(FeatureFlag, 'READ_MARKET') else True
+        assert self.governor.is_allowed(FeatureFlag.READ_MARKET) if hasattr(FeatureFlag, "READ_MARKET") else True
 
     def test_transition_to_shutdown(self):
         """SHUTDOWN geçiş — tüm feature'lar devre dışı."""
@@ -578,6 +589,7 @@ class TestSystemGovernor:
     @pytest.mark.asyncio
     async def test_health_check(self):
         """Sağlık kontrolü."""
+
         def healthy_check():
             return True
 
@@ -596,10 +608,7 @@ class TestSystemGovernor:
         """Otomatik degradation."""
         # Register many unhealthy checks
         for i in range(10):
-            self.governor.register_health_check(
-                f"comp_{i}",
-                lambda: False
-            )
+            self.governor.register_health_check(f"comp_{i}", lambda: False)
 
         await self.governor.run_health_checks()
 
@@ -610,6 +619,7 @@ class TestSystemGovernor:
 # =====================================================
 # Integration Tests
 # =====================================================
+
 
 class TestCoreIntegration:
     """Entegrasyon testleri."""

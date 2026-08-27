@@ -56,6 +56,7 @@ from services.agents.agent_pipeline import PipelineResult
 # HELPERS
 # =====================================================
 
+
 def create_mock_features():
     """Mock feature'lar oluştur."""
     return {
@@ -109,6 +110,7 @@ def run_async(coro):
 # FAZ 0: TEMEL ALTYAPI
 # =====================================================
 
+
 class TestFaz0_LLMClient:
     """Faz 0: LLM Client Abstraction test'leri."""
 
@@ -160,6 +162,7 @@ class TestFaz0_Schemas:
 
     def test_agent_output_schema_valid(self):
         from services.agents.schemas import AgentOutputSchema
+
         data = {"direction": "LONG", "confidence": 0.7, "score": 65}
         schema = AgentOutputSchema(**data)
         assert schema.direction == "LONG"
@@ -167,6 +170,7 @@ class TestFaz0_Schemas:
 
     def test_agent_output_schema_normalize_confidence(self):
         from services.agents.schemas import AgentOutputSchema
+
         data = {"confidence": 75}  # 0-100 arası
         schema = AgentOutputSchema(**data)
         assert schema.confidence == 0.75
@@ -248,6 +252,7 @@ class TestFaz0_AgentSystem:
 # FAZ 1: PARALEL ÇALIŞMA
 # =====================================================
 
+
 class TestFaz1_ParallelRunner:
     """Faz 1: Parallel Agent Runner test'leri."""
 
@@ -286,12 +291,18 @@ class TestFaz1_ParallelRunner:
 
         tasks = {
             AgentRole.TECHNICAL: AgentTask(
-                task_id="t1", agent_role=AgentRole.TECHNICAL,
-                ticker="THYAO", prompt="test", context={"features": {}},
+                task_id="t1",
+                agent_role=AgentRole.TECHNICAL,
+                ticker="THYAO",
+                prompt="test",
+                context={"features": {}},
             ),
             AgentRole.FUNDAMENTAL: AgentTask(
-                task_id="t2", agent_role=AgentRole.FUNDAMENTAL,
-                ticker="THYAO", prompt="test", context={"features": {}},
+                task_id="t2",
+                agent_role=AgentRole.FUNDAMENTAL,
+                ticker="THYAO",
+                prompt="test",
+                context={"features": {}},
             ),
         }
 
@@ -303,6 +314,7 @@ class TestFaz1_ParallelRunner:
 # =====================================================
 # FAZ 2: CONFLICT + DEBATE
 # =====================================================
+
 
 class TestFaz2_ConflictDetector:
     """Faz 2: Conflict Detection test'leri."""
@@ -363,35 +375,52 @@ class TestFaz2_DebateEngine:
 # FAZ 3: MEMORY
 # =====================================================
 
+
 class TestFaz3_WorkingMemory:
     """Faz 3: Working Memory test'leri."""
 
     def test_add_and_get_recent(self):
         wm = WorkingMemory(max_items=5)
         for i in range(10):
-            wm.add(MemoryEntry(
-                task_id=f"t{i}",
-                agent_role="TECHNICAL",
-                ticker="THYAO",
-                direction="LONG",
-                confidence=0.7,
-                reasoning="test",
-                timestamp=datetime.now(UTC).isoformat(),
-            ))
+            wm.add(
+                MemoryEntry(
+                    task_id=f"t{i}",
+                    agent_role="TECHNICAL",
+                    ticker="THYAO",
+                    direction="LONG",
+                    confidence=0.7,
+                    reasoning="test",
+                    timestamp=datetime.now(UTC).isoformat(),
+                )
+            )
         assert len(wm.items) == 5  # max_items
         recent = wm.get_recent(limit=3)
         assert len(recent) == 3
 
     def test_get_last_direction(self):
         wm = WorkingMemory()
-        wm.add(MemoryEntry(
-            task_id="t1", agent_role="TECHNICAL", ticker="THYAO",
-            direction="SHORT", confidence=0.6, reasoning="", timestamp="",
-        ))
-        wm.add(MemoryEntry(
-            task_id="t2", agent_role="TECHNICAL", ticker="THYAO",
-            direction="LONG", confidence=0.8, reasoning="", timestamp="",
-        ))
+        wm.add(
+            MemoryEntry(
+                task_id="t1",
+                agent_role="TECHNICAL",
+                ticker="THYAO",
+                direction="SHORT",
+                confidence=0.6,
+                reasoning="",
+                timestamp="",
+            )
+        )
+        wm.add(
+            MemoryEntry(
+                task_id="t2",
+                agent_role="TECHNICAL",
+                ticker="THYAO",
+                direction="LONG",
+                confidence=0.8,
+                reasoning="",
+                timestamp="",
+            )
+        )
         assert wm.get_last_direction("THYAO") == "LONG"
 
 
@@ -400,10 +429,17 @@ class TestFaz3_EpisodicMemory:
 
     def test_record_outcome(self):
         em = EpisodicMemory()
-        em.add(MemoryEntry(
-            task_id="t1", agent_role="TECHNICAL", ticker="THYAO",
-            direction="LONG", confidence=0.7, reasoning="", timestamp="",
-        ))
+        em.add(
+            MemoryEntry(
+                task_id="t1",
+                agent_role="TECHNICAL",
+                ticker="THYAO",
+                direction="LONG",
+                confidence=0.7,
+                reasoning="",
+                timestamp="",
+            )
+        )
         em.record_outcome("t1", 5.0, "RISK_ON")
 
         assert len(em.outcomes) == 1
@@ -413,10 +449,17 @@ class TestFaz3_EpisodicMemory:
         em = EpisodicMemory()
         for i in range(10):
             task_id = f"t{i}"
-            em.add(MemoryEntry(
-                task_id=task_id, agent_role="TECHNICAL", ticker="THYAO",
-                direction="LONG", confidence=0.7, reasoning="", timestamp="",
-            ))
+            em.add(
+                MemoryEntry(
+                    task_id=task_id,
+                    agent_role="TECHNICAL",
+                    ticker="THYAO",
+                    direction="LONG",
+                    confidence=0.7,
+                    reasoning="",
+                    timestamp="",
+                )
+            )
             em.record_outcome(task_id, 5.0 if i < 7 else -3.0, "RISK_ON")
 
         # 10 episodic (conf 0.7 > 0.6), 7 correct, 3 wrong
@@ -472,6 +515,7 @@ class TestFaz3_MemoryConsolidator:
 # =====================================================
 # FAZ 4: COMMUNICATION + SYNTHESIS
 # =====================================================
+
 
 class TestFaz4_CommunicationBus:
     """Faz 4: Communication Bus test'leri."""
@@ -544,8 +588,10 @@ class TestFaz4_SynthesisEngine:
             AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "LONG", 0.6),
         }
         resolution = Resolution(
-            direction="LONG", confidence=0.65,
-            method="majority_vote", conflict=False,
+            direction="LONG",
+            confidence=0.65,
+            method="majority_vote",
+            conflict=False,
         )
         result = await engine.synthesize(
             ticker="THYAO",
@@ -560,6 +606,7 @@ class TestFaz4_SynthesisEngine:
 # =====================================================
 # FAZ 5: SELF-EVALUATION
 # =====================================================
+
 
 class TestFaz5_SelfEvaluator:
     """Faz 5: Self-Evaluator test'leri."""
@@ -590,6 +637,7 @@ class TestFaz5_SelfEvaluator:
 # FAZ 6: RISK + PIPELINE
 # =====================================================
 
+
 class TestFaz6_RiskAssessor:
     """Faz 6: Risk Assessor test'leri."""
 
@@ -614,13 +662,17 @@ class TestFaz6_RiskAssessor:
         }
         assessment = await assessor.assess("THYAO", results, features)
         assert assessment.risk_score > 20
-        assert "volatilite" in str(assessment.risk_factors).lower() or \
-               assessment.risk_level in ["MEDIUM", "HIGH", "CRITICAL"]
+        assert "volatilite" in str(assessment.risk_factors).lower() or assessment.risk_level in [
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL",
+        ]
 
 
 # =====================================================
 # FAZ 7: ENTEGRASYON
 # =====================================================
+
 
 class TestFaz7_Integration:
     """Faz 7: Entegrasyon test'leri."""
@@ -642,6 +694,7 @@ class TestFaz7_Integration:
             RiskAssessor,
             SynthesisEngine,
         )
+
         assert AgentRole is not None
         assert AgentTask is not None
         assert AgentResult is not None
@@ -659,10 +712,11 @@ class TestFaz7_Integration:
     def test_pipeline_result_structure(self):
         """PipelineResult yapısını doğrula."""
         import dataclasses
+
         assert dataclasses.is_dataclass(PipelineResult)
         field_names = [f.name for f in dataclasses.fields(PipelineResult)]
-        assert 'ticker' in field_names
-        assert 'synthesis' in field_names
+        assert "ticker" in field_names
+        assert "synthesis" in field_names
 
     def test_memory_persistence_path(self):
         """Memory persistence path'in doğru oluştuğunu doğrula."""
@@ -689,6 +743,7 @@ class TestFaz7_Integration:
 # =====================================================
 # BUG FIX TESTS
 # =====================================================
+
 
 class TestBugFixes:
     """Düzeltilen bug'lar için test'ler."""
@@ -758,7 +813,9 @@ class TestBugFixes:
         # synthesis template'inde {agent_results} var ama kwargs'da yok
         try:
             system, user = PromptFactory.get_prompts(
-                "synthesis", "THYAO", {},
+                "synthesis",
+                "THYAO",
+                {},
                 # agent_results, debate_result vb. gönderilmiyor
             )
             # KeyError atmamalı, boş string kullanmalı

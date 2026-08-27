@@ -3,6 +3,7 @@
 8+ anomaly/faktör: temettü, likidite, kur, enflasyon, faiz, sektör momentum,
 KAP sentiment, yabancı yatırımcı.
 """
+
 from typing import Any
 
 import structlog

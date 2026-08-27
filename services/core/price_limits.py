@@ -21,9 +21,9 @@ logger = structlog.get_logger()
 @dataclass
 class PriceLimitResult:
     limit_hit: bool
-    direction: str = ""       # "UP" veya "DOWN"
+    direction: str = ""  # "UP" veya "DOWN"
     change_pct: float = 0.0
-    limit: float = 10.0       # Yüzde limit
+    limit: float = 10.0  # Yüzde limit
     reference_price: float = 0.0
     current_price: float = 0.0
     upper_limit: float = 0.0
@@ -55,14 +55,14 @@ class PriceLimitMonitor:
     """
 
     # Eylül 2025 sonrası: Tüm pazarlarda standart ±%10
-    DEFAULT_LIMIT = 10.0        # %10 (tüm pazarlar standart)
-    YILDIZ_LIMIT = 10.0         # %10 (Yıldız Pazar)
-    ANA_LIMIT = 10.0            # %10 (Ana Pazar)
-    ALT_LIMIT = 10.0            # %10 (Alt Pazar)
+    DEFAULT_LIMIT = 10.0  # %10 (tüm pazarlar standart)
+    YILDIZ_LIMIT = 10.0  # %10 (Yıldız Pazar)
+    ANA_LIMIT = 10.0  # %10 (Ana Pazar)
+    ALT_LIMIT = 10.0  # %10 (Alt Pazar)
 
     # Özel durum limitleri
-    IPO_NO_LIMIT = True         # Halka arz günü limit yok
-    POST_CB_LIMIT = 5.0         # Devre kesici sonrası daraltma
+    IPO_NO_LIMIT = True  # Halka arz günü limit yok
+    POST_CB_LIMIT = 5.0  # Devre kesici sonrası daraltma
     POST_CORP_ACTION_LIMIT = 10.0  # Kurumsal işlem sonrası (bedelsiz/bölünme)
 
     # Pazar bazlı limit haritası
@@ -70,12 +70,12 @@ class PriceLimitMonitor:
         "yildiz": 10.0,
         "ana": 10.0,
         "alt": 10.0,
-        "fiyat": 10.0,       # Fiyat Pazarı
-        "kesin": 10.0,       # Kesin Alım Satım Pazarı
-        "gözaltı": 10.0,     # Gözaltı Pazarı
-        "yakın": 10.0,       # Yakın İzleme Pazarı
-        "kolektif": 10.0,    # Kolektif Yatırım Ürünleri
-        "serbest": 0.0,      # Serbest İşlem (limit yok)
+        "fiyat": 10.0,  # Fiyat Pazarı
+        "kesin": 10.0,  # Kesin Alım Satım Pazarı
+        "gözaltı": 10.0,  # Gözaltı Pazarı
+        "yakın": 10.0,  # Yakın İzleme Pazarı
+        "kolektif": 10.0,  # Kolektif Yatırım Ürünleri
+        "serbest": 0.0,  # Serbest İşlem (limit yok)
     }
 
     def __init__(self):

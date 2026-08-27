@@ -175,15 +175,18 @@ class IntelligenceService:
         except Exception as e:
             logger.error("KAP analysis error", error=str(e))
 
-    def analyze_ticker(self, ticker: str, features: dict, market_state: dict = None,
-                       fundamentals: dict = None, news: list = None) -> dict[str, Any]:
+    def analyze_ticker(
+        self, ticker: str, features: dict, market_state: dict = None, fundamentals: dict = None, news: list = None
+    ) -> dict[str, Any]:
         """Tek hisse için tam intelligence analizi — tüm modülleri kullanır.
 
         Bu metod orchestrator tarafından çağrılır.
         """
         result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
-        if market_state is None: market_state = {}
-        if fundamentals is None: fundamentals = {}
+        if market_state is None:
+            market_state = {}
+        if fundamentals is None:
+            fundamentals = {}
 
         # 1. World State
         try:
@@ -196,6 +199,7 @@ class IntelligenceService:
         # 2. Regime
         try:
             from .regime import regime_engine
+
             regime = regime_engine.detect_regime(features)
             result["regime"] = regime.regime if hasattr(regime, "regime") else str(regime)
         except Exception as e:
@@ -213,6 +217,7 @@ class IntelligenceService:
         # 4. Forecasting
         try:
             from .forecasting import ForecastingEngine
+
             ForecastingEngine()
             result["forecast"] = {"horizons": [1, 5, 20]}
         except Exception as e:
@@ -250,6 +255,7 @@ class IntelligenceService:
         # 9. Knowledge Graph
         try:
             from .knowledge_graph import KnowledgeGraph
+
             KnowledgeGraph()
             result["knowledge_graph"] = {"loaded": True}
         except Exception as e:
@@ -259,6 +265,7 @@ class IntelligenceService:
         # 10. Research Memory
         try:
             from .research_memory import ResearchMemory
+
             ResearchMemory()
             result["research_memory"] = {"available": True}
         except Exception as e:
@@ -275,6 +282,7 @@ class IntelligenceService:
         # 12. Factor Engine (B30)
         try:
             from .factor_engine import compute_financial_scores
+
             if fundamentals:
                 result["factors"] = compute_financial_scores(fundamentals)
         except Exception as e:
@@ -333,31 +341,41 @@ class IntelligenceService:
                 redis_hgetall(f"features:{ticker}"),
                 redis_get("market_state"),
                 redis_get("world_state"),
-                pg_fetch("""
+                pg_fetch(
+                    """
                     SELECT signal_type, direction, score, confidence, risk_level,
                            horizon, expected_return_pct, created_at
                     FROM signals
                     WHERE instrument_id = (SELECT id FROM instruments WHERE symbol = $1)
                     AND status = 'ACTIVE'
                     ORDER BY created_at DESC LIMIT 5
-                """, ticker),
-                pg_fetch("""
+                """,
+                    ticker,
+                ),
+                pg_fetch(
+                    """
                     SELECT mp.predicted_direction, mp.predicted_return_pct,
                            mp.probability_positive, mo.actual_return_pct, mo.is_correct
                     FROM model_predictions mp
                     LEFT JOIN model_outcomes mo ON mo.prediction_id = mp.id
                     WHERE mp.instrument_id = (SELECT id FROM instruments WHERE symbol = $1)
                     ORDER BY mp.created_at DESC LIMIT 10
-                """, ticker),
+                """,
+                    ticker,
+                ),
                 redis_get(f"analogues:{ticker}"),
                 redis_get(f"model_confidence:{ticker}"),
-                pg_fetch("""
+                pg_fetch(
+                    """
                     SELECT p.quantity, p.avg_cost, p.current_price, p.weight_pct
                     FROM positions p
                     JOIN instruments i ON p.instrument_id = i.id
                     WHERE i.symbol = $1 AND p.status = 'OPEN'
-                """, ticker),
-                pg_fetch("""
+                """,
+                    ticker,
+                ),
+                pg_fetch(
+                    """
                     SELECT kr.relation_type, kr.strength, ke.name as related_entity
                     FROM knowledge_relations kr
                     JOIN knowledge_entities ke ON ke.id = kr.target_entity_id
@@ -365,13 +383,26 @@ class IntelligenceService:
                         SELECT id FROM knowledge_entities WHERE name = $1 LIMIT 1
                     )
                     ORDER BY kr.strength DESC LIMIT 10
-                """, ticker),
+                """,
+                    ticker,
+                ),
                 redis_get(f"impact:{ticker}"),
                 return_exceptions=True,
             )
 
             # Sonuçları context'e ekle
-            features, market_state, world_state, signals, predictions, analogues, model_info, portfolio, kg_relations, impact = results
+            (
+                features,
+                market_state,
+                world_state,
+                signals,
+                predictions,
+                analogues,
+                model_info,
+                portfolio,
+                kg_relations,
+                impact,
+            ) = results
 
             if isinstance(features, dict) and features:
                 context["features"] = features
@@ -416,7 +447,9 @@ Analyze the provided market data and return a JSON object with these fields:
 
 Return ONLY valid JSON, no other text. Do not give financial advice."""
 
-            user_prompt = f"{prompt}\n\nContext:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
+            user_prompt = (
+                f"{prompt}\n\nContext:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
+            )
 
             # Call Ollama API
             response = await self._http_client.post(
@@ -441,8 +474,9 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
                 parsed = None
                 try:
                     import re
+
                     # JSON bloğu ara
-                    json_match = re.search(r'\{[^{}]*\}', raw_response, re.DOTALL)
+                    json_match = re.search(r"\{[^{}]*\}", raw_response, re.DOTALL)
                     if json_match:
                         parsed = orjson.loads(json_match.group())
 
@@ -474,6 +508,7 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
 # Health Check HTTP Server
 # =====================================================
 
+
 async def _health_server(port: int = 8080):
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
@@ -482,10 +517,10 @@ async def _health_server(port: int = 8080):
         return web.json_response({"status": "healthy", "service": "intelligence"})
 
     app = web.Application()
-    app.router.add_get('/health', health_handler)
+    app.router.add_get("/health", health_handler)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
     logger.info("Health server started", port=port)
 
@@ -493,6 +528,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 # Entry Point
 # =====================================================
+
 
 async def main():
     """Main entry point for the intelligence service."""

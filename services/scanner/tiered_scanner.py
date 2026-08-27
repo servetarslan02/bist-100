@@ -29,19 +29,22 @@ logger = structlog.get_logger()
 # Tier Definitions
 # =====================================================
 
+
 class Tier:
     """Tarama tier'ı."""
-    CONTINUOUS_WATCH = 0   # 800 hisse, ucuz state
-    QUANT_SCAN = 1         # 800 hisse, matematiksel filtre
-    OPPORTUNITY = 2        # 800 → 50
-    DEEP_ANALYSIS = 3      # 50 → 10
-    GEMMA = 4              # 10 → 3-5
-    DECISION = 5           # 3-5 → 0-3
+
+    CONTINUOUS_WATCH = 0  # 800 hisse, ucuz state
+    QUANT_SCAN = 1  # 800 hisse, matematiksel filtre
+    OPPORTUNITY = 2  # 800 → 50
+    DEEP_ANALYSIS = 3  # 50 → 10
+    GEMMA = 4  # 10 → 3-5
+    DECISION = 5  # 3-5 → 0-3
 
 
 @dataclass
 class AssetTierState:
     """Her hissenin tier durumu."""
+
     ticker: str
     instrument_id: int = 0
     current_tier: int = Tier.CONTINUOUS_WATCH
@@ -114,20 +117,23 @@ class AssetTierState:
 @dataclass
 class MarketRegime:
     """Piyasa rejimi — tarama kriterlerini etkiler."""
+
     regime: str = "RANGE"
     confidence: float = 0.5
 
     # Rejime göre ağırlıklar
-    weights: dict[str, float] = field(default_factory=lambda: {
-        "momentum": 1.0,
-        "volume_anomaly": 1.0,
-        "breakout": 1.0,
-        "volatility": 1.0,
-        "relative_strength": 1.0,
-        "sector_divergence": 1.0,
-        "flow_correlation": 1.0,
-        "liquidity": 1.0,
-    })
+    weights: dict[str, float] = field(
+        default_factory=lambda: {
+            "momentum": 1.0,
+            "volume_anomaly": 1.0,
+            "breakout": 1.0,
+            "volatility": 1.0,
+            "relative_strength": 1.0,
+            "sector_divergence": 1.0,
+            "flow_correlation": 1.0,
+            "liquidity": 1.0,
+        }
+    )
 
     def update_weights(self, regime: str):
         """Rejime göre ağırlıkları güncelle."""
@@ -135,39 +141,65 @@ class MarketRegime:
 
         if regime in ["TRENDING-UP", "MOMENTUM-EXPANSION"]:
             self.weights = {
-                "momentum": 1.5, "volume_anomaly": 1.2, "breakout": 1.4,
-                "volatility": 0.7, "relative_strength": 1.3, "sector_divergence": 1.0,
-                "flow_correlation": 0.8, "liquidity": 0.6,
+                "momentum": 1.5,
+                "volume_anomaly": 1.2,
+                "breakout": 1.4,
+                "volatility": 0.7,
+                "relative_strength": 1.3,
+                "sector_divergence": 1.0,
+                "flow_correlation": 0.8,
+                "liquidity": 0.6,
             }
         elif regime in ["RISK-OFF", "PANIC"]:
             self.weights = {
-                "momentum": 0.3, "volume_anomaly": 0.8, "breakout": 0.4,
-                "volatility": 1.5, "relative_strength": 0.5, "sector_divergence": 0.7,
-                "flow_correlation": 1.2, "liquidity": 1.5,
+                "momentum": 0.3,
+                "volume_anomaly": 0.8,
+                "breakout": 0.4,
+                "volatility": 1.5,
+                "relative_strength": 0.5,
+                "sector_divergence": 0.7,
+                "flow_correlation": 1.2,
+                "liquidity": 1.5,
             }
         elif regime == "HIGH-VOLATILITY":
             self.weights = {
-                "momentum": 0.6, "volume_anomaly": 1.3, "breakout": 0.8,
-                "volatility": 1.4, "relative_strength": 0.7, "sector_divergence": 1.0,
-                "flow_correlation": 1.0, "liquidity": 1.2,
+                "momentum": 0.6,
+                "volume_anomaly": 1.3,
+                "breakout": 0.8,
+                "volatility": 1.4,
+                "relative_strength": 0.7,
+                "sector_divergence": 1.0,
+                "flow_correlation": 1.0,
+                "liquidity": 1.2,
             }
         elif regime == "RANGE":
             self.weights = {
-                "momentum": 0.8, "volume_anomaly": 1.0, "breakout": 1.2,
-                "volatility": 1.0, "relative_strength": 1.0, "sector_divergence": 1.0,
-                "flow_correlation": 1.0, "liquidity": 1.0,
+                "momentum": 0.8,
+                "volume_anomaly": 1.0,
+                "breakout": 1.2,
+                "volatility": 1.0,
+                "relative_strength": 1.0,
+                "sector_divergence": 1.0,
+                "flow_correlation": 1.0,
+                "liquidity": 1.0,
             }
         else:  # RECOVERY, LOW-VOLATILITY, vb.
             self.weights = {
-                "momentum": 1.0, "volume_anomaly": 1.0, "breakout": 1.0,
-                "volatility": 1.0, "relative_strength": 1.0, "sector_divergence": 1.0,
-                "flow_correlation": 1.0, "liquidity": 1.0,
+                "momentum": 1.0,
+                "volume_anomaly": 1.0,
+                "breakout": 1.0,
+                "volatility": 1.0,
+                "relative_strength": 1.0,
+                "sector_divergence": 1.0,
+                "flow_correlation": 1.0,
+                "liquidity": 1.0,
             }
 
 
 # =====================================================
 # Tiered Scanner
 # =====================================================
+
 
 class TieredScanner:
     """Katmanlı tarama motoru."""
@@ -181,9 +213,7 @@ class TieredScanner:
     def register_asset(self, ticker: str, instrument_id: int = 0):
         """Hisse kaydet."""
         if ticker not in self._assets:
-            self._assets[ticker] = AssetTierState(
-                ticker=ticker, instrument_id=instrument_id
-            )
+            self._assets[ticker] = AssetTierState(ticker=ticker, instrument_id=instrument_id)
 
     def register_assets(self, tickers: list[str]):
         """Birden fazla hisse kaydet."""
@@ -194,8 +224,9 @@ class TieredScanner:
     # Tier 0: Continuous Watch (Ucuz State Tracking)
     # =====================================================
 
-    def process_tick(self, ticker: str, price: float, volume: int,
-                     bid: float = 0, ask: float = 0, timestamp: datetime | None = None):
+    def process_tick(
+        self, ticker: str, price: float, volume: int, bid: float = 0, ask: float = 0, timestamp: datetime | None = None
+    ):
         """
         Yeni tick → sadece state güncelle.
         800 hissenin geçmişini baştan okumaz.
@@ -305,17 +336,16 @@ class TieredScanner:
                 asset.current_tier = Tier.OPPORTUNITY
 
         selected = ranked[:top_n]
-        logger.info("Opportunities selected", count=len(selected),
-                    top=selected[0].ticker if selected else "none")
+        logger.info("Opportunities selected", count=len(selected), top=selected[0].ticker if selected else "none")
         return selected
 
     # =====================================================
     # Tier 3: Deep Analysis (50 → 10)
     # =====================================================
 
-    def run_deep_analysis(self, opportunities: list[AssetTierState],
-                          ml_results: dict[str, dict],
-                          historical_data: dict[str, Any]) -> list[AssetTierState]:
+    def run_deep_analysis(
+        self, opportunities: list[AssetTierState], ml_results: dict[str, dict], historical_data: dict[str, Any]
+    ) -> list[AssetTierState]:
         """
         50 aday için derin analiz.
         ML ensemble, historical analogues, scenario analysis.
@@ -345,11 +375,11 @@ class TieredScanner:
             asset.current_tier = Tier.DEEP_ANALYSIS
 
         # En iyi 10'u seç
-        ranked = sorted(opportunities, key=lambda a: (
-            a.ml_confidence * 0.4
-            + a.scenario_expected_return * 0.3
-            + a.risk_reward_ratio * 0.3
-        ), reverse=True)
+        ranked = sorted(
+            opportunities,
+            key=lambda a: a.ml_confidence * 0.4 + a.scenario_expected_return * 0.3 + a.risk_reward_ratio * 0.3,
+            reverse=True,
+        )
 
         top_10 = ranked[:10]
         for asset in top_10:
@@ -370,9 +400,7 @@ class TieredScanner:
         gemma_candidates = []
         for asset in deep_candidates:
             # Gemma kriterleri
-            if (asset.ml_confidence > 0.6
-                and asset.scenario_expected_return > 2.0
-                and asset.risk_reward_ratio > 1.5):
+            if asset.ml_confidence > 0.6 and asset.scenario_expected_return > 2.0 and asset.risk_reward_ratio > 1.5:
                 asset.current_tier = Tier.GEMMA
                 gemma_candidates.append(asset)
 
@@ -385,8 +413,9 @@ class TieredScanner:
     # Tier 5: Decision (3-5 → 0-3)
     # =====================================================
 
-    def make_decisions(self, gemma_results: list[AssetTierState],
-                       risk_limits: dict[str, float]) -> list[AssetTierState]:
+    def make_decisions(
+        self, gemma_results: list[AssetTierState], risk_limits: dict[str, float]
+    ) -> list[AssetTierState]:
         """
         Risk motoru son kararı verir.
         """
@@ -402,7 +431,9 @@ class TieredScanner:
             # Pozisyon limiti kontrolü
             risk_limits.get("max_position_pct", 10.0)
 
-            asset.action = "BUY" if asset.ai_direction == "LONG" else "SELL" if asset.ai_direction == "SHORT" else "HOLD"
+            asset.action = (
+                "BUY" if asset.ai_direction == "LONG" else "SELL" if asset.ai_direction == "SHORT" else "HOLD"
+            )
             asset.conviction = "HIGH" if asset.ai_confidence > 0.8 else "MEDIUM"
             asset.current_tier = Tier.DECISION
             decisions.append(asset)
@@ -430,16 +461,20 @@ class TieredScanner:
             asset.current_tier = Tier.DEEP_ANALYSIS
             asset.escalated_by_event = True
             asset.escalation_reason = reason
-            logger.warning("EVENT ESCALATION", ticker=ticker,
-                          from_tier=old_tier, to_tier=Tier.DEEP_ANALYSIS,
-                          reason=reason, importance=importance)
+            logger.warning(
+                "EVENT ESCALATION",
+                ticker=ticker,
+                from_tier=old_tier,
+                to_tier=Tier.DEEP_ANALYSIS,
+                reason=reason,
+                importance=importance,
+            )
         elif importance > 0.5:
             # Orta önem → Tier 2'ye atla
             asset.current_tier = Tier.OPPORTUNITY
             asset.escalated_by_event = True
             asset.escalation_reason = reason
-            logger.info("Event escalation (medium)", ticker=ticker,
-                       from_tier=old_tier, to_tier=Tier.OPPORTUNITY)
+            logger.info("Event escalation (medium)", ticker=ticker, from_tier=old_tier, to_tier=Tier.OPPORTUNITY)
 
     # =====================================================
     # Rejim Değişikliği
@@ -453,8 +488,7 @@ class TieredScanner:
         self._regime.update_weights(new_regime)
         self._regime.confidence = confidence
 
-        logger.info("Regime changed", old=old_regime, new=new_regime,
-                   weights=self._regime.weights)
+        logger.info("Regime changed", old=old_regime, new=new_regime, weights=self._regime.weights)
 
     # =====================================================
     # Quant Scoring Fonksiyonları
@@ -618,7 +652,7 @@ class TieredScanner:
         elif vol_ratio > 1.5 and roc_5d < -2:
             score -= 10  # Hacim artıyor + momentum negatif (dağıtım)
         elif vol_ratio < 0.7 and abs(roc_5d) < 1:
-            score += 5   # Düşük hacim + sakin fiyat → birikim olabilir
+            score += 5  # Düşük hacim + sakin fiyat → birikim olabilir
 
         return max(0, min(100, score))
 
@@ -669,19 +703,22 @@ class TieredScanner:
             reverse=True,
         )
 
-        return [{
-            "ticker": a.ticker,
-            "tier": a.current_tier,
-            "opportunity_score": round(a.opportunity_score, 1),
-            "momentum": round(a.momentum_score, 1),
-            "volume_anomaly": round(a.volume_anomaly_score, 1),
-            "breakout": round(a.breakout_score, 1),
-            "volatility": round(a.volatility_score, 1),
-            "relative_strength": round(a.relative_strength_score, 1),
-            "price": a.price,
-            "change_pct": round(a.price_change_pct, 2),
-            "escalated": a.escalated_by_event,
-        } for a in ranked[:n]]
+        return [
+            {
+                "ticker": a.ticker,
+                "tier": a.current_tier,
+                "opportunity_score": round(a.opportunity_score, 1),
+                "momentum": round(a.momentum_score, 1),
+                "volume_anomaly": round(a.volume_anomaly_score, 1),
+                "breakout": round(a.breakout_score, 1),
+                "volatility": round(a.volatility_score, 1),
+                "relative_strength": round(a.relative_strength_score, 1),
+                "price": a.price,
+                "change_pct": round(a.price_change_pct, 2),
+                "escalated": a.escalated_by_event,
+            }
+            for a in ranked[:n]
+        ]
 
 
 # Singleton

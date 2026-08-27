@@ -17,7 +17,9 @@ import polars as pl
 def _make_market_data(n_stocks=8, n_days=380, seed=42):
     np.random.seed(seed)
     market = {}
-    pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
+    pl.date_range(datetime.now() - timedelta(days=n_days * 2), datetime.now(), timedelta(days=1), eager=True).tail(
+        n_days
+    )
     for i in range(n_stocks):
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
@@ -25,10 +27,15 @@ def _make_market_data(n_stocks=8, n_days=380, seed=42):
         high = close * (1 + np.abs(np.random.randn(n_days)) * 0.008)
         low = close * (1 - np.abs(np.random.randn(n_days)) * 0.008)
         volume = np.random.randint(50000, 500000, n_days).astype(float)
-        market[f"STOCK{i:04d}"] = pl.DataFrame({
-            'Open': close * (1 + np.random.randn(n_days) * 0.002),
-            'High': high, 'Low': low, 'Close': close, 'Volume': volume
-        })
+        market[f"STOCK{i:04d}"] = pl.DataFrame(
+            {
+                "Open": close * (1 + np.random.randn(n_days) * 0.002),
+                "High": high,
+                "Low": low,
+                "Close": close,
+                "Volume": volume,
+            }
+        )
     return market
 
 
@@ -37,10 +44,9 @@ def _make_benchmark(market, seed=99):
     dates = sorted(set(d for df in market.values() for d in df.index))
     n = len(dates)
     close = 1000 * np.exp(np.cumsum(np.random.randn(n) * 0.008))
-    return pl.DataFrame({
-        'Open': close, 'High': close * 1.005, 'Low': close * 0.995,
-        'Close': close, 'Volume': np.full(n, 1000000.0)
-    })
+    return pl.DataFrame(
+        {"Open": close, "High": close * 1.005, "Low": close * 0.995, "Close": close, "Volume": np.full(n, 1000000.0)}
+    )
 
 
 def _make_historical_repo():
@@ -52,34 +58,58 @@ def _make_historical_repo():
     )
     from services.data.persistent_repository import PersistentHistoricalRepository
 
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     repo = PersistentHistoricalRepository(db_path=path)
 
     # Fundamental
     for ticker in ["STOCK0000", "STOCK0001"]:
-        repo.add_fundamental_snapshot(FundamentalSnapshot(
-            ticker=ticker, period_end="2025-06-30", available_at="2025-08-14",
-            values={"pe_ratio": 8.5, "roe": 0.18, "free_cash_flow": 5e9,
-                    "market_cap": 200e9, "debt_to_equity": 0.3, "current_ratio": 2.5},
-            source="yfinance", status="FRESH",
-        ))
+        repo.add_fundamental_snapshot(
+            FundamentalSnapshot(
+                ticker=ticker,
+                period_end="2025-06-30",
+                available_at="2025-08-14",
+                values={
+                    "pe_ratio": 8.5,
+                    "roe": 0.18,
+                    "free_cash_flow": 5e9,
+                    "market_cap": 200e9,
+                    "debt_to_equity": 0.3,
+                    "current_ratio": 2.5,
+                },
+                source="yfinance",
+                status="FRESH",
+            )
+        )
 
     # KAP events
     for ticker in ["STOCK0000", "STOCK0001"]:
-        repo.add_event_snapshot(EventSnapshot(
-            event_id=f"KAP-{ticker}", ticker=ticker,
-            published_at="2025-08-10T10:00:00", event_type="FINANCIAL_REPORT",
-            title="Q2 Report", sentiment=0.5, importance=1.0, source="kap",
-        ))
+        repo.add_event_snapshot(
+            EventSnapshot(
+                event_id=f"KAP-{ticker}",
+                ticker=ticker,
+                published_at="2025-08-10T10:00:00",
+                event_type="FINANCIAL_REPORT",
+                title="Q2 Report",
+                sentiment=0.5,
+                importance=1.0,
+                source="kap",
+            )
+        )
 
     # Catalyst
     for ticker in ["STOCK0000", "STOCK0001"]:
-        repo.add_catalyst_snapshot(CatalystSnapshot(
-            event_id=f"CAT-{ticker}", ticker=ticker,
-            announcement_date="2025-08-10", event_date="2025-08-20",
-            catalyst_type="EARNINGS", importance=0.9, source="kap",
-        ))
+        repo.add_catalyst_snapshot(
+            CatalystSnapshot(
+                event_id=f"CAT-{ticker}",
+                ticker=ticker,
+                announcement_date="2025-08-10",
+                event_date="2025-08-20",
+                catalyst_type="EARNINGS",
+                importance=0.9,
+                source="kap",
+            )
+        )
 
     return repo, path
 
@@ -88,10 +118,12 @@ def _make_historical_repo():
 # 1. WALK-FORWARD CANONICAL MODE WORKS
 # =====================================================
 
+
 def test_wf_canonical_mode_works():
     """Walk-forward canonical modda çalışıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
@@ -99,15 +131,18 @@ def test_wf_canonical_mode_works():
 
     cfg = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
     )
 
     runner = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -127,10 +162,12 @@ def test_wf_canonical_mode_works():
 # 2. WALK-FORWARD LEGACY MODE UNCHANGED
 # =====================================================
 
+
 def test_wf_legacy_mode_unchanged():
     """Walk-forward legacy mode hiç değişmemiş mi?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
@@ -139,8 +176,11 @@ def test_wf_legacy_mode_unchanged():
 
     runner = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -158,10 +198,12 @@ def test_wf_legacy_mode_unchanged():
 # 3. WALK-FORWARD WITH HISTORICAL REPOSITORY
 # =====================================================
 
+
 def test_wf_with_historical_repo():
     """Walk-forward historical repository ile çalışıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
@@ -170,7 +212,7 @@ def test_wf_with_historical_repo():
 
     cfg = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
         historical_repository=repo,
@@ -178,8 +220,11 @@ def test_wf_with_historical_repo():
 
     runner = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -201,21 +246,23 @@ def test_wf_with_historical_repo():
 # 4. FOLD DATA PIT-SAFE
 # =====================================================
 
+
 def test_fold_data_pit_safe():
     """Her fold'un verisi test_end'e kadar kesiliyor mu?"""
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(5, 200)
     dates = sorted(set(d for df in market.values() for d in df.index))
 
     # Truncate test
-    test_end = str(dates[150].date()) if hasattr(dates[150], 'date') else str(dates[150])
+    test_end = str(dates[150].date()) if hasattr(dates[150], "date") else str(dates[150])
     truncated = WalkForwardBacktestRunner._truncate(market, test_end)
 
     for ticker, df in truncated.items():
         last = df.index[-1]
-        last_str = str(last.date()) if hasattr(last, 'date') else str(last)
+        last_str = str(last.date()) if hasattr(last, "date") else str(last)
         if last_str > test_end:
             issues.append(f"{ticker}: veri {last_str} > {test_end}")
 
@@ -226,10 +273,12 @@ def test_fold_data_pit_safe():
 # 5. TRAIN-TEST LEAKAGE
 # =====================================================
 
+
 def test_train_test_leakage():
     """Train verisi test'e sızıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
@@ -238,8 +287,11 @@ def test_train_test_leakage():
 
     runner = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -263,10 +315,12 @@ def test_train_test_leakage():
 # 6. CANONICAL SCORE DETERMINISTIC
 # =====================================================
 
+
 def test_canonical_score_deterministic_in_wf():
     """Walk-forward canonical skorlar deterministic mi?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380, seed=42)
@@ -274,7 +328,7 @@ def test_canonical_score_deterministic_in_wf():
 
     cfg = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
     )
@@ -284,8 +338,11 @@ def test_canonical_score_deterministic_in_wf():
     for _ in range(2):
         runner = WalkForwardBacktestRunner(
             backtest_config=cfg,
-            purge_days=5, embargo_days=5,
-            train_days=120, test_days=40, step_days=40,
+            purge_days=5,
+            embargo_days=5,
+            train_days=120,
+            test_days=40,
+            step_days=40,
             use_panel_features=False,
         )
         r = runner.run(market, benchmark_data=benchmark, persist=False)
@@ -307,10 +364,12 @@ def test_canonical_score_deterministic_in_wf():
 # 7. FUTURE DATA MUTATION INVARIANCE
 # =====================================================
 
+
 def test_future_data_mutation_invariance():
     """Gelecek veri değişimi geçmiş fold sonuçlarını etkilememeli."""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380, seed=42)
@@ -318,15 +377,18 @@ def test_future_data_mutation_invariance():
 
     cfg = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
     )
 
     runner = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -338,14 +400,17 @@ def test_future_data_mutation_invariance():
     for ticker, df in market.items():
         df2 = df.copy()
         # Son50 günü çılgın değerlere çevir
-        df2.iloc[-50:, df2.columns.get_loc('Close')] *= 100
-        df2.iloc[-50:, df2.columns.get_loc('Open')] *= 100
+        df2.iloc[-50:, df2.columns.get_loc("Close")] *= 100
+        df2.iloc[-50:, df2.columns.get_loc("Open")] *= 100
         market_poisoned[ticker] = df2
 
     runner2 = WalkForwardBacktestRunner(
         backtest_config=cfg,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
     result_poisoned = runner2.run(market_poisoned, benchmark_data=benchmark, persist=False)
@@ -358,8 +423,7 @@ def test_future_data_mutation_invariance():
             # Trade sayısı aynı olmalı (gelecek veri etkilememeli)
             if f_normal.total_trades != f_poisoned.total_trades:
                 issues.append(
-                    f"Fold {f_normal.fold_id} trades değişti: "
-                    f"{f_normal.total_trades} vs {f_poisoned.total_trades}"
+                    f"Fold {f_normal.fold_id} trades değişti: {f_normal.total_trades} vs {f_poisoned.total_trades}"
                 )
 
     return "Future data mutation invariance", len(issues) == 0, issues
@@ -369,10 +433,12 @@ def test_future_data_mutation_invariance():
 # 8. HISTORICAL DATA IN FOLD
 # =====================================================
 
+
 def test_historical_data_used_in_fold():
     """Historical veri fold'larda gerçekten kullanılıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
@@ -382,7 +448,7 @@ def test_historical_data_used_in_fold():
     # Historical repo ile
     cfg_with = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
         historical_repository=repo,
@@ -391,22 +457,28 @@ def test_historical_data_used_in_fold():
     # Historical repo olmadan
     cfg_without = BacktestConfig(
         use_canonical_scoring=True,
-        regime='BULL',
+        regime="BULL",
         lookback_days=60,
         initial_capital=100000,
     )
 
     runner_with = WalkForwardBacktestRunner(
         backtest_config=cfg_with,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
     runner_without = WalkForwardBacktestRunner(
         backtest_config=cfg_without,
-        purge_days=5, embargo_days=5,
-        train_days=120, test_days=40, step_days=40,
+        purge_days=5,
+        embargo_days=5,
+        train_days=120,
+        test_days=40,
+        step_days=40,
         use_panel_features=False,
     )
 
@@ -427,15 +499,17 @@ def test_historical_data_used_in_fold():
 # 9. REGIME IN WALK-FORWARD
 # =====================================================
 
+
 def test_regime_in_walk_forward():
     """Regime değişimi walk-forward'da doğru mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(8, 380)
 
-    for regime in ['BULL', 'BEAR', 'SIDEWAYS']:
+    for regime in ["BULL", "BEAR", "SIDEWAYS"]:
         cfg = BacktestConfig(
             use_canonical_scoring=True,
             regime=regime,
@@ -445,8 +519,11 @@ def test_regime_in_walk_forward():
 
         runner = WalkForwardBacktestRunner(
             backtest_config=cfg,
-            purge_days=5, embargo_days=5,
-            train_days=120, test_days=40, step_days=40,
+            purge_days=5,
+            embargo_days=5,
+            train_days=120,
+            test_days=40,
+            step_days=40,
             use_panel_features=False,
         )
 
@@ -463,21 +540,23 @@ def test_regime_in_walk_forward():
 # 10. LEAKAGE GUARDS
 # =====================================================
 
+
 def test_leakage_guards():
     """Leakage guard'ları çalışıyor mu?"""
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
+
     issues = []
 
     market = _make_market_data(5, 200)
     dates = sorted(set(d for df in market.values() for d in df.index))
 
     # Geçerli fold
-    test_end = str(dates[150].date()) if hasattr(dates[150], 'date') else str(dates[150])
+    test_end = str(dates[150].date()) if hasattr(dates[150], "date") else str(dates[150])
     truncated = WalkForwardBacktestRunner._truncate(market, test_end)
 
     for ticker, df in truncated.items():
         last = df.index[-1]
-        last_str = str(last.date()) if hasattr(last, 'date') else str(last)
+        last_str = str(last.date()) if hasattr(last, "date") else str(last)
         if last_str > test_end:
             issues.append(f"PIT ihlali: {ticker}")
 
@@ -487,6 +566,7 @@ def test_leakage_guards():
 # =====================================================
 # RUN
 # =====================================================
+
 
 def run_all():
     print("=" * 60)
@@ -515,6 +595,7 @@ def run_all():
         except Exception as e:
             name, ok, issues = test_func.__name__, False, [f"Exception: {e}"]
             import traceback
+
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"

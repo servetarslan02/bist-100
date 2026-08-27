@@ -31,6 +31,7 @@ logger = structlog.get_logger(__name__)
 # POLICY DIFF TESTS
 # =====================================================
 
+
 async def test_policy_diff_no_changes():
     """Aynı config diff'inde değişiklik olmamalı."""
     issues = []
@@ -135,6 +136,7 @@ async def test_policy_diff_on_update():
 # OPTIMISTIC LOCKING TESTS
 # =====================================================
 
+
 async def test_optimistic_lock_version_conflict():
     """Yanlış version ile update reddedilmeli."""
     issues = []
@@ -143,8 +145,7 @@ async def test_optimistic_lock_version_conflict():
     policy._version = 5
 
     try:
-        policy.update({"escalation_timeouts": {"cash_negative": 99}},
-                      actor="user1", expected_version=3)
+        policy.update({"escalation_timeouts": {"cash_negative": 99}}, actor="user1", expected_version=3)
         issues.append("Version conflict yakalanmadı")
     except VersionConflictError as e:
         if "expected 3" not in str(e):
@@ -164,8 +165,7 @@ async def test_optimistic_lock_correct_version():
     policy = AlertPolicy()
     policy._version = 5
 
-    result = policy.update({"escalation_timeouts": {"cash_negative": 99}},
-                           actor="user1", expected_version=5)
+    result = policy.update({"escalation_timeouts": {"cash_negative": 99}}, actor="user1", expected_version=5)
 
     if not result.get("success"):
         issues.append(f"Update başarısız: {result}")
@@ -183,8 +183,7 @@ async def test_optimistic_lock_no_version_check():
     policy = AlertPolicy()
     policy._version = 5
 
-    result = policy.update({"escalation_timeouts": {"cash_negative": 99}},
-                           actor="user1", expected_version=0)
+    result = policy.update({"escalation_timeouts": {"cash_negative": 99}}, actor="user1", expected_version=0)
 
     if not result.get("success"):
         issues.append(f"Update başarısız: {result}")
@@ -263,15 +262,13 @@ async def test_concurrent_policy_update():
     # User1 okur (version=1)
     # User2 okur (version=1)
     # User1 günceller (version=1→2)
-    result1 = policy.update({"escalation_timeouts": {"cash_negative": 100}},
-                            actor="user1", expected_version=1)
+    result1 = policy.update({"escalation_timeouts": {"cash_negative": 100}}, actor="user1", expected_version=1)
     if not result1.get("success"):
         issues.append(f"User1 update başarısız: {result1}")
 
     # User2 eski version ile günceller → conflict
     try:
-        policy.update({"escalation_timeouts": {"cash_negative": 200}},
-                      actor="user2", expected_version=1)
+        policy.update({"escalation_timeouts": {"cash_negative": 200}}, actor="user2", expected_version=1)
         issues.append("Concurrent update yakalanmadı")
     except VersionConflictError:
         logger.debug("Version conflict (expected) in test_concurrent_policy_update", exc_info=True)
@@ -286,6 +283,7 @@ async def test_concurrent_policy_update():
 # =====================================================
 # POLICY WEBHOOK TESTS
 # =====================================================
+
 
 async def test_policy_webhook_config():
     """Webhook URL'leri yapılandırılabilmeli."""
@@ -325,6 +323,7 @@ async def test_policy_change_triggers_notification():
 # =====================================================
 # BATCH SILENCE TESTS
 # ============================================================
+
 
 async def test_batch_add_silences():
     """Toplu susturma ekleme çalışmalı."""
@@ -382,17 +381,17 @@ async def test_batch_remove_silences():
     db.commit()
 
     policy = AlertPolicy()
-    policy.batch_add_silences([
-        {"alert_type": "test1", "duration_s": 60},
-        {"alert_type": "test2", "duration_s": 60},
-        {"fingerprint": "fp3", "duration_s": 60},
-    ], db=db)
+    policy.batch_add_silences(
+        [
+            {"alert_type": "test1", "duration_s": 60},
+            {"alert_type": "test2", "duration_s": 60},
+            {"fingerprint": "fp3", "duration_s": 60},
+        ],
+        db=db,
+    )
 
     # Batch remove
-    result = policy.batch_remove_silences(
-        [{"alert_type": "test1"}, {"fingerprint": "fp3"}],
-        actor="admin", db=db
-    )
+    result = policy.batch_remove_silences([{"alert_type": "test1"}, {"fingerprint": "fp3"}], actor="admin", db=db)
 
     if result.get("removed") != 2:
         issues.append(f"Removed: {result.get('removed')}")
@@ -421,10 +420,13 @@ async def test_batch_silence_transaction():
     policy = AlertPolicy()
 
     # İlk batch başarılı olmalı
-    results1 = policy.batch_add_silences([
-        {"alert_type": "test1", "duration_s": 60},
-        {"alert_type": "test2", "duration_s": 60},
-    ], db=db)
+    results1 = policy.batch_add_silences(
+        [
+            {"alert_type": "test1", "duration_s": 60},
+            {"alert_type": "test2", "duration_s": 60},
+        ],
+        db=db,
+    )
 
     if not all(r.get("success") for r in results1):
         issues.append("İlk batch başarısız")
@@ -437,14 +439,15 @@ async def test_batch_silence_audit():
     issues = []
 
     policy = AlertPolicy()
-    policy.batch_add_silences([
-        {"alert_type": "test1", "duration_s": 60, "reason": "maintenance"},
-        {"alert_type": "test2", "duration_s": 120},
-    ], created_by="admin")
-
-    policy.batch_remove_silences(
-        [{"alert_type": "test1"}], actor="ops"
+    policy.batch_add_silences(
+        [
+            {"alert_type": "test1", "duration_s": 60, "reason": "maintenance"},
+            {"alert_type": "test2", "duration_s": 120},
+        ],
+        created_by="admin",
     )
+
+    policy.batch_remove_silences([{"alert_type": "test1"}], actor="ops")
 
     audit = policy.get_audit_log()
     actions = [e.get("action") for e in audit]
@@ -465,6 +468,7 @@ async def test_batch_silence_audit():
 # =====================================================
 # AUDIT LOG COMPLETENESS
 # =====================================================
+
 
 async def test_audit_log_completeness():
     """Her değişiklik audit log'a yazılmalı."""
@@ -519,6 +523,7 @@ async def test_audit_log_limit():
 # INTEGRATION
 # =====================================================
 
+
 async def test_full_policy_workflow():
     """Tam policy iş akışı: update → diff → conflict → rollback."""
     issues = []
@@ -537,8 +542,7 @@ async def test_full_policy_workflow():
 
     # Conflict: eski version ile
     try:
-        policy.update({"escalation_timeouts": {"cash_negative": 999}},
-                      actor="user", expected_version=1)
+        policy.update({"escalation_timeouts": {"cash_negative": 999}}, actor="user", expected_version=1)
         issues.append("Conflict yakalanmadı")
     except VersionConflictError:
         logger.warning("Error in test_full_policy_workflow: VersionConflictError", exc_info=True)
@@ -562,6 +566,7 @@ async def test_full_policy_workflow():
 # =====================================================
 # RUN
 # =====================================================
+
 
 async def run_all():
     print("=" * 60)

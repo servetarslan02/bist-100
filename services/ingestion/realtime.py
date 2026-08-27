@@ -67,10 +67,9 @@ class RealtimeDataProvider:
 
                 # Chunked download
                 for i in range(0, len(tickers), 50):
-                    chunk = tickers[i:i+50]
+                    chunk = tickers[i : i + 50]
                     tickers_yf = [f"{t}.IS" for t in chunk]
-                    data = yf.download(tickers_yf, period="1d", group_by="ticker",
-                                      threads=True, progress=False)
+                    data = yf.download(tickers_yf, period="1d", group_by="ticker", threads=True, progress=False)
 
                     for ticker in chunk:
                         try:
@@ -89,6 +88,7 @@ class RealtimeDataProvider:
                                 # Güncelle
                                 self._last_prices[ticker] = price
                                 from datetime import timedelta
+
                                 self._last_update[ticker] = datetime.now(UTC) - timedelta(minutes=15)
 
                                 # Handler'ları çağır
@@ -136,7 +136,8 @@ class RealtimeDataProvider:
             "provider": self._provider,
             "tickers_tracked": len(self._last_prices),
             "last_updates": {
-                t: u.isoformat() for t, u in sorted(
+                t: u.isoformat()
+                for t, u in sorted(
                     self._last_update.items(),
                     key=lambda x: x[1],
                     reverse=True,

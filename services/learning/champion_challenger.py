@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class ChampionRecord:
     """Champion model kaydı."""
+
     model_id: str
     version: str
     promoted_at: str
@@ -65,19 +66,23 @@ class ChampionChallengerEngine:
         if len(self._champion_history) > 1000:
             self._champion_history = self._champion_history[-1000:]
 
-        logger.info("Challenger promoted to champion",
-                   challenger=challenger_id,
-                   old=old_champion.model_id if old_champion else "none",
-                   improvement=metrics.get("improvement_pct", 0))
+        logger.info(
+            "Challenger promoted to champion",
+            challenger=challenger_id,
+            old=old_champion.model_id if old_champion else "none",
+            improvement=metrics.get("improvement_pct", 0),
+        )
 
     def reject(self, challenger_id: str, reason: str, metrics: dict):
         """Challenger'ı reddet."""
-        self._rejected_challengers.append({
-            "model_id": challenger_id,
-            "rejected_at": datetime.now(UTC).isoformat(),
-            "reason": reason,
-            "metrics": metrics,
-        })
+        self._rejected_challengers.append(
+            {
+                "model_id": challenger_id,
+                "rejected_at": datetime.now(UTC).isoformat(),
+                "reason": reason,
+                "metrics": metrics,
+            }
+        )
         if len(self._rejected_challengers) > 500:
             self._rejected_challengers = self._rejected_challengers[-500:]
 
@@ -111,7 +116,14 @@ class ChampionChallengerEngine:
             for r in self._champion_history
         ]
 
-    def canary_deploy(self, challenger_id: str, version: str, allocation_pct: float = 0.1, metrics: dict = None, regime: str = "UNKNOWN"):
+    def canary_deploy(
+        self,
+        challenger_id: str,
+        version: str,
+        allocation_pct: float = 0.1,
+        metrics: dict = None,
+        regime: str = "UNKNOWN",
+    ):
         """Canary deployment — küçük pozisyonlarla test.
 
         Yeni modeli production'da %10 pozisyonla test eder.
@@ -124,9 +136,7 @@ class ChampionChallengerEngine:
             metrics: Mevcut metrikler
             regime: Piyasa rejimi
         """
-        logger.info("Canary deployment started",
-                   challenger=challenger_id,
-                   allocation=f"{allocation_pct*100:.0f}%")
+        logger.info("Canary deployment started", challenger=challenger_id, allocation=f"{allocation_pct * 100:.0f}%")
 
         self._canary_active = True
         self._canary_model = challenger_id
@@ -193,7 +203,9 @@ class ChampionChallengerEngine:
                 "model_id": self._current_champion.model_id,
                 "version": self._current_champion.version,
                 "promoted_at": self._current_champion.promoted_at,
-            } if self._current_champion else None,
+            }
+            if self._current_champion
+            else None,
             "total_promotions": len(self._champion_history),
             "total_rejections": len(self._rejected_challengers),
         }

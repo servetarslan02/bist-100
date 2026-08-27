@@ -15,6 +15,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 class NewsImpactEngine:
     """Haber etki motoru."""
 
@@ -92,11 +93,13 @@ class EventTimelineEngine:
         if ticker not in self._timelines:
             self._timelines[ticker] = deque(maxlen=100)
 
-        self._timelines[ticker].append({
-            "type": event_type,
-            "data": data,
-            "timestamp": timestamp,
-        })
+        self._timelines[ticker].append(
+            {
+                "type": event_type,
+                "data": data,
+                "timestamp": timestamp,
+            }
+        )
 
     def get_timeline(self, ticker: str, limit: int = 20) -> list[dict]:
         """Ticker olay zaman çizelgesi."""
@@ -118,6 +121,7 @@ class EventTimelineEngine:
             "recent_event_types": list(unique_types),
             "event_frequency": {t: event_types.count(t) for t in unique_types},
         }
+
 
 # Singletons
 news_impact_engine = NewsImpactEngine()

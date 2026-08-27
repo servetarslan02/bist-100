@@ -1,6 +1,5 @@
 """VIOP API — Gerçek veriyle çalışan endpoint'ler."""
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...viop.contract_catalog import viop_catalog
@@ -24,6 +23,7 @@ router = APIRouter()
 # =====================================================
 # OPTIONS PRICING & GREEKS
 # =====================================================
+
 
 @router.get("/options")
 async def get_options(
@@ -93,6 +93,7 @@ async def calculate_iv(
 # PORTFOLIO GREEKS
 # =====================================================
 
+
 @router.post("/greeks")
 async def get_portfolio_greeks(
     positions: list[dict],
@@ -113,6 +114,7 @@ async def get_portfolio_greeks(
 # =====================================================
 # STRATEGIES
 # =====================================================
+
 
 @router.get("/strategies")
 async def list_strategies(
@@ -150,45 +152,66 @@ async def analyze_strategy(
 
     strategy_map = {
         "COVERED_CALL": lambda: strat.covered_call(
-            spot, params.get("call_strike", spot * 1.05),
-            params.get("call_premium", spot * 0.02), params.get("shares", 100)),
+            spot,
+            params.get("call_strike", spot * 1.05),
+            params.get("call_premium", spot * 0.02),
+            params.get("shares", 100),
+        ),
         "PROTECTIVE_PUT": lambda: strat.protective_put(
-            spot, params.get("put_strike", spot * 0.95),
-            params.get("put_premium", spot * 0.02), params.get("shares", 100)),
+            spot,
+            params.get("put_strike", spot * 0.95),
+            params.get("put_premium", spot * 0.02),
+            params.get("shares", 100),
+        ),
         "COLLAR": lambda: strat.collar(
-            spot, params.get("put_strike", spot * 0.95),
+            spot,
+            params.get("put_strike", spot * 0.95),
             params.get("put_premium", spot * 0.02),
             params.get("call_strike", spot * 1.05),
-            params.get("call_premium", spot * 0.02), params.get("shares", 100)),
+            params.get("call_premium", spot * 0.02),
+            params.get("shares", 100),
+        ),
         "IRON_CONDOR": lambda: strat.iron_condor(
-            spot, params.get("put_sell", spot * 0.95),
+            spot,
+            params.get("put_sell", spot * 0.95),
             params.get("put_buy", spot * 0.90),
             params.get("call_sell", spot * 1.05),
             params.get("call_buy", spot * 1.10),
             params.get("put_sell_prem", spot * 0.02),
             params.get("put_buy_prem", spot * 0.01),
             params.get("call_sell_prem", spot * 0.02),
-            params.get("call_buy_prem", spot * 0.01)),
+            params.get("call_buy_prem", spot * 0.01),
+        ),
         "STRADDLE": lambda: strat.straddle(
-            spot, spot, params.get("call_premium", spot * 0.03),
-            params.get("put_premium", spot * 0.03)),
+            spot, spot, params.get("call_premium", spot * 0.03), params.get("put_premium", spot * 0.03)
+        ),
         "STRANGLE": lambda: strat.strangle(
-            spot, params.get("put_strike", spot * 0.95),
+            spot,
+            params.get("put_strike", spot * 0.95),
             params.get("call_strike", spot * 1.05),
             params.get("put_premium", spot * 0.02),
-            params.get("call_premium", spot * 0.02)),
+            params.get("call_premium", spot * 0.02),
+        ),
         "BULL_CALL_SPREAD": lambda: strat.bull_call_spread(
-            params.get("buy_strike", spot), params.get("sell_strike", spot * 1.10),
-            params.get("buy_premium", spot * 0.05), params.get("sell_premium", spot * 0.02)),
+            params.get("buy_strike", spot),
+            params.get("sell_strike", spot * 1.10),
+            params.get("buy_premium", spot * 0.05),
+            params.get("sell_premium", spot * 0.02),
+        ),
         "BEAR_PUT_SPREAD": lambda: strat.bear_put_spread(
-            params.get("buy_strike", spot * 1.10), params.get("sell_strike", spot),
-            params.get("buy_premium", spot * 0.05), params.get("sell_premium", spot * 0.02)),
+            params.get("buy_strike", spot * 1.10),
+            params.get("sell_strike", spot),
+            params.get("buy_premium", spot * 0.05),
+            params.get("sell_premium", spot * 0.02),
+        ),
         "BUTTERFLY": lambda: strat.butterfly(
-            params.get("lower", spot * 0.95), params.get("middle", spot),
+            params.get("lower", spot * 0.95),
+            params.get("middle", spot),
             params.get("upper", spot * 1.05),
             params.get("lower_prem", spot * 0.06),
             params.get("middle_prem", spot * 0.03),
-            params.get("upper_prem", spot * 0.01)),
+            params.get("upper_prem", spot * 0.01),
+        ),
     }
 
     factory = strategy_map.get(strategy.upper())
@@ -202,6 +225,7 @@ async def analyze_strategy(
 # =====================================================
 # HEDGING
 # =====================================================
+
 
 @router.post("/hedge")
 async def calculate_hedge(
@@ -233,6 +257,7 @@ async def gamma_scalp(
 # MARGIN
 # =====================================================
 
+
 @router.post("/margin")
 async def calculate_margin(
     positions: list[dict],
@@ -251,6 +276,7 @@ async def calculate_margin(
 # ARBITRAGE
 # =====================================================
 
+
 @router.post("/arbitrage")
 async def check_arbitrage(
     spot_price: float = Query(..., description="Spot fiyat"),
@@ -262,14 +288,14 @@ async def check_arbitrage(
     _=Depends(check_rate_limit),
 ):
     """Futures-spot arbitraj kontrolü."""
-    result = futures_spot_arbitrage.analyze(
-        spot_price, futures_price, risk_free_rate, dividend_yield, time_to_expiry)
+    result = futures_spot_arbitrage.analyze(spot_price, futures_price, risk_free_rate, dividend_yield, time_to_expiry)
     return result.to_dict()
 
 
 # =====================================================
 # PARITY
 # =====================================================
+
 
 @router.post("/parity")
 async def check_parity(
@@ -290,6 +316,7 @@ async def check_parity(
 # RISK
 # =====================================================
 
+
 @router.post("/risk")
 async def calculate_viop_risk(
     viop_positions: list[dict],
@@ -304,6 +331,7 @@ async def calculate_viop_risk(
 # =====================================================
 # CONTRACT CATALOG
 # =====================================================
+
 
 @router.get("/contracts")
 async def list_contracts(

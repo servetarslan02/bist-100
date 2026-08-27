@@ -30,6 +30,7 @@ DASHBOARD_DIR = Path(__file__).parent.parent.parent / "monitoring"
 @dataclass
 class GrafanaConfig:
     """Grafana bağlantı yapılandırması."""
+
     url: str = os.environ.get("GRAFANA_URL", "http://localhost:3000")
     auth: str = os.environ.get("GRAFANA_AUTH", "admin:admin")  # user:password veya API key
     timeout: float = 30.0
@@ -39,6 +40,7 @@ class GrafanaConfig:
 @dataclass
 class DatasourceConfig:
     """Datasource yapılandırması."""
+
     name: str
     type: str  # prometheus, influxdb, etc.
     url: str
@@ -61,6 +63,7 @@ class DatasourceConfig:
 @dataclass
 class DashboardVersion:
     """Dashboard versiyon kaydı."""
+
     uid: str
     title: str
     version: int
@@ -85,6 +88,7 @@ class GrafanaProvisioner:
         """Datasource oluştur veya güncelle."""
         try:
             import aiohttp
+
             url = f"{self._config.url}/api/datasources"
             auth_parts = self._config.auth.split(":")
             auth = aiohttp.BasicAuth(auth_parts[0], auth_parts[1]) if len(auth_parts) == 2 else None
@@ -105,7 +109,8 @@ class GrafanaProvisioner:
                         payload["id"] = existing["id"]
                         async with session.put(
                             f"{url}/{existing['id']}",
-                            json=payload, auth=auth,
+                            json=payload,
+                            auth=auth,
                             timeout=aiohttp.ClientTimeout(total=self._config.timeout),
                         ) as put_resp:
                             if put_resp.status == 200:
@@ -117,7 +122,9 @@ class GrafanaProvisioner:
 
                 # Yeni oluştur
                 async with session.post(
-                    url, json=payload, auth=auth,
+                    url,
+                    json=payload,
+                    auth=auth,
                     timeout=aiohttp.ClientTimeout(total=self._config.timeout),
                     ssl=self._config.verify_ssl,
                 ) as resp:
@@ -129,8 +136,9 @@ class GrafanaProvisioner:
                         return True
                     else:
                         body = await resp.text()
-                        logger.error("Datasource creation failed",
-                                   name=ds_config.name, status=resp.status, body=body[:200])
+                        logger.error(
+                            "Datasource creation failed", name=ds_config.name, status=resp.status, body=body[:200]
+                        )
                         return False
 
         except Exception as e:
@@ -141,8 +149,7 @@ class GrafanaProvisioner:
     # DASHBOARD
     # =====================================================
 
-    async def provision_dashboard(self, file_path: str, folder_id: int = 0,
-                                  overwrite: bool = True) -> int | None:
+    async def provision_dashboard(self, file_path: str, folder_id: int = 0, overwrite: bool = True) -> int | None:
         """Dashboard JSON dosyasını Grafana'ya yükle.
 
         Returns:
@@ -169,6 +176,7 @@ class GrafanaProvisioner:
             # UID yoksa oluştur
             if "uid" not in payload["dashboard"]:
                 import hashlib
+
                 uid = hashlib.sha256(str(path).encode()).hexdigest()[:12]
                 payload["dashboard"]["uid"] = uid
 
@@ -176,11 +184,16 @@ class GrafanaProvisioner:
             auth_parts = self._config.auth.split(":")
             auth = aiohttp.BasicAuth(auth_parts[0], auth_parts[1]) if len(auth_parts) == 2 else None
 
-            async with aiohttp.ClientSession() as session, session.post(
-                url, json=payload, auth=auth,
-                timeout=aiohttp.ClientTimeout(total=self._config.timeout),
-                ssl=self._config.verify_ssl,
-            ) as resp:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    url,
+                    json=payload,
+                    auth=auth,
+                    timeout=aiohttp.ClientTimeout(total=self._config.timeout),
+                    ssl=self._config.verify_ssl,
+                ) as resp,
+            ):
                 if resp.status in (200, 201):
                     result = await resp.json()
                     version = result.get("version", 1)
@@ -188,20 +201,23 @@ class GrafanaProvisioner:
                     title = payload["dashboard"].get("title", "unknown")
 
                     self._provisioned_dashboards[uid] = version
-                    self._versions.append(DashboardVersion(
-                        uid=uid, title=title, version=version,
-                        provisioned_at=str(__import__('datetime').datetime.now(
-                            __import__('datetime').timezone.utc)),
-                        file_path=str(path),
-                    ))
+                    self._versions.append(
+                        DashboardVersion(
+                            uid=uid,
+                            title=title,
+                            version=version,
+                            provisioned_at=str(
+                                __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+                            ),
+                            file_path=str(path),
+                        )
+                    )
 
-                    logger.info("Dashboard provisioned",
-                              title=title, version=version, uid=uid)
+                    logger.info("Dashboard provisioned", title=title, version=version, uid=uid)
                     return version
                 else:
                     body = await resp.text()
-                    logger.error("Dashboard provisioning failed",
-                               status=resp.status, body=body[:200])
+                    logger.error("Dashboard provisioning failed", status=resp.status, body=body[:200])
                     return None
 
         except Exception as e:
@@ -260,9 +276,7 @@ class GrafanaProvisioner:
             "dashboards_provisioned": len(self._provisioned_dashboards),
             "datasources_provisioned": len(self._provisioned_datasources),
             "dashboard_versions": len(self._versions),
-            "latest_versions": {
-                uid: ver for uid, ver in self._provisioned_dashboards.items()
-            },
+            "latest_versions": {uid: ver for uid, ver in self._provisioned_dashboards.items()},
         }
 
 

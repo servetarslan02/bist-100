@@ -26,11 +26,13 @@ class EventReplay:
 
     def log_event(self, event_type: str, data: dict, timestamp: str = None):
         """Event kaydet (replay için)."""
-        self._event_log.append({
-            "event_type": event_type,
-            "data": data,
-            "timestamp": timestamp or datetime.now(UTC).isoformat(),
-        })
+        self._event_log.append(
+            {
+                "event_type": event_type,
+                "data": data,
+                "timestamp": timestamp or datetime.now(UTC).isoformat(),
+            }
+        )
         if len(self._event_log) > 1000:
             self._event_log = self._event_log[-1000:]
 
@@ -92,6 +94,7 @@ class GracefulShutdown:
         # Downtime tracker'a kapanış kaydı
         try:
             from .downtime_tracker import downtime_tracker
+
             downtime_tracker.record_shutdown()
         except Exception as e:
             logger.warning("Downtime tracker shutdown record failed", error=str(e))
@@ -99,6 +102,7 @@ class GracefulShutdown:
         # Scheduler state kaydet
         try:
             from ..scheduler.unified_scheduler import unified_scheduler
+
             unified_scheduler.save_state()
         except Exception as e:
             logger.warning("Scheduler state save failed", error=str(e))
@@ -106,6 +110,7 @@ class GracefulShutdown:
         # Offline queue'yu flush et (mümkünse)
         try:
             from .offline_queue import offline_queue
+
             await offline_queue.flush()
         except Exception as e:
             logger.warning("Offline queue flush failed", error=str(e))
@@ -170,20 +175,24 @@ class StartupRecovery:
         # Step 4: Downtime tracker başlat
         try:
             from .downtime_tracker import downtime_tracker
+
             downtime_tracker.record_startup()
             dt_status = downtime_tracker.get_status()
-            results["steps"].append({
-                "step": "downtime_tracker",
-                "status": "OK",
-                "downtime_seconds": dt_status["downtime_seconds"],
-                "catchup_level": dt_status["catchup_level"],
-            })
+            results["steps"].append(
+                {
+                    "step": "downtime_tracker",
+                    "status": "OK",
+                    "downtime_seconds": dt_status["downtime_seconds"],
+                    "catchup_level": dt_status["catchup_level"],
+                }
+            )
         except Exception as e:
             results["steps"].append({"step": "downtime_tracker", "status": "FAILED", "error": str(e)})
 
         # Step 5: Connectivity monitor başlat (idempotent)
         try:
             from .connectivity import connectivity_monitor
+
             if not connectivity_monitor._running:
                 await connectivity_monitor.start()
             results["steps"].append({"step": "connectivity_monitor", "status": "OK"})

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 try:
     import nats
+
     HAS_NATS = True
 except ImportError:
     HAS_NATS = False
@@ -196,16 +197,15 @@ class NatsClient:
                 logger.warning("Caught Exception in publish_durable", exc_info=True)
 
             ack = await self._js.publish(subject, payload)
-            logger.debug("JetStream published", subject=subject, stream=stream,
-                        seq=ack.seq)
+            logger.debug("JetStream published", subject=subject, stream=stream, seq=ack.seq)
             return True
         except Exception as e:
             logger.debug("JetStream publish failed, falling back", error=str(e))
             return await self.publish(subject, data)
 
-    async def subscribe_durable(self, subject: str, durable_name: str,
-                                handler: Callable = None,
-                                stream: str = None) -> AsyncIterator[dict[str, Any]]:
+    async def subscribe_durable(
+        self, subject: str, durable_name: str, handler: Callable = None, stream: str = None
+    ) -> AsyncIterator[dict[str, Any]]:
         """JetStream ile kalıcı abone ol.
 
         Durable consumer: mesajlar kaybolmaz, restart sonrası kaldığı yerden devam.
@@ -241,11 +241,9 @@ class NatsClient:
                         logger.error("JetStream handler error", subject=subject, error=str(e))
                         await msg.nak()
 
-                psub = await self._js.subscribe(subject, durable=durable_name,
-                                                cb=_msg_handler)
+                psub = await self._js.subscribe(subject, durable=durable_name, cb=_msg_handler)
                 self._subscriptions[subject] = psub
-                logger.info("JetStream subscribed (callback)", subject=subject,
-                           durable=durable_name)
+                logger.info("JetStream subscribed (callback)", subject=subject, durable=durable_name)
             else:
                 # Iterator mode
                 psub = await self._js.subscribe(subject, durable=durable_name)
@@ -293,6 +291,7 @@ class NatsClient:
 # Konu (Subject) Tanımları
 # =====================================================
 
+
 class Subjects:
     """NATS konu tanımları — organize mesajlaşma.
 
@@ -300,6 +299,7 @@ class Subjects:
     Normal publish: anlık (fire-and-forget)
     Durable publish: disk'e yazılır, restart sonrası devam eder.
     """
+
     TICKS = "alpha.market.ticks"
     OHLCV = "alpha.market.ohlcv"
     SIGNALS = "alpha.signals.new"

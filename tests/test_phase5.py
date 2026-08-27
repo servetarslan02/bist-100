@@ -41,15 +41,19 @@ def test_monte_carlo():
 
     # 3. Probability consistency
     assert result.prob_minus_10pct <= result.prob_minus_5pct  # %10 kayıp < %5 kayıp
-    assert result.prob_plus_10pct <= result.prob_plus_5pct    # %10 kazanç < %5 kazanç
+    assert result.prob_plus_10pct <= result.prob_plus_5pct  # %10 kazanç < %5 kazanç
     passed += 1
     print("  ✓ Probability consistency")
 
     # 4. High volatility → wider distribution
     result_high_vol = monte_carlo_engine.simulate_price_paths(
-        ticker="TEST", current_price=100,
-        expected_return_annual=0.15, volatility_annual=0.50,
-        horizon_days=20, num_simulations=10000, seed=42,
+        ticker="TEST",
+        current_price=100,
+        expected_return_annual=0.15,
+        volatility_annual=0.50,
+        horizon_days=20,
+        num_simulations=10000,
+        seed=42,
     )
     spread_high = result_high_vol.p90 - result_high_vol.p10
     spread_low = result.p90 - result.p10
@@ -66,8 +70,10 @@ def test_monte_carlo():
 
     # 6. Dynamic scenario count
     count = monte_carlo_engine.compute_dynamic_scenario_count(
-        volatility=0.25, model_uncertainty=0.3,
-        portfolio_size=100000, compute_budget_ms=1000,
+        volatility=0.25,
+        model_uncertainty=0.3,
+        portfolio_size=100000,
+        compute_budget_ms=1000,
     )
     assert count >= 1000
     passed += 1
@@ -88,6 +94,7 @@ def test_probability_engine():
 
     # 1. Return distribution
     import numpy as np
+
     np.random.seed(42)
     returns = list(np.random.normal(0.05, 2.0, 252))  # 1 yıl günlük getiri
 
@@ -114,8 +121,8 @@ def test_probability_engine():
     # 3. Hit rate with errors
     predictions_wrong = [
         PredictionOutcome(0.8, False, "A", "2026-01-01", 5),  # Yanlış
-        PredictionOutcome(0.7, True, "B", "2026-01-01", 5),   # Doğru
-        PredictionOutcome(0.3, True, "C", "2026-01-01", 5),   # Yanlış
+        PredictionOutcome(0.7, True, "B", "2026-01-01", 5),  # Doğru
+        PredictionOutcome(0.3, True, "C", "2026-01-01", 5),  # Yanlış
     ]
     hit_rate2 = probability_engine.compute_hit_rate(predictions_wrong)
     assert hit_rate2 < 1.0
@@ -139,9 +146,12 @@ def test_probability_engine():
 
     # 5. Probability from features
     features = {
-        "roc_5d": 5.0, "momentum_20d": 10.0,
-        "volume_zscore": 3.0, "realized_vol_20d": 15.0,
-        "trend_slope_20d": 2.0, "rsi_14": 55.0,
+        "roc_5d": 5.0,
+        "momentum_20d": 10.0,
+        "volume_zscore": 3.0,
+        "realized_vol_20d": 15.0,
+        "trend_slope_20d": 2.0,
+        "rsi_14": 55.0,
     }
     prob = probability_engine.compute_probability_from_features(features)
     assert 0 <= prob["probability_positive"] <= 1
@@ -152,9 +162,12 @@ def test_probability_engine():
 
     # 6. Negative features
     features_neg = {
-        "roc_5d": -5.0, "momentum_20d": -10.0,
-        "volume_zscore": -1.0, "realized_vol_20d": 40.0,
-        "trend_slope_20d": -3.0, "rsi_14": 25.0,
+        "roc_5d": -5.0,
+        "momentum_20d": -10.0,
+        "volume_zscore": -1.0,
+        "realized_vol_20d": 40.0,
+        "trend_slope_20d": -3.0,
+        "rsi_14": 25.0,
     }
     prob_neg = probability_engine.compute_probability_from_features(features_neg)
     assert prob_neg["probability_positive"] < 0.5
@@ -194,6 +207,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback
+
             traceback.print_exc()
             total_failed += 1
 

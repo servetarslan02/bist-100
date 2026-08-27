@@ -33,8 +33,10 @@ class ReplayResult:
     def summary(self) -> dict[str, Any]:
         return {
             "period": f"{self.start_date} → {self.end_date}",
-            "total_ticks": self.total_ticks, "total_orders": self.total_orders,
-            "filled_orders": self.filled_orders, "total_pnl": round(self.total_pnl, 2),
+            "total_ticks": self.total_ticks,
+            "total_orders": self.total_orders,
+            "filled_orders": self.filled_orders,
+            "total_pnl": round(self.total_pnl, 2),
             "total_return_pct": round(self.total_return_pct, 2),
             "sharpe_ratio": round(self.sharpe_ratio, 2),
             "max_drawdown_pct": round(self.max_drawdown_pct, 2),
@@ -51,8 +53,9 @@ class StrategyReplay:
     def load_strategy(self, strategy):
         self._strategy = strategy
 
-    def run(self, start_date: str, end_date: str, tickers: list[str] | None = None,
-            initial_capital: float = 1_000_000.0) -> ReplayResult:
+    def run(
+        self, start_date: str, end_date: str, tickers: list[str] | None = None, initial_capital: float = 1_000_000.0
+    ) -> ReplayResult:
         """Replay'i çalıştır."""
         from replay.market_player import MarketPlayer
 
@@ -65,6 +68,7 @@ class StrategyReplay:
             return result
 
         from services.paper_trading.paper_execution import PaperExecutionEngine
+
         paper = PaperExecutionEngine()
 
         equity = initial_capital
@@ -83,18 +87,23 @@ class StrategyReplay:
 
                     order = paper.execute_signal(
                         date=tick.timestamp.strftime("%Y-%m-%d"),
-                        ticker=tick.ticker, side=signal["action"],
+                        ticker=tick.ticker,
+                        side=signal["action"],
                         quantity=signal.get("quantity", 100),
-                        signal_price=tick.close, market_price=tick.close,
+                        signal_price=tick.close,
+                        market_price=tick.close,
                     )
 
                     if order.get("status") in ("FILLED", "PARTIAL_FILL"):
                         result.filled_orders += 1
-                        result.trades.append({
-                            "timestamp": tick.timestamp.isoformat(),
-                            "ticker": tick.ticker, "side": signal["action"],
-                            "price": order.get("execution_price", tick.close),
-                        })
+                        result.trades.append(
+                            {
+                                "timestamp": tick.timestamp.isoformat(),
+                                "ticker": tick.ticker,
+                                "side": signal["action"],
+                                "price": order.get("execution_price", tick.close),
+                            }
+                        )
 
             if result.total_ticks % 100 == 0:
                 result.equity_curve.append(equity)
@@ -104,7 +113,7 @@ class StrategyReplay:
             if len(returns) > 1:
                 result.sharpe_ratio = float(returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
                 cumulative = (1 + returns).cumprod()
-                drawdown = (cumulative / cumulative.cummax() - 1)
+                drawdown = cumulative / cumulative.cummax() - 1
                 result.max_drawdown_pct = float(drawdown.min()) * 100
 
         result.total_pnl = equity - initial_capital

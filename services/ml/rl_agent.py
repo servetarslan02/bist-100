@@ -3,6 +3,7 @@
 Reinforcement Learning agent — PPO, A2C, DQN desteği,
 custom reward function, multi-action space, proper training.
 """
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class RLConfig:
     """RL Agent konfigürasyonu."""
+
     algorithm: str = "PPO"  # PPO, A2C, DQN
     total_timesteps: int = 100_000
     learning_rate: float = 3e-4
@@ -79,6 +81,7 @@ class BISTTradingEnv:
         """Observation space oluştur."""
         try:
             from gymnasium import spaces
+
             return spaces.Box(low=-np.inf, high=np.inf, shape=(self.features.shape[1] + 2,), dtype=np.float32)
         except ImportError:
             return None
@@ -87,6 +90,7 @@ class BISTTradingEnv:
         """Action space oluştur."""
         try:
             from gymnasium import spaces
+
             if self.action_space_type == "discrete":
                 return spaces.Discrete(3)  # BUY, HOLD, SELL
             else:
@@ -148,10 +152,12 @@ class BISTTradingEnv:
         if self._current_step >= len(self.features):
             return np.zeros(self.features.shape[1] + 2, dtype=np.float32)
 
-        obs = np.concatenate([
-            self.features[self._current_step],
-            [self._position, self._capital / self.initial_capital],
-        ]).astype(np.float32)
+        obs = np.concatenate(
+            [
+                self.features[self._current_step],
+                [self._position, self._capital / self.initial_capital],
+            ]
+        ).astype(np.float32)
         return obs
 
     def _compute_reward(self) -> float:
@@ -219,7 +225,8 @@ def train_rl_agent(
     # Model seçimi
     if config.algorithm == "PPO":
         model = PPO(
-            "MlpPolicy", vec_env,
+            "MlpPolicy",
+            vec_env,
             learning_rate=config.learning_rate,
             gamma=config.gamma,
             gae_lambda=config.gae_lambda,
@@ -235,7 +242,8 @@ def train_rl_agent(
         )
     elif config.algorithm == "A2C":
         model = A2C(
-            "MlpPolicy", vec_env,
+            "MlpPolicy",
+            vec_env,
             learning_rate=config.learning_rate,
             gamma=config.gamma,
             gae_lambda=config.gae_lambda,
@@ -248,7 +256,8 @@ def train_rl_agent(
         )
     elif config.algorithm == "DQN":
         model = DQN(
-            "MlpPolicy", vec_env,
+            "MlpPolicy",
+            vec_env,
             learning_rate=config.learning_rate,
             gamma=config.gamma,
             batch_size=config.batch_size,

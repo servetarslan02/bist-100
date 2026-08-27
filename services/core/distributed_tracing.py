@@ -31,23 +31,21 @@ try:
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
     _OTEL_AVAILABLE = True
 except ImportError:
     _OTEL_AVAILABLE = False
     otel_trace = None
 
 # Context variable for correlation ID propagation
-correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "correlation_id", default=None
-)
-span_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "span_id", default=None
-)
+correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("correlation_id", default=None)
+span_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("span_id", default=None)
 
 
 @dataclass
 class Span:
     """Tek bir tracing span'i."""
+
     span_id: str
     parent_id: str | None
     correlation_id: str
@@ -70,11 +68,13 @@ class Span:
         self.status = status
 
     def add_event(self, name: str, attributes: dict[str, Any] | None = None):
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {},
-        })
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.time(),
+                "attributes": attributes or {},
+            }
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +93,7 @@ class Span:
 @dataclass
 class Trace:
     """Bir request'in tam trace'i."""
+
     correlation_id: str
     spans: list[Span] = field(default_factory=list)
     start_time: float = field(default_factory=time.monotonic)
@@ -172,9 +173,7 @@ class DistributedTracer:
         # Root span
         self.start_span(operation, correlation_id=corr_id)
 
-        logger.debug("Trace started",
-                    correlation_id=corr_id,
-                    operation=operation)
+        logger.debug("Trace started", correlation_id=corr_id, operation=operation)
 
         return corr_id
 
@@ -233,10 +232,12 @@ class DistributedTracer:
 
         # Slow span warning
         if span.duration_ms > self._slow_threshold_ms:
-            logger.warning("Slow span detected",
-                          operation=span.operation,
-                          duration_ms=round(span.duration_ms, 2),
-                          threshold_ms=self._slow_threshold_ms)
+            logger.warning(
+                "Slow span detected",
+                operation=span.operation,
+                duration_ms=round(span.duration_ms, 2),
+                threshold_ms=self._slow_threshold_ms,
+            )
 
     def finish_trace(self, correlation_id: str | None = None):
         """Trace'i bitir."""
@@ -246,10 +247,9 @@ class DistributedTracer:
 
         # Cleanup old traces
         if len(self._traces) > self._max_traces:
-            oldest = sorted(
-                self._traces.keys(),
-                key=lambda k: self._traces[k].start_time
-            )[:len(self._traces) - self._max_traces]
+            oldest = sorted(self._traces.keys(), key=lambda k: self._traces[k].start_time)[
+                : len(self._traces) - self._max_traces
+            ]
             for k in oldest:
                 del self._traces[k]
 
@@ -265,10 +265,7 @@ class DistributedTracer:
     def get_slow_traces(self, threshold_ms: float | None = None) -> list[dict[str, Any]]:
         """Yavaş trace'leri listele."""
         threshold = threshold_ms or self._slow_threshold_ms
-        slow = [
-            trace for trace in self._traces.values()
-            if trace.total_duration_ms > threshold
-        ]
+        slow = [trace for trace in self._traces.values() if trace.total_duration_ms > threshold]
         return [t.to_dict() for t in sorted(slow, key=lambda t: t.total_duration_ms, reverse=True)[:20]]
 
     def get_stats(self) -> dict[str, Any]:
@@ -316,8 +313,10 @@ distributed_tracer = DistributedTracer()
 
 def trace(operation: str, **kwargs):
     """Tracing decorator."""
+
     def decorator(func):
         if asyncio.iscoroutinefunction(func):
+
             async def async_wrapper(*args, **kw):
                 with SpanContextManager(distributed_tracer, operation, **kwargs) as span:
                     try:
@@ -326,8 +325,10 @@ def trace(operation: str, **kwargs):
                     except Exception as e:
                         span.add_event("error", {"error": str(e)})
                         raise
+
             return async_wrapper
         else:
+
             def sync_wrapper(*args, **kw):
                 with SpanContextManager(distributed_tracer, operation, **kwargs) as span:
                     try:
@@ -336,5 +337,7 @@ def trace(operation: str, **kwargs):
                     except Exception as e:
                         span.add_event("error", {"error": str(e)})
                         raise
+
             return sync_wrapper
+
     return decorator

@@ -23,34 +23,36 @@ logger = structlog.get_logger()
 @dataclass
 class VIOPContract:
     """VIOP sözleşmesi."""
-    symbol: str              # Sözleşme kodu (XU030, DOL, GAU)
-    name: str                # Sözleşme adı
-    underlying: str          # Dayanak varlık
-    contract_size: float     # Sözleşme büyüklüğü
+
+    symbol: str  # Sözleşme kodu (XU030, DOL, GAU)
+    name: str  # Sözleşme adı
+    underlying: str  # Dayanak varlık
+    contract_size: float  # Sözleşme büyüklüğü
     contract_size_unit: str  # Birim (TL, USD, EUR, gram, ton)
-    tick_size: float         # Minimum fiyat adımı
-    tick_value: float        # Tick değeri (TL)
-    margin_rate: float       # Teminat oranı (%)
-    settlement: str          # Takas yöntemi (nakdi/fiziki)
+    tick_size: float  # Minimum fiyat adımı
+    tick_value: float  # Tick değeri (TL)
+    margin_rate: float  # Teminat oranı (%)
+    settlement: str  # Takas yöntemi (nakdi/fiziki)
     expiry_months: list[int]  # Vade ayları
     exchange: str = "BIST"
-    category: str = ""       # endeks, döviz, emtia
+    category: str = ""  # endeks, döviz, emtia
 
 
 @dataclass
 class OptionContract:
     """Opsiyon sözleşmesi."""
-    symbol: str              # Opsiyon kodu
-    underlying: str          # Dayanak varlık
-    option_type: str         # call / put
-    strike: float            # Kullanım fiyatı
-    expiry: date             # Vade tarihi
-    premium: float = 0.0     # Primi
-    bid: float = 0.0         # Alış
-    ask: float = 0.0         # Satış
-    open_interest: int = 0   # Açık pozisyon
-    volume: int = 0          # Hacim
-    implied_vol: float = 0.0 # Implied volatility
+
+    symbol: str  # Opsiyon kodu
+    underlying: str  # Dayanak varlık
+    option_type: str  # call / put
+    strike: float  # Kullanım fiyatı
+    expiry: date  # Vade tarihi
+    premium: float = 0.0  # Primi
+    bid: float = 0.0  # Alış
+    ask: float = 0.0  # Satış
+    open_interest: int = 0  # Açık pozisyon
+    volume: int = 0  # Hacim
+    implied_vol: float = 0.0  # Implied volatility
 
 
 class VIOPContractCatalog:

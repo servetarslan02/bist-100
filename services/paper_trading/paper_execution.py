@@ -28,12 +28,12 @@ class PaperExecutionEngine:
 
     def __init__(
         self,
-        commission_rate: float = 0.0003,      # %0.03 broker
+        commission_rate: float = 0.0003,  # %0.03 broker
         exchange_fee_rate: float = 0.000056,  # %0.0056 BIST
-        bsmv_rate: float = 0.05,              # BSMV
+        bsmv_rate: float = 0.05,  # BSMV
         min_commission: float = 1.0,
-        slippage_base_pct: float = 0.05,      # %0.05 base
-        slippage_max_pct: float = 0.5,        # %0.5 max
+        slippage_base_pct: float = 0.05,  # %0.05 base
+        slippage_max_pct: float = 0.5,  # %0.5 max
         microstructure: MarketMicrostructureEngine | None = None,
     ):
         self.commission_rate = commission_rate
@@ -202,9 +202,14 @@ class PaperExecutionEngine:
 
         if walk_res["is_partial"]:
             order["status"] = "PARTIAL_FILL"
-            logger.info("Order partially filled due to synthetic liquidity cap",
-                        ticker=ticker, requested=quantity, filled=filled_quantity,
-                        remaining=walk_res["remaining_quantity"], scenario=scenario_enum.value)
+            logger.info(
+                "Order partially filled due to synthetic liquidity cap",
+                ticker=ticker,
+                requested=quantity,
+                filled=filled_quantity,
+                remaining=walk_res["remaining_quantity"],
+                scenario=scenario_enum.value,
+            )
 
         # === COMMISSION ===
         amount = filled_quantity * fill_price
@@ -221,18 +226,24 @@ class PaperExecutionEngine:
         # Turnover guncelle
         self._daily_turnover_value += amount
 
-        logger.info("Order executed",
-                   order_id=order_id, ticker=ticker, side=side,
-                   qty=filled_quantity, signal_price=signal_price,
-                   execution_price=order["execution_price"],
-                   commission=order["commission"],
-                   slippage=order["slippage_pct"],
-                   status=order["status"])
+        logger.info(
+            "Order executed",
+            order_id=order_id,
+            ticker=ticker,
+            side=side,
+            qty=filled_quantity,
+            signal_price=signal_price,
+            execution_price=order["execution_price"],
+            commission=order["commission"],
+            slippage=order["slippage_pct"],
+            status=order["status"],
+        )
 
         # ORDER_FILLED event publish
         try:
             from services.core.event_bus import publish_event
             from services.core.event_schema import CanonicalEvent, EventType
+
             order_event = CanonicalEvent(
                 event_type=EventType.ORDER_FILLED,
                 payload={
@@ -301,10 +312,7 @@ class PaperExecutionEngine:
         """Islem maliyet ozeti."""
         filled = [o for o in orders if o.get("status") in {"FILLED", "PARTIAL_FILL"}]
         total_commission = sum(o.get("commission", 0) for o in filled)
-        total_slippage_cost = sum(
-            o["quantity"] * o["signal_price"] * (o.get("slippage_pct", 0) / 100)
-            for o in filled
-        )
+        total_slippage_cost = sum(o["quantity"] * o["signal_price"] * (o.get("slippage_pct", 0) / 100) for o in filled)
         return {
             "total_commission": round(total_commission, 2),
             "total_slippage_cost": round(total_slippage_cost, 2),

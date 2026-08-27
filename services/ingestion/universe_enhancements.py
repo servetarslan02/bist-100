@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class InstrumentInfo:
     """Enstrüman bilgisi."""
+
     ticker: str
     name: str
     sector: str
@@ -68,7 +69,9 @@ class UniverseEnhancements:
 
         return max(0, min(100, score))
 
-    def classify_listing_status(self, ticker: str, last_trade_date: str | None = None, has_suspension: bool = False) -> str:
+    def classify_listing_status(
+        self, ticker: str, last_trade_date: str | None = None, has_suspension: bool = False
+    ) -> str:
         """Listing status sınıflandır."""
         if has_suspension:
             return "SUSPENDED"

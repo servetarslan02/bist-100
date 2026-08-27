@@ -85,8 +85,9 @@ class EventScanner:
                         "surprise": surprise,
                         "timestamp": datetime.now(UTC).isoformat(),
                     }
-                logger.info("Macro event → rescan", indicator=indicator,
-                           surprise=surprise, affected_count=len(affected))
+                logger.info(
+                    "Macro event → rescan", indicator=indicator, surprise=surprise, affected_count=len(affected)
+                )
 
         elif event_type == "market_state.changed":
             # Rejim değişimi → tüm hisseleri yeniden değerlendir

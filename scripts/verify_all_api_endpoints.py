@@ -57,9 +57,9 @@ def check(name: str, status: str, detail: str = ""):
 
 def section(title: str):
     """Bölüm başlığı."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {title}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 # =====================================================
@@ -114,100 +114,181 @@ section("2. ENDPOINT TANIMLAMA TESTLERİ")
 
 EXPECTED_ENDPOINTS = {
     "market": [
-        ("GET", "/state"), ("GET", "/instruments"), ("GET", "/instruments/{ticker}"),
-        ("GET", "/instruments/{ticker}/ohlcv"), ("GET", "/instruments/{ticker}/live_intel"),
-        ("GET", "/instruments/{ticker}/full"), ("GET", "/instruments/{ticker}/features"),
-        ("GET", "/sectors"), ("GET", "/calendar"), ("GET", "/events"),
-        ("GET", "/radar"), ("GET", "/regime"), ("GET", "/heatmap"),
+        ("GET", "/state"),
+        ("GET", "/instruments"),
+        ("GET", "/instruments/{ticker}"),
+        ("GET", "/instruments/{ticker}/ohlcv"),
+        ("GET", "/instruments/{ticker}/live_intel"),
+        ("GET", "/instruments/{ticker}/full"),
+        ("GET", "/instruments/{ticker}/features"),
+        ("GET", "/sectors"),
+        ("GET", "/calendar"),
+        ("GET", "/events"),
+        ("GET", "/radar"),
+        ("GET", "/regime"),
+        ("GET", "/heatmap"),
     ],
     "portfolio": [
-        ("GET", ""), ("GET", "/"), ("GET", "/summary"), ("GET", "/state"),
-        ("GET", "/positions"), ("GET", "/trades"), ("GET", "/pnl"),
-        ("GET", "/equity-curve"), ("GET", "/risk-metrics"), ("GET", "/drawdown"),
-        ("GET", "/metrics"), ("GET", "/accounting"), ("POST", "/reset"),
-        ("GET", "/cash-ledger"), ("GET", "/orders"),
+        ("GET", ""),
+        ("GET", "/"),
+        ("GET", "/summary"),
+        ("GET", "/state"),
+        ("GET", "/positions"),
+        ("GET", "/trades"),
+        ("GET", "/pnl"),
+        ("GET", "/equity-curve"),
+        ("GET", "/risk-metrics"),
+        ("GET", "/drawdown"),
+        ("GET", "/metrics"),
+        ("GET", "/accounting"),
+        ("POST", "/reset"),
+        ("GET", "/cash-ledger"),
+        ("GET", "/orders"),
     ],
     "risk": [
-        ("GET", "/overview"), ("GET", "/summary"), ("GET", "/dashboard"),
-        ("GET", "/var"), ("GET", "/portfolio"), ("GET", "/limits"),
-        ("GET", "/drawdown"), ("GET", "/stress-test/scenarios"),
-        ("POST", "/stress-test/run"), ("GET", "/tail-hedge"),
-        ("POST", "/tail-hedge/analyze"), ("GET", "/risk-parity"),
-        ("POST", "/risk-parity/optimize"), ("GET", "/monitoring"),
-        ("GET", "/alerts"), ("GET", "/calibration"), ("POST", "/check"),
+        ("GET", "/overview"),
+        ("GET", "/summary"),
+        ("GET", "/dashboard"),
+        ("GET", "/var"),
+        ("GET", "/portfolio"),
+        ("GET", "/limits"),
+        ("GET", "/drawdown"),
+        ("GET", "/stress-test/scenarios"),
+        ("POST", "/stress-test/run"),
+        ("GET", "/tail-hedge"),
+        ("POST", "/tail-hedge/analyze"),
+        ("GET", "/risk-parity"),
+        ("POST", "/risk-parity/optimize"),
+        ("GET", "/monitoring"),
+        ("GET", "/alerts"),
+        ("GET", "/calibration"),
+        ("POST", "/check"),
         ("GET", "/compliance"),
     ],
     "intelligence": [
-        ("GET", "/regime"), ("GET", "/decisions"),
-        ("GET", "/simulation/{ticker}"), ("GET", "/analysis/{ticker}"),
-        ("POST", "/ask_gemini"), ("GET", "/gemini_report/{ticker}"),
+        ("GET", "/regime"),
+        ("GET", "/decisions"),
+        ("GET", "/simulation/{ticker}"),
+        ("GET", "/analysis/{ticker}"),
+        ("POST", "/ask_gemini"),
+        ("GET", "/gemini_report/{ticker}"),
     ],
     "decisions": [
-        ("GET", "/list"), ("GET", "/detail/{decision_id}"),
-        ("POST", "/create"), ("GET", "/audit/{decision_id}"),
-        ("GET", "/pending-opportunities"), ("GET", "/plan"),
+        ("GET", "/list"),
+        ("GET", "/detail/{decision_id}"),
+        ("POST", "/create"),
+        ("GET", "/audit/{decision_id}"),
+        ("GET", "/pending-opportunities"),
+        ("GET", "/plan"),
     ],
     "backtest": [
-        ("POST", "/run"), ("GET", "/results/{backtest_id}"),
-        ("GET", "/list"), ("POST", "/walk-forward"),
-        ("GET", "/deflated-sharpe"), ("GET", "/history_30y"),
-        ("GET", "/transaction-costs"), ("GET", "/trades/{backtest_id}"),
+        ("POST", "/run"),
+        ("GET", "/results/{backtest_id}"),
+        ("GET", "/list"),
+        ("POST", "/walk-forward"),
+        ("GET", "/deflated-sharpe"),
+        ("GET", "/history_30y"),
+        ("GET", "/transaction-costs"),
+        ("GET", "/trades/{backtest_id}"),
         ("GET", "/equity-curve/{backtest_id}"),
     ],
     "learning": [
-        ("GET", "/status"), ("GET", "/performance-matrix"),
-        ("GET", "/metrics"), ("GET", "/report"), ("POST", "/cycle"),
-        ("POST", "/record_prediction"), ("POST", "/record_outcome"),
-        ("GET", "/calibration"), ("GET", "/drift"),
+        ("GET", "/status"),
+        ("GET", "/performance-matrix"),
+        ("GET", "/metrics"),
+        ("GET", "/report"),
+        ("POST", "/cycle"),
+        ("POST", "/record_prediction"),
+        ("POST", "/record_outcome"),
+        ("GET", "/calibration"),
+        ("GET", "/drift"),
         ("GET", "/champion-challenger"),
     ],
     "models": [
-        ("GET", ""), ("GET", "/"), ("GET", "/status"),
-        ("GET", "/list"), ("GET", "/registry"), ("GET", "/performance"),
-        ("GET", "/champion"), ("POST", "/retrain"),
+        ("GET", ""),
+        ("GET", "/"),
+        ("GET", "/status"),
+        ("GET", "/list"),
+        ("GET", "/registry"),
+        ("GET", "/performance"),
+        ("GET", "/champion"),
+        ("POST", "/retrain"),
     ],
     "agents": [
-        ("GET", "/list"), ("GET", "/status"), ("POST", "/run"),
+        ("GET", "/list"),
+        ("GET", "/status"),
+        ("POST", "/run"),
     ],
     "scanner": [
-        ("GET", "/signals"), ("GET", "/opportunities"), ("GET", "/status"),
-        ("GET", "/dashboard"), ("GET", "/results"), ("GET", "/tiers"),
-        ("GET", "/history/{ticker}"), ("GET", "/performance"),
-        ("GET", "/alerts"), ("GET", "/filters"), ("GET", "/dedup"),
-        ("GET", "/scheduler"), ("POST", "/trigger"), ("POST", "/event"),
+        ("GET", "/signals"),
+        ("GET", "/opportunities"),
+        ("GET", "/status"),
+        ("GET", "/dashboard"),
+        ("GET", "/results"),
+        ("GET", "/tiers"),
+        ("GET", "/history/{ticker}"),
+        ("GET", "/performance"),
+        ("GET", "/alerts"),
+        ("GET", "/filters"),
+        ("GET", "/dedup"),
+        ("GET", "/scheduler"),
+        ("POST", "/trigger"),
+        ("POST", "/event"),
     ],
     "macro": [
-        ("GET", "/overview"), ("GET", "/world"), ("GET", "/state"),
-        ("GET", "/indicators"), ("GET", "/impact/{ticker}"),
+        ("GET", "/overview"),
+        ("GET", "/world"),
+        ("GET", "/state"),
+        ("GET", "/indicators"),
+        ("GET", "/impact/{ticker}"),
         ("GET", "/sensitivity/{sector}"),
     ],
     "factors": [
-        ("GET", "/scores/{ticker}"), ("GET", "/exposure/{ticker}"),
+        ("GET", "/scores/{ticker}"),
+        ("GET", "/exposure/{ticker}"),
         ("GET", "/portfolio-exposure"),
     ],
     "alternative": [
-        ("GET", "/sources"), ("GET", "/sentiment/{ticker}"),
-        ("GET", "/news"), ("GET", "/macro"),
+        ("GET", "/sources"),
+        ("GET", "/sentiment/{ticker}"),
+        ("GET", "/news"),
+        ("GET", "/macro"),
     ],
     "viop": [
-        ("GET", "/options"), ("POST", "/options/price"),
-        ("POST", "/options/implied-vol"), ("POST", "/greeks"),
-        ("GET", "/strategies"), ("POST", "/strategies/analyze"),
-        ("POST", "/hedge"), ("POST", "/hedge/gamma-scalp"),
-        ("POST", "/margin"), ("POST", "/arbitrage"),
-        ("POST", "/parity"), ("POST", "/risk"),
-        ("GET", "/contracts"), ("GET", "/contracts/{symbol}"),
+        ("GET", "/options"),
+        ("POST", "/options/price"),
+        ("POST", "/options/implied-vol"),
+        ("POST", "/greeks"),
+        ("GET", "/strategies"),
+        ("POST", "/strategies/analyze"),
+        ("POST", "/hedge"),
+        ("POST", "/hedge/gamma-scalp"),
+        ("POST", "/margin"),
+        ("POST", "/arbitrage"),
+        ("POST", "/parity"),
+        ("POST", "/risk"),
+        ("GET", "/contracts"),
+        ("GET", "/contracts/{symbol}"),
     ],
     "event_study": [
-        ("GET", "/events"), ("GET", "/calendar"), ("GET", "/analyze/{ticker}"),
+        ("GET", "/events"),
+        ("GET", "/calendar"),
+        ("GET", "/analyze/{ticker}"),
     ],
     "system": [
-        ("GET", "/status"), ("GET", "/health"), ("GET", "/databases"),
-        ("GET", "/alerts"), ("POST", "/optimize_storage"),
+        ("GET", "/status"),
+        ("GET", "/health"),
+        ("GET", "/databases"),
+        ("GET", "/alerts"),
+        ("POST", "/optimize_storage"),
     ],
     "sse": [
-        ("GET", "/ticks"), ("GET", "/signals"), ("GET", "/portfolio"),
-        ("GET", "/alerts"), ("GET", "/regime"), ("GET", "/radar"),
+        ("GET", "/ticks"),
+        ("GET", "/signals"),
+        ("GET", "/portfolio"),
+        ("GET", "/alerts"),
+        ("GET", "/regime"),
+        ("GET", "/radar"),
     ],
 }
 
@@ -233,9 +314,9 @@ for module_name, endpoints in EXPECTED_ENDPOINTS.items():
                 # Bazı varyasyonları dene
                 found = False
                 for reg_method, reg_path in registered_routes:
-                    if reg_method == method and (reg_path == path or
-                        reg_path == f"/{module_name}{path}" or
-                        reg_path.endswith(path)):
+                    if reg_method == method and (
+                        reg_path == path or reg_path == f"/{module_name}{path}" or reg_path.endswith(path)
+                    ):
                         found = True
                         break
                 if not found:
@@ -244,8 +325,11 @@ for module_name, endpoints in EXPECTED_ENDPOINTS.items():
         if not missing:
             check(f"Endpoints: {module_name}", "PASS", f"{len(endpoints)} endpoint tanımlı")
         else:
-            check(f"Endpoints: {module_name}", "WARN",
-                  f"{len(endpoints)-len(missing)}/{len(endpoints)} tanımlı, eksik: {', '.join(missing[:3])}")
+            check(
+                f"Endpoints: {module_name}",
+                "WARN",
+                f"{len(endpoints) - len(missing)}/{len(endpoints)} tanımlı, eksik: {', '.join(missing[:3])}",
+            )
 
     except Exception as e:
         check(f"Endpoints: {module_name}", "FAIL", str(e))
@@ -311,6 +395,7 @@ try:
     import asyncio
 
     from services.core.database import check_db_health
+
     health = asyncio.run(check_db_health())
     for db_name, status in health.items():
         if status == "healthy":
@@ -327,6 +412,7 @@ try:
     import asyncio
 
     from services.core.database import get_redis
+
     redis = asyncio.run(get_redis())
     if redis:
         check("Database: Redis", "PASS", "Bağlantı başarılı")
@@ -342,6 +428,7 @@ try:
     import asyncio
 
     from services.core.database import get_clickhouse
+
     ch = asyncio.run(get_clickhouse())
     if ch:
         check("Database: ClickHouse", "PASS", "Bağlantı başarılı")
@@ -355,6 +442,7 @@ except Exception as e:
 # 4.4 NATS
 try:
     from services.nats.client import nats_client
+
     if hasattr(nats_client, "is_connected"):
         check("Database: NATS", "PASS", "NATS client modülü mevcut")
     else:
@@ -408,7 +496,8 @@ for file_path, name in CONFIG_FILES:
     if full_path.exists():
         try:
             import orjson
-            with open(full_path, 'rb') as f:
+
+            with open(full_path, "rb") as f:
                 data = orjson.loads(f.read())
             check(f"Config: {name}", "PASS", f"Geçerli JSON ({len(data)} key)")
         except orjson.JSONDecodeError as e:
@@ -427,18 +516,40 @@ section("7. DOCKER-COMPOSE SERVİS TUTARLILIĞI")
 
 try:
     import yaml
+
     compose_path = PROJECT_ROOT / "docker-compose.yml"
     with open(compose_path) as f:
         compose = yaml.safe_load(f)
 
     services = compose.get("services", {})
     expected_services = [
-        "traefik", "postgres", "postgres-replica", "clickhouse", "clickhouse-2",
-        "zookeeper", "redis", "redis-sentinel-1", "redis-sentinel-2", "redis-sentinel-3",
-        "nats", "api", "ingestion", "feature-engine", "market-state",
-        "intelligence", "simulation", "risk", "portfolio", "learning",
-        "celery-worker", "dashboard", "postgres-exporter", "redis-exporter",
-        "prometheus", "grafana", "mlflow",
+        "traefik",
+        "postgres",
+        "postgres-replica",
+        "clickhouse",
+        "clickhouse-2",
+        "zookeeper",
+        "redis",
+        "redis-sentinel-1",
+        "redis-sentinel-2",
+        "redis-sentinel-3",
+        "nats",
+        "api",
+        "ingestion",
+        "feature-engine",
+        "market-state",
+        "intelligence",
+        "simulation",
+        "risk",
+        "portfolio",
+        "learning",
+        "celery-worker",
+        "dashboard",
+        "postgres-exporter",
+        "redis-exporter",
+        "prometheus",
+        "grafana",
+        "mlflow",
     ]
 
     for svc_name in expected_services:
@@ -489,6 +600,7 @@ else:
 # Protobuf import testi
 try:
     from services.grpc.generated import market_pb2
+
     tick = market_pb2.MarketTick(ticker="THYAO", price=100.0, timestamp=1234567890)
     serialized = tick.SerializeToString()
     tick2 = market_pb2.MarketTick()
@@ -545,6 +657,7 @@ for filename, name in cert_files.items():
 # mTLS modülü testi
 try:
     from services.core.mtls import MTLSConfig, MTLSContext
+
     config = MTLSConfig()
     ctx = MTLSContext(config)
     status = ctx.get_status()
@@ -585,8 +698,9 @@ try:
     check("BinaryWS: OHLCV encode/decode", "PASS", f"{len(ohlcv_data)} bytes")
 
     # Portfolio encode/decode
-    pf_data = ProtobufMessage.encode_portfolio(1000000, 200000, 5000, 0.5,
-                                                [{"ticker": "THYAO", "quantity": 100, "avg_price": 250}])
+    pf_data = ProtobufMessage.encode_portfolio(
+        1000000, 200000, 5000, 0.5, [{"ticker": "THYAO", "quantity": 100, "avg_price": 250}]
+    )
     decoded = ProtobufMessage.decode(pf_data)
     assert decoded["type"] == "portfolio"
     assert decoded["data"]["total_value"] == 1000000
@@ -637,12 +751,12 @@ if warning_checks > 0:
         if result["status"] == "WARN":
             print(f"     • {name}: {result['detail']}")
 
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 if failed_checks == 0:
     print("  🎉 TÜM KRİTİK KONTROLLER BAŞARILI!")
 else:
     print(f"  ⚠️  {failed_checks} KRİTİK KONTROL BAŞARISIZ — düzeltme gerekli")
-print(f"{'='*60}\n")
+print(f"{'=' * 60}\n")
 
 # Exit code
 sys.exit(0 if failed_checks == 0 else 1)

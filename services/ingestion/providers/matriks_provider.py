@@ -25,10 +25,15 @@ class MatriksProvider:
     BASE_URL = "https://www.matriks.com"
 
     def __init__(self):
-        self._client = get_client("matriks", timeout=15.0, max_retries=3, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept": "application/json, text/html, */*",
-        })
+        self._client = get_client(
+            "matriks",
+            timeout=15.0,
+            max_retries=3,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept": "application/json, text/html, */*",
+            },
+        )
 
     async def fetch_stock_price(self, ticker: str) -> dict[str, Any] | None:
         """Tek hisse fiyatı — 15dk gecikmeli (async)."""

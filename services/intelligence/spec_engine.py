@@ -30,6 +30,7 @@ def _safe(val) -> float:
 @dataclass
 class SPECConfig:
     """SPEC skor hesaplama ağırlıkları ve eşikleri."""
+
     w_anomaly: float = 0.20
     w_evidence: float = 0.25
     w_regime: float = 0.15
@@ -129,14 +130,21 @@ class SPECEngine:
         }
 
         return SPECResult(
-            ticker=ticker, timestamp=datetime.now(UTC),
-            spec_score=round(spec_score_100, 2), category=category,
-            anomaly_score=round(anomaly, 4), evidence_consensus=round(evidence_consensus, 4),
-            regime_compatibility=round(regime_compat, 4), expected_value=round(expected_value, 4),
-            risk_asymmetry=round(risk_asymmetry, 4), historical_similarity=round(historical_sim, 4),
+            ticker=ticker,
+            timestamp=datetime.now(UTC),
+            spec_score=round(spec_score_100, 2),
+            category=category,
+            anomaly_score=round(anomaly, 4),
+            evidence_consensus=round(evidence_consensus, 4),
+            regime_compatibility=round(regime_compat, 4),
+            expected_value=round(expected_value, 4),
+            risk_asymmetry=round(risk_asymmetry, 4),
+            historical_similarity=round(historical_sim, 4),
             penalty_factors=round(penalty, 4),
-            evidence_list=evidence_list, regime_fit=regime_fit,
-            penalty_details=penalty_details, edge_decomposition=edge,
+            evidence_list=evidence_list,
+            regime_fit=regime_fit,
+            penalty_details=penalty_details,
+            edge_decomposition=edge,
         )
 
     def _compute_anomaly(self, state: dict[str, Any]) -> float:
@@ -144,9 +152,9 @@ class SPECEngine:
         price_z = abs(_safe(state.get("price_change_1d_zscore", 0)))
         volat_z = abs(_safe(state.get("volatility_zscore", 0)))
         raw = (
-            self.config.anomaly_volume_weight * vol_z ** 2
-            + self.config.anomaly_price_weight * price_z ** 2
-            + self.config.anomaly_volatility_weight * volat_z ** 2
+            self.config.anomaly_volume_weight * vol_z**2
+            + self.config.anomaly_price_weight * price_z**2
+            + self.config.anomaly_volatility_weight * volat_z**2
         )
         return min(raw / 4.0, 1.0)
 
@@ -169,41 +177,83 @@ class SPECEngine:
         flow_score = _safe(state.get("flow_score", 0))
 
         # Her evidence için reliability/confidence/freshness ağırlığı
-        evidence.append({
-            "name": "volume_anomaly", "active": vol_z > 2.0,
-            "value": vol_z, "threshold": 2.0,
-            "reliability": 0.95, "confidence": min(vol_z / 4.0, 1.0), "freshness": 1.0,
-        })
-        evidence.append({
-            "name": "price_breakout", "active": bb_pos > 0.95 or near_high == 1,
-            "value": bb_pos, "threshold": 0.95,
-            "reliability": 0.9, "confidence": min(bb_pos, 1.0), "freshness": 1.0,
-        })
-        evidence.append({
-            "name": "sector_strength", "active": sector_str > 1.5,
-            "value": sector_str, "threshold": 1.5,
-            "reliability": 0.85, "confidence": min(sector_str / 3.0, 1.0), "freshness": 0.9,
-        })
-        evidence.append({
-            "name": "kap_positive", "active": kap_sent > 0.3,
-            "value": kap_sent, "threshold": 0.3,
-            "reliability": 0.95, "confidence": abs(kap_sent), "freshness": 1.0,
-        })
-        evidence.append({
-            "name": "momentum_build", "active": roc_5d > 2.0 and accel > 0,
-            "value": roc_5d, "threshold": 2.0,
-            "reliability": 0.8, "confidence": min(roc_5d / 5.0, 1.0), "freshness": 0.95,
-        })
-        evidence.append({
-            "name": "low_vol_expansion", "active": vol_regime == "LOW" and vol_z > 1.5,
-            "value": vol_z if vol_regime == "LOW" else 0, "threshold": 1.5,
-            "reliability": 0.75, "confidence": 0.7, "freshness": 0.85,
-        })
-        evidence.append({
-            "name": "institutional_flow", "active": flow_score > 0.7,
-            "value": flow_score, "threshold": 0.7,
-            "reliability": 0.7, "confidence": flow_score, "freshness": 0.8,
-        })
+        evidence.append(
+            {
+                "name": "volume_anomaly",
+                "active": vol_z > 2.0,
+                "value": vol_z,
+                "threshold": 2.0,
+                "reliability": 0.95,
+                "confidence": min(vol_z / 4.0, 1.0),
+                "freshness": 1.0,
+            }
+        )
+        evidence.append(
+            {
+                "name": "price_breakout",
+                "active": bb_pos > 0.95 or near_high == 1,
+                "value": bb_pos,
+                "threshold": 0.95,
+                "reliability": 0.9,
+                "confidence": min(bb_pos, 1.0),
+                "freshness": 1.0,
+            }
+        )
+        evidence.append(
+            {
+                "name": "sector_strength",
+                "active": sector_str > 1.5,
+                "value": sector_str,
+                "threshold": 1.5,
+                "reliability": 0.85,
+                "confidence": min(sector_str / 3.0, 1.0),
+                "freshness": 0.9,
+            }
+        )
+        evidence.append(
+            {
+                "name": "kap_positive",
+                "active": kap_sent > 0.3,
+                "value": kap_sent,
+                "threshold": 0.3,
+                "reliability": 0.95,
+                "confidence": abs(kap_sent),
+                "freshness": 1.0,
+            }
+        )
+        evidence.append(
+            {
+                "name": "momentum_build",
+                "active": roc_5d > 2.0 and accel > 0,
+                "value": roc_5d,
+                "threshold": 2.0,
+                "reliability": 0.8,
+                "confidence": min(roc_5d / 5.0, 1.0),
+                "freshness": 0.95,
+            }
+        )
+        evidence.append(
+            {
+                "name": "low_vol_expansion",
+                "active": vol_regime == "LOW" and vol_z > 1.5,
+                "value": vol_z if vol_regime == "LOW" else 0,
+                "threshold": 1.5,
+                "reliability": 0.75,
+                "confidence": 0.7,
+                "freshness": 0.85,
+            }
+        )
+        evidence.append(
+            {
+                "name": "institutional_flow",
+                "active": flow_score > 0.7,
+                "value": flow_score,
+                "threshold": 0.7,
+                "reliability": 0.7,
+                "confidence": flow_score,
+                "freshness": 0.8,
+            }
+        )
 
         # Ağırlıklı evidence consensus (basit ortalama değil)
         if not evidence:
@@ -264,6 +314,7 @@ class SPECEngine:
         # raw_ev tipik olarak -3 ile +3 arası
         # sigmoid: 1 / (1 + exp(-x)) → [0, 1]
         import math
+
         try:
             normalized = 1.0 / (1.0 + math.exp(-raw_ev))
         except (OverflowError, ValueError):

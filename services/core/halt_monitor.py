@@ -22,9 +22,9 @@ logger = structlog.get_logger()
 class HaltStatus:
     halted: bool
     reason: str = ""
-    halt_type: str = ""          # KAP, CORPORATE, SPK, CIRCUIT_BREAKER
+    halt_type: str = ""  # KAP, CORPORATE, SPK, CIRCUIT_BREAKER
     expected_resume: str | None = None
-    action: str = ""             # "WAIT", "CANCEL_ORDERS", "NO_ACTION"
+    action: str = ""  # "WAIT", "CANCEL_ORDERS", "NO_ACTION"
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -84,17 +84,24 @@ class HaltMonitor:
         """Hisse durdurulmuş mu?"""
         return ticker in self._halted_tickers
 
-
     def _persist_state(self, ticker: str):
         """Halt durumunu SQLite'a kaydet."""
         try:
             from .state_store import state_store
+
             status = self._halted_tickers.get(ticker)
             if status:
                 with state_store._connect() as conn:
                     conn.execute(
                         "INSERT OR REPLACE INTO halt_states (ticker, reason, halt_type, expected_resume, action, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                        (ticker, status.reason, status.halt_type, status.expected_resume, status.action, datetime.now(UTC).isoformat())
+                        (
+                            ticker,
+                            status.reason,
+                            status.halt_type,
+                            status.expected_resume,
+                            status.action,
+                            datetime.now(UTC).isoformat(),
+                        ),
                     )
         except Exception as e:
             logger.debug("Halt persist skipped", ticker=ticker, error=str(e))
@@ -103,6 +110,7 @@ class HaltMonitor:
         """Halt durumunu SQLite'dan sil."""
         try:
             from .state_store import state_store
+
             with state_store._connect() as conn:
                 conn.execute("DELETE FROM halt_states WHERE ticker = ?", (ticker,))
         except Exception as e:
@@ -112,6 +120,7 @@ class HaltMonitor:
         """Halt durumunu SQLite'dan geri yükle."""
         try:
             from .state_store import state_store
+
             with state_store._connect() as conn:
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS halt_states (
@@ -123,7 +132,9 @@ class HaltMonitor:
                         updated_at TEXT
                     )
                 """)
-                rows = conn.execute("SELECT ticker, reason, halt_type, expected_resume, action FROM halt_states").fetchall()
+                rows = conn.execute(
+                    "SELECT ticker, reason, halt_type, expected_resume, action FROM halt_states"
+                ).fetchall()
                 for row in rows:
                     self._halted_tickers[row[0]] = HaltStatus(
                         halted=True,

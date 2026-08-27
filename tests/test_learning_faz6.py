@@ -314,6 +314,7 @@ def test_features_stored():
 
 # ===================== MAIN =====================
 
+
 def run_all_tests():
     tests = [
         test_register,
@@ -352,9 +353,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 6 TEST SONUÇLARI (Model Registry)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

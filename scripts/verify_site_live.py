@@ -8,17 +8,18 @@ import urllib.request
 import orjson
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 endpoints = [
-    ('http://localhost:8000/api/v1/market/state', 'Canlı BIST Rejim & Piyasa Genişliği'),
-    ('http://localhost:8000/api/v1/market/heatmap', 'Canlı Sektör Isı Haritası & Hisse Fiyatları'),
-    ('http://localhost:8000/api/v1/market/radar?limit=1000', 'Canlı BIST TÜM Evren Radarı & RSI/Skor'),
-    ('http://localhost:8000/api/v1/macro/world', 'Canlı DXY, US10Y, Brent, Altın, USDTRY, VIX'),
-    ('http://localhost:8000/api/v1/event-study/events', 'Canlı KAP & Finans Haber Akışı'),
-    ('http://localhost:8000/api/v1/system/status', 'Canlı CPU, RAM, Latency & Servis Durumu'),
-    ('http://localhost:8000/api/v1/system/databases', 'Gerçek PostgreSQL, ClickHouse, Redis Boyutları'),
+    ("http://localhost:8000/api/v1/market/state", "Canlı BIST Rejim & Piyasa Genişliği"),
+    ("http://localhost:8000/api/v1/market/heatmap", "Canlı Sektör Isı Haritası & Hisse Fiyatları"),
+    ("http://localhost:8000/api/v1/market/radar?limit=1000", "Canlı BIST TÜM Evren Radarı & RSI/Skor"),
+    ("http://localhost:8000/api/v1/macro/world", "Canlı DXY, US10Y, Brent, Altın, USDTRY, VIX"),
+    ("http://localhost:8000/api/v1/event-study/events", "Canlı KAP & Finans Haber Akışı"),
+    ("http://localhost:8000/api/v1/system/status", "Canlı CPU, RAM, Latency & Servis Durumu"),
+    ("http://localhost:8000/api/v1/system/databases", "Gerçek PostgreSQL, ClickHouse, Redis Boyutları"),
 ]
+
 
 def main():
     print("=" * 80)
@@ -27,7 +28,7 @@ def main():
     for url, name in endpoints:
         try:
             req = urllib.request.urlopen(url, timeout=30)
-            data = orjson.loads(req.read().decode('utf-8'))
+            data = orjson.loads(req.read().decode("utf-8"))
             sample = ""
             if "sectors" in data:
                 sample = f"Sektörler: {len(data['sectors'])} adet | İlk hisse: {data['sectors'][0]['stocks'][0]['symbol']} = ₺{data['sectors'][0]['stocks'][0]['price']}"
@@ -48,6 +49,7 @@ def main():
         except Exception as e:
             print(f"[HATA] {name} -> {e}")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     main()

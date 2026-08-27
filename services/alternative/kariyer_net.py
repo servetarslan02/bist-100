@@ -103,7 +103,7 @@ class KariyerNetAdapter(BaseAdapter):
                         return {}
 
                     html = await resp.text()
-                    soup = BeautifulSoup(html, 'html.parser')
+                    soup = BeautifulSoup(html, "html.parser")
 
                     # İlanları parse et
                     postings = self._parse_postings(soup)
@@ -131,19 +131,21 @@ class KariyerNetAdapter(BaseAdapter):
 
         for card in job_cards[:50]:  # Max 50 ilan
             try:
-                title = card.select_one('.job-title, .title, h3')
-                location = card.select_one('.location, .city')
-                department = card.select_one('.department, .category')
+                title = card.select_one(".job-title, .title, h3")
+                location = card.select_one(".location, .city")
+                department = card.select_one(".department, .category")
 
-                postings.append({
-                    "title": title.text.strip() if title else "",
-                    "location": location.text.strip() if location else "",
-                    "department": department.text.strip() if department else "",
-                    "is_tech": self._is_tech_role(title.text if title else ""),
-                    "is_management": self._is_management_role(title.text if title else ""),
-                    "is_remote": "uzaktan" in (title.text if title else "").lower() or
-                                 "remote" in (title.text if title else "").lower(),
-                })
+                postings.append(
+                    {
+                        "title": title.text.strip() if title else "",
+                        "location": location.text.strip() if location else "",
+                        "department": department.text.strip() if department else "",
+                        "is_tech": self._is_tech_role(title.text if title else ""),
+                        "is_management": self._is_management_role(title.text if title else ""),
+                        "is_remote": "uzaktan" in (title.text if title else "").lower()
+                        or "remote" in (title.text if title else "").lower(),
+                    }
+                )
             except Exception as e:
                 logger.debug("Handled exception, continuing", error=str(e))
                 continue
@@ -153,10 +155,30 @@ class KariyerNetAdapter(BaseAdapter):
     def _is_tech_role(self, title: str) -> bool:
         """Teknik pozisyon mu?"""
         tech_keywords = [
-            "yazılım", "software", "developer", "mühendis", "engineer",
-            "data", "veri", "analyst", "analist", "DevOps", "QA", "test",
-            "backend", "frontend", "full stack", "mobile", "iOS", "Android",
-            "python", "java", "react", "AI", "yapay zeka", "machine learning",
+            "yazılım",
+            "software",
+            "developer",
+            "mühendis",
+            "engineer",
+            "data",
+            "veri",
+            "analyst",
+            "analist",
+            "DevOps",
+            "QA",
+            "test",
+            "backend",
+            "frontend",
+            "full stack",
+            "mobile",
+            "iOS",
+            "Android",
+            "python",
+            "java",
+            "react",
+            "AI",
+            "yapay zeka",
+            "machine learning",
         ]
         title_lower = title.lower()
         return any(kw.lower() in title_lower for kw in tech_keywords)
@@ -164,9 +186,21 @@ class KariyerNetAdapter(BaseAdapter):
     def _is_management_role(self, title: str) -> bool:
         """Yönetim pozisyonu mu?"""
         mgmt_keywords = [
-            "müdür", "manager", "director", "başkan", "head", "lead",
-            "CTO", "CEO", "CFO", "VP", "genel müdür", "koordinatör",
-            "şef", "supervisor", "team lead",
+            "müdür",
+            "manager",
+            "director",
+            "başkan",
+            "head",
+            "lead",
+            "CTO",
+            "CEO",
+            "CFO",
+            "VP",
+            "genel müdür",
+            "koordinatör",
+            "şef",
+            "supervisor",
+            "team lead",
         ]
         title_lower = title.lower()
         return any(kw.lower() in title_lower for kw in mgmt_keywords)

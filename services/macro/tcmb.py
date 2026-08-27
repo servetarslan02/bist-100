@@ -80,7 +80,9 @@ def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
         rate_change = tcmb_data.get("rate_change", 0)
         if rate_change:
             features["tcmb_rate_change"] = round(float(rate_change), 2)
-            features["tcmb_rate_direction"] = 1.0 if float(rate_change) > 0 else (-1.0 if float(rate_change) < 0 else 0.0)
+            features["tcmb_rate_direction"] = (
+                1.0 if float(rate_change) > 0 else (-1.0 if float(rate_change) < 0 else 0.0)
+            )
 
         # ABD faiz farkı (carry trade etkisi)
         us_rate = tcmb_data.get("us_rate")

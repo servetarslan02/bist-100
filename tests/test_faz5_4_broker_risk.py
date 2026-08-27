@@ -11,6 +11,7 @@ import time
 # 1. Broker — valid order
 # ────────────────────────────────────────────────────────────
 
+
 def test_broker_valid_order():
     """Geçerli order fill edilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
@@ -20,8 +21,7 @@ def test_broker_valid_order():
 
     broker = PaperBroker(initial_capital=1_000_000)
     order = Order(
-        order_id="", ticker="THYAO", side=OrderSide.BUY.value,
-        quantity=100, price=300.0, idempotency_key="test_valid"
+        order_id="", ticker="THYAO", side=OrderSide.BUY.value, quantity=100, price=300.0, idempotency_key="test_valid"
     )
 
     result = broker.submit_order(order)
@@ -40,6 +40,7 @@ def test_broker_valid_order():
 # 2. Broker — rejected order (insufficient capital)
 # ────────────────────────────────────────────────────────────
 
+
 def test_broker_rejected_order():
     """Yetersiz sermaye ile order reddedilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
@@ -48,10 +49,7 @@ def test_broker_rejected_order():
     failed = 0
 
     broker = PaperBroker(initial_capital=1000)
-    order = Order(
-        order_id="", ticker="THYAO", side=OrderSide.BUY.value,
-        quantity=100, price=300.0
-    )
+    order = Order(order_id="", ticker="THYAO", side=OrderSide.BUY.value, quantity=100, price=300.0)
 
     result = broker.submit_order(order)
     assert result.status == OrderStatus.REJECTED.value, f"Expected REJECTED, got {result.status}"
@@ -67,6 +65,7 @@ def test_broker_rejected_order():
 # 3. Broker — duplicate order
 # ────────────────────────────────────────────────────────────
 
+
 def test_broker_duplicate_order():
     """Aynı idempotency_key ile iki order engellenmeli."""
     from services.core.broker import Order, OrderSide, PaperBroker
@@ -77,14 +76,12 @@ def test_broker_duplicate_order():
     broker = PaperBroker(initial_capital=1_000_000)
 
     order1 = Order(
-        order_id="", ticker="THYAO", side=OrderSide.BUY.value,
-        quantity=100, price=300.0, idempotency_key="dup_key_1"
+        order_id="", ticker="THYAO", side=OrderSide.BUY.value, quantity=100, price=300.0, idempotency_key="dup_key_1"
     )
     result1 = broker.submit_order(order1)
 
     order2 = Order(
-        order_id="", ticker="THYAO", side=OrderSide.BUY.value,
-        quantity=100, price=300.0, idempotency_key="dup_key_1"
+        order_id="", ticker="THYAO", side=OrderSide.BUY.value, quantity=100, price=300.0, idempotency_key="dup_key_1"
     )
     result2 = broker.submit_order(order2)
 
@@ -101,6 +98,7 @@ def test_broker_duplicate_order():
 # 4. Broker — cancel order
 # ────────────────────────────────────────────────────────────
 
+
 def test_broker_cancel_order():
     """Order iptal edilebilmeli."""
     from services.core.broker import Order, OrderSide, PaperBroker
@@ -109,10 +107,7 @@ def test_broker_cancel_order():
     failed = 0
 
     broker = PaperBroker(initial_capital=1_000_000)
-    order = Order(
-        order_id="cancel_test", ticker="THYAO", side=OrderSide.BUY.value,
-        quantity=100, price=300.0
-    )
+    order = Order(order_id="cancel_test", ticker="THYAO", side=OrderSide.BUY.value, quantity=100, price=300.0)
     broker.submit_order(order)
 
     # Already filled — cancel should fail
@@ -129,6 +124,7 @@ def test_broker_cancel_order():
 # 5. Risk gate — valid order allowed
 # ────────────────────────────────────────────────────────────
 
+
 def test_risk_gate_valid():
     """Geçerli order risk gate'den geçmeli."""
     from services.core.risk_gate import RiskGate
@@ -139,9 +135,15 @@ def test_risk_gate_valid():
     gate = RiskGate(max_position_pct=10, max_single_order_pct=5, min_confidence=0.3)
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=10, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        model_confidence=0.7, market_open=True, data_valid=True
+        ticker="THYAO",
+        side="BUY",
+        quantity=10,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        model_confidence=0.7,
+        market_open=True,
+        data_valid=True,
     )
 
     assert decision.allowed, f"Should be allowed: {decision.reason}"
@@ -158,6 +160,7 @@ def test_risk_gate_valid():
 # 6. Risk gate — rejected (position too large)
 # ────────────────────────────────────────────────────────────
 
+
 def test_risk_gate_position_limit():
     """Pozisyon limiti aşıldığında reddedilmeli."""
     from services.core.risk_gate import RiskGate
@@ -168,9 +171,13 @@ def test_risk_gate_position_limit():
     gate = RiskGate(max_position_pct=10, max_single_order_pct=50)
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=1000, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        model_confidence=0.7
+        ticker="THYAO",
+        side="BUY",
+        quantity=1000,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        model_confidence=0.7,
     )
 
     # 1000 * 300 = 300,000 → 30% > 10% limit
@@ -187,6 +194,7 @@ def test_risk_gate_position_limit():
 # 7. Risk gate — confidence rejection
 # ────────────────────────────────────────────────────────────
 
+
 def test_risk_gate_confidence():
     """Düşük confidence reddedilmeli."""
     from services.core.risk_gate import RiskGate
@@ -197,9 +205,13 @@ def test_risk_gate_confidence():
     gate = RiskGate(min_confidence=0.5)
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=10, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        model_confidence=0.1
+        ticker="THYAO",
+        side="BUY",
+        quantity=10,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        model_confidence=0.1,
     )
 
     assert not decision.allowed
@@ -215,6 +227,7 @@ def test_risk_gate_confidence():
 # 8. Risk gate — market closed
 # ────────────────────────────────────────────────────────────
 
+
 def test_risk_gate_market_closed():
     """Market kapalıyken order reddedilmeli."""
     from services.core.risk_gate import RiskGate
@@ -225,9 +238,13 @@ def test_risk_gate_market_closed():
     gate = RiskGate()
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=10, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        market_open=False
+        ticker="THYAO",
+        side="BUY",
+        quantity=10,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        market_open=False,
     )
 
     assert not decision.allowed
@@ -243,6 +260,7 @@ def test_risk_gate_market_closed():
 # 9. Risk gate — stale data
 # ────────────────────────────────────────────────────────────
 
+
 def test_risk_gate_stale_data():
     """Eski veri ile order reddedilmeli."""
     from services.core.risk_gate import RiskGate
@@ -253,9 +271,13 @@ def test_risk_gate_stale_data():
     gate = RiskGate()
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=10, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        data_valid=False
+        ticker="THYAO",
+        side="BUY",
+        quantity=10,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        data_valid=False,
     )
 
     assert not decision.allowed
@@ -271,6 +293,7 @@ def test_risk_gate_stale_data():
 # 10. Circuit breaker — open blocks orders
 # ────────────────────────────────────────────────────────────
 
+
 def test_circuit_breaker_open():
     """Circuit açıkken order reddedilmeli."""
     from services.core.risk_gate import RiskGate
@@ -281,9 +304,13 @@ def test_circuit_breaker_open():
     gate = RiskGate()
 
     decision = gate.check_order(
-        ticker="THYAO", side="BUY", quantity=10, price=300,
-        portfolio_value=1_000_000, current_positions={},
-        circuit_open=True
+        ticker="THYAO",
+        side="BUY",
+        quantity=10,
+        price=300,
+        portfolio_value=1_000_000,
+        current_positions={},
+        circuit_open=True,
     )
 
     assert not decision.allowed
@@ -299,6 +326,7 @@ def test_circuit_breaker_open():
 # 11. Circuit breaker — recovery
 # ────────────────────────────────────────────────────────────
 
+
 def test_circuit_breaker_recovery():
     """Circuit breaker recovery çalışmalı."""
     from services.core.circuit_breaker import CircuitBreaker, CircuitState
@@ -306,10 +334,7 @@ def test_circuit_breaker_recovery():
     passed = 0
     failed = 0
 
-    cb = CircuitBreaker(
-        name="test", failure_threshold=3,
-        recovery_timeout_seconds=0.01, state=CircuitState.CLOSED
-    )
+    cb = CircuitBreaker(name="test", failure_threshold=3, recovery_timeout_seconds=0.01, state=CircuitState.CLOSED)
 
     # 3 failure → OPEN
     for _ in range(3):
@@ -336,6 +361,7 @@ def test_circuit_breaker_recovery():
 # 12. Circuit breaker — half-open failure
 # ────────────────────────────────────────────────────────────
 
+
 def test_circuit_breaker_half_open_failure():
     """Half-open'da failure tekrar OPEN yapmalı."""
     from services.core.circuit_breaker import CircuitBreaker, CircuitState
@@ -343,10 +369,7 @@ def test_circuit_breaker_half_open_failure():
     passed = 0
     failed = 0
 
-    cb = CircuitBreaker(
-        name="test", failure_threshold=2,
-        recovery_timeout_seconds=0.01, state=CircuitState.CLOSED
-    )
+    cb = CircuitBreaker(name="test", failure_threshold=2, recovery_timeout_seconds=0.01, state=CircuitState.CLOSED)
 
     cb.record_failure()
     cb.record_failure()
@@ -368,6 +391,7 @@ def test_circuit_breaker_half_open_failure():
 # 13. Broker — sell without position
 # ────────────────────────────────────────────────────────────
 
+
 def test_broker_sell_no_position():
     """Pozisyon olmadan satış reddedilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
@@ -376,10 +400,7 @@ def test_broker_sell_no_position():
     failed = 0
 
     broker = PaperBroker(initial_capital=1_000_000)
-    order = Order(
-        order_id="", ticker="THYAO", side=OrderSide.SELL.value,
-        quantity=100, price=300.0
-    )
+    order = Order(order_id="", ticker="THYAO", side=OrderSide.SELL.value, quantity=100, price=300.0)
 
     result = broker.submit_order(order)
     assert result.status == OrderStatus.REJECTED.value
@@ -394,6 +415,7 @@ def test_broker_sell_no_position():
 # ────────────────────────────────────────────────────────────
 # 14. Risk gate — portfolio exposure
 # ────────────────────────────────────────────────────────────
+
 
 def test_risk_gate_portfolio_exposure():
     """Portföy exposure limiti aşıldığında reddedilmeli."""
@@ -412,9 +434,13 @@ def test_risk_gate_portfolio_exposure():
     sum(p["qty"] * p["avg_cost"] for p in positions.values())  # 950,000
 
     decision = gate.check_order(
-        ticker="C", side="BUY", quantity=10, price=100,
-        portfolio_value=1_000_000, current_positions=positions,
-        model_confidence=0.7
+        ticker="C",
+        side="BUY",
+        quantity=10,
+        price=100,
+        portfolio_value=1_000_000,
+        current_positions=positions,
+        model_confidence=0.7,
     )
 
     # 950,000 / 1,000,000 = 95% > 90%
@@ -430,6 +456,7 @@ def test_risk_gate_portfolio_exposure():
 # ────────────────────────────────────────────────────────────
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
+
 
 def run_all():
     tests = [
@@ -466,6 +493,7 @@ def run_all():
                 print(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
+
             print(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1

@@ -29,14 +29,16 @@ class HealthCheckWorker:
 
         try:
             from services.core.market_session_fsm import bist_session_fsm
+
             result["checks"]["market"] = {"status": "ok", **bist_session_fsm.get_status()}
         except Exception as e:
             result["checks"]["market"] = {"status": "warning", "warning": str(e)}
 
         import os
+
         model_dir = "ml/saved_models"
         if os.path.exists(model_dir):
-            models = [f for f in os.listdir(model_dir) if f.endswith(('.pkl', '.json'))]
+            models = [f for f in os.listdir(model_dir) if f.endswith((".pkl", ".json"))]
             result["checks"]["models"] = {"status": "ok" if models else "warning", "count": len(models)}
 
         self._last_check = result["timestamp"]

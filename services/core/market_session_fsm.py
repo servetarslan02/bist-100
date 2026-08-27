@@ -39,13 +39,13 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 class BISTMarketPhase(Enum):
     CLOSED = "CLOSED"
-    OPENING_AUCTION_COLLECTION = "OPENING_AUCTION_COLLECTION"       # 09:40 - 09:55
-    OPENING_AUCTION_DETERMINATION = "OPENING_AUCTION_DETERMINATION" # 09:55 - 10:00
-    CONTINUOUS_AUCTION = "CONTINUOUS_AUCTION"                       # 10:00 - 18:00
-    CIRCUIT_BREAKER_AUCTION = "CIRCUIT_BREAKER_AUCTION"             # Tetiklendiğinde
-    CLOSING_AUCTION_COLLECTION = "CLOSING_AUCTION_COLLECTION"       # 18:01 - 18:05
-    CLOSING_AUCTION_DETERMINATION = "CLOSING_AUCTION_DETERMINATION" # 18:05 - 18:07
-    CLOSING_PRICE_TRADING = "CLOSING_PRICE_TRADING"                 # 18:08 - 18:10
+    OPENING_AUCTION_COLLECTION = "OPENING_AUCTION_COLLECTION"  # 09:40 - 09:55
+    OPENING_AUCTION_DETERMINATION = "OPENING_AUCTION_DETERMINATION"  # 09:55 - 10:00
+    CONTINUOUS_AUCTION = "CONTINUOUS_AUCTION"  # 10:00 - 18:00
+    CIRCUIT_BREAKER_AUCTION = "CIRCUIT_BREAKER_AUCTION"  # Tetiklendiğinde
+    CLOSING_AUCTION_COLLECTION = "CLOSING_AUCTION_COLLECTION"  # 18:01 - 18:05
+    CLOSING_AUCTION_DETERMINATION = "CLOSING_AUCTION_DETERMINATION"  # 18:05 - 18:07
+    CLOSING_PRICE_TRADING = "CLOSING_PRICE_TRADING"  # 18:08 - 18:10
 
 
 class MarketSessionStateMachine:
@@ -74,15 +74,24 @@ class MarketSessionStateMachine:
 
     # Devre kesici sabitleri (Ağustos 2025 güncel)
     CIRCUIT_BREAKER_DURATION_MINUTES = 10  # BIST resmi: 10 dakika emir toplama (tüm paylar)
-    EBDKS_THRESHOLD_PCT = 6.0              # Endekse bağlı devre kesici: BIST-100 %6 düşüş (tek aşamalı)
+    EBDKS_THRESHOLD_PCT = 6.0  # Endekse bağlı devre kesici: BIST-100 %6 düşüş (tek aşamalı)
 
     # EBDKS durdurma süreleri — özellik koduna göre farklılaştırılmış (Ağustos 2025)
     # .E, .F1, .F2, .S1, .G → 10 dakika
     # .V, .C, .F, .R, .BE, .AOF → 20 dakika
     # VİOP pay/endeks sözleşmeleri → 20 dakika
     EBDKS_DURATION_BY_FEATURE = {
-        "E": 10, "F1": 10, "F2": 10, "S1": 10, "G": 10,
-        "V": 20, "C": 20, "F": 20, "R": 20, "BE": 20, "AOF": 20,
+        "E": 10,
+        "F1": 10,
+        "F2": 10,
+        "S1": 10,
+        "G": 10,
+        "V": 20,
+        "C": 20,
+        "F": 20,
+        "R": 20,
+        "BE": 20,
+        "AOF": 20,
     }
     EBDKS_DEFAULT_DURATION = 20  # VİOP ve tanımsız özellik kodları için
 
@@ -127,9 +136,9 @@ class MarketSessionStateMachine:
         now = self.now_istanbul()
         expiry = now + timedelta(minutes=duration_minutes)
         self._circuit_breaker_active[ticker] = expiry
-        logger.warning("BIST Pay Bazında Devre Kesici",
-                       ticker=ticker, expiry=expiry.isoformat(),
-                       duration_min=duration_minutes)
+        logger.warning(
+            "BIST Pay Bazında Devre Kesici", ticker=ticker, expiry=expiry.isoformat(), duration_min=duration_minutes
+        )
 
     def trigger_ebdks(self, feature_code: str | None = None):
         """Endekse bağlı devre kesici (EBDKS) başlatır.
@@ -160,12 +169,14 @@ class MarketSessionStateMachine:
         # Geç seans kuralı: 17:30'dan sonra tetiklenirse kapanış seansı başlatılmalı
         late_session = now.time() >= self.EBDKS_LATE_SESSION_CUTOFF
 
-        logger.warning("BIST EBDKS Tetiklendi",
-                       expiry=expiry.isoformat(),
-                       duration_min=duration,
-                       feature_code=feature_code,
-                       count_today=self._ebdks_triggered_count,
-                       late_session_rule=late_session)
+        logger.warning(
+            "BIST EBDKS Tetiklendi",
+            expiry=expiry.isoformat(),
+            duration_min=duration,
+            feature_code=feature_code,
+            count_today=self._ebdks_triggered_count,
+            late_session_rule=late_session,
+        )
 
     def clear_circuit_breaker(self, ticker: str):
         self._circuit_breaker_active.pop(ticker, None)

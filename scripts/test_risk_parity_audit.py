@@ -55,7 +55,7 @@ def main():
         atr_trailing_bear_mult=2.00,
         crisis_exit_buffer=0.96,
         max_positions_bull=8,
-        max_positions_bear=3
+        max_positions_bear=3,
     )
 
     # ---------------------------------------------------------------------------------------------
@@ -99,7 +99,9 @@ def main():
     print("\n" + "=" * 105)
     print("📅 3. YIL BAZINDA GERÇEK GETİRİ VE MAKSİMUM DÜŞÜŞ TABLOSU (1997 - 2026)")
     print("=" * 105)
-    print(f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'SİSTEM MAX DD':<14} | {'PF':<6}")
+    print(
+        f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'SİSTEM MAX DD':<14} | {'PF':<6}"
+    )
     print("-" * 105)
 
     years = sorted(list(set(d.year for d in bm_df.index)))
@@ -108,10 +110,16 @@ def main():
     for y in years:
         res = engine.simulate(params, start_year=y, end_year=y, initial_capital=total_sys_eq)
         bm_y = bm_df[bm_df.index.year == y]
-        bm_y_ret = ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0 if len(bm_y) > 10 else 0.0
+        bm_y_ret = (
+            ((bm_y["Close"].iloc[-1] - bm_y["Close"].iloc[0]) / bm_y["Close"].iloc[0]) * 100.0
+            if len(bm_y) > 10
+            else 0.0
+        )
         diff = res.total_return_pct - bm_y_ret
         kriz_tag = " ⚠️ KRİZ" if y in [2000, 2001, 2008, 2018] else ""
-        print(f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>11.2f} | {res.profit_factor:>4.2f}{kriz_tag}")
+        print(
+            f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>11.2f} | {res.profit_factor:>4.2f}{kriz_tag}"
+        )
 
     # ---------------------------------------------------------------------------------------------
     # 4. ÖNCESİ / SONRASI HEDEF KARŞILAŞTIRMA TABLOSU

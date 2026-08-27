@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 class ComplianceResult:
     notification_required: bool = False
     violation: bool = False
-    action: str = ""        # "OK", "NOTIFY", "BLOCK"
+    action: str = ""  # "OK", "NOTIFY", "BLOCK"
     reason: str = ""
     details: dict[str, Any] = None
 
@@ -41,11 +41,11 @@ class ComplianceChecker:
     """SPK uyumluluk kontrolü."""
 
     # %5 bildirim eşiği
-    NOTIFICATION_THRESHOLD = 0.05   # %5
+    NOTIFICATION_THRESHOLD = 0.05  # %5
     # %10 zorunlu teklif eşiği
     MANDATORY_BID_THRESHOLD = 0.10  # %10
     # %20 engelleme azınlığı
-    BLOCKING_MINORITY = 0.20        # %20
+    BLOCKING_MINORITY = 0.20  # %20
     # Algoritmik trading bildirim eşiği (günlük işlem adedi)
     ALGO_TRADING_ORDER_THRESHOLD = 1000  # Günde 1000+ emir = algoritmik trading
     ALGO_TRADING_VOLUME_THRESHOLD = 0.05  # Günlük hacmin %5'i = algoritmik trading
@@ -89,7 +89,7 @@ class ComplianceChecker:
                 notification_required=True,
                 violation=True,
                 action="BLOCK",
-                reason=f"SPK %10 zorunlu teklif eşiği: {new_position_pct*100:.1f}%",
+                reason=f"SPK %10 zorunlu teklif eşiği: {new_position_pct * 100:.1f}%",
                 details={**details, "new_position_pct": new_position_pct},
             )
 
@@ -99,7 +99,7 @@ class ComplianceChecker:
                 return ComplianceResult(
                     notification_required=True,
                     action="NOTIFY",
-                    reason=f"SPK %5 bildirim yükümlülüğü: {new_position_pct*100:.1f}%",
+                    reason=f"SPK %5 bildirim yükümlülüğü: {new_position_pct * 100:.1f}%",
                     details={**details, "new_position_pct": new_position_pct},
                 )
         else:
@@ -108,7 +108,7 @@ class ComplianceChecker:
                 return ComplianceResult(
                     notification_required=True,
                     action="NOTIFY",
-                    reason=f"SPK %5 bildirim altına düşüş: {new_position_pct*100:.1f}%",
+                    reason=f"SPK %5 bildirim altına düşüş: {new_position_pct * 100:.1f}%",
                     details={**details, "new_position_pct": new_position_pct},
                 )
 
@@ -141,7 +141,7 @@ class ComplianceChecker:
             return ComplianceResult(
                 notification_required=True,
                 action="NOTIFY",
-                reason=f"Algoritmik trading bildirimi: hacim %{daily_volume_pct*100:.1f} (eşik: %{self.ALGO_TRADING_VOLUME_THRESHOLD*100:.0f})",
+                reason=f"Algoritmik trading bildirimi: hacim %{daily_volume_pct * 100:.1f} (eşik: %{self.ALGO_TRADING_VOLUME_THRESHOLD * 100:.0f})",
                 details={"daily_volume_pct": daily_volume_pct, "threshold": self.ALGO_TRADING_VOLUME_THRESHOLD},
             )
 

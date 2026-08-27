@@ -55,36 +55,46 @@ FROZEN_PARAMS = {
         "BEAR_MARKET": 0.28,
         "HIGH_VOLATILITY": 0.22,
     },
-    "top1_alloc_pct": 0.30,       # Lider hisse conviction payı
-    "default_alloc_pct": 0.20,    # Diğer hisseler
-    "trailing_atr_mult": 2.5,     # ATR trailing stop çarpanı
-    "min_atr_pct": 4.0,           # Minimum trailing stop (%)
-    "hard_stop_pct": -6.5,        # Hard stop-loss
-    "take_profit_pct": 35.0,      # Take-profit
-    "min_hold_days": 12,          # Minimum tutma süresi
-    "max_hold_days": 65,          # Maksimum tutma süresi
+    "top1_alloc_pct": 0.30,  # Lider hisse conviction payı
+    "default_alloc_pct": 0.20,  # Diğer hisseler
+    "trailing_atr_mult": 2.5,  # ATR trailing stop çarpanı
+    "min_atr_pct": 4.0,  # Minimum trailing stop (%)
+    "hard_stop_pct": -6.5,  # Hard stop-loss
+    "take_profit_pct": 35.0,  # Take-profit
+    "min_hold_days": 12,  # Minimum tutma süresi
+    "max_hold_days": 65,  # Maksimum tutma süresi
     "signal_reversal_thresh": -0.15,  # Sinyal tersine dönüş
-    "ema_alpha_fast": 0.75,       # Hızlı sinyal ivmesi
-    "ema_alpha_slow": 0.40,       # Yavaş gürültü filtresi
-    "ema_delta_thresh": 0.15,     # İvme eşiği
-    "conviction_score_min": 0.20, # %30 pay için minimum skor
-    "transaction_fee": 0.00074,   # BIST komisyon + MKK + Takas
-    "slippage": 0.00050,          # Slippage
+    "ema_alpha_fast": 0.75,  # Hızlı sinyal ivmesi
+    "ema_alpha_slow": 0.40,  # Yavaş gürültü filtresi
+    "ema_delta_thresh": 0.15,  # İvme eşiği
+    "conviction_score_min": 0.20,  # %30 pay için minimum skor
+    "transaction_fee": 0.00074,  # BIST komisyon + MKK + Takas
+    "slippage": 0.00050,  # Slippage
     "min_cash_to_open": 200_000,  # Yeni pozisyon açmak için minimum nakit
-    "retraining_freq": 20,        # Her 20 günde bir model yeniden eğitimi
+    "retraining_freq": 20,  # Her 20 günde bir model yeniden eğitimi
 }
 
 MODELS = [
-    "LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model",
-    "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"
+    "LightGBM_LambdaRank",
+    "CatBoost_Classifier",
+    "XGBoost_Model",
+    "Cross_Sectional_Momentum",
+    "SPEC_Anomaly_Detector",
+    "LSTM_Sequential",
 ]
 
 TOTAL_FRICTION = FROZEN_PARAMS["transaction_fee"] + FROZEN_PARAMS["slippage"]
 
 
-def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
-                        trainer, initial_capital=10_000_000.0,
-                        verbose=False, label="Frozen Strategy"):
+def run_frozen_strategy(
+    eval_dates,
+    features_by_ticker,
+    xu100_close,
+    trainer,
+    initial_capital=10_000_000.0,
+    verbose=False,
+    label="Frozen Strategy",
+):
     """
     Tamamen dondurulmuş C_Max_Sustainable_Alpha stratejisini çalıştırır.
     Final Holdout veya Train/Validation fark etmeksizin aynı parametrelerle çalışır.
@@ -97,10 +107,10 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     daily_exposures = []
     monthly_perf: dict[str, dict[str, float]] = {}
 
-    regime_pnl = {r: {"pnl": 0.0, "trades": 0, "wins": 0} for r in [
-        "BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE", "HIGH_VOLATILITY",
-        "LOW_VOLATILITY", "V_DIP_RECOVERY"
-    ]}
+    regime_pnl = {
+        r: {"pnl": 0.0, "trades": 0, "wins": 0}
+        for r in ["BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE", "HIGH_VOLATILITY", "LOW_VOLATILITY", "V_DIP_RECOVERY"]
+    }
 
     total_costs = 0.0
     trades_count = 0
@@ -113,7 +123,9 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     completed_wins = {m: 0 for m in MODELS}
     completed_totals = {m: 0 for m in MODELS}
 
-    start_xu100 = float(xu100_close[eval_dates[0]]) if eval_dates[0] in xu100_close.index else float(xu100_close.iloc[0])
+    start_xu100 = (
+        float(xu100_close[eval_dates[0]]) if eval_dates[0] in xu100_close.index else float(xu100_close.iloc[0])
+    )
     equity_xu100 = []
     daily_rets_xu100 = []
     equity_ew = []
@@ -137,7 +149,11 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
         # 1. RETRAINING (Genişleyen pencere, 5 gün embargo)
         if step_i % FROZEN_PARAMS["retraining_freq"] == 0:
             current_fold += 1
-            train_rows = [fdf.filter(pl.col("timestamp") <= current_date - timedelta(days=7)) for fdf in features_by_ticker.values() if fdf.height > 0]
+            train_rows = [
+                fdf.filter(pl.col("timestamp") <= current_date - timedelta(days=7))
+                for fdf in features_by_ticker.values()
+                if fdf.height > 0
+            ]
             comb_train = pl.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(comb_train)
 
@@ -145,7 +161,7 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
         current_regime = detect_market_regime_v2(xu100_close, current_date)
         hist_xu = xu100_close.filter(xu100_close.index <= current_date)
         ret_5d_xu = (hist_xu[-1] / hist_xu[-5] - 1.0) * 100.0 if len(hist_xu) >= 5 else 0.0
-        is_v_dip = (current_regime == "BULL_TREND" and ret_5d_xu > 3.5)
+        is_v_dip = current_regime == "BULL_TREND" and ret_5d_xu > 3.5
         regime_tag = "V_DIP_RECOVERY" if is_v_dip else current_regime
 
         max_pos = FROZEN_PARAMS["max_pos"].get(current_regime, 2)
@@ -166,7 +182,12 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
         # 4. SİNYAL FUSION
         day_tickers = list(features_by_ticker.keys())
-        day_rows = [features_by_ticker[tk].filter(pl.col("timestamp") == current_date).row(0, named=True) if features_by_ticker[tk].filter(pl.col("timestamp") == current_date).height > 0 else {} for tk in day_tickers]
+        day_rows = [
+            features_by_ticker[tk].filter(pl.col("timestamp") == current_date).row(0, named=True)
+            if features_by_ticker[tk].filter(pl.col("timestamp") == current_date).height > 0
+            else {}
+            for tk in day_tickers
+        ]
         batch_sigs = trainer.predict_batch_day(day_tickers, day_rows)
 
         cand = []
@@ -177,21 +198,29 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
             raw_c = sum(norm_w[m] * batch_sigs[tk][m] for m in MODELS)
             delta_s = abs(raw_c - smoothed_scores[tk])
-            alpha_ema = FROZEN_PARAMS["ema_alpha_fast"] if delta_s > FROZEN_PARAMS["ema_delta_thresh"] else FROZEN_PARAMS["ema_alpha_slow"]
+            alpha_ema = (
+                FROZEN_PARAMS["ema_alpha_fast"]
+                if delta_s > FROZEN_PARAMS["ema_delta_thresh"]
+                else FROZEN_PARAMS["ema_alpha_slow"]
+            )
             smoothed_scores[tk] = alpha_ema * raw_c + (1.0 - alpha_ema) * smoothed_scores[tk]
 
-            cand.append({
-                "ticker": tk, "score": smoothed_scores[tk],
-                "close": float(row["close"]), "ret_5d": ret_5d, "atr_pct": atr_p
-            })
+            cand.append(
+                {
+                    "ticker": tk,
+                    "score": smoothed_scores[tk],
+                    "close": float(row["close"]),
+                    "ret_5d": ret_5d,
+                    "atr_pct": atr_p,
+                }
+            )
 
             for m in MODELS:
                 p_val = 1 if batch_sigs[tk][m] > 0 else -1
                 act_sign = 1 if ret_5d > 0 else -1
-                pending_evals.append({
-                    "eval_date": current_date + timedelta(days=7), "model": m,
-                    "is_correct": (p_val == act_sign)
-                })
+                pending_evals.append(
+                    {"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_val == act_sign)}
+                )
 
         # 5. POZİSYON ÇIKIŞLARI (ATR Trailing + Hard Stop + Min Hold)
         closed_tickers = []
@@ -201,15 +230,22 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
             pos["days_held"] += 1
             pos["highest_price"] = max(pos.get("highest_price", pos["entry_price"]), cur_p)
 
-            atr_buffer = max(
-                FROZEN_PARAMS["min_atr_pct"],
-                pos.get("atr_pct", 3.0) * FROZEN_PARAMS["trailing_atr_mult"]
-            )
+            atr_buffer = max(FROZEN_PARAMS["min_atr_pct"], pos.get("atr_pct", 3.0) * FROZEN_PARAMS["trailing_atr_mult"])
 
             should_exit = False
-            if pnl_pct <= FROZEN_PARAMS["hard_stop_pct"] or (pos["highest_price"] > pos["entry_price"] * 1.06 and
-                  cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)) or pnl_pct >= FROZEN_PARAMS["take_profit_pct"] or (pos["days_held"] >= FROZEN_PARAMS["min_hold_days"] and
-                  smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]) or pos["days_held"] >= FROZEN_PARAMS["max_hold_days"]:
+            if (
+                pnl_pct <= FROZEN_PARAMS["hard_stop_pct"]
+                or (
+                    pos["highest_price"] > pos["entry_price"] * 1.06
+                    and cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)
+                )
+                or pnl_pct >= FROZEN_PARAMS["take_profit_pct"]
+                or (
+                    pos["days_held"] >= FROZEN_PARAMS["min_hold_days"]
+                    and smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]
+                )
+                or pos["days_held"] >= FROZEN_PARAMS["max_hold_days"]
+            ):
                 should_exit = True
 
             if should_exit:
@@ -253,21 +289,21 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
                     if (rank_idx == 0 and c["score"] > FROZEN_PARAMS["conviction_score_min"])
                     else FROZEN_PARAMS["default_alloc_pct"]
                 )
-                alloc_slot = min(
-                    portfolio_cash / (slots - rank_idx),
-                    tot_val * alloc_pct
-                )
+                alloc_slot = min(portfolio_cash / (slots - rank_idx), tot_val * alloc_pct)
                 shares = int((alloc_slot * (1.0 - TOTAL_FRICTION)) / c["close"])
                 if shares > 0:
                     cost = shares * c["close"]
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash -= (cost + friction)
+                    portfolio_cash -= cost + friction
                     total_costs += friction
                     positions[c["ticker"]] = {
-                        "shares": shares, "entry_price": c["close"],
-                        "days_held": 0, "highest_price": c["close"],
+                        "shares": shares,
+                        "entry_price": c["close"],
+                        "days_held": 0,
+                        "highest_price": c["close"],
                         "atr_pct": c["atr_pct"],
-                        "regime": current_regime, "regime_tag": regime_tag
+                        "regime": current_regime,
+                        "regime_tag": regime_tag,
                     }
 
         # 7. GÜNLÜK EQUITY
@@ -287,11 +323,15 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
         eq_xu = initial_capital * (cur_xu / start_xu100)
         equity_xu100.append(eq_xu)
 
-        eq_ew = initial_capital * np.mean([
-            float(fdf.filter(pl.col("timestamp") == current_date)["close"][0]) / float(fdf.filter(pl.col("timestamp") == eval_dates[0])["close"][0])
-            for fdf in features_by_ticker.values()
-            if fdf.filter(pl.col("timestamp") == current_date).height > 0 and fdf.filter(pl.col("timestamp") == eval_dates[0]).height > 0
-        ])
+        eq_ew = initial_capital * np.mean(
+            [
+                float(fdf.filter(pl.col("timestamp") == current_date)["close"][0])
+                / float(fdf.filter(pl.col("timestamp") == eval_dates[0])["close"][0])
+                for fdf in features_by_ticker.values()
+                if fdf.filter(pl.col("timestamp") == current_date).height > 0
+                and fdf.filter(pl.col("timestamp") == eval_dates[0]).height > 0
+            ]
+        )
         equity_ew.append(eq_ew)
 
         if len(equity_curve) > 1:
@@ -300,8 +340,10 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
             if month_key not in monthly_perf:
                 monthly_perf[month_key] = {
-                    "strat_start": equity_curve[-2], "xu_start": equity_xu100[-2],
-                    "strat_end": cur_eq, "xu_end": eq_xu
+                    "strat_start": equity_curve[-2],
+                    "xu_start": equity_xu100[-2],
+                    "strat_end": cur_eq,
+                    "xu_end": eq_xu,
                 }
             else:
                 monthly_perf[month_key]["strat_end"] = cur_eq
@@ -346,15 +388,25 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     return {
         "label": label,
         "final_equity": eq_s[-1],
-        "tot_ret": tot_ret, "cagr": cagr,
-        "tot_ret_xu": tot_ret_xu, "cagr_xu": cagr_xu,
+        "tot_ret": tot_ret,
+        "cagr": cagr,
+        "tot_ret_xu": tot_ret_xu,
+        "cagr_xu": cagr_xu,
         "tot_ret_ew": tot_ret_ew,
-        "max_dd": max_dd, "max_dd_xu": max_dd_xu,
-        "sharpe": sharpe, "sortino": sortino, "calmar": calmar,
-        "profit_factor": profit_factor, "win_rate": win_rate,
-        "trades": trades_count, "turnover": turnover, "costs": total_costs,
-        "upside_cap": upside_cap, "downside_cap": downside_cap,
-        "beta": beta, "alpha_annual": alpha_annual,
+        "max_dd": max_dd,
+        "max_dd_xu": max_dd_xu,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "calmar": calmar,
+        "profit_factor": profit_factor,
+        "win_rate": win_rate,
+        "trades": trades_count,
+        "turnover": turnover,
+        "costs": total_costs,
+        "upside_cap": upside_cap,
+        "downside_cap": downside_cap,
+        "beta": beta,
+        "alpha_annual": alpha_annual,
         "avg_exposure": np.mean(daily_exposures),
         "avg_holding": np.mean(holding_periods) if holding_periods else 0.0,
         "monthly_perf": monthly_perf,
@@ -363,13 +415,15 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
 
 def print_full_report(m: dict[str, Any]):
-    logger.info(f"\n{'='*65}")
+    logger.info(f"\n{'=' * 65}")
     logger.info(f"🏆 {m['label']} — SONUÇ RAPORU")
-    logger.info(f"{'='*65}")
+    logger.info(f"{'=' * 65}")
     logger.info(f"| Metrik | {m['label']} | XU100 Buy&Hold | Equal-Weight BIST |")
     logger.info("|---|---|---|---|")
     logger.info(f"| **Bitiş Sermayesi** | **₺{m['final_equity']:,.2f}** | - | - |")
-    logger.info(f"| **Toplam Net Getiri** | **%{m['tot_ret']:+.2f}** | %{m['tot_ret_xu']:+.2f} | %{m['tot_ret_ew']:+.2f} |")
+    logger.info(
+        f"| **Toplam Net Getiri** | **%{m['tot_ret']:+.2f}** | %{m['tot_ret_xu']:+.2f} | %{m['tot_ret_ew']:+.2f} |"
+    )
     logger.info(f"| **CAGR** | **%{m['cagr']:+.2f}** | %{m['cagr_xu']:+.2f} | - |")
     logger.info(f"| **Max DD** | **%{m['max_dd']:.2f}** | %{m['max_dd_xu']:.2f} | - |")
     logger.info(f"| **Sharpe (Rf=%40)** | **{m['sharpe']:.2f}** | - | - |")
@@ -406,13 +460,19 @@ if __name__ == "__main__":
     logger.info("PHASE 6 — LEAKAGE, CAUSALITY & COST AUDIT")
     logger.info("=================================================================")
     logger.info("✅ Her feature T anında hesaplanıyor (OHLCV T kapanışından): GEÇER")
-    logger.info("✅ target_5d_ret = (close[T+5] / close[T] - 1): GELECEK BİLGİSİ — yalnızca EĞİTİM ETİKETİ olarak kullanılıyor, tahmin zamanında erişilmiyor: GEÇER")
+    logger.info(
+        "✅ target_5d_ret = (close[T+5] / close[T] - 1): GELECEK BİLGİSİ — yalnızca EĞİTİM ETİKETİ olarak kullanılıyor, tahmin zamanında erişilmiyor: GEÇER"
+    )
     logger.info("✅ 5 gün Purge/Embargo: Eğitim seti T-7'de kesiliyor, T+5 outcome T+7'de hesaplanıyor: GEÇER")
     logger.info("✅ Trust Queue: Yalnızca tamamlanmış geçmiş sonuçlar kullanılıyor (eval_date <= current_date): GEÇER")
-    logger.info("✅ V-Dip Override: ret_5d_xu 5 günlük geçmiş veriden hesaplanıyor, hiçbir gelecek bar kullanılmıyor: GEÇER")
+    logger.info(
+        "✅ V-Dip Override: ret_5d_xu 5 günlük geçmiş veriden hesaplanıyor, hiçbir gelecek bar kullanılmıyor: GEÇER"
+    )
     logger.info("✅ BIST Komisyon (%0.074) + Slippage (%0.050) = %0.124 her alış ve satışta uygulanıyor: GEÇER")
     logger.info("✅ Survivorship Bias: Tüm 20 hisse baştan sona sabit tutulmuş (sektör değişimi yok): GEÇER")
-    logger.info("✅ Conviction Sizing: %30 payı T anındaki skor sırasına göre belirleniyor, T+1 fiyatına bakılmıyor: GEÇER")
+    logger.info(
+        "✅ Conviction Sizing: %30 payı T anındaki skor sırasına göre belirleniyor, T+1 fiyatına bakılmıyor: GEÇER"
+    )
     logger.info("✅ Final Holdout (2025-10 sonrası) bu modülde HİÇ KULLANILMADI: GEÇER")
     logger.info("\n🔒 PHASE 6 AUDIT: TÜM KONTROLLER BAŞARILI — Leakage / Look-ahead bias YOK.\n")
 
@@ -423,9 +483,16 @@ if __name__ == "__main__":
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
     features_by_ticker = {}
     for tk, df in stock_data.items():
@@ -437,10 +504,13 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    logger.info(f"Validation Aralığı: {val_dates[0].strftime('%Y-%m-%d')} → {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
+    logger.info(
+        f"Validation Aralığı: {val_dates[0].strftime('%Y-%m-%d')} → {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)"
+    )
 
-    val_result = run_frozen_strategy(val_dates, features_by_ticker, xu100_close,
-                                     trainer, label="Frozen_C_TRAIN_VALIDATION")
+    val_result = run_frozen_strategy(
+        val_dates, features_by_ticker, xu100_close, trainer, label="Frozen_C_TRAIN_VALIDATION"
+    )
     print_full_report(val_result)
 
     logger.info("\n=================================================================")
@@ -450,11 +520,14 @@ if __name__ == "__main__":
     logger.info("   Parametreler dondurulmuştur. Sonuç ne olursa olsun değiştirme YASAKTIR.")
 
     holdout_dates = common_dates[280:-5]
-    logger.info(f"Holdout Aralığı: {holdout_dates[0].strftime('%Y-%m-%d')} → {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n")
+    logger.info(
+        f"Holdout Aralığı: {holdout_dates[0].strftime('%Y-%m-%d')} → {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n"
+    )
 
     trainer_h = ModelTrainer(feature_cols)
-    holdout_result = run_frozen_strategy(holdout_dates, features_by_ticker, xu100_close,
-                                          trainer_h, label="Frozen_C_FINAL_HOLDOUT")
+    holdout_result = run_frozen_strategy(
+        holdout_dates, features_by_ticker, xu100_close, trainer_h, label="Frozen_C_FINAL_HOLDOUT"
+    )
     print_full_report(holdout_result)
 
     # Phase 9 — NİHAİ KARAR
@@ -483,6 +556,6 @@ if __name__ == "__main__":
     logger.info(f"Profit Factor ≥ 1.2?        : {'EVET ✅' if pf_ok else 'HAYIR ❌'}")
     logger.info(f"Turnover ≤ 150/yıl?         : {'EVET ✅' if turnover_ok else 'HAYIR ❌'}")
     logger.info(f"Upside Capture > %45?       : {'EVET ✅' if upside_improved else 'HAYIR ❌'}")
-    logger.info(f"\n{'='*65}")
+    logger.info(f"\n{'=' * 65}")
     logger.info(f"NİHAİ KARAR: {verdict}")
-    logger.info(f"{'='*65}")
+    logger.info(f"{'=' * 65}")

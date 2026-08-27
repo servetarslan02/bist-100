@@ -30,6 +30,7 @@ logger = structlog.get_logger()
 @dataclass
 class TransactionMetrics:
     """Transaction metrikleri."""
+
     total_transactions: int = 0
     committed: int = 0
     rolled_back: int = 0
@@ -44,15 +45,14 @@ class TransactionMetrics:
             "rolled_back": self.rolled_back,
             "retried": self.retried,
             "timed_out": self.timed_out,
-            "avg_duration_ms": round(
-                self.total_duration_ms / max(self.total_transactions, 1), 2
-            ),
+            "avg_duration_ms": round(self.total_duration_ms / max(self.total_transactions, 1), 2),
         }
 
 
 @dataclass
 class QueryMetrics:
     """Tek sorgu metrikleri."""
+
     query_hash: str
     duration_ms: float
     rows_affected: int = 0
@@ -143,9 +143,7 @@ class TransactionHelper:
             duration = (time.monotonic() - start_time) * 1000
             self._metrics.total_duration_ms += duration
 
-            logger.debug("Transaction committed",
-                        duration_ms=round(duration, 2),
-                        queries=len(self._query_log))
+            logger.debug("Transaction committed", duration_ms=round(duration, 2), queries=len(self._query_log))
 
         except TimeoutError:
             self._metrics.timed_out += 1
@@ -200,18 +198,14 @@ class TransactionHelper:
             except Exception as e:
                 last_error = e
                 if attempt < retries:
-                    delay = self._retry_base_delay * (2 ** attempt)
+                    delay = self._retry_base_delay * (2**attempt)
                     self._metrics.retried += 1
-                    logger.warning("Transaction retry",
-                                 attempt=attempt + 1,
-                                 max_retries=retries,
-                                 delay_seconds=delay,
-                                 error=str(e))
+                    logger.warning(
+                        "Transaction retry", attempt=attempt + 1, max_retries=retries, delay_seconds=delay, error=str(e)
+                    )
                     await asyncio.sleep(delay)
                 else:
-                    logger.error("Transaction failed after retries",
-                                attempts=retries + 1,
-                                error=str(e))
+                    logger.error("Transaction failed after retries", attempts=retries + 1, error=str(e))
 
         raise last_error
 
@@ -305,22 +299,26 @@ class TransactionConnection:
             result = await self._conn.execute(query, *args)
             duration = (time.monotonic() - start) * 1000
 
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                success=True,
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    success=True,
+                )
+            )
 
             return result
 
         except Exception as e:
             duration = (time.monotonic() - start) * 1000
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                success=False,
-                error=str(e),
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    success=False,
+                    error=str(e),
+                )
+            )
             raise
 
     async def fetch(self, query: str, *args) -> list[Any]:
@@ -332,23 +330,27 @@ class TransactionConnection:
             result = await self._conn.fetch(query, *args)
             duration = (time.monotonic() - start) * 1000
 
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                rows_affected=len(result),
-                success=True,
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    rows_affected=len(result),
+                    success=True,
+                )
+            )
 
             return result
 
         except Exception as e:
             duration = (time.monotonic() - start) * 1000
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                success=False,
-                error=str(e),
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    success=False,
+                    error=str(e),
+                )
+            )
             raise
 
     async def fetchval(self, query: str, *args) -> Any:
@@ -360,22 +362,26 @@ class TransactionConnection:
             result = await self._conn.fetchval(query, *args)
             duration = (time.monotonic() - start) * 1000
 
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                success=True,
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    success=True,
+                )
+            )
 
             return result
 
         except Exception as e:
             duration = (time.monotonic() - start) * 1000
-            self._query_log.append(QueryMetrics(
-                query_hash=query_hash,
-                duration_ms=duration,
-                success=False,
-                error=str(e),
-            ))
+            self._query_log.append(
+                QueryMetrics(
+                    query_hash=query_hash,
+                    duration_ms=duration,
+                    success=False,
+                    error=str(e),
+                )
+            )
             raise
 
 

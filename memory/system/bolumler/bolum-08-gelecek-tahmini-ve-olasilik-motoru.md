@@ -50,8 +50,7 @@ forecasts = forecasting_engine.compute_forecasts("THYAO", features, [1, 2, -1])
 # services/intelligence/probability.py
 from services.intelligence.probability import probability_engine
 
-prob = probability_engine.compute_probability_from_features(
-    {"roc_5d": 5, "momentum_20d": 10, "rsi_14": 60})
+prob = probability_engine.compute_probability_from_features({"roc_5d": 5, "momentum_20d": 10, "rsi_14": 60})
 # probability_positive: 0.68, confidence: 0.36
 ```
 
@@ -68,9 +67,30 @@ from services.intelligence.forecasting import ensemble_forecasting
 
 # Farklı modellerden gelen tahminler
 forecasts = [
-    Forecast(ticker="THYAO", horizon_days=5, predicted_return=1.2, probability_positive=0.6, confidence=0.8, model_source="technical"),
-    Forecast(ticker="THYAO", horizon_days=5, predicted_return=0.8, probability_positive=0.55, confidence=0.7, model_source="ml"),
-    Forecast(ticker="THYAO", horizon_days=5, predicted_return=1.5, probability_positive=0.65, confidence=0.6, model_source="fundamental"),
+    Forecast(
+        ticker="THYAO",
+        horizon_days=5,
+        predicted_return=1.2,
+        probability_positive=0.6,
+        confidence=0.8,
+        model_source="technical",
+    ),
+    Forecast(
+        ticker="THYAO",
+        horizon_days=5,
+        predicted_return=0.8,
+        probability_positive=0.55,
+        confidence=0.7,
+        model_source="ml",
+    ),
+    Forecast(
+        ticker="THYAO",
+        horizon_days=5,
+        predicted_return=1.5,
+        probability_positive=0.65,
+        confidence=0.6,
+        model_source="fundamental",
+    ),
 ]
 
 combined = ensemble_forecasting.combine_forecasts(forecasts)

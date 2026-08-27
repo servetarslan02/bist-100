@@ -27,6 +27,7 @@ logger = structlog.get_logger()
 @dataclass
 class FeatureImportanceRecord:
     """Feature importance kaydı."""
+
     date: str
     feature: str
     importance: float
@@ -37,6 +38,7 @@ class FeatureImportanceRecord:
 @dataclass
 class FeatureTrend:
     """Feature trend bilgisi."""
+
     feature: str
     avg_importance: float
     trend: str  # increasing, decreasing, stable
@@ -77,9 +79,7 @@ class FeatureImportanceTracker:
         sample_size = sample_size or cfg.shap_sample_size
 
         # SHAP hesapla
-        result = SHAPHelpers.compute_shap_values(
-            model, X, feature_names, sample_size=sample_size
-        )
+        result = SHAPHelpers.compute_shap_values(model, X, feature_names, sample_size=sample_size)
 
         # Kaydet
         for name, importance in result.feature_importance.items():
@@ -103,9 +103,7 @@ class FeatureImportanceTracker:
         # Son importance
         self._last_importance = result.feature_importance
 
-        logger.info("Feature importance tracked",
-                   features=len(result.feature_importance),
-                   regime=regime, date=date)
+        logger.info("Feature importance tracked", features=len(result.feature_importance), regime=regime, date=date)
 
     def get_trends(
         self,
@@ -161,11 +159,13 @@ class FeatureImportanceTracker:
             )
 
         # Top N
-        sorted_trends = dict(sorted(
-            trends.items(),
-            key=lambda x: x[1].avg_importance,
-            reverse=True,
-        )[:top_n])
+        sorted_trends = dict(
+            sorted(
+                trends.items(),
+                key=lambda x: x[1].avg_importance,
+                reverse=True,
+            )[:top_n]
+        )
 
         return sorted_trends
 
@@ -188,11 +188,7 @@ class FeatureImportanceTracker:
         for h in regime_data:
             feature_values[h.feature].append(h.importance)
 
-        return {
-            feature: round(float(np.mean(values)), 6)
-            for feature, values in feature_values.items()
-            if values
-        }
+        return {feature: round(float(np.mean(values)), 6) for feature, values in feature_values.items() if values}
 
     def suggest_feature_selection(
         self,
@@ -204,7 +200,8 @@ class FeatureImportanceTracker:
 
         trends = self.get_trends(top_n=200)
         return [
-            feature for feature, trend in trends.items()
+            feature
+            for feature, trend in trends.items()
             if trend.avg_importance < min_importance and trend.trend == "decreasing"
         ]
 
@@ -215,10 +212,7 @@ class FeatureImportanceTracker:
             "status": "OK",
             "total_records": len(self._history),
             "unique_features": len(set(h.feature for h in self._history)),
-            "top_features": {
-                f: {"importance": t.avg_importance, "trend": t.trend}
-                for f, t in trends.items()
-            },
+            "top_features": {f: {"importance": t.avg_importance, "trend": t.trend} for f, t in trends.items()},
             "last_importance": self._last_importance,
         }
 

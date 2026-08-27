@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 @dataclass
 class ScenarioResult:
     """Tek bir senaryo için performans sonucu."""
+
     scenario: LiquidityScenario
     total_return_pct: float
     cagr_pct: float
@@ -102,11 +103,7 @@ class LiquidityScenarioManager:
                 "OPTIMISTIC_ONLY_BIAS: Strategy is profitable ONLY under optimistic liquidity assumptions"
             )
 
-        is_valid = (
-            len(rejection_reasons) == 0
-            and passed_normal_return
-            and passed_stress
-        )
+        is_valid = len(rejection_reasons) == 0 and passed_normal_return and passed_stress
 
         decision = "VALID_QUANT_STRATEGY" if is_valid else "INVALID_STRATEGY"
 

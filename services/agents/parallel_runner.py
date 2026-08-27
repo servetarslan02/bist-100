@@ -30,6 +30,7 @@ logger = structlog.get_logger()
 @dataclass
 class ParallelRunResult:
     """Paralel çalıştırma sonucu."""
+
     results: dict[AgentRole, AgentResult]
     total_duration_ms: float
     success_count: int
@@ -113,10 +114,7 @@ class ParallelAgentRunner:
         )
 
         # Paralel çalıştır
-        coroutines = [
-            self._run_one_with_semaphore(role, agent, task, llm_client)
-            for role, agent, task in agent_tasks
-        ]
+        coroutines = [self._run_one_with_semaphore(role, agent, task, llm_client) for role, agent, task in agent_tasks]
 
         gathered_results = await asyncio.gather(
             *coroutines,
@@ -196,9 +194,7 @@ class ParallelAgentRunner:
         """Timeout sonucu oluştur."""
         fallback_output = {}
         if self.enable_fallback:
-            fallback_output = AIFallback.rule_based_analysis(
-                task.context.get("features", {}), task.ticker
-            )
+            fallback_output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
             fallback_output["source"] = "fallback_timeout"
 
         return AgentResult(
@@ -217,15 +213,11 @@ class ParallelAgentRunner:
             error=f"Timeout after {self.timeout_seconds}s",
         )
 
-    def _create_error_result(
-        self, task: AgentTask, role: AgentRole, error: str
-    ) -> AgentResult:
+    def _create_error_result(self, task: AgentTask, role: AgentRole, error: str) -> AgentResult:
         """Hata sonucu oluştur."""
         fallback_output = {}
         if self.enable_fallback:
-            fallback_output = AIFallback.rule_based_analysis(
-                task.context.get("features", {}), task.ticker
-            )
+            fallback_output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
             fallback_output["source"] = "fallback_error"
 
         return AgentResult(
@@ -264,8 +256,10 @@ class AgentPipelineBuilder:
     def with_default_agents(self) -> "AgentPipelineBuilder":
         """Varsayılan agent'ları ekle."""
         for role in [
-            AgentRole.TECHNICAL, AgentRole.FUNDAMENTAL,
-            AgentRole.NEWS, AgentRole.MACRO,
+            AgentRole.TECHNICAL,
+            AgentRole.FUNDAMENTAL,
+            AgentRole.NEWS,
+            AgentRole.MACRO,
         ]:
             self._agents[role] = BaseAgent(role, llm_client=self.llm_client)
         return self
@@ -295,6 +289,4 @@ class AgentPipelineBuilder:
                 template_name=template_map.get(role),
             )
 
-        return await self._runner.run_agents(
-            self._agents, tasks, self.llm_client
-        )
+        return await self._runner.run_agents(self._agents, tasks, self.llm_client)

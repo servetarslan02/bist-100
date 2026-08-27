@@ -75,12 +75,11 @@ def test_multi_day_t2_roll():
 
         # 3 gün sonra: T+2 → T+1 → T+0 → settled'a düşmeli
         expected_settled = initial_settled + initial_t1 + initial_t2
-        assert portfolio.settled_cash == expected_settled, \
+        assert portfolio.settled_cash == expected_settled, (
             f"Expected settled={expected_settled}, got {portfolio.settled_cash}"
-        assert portfolio.unsettled_cash_t1 == 0.0, \
-            f"Expected t1=0, got {portfolio.unsettled_cash_t1}"
-        assert portfolio.unsettled_cash_t2 == 0.0, \
-            f"Expected t2=0, got {portfolio.unsettled_cash_t2}"
+        )
+        assert portfolio.unsettled_cash_t1 == 0.0, f"Expected t1=0, got {portfolio.unsettled_cash_t1}"
+        assert portfolio.unsettled_cash_t2 == 0.0, f"Expected t2=0, got {portfolio.unsettled_cash_t2}"
 
         print(f"  ✅ T+2 roll: 3 gün sonunda settled={portfolio.settled_cash:.0f}")
         print(f"     Başlangıç: settled={initial_settled:.0f}, t1={initial_t1:.0f}, t2={initial_t2:.0f}")
@@ -116,9 +115,7 @@ def test_pending_signal_expiry():
         # Not: expires_at 1 gün sonra, bu yüzden 0 gün ile temizlemek için
         # doğrudan DB'yi manipüle edelim
         with store._connect() as conn:
-            conn.execute(
-                "UPDATE pending_signals SET expires_at = '2020-01-01T00:00:00'"
-            )
+            conn.execute("UPDATE pending_signals SET expires_at = '2020-01-01T00:00:00'")
             conn.commit()
 
         cleared = store.clear_stale_pending_signals(max_age_days=1)
@@ -159,8 +156,7 @@ def test_kill_switch_auto_reset():
         # Recovery çalıştır (yeni gün)
         result = orchestrator.recover_from_downtime("2026-08-25")
 
-        assert not orchestrator.risk_gate.is_kill_switch_active(), \
-            "Kill switch should be reset after recovery"
+        assert not orchestrator.risk_gate.is_kill_switch_active(), "Kill switch should be reset after recovery"
 
         print("  ✅ Kill switch otomatik resetlendi")
         print(f"     Gap gün sayısı: {result['gap_days']}")
@@ -187,8 +183,7 @@ def test_equity_curve_gap_fill():
 
         # Mevcut equity curve'e bir kayıt ekle
         orchestrator.portfolio._equity_curve = [
-            {"date": "2026-08-20", "equity": 1_050_000, "cash": 500_000,
-             "settled_cash": 500_000, "invested": 550_000}
+            {"date": "2026-08-20", "equity": 1_050_000, "cash": 500_000, "settled_cash": 500_000, "invested": 550_000}
         ]
 
         # Recovery çalıştır (5 gün gap)
@@ -279,7 +274,6 @@ def test_holiday_calendar_extended():
     """Test 9: Holiday takvimi 2028+ yılları içeriyor mu?"""
     print("\n=== TEST 9: Holiday Calendar Extended ===")
 
-
     from services.scheduler.unified_scheduler import HolidayProvider
 
     provider = HolidayProvider()
@@ -314,13 +308,21 @@ def test_force_price_refresh():
         # Pozisyon ekle
         portfolio._positions = {
             "THYAO": {
-                "ticker": "THYAO", "quantity": 100, "avg_cost": 280.0,
-                "current_price": 280.0, "market_value": 28000, "sector": "ULAŞTIRMA"
+                "ticker": "THYAO",
+                "quantity": 100,
+                "avg_cost": 280.0,
+                "current_price": 280.0,
+                "market_value": 28000,
+                "sector": "ULAŞTIRMA",
             },
             "GARAN": {
-                "ticker": "GARAN", "quantity": 200, "avg_cost": 120.0,
-                "current_price": 120.0, "market_value": 24000, "sector": "BANKA"
-            }
+                "ticker": "GARAN",
+                "quantity": 200,
+                "avg_cost": 120.0,
+                "current_price": 120.0,
+                "market_value": 24000,
+                "sector": "BANKA",
+            },
         }
 
         # Force refresh (Redis yoksa mevcut fiyatları korumalı)

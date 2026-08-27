@@ -41,7 +41,7 @@ class HyperOptimizer:
                     ds_train,
                     num_boost_round=100,
                     valid_sets=[ds_val],
-                    callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=False)]
+                    callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=False)],
                 )
 
                 preds = gbm.predict(X_v)

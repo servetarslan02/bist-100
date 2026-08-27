@@ -37,12 +37,7 @@ class CompanyMemory:
     def facts_at(self, company_id: str, as_of: datetime) -> list[CompanyFact]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone aware")
-        return [
-            fact
-            for fact in self._facts
-            if fact.company_id == company_id
-            and fact.effective_at <= as_of
-        ]
+        return [fact for fact in self._facts if fact.company_id == company_id and fact.effective_at <= as_of]
 
     def all_facts(self) -> tuple[CompanyFact, ...]:
         return tuple(self._facts)

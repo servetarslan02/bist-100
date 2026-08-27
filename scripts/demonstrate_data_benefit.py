@@ -11,7 +11,7 @@ import orjson
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 print("=" * 85)
 print("ÇOKLU VERİ AKIŞININ (KAP, HABER, SOSYAL, BİLANÇO, MAKRO) SİSTEME KÂR KANITI")
@@ -25,10 +25,10 @@ scenarios = [
         "pure_technical_decision": "AL (Sırf fiyata ve RSI/Momentum'a bakarak tepe fiyattan alır)",
         "pure_technical_pnl": "-%18.50 ZARAR (Tepe alımı sonrası çakılma)",
         "multi_data_features": {
-            "kap_news_sentiment": -0.10, # KAP'ta hiçbir yeni iş/sözleşme yok
-            "social_volume_zscore": +4.20, # Sosyal medyada aşırı manipülatif şişirme (FOMO)
-            "institutional_flow_zscore": -1.85, # Kurumsal/büyük fonlar hisseyi satıp çıkıyor
-            "sector_norm_pe_ratio": 3.80, # Şirket sektöre göre 4 kat pahalı balon
+            "kap_news_sentiment": -0.10,  # KAP'ta hiçbir yeni iş/sözleşme yok
+            "social_volume_zscore": +4.20,  # Sosyal medyada aşırı manipülatif şişirme (FOMO)
+            "institutional_flow_zscore": -1.85,  # Kurumsal/büyük fonlar hisseyi satıp çıkıyor
+            "sector_norm_pe_ratio": 3.80,  # Şirket sektöre göre 4 kat pahalı balon
         },
         "alpha_engine_interpretation": "Manipülatif Perakende Şişirmesi & Kurumsal Çıkış Tespiti",
         "alpha_engine_decision": "ENGELLE / ALIM YAPMA (Sermayeyi Koru)",
@@ -41,10 +41,10 @@ scenarios = [
         "pure_technical_decision": "SAT / BEKLE (Teknik göstergeler bozuldu diye dipten satar)",
         "pure_technical_pnl": "-%4.50 ZARAR ile pozisyonu kapatır, toparlanmayı kaçırır",
         "multi_data_features": {
-            "kap_news_sentiment": +0.65, # KAP: İştirakinden rekor temettü/kâr kararı geldi
-            "why_falling_cause": "MARKET_SELLOFF", # Düşüş şirketten değil, endeks paniginden
-            "fcf_yield_pct": 14.2, # Güçlü nakit akışı
-            "pe_discount_vs_sector": -35.0, # Sektöre göre %35 iskontolu ucuz
+            "kap_news_sentiment": +0.65,  # KAP: İştirakinden rekor temettü/kâr kararı geldi
+            "why_falling_cause": "MARKET_SELLOFF",  # Düşüş şirketten değil, endeks paniginden
+            "fcf_yield_pct": 14.2,  # Güçlü nakit akışı
+            "pe_discount_vs_sector": -35.0,  # Sektöre göre %35 iskontolu ucuz
         },
         "alpha_engine_interpretation": "Geçici Piyasa Paniğinde İskontolu ve Temeli Sağlam Şirket Fırsatı",
         "alpha_engine_decision": "GÜÇLÜ AL (Dipte Pozisyon Büyüt)",
@@ -57,14 +57,14 @@ scenarios = [
         "pure_technical_decision": "İki hissenin de grafiği aynıysa ikisine de aynı kararı verir",
         "pure_technical_pnl": "Nötr / Rastgele",
         "multi_data_features": {
-            "macro_brent_spike": +26.6, # Ham petrol artışı
+            "macro_brent_spike": +26.6,  # Ham petrol artışı
             "tuprs_crack_spread": "POZİTİF MARJ GENİŞLEMESİ (Rafineri kârlılığı artar)",
             "thyao_fuel_cost": "NEGATİF MALİYET BASKISI (Akaryakıt gideri %40'ı bulur)",
         },
         "alpha_engine_interpretation": "Makro Verinin Şirket Bilançosuna Birebir Çevrilmesi",
         "alpha_engine_decision": "TUPRS için ALIM Ağırlığını Artır | THYAO Riskini Azalt/Koru",
         "alpha_engine_pnl": "+%14.20 KÂR (Sektörel doğru rotasyon kârı)",
-    }
+    },
 ]
 
 for s in scenarios:

@@ -66,8 +66,7 @@ class HistoricalIngestionPipeline:
                 last_dt = datetime.fromisoformat(last_ingestion)
                 hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:  # 1 saatten az geçtiyse skip
-                    logger.info("Fundamental ingestion skipped (too recent)",
-                              hours_since=round(hours_since, 1))
+                    logger.info("Fundamental ingestion skipped (too recent)", hours_since=round(hours_since, 1))
                     return {"status": "skipped", "reason": "too_recent"}
             except ValueError:
                 logger.warning("Data error in ingest_fundamentals: ValueError", exc_info=True)
@@ -75,9 +74,7 @@ class HistoricalIngestionPipeline:
         success_count = 0
         for ticker in tickers:
             try:
-                snapshots = self._fund_provider.fetch_historical_fundamentals(
-                    ticker, max_periods=8
-                )
+                snapshots = self._fund_provider.fetch_historical_fundamentals(ticker, max_periods=8)
 
                 if not snapshots:
                     results[ticker] = "no_data"
@@ -97,19 +94,14 @@ class HistoricalIngestionPipeline:
                 success_count += 1
 
             except Exception as e:
-                logger.error("Fundamental ingestion failed",
-                           ticker=ticker, error=str(e))
+                logger.error("Fundamental ingestion failed", ticker=ticker, error=str(e))
                 results[ticker] = str(e)
 
         # Son ingestion timestamp'ini güncelle
         if success_count > 0:
-            self._repo.set_last_ingestion_time(
-                "fundamental",
-                datetime.now(UTC).isoformat()
-            )
+            self._repo.set_last_ingestion_time("fundamental", datetime.now(UTC).isoformat())
 
-        logger.info("Fundamental ingestion completed",
-                   tickers=len(tickers), success=success_count)
+        logger.info("Fundamental ingestion completed", tickers=len(tickers), success=success_count)
 
         return results
 
@@ -137,14 +129,14 @@ class HistoricalIngestionPipeline:
                 last_dt = datetime.fromisoformat(last_ingestion)
                 hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:
-                    logger.info("KAP ingestion skipped (too recent)",
-                              hours_since=round(hours_since, 1))
+                    logger.info("KAP ingestion skipped (too recent)", hours_since=round(hours_since, 1))
                     return {"status": "skipped", "reason": "too_recent"}
             except ValueError:
                 logger.warning("Data error in ingest_kap_events: ValueError", exc_info=True)
 
         try:
             from ..ingestion.providers.kap_provider import KAPProvider
+
             kap = KAPProvider()
         except ImportError:
             logger.error("KAP provider not available")
@@ -157,6 +149,7 @@ class HistoricalIngestionPipeline:
         for ticker in tickers:
             try:
                 import asyncio
+
                 events = asyncio.run(
                     kap.fetch_disclosures(
                         from_date=from_date,
@@ -195,18 +188,13 @@ class HistoricalIngestionPipeline:
                 success_count += 1
 
             except Exception as e:
-                logger.error("KAP ingestion failed",
-                           ticker=ticker, error=str(e))
+                logger.error("KAP ingestion failed", ticker=ticker, error=str(e))
                 results[ticker] = str(e)
 
         if success_count > 0:
-            self._repo.set_last_ingestion_time(
-                "kap",
-                datetime.now(UTC).isoformat()
-            )
+            self._repo.set_last_ingestion_time("kap", datetime.now(UTC).isoformat())
 
-        logger.info("KAP ingestion completed",
-                   tickers=len(tickers), success=success_count)
+        logger.info("KAP ingestion completed", tickers=len(tickers), success=success_count)
 
         return results
 
@@ -241,6 +229,7 @@ class HistoricalIngestionPipeline:
 
         try:
             from ..ingestion.providers.news_provider import NewsProvider
+
             news = NewsProvider()
         except ImportError:
             logger.error("News provider not available")
@@ -248,6 +237,7 @@ class HistoricalIngestionPipeline:
 
         try:
             import asyncio
+
             raw_news = asyncio.run(news.fetch_financial_news_rss())
         except Exception as e:
             logger.error("News fetch failed", error=str(e))
@@ -273,9 +263,8 @@ class HistoricalIngestionPipeline:
                     continue
 
                 import hashlib
-                event_id = hashlib.md5(
-                    f"{pub_date}:{title}:{ticker}".encode()
-                ).hexdigest()[:16]
+
+                event_id = hashlib.md5(f"{pub_date}:{title}:{ticker}".encode()).hexdigest()[:16]
 
                 snapshot = EventSnapshot(
                     event_id=event_id,
@@ -292,13 +281,9 @@ class HistoricalIngestionPipeline:
                 if self._repo.add_event_snapshot(snapshot):
                     saved_total += 1
 
-        self._repo.set_last_ingestion_time(
-            "news",
-            datetime.now(UTC).isoformat()
-        )
+        self._repo.set_last_ingestion_time("news", datetime.now(UTC).isoformat())
 
-        logger.info("News ingestion completed",
-                   tickers=len(tickers), events=saved_total)
+        logger.info("News ingestion completed", tickers=len(tickers), events=saved_total)
 
         return {"status": "ok", "events": saved_total}
 
@@ -320,13 +305,13 @@ class HistoricalIngestionPipeline:
                 """SELECT * FROM event_snapshots
                    WHERE ticker = ? AND source = 'kap'
                    ORDER BY published_at DESC""",
-                (ticker,)
+                (ticker,),
             ).fetchall()
 
             saved = 0
             for row in rows:
-                category = row['event_type']
-                published_at = row['published_at']
+                category = row["event_type"]
+                published_at = row["published_at"]
 
                 # Catalyst türünü belirle
                 catalyst_type = self._category_to_catalyst_type(category)
@@ -336,7 +321,8 @@ class HistoricalIngestionPipeline:
                 # Event date: published_at + 30 gün (tahmini)
                 try:
                     from datetime import timedelta
-                    pub_dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
+
+                    pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                     event_dt = pub_dt + timedelta(days=30)
                     event_date = event_dt.strftime("%Y-%m-%d")
                 except (ValueError, TypeError):
@@ -348,7 +334,7 @@ class HistoricalIngestionPipeline:
                     announcement_date=published_at[:10],
                     event_date=event_date,
                     catalyst_type=catalyst_type,
-                    importance=row['importance'],
+                    importance=row["importance"],
                     source="kap",
                 )
 

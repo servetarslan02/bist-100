@@ -202,8 +202,7 @@ Borsadan çıkmış şirketler tarihsel analizde tutulmalı.
 from services.ingestion.universe_enhancements import survivorship_bias
 
 survivorship_bias.mark_delisted("OLD_COMPANY", "2025-01-01", "bankruptcy")
-active = survivorship_bias.get_active_universe(
-    ["THYAO", "OLD_COMPANY", "ASELS"], "2026-01-01")
+active = survivorship_bias.get_active_universe(["THYAO", "OLD_COMPANY", "ASELS"], "2026-01-01")
 # active = ["THYAO", "ASELS"] (OLD_COMPANY çıkarıldı)
 ```
 
@@ -232,10 +231,8 @@ from services.intelligence.research_memory import data_lineage, LineageNode
 
 # Ham veri → Feature → Model → Prediction zinciri
 data_lineage.add_node(LineageNode("raw_data", "price_THYAO", "2026-08-15T10:00:00"))
-data_lineage.add_node(LineageNode("feature", "rsi_THYAO", "2026-08-15T10:00:01",
-    parent_ids=["raw_data:price_THYAO"]))
-data_lineage.add_node(LineageNode("prediction", "pred_THYAO", "2026-08-15T10:00:02",
-    parent_ids=["feature:rsi_THYAO"]))
+data_lineage.add_node(LineageNode("feature", "rsi_THYAO", "2026-08-15T10:00:01", parent_ids=["raw_data:price_THYAO"]))
+data_lineage.add_node(LineageNode("prediction", "pred_THYAO", "2026-08-15T10:00:02", parent_ids=["feature:rsi_THYAO"]))
 
 # İleriye doğru izle (raw → feature → prediction)
 forward = data_lineage.trace_forward("raw_data", "price_THYAO")

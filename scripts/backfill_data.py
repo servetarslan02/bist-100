@@ -45,7 +45,8 @@ async def backfill_ticker(ticker: str, start_date: str, end_date: str):
                        (instrument_id, snapshot_date, data_source, bar_count, first_bar_date, last_bar_date, quality_score)
                        VALUES ((SELECT id FROM instruments WHERE symbol = $1), $2, 'yfinance', 1, $2, $2, 1.0)
                        ON CONFLICT (instrument_id, snapshot_date, data_source) DO NOTHING""",
-                    ticker, date_str
+                    ticker,
+                    date_str,
                 )
                 count += 1
             except Exception as e:
@@ -68,10 +69,12 @@ async def main():
     args = parser.parse_args()
 
     from services.core.database import init_databases
+
     await init_databases()
 
     if args.all_bist100:
         from services.ingestion.bist_universe import bist_universe
+
         tickers = bist_universe.BIST_100_TICKERS
     elif args.tickers:
         tickers = args.tickers.split(",")

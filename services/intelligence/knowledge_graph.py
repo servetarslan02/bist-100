@@ -26,8 +26,9 @@ logger = structlog.get_logger()
 @dataclass
 class Entity:
     """Knowledge entity."""
+
     entity_id: str
-    entity_type: str   # company, sector, person, event, macro, product
+    entity_type: str  # company, sector, person, event, macro, product
     name: str
     aliases: list[str] = field(default_factory=list)
     properties: dict[str, Any] = field(default_factory=dict)
@@ -36,6 +37,7 @@ class Entity:
 @dataclass
 class Relation:
     """Entity ilişkisi."""
+
     source_id: str
     target_id: str
     relation_type: str  # belongs_to, supplies, manages, affected_by, correlated_with
@@ -156,64 +158,100 @@ class KnowledgeGraph:
         """Varsayılan BIST entity'lerini yükle."""
         # Sektörler
         sectors = [
-            "BANK", "INDUST", "TECH", "ENERGY", "RETAIL", "CONSTR",
-            "FOOD", "CHEM", "METAL", "TELECOM", "HEALTH", "REAL",
-            "AUTO", "TEXTIL", "AVIATION", "HOLDING",
+            "BANK",
+            "INDUST",
+            "TECH",
+            "ENERGY",
+            "RETAIL",
+            "CONSTR",
+            "FOOD",
+            "CHEM",
+            "METAL",
+            "TELECOM",
+            "HEALTH",
+            "REAL",
+            "AUTO",
+            "TEXTIL",
+            "AVIATION",
+            "HOLDING",
         ]
         for s in sectors:
-            self.add_entity(Entity(
-                entity_id=f"sector_{s}",
-                entity_type="sector",
-                name=s,
-            ))
+            self.add_entity(
+                Entity(
+                    entity_id=f"sector_{s}",
+                    entity_type="sector",
+                    name=s,
+                )
+            )
 
         # Macro entities
         macros = [
-            ("USDTRY", "currency"), ("EURTRY", "currency"),
-            ("TCMB_RATE", "rate"), ("CPI", "inflation"),
-            ("VIX", "volatility"), ("OIL", "commodity"),
-            ("GOLD", "commodity"), ("SP500", "index"),
+            ("USDTRY", "currency"),
+            ("EURTRY", "currency"),
+            ("TCMB_RATE", "rate"),
+            ("CPI", "inflation"),
+            ("VIX", "volatility"),
+            ("OIL", "commodity"),
+            ("GOLD", "commodity"),
+            ("SP500", "index"),
         ]
         for name, mtype in macros:
-            self.add_entity(Entity(
-                entity_id=f"macro_{name}",
-                entity_type="macro",
-                name=name,
-                properties={"type": mtype},
-            ))
+            self.add_entity(
+                Entity(
+                    entity_id=f"macro_{name}",
+                    entity_type="macro",
+                    name=name,
+                    properties={"type": mtype},
+                )
+            )
 
         # Macro → Sector ilişkileri
         macro_sector_relations = [
-            ("USDTRY", "AVIATION", -0.8), ("USDTRY", "BANK", -0.3),
-            ("USDTRY", "ENERGY", 0.5), ("USDTRY", "TECH", 0.4),
+            ("USDTRY", "AVIATION", -0.8),
+            ("USDTRY", "BANK", -0.3),
+            ("USDTRY", "ENERGY", 0.5),
+            ("USDTRY", "TECH", 0.4),
             ("USDTRY", "RETAIL", -0.6),
-            ("TCMB_RATE", "BANK", 0.9), ("TCMB_RATE", "REAL", -0.5),
-            ("OIL", "AVIATION", -0.9), ("OIL", "ENERGY", 0.9),
-            ("VIX", "BANK", -0.6), ("VIX", "TECH", -0.5),
+            ("TCMB_RATE", "BANK", 0.9),
+            ("TCMB_RATE", "REAL", -0.5),
+            ("OIL", "AVIATION", -0.9),
+            ("OIL", "ENERGY", 0.9),
+            ("VIX", "BANK", -0.6),
+            ("VIX", "TECH", -0.5),
         ]
         for macro, sector, strength in macro_sector_relations:
-            self.add_relation(Relation(
-                source_id=f"macro_{macro}",
-                target_id=f"sector_{sector}",
-                relation_type="affects",
-                strength=strength,
-            ))
+            self.add_relation(
+                Relation(
+                    source_id=f"macro_{macro}",
+                    target_id=f"sector_{sector}",
+                    relation_type="affects",
+                    strength=strength,
+                )
+            )
 
-        logger.info("BIST defaults loaded",
-                   entities=len(self._entities),
-                   relations=len(self._relations))
+        logger.info("BIST defaults loaded", entities=len(self._entities), relations=len(self._relations))
 
     def save(self, path: str = "data/knowledge_graph.json"):
         """Graph'u dosyaya kaydet."""
         data = {
             "entities": [
-                {"entity_id": e.entity_id, "entity_type": e.entity_type, "name": e.name,
-                 "aliases": e.aliases, "properties": e.properties}
+                {
+                    "entity_id": e.entity_id,
+                    "entity_type": e.entity_type,
+                    "name": e.name,
+                    "aliases": e.aliases,
+                    "properties": e.properties,
+                }
                 for e in self._entities.values()
             ],
             "relations": [
-                {"source_id": r.source_id, "target_id": r.target_id,
-                 "relation_type": r.relation_type, "strength": r.strength, "properties": r.properties}
+                {
+                    "source_id": r.source_id,
+                    "target_id": r.target_id,
+                    "relation_type": r.relation_type,
+                    "strength": r.strength,
+                    "properties": r.properties,
+                }
                 for r in self._relations
             ],
         }
@@ -233,7 +271,9 @@ class KnowledgeGraph:
                 self.add_entity(Entity(**e))
             for r in data.get("relations", []):
                 self.add_relation(Relation(**r))
-            logger.info("Knowledge graph loaded", path=path, entities=len(self._entities), relations=len(self._relations))
+            logger.info(
+                "Knowledge graph loaded", path=path, entities=len(self._entities), relations=len(self._relations)
+            )
         except Exception as e:
             logger.warning("Failed to load knowledge graph", path=path, error=str(e))
 

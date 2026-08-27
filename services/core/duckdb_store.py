@@ -96,7 +96,7 @@ class DuckDBStore:
     def executescript(self, script: str) -> None:
         """Birden fazla SQL çalıştır."""
         with self._get_conn() as conn:
-            for stmt in script.split(';'):
+            for stmt in script.split(";"):
                 stmt = stmt.strip()
                 if stmt:
                     conn.execute(stmt)

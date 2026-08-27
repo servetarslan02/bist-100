@@ -23,7 +23,6 @@ from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 logger = structlog.get_logger()
 
 
-
 def train_all_models():
     logger.info("=================================================================")
     logger.info("ALPHA BIST — TÜM MAKİNE ÖĞRENİMİ MODELLERİNİ EĞİTME HATTI")
@@ -34,14 +33,43 @@ def train_all_models():
 
     # 1. Sentetik & Tarihsel BIST Feature Matrisi Hazırlığı (252 işlem günü x 50 hisse = 12,600 örneklem)
     logger.info("\n[1] 148 Teknik & Temel Feature ve Çoklu Vade Hedefleri (Labels) Üretiliyor...")
-    tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "PGSUS", "FROTO", "BIMAS", "AKBNK", "SISE", "POLTK", "SDTTR", "KONYA", "REEDR", "FORTE"]
+    tickers = [
+        "THYAO",
+        "ASELS",
+        "GARAN",
+        "KCHOL",
+        "TUPRS",
+        "PGSUS",
+        "FROTO",
+        "BIMAS",
+        "AKBNK",
+        "SISE",
+        "POLTK",
+        "SDTTR",
+        "KONYA",
+        "REEDR",
+        "FORTE",
+    ]
     n_samples = 1200
 
     feature_names = [
-        "momentum_20d", "roc_5d", "roc_20d", "volume_zscore", "rs_vs_bist_5d",
-        "relative_strength_vs_sector", "bb_position", "price_vs_sma20", "price_vs_sma50",
-        "trend_slope_20d", "trend_r2_20d", "fcf_yield_pct", "sector_norm_pe_ratio",
-        "kap_sentiment_avg", "flow_score", "atr_pct", "volatility_20d"
+        "momentum_20d",
+        "roc_5d",
+        "roc_20d",
+        "volume_zscore",
+        "rs_vs_bist_5d",
+        "relative_strength_vs_sector",
+        "bb_position",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "trend_slope_20d",
+        "trend_r2_20d",
+        "fcf_yield_pct",
+        "sector_norm_pe_ratio",
+        "kap_sentiment_avg",
+        "flow_score",
+        "atr_pct",
+        "volatility_20d",
     ]
 
     features_map = {}
@@ -64,10 +92,10 @@ def train_all_models():
 
         # Hedef getiri (Target Label): Feature'lar ile korele + piyasa gürültüsü
         fwd_return = (
-            0.35 * feat_dict["momentum_20d"] +
-            0.25 * feat_dict["roc_5d"] +
-            0.20 * feat_dict["volume_zscore"] +
-            np.random.normal(0.0, 1.8)
+            0.35 * feat_dict["momentum_20d"]
+            + 0.25 * feat_dict["roc_5d"]
+            + 0.20 * feat_dict["volume_zscore"]
+            + np.random.normal(0.0, 1.8)
         )
 
         features_map[t_key] = feat_dict
@@ -88,6 +116,7 @@ def train_all_models():
         logger.info(f"  • Yön Doğruluğu: %{trained_lgb.validation_metrics.get('directional_accuracy', 0.68) * 100:.1f}")
         logger.info(f"  • Information Coefficient (IC): {trained_lgb.validation_metrics.get('ic', 0.14):.4f}")
         from services.core.safe_pickle import safe_pickle_dump
+
         safe_pickle_dump(trained_lgb, "models/lightgbm_lambdarank.pkl")
         logger.info("  • Model Kaydedildi: models/lightgbm_lambdarank.pkl")
 

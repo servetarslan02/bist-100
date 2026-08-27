@@ -20,11 +20,12 @@ logger = structlog.get_logger()
 @dataclass
 class MarketRestrictionRecord:
     """Zaman damgalı KAP piyasa kısıtı ve tedbir kaydı."""
+
     ticker: str
-    restriction_type: str        # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "CIRCUIT_BREAKER"
-    published_at: str            # ISO Timestamp (KAP yayin zamani)
-    effective_date: str          # Yürürlüğe girdiği ilk seans tarihi (YYYY-MM-DD)
-    end_date: str | None = None # Tedbirin bittiği tarih (YYYY-MM-DD)
+    restriction_type: str  # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "CIRCUIT_BREAKER"
+    published_at: str  # ISO Timestamp (KAP yayin zamani)
+    effective_date: str  # Yürürlüğe girdiği ilk seans tarihi (YYYY-MM-DD)
+    end_date: str | None = None  # Tedbirin bittiği tarih (YYYY-MM-DD)
     details: str = ""
 
 
@@ -66,9 +67,13 @@ class KAPMarketRestrictionRegistry:
         elif restriction_type == "VBTS_SHORT_BAN":
             self._short_ban_tickers.add(ticker)
 
-        logger.info("KAP Market Restriction Registered",
-                    ticker=ticker, type=restriction_type,
-                    published=published_at, effective=effective_date)
+        logger.info(
+            "KAP Market Restriction Registered",
+            ticker=ticker,
+            type=restriction_type,
+            published=published_at,
+            effective=effective_date,
+        )
 
     def is_halted(self, ticker: str, current_date: str) -> bool:
         """Hisse belirtilen işlem gününde durdurulmuş mu?"""

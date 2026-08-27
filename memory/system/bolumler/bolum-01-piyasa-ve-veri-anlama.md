@@ -174,14 +174,11 @@ from services.core.pit_store import pit_store
 from datetime import datetime, timezone
 
 # Bilanço düzeltmesi
-pit_store.insert("THYAO", "pe_ratio", 8.5,
-    valid_from=datetime(2026, 3, 31, tzinfo=timezone.utc), source="kap")
-pit_store.insert("THYAO", "pe_ratio", 9.0,
-    valid_from=datetime(2026, 4, 30, tzinfo=timezone.utc), source="kap")
+pit_store.insert("THYAO", "pe_ratio", 8.5, valid_from=datetime(2026, 3, 31, tzinfo=timezone.utc), source="kap")
+pit_store.insert("THYAO", "pe_ratio", 9.0, valid_from=datetime(2026, 4, 30, tzinfo=timezone.utc), source="kap")
 
 # Backtest'te sadece o tarihte bilinen veriyi gör
-val = pit_store.get_as_of("THYAO", "pe_ratio",
-    as_of_date=datetime(2026, 4, 15, tzinfo=timezone.utc))
+val = pit_store.get_as_of("THYAO", "pe_ratio", as_of_date=datetime(2026, 4, 15, tzinfo=timezone.utc))
 # val = 8.5 (düzeltilmiş 9.0 henüz bilinmiyordu!)
 ```
 
@@ -219,10 +216,12 @@ from services.portfolio.enhancements import multi_currency
 try_amount = multi_currency.convert(1000, "USD", "TRY")
 # try_amount = 47880 (USD/TRY = 47.88)
 
-fx_impact = multi_currency.get_fx_impact([
-    {"value": 10000, "currency": "TRY"},
-    {"value": 5000, "currency": "USD"},
-])
+fx_impact = multi_currency.get_fx_impact(
+    [
+        {"value": 10000, "currency": "TRY"},
+        {"value": 5000, "currency": "USD"},
+    ]
+)
 # fx_impact = {"total_try": 249400, "total_usd": 5220}
 ```
 

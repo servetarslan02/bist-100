@@ -47,10 +47,26 @@ async def test_clean_migration():
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%' ORDER BY name"
     )
     table_names = [t["name"] for t in tables]
-    expected = ['audit_logs', 'cash_ledger', 'companies', 'daily_pnl', 'equity_snapshots',
-                'fills', 'instruments', 'model_versions', 'models', 'orders', 'portfolios',
-                'position_history', 'positions', 'schema_migrations', 'sectors', 'signals',
-                'strategies', 'system_config']
+    expected = [
+        "audit_logs",
+        "cash_ledger",
+        "companies",
+        "daily_pnl",
+        "equity_snapshots",
+        "fills",
+        "instruments",
+        "model_versions",
+        "models",
+        "orders",
+        "portfolios",
+        "position_history",
+        "positions",
+        "schema_migrations",
+        "sectors",
+        "signals",
+        "strategies",
+        "system_config",
+    ]
     for t in expected:
         if t not in table_names:
             issues.append(f"Tablo eksik: {t}")
@@ -143,9 +159,7 @@ async def test_rollback():
         issues.append(f"Rollback sonrası version: {version} != 1")
 
     # v2 tabloları silinmeli
-    tables = await runner._fetchall(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%'"
-    )
+    tables = await runner._fetchall("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite%'")
     table_names = [t["name"] for t in tables]
     for t in ["cash_ledger", "position_history", "equity_snapshots", "daily_pnl"]:
         if t in table_names:
@@ -220,7 +234,9 @@ async def test_data_preservation():
 
     # Veri ekle
     db.execute("INSERT INTO sectors (code, name) VALUES ('BANK', 'Bankacılık')")
-    db.execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'THY', id FROM sectors WHERE code = 'BANK'")
+    db.execute(
+        "INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'THY', id FROM sectors WHERE code = 'BANK'"
+    )
     db.execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO'")
     db.execute("INSERT INTO portfolios (name, initial_capital, cash_balance) VALUES ('P1', 100000, 100000)")
     db.execute("""INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, status)
@@ -233,7 +249,12 @@ async def test_data_preservation():
         return "Data Preservation", False, ["Pozisyon verisi bulunamadı"]
 
     # entry_commission sütunu var mı? (v003)
-    if "entry_commission" not in [c["name"] for c in await runner._fetchall("SELECT column_name FROM information_schema.columns WHERE table_name = 'positions'")]:
+    if "entry_commission" not in [
+        c["name"]
+        for c in await runner._fetchall(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'positions'"
+        )
+    ]:
         return "Data Preservation", False, ["entry_commission sütunu yok"]
 
     # Veri hâlâ orada
@@ -290,6 +311,7 @@ async def test_migration_file_parse():
 # ============================================================
 # RUN
 # ============================================================
+
 
 async def run_all():
     print("=" * 60)

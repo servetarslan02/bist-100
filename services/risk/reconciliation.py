@@ -19,6 +19,7 @@ logger = structlog.get_logger()
 @dataclass
 class ReconciliationResult:
     """Uzlaştırma sonucu."""
+
     is_consistent: bool
     cash_diff: float
     position_diff: float
@@ -56,7 +57,9 @@ class ReconciliationEngine:
         # Position value kontrolü
         position_diff = abs(ledger_positions_value - db_positions_value)
         if position_diff > tolerance:
-            errors.append(f"Position mismatch: ledger={ledger_positions_value:.2f}, db={db_positions_value:.2f}, diff={position_diff:.2f}")
+            errors.append(
+                f"Position mismatch: ledger={ledger_positions_value:.2f}, db={db_positions_value:.2f}, diff={position_diff:.2f}"
+            )
 
         # Equity kontrolü
         equity_diff = abs(ledger_equity - db_equity)
@@ -67,14 +70,14 @@ class ReconciliationEngine:
         calculated_equity = ledger_cash + ledger_positions_value
         calc_diff = abs(calculated_equity - ledger_equity)
         if calc_diff > tolerance:
-            errors.append(f"Equation mismatch: cash({ledger_cash:.2f}) + positions({ledger_positions_value:.2f}) ≠ equity({ledger_equity:.2f})")
+            errors.append(
+                f"Equation mismatch: cash({ledger_cash:.2f}) + positions({ledger_positions_value:.2f}) ≠ equity({ledger_equity:.2f})"
+            )
 
         is_consistent = len(errors) == 0
 
         if not is_consistent:
-            logger.warning("Portfolio reconciliation FAILED",
-                         portfolio_id=portfolio_id,
-                         errors=errors)
+            logger.warning("Portfolio reconciliation FAILED", portfolio_id=portfolio_id, errors=errors)
 
         return ReconciliationResult(
             is_consistent=is_consistent,

@@ -3,12 +3,12 @@ ALPHA BIST — Real Feature Store
 Redis ve bellek üzerinden anlık canlı öznitelikleri depolar ve sorgular.
 """
 
-
 import structlog
 
 from services.core.redis_helper import get_cached, set_cached
 
 logger = structlog.get_logger()
+
 
 class FeatureStore:
     """Canlı Feature Store erişim katmanı."""
@@ -24,5 +24,6 @@ class FeatureStore:
         """Öznitelikleri kaydet."""
         if features:
             set_cached(f"features:{ticker}", features, ttl=ttl)
+
 
 feature_store = FeatureStore()

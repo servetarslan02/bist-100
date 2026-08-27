@@ -30,6 +30,7 @@ class BistMLScanner:
     def _load_models(self):
         """Kayıtlı modelleri RAM'e yükler (SHA256 doğrulamalı)."""
         from services.core.safe_pickle import safe_pickle_load
+
         for m_name in ["lightgbm", "xgboost", "catboost", "extratrees"]:
             pkl_path = self.models_dir / f"{m_name}_model.pkl"
             if pkl_path.exists():
@@ -105,11 +106,28 @@ class BistMLScanner:
             is_breakout = 1.0 if (near_20d_high == 1.0 and vol_surge >= 1.10 and rsi_14 >= 55.0) else 0.0
             is_dip = 1.0 if (buyer_press >= 50.0 and (rsi_14 <= 32.0 or vol_surge >= 1.20)) else 0.0
 
-            feat_vec = np.array([[
-                rsi_14, atr_pct, ret_1d, ret_5d, ret_20d,
-                vol_surge, buyer_press, near_20d_high, is_breakout, is_dip,
-                1.0 if is_bull else 0.0, bm_dist_sma200, 0.0, bm_ret_5d, bm_vol_20d
-            ]], dtype=np.float32)
+            feat_vec = np.array(
+                [
+                    [
+                        rsi_14,
+                        atr_pct,
+                        ret_1d,
+                        ret_5d,
+                        ret_20d,
+                        vol_surge,
+                        buyer_press,
+                        near_20d_high,
+                        is_breakout,
+                        is_dip,
+                        1.0 if is_bull else 0.0,
+                        bm_dist_sma200,
+                        0.0,
+                        bm_ret_5d,
+                        bm_vol_20d,
+                    ]
+                ],
+                dtype=np.float32,
+            )
 
             # ML Ensemble Tahmini
             pred_scores = []
@@ -147,30 +165,32 @@ class BistMLScanner:
             stop_l = round(max(latest_p - (atr_val * 2.0), latest_p * 0.90), 2)
             risk_rew = round((target_1 - latest_p) / max(latest_p - stop_l, 1e-2), 2)
 
-            candidates.append({
-                "ticker": sym,
-                "symbol": sym,
-                "name": f"{sym} Hisse Senedi",
-                "price": round(latest_p, 2),
-                "change_pct": change_pct,
-                "score": ui_score,
-                "direction": dir_str,
-                "signal": sig_name,
-                "signal_type": sig_name,
-                "spec_category": spec_category,
-                "spec_reason": f"ML Ensemble Skor: {raw_score:.3f} | Alıcı Baskısı: %{buyer_press:.0f} | RSI: {rsi_14:.1f}",
-                "expected_return_pct": round(raw_score * 100.0, 2),
-                "target_price": target_1,
-                "target_price_2": target_2,
-                "stop_loss": stop_l,
-                "risk_reward_ratio": risk_rew,
-                "rsi": round(rsi_14, 1),
-                "volume_ratio": round(vol_surge, 2),
-                "momentum_1m": round(ret_20d, 1),
-                "momentum_3m": round(ret_20d * 2.5, 1),
-                "horizon": "5-10 Gün",
-                "risk_level": "low" if atr_pct < 3.0 else ("med" if atr_pct < 5.5 else "high")
-            })
+            candidates.append(
+                {
+                    "ticker": sym,
+                    "symbol": sym,
+                    "name": f"{sym} Hisse Senedi",
+                    "price": round(latest_p, 2),
+                    "change_pct": change_pct,
+                    "score": ui_score,
+                    "direction": dir_str,
+                    "signal": sig_name,
+                    "signal_type": sig_name,
+                    "spec_category": spec_category,
+                    "spec_reason": f"ML Ensemble Skor: {raw_score:.3f} | Alıcı Baskısı: %{buyer_press:.0f} | RSI: {rsi_14:.1f}",
+                    "expected_return_pct": round(raw_score * 100.0, 2),
+                    "target_price": target_1,
+                    "target_price_2": target_2,
+                    "stop_loss": stop_l,
+                    "risk_reward_ratio": risk_rew,
+                    "rsi": round(rsi_14, 1),
+                    "volume_ratio": round(vol_surge, 2),
+                    "momentum_1m": round(ret_20d, 1),
+                    "momentum_3m": round(ret_20d * 2.5, 1),
+                    "horizon": "5-10 Gün",
+                    "risk_level": "low" if atr_pct < 3.0 else ("med" if atr_pct < 5.5 else "high"),
+                }
+            )
 
         candidates.sort(key=lambda x: x["score"], reverse=True)
         return candidates[:limit]

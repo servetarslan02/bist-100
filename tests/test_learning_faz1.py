@@ -67,11 +67,13 @@ def test_brier_score_overconfident():
     np.random.seed(42)
     predictions = []
     for _i in range(100):
-        predictions.append({
-            "confidence": 0.9,
-            "outcome": 1 if np.random.random() < 0.5 else 0,
-            "regime": "BULL",
-        })
+        predictions.append(
+            {
+                "confidence": 0.9,
+                "outcome": 1 if np.random.random() < 0.5 else 0,
+                "regime": "BULL",
+            }
+        )
     result = cal.calibrate(predictions)
     assert result.brier_score > 0.2, f"Brier score düşük: {result.brier_score}"
     print(f"✅ Brier overconfident: {result.brier_score}")
@@ -85,11 +87,13 @@ def test_ece_overconfident():
     # Hep %90 confidence ama sadece %50 doğru
     predictions = []
     for i in range(100):
-        predictions.append({
-            "confidence": 0.9,
-            "outcome": 1 if i % 2 == 0 else 0,
-            "regime": "BULL",
-        })
+        predictions.append(
+            {
+                "confidence": 0.9,
+                "outcome": 1 if i % 2 == 0 else 0,
+                "regime": "BULL",
+            }
+        )
     result = cal.calibrate(predictions)
     assert result.ece > 0.3, f"ECE düşük: {result.ece}"
     assert result.overconfident is True
@@ -151,8 +155,10 @@ def test_regime_calibration():
     assert "BEAR" in result.regime_calibration
     # BEAR overconfident olmalı
     assert result.regime_calibration["BEAR"]["overconfident"] is True
-    print(f"✅ Regime calibration: BULL={result.regime_calibration['BULL']['brier_score']}, "
-          f"BEAR={result.regime_calibration['BEAR']['brier_score']}")
+    print(
+        f"✅ Regime calibration: BULL={result.regime_calibration['BULL']['brier_score']}, "
+        f"BEAR={result.regime_calibration['BEAR']['brier_score']}"
+    )
 
 
 def test_platt_scaling_fit():
@@ -252,8 +258,7 @@ def test_calibration_report():
     assert "metrics" in report
     assert "diagnosis" in report
     assert "brier_score" in report["metrics"]
-    print(f"✅ Calibration report: brier={report['metrics']['brier_score']}, "
-          f"ece={report['metrics']['ece']}")
+    print(f"✅ Calibration report: brier={report['metrics']['brier_score']}, ece={report['metrics']['ece']}")
 
 
 def test_calibration_report_empty():
@@ -317,9 +322,9 @@ def run_all_tests():
             errors.append((test.__name__, str(e)))
             print(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("📊 FAZ 1 TEST SONUÇLARI (Calibration)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")

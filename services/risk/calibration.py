@@ -19,9 +19,10 @@ logger = structlog.get_logger()
 @dataclass
 class CalibrationParams:
     """Calibration parametreleri."""
+
     method: str = "platt"  # platt | isotonic | empirical
-    a: float = 1.0         # Platt: scale
-    b: float = 0.0         # Platt: shift
+    a: float = 1.0  # Platt: scale
+    b: float = 0.0  # Platt: shift
     empirical_bins: dict[str, float] = None  # Bin bazli mapping
 
 
@@ -74,10 +75,7 @@ class ScoreCalibrator:
             self.params.a, self.params.b = np.linalg.lstsq(A, log_odds, rcond=None)[0]
             self._fitted = True
 
-            logger.info("Calibration fitted",
-                       trades=len(trades),
-                       a=round(self.params.a, 4),
-                       b=round(self.params.b, 4))
+            logger.info("Calibration fitted", trades=len(trades), a=round(self.params.a, 4), b=round(self.params.b, 4))
 
     def calibrate(self, score: float) -> float:
         """Score -> win_probability."""
@@ -95,12 +93,14 @@ class ScoreCalibrator:
 
     def add_trade(self, score: float, return_pct: float, ticker: str, date: str):
         """Yeni trade ekle (online learning)."""
-        self._trade_history.append({
-            "score": score,
-            "return_pct": return_pct,
-            "ticker": ticker,
-            "date": date,
-        })
+        self._trade_history.append(
+            {
+                "score": score,
+                "return_pct": return_pct,
+                "ticker": ticker,
+                "date": date,
+            }
+        )
         if len(self._trade_history) > 5000:
             self._trade_history = self._trade_history[-5000:]
 
@@ -153,9 +153,7 @@ class ScoreCalibrator:
         if len(self._brier_scores) > 1000:
             self._brier_scores = self._brier_scores[-1000:]
 
-        logger.info("Brier score computed",
-                   brier=round(brier, 4),
-                   n_trades=len(trades))
+        logger.info("Brier score computed", brier=round(brier, 4), n_trades=len(trades))
 
         return brier
 

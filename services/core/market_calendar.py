@@ -23,15 +23,17 @@ logger = structlog.get_logger()
 
 class MarketSession(StrEnum):
     """BIST işlem seansları."""
-    PRE_MARKET = "PRE_MARKET"      # 09:40 - 10:00
-    OPENING = "OPENING"             # 09:55 - 10:00
-    CONTINUOUS = "CONTINUOUS"       # 10:00 - 18:00
-    CLOSING = "CLOSING"             # 18:01 - 18:10
+
+    PRE_MARKET = "PRE_MARKET"  # 09:40 - 10:00
+    OPENING = "OPENING"  # 09:55 - 10:00
+    CONTINUOUS = "CONTINUOUS"  # 10:00 - 18:00
+    CLOSING = "CLOSING"  # 18:01 - 18:10
     CLOSED = "CLOSED"
 
 
 class MarketStatus(StrEnum):
     """Piyasa durumu."""
+
     OPEN = "OPEN"
     CLOSED = "CLOSED"
     PRE_MARKET = "PRE_MARKET"
@@ -41,27 +43,27 @@ class MarketStatus(StrEnum):
 
 # 2026 Türkiye resmi tatilleri
 TURKEY_HOLIDAYS_2026 = [
-    date(2026, 1, 1),    # Yılbaşı
-    date(2026, 4, 23),   # Ulusal Egemenlik ve Çocuk Bayramı
-    date(2026, 5, 1),    # Emek ve Dayanışma Günü
-    date(2026, 5, 19),   # Atatürk'ü Anma, Gençlik ve Spor Bayramı
-    date(2026, 7, 15),   # Demokrasi ve Millî Birlik Günü
-    date(2026, 8, 30),   # Zafer Bayramı
+    date(2026, 1, 1),  # Yılbaşı
+    date(2026, 4, 23),  # Ulusal Egemenlik ve Çocuk Bayramı
+    date(2026, 5, 1),  # Emek ve Dayanışma Günü
+    date(2026, 5, 19),  # Atatürk'ü Anma, Gençlik ve Spor Bayramı
+    date(2026, 7, 15),  # Demokrasi ve Millî Birlik Günü
+    date(2026, 8, 30),  # Zafer Bayramı
     date(2026, 10, 29),  # Cumhuriyet Bayramı
-    date(2026, 3, 21),   # Ramazan Bayramı 1. gün
-    date(2026, 3, 22),   # Ramazan Bayramı 2. gün
-    date(2026, 3, 23),   # Ramazan Bayramı 3. gün
-    date(2026, 5, 28),   # Kurban Bayramı 1. gün
-    date(2026, 5, 29),   # Kurban Bayramı 2. gün
-    date(2026, 5, 30),   # Kurban Bayramı 3. gün
-    date(2026, 5, 31),   # Kurban Bayramı 4. gün
+    date(2026, 3, 21),  # Ramazan Bayramı 1. gün
+    date(2026, 3, 22),  # Ramazan Bayramı 2. gün
+    date(2026, 3, 23),  # Ramazan Bayramı 3. gün
+    date(2026, 5, 28),  # Kurban Bayramı 1. gün
+    date(2026, 5, 29),  # Kurban Bayramı 2. gün
+    date(2026, 5, 30),  # Kurban Bayramı 3. gün
+    date(2026, 5, 31),  # Kurban Bayramı 4. gün
 ]
 
 # 2026 Türkiye yarım gün tatilleri (resmi tatil arifeleri)
 # Bu günlerde piyasa 12:30'da kapanır
 TURKEY_HALF_DAYS_2026 = [
-    date(2026, 3, 20),   # Ramazan Bayramı Arifesi
-    date(2026, 5, 27),   # Kurban Bayramı Arifesi
+    date(2026, 3, 20),  # Ramazan Bayramı Arifesi
+    date(2026, 5, 27),  # Kurban Bayramı Arifesi
     date(2026, 10, 28),  # Cumhuriyet Bayramı Arifesi (yarım gün)
 ]
 

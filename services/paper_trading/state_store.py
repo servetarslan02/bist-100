@@ -174,16 +174,19 @@ class PaperStateStore:
         try:
             # Mevcut DB'yi temp'e kopyala, güncelle, ve geri al
             with self._connect() as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO portfolio_state (id, date, cash, initial_capital, last_updated, json_data)
                     VALUES (1, ?, ?, ?, ?, ?)
-                """, (
-                    state["date"],
-                    state["cash"],
-                    state["initial_capital"],
-                    state.get("last_updated", datetime.now(UTC).isoformat()),
-                    state_json,
-                ))
+                """,
+                    (
+                        state["date"],
+                        state["cash"],
+                        state["initial_capital"],
+                        state.get("last_updated", datetime.now(UTC).isoformat()),
+                        state_json,
+                    ),
+                )
                 conn.commit()
         except Exception as e:
             logger.error("Failed to save portfolio state", error=str(e))
@@ -207,14 +210,22 @@ class PaperStateStore:
         with self._connect() as conn:
             conn.execute("DELETE FROM positions")
             for pos in positions:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO positions (ticker, quantity, avg_cost, current_price, sector, entry_date, last_update, json_data)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    pos["ticker"], pos["quantity"], pos["avg_cost"], pos.get("current_price", pos["avg_cost"]),
-                    pos.get("sector", ""), pos.get("entry_date", ""), pos.get("last_update", ""),
-                    orjson.dumps(pos).decode(),
-                ))
+                """,
+                    (
+                        pos["ticker"],
+                        pos["quantity"],
+                        pos["avg_cost"],
+                        pos.get("current_price", pos["avg_cost"]),
+                        pos.get("sector", ""),
+                        pos.get("entry_date", ""),
+                        pos.get("last_update", ""),
+                        orjson.dumps(pos).decode(),
+                    ),
+                )
             conn.commit()
 
     def load_positions(self) -> list[dict[str, Any]]:
@@ -228,15 +239,25 @@ class PaperStateStore:
     def save_trade(self, trade: dict[str, Any]):
         """Trade kaydet."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO trades (trade_id, date, ticker, side, quantity, entry_price, exit_price, realized_pnl, commission, reason, json_data)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                trade["trade_id"], trade["exit_date"], trade["ticker"], trade["side"],
-                trade["quantity"], trade["entry_price"], trade["exit_price"],
-                trade["realized_pnl"], trade["commission"], trade.get("reason", ""),
-                orjson.dumps(trade).decode(),
-            ))
+            """,
+                (
+                    trade["trade_id"],
+                    trade["exit_date"],
+                    trade["ticker"],
+                    trade["side"],
+                    trade["quantity"],
+                    trade["entry_price"],
+                    trade["exit_price"],
+                    trade["realized_pnl"],
+                    trade["commission"],
+                    trade.get("reason", ""),
+                    orjson.dumps(trade).decode(),
+                ),
+            )
             conn.commit()
 
     def load_trades(self, limit: int | None = None) -> list[dict[str, Any]]:
@@ -253,22 +274,35 @@ class PaperStateStore:
     def save_order(self, order: dict[str, Any]):
         """Order kaydet."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO orders (order_id, date, ticker, side, quantity, signal_price, execution_price, commission, slippage_pct, status, rejection_reason, json_data)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                order["order_id"], order["date"], order["ticker"], order["side"],
-                order["quantity"], order["signal_price"], order.get("execution_price", 0),
-                order.get("commission", 0), order.get("slippage_pct", 0), order["status"],
-                order.get("rejection_reason"), orjson.dumps(order).decode(),
-            ))
+            """,
+                (
+                    order["order_id"],
+                    order["date"],
+                    order["ticker"],
+                    order["side"],
+                    order["quantity"],
+                    order["signal_price"],
+                    order.get("execution_price", 0),
+                    order.get("commission", 0),
+                    order.get("slippage_pct", 0),
+                    order["status"],
+                    order.get("rejection_reason"),
+                    orjson.dumps(order).decode(),
+                ),
+            )
             conn.commit()
 
     def load_orders(self, date: str | None = None) -> list[dict[str, Any]]:
         """Order'lari yukle."""
         with self._connect() as conn:
             if date:
-                rows = conn.execute("SELECT json_data FROM orders WHERE date = ? ORDER BY date DESC", (date,)).fetchall()
+                rows = conn.execute(
+                    "SELECT json_data FROM orders WHERE date = ? ORDER BY date DESC", (date,)
+                ).fetchall()
             else:
                 rows = conn.execute("SELECT json_data FROM orders ORDER BY date DESC").fetchall()
             return [orjson.loads(r["json_data"]) for r in rows]
@@ -279,16 +313,25 @@ class PaperStateStore:
         """Audit entry ekle (immutable, append-only)."""
         entry_hash = self._compute_hash(entry)
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO audit_log (timestamp, date, entry_type, ticker, json_data, entry_hash)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                entry["timestamp"], entry["date"], entry["entry_type"], entry.get("ticker"),
-                orjson.dumps(entry, default=str).decode(), entry_hash,
-            ))
+            """,
+                (
+                    entry["timestamp"],
+                    entry["date"],
+                    entry["entry_type"],
+                    entry.get("ticker"),
+                    orjson.dumps(entry, default=str).decode(),
+                    entry_hash,
+                ),
+            )
             conn.commit()
 
-    def load_audit_log(self, date: str | None = None, entry_type: str | None = None, limit: int = 1000) -> list[dict[str, Any]]:
+    def load_audit_log(
+        self, date: str | None = None, entry_type: str | None = None, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """Audit log'u yukle."""
         with self._connect() as conn:
             sql = "SELECT json_data FROM audit_log WHERE 1=1"
@@ -309,17 +352,28 @@ class PaperStateStore:
     def save_daily_performance(self, perf: dict[str, Any]):
         """Gunluk performans kaydet."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO daily_performance
                 (date, portfolio_value, cash, daily_return_pct, cumulative_return_pct, max_drawdown_pct, benchmark_return_pct, alpha_pct, turnover, transaction_cost, num_positions, num_trades, json_data)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                perf["date"], perf["portfolio_value"], perf["cash"], perf["daily_return_pct"],
-                perf["cumulative_return_pct"], perf["max_drawdown_pct"], perf["benchmark_return_pct"],
-                perf["alpha_pct"], perf["turnover"], perf["transaction_cost"],
-                perf["num_positions"], perf["num_trades"],
-                orjson.dumps(perf).decode(),
-            ))
+            """,
+                (
+                    perf["date"],
+                    perf["portfolio_value"],
+                    perf["cash"],
+                    perf["daily_return_pct"],
+                    perf["cumulative_return_pct"],
+                    perf["max_drawdown_pct"],
+                    perf["benchmark_return_pct"],
+                    perf["alpha_pct"],
+                    perf["turnover"],
+                    perf["transaction_cost"],
+                    perf["num_positions"],
+                    perf["num_trades"],
+                    orjson.dumps(perf).decode(),
+                ),
+            )
             conn.commit()
 
     def load_daily_performance(self) -> list[dict[str, Any]]:
@@ -330,22 +384,34 @@ class PaperStateStore:
 
     # ===================== EQUITY CURVE =====================
 
-    def save_equity_point(self, date: str, equity: float, cash: float, invested: float, benchmark_equity: float | None = None):
+    def save_equity_point(
+        self, date: str, equity: float, cash: float, invested: float, benchmark_equity: float | None = None
+    ):
         """Equity curve noktasi kaydet."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO equity_curve (date, equity, cash, invested, benchmark_equity)
                 VALUES (?, ?, ?, ?, ?)
-            """, (date, equity, cash, invested, benchmark_equity))
+            """,
+                (date, equity, cash, invested, benchmark_equity),
+            )
             conn.commit()
 
     def load_equity_curve(self) -> list[dict[str, Any]]:
         """Equity curve'u yukle."""
         with self._connect() as conn:
-            rows = conn.execute("SELECT date, equity, cash, invested, benchmark_equity FROM equity_curve ORDER BY date ASC").fetchall()
+            rows = conn.execute(
+                "SELECT date, equity, cash, invested, benchmark_equity FROM equity_curve ORDER BY date ASC"
+            ).fetchall()
             return [
-                {"date": r["date"], "equity": r["equity"], "cash": r["cash"],
-                 "invested": r["invested"], "benchmark_equity": r["benchmark_equity"]}
+                {
+                    "date": r["date"],
+                    "equity": r["equity"],
+                    "cash": r["cash"],
+                    "invested": r["invested"],
+                    "benchmark_equity": r["benchmark_equity"],
+                }
                 for r in rows
             ]
 
@@ -361,35 +427,39 @@ class PaperStateStore:
             expires_iso = expires_dt.isoformat()
             for idx, sig in enumerate(signals):
                 sig_id = f"SIG_{date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO pending_signals (
                         signal_id, date, ticker, direction, rank, score, confidence,
                         model_version, target_weight, json_data, created_at, expires_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    sig_id,
-                    date,
-                    sig.get("ticker", ""),
-                    sig.get("direction", "LONG"),
-                    sig.get("rank", idx + 1),
-                    sig.get("score", 0.0),
-                    sig.get("confidence", 0.0),
-                    sig.get("model_version", ""),
-                    sig.get("target_weight", 0.10),
-                    orjson.dumps(sig).decode(),
-                    now_iso,
-                    expires_iso,
-                ))
+                """,
+                    (
+                        sig_id,
+                        date,
+                        sig.get("ticker", ""),
+                        sig.get("direction", "LONG"),
+                        sig.get("rank", idx + 1),
+                        sig.get("score", 0.0),
+                        sig.get("confidence", 0.0),
+                        sig.get("model_version", ""),
+                        sig.get("target_weight", 0.10),
+                        orjson.dumps(sig).decode(),
+                        now_iso,
+                        expires_iso,
+                    ),
+                )
             conn.commit()
-        logger.info("Saved pending signals for next session execution", count=len(signals), date=date, expires=expires_iso)
+        logger.info(
+            "Saved pending signals for next session execution", count=len(signals), date=date, expires=expires_iso
+        )
 
     def load_pending_signals(self) -> list[dict[str, Any]]:
         """Bekleyen sinyalleri yukle (süresi dolmuş olanlar hariç)."""
         with self._connect() as conn:
             now_iso = datetime.now(UTC).isoformat()
             rows = conn.execute(
-                "SELECT json_data FROM pending_signals WHERE expires_at > ? ORDER BY rank ASC",
-                (now_iso,)
+                "SELECT json_data FROM pending_signals WHERE expires_at > ? ORDER BY rank ASC", (now_iso,)
             ).fetchall()
             return [orjson.loads(r["json_data"]) for r in rows]
 
@@ -397,10 +467,7 @@ class PaperStateStore:
         """Süresi dolmuş bekleyen sinyalleri temizler. Temizlenen sayıyı döner."""
         with self._connect() as conn:
             now_iso = datetime.now(UTC).isoformat()
-            cursor = conn.execute(
-                "DELETE FROM pending_signals WHERE expires_at <= ?",
-                (now_iso,)
-            )
+            cursor = conn.execute("DELETE FROM pending_signals WHERE expires_at <= ?", (now_iso,))
             deleted = cursor.rowcount
             conn.commit()
             if deleted > 0:
@@ -417,10 +484,13 @@ class PaperStateStore:
 
     def set_config(self, key: str, value: str):
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO config (key, value, updated_at)
                 VALUES (?, ?, ?)
-            """, (key, value, datetime.now(UTC).isoformat()))
+            """,
+                (key, value, datetime.now(UTC).isoformat()),
+            )
             conn.commit()
 
     def get_config(self, key: str, default: str | None = None) -> str | None:
@@ -456,6 +526,7 @@ class PaperStateStore:
     @staticmethod
     def _compute_hash(entry: dict[str, Any]) -> str:
         import hashlib
+
         data = orjson.dumps(entry, option=orjson.OPT_SORT_KEYS, default=str).decode()
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 

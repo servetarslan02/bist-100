@@ -22,6 +22,7 @@ import structlog
 try:
     import grpc
     from grpc import aio
+
     HAS_GRPC = True
 except ImportError:
     HAS_GRPC = False
@@ -29,6 +30,7 @@ except ImportError:
 # Generated protobuf imports
 try:
     from .generated import market_pb2, market_pb2_grpc
+
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -51,6 +53,7 @@ class BaseGRPCClient:
         """
         if hosts is None:
             import os
+
             raw = os.environ.get("GRPC_HOSTS", "localhost")
             hosts = [h.strip() for h in raw.split(",") if h.strip()]
         self.hosts = hosts
@@ -72,6 +75,7 @@ class BaseGRPCClient:
             tls_credentials = None
             try:
                 from ..core.mtls import get_grpc_client_credentials
+
                 tls_credentials = get_grpc_client_credentials()
             except ImportError:
                 logger.debug("Optional import not available in connect", exc_info=True)
@@ -88,21 +92,21 @@ class BaseGRPCClient:
 
             if len(self.hosts) > 1:
                 targets = ",".join(f"{h}:{self.port}" for h in self.hosts)
-                options.append(
-                    ("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}')
-                )
+                options.append(("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}'))
                 target_uri = f"ipv4:///{targets}"
             else:
                 target_uri = f"{self.hosts[0]}:{self.port}"
 
             if tls_credentials:
                 self._channel = aio.secure_channel(target_uri, tls_credentials, options=options)
-                logger.info("gRPC connected with mTLS", hosts=self.hosts,
-                           lb="round_robin" if len(self.hosts) > 1 else "single")
+                logger.info(
+                    "gRPC connected with mTLS", hosts=self.hosts, lb="round_robin" if len(self.hosts) > 1 else "single"
+                )
             else:
                 self._channel = aio.insecure_channel(target_uri, options=options)
-                logger.info("gRPC connected (insecure)", hosts=self.hosts,
-                           lb="round_robin" if len(self.hosts) > 1 else "single")
+                logger.info(
+                    "gRPC connected (insecure)", hosts=self.hosts, lb="round_robin" if len(self.hosts) > 1 else "single"
+                )
 
             await self._channel.channel_ready()
             return True
@@ -141,6 +145,7 @@ class MarketClient(BaseGRPCClient):
         if not self._stub:
             logger.warning("MarketClient not connected, falling back to Redis")
             from ..core.redis_helper import get_cached
+
             while True:
                 for ticker in tickers:
                     data = get_cached(f"price:{ticker}")
@@ -174,6 +179,7 @@ class MarketClient(BaseGRPCClient):
         """Tek seferlik fiyat (Protobuf)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             data = get_cached(f"price:{ticker}")
             return data or {"ticker": ticker, "price": 0}
 
@@ -206,6 +212,7 @@ class SignalClient(BaseGRPCClient):
         """Sinyal stream'i (Protobuf binary)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             while True:
                 signals = get_cached("signals:latest") or []
                 for signal in signals:
@@ -234,6 +241,7 @@ class SignalClient(BaseGRPCClient):
         """Son sinyalleri al (Protobuf)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             signals = get_cached("signals:latest") or []
             return [s for s in signals if s.get("confidence", 0) >= min_confidence]
 
@@ -271,6 +279,7 @@ class PortfolioClient(BaseGRPCClient):
         """Anlık portföy durumu (Protobuf)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             return get_cached("portfolio:state") or {}
 
         request = market_pb2.PortfolioRequest(portfolio_id="default")
@@ -303,6 +312,7 @@ class PortfolioClient(BaseGRPCClient):
         """Portföy durumu stream'i (Protobuf binary)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             while True:
                 pf = get_cached("portfolio:state")
                 if pf:
@@ -347,6 +357,7 @@ class RiskClient(BaseGRPCClient):
         """Anlık risk durumu (Protobuf)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             return get_cached("risk:metrics") or {}
 
         request = market_pb2.RiskRequest(portfolio_id="default")
@@ -369,6 +380,7 @@ class RiskClient(BaseGRPCClient):
         """Risk metrikleri stream'i (Protobuf binary)."""
         if not self._stub:
             from ..core.redis_helper import get_cached
+
             while True:
                 risk = get_cached("risk:metrics")
                 if risk:

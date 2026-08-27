@@ -65,16 +65,13 @@ class StateRecovery:
                     self._recovery_errors = self._recovery_errors[-500:]
                 logger.warning("State recovery failed", ticker=ticker, error=str(e))
 
-        logger.info("State recovery completed",
-                    recovered=recovered,
-                    total=len(tickers),
-                    errors=len(self._recovery_errors))
+        logger.info(
+            "State recovery completed", recovered=recovered, total=len(tickers), errors=len(self._recovery_errors)
+        )
 
         return self._recovered_states
 
-    async def _recover_via_snapshot(
-        self, ticker: str, redis_client=None, pg_pool=None
-    ) -> dict | None:
+    async def _recover_via_snapshot(self, ticker: str, redis_client=None, pg_pool=None) -> dict | None:
         """Snapshot + Event Replay ile state kurtar.
 
         1. Redis'ten son snapshot'ı oku
@@ -88,13 +85,13 @@ class StateRecovery:
                 snapshot_data = await redis_client.get(f"state_snapshot:{ticker}")
                 if snapshot_data:
                     snapshot = orjson.loads(snapshot_data)
-                    logger.debug("Snapshot found (Redis)", ticker=ticker,
-                               snapshot_time=snapshot.get("timestamp"))
+                    logger.debug("Snapshot found (Redis)", ticker=ticker, snapshot_time=snapshot.get("timestamp"))
                     return snapshot
 
             # SQLite'tan son snapshot'ı oku (Redis yoksa veya TTL dolmuşsa)
             try:
                 from .state_store import state_store
+
                 all_state = state_store.load_learning_state()
                 state_key = f"snapshot:{ticker}"
                 if state_key in all_state:
@@ -109,15 +106,17 @@ class StateRecovery:
             # DB'den son snapshot'ı oku
             if pg_pool:
                 async with pg_pool.acquire() as conn:
-                    row = await conn.fetchrow("""
+                    row = await conn.fetchrow(
+                        """
                         SELECT state_data, snapshot_time FROM state_snapshots
                         WHERE ticker = $1
                         ORDER BY snapshot_time DESC LIMIT 1
-                    """, ticker)
+                    """,
+                        ticker,
+                    )
                     if row:
                         snapshot = orjson.loads(row["state_data"])
-                        logger.debug("DB snapshot found", ticker=ticker,
-                                   snapshot_time=row["snapshot_time"])
+                        logger.debug("DB snapshot found", ticker=ticker, snapshot_time=row["snapshot_time"])
                         return snapshot
 
             return None
@@ -126,9 +125,7 @@ class StateRecovery:
             logger.warning("Snapshot recovery failed", ticker=ticker, error=str(e))
             return None
 
-    async def _recover_from_clickhouse(
-        self, ticker: str, pg_pool=None
-    ) -> dict | None:
+    async def _recover_from_clickhouse(self, ticker: str, pg_pool=None) -> dict | None:
         """ClickHouse'dan feature'ları yeniden hesapla.
 
         Son seçenek: Snapshot ve event log yoksa.
@@ -150,10 +147,16 @@ class StateRecovery:
                 return None
 
             df = pl.from_pandas(hist[["Date", "Open", "High", "Low", "Close", "Volume"]])
-            df = df.rename({
-                "Date": "timestamp", "Open": "open", "High": "high",
-                "Low": "low", "Close": "close", "Volume": "volume"
-            })
+            df = df.rename(
+                {
+                    "Date": "timestamp",
+                    "Open": "open",
+                    "High": "high",
+                    "Low": "low",
+                    "Close": "close",
+                    "Volume": "volume",
+                }
+            )
 
             features = feature_calculator.compute_all_features(df)
 
@@ -194,6 +197,7 @@ class StateRecovery:
             # SQLite'a da kaydet (restart-safe — elektrik kesintisinde kaybolmaz)
             try:
                 from .state_store import state_store
+
                 state_store.save_learning_state({f"snapshot:{ticker}": state})
             except Exception as e:
                 logger.debug(f"SQLite snapshot save skipped for {ticker}: {e}")

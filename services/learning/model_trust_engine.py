@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class ModelTrustScore:
     """Model güvenilirlik ve adaptif ağırlıklandırma puanı."""
+
     model_id: str
     model_version: str
     sample_size: int
@@ -89,12 +90,7 @@ class ModelTrustEngine:
             regime_score = acc_score
 
         # 6. Ham Güvenilirlik Formülü
-        raw_trust = (
-            0.35 * acc_score +
-            0.25 * sharpe_score +
-            0.20 * calibration_score +
-            0.20 * regime_score
-        )
+        raw_trust = 0.35 * acc_score + 0.25 * sharpe_score + 0.20 * calibration_score + 0.20 * regime_score
 
         # 7. Shrinkage Uygulama (Yetersiz örneklem durumunda Prior'a çeker)
         # S_rel = (1 - shrinkage) * prior + shrinkage * raw_trust
@@ -152,11 +148,11 @@ class ModelTrustEngine:
 
             for k, w in weights.items():
                 if w > eff_max:
-                    excess += (w - eff_max)
+                    excess += w - eff_max
                     weights[k] = eff_max
                     clipped = True
                 elif w < eff_min:
-                    excess -= (eff_min - w)
+                    excess -= eff_min - w
                     weights[k] = eff_min
                     clipped = True
                 else:

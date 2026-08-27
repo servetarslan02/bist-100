@@ -42,12 +42,12 @@ Risk/Güvenlik kontrolü → İşleme izin → İşlem → Audit Log
 from services.core.security import authz_service, Role, Permission
 
 authz_service.check_permission(
-    User(user_id="1", username="analyst", role=Role.ANALYST),
-    Permission.RUN_BACKTEST)  # True
+    User(user_id="1", username="analyst", role=Role.ANALYST), Permission.RUN_BACKTEST
+)  # True
 
 authz_service.check_permission(
-    User(user_id="1", username="analyst", role=Role.ANALYST),
-    Permission.LIVE_EXECUTION)  # False
+    User(user_id="1", username="analyst", role=Role.ANALYST), Permission.LIVE_EXECUTION
+)  # False
 ```
 
 ---

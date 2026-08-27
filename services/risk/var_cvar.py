@@ -32,32 +32,35 @@ class VaRMethod(StrEnum):
 @dataclass
 class VaRResult:
     """VaR/CVaR hesaplama sonucu."""
-    var_95: float           # %95 güven VaR
-    var_99: float           # %99 güven VaR
-    cvar_95: float          # %95 CVaR (Expected Shortfall)
-    cvar_99: float          # %99 CVaR
-    method: str             # Kullanılan yöntem
-    sample_size: int        # Örneklem büyüklüğü
+
+    var_95: float  # %95 güven VaR
+    var_99: float  # %99 güven VaR
+    cvar_95: float  # %95 CVaR (Expected Shortfall)
+    cvar_99: float  # %99 CVaR
+    method: str  # Kullanılan yöntem
+    sample_size: int  # Örneklem büyüklüğü
     portfolio_value: float  # Portföy değeri
-    var_95_amount: float    # %95 VaR (TL)
-    var_99_amount: float    # %99 VaR (TL)
-    cvar_95_amount: float   # %95 CVaR (TL)
-    cvar_99_amount: float   # %99 CVaR (TL)
+    var_95_amount: float  # %95 VaR (TL)
+    var_99_amount: float  # %99 VaR (TL)
+    cvar_95_amount: float  # %95 CVaR (TL)
+    cvar_99_amount: float  # %99 CVaR (TL)
 
 
 @dataclass
 class ComponentVaRResult:
     """Component VaR sonucu."""
+
     ticker: str
     weight: float
-    component_var_95: float     # Bu pozisyonun portföy VaR'ına katkısı
-    marginal_var_95: float      # Yeni pozisyon eklenince risk değişimi
-    pct_of_total_var: float     # Toplam VaR'ın yüzdesi
+    component_var_95: float  # Bu pozisyonun portföy VaR'ına katkısı
+    marginal_var_95: float  # Yeni pozisyon eklenince risk değişimi
+    pct_of_total_var: float  # Toplam VaR'ın yüzdesi
 
 
 @dataclass
 class MonteCarloResult:
     """Monte Carlo simülasyon sonucu."""
+
     var_95: float
     var_99: float
     cvar_95: float
@@ -137,6 +140,7 @@ class VaRCalculator:
 
         try:
             from scipy.stats import norm
+
             z_alpha = float(norm.ppf(1 - confidence))
         except (ImportError, Exception):
             if confidence >= 0.99:
@@ -184,6 +188,7 @@ class VaRCalculator:
 
         try:
             from scipy.stats import norm
+
             z_alpha = float(norm.ppf(1 - confidence))
             phi_z = float(norm.pdf(z_alpha))
         except (ImportError, Exception):
@@ -197,10 +202,7 @@ class VaRCalculator:
                 z_alpha = -1.644853
             phi_z = (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * z_alpha * z_alpha)
 
-        tail_mean = (
-            mu * holding_period_days
-            - sigma * np.sqrt(holding_period_days) * phi_z / (1 - confidence)
-        )
+        tail_mean = mu * holding_period_days - sigma * np.sqrt(holding_period_days) * phi_z / (1 - confidence)
         cvar_amount = max(0.0, -tail_mean * portfolio_value)
 
         return float(cvar_amount)
@@ -313,8 +315,7 @@ class VaRCalculator:
         rng = np.random.default_rng(seed) if seed is not None else np.random.default_rng()
 
         if len(returns) < 2 or holding_period_days < 1:
-            return MonteCarloResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                    n_simulations, holding_period_days, {})
+            return MonteCarloResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, n_simulations, holding_period_days, {})
 
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
@@ -323,13 +324,14 @@ class VaRCalculator:
         simulated_returns = None
         try:
             import torch
+
             if torch.cuda.is_available():
                 if sigma <= 0:
                     simulated_returns = np.full(n_simulations, mu * holding_period_days)
                 else:
                     mean_val = float(mu * holding_period_days)
                     std_val = float(sigma * np.sqrt(holding_period_days))
-                    t_samples = torch.normal(mean=mean_val, std=std_val, size=(n_simulations,), device='cuda')
+                    t_samples = torch.normal(mean=mean_val, std=std_val, size=(n_simulations,), device="cuda")
                     simulated_returns = t_samples.cpu().numpy()
         except Exception:
             logger.warning("Caught Exception in calculate_monte_carlo_var", exc_info=True)
@@ -412,6 +414,7 @@ class VaRCalculator:
         """
         try:
             from scipy.stats import norm
+
             z_alpha = float(norm.ppf(confidence))
         except ImportError:
             # scipy yoksa sabit z-skorları kullan
@@ -427,14 +430,17 @@ class VaRCalculator:
         results = []
         for i in range(len(weights)):
             ticker = tickers[i] if tickers and i < len(tickers) else f"asset_{i}"
-            results.append(ComponentVaRResult(
-                ticker=ticker,
-                weight=float(weights[i]),
-                component_var_95=float(component_var[i] * portfolio_value),
-                marginal_var_95=float(marginal_var[i] * portfolio_value),
-                pct_of_total_var=float(component_var[i] / np.sum(np.abs(component_var)) * 100)
-                if np.sum(np.abs(component_var)) > 0 else 0.0,
-            ))
+            results.append(
+                ComponentVaRResult(
+                    ticker=ticker,
+                    weight=float(weights[i]),
+                    component_var_95=float(component_var[i] * portfolio_value),
+                    marginal_var_95=float(marginal_var[i] * portfolio_value),
+                    pct_of_total_var=float(component_var[i] / np.sum(np.abs(component_var)) * 100)
+                    if np.sum(np.abs(component_var)) > 0
+                    else 0.0,
+                )
+            )
 
         return results
 
@@ -451,6 +457,7 @@ class VaRCalculator:
         """
         try:
             from scipy.stats import norm
+
             z_alpha = float(norm.ppf(confidence))
         except ImportError:
             # Fallback: invert normal CDF via math.erf
@@ -463,7 +470,7 @@ class VaRCalculator:
                 t = math.sqrt(-2.0 * math.log(1.0 - p))
                 c0, c1, c2 = 2.515517, 0.802853, 0.010328
                 d1, d2, d3 = 1.432788, 0.189269, 0.001308
-                z_alpha = t - (c0 + c1*t + c2*t*t) / (1.0 + d1*t + d2*t*t + d3*t*t*t)
+                z_alpha = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t)
 
         portfolio_vol = np.sqrt(weights @ cov_matrix @ weights)
         if portfolio_vol <= 0:
@@ -525,9 +532,7 @@ class VaRCalculator:
         }
 
         # Monte Carlo VaR/CVaR
-        mc_result = self.calculate_monte_carlo_var(
-            returns, 0.95, portfolio_value, n_monte_carlo, holding_period_days
-        )
+        mc_result = self.calculate_monte_carlo_var(returns, 0.95, portfolio_value, n_monte_carlo, holding_period_days)
         report["monte_carlo"] = {
             "var_95": mc_result.var_95,
             "var_99": mc_result.var_99,
@@ -540,9 +545,7 @@ class VaRCalculator:
 
         # Component VaR (eğer ağırlıklar ve kovaryans verilmişse)
         if weights is not None and cov_matrix is not None:
-            component_var = self.calculate_component_var(
-                weights, cov_matrix, 0.95, portfolio_value, tickers
-            )
+            component_var = self.calculate_component_var(weights, cov_matrix, 0.95, portfolio_value, tickers)
             report["component_var"] = [
                 {
                     "ticker": cv.ticker,
@@ -564,12 +567,15 @@ class VaRCalculator:
             "var_95_min": float(np.min(var_95_values)),
             "var_95_max": float(np.max(var_95_values)),
             "method_agreement": float(1 - np.std(var_95_values) / np.mean(var_95_values))
-            if np.mean(var_95_values) > 0 else 0.0,
+            if np.mean(var_95_values) > 0
+            else 0.0,
         }
 
-        logger.info("VaR report generated",
-                    var_95_consensus=round(report["consensus"]["var_95"], 2),
-                    portfolio_value=portfolio_value)
+        logger.info(
+            "VaR report generated",
+            var_95_consensus=round(report["consensus"]["var_95"], 2),
+            portfolio_value=portfolio_value,
+        )
 
         return report
 
@@ -599,6 +605,7 @@ class VaRCalculator:
         """
         try:
             from scipy.stats import norm
+
             z_alpha = float(norm.ppf(confidence))
         except ImportError:
             p = confidence
@@ -608,7 +615,7 @@ class VaRCalculator:
                 t = math.sqrt(-2.0 * math.log(1.0 - p))
                 c0, c1, c2 = 2.515517, 0.802853, 0.010328
                 d1, d2, d3 = 1.432788, 0.189269, 0.001308
-                z_alpha = t - (c0 + c1*t + c2*t*t) / (1.0 + d1*t + d2*t*t + d3*t*t*t)
+                z_alpha = t - (c0 + c1 * t + c2 * t * t) / (1.0 + d1 * t + d2 * t * t + d3 * t * t * t)
 
         sigma = np.std(returns, ddof=1)
         if sigma <= 0:

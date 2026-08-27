@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 @dataclass
 class DeflatedSharpeResult:
     """Deflated Sharpe sonucu."""
+
     observed_sharpe: float
     expected_max_sharpe: float
     std_max_sharpe: float
@@ -101,10 +102,10 @@ class DeflatedSharpeCalculator:
             return 0.0, 1.0
 
         from scipy.stats import norm as _norm
+
         n = num_strategies
-        expected_max_z = (
-            (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n)
-            + euler_mascheroni * _norm.ppf(1 - 1.0 / (n * np.e))
+        expected_max_z = (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n) + euler_mascheroni * _norm.ppf(
+            1 - 1.0 / (n * np.e)
         )
 
         # Sharpe'a dönüştür (sqrt(T) ile ölçekle, periods_per_year ile
@@ -187,11 +188,13 @@ class DeflatedSharpeCalculator:
             confidence_level=confidence,
         )
 
-        logger.info("Deflated Sharpe computed",
-                    observed=round(observed_sharpe, 3),
-                    deflated=round(deflated_sr, 3),
-                    p_value=round(p_value, 4),
-                    confidence=confidence)
+        logger.info(
+            "Deflated Sharpe computed",
+            observed=round(observed_sharpe, 3),
+            deflated=round(deflated_sr, 3),
+            p_value=round(p_value, 4),
+            confidence=confidence,
+        )
 
         return result
 
@@ -216,10 +219,17 @@ class DeflatedSharpeCalculator:
         """
         if len(returns) < 2:
             return DeflatedSharpeResult(
-                observed_sharpe=0, expected_max_sharpe=0, std_max_sharpe=1,
-                deflated_sharpe=0, num_strategies_tested=num_strategies,
-                num_observations=len(returns), skewness=0, kurtosis=3,
-                p_value=1, is_significant=False, confidence_level="not_significant",
+                observed_sharpe=0,
+                expected_max_sharpe=0,
+                std_max_sharpe=1,
+                deflated_sharpe=0,
+                num_strategies_tested=num_strategies,
+                num_observations=len(returns),
+                skewness=0,
+                kurtosis=3,
+                p_value=1,
+                is_significant=False,
+                confidence_level="not_significant",
             )
 
         # Annualized Sharpe
@@ -277,8 +287,7 @@ class ProbabilisticSharpeRatio:
 
         # Sharpe'ın standart hatası
         sr_std = np.sqrt(
-            (1 - skewness * observed_sharpe + (kurtosis - 1) / 4 * observed_sharpe**2)
-            / (num_observations - 1)
+            (1 - skewness * observed_sharpe + (kurtosis - 1) / 4 * observed_sharpe**2) / (num_observations - 1)
         )
 
         if sr_std <= 0:
@@ -309,9 +318,7 @@ class ProbabilisticSharpeRatio:
         skewness = float(stats.skew(returns))
         kurtosis = float(stats.kurtosis(returns, fisher=False))
 
-        psr = ProbabilisticSharpeRatio.compute(
-            observed_sharpe, benchmark_sharpe, len(returns), skewness, kurtosis
-        )
+        psr = ProbabilisticSharpeRatio.compute(observed_sharpe, benchmark_sharpe, len(returns), skewness, kurtosis)
 
         return {
             "psr": round(psr, 4),

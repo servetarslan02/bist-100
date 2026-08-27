@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 @dataclass
 class CircuitBreakerSnapshot:
     """Anlık circuit breaker durumu."""
+
     name: str
     state: str  # CLOSED, OPEN, HALF_OPEN
     failure_count: int
@@ -77,19 +78,17 @@ class CircuitBreakerMetricsCollector:
         if not breaker:
             return None
 
-        total_req = getattr(breaker, '_total_requests', 0)
-        total_fail = getattr(breaker, '_total_failures', 0)
-        total_succ = getattr(breaker, '_total_successes', 0)
+        total_req = getattr(breaker, "_total_requests", 0)
+        total_fail = getattr(breaker, "_total_failures", 0)
+        total_succ = getattr(breaker, "_total_successes", 0)
 
-        uptime = (
-            (total_succ / total_req * 100) if total_req > 0 else 100.0
-        )
+        uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
 
         return CircuitBreakerSnapshot(
             name=breaker.name,
-            state=breaker.state.value if hasattr(breaker.state, 'value') else str(breaker.state),
+            state=breaker.state.value if hasattr(breaker.state, "value") else str(breaker.state),
             failure_count=breaker.failure_count,
-            success_count=getattr(breaker, 'success_count', 0),
+            success_count=getattr(breaker, "success_count", 0),
             failure_threshold=breaker.failure_threshold,
             recovery_timeout_seconds=breaker.recovery_timeout_seconds,
             last_failure_time=breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
@@ -102,10 +101,7 @@ class CircuitBreakerMetricsCollector:
 
     def get_all_snapshots(self) -> list[CircuitBreakerSnapshot]:
         """Tüm circuit breaker snapshot'ları."""
-        return [
-            self.get_snapshot(name)
-            for name in self._tracked_breakers
-        ]
+        return [self.get_snapshot(name) for name in self._tracked_breakers]
 
     def export_prometheus(self) -> str:
         """
@@ -131,20 +127,19 @@ class CircuitBreakerMetricsCollector:
 
         for name, breaker in self._tracked_breakers.items():
             state_value = {"CLOSED": 0, "OPEN": 1, "HALF_OPEN": 2}.get(
-                breaker.state.value if hasattr(breaker.state, 'value') else str(breaker.state),
-                -1
+                breaker.state.value if hasattr(breaker.state, "value") else str(breaker.state), -1
             )
 
-            total_req = getattr(breaker, '_total_requests', 0)
-            getattr(breaker, '_total_failures', 0)
-            total_succ = getattr(breaker, '_total_successes', 0)
+            total_req = getattr(breaker, "_total_requests", 0)
+            getattr(breaker, "_total_failures", 0)
+            total_succ = getattr(breaker, "_total_successes", 0)
             uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
 
             labels = f'name="{name}"'
-            lines.append(f'circuit_breaker_state{{{labels}}} {state_value}')
-            lines.append(f'circuit_breaker_failures{{{labels}}} {breaker.failure_count}')
-            lines.append(f'circuit_breaker_requests{{{labels}}} {total_req}')
-            lines.append(f'circuit_breaker_uptime_pct{{{labels}}} {uptime:.2f}')
+            lines.append(f"circuit_breaker_state{{{labels}}} {state_value}")
+            lines.append(f"circuit_breaker_failures{{{labels}}} {breaker.failure_count}")
+            lines.append(f"circuit_breaker_requests{{{labels}}} {total_req}")
+            lines.append(f"circuit_breaker_uptime_pct{{{labels}}} {uptime:.2f}")
 
         return "\n".join(lines) + "\n"
 
@@ -152,23 +147,23 @@ class CircuitBreakerMetricsCollector:
         """JSON formatında export."""
         return {
             "timestamp": datetime.now(UTC).isoformat(),
-            "circuit_breakers": {
-                name: self.get_snapshot(name).to_dict()
-                for name in self._tracked_breakers
-            },
+            "circuit_breakers": {name: self.get_snapshot(name).to_dict() for name in self._tracked_breakers},
             "summary": {
                 "total": len(self._tracked_breakers),
                 "closed": sum(
-                    1 for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, 'value') else str(b.state)) == "CLOSED"
+                    1
+                    for b in self._tracked_breakers.values()
+                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "CLOSED"
                 ),
                 "open": sum(
-                    1 for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, 'value') else str(b.state)) == "OPEN"
+                    1
+                    for b in self._tracked_breakers.values()
+                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "OPEN"
                 ),
                 "half_open": sum(
-                    1 for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, 'value') else str(b.state)) == "HALF_OPEN"
+                    1
+                    for b in self._tracked_breakers.values()
+                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "HALF_OPEN"
                 ),
             },
         }
@@ -186,10 +181,9 @@ class CircuitBreakerMetricsCollector:
             self._history = self._history[-1000:]
 
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
 
-        logger.info("Circuit breaker state changed",
-                    name=name, old=old_state, new=new_state)
+        logger.info("Circuit breaker state changed", name=name, old=old_state, new=new_state)
 
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """State change geçmişi."""

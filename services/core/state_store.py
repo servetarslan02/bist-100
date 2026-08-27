@@ -172,24 +172,30 @@ class CentralStateStore:
 
     # ===================== CIRCUIT BREAKER =====================
 
-    def save_circuit_state(self, name: str, state: str, failure_count: int,
-                           last_failure: str | None = None,
-                           last_success: str | None = None):
+    def save_circuit_state(
+        self,
+        name: str,
+        state: str,
+        failure_count: int,
+        last_failure: str | None = None,
+        last_success: str | None = None,
+    ):
         """Circuit breaker durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
-        self._buffered_write("""
+        self._buffered_write(
+            """
             INSERT OR REPLACE INTO circuit_breakers
             (name, state, failure_count, last_failure_at, last_success_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (name, state, failure_count, last_failure, last_success, now))
+        """,
+            (name, state, failure_count, last_failure, last_success, now),
+        )
 
     def load_circuit_state(self, name: str) -> dict[str, Any] | None:
         """Circuit breaker durumunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM circuit_breakers WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM circuit_breakers WHERE name = ?", (name,)).fetchone()
             if row:
                 return dict(row)
         return None
@@ -203,24 +209,24 @@ class CentralStateStore:
 
     # ===================== PROVIDER RELIABILITY =====================
 
-    def save_provider_reliability(self, name: str, total_calls: int,
-                                   total_failures: int, recent_results: list):
+    def save_provider_reliability(self, name: str, total_calls: int, total_failures: int, recent_results: list):
         """Provider reliability skorunu kaydet."""
         now = datetime.now(UTC).isoformat()
         results_json = orjson.dumps(recent_results[-100:]).decode()
-        self._buffered_write("""
+        self._buffered_write(
+            """
             INSERT OR REPLACE INTO provider_reliability
             (name, total_calls, total_failures, recent_results, updated_at)
             VALUES (?, ?, ?, ?, ?)
-        """, (name, total_calls, total_failures, results_json, now))
+        """,
+            (name, total_calls, total_failures, results_json, now),
+        )
 
     def load_provider_reliability(self, name: str) -> dict[str, Any] | None:
         """Provider reliability skorunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM provider_reliability WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM provider_reliability WHERE name = ?", (name,)).fetchone()
             if row:
                 result = dict(row)
                 result["recent_results"] = orjson.loads(result["recent_results"])
@@ -232,18 +238,19 @@ class CentralStateStore:
     def save_rate_limiter(self, name: str, tokens: float):
         """Rate limiter token durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
-        self._buffered_write("""
+        self._buffered_write(
+            """
             INSERT OR REPLACE INTO rate_limiters (name, tokens, updated_at)
             VALUES (?, ?, ?)
-        """, (name, tokens, now))
+        """,
+            (name, tokens, now),
+        )
 
     def load_rate_limiter(self, name: str) -> float | None:
         """Rate limiter token durumunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT tokens FROM rate_limiters WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT tokens FROM rate_limiters WHERE name = ?", (name,)).fetchone()
             return row["tokens"] if row else None
 
     # ===================== LEARNING LOOP =====================
@@ -254,10 +261,13 @@ class CentralStateStore:
         with self._connect() as conn:
             for key, value in state.items():
                 value = orjson.dumps(value, default=str).decode() if isinstance(value, (dict, list)) else str(value)
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO learning_state (key, value, updated_at)
                     VALUES (?, ?, ?)
-                """, (key, value, now))
+                """,
+                    (key, value, now),
+                )
             conn.commit()
 
     def load_learning_state(self) -> dict[str, Any]:
@@ -273,43 +283,57 @@ class CentralStateStore:
                     state[row["key"]] = row["value"]
             return state
 
-    def save_prediction(self, ticker: str, predicted_direction: str,
-                        predicted_return: float, confidence: float,
-                        regime: str, features: dict):
+    def save_prediction(
+        self,
+        ticker: str,
+        predicted_direction: str,
+        predicted_return: float,
+        confidence: float,
+        regime: str,
+        features: dict,
+    ):
         """Tahmin kaydet."""
         now = datetime.now(UTC).isoformat()
         features_json = orjson.dumps(features, default=str).decode()
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO learning_predictions
                 (ticker, predicted_direction, predicted_return, confidence,
                  regime, features, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (ticker, predicted_direction, predicted_return, confidence,
-                  regime, features_json, now))
+            """,
+                (ticker, predicted_direction, predicted_return, confidence, regime, features_json, now),
+            )
             conn.commit()
 
     def update_prediction_outcome(self, ticker: str, outcome: dict):
         """Tahmin sonucunu güncelle."""
         outcome_json = orjson.dumps(outcome, default=str).decode()
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE learning_predictions SET outcome = ?
                 WHERE ticker = ? AND outcome IS NULL
                 AND id = (SELECT id FROM learning_predictions
                           WHERE ticker = ? AND outcome IS NULL
                           ORDER BY created_at DESC LIMIT 1)
-            """, (outcome_json, ticker, ticker))
+            """,
+                (outcome_json, ticker, ticker),
+            )
             conn.commit()
 
     def load_recent_predictions(self, limit: int = 100) -> list[dict]:
         """Son tahminleri yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM learning_predictions
                 ORDER BY created_at DESC LIMIT ?
-            """, (limit,)).fetchall()
+            """,
+                (limit,),
+            ).fetchall()
             results = []
             for row in rows:
                 d = dict(row)
@@ -323,10 +347,13 @@ class CentralStateStore:
     def cleanup_old_predictions(self, keep_days: int = 30):
         """Eski tahminleri temizle (SSD dostu)."""
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 DELETE FROM learning_predictions
                 WHERE created_at < (current_date - INTERVAL '1 day' * ?)
-            """, (keep_days,))
+            """,
+                (keep_days,),
+            )
             conn.commit()
 
     # ===================== SIGNAL FUSION =====================
@@ -336,19 +363,20 @@ class CentralStateStore:
         now = datetime.now(UTC).isoformat()
         weights_json = orjson.dumps(weights).decode()
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO fusion_weights (key, weights, updated_at)
                 VALUES ('adaptive', ?, ?)
-            """, (weights_json, now))
+            """,
+                (weights_json, now),
+            )
             conn.commit()
 
     def load_fusion_weights(self) -> dict[str, float] | None:
         """Signal fusion ağırlıklarını yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT weights FROM fusion_weights WHERE key = 'adaptive'"
-            ).fetchone()
+            row = conn.execute("SELECT weights FROM fusion_weights WHERE key = 'adaptive'").fetchone()
             if row:
                 return orjson.loads(row["weights"])
         return None
@@ -359,21 +387,27 @@ class CentralStateStore:
         """Korelasyon geçmişini kaydet."""
         now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(values).decode()
-        f"{min(var1,var2)}:{max(var1,var2)}"
-        self._buffered_write("""
+        f"{min(var1, var2)}:{max(var1, var2)}"
+        self._buffered_write(
+            """
             INSERT OR REPLACE INTO correlation_history
             (var1, var2, corr_values, updated_at)
             VALUES (?, ?, ?, ?)
-        """, (var1, var2, values_json, now))
+        """,
+            (var1, var2, values_json, now),
+        )
 
     def load_correlation_history(self, var1: str, var2: str) -> list[float] | None:
         """Korelasyon geçmişini yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT corr_values FROM correlation_history
                 WHERE var1 = ? AND var2 = ?
-            """, (var1, var2)).fetchone()
+            """,
+                (var1, var2),
+            ).fetchone()
             if row:
                 return orjson.loads(row["corr_values"])
         return None
@@ -385,20 +419,26 @@ class CentralStateStore:
         now = datetime.now(UTC).isoformat()
         data_json = orjson.dumps(data, default=str).decode()
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO champion_history (data, created_at)
                 VALUES (?, ?)
-            """, (data_json, now))
+            """,
+                (data_json, now),
+            )
             conn.commit()
 
     def load_champion_history(self, limit: int = 100) -> list[dict]:
         """Champion challenger geçmişini yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT * FROM champion_history
                 ORDER BY created_at DESC LIMIT ?
-            """, (limit,)).fetchall()
+            """,
+                (limit,),
+            ).fetchall()
             return [orjson.loads(row["data"]) for row in rows]
 
     # ===================== GENEL =====================
@@ -407,9 +447,14 @@ class CentralStateStore:
         """İstatistikler."""
         with self._connect() as conn:
             tables = [
-                "circuit_breakers", "provider_reliability", "rate_limiters",
-                "learning_state", "learning_predictions", "fusion_weights",
-                "correlation_history", "champion_history",
+                "circuit_breakers",
+                "provider_reliability",
+                "rate_limiters",
+                "learning_state",
+                "learning_predictions",
+                "fusion_weights",
+                "correlation_history",
+                "champion_history",
             ]
             stats = {}
             for table in tables:
@@ -440,11 +485,13 @@ state_store = CentralStateStore()
 # Elektrik kesintisi veya SIGTERM/SIGINT'te buffer'ı flush et
 # =====================================================
 
+
 def _flush_on_exit():
     try:
         state_store.flush()
     except Exception:
         logger.warning("Caught Exception in _flush_on_exit", exc_info=True)
+
 
 def _flush_on_signal(signum, frame):
     try:
@@ -452,6 +499,7 @@ def _flush_on_signal(signum, frame):
         state_store.flush()
     except Exception:
         logger.warning("Caught Exception in _flush_on_signal", exc_info=True)
+
 
 atexit.register(_flush_on_exit)
 try:

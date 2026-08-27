@@ -1,6 +1,7 @@
 """
 ALPHA BIST — WebSocket Canlı Akış & SWR Veri Mimarisi Doğrulama Testi
 """
+
 import asyncio
 import os
 import sys
@@ -10,12 +11,13 @@ import requests
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
 
 try:
     import websockets
 except ImportError:
     websockets = None
+
 
 async def test_websocket_channels():
     print("=" * 80)
@@ -41,6 +43,7 @@ async def test_websocket_channels():
         except Exception as e:
             print(f"  • [Kanal: /ws/{ch:<6}] HATA: {e}")
 
+
 def test_api_latencies():
     print("\n" + "=" * 80)
     print("2. REST API UÇ NOKTALARI TEPKİ SÜRESİ VE STABİLİTE TESTİ")
@@ -64,6 +67,7 @@ def test_api_latencies():
             print(f"  • HTTP {r.status_code} | {elapsed:>6.1f} ms | {ep}")
         except Exception as e:
             print(f"  • HATA     | {ep} -> {e}")
+
 
 if __name__ == "__main__":
     if websockets:

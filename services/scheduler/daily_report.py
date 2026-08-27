@@ -4,7 +4,6 @@ ALPHA BIST — Günlük Rapor Üretici
 Her gün piyasa kapandıktan sonra otomatik rapor üretir.
 """
 
-
 import structlog
 
 logger = structlog.get_logger()
@@ -22,10 +21,10 @@ def generate_daily_report(
     """Günlük rapor üret."""
 
     lines = []
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
     lines.append("ALPHA BIST — GÜNLÜK RAPOR")
     lines.append(f"Tarih: {date}")
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
     lines.append("")
 
     # Piyasa Durumu
@@ -48,34 +47,38 @@ def generate_daily_report(
     # En Güçlü Sinyaller
     lines.append("🎯 EN GÜÇLÜ SİNYALLER")
     lines.append(f"   {'Ticker':<8} {'SPEC':>5} {'Kategori':<15} {'Fiyat':>10}")
-    lines.append(f"   {'-'*40}")
+    lines.append(f"   {'-' * 40}")
     for s in signals[:10]:
-        lines.append(f"   {s.get('ticker',''):<8} {s.get('spec_score',0):>5.0f} {s.get('spec_category',''):<15} ₺{s.get('price',0):>8.2f}")
+        lines.append(
+            f"   {s.get('ticker', ''):<8} {s.get('spec_score', 0):>5.0f} {s.get('spec_category', ''):<15} ₺{s.get('price', 0):>8.2f}"
+        )
     lines.append("")
 
     # Trade Planları
     if trade_plans:
         lines.append("💼 İŞLEM PLANLARI")
         lines.append(f"   {'Ticker':<8} {'Karar':<6} {'Giriş':>10} {'Hedef':>10} {'Stop':>10} {'R/R':>5}")
-        lines.append(f"   {'-'*50}")
+        lines.append(f"   {'-' * 50}")
         for p in trade_plans:
-            lines.append(f"   {p.get('ticker',''):<8} {p.get('action',''):<6} ₺{p.get('entry',0):>8.2f} ₺{p.get('target',0):>8.2f} ₺{p.get('stop',0):>8.2f} {p.get('risk_reward',0):>4.1f}")
+            lines.append(
+                f"   {p.get('ticker', ''):<8} {p.get('action', ''):<6} ₺{p.get('entry', 0):>8.2f} ₺{p.get('target', 0):>8.2f} ₺{p.get('stop', 0):>8.2f} {p.get('risk_reward', 0):>4.1f}"
+            )
         lines.append("")
 
     # Anomaliler
     if anomalies:
         lines.append("🚨 ANORMAL HACİM")
         for a in anomalies[:10]:
-            lines.append(f"   {a.get('ticker','')}: {a.get('score',0):.1f}σ — ₺{a.get('price',0):.2f}")
+            lines.append(f"   {a.get('ticker', '')}: {a.get('score', 0):.1f}σ — ₺{a.get('price', 0):.2f}")
         lines.append("")
 
     # Portföy
     if portfolio:
         lines.append("💰 PORTFÖY")
-        lines.append(f"   Sermaye: ₺{portfolio.get('capital',0):,.0f}")
-        lines.append(f"   Yatırılan: ₺{portfolio.get('invested',0):,.0f}")
-        lines.append(f"   Nakit: ₺{portfolio.get('cash',0):,.0f}")
-        lines.append(f"   P&L: ₺{portfolio.get('pnl',0):,.0f} ({portfolio.get('pnl_pct',0):.2f}%)")
+        lines.append(f"   Sermaye: ₺{portfolio.get('capital', 0):,.0f}")
+        lines.append(f"   Yatırılan: ₺{portfolio.get('invested', 0):,.0f}")
+        lines.append(f"   Nakit: ₺{portfolio.get('cash', 0):,.0f}")
+        lines.append(f"   P&L: ₺{portfolio.get('pnl', 0):,.0f} ({portfolio.get('pnl_pct', 0):.2f}%)")
         lines.append("")
 
     # Özet
@@ -84,7 +87,7 @@ def generate_daily_report(
     lines.append(f"   Üretilen sinyal: {len(signals)}")
     lines.append(f"   Trade planı: {len(trade_plans)}")
     lines.append(f"   Anomali: {len(anomalies)}")
-    lines.append(f"{'='*60}")
+    lines.append(f"{'=' * 60}")
 
     return "\n".join(lines)
 
