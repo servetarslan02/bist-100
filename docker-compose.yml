@@ -1000,7 +1000,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: ghcr.io/mlflow/mlflow:v3.15.1
+    image: ghcr.io/mlflow/mlflow:v3.15.2
     container_name: alpha-mlflow
     ports:
     - 5000:5000
@@ -1071,7 +1071,7 @@ services:
     stop_grace_period: 10s
     networks: *id002
     logging: *id003
-    image: questdb/questdb:8.2.3
+    image: questdb/questdb:10.0.1
     container_name: alpha-questdb
     ports:
     - 9009:9009

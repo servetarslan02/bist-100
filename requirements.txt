@@ -38,7 +38,7 @@ SQLAlchemy>=2.0.36
 # === Numerical, Finance & ML ===
 numpy>=2.5.0
 pandas>=3.0.0
-scipy>=1.15.0
+scipy>=1.18.0
 scikit-learn>=1.9.0
 lightgbm>=4.7.0
 xgboost>=3.4.0
@@ -51,12 +51,12 @@ torch>=2.13.0
 prometheus-client>=0.26.0
 opentelemetry-api>=1.44.0
 opentelemetry-sdk>=1.44.0
-mlflow>=3.15.0
+mlflow>=3.15.2
 
 # === Testing & Dev Tools ===
-pytest>=8.4.0
+pytest>=9.1.0
 pytest-asyncio>=0.25.0
-ruff>=0.12.0
+ruff>=0.16.0
 
 # === Web Scraping & Data Sources ===
 requests>=2.32.0
@@ -82,16 +82,16 @@ stable-baselines3>=2.9.0
 pytrends>=5.0.0
 
 # === NLP & Transformers ===
-transformers>=5.15.0
+transformers>=5.16.0
 
 # === Google Auth ===
 google-auth>=2.38.0
 
 # === High-Performance API & Serialization ===
-grpcio>=1.70.0
-grpcio-tools>=1.70.0
-grpcio-health-checking>=1.70.0
-grpcio-reflection>=1.70.0
+grpcio>=1.83.0
+grpcio-tools>=1.83.0
+grpcio-health-checking>=1.83.0
+grpcio-reflection>=1.83.0
 protobuf>=5.29.0
 nats-py>=2.15.0
 
