@@ -14,7 +14,7 @@ Production-grade lock infrastructure.
 - Lock ordering (deadlock prevention)
 
 Kullanım:
-    async with DatabaseLock(db, dialect="postgresql", key="portfolio_trade") as lock:
+    async with DatabaseLock(db, key="portfolio_trade") as lock:
         # Atomik işlemler
         pass
 """
@@ -525,7 +525,7 @@ class DatabaseLock:
 class CoordinatedLock:
     """In-process asyncio lock + DB-level lock koordinasyonu."""
 
-    def __init__(self, db, dialect: str = "sqlite", key: str = "default", timeout_ms: int = 5000):
+    def __init__(self, db, dialect: str = "postgresql", key: str = "default", timeout_ms: int = 5000):
         self._asyncio_lock = asyncio.Lock()
         self._db_lock = DatabaseLock(db, dialect=dialect, key=key, timeout_ms=timeout_ms)
         self._key = key
@@ -573,7 +573,7 @@ class CoordinatedLock:
 
 
 @asynccontextmanager
-async def portfolio_trade_lock(db, dialect: str = "sqlite", timeout_ms: int = 5000):
+async def portfolio_trade_lock(db, dialect: str = "postgresql", timeout_ms: int = 5000):
     """Portfolio işlem lock'u (context manager)."""
     lock = CoordinatedLock(db, dialect=dialect, key="portfolio_trade", timeout_ms=timeout_ms)
     async with lock:

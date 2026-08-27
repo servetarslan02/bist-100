@@ -16,6 +16,8 @@ Kapsam:
 import asyncio
 import sys
 
+import sqlite3
+
 import duckdb
 
 from services.core.database_dev import dev_db
@@ -30,6 +32,13 @@ from services.portfolio.main import PortfolioService
 
 
 def fresh_db():
+    """Test için SQLite in-memory DB (SQLite dialect testleri için)."""
+    db = sqlite3.connect(":memory:")
+    return db
+
+
+def fresh_duckdb():
+    """Test için DuckDB in-memory DB (PostgreSQL dialect testleri için)."""
     db = duckdb.connect(":memory:")
     return db
 
