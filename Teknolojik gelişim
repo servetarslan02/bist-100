@@ -1077,7 +1077,7 @@ Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
 
 | # | Geliştirme | Öncelik | Gerekçe |
 |---|---|---|---|
-| 1 | Feature Engine düzeltme + standardizasyon | 🔴 | Polars/Pandas/dict karışıklığı, feature contract yok |
+| 1 | Feature Engine düzeltme + standardizasyon | 🔴 | ✅ DÜZELTİLDİ (commit 2f211a7) — crash bug, sahte veri, feature contract |
 | 2 | PIT/data leakage garantisi | 🔴 | Backtest güvenilirliği için temel |
 | 3 | Data quality + fail-closed | 🔴 | `event_bus.py`'de fail-open var, risk engine fail-closed |
 | 4 | ML training/inference feature parity | 🔴 | Training'de farklı, inference'da farklı feature kullanılabilir |
@@ -1258,7 +1258,7 @@ Bence bundan sonraki büyük çalışma **"Technology Upgrade"** değil, **"Arch
 | 15 | pgvector | ✅ En iyi | 10/10 |
 | 16 | Backtest Engine | ✅ En iyi | 10/10 |
 | 17 | Risk Engine | ✅ En iyi | 10/10 |
-| 18 | Feature Engine | ⚠️ Karışık kullanım | 6/10 |
+| 18 | Feature Engine | ✅ Düzeltildi — crash bug, sahte veri temizlendi, contract eklendi | 8/10 |
 | 19 | CI/CD Pipeline | ⚠️ Basit | 5/10 |
 | 20 | Data Quality | ⚠️ Partial | 6/10 |
 
