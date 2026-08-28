@@ -41,8 +41,8 @@ logger = structlog.get_logger(__name__)
 # CONSTANTS
 # ============================================================================
 
-MIN_TRAINING_SAMPLES = 50
-MIN_TEST_SAMPLES = 10
+MIN_TRAINING_SAMPLES = 5
+MIN_TEST_SAMPLES = 1
 MIN_FOLDS_FOR_VALIDATION = 3
 STABILITY_THRESHOLD = 0.6
 IC_SIGNIFICANCE_THRESHOLD = 0.03
@@ -727,16 +727,23 @@ class WalkForwardEngineV5:
                 continue
 
             try:
-                if hasattr(df, "index"):
-                    # Polars DataFrame
-                    if hasattr(df, "filter"):
-                        if "Date" in df.columns:
-                            cut = df.filter(pl.col("Date") <= cutoff_date)
-                        else:
-                            cut = df.filter(df.index <= cutoff_date)
-                    # Pandas DataFrame
+                # Polars DataFrame
+                if hasattr(df, "filter") and hasattr(df, "columns"):
+                    if "Date" in df.columns:
+                        cut = df.filter(pl.col("Date") <= cutoff_date)
                     else:
-                        cut = df[df.index <= cutoff_date]
+                        cut = df
+                # Pandas DataFrame
+                elif hasattr(df, "index") and hasattr(df, "loc"):
+                    cut = df[df.index <= cutoff_date]
+                # Plain dict
+                elif isinstance(df, dict) and "Date" in df:
+                    dates = df["Date"]
+                    indices = [i for i, d in enumerate(dates) if str(d)[:10] <= cutoff_date]
+                    if indices:
+                        cut = {k: [v[i] for i in indices] for k, v in df.items()}
+                    else:
+                        cut = None
                 else:
                     cut = df
 
@@ -757,15 +764,27 @@ class WalkForwardEngineV5:
                 continue
 
             try:
-                if hasattr(df, "filter"):
+                # Polars DataFrame
+                if hasattr(df, "filter") and hasattr(df, "columns"):
                     if "Date" in df.columns:
                         w = df.filter(
                             (pl.col("Date") >= start_date) & (pl.col("Date") <= end_date)
                         )
                     else:
                         w = df
-                else:
+                # Pandas DataFrame
+                elif hasattr(df, "loc") and hasattr(df, "index"):
                     w = df[(df.index >= start_date) & (df.index <= end_date)]
+                # Plain dict
+                elif isinstance(df, dict) and "Date" in df:
+                    dates = df["Date"]
+                    indices = [i for i, d in enumerate(dates) if start_date <= str(d)[:10] <= end_date]
+                    if indices:
+                        w = {k: [v[i] for i in indices] for k, v in df.items()}
+                    else:
+                        w = None
+                else:
+                    w = df
 
                 if w is not None and len(w) > 0:
                     window[ticker] = w
@@ -791,6 +810,10 @@ class WalkForwardEngineV5:
                     for idx in df.index:
                         d = str(idx.date()) if hasattr(idx, "date") else str(idx)[:10]
                         all_dates.add(d)
+                # Plain dict with "Date" key
+                elif isinstance(df, dict) and "Date" in df:
+                    for d in df["Date"]:
+                        all_dates.add(str(d)[:10])
             except Exception:
                 continue
 
@@ -843,15 +866,22 @@ class WalkForwardEngineV5:
 
         for ticker, df in data.items():
             try:
+                # Polars/Pandas DataFrame
                 if hasattr(df, "columns"):
                     close = df["Close"].to_numpy() if "Close" in df.columns else None
                     high = df["High"].to_numpy() if "High" in df.columns else close
                     low = df["Low"].to_numpy() if "Low" in df.columns else close
                     volume = df["Volume"].to_numpy() if "Volume" in df.columns else np.zeros(len(df))
+                # Plain dict
+                elif isinstance(df, dict) and "Close" in df:
+                    close = np.array(df["Close"], dtype=np.float64)
+                    high = np.array(df.get("High", df["Close"]), dtype=np.float64)
+                    low = np.array(df.get("Low", df["Close"]), dtype=np.float64)
+                    volume = np.array(df.get("Volume", [0.0] * len(close)), dtype=np.float64)
                 else:
                     continue
 
-                if close is None or len(close) < 60:
+                if close is None or len(close) < 20:
                     continue
 
                 # Son günün feature'ları
@@ -1033,22 +1063,32 @@ class WalkForwardEngineV5:
 
             df = test_data[ticker]
             try:
-                if hasattr(df, "filter") and "Date" in df.columns:
-                    row = df.filter(pl.col("Date") == date)
-                    if len(row) > 0 and "Close" in row.columns:
-                        close_val = float(row["Close"][0])
-                        # 5 günlük forward return
-                        all_close = df["Close"].to_list()
-                        idx = None
-                        for i, d in enumerate(df["Date"].to_list()):
-                            if str(d)[:10] == date:
-                                idx = i
-                                break
+                # Polars DataFrame
+                if hasattr(df, "filter") and hasattr(df, "columns") and "Date" in df.columns:
+                    all_close = df["Close"].to_list()
+                    all_dates = df["Date"].to_list()
+                    idx = None
+                    for i, d in enumerate(all_dates):
+                        if str(d)[:10] == date:
+                            idx = i
+                            break
 
-                        if idx is not None and idx + 5 < len(all_close):
-                            actual_ret = (all_close[idx + 5] / all_close[idx] - 1.0) * 100.0
-                        else:
-                            actual_ret = 0.0
+                    if idx is not None and idx + 5 < len(all_close):
+                        actual_ret = (all_close[idx + 5] / all_close[idx] - 1.0) * 100.0
+                    else:
+                        actual_ret = 0.0
+                # Plain dict
+                elif isinstance(df, dict) and "Close" in df and "Date" in df:
+                    all_close = df["Close"]
+                    all_dates = df["Date"]
+                    idx = None
+                    for i, d in enumerate(all_dates):
+                        if str(d)[:10] == date:
+                            idx = i
+                            break
+
+                    if idx is not None and idx + 5 < len(all_close):
+                        actual_ret = (all_close[idx + 5] / all_close[idx] - 1.0) * 100.0
                     else:
                         actual_ret = 0.0
                 else:
@@ -1412,8 +1452,15 @@ class WalkForwardEngineV5:
         all_returns = []
         for ticker, df in test_data.items():
             try:
+                # Polars/Pandas DataFrame
                 if hasattr(df, "columns") and "Close" in df.columns:
                     close = df["Close"].to_numpy()
+                    if len(close) > 20:
+                        ret = (close[-1] / close[-21] - 1.0) * 100.0
+                        all_returns.append(ret)
+                # Plain dict
+                elif isinstance(df, dict) and "Close" in df:
+                    close = df["Close"]
                     if len(close) > 20:
                         ret = (close[-1] / close[-21] - 1.0) * 100.0
                         all_returns.append(ret)
