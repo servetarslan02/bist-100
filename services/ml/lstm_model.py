@@ -134,6 +134,7 @@ class StockLSTM:
         # Training loop
         best_val_loss = float("inf")
         patience_counter = 0
+        best_state = None
         history = []
 
         for epoch in range(self._config.epochs):
@@ -180,7 +181,7 @@ class StockLSTM:
             )
 
         # Best model yükle
-        if "best_state" in locals():
+        if best_state is not None:
             self._model.load_state_dict(best_state)
 
         self._is_trained = True
