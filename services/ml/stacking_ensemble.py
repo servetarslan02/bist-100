@@ -514,6 +514,112 @@ class StackingEnsemble:
             "n_regime_weights": len(self._regime_weights),
         }
 
+    # =====================================================
+    # REGIME SMOOTHING (v2.1)
+    # =====================================================
+
+    def predict_with_regime_smoothing(
+        self,
+        X: np.ndarray,
+        current_regime: str,
+        previous_regime: str | None = None,
+        smoothing_factor: float = 0.3,
+    ) -> np.ndarray:
+        """Rejim geçişlerinde ağırlık smoothing.
+
+        Ani rejim değişimlerinde ağırlıkları kademeli olarak değiştirir.
+
+        Args:
+            X: Feature matrix
+n            current_regime: Mevcut rejim
+            previous_regime: Önceki rejim (None = ilk tahmin)
+            smoothing_factor: Smoothing hızı (0 = tam smoothing, 1 = anlık geçiş)
+
+        Returns:
+            Smoothed predictions
+        """
+        if previous_regime is None or previous_regime == current_regime:
+            return self.predict(X, regime=current_regime)
+
+        # İki rejim için ayrı tahminler
+        pred_current = self.predict(X, regime=current_regime)
+        pred_previous = self.predict(X, regime=previous_regime)
+
+        # Smoothing: smoothing_factor kadar yeni rejime, geri kalanı eski rejime
+        smoothed = smoothing_factor * pred_current + (1 - smoothing_factor) * pred_previous
+
+        logger.debug(
+            "regime_smoothing_applied",
+            current=current_regime,
+            previous=previous_regime,
+            factor=smoothing_factor,
+        )
+
+        return smoothed
+
+    def get_regime_performance_report(
+        self,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        regimes: np.ndarray,
+    ) -> dict[str, dict[str, float]]:
+        """Her rejimdeki ensemble performansı.
+
+        Args:
+            X_val: Validation features
+            y_val: Validation targets
+            regimes: Rejim etiketleri
+
+        Returns:
+            {regime: {ic, rank_ic, direction_accuracy, n_samples}}
+        """
+        report: dict[str, dict[str, float]] = {}
+
+        unique_regimes = np.unique(regimes)
+        for regime in unique_regimes:
+            mask = regimes == regime
+            n = int(np.sum(mask))
+
+            if n < 10:
+                continue
+
+            preds = self.predict(X_val[mask], regime=str(regime))
+            y_regime = y_val[mask]
+
+            # IC
+            try:
+                finite_mask = np.isfinite(preds) & np.isfinite(y_regime)
+                ic = float(np.corrcoef(preds[finite_mask], y_regime[finite_mask])[0, 1])
+                if not np.isfinite(ic):
+                    ic = 0.0
+            except Exception:
+                ic = 0.0
+
+            # Rank IC
+            try:
+                from scipy.stats import spearmanr
+                rank_ic, _ = spearmanr(preds[finite_mask], y_regime[finite_mask])
+                rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
+            except Exception:
+                rank_ic = 0.0
+
+            # Direction accuracy
+            try:
+                pred_sign = np.sign(preds)
+                true_sign = np.sign(y_regime)
+                direction_acc = float(np.mean(pred_sign == true_sign))
+            except Exception:
+                direction_acc = 0.0
+
+            report[str(regime)] = {
+                "ic": round(ic, 4),
+                "rank_ic": round(rank_ic, 4),
+                "direction_accuracy": round(direction_acc, 4),
+                "n_samples": n,
+            }
+
+        return report
+
     @property
     def is_fitted(self) -> bool:
         return self._is_fitted

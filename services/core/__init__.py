@@ -17,7 +17,12 @@ from .bist_tick_size import get_bist_tick_size, is_valid_bist_tick, round_to_bis
 from .circuit_breaker_metrics import CircuitBreakerMetricsCollector, CircuitBreakerSnapshot, circuit_breaker_metrics
 from .compliance import ComplianceChecker, compliance_checker
 from .config_hot_reload import ConfigChange, ConfigHotReload, SettingsBridge, config_hot_reload, settings_bridge
-from .dead_letter_queue import DeadLetterQueue, DLQEntry, DLQStatus, dead_letter_queue
+from .dead_letter_queue import DLQEntry, DLQStatus, dead_letter_queue
+
+try:
+    from .dead_letter_queue import DeadLetterQueue
+except ImportError:
+    DeadLetterQueue = type(dead_letter_queue)
 from .distributed_tracing import (
     DistributedTracer,
     Span,

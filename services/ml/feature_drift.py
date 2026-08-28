@@ -226,6 +226,243 @@ class FeatureDriftDetector:
         """SHAP history."""
         return self._shap_history
 
+    # =====================================================
+    # PER-TICKER & TIME SERIES (v2.1)
+    # =====================================================
+
+    def record_shap_per_ticker(
+        self,
+        ticker: str,
+        shap_values: dict[str, float],
+    ) -> None:
+        """Ticker bazlı SHAP importance kaydet.
+
+        Args:
+            ticker: Hisse kodu
+            shap_values: {feature_name: importance}
+        """
+        if not hasattr(self, "_shap_by_ticker"):
+            self._shap_by_ticker: dict[str, list[dict[str, Any]]] = {}
+
+        if ticker not in self._shap_by_ticker:
+            self._shap_by_ticker[ticker] = []
+
+        self._shap_by_ticker[ticker].append({
+            **shap_values,
+            "_timestamp": datetime.now(UTC).isoformat(),
+        })
+
+        # Son 500 kaydı tut
+        if len(self._shap_by_ticker[ticker]) > 500:
+            self._shap_by_ticker[ticker] = self._shap_by_ticker[ticker][-500:]
+
+    def get_importance_time_series(
+        self,
+        feature_name: str,
+        window: int = 30,
+    ) -> dict[str, Any]:
+        """Feature importance zaman serisi.
+
+        Args:
+            feature_name: Feature adı
+            window: Son N kayıt
+
+        Returns:
+            {feature, values, timestamps, trend, mean, std}
+        """
+        if len(self._shap_history) < 2:
+            return {
+                "feature": feature_name,
+                "values": [],
+                "timestamps": [],
+                "trend": "stable",
+                "mean": 0.0,
+                "std": 0.0,
+            }
+
+        recent = self._shap_history[-window:]
+        values = [h.get(feature_name, 0.0) for h in recent if feature_name in h]
+        timestamps = [h.get("_timestamp", "") for h in recent if feature_name in h]
+
+        if not values:
+            return {
+                "feature": feature_name,
+                "values": [],
+                "timestamps": [],
+                "trend": "stable",
+                "mean": 0.0,
+                "std": 0.0,
+            }
+
+        # Trend analizi
+        arr = np.array(values)
+        mean_val = float(np.mean(arr))
+        std_val = float(np.std(arr))
+
+        if len(values) >= 4:
+            first_half = np.mean(arr[:len(arr)//2])
+            second_half = np.mean(arr[len(arr)//2:])
+            change = (second_half - first_half) / max(abs(first_half), 0.001)
+
+            if change > 0.2:
+                trend = "increasing"
+            elif change < -0.2:
+                trend = "decreasing"
+            elif std_val > mean_val * 0.5:
+                trend = "volatile"
+            else:
+                trend = "stable"
+        else:
+            trend = "stable"
+
+        return {
+            "feature": feature_name,
+            "values": [round(v, 6) for v in values],
+            "timestamps": timestamps,
+            "trend": trend,
+            "mean": round(mean_val, 6),
+            "std": round(std_val, 6),
+        }
+
+    def get_strengthening_features(
+        self,
+        threshold: float = 0.1,
+    ) -> list[dict[str, Any]]:
+        """Güçlenen feature'ları listele.
+
+        Son dönemde importance'ı artan feature'ları döndürür.
+
+        Args:
+            threshold: Artış eşiği (oran)
+
+        Returns:
+            [{feature, current_importance, historical_importance, change_ratio, trend}]
+        """
+        if len(self._shap_history) < 4:
+            return []
+
+        current = self._shap_history[-1]
+        historical = self._shap_history[:-1]
+
+        strengthening: list[dict[str, Any]] = []
+
+        for feature in current:
+            if feature.startswith("_"):
+                continue
+
+            current_imp = current.get(feature, 0)
+            historical_imps = [h.get(feature, 0) for h in historical if feature in h]
+
+            if not historical_imps or current_imp <= 0:
+                continue
+
+            hist_mean = float(np.mean(historical_imps))
+            if hist_mean <= 0:
+                continue
+
+            change_ratio = (current_imp - hist_mean) / hist_mean
+
+            if change_ratio > threshold:
+                strengthening.append({
+                    "feature": feature,
+                    "current_importance": round(current_imp, 6),
+                    "historical_importance": round(hist_mean, 6),
+                    "change_ratio": round(change_ratio, 4),
+                    "trend": "strengthening",
+                })
+
+        return sorted(strengthening, key=lambda x: x["change_ratio"], reverse=True)
+
+    def get_weakening_features(
+        self,
+        threshold: float = 0.1,
+    ) -> list[dict[str, Any]]:
+        """Zayıflayan feature'ları listele.
+
+        Son dönemde importance'ı azalan feature'ları döndürür.
+
+        Args:
+            threshold: Azalma eşiği (oran)
+
+        Returns:
+            [{feature, current_importance, historical_importance, change_ratio, trend}]
+        """
+        if len(self._shap_history) < 4:
+            return []
+
+        current = self._shap_history[-1]
+        historical = self._shap_history[:-1]
+
+        weakening: list[dict[str, Any]] = []
+
+        for feature in current:
+            if feature.startswith("_"):
+                continue
+
+            current_imp = current.get(feature, 0)
+            historical_imps = [h.get(feature, 0) for h in historical if feature in h]
+
+            if not historical_imps:
+                continue
+
+            hist_mean = float(np.mean(historical_imps))
+            if hist_mean <= 0:
+                continue
+
+            change_ratio = (current_imp - hist_mean) / hist_mean
+
+            if change_ratio < -threshold:
+                weakening.append({
+                    "feature": feature,
+                    "current_importance": round(current_imp, 6),
+                    "historical_importance": round(hist_mean, 6),
+                    "change_ratio": round(change_ratio, 4),
+                    "trend": "weakening",
+                })
+
+        return sorted(weakening, key=lambda x: x["change_ratio"])
+
+    def get_ticker_shap_summary(
+        self,
+        ticker: str,
+    ) -> dict[str, Any]:
+        """Ticker bazlı SHAP özeti.
+
+        Args:
+            ticker: Hisse kodu
+
+        Returns:
+            {ticker, n_records, top_features, latest_shap}
+        """
+        if not hasattr(self, "_shap_by_ticker") or ticker not in self._shap_by_ticker:
+            return {
+                "ticker": ticker,
+                "n_records": 0,
+                "top_features": [],
+                "latest_shap": {},
+            }
+
+        records = self._shap_by_ticker[ticker]
+        latest = records[-1] if records else {}
+
+        # Top features
+        feature_sums: dict[str, float] = {}
+        for r in records:
+            for k, v in r.items():
+                if not k.startswith("_"):
+                    feature_sums[k] = feature_sums.get(k, 0) + abs(float(v))
+
+        n = len(records)
+        avg_importance = {k: round(v / n, 6) for k, v in feature_sums.items()}
+        top_features = sorted(avg_importance.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        return {
+            "ticker": ticker,
+            "n_records": n,
+            "top_features": [{"feature": f, "importance": i} for f, i in top_features],
+            "latest_shap": {k: v for k, v in latest.items() if not k.startswith("_")},
+        }
+
     def _compute_trend(self, historical: list[float], current: float) -> str:
         """Importance trend hesapla."""
         if len(historical) < 3:

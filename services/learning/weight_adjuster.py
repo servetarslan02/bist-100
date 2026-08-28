@@ -132,5 +132,116 @@ class WeightAdjuster:
         return self.adjust_weights(model_metrics, metric_key)
 
 
+    # =====================================================
+    # TRADE RESULT TRIGGER (v2.1)
+    # =====================================================
+
+    def trigger_from_trade_result(
+        self,
+        model_id: str,
+        prediction: float,
+        actual_return: float,
+        metric_key: str = "direction_accuracy",
+    ) -> dict[str, float]:
+        """Her trade sonucu sonrası ağırlık güncelle.
+
+        Args:
+            model_id: Model adı
+            prediction: Model tahmini
+            actual_return: Gerçek getiri
+            metric_key: Güncelleme metriği
+
+        Returns:
+            Güncellenmiş ağırlıklar
+        """
+        # Model metrics'i güncelle
+        if not hasattr(self, "_model_outcomes"):
+            self._model_outcomes: dict[str, list[dict]] = {}
+
+        if model_id not in self._model_outcomes:
+            self._model_outcomes[model_id] = []
+
+        pred_dir = "UP" if prediction > 0.5 else "DOWN"
+        act_dir = "UP" if actual_return > 0 else "DOWN"
+        is_correct = pred_dir == act_dir
+
+        self._model_outcomes[model_id].append({
+            "prediction": prediction,
+            "actual_return": actual_return,
+            "is_correct": is_correct,
+            "timestamp": time.time(),
+        })
+
+        # Son 200 outcome'u tut
+        if len(self._model_outcomes[model_id]) > 200:
+            self._model_outcomes[model_id] = self._model_outcomes[model_id][-200:]
+
+        # Metrics oluştur
+        model_metrics: dict[str, dict[str, float]] = {}
+        for mid, outcomes in self._model_outcomes.items():
+            if len(outcomes) < 5:
+                continue
+
+            recent = outcomes[-50:]
+            accuracy = sum(1 for o in recent if o["is_correct"]) / len(recent)
+            model_metrics[mid] = {
+                metric_key: accuracy,
+                "n_resolved": len(recent),
+            }
+
+        if model_metrics:
+            return self.adjust_weights(model_metrics, metric_key)
+
+        return self._weights.copy()
+
+    def expanding_window_recalc(
+        self,
+        min_window: int = 100,
+        metric_key: str = "direction_accuracy",
+    ) -> dict[str, float]:
+        """Expanding window ile periyodik ağırlık recalculation.
+
+        Args:
+            min_window: Minimum veri noktası
+            metric_key: Metrik anahtarı
+
+        Returns:
+            Güncellenmiş ağırlıklar
+        """
+        if not hasattr(self, "_model_outcomes"):
+            return self._weights.copy()
+
+        model_metrics: dict[str, dict[str, float]] = {}
+
+        for mid, outcomes in self._model_outcomes.items():
+            if len(outcomes) < min_window:
+                continue
+
+            # Expanding window: tüm veriyi kullan
+            accuracy = sum(1 for o in outcomes if o["is_correct"]) / len(outcomes)
+
+            # Son N outcome'un accuracy'si (trend)
+            recent_n = min(50, len(outcomes))
+            recent = outcomes[-recent_n:]
+            recent_acc = sum(1 for o in recent if o["is_correct"]) / len(recent)
+
+            # Ağırlıklı skor: %60 genel + %40 recent
+            weighted_score = 0.6 * accuracy + 0.4 * recent_acc
+
+            model_metrics[mid] = {
+                metric_key: weighted_score,
+                "n_resolved": len(outcomes),
+            }
+
+        if model_metrics:
+            return self.adjust_weights(model_metrics, metric_key)
+
+        return self._weights.copy()
+
+    def get_weight_change_log(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Son ağırlık değişimlerini döndür."""
+        return self._history[-limit:]
+
+
 # Singleton
 weight_adjuster = WeightAdjuster()

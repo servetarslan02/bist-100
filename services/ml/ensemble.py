@@ -541,6 +541,115 @@ class EnsembleModel:
     def state(self) -> EnsembleState | None:
         return self._state
 
+    # =====================================================
+    # AUTO-PRUNE (v2.1)
+    # =====================================================
+
+    def auto_prune_redundant(
+        self,
+        model_predictions: dict[str, np.ndarray],
+        model_ics: dict[str, float] | None = None,
+        threshold: float | None = None,
+    ) -> tuple[dict[str, np.ndarray], list[str]]:
+        """Redundant modelleri otomatik çıkar.
+
+        Yüksek korelasyonlu model çiftlerinden daha düşük IC'li olanı ele.
+
+        Args:
+            model_predictions: {model_name: predictions_array}
+            model_ics: {model_name: IC score} — hangi modelin daha iyi olduğunu belirlemek için
+            threshold: Korelasyon eşiği (None = _diversity_threshold)
+
+        Returns:
+            (pruned_predictions, removed_models)
+        """
+        if threshold is None:
+            threshold = self._diversity_threshold
+
+        diversity = self.analyze_diversity(model_predictions, threshold)
+
+        if not diversity.redundant_models:
+            return model_predictions.copy(), []
+
+        removed: list[str] = []
+        pruned = model_predictions.copy()
+
+        for pair in diversity.redundant_models:
+            parts = pair.split("↔")
+            if len(parts) != 2:
+                continue
+
+            name_a, name_b = parts
+
+            if name_a not in pruned or name_b not in pruned:
+                continue
+
+            # Düşük IC'li olanı çıkar
+            if model_ics:
+                ic_a = model_ics.get(name_a, 0.0)
+                ic_b = model_ics.get(name_b, 0.0)
+                remove_name = name_a if ic_a < ic_b else name_b
+            else:
+                # IC yoksa ikincisini çıkar (arbitrary)
+                remove_name = name_b
+
+            if remove_name in pruned:
+                del pruned[remove_name]
+                removed.append(remove_name)
+                logger.info(
+                    "ensemble_auto_prune",
+                    removed=remove_name,
+                    kept=name_a if remove_name == name_b else name_b,
+                    correlation=diversity.correlation_matrix.get(name_a, {}).get(name_b, 0),
+                )
+
+        return pruned, removed
+
+    def should_use_ensemble(
+        self,
+        diversity_report: DiversityReport,
+        benefit_report: BenefitReport,
+        min_diversity: float = 0.15,
+    ) -> tuple[bool, str]:
+        """Diversity + benefit gate birleşik karar.
+
+        Args:
+            diversity_report: Diversity analiz sonucu
+            benefit_report: Benefit analiz sonucu
+n            min_diversity: Minimum diversity skoru
+
+        Returns:
+            (use_ensemble, reason)
+        """
+        # Düşük diversity → ensemble faydasız
+        if diversity_report.diversity_score < min_diversity:
+            return False, (
+                f"Düşük diversity ({diversity_report.diversity_score:.4f} < {min_diversity}). "
+                f"Modeller çok benzer — en iyi tek modeli kullan."
+            )
+
+        # Redundant modeller var → önce prune et
+        if diversity_report.redundant_models:
+            logger.info(
+                "ensemble_redundant_detected",
+                redundant=diversity_report.redundant_models,
+                recommendation="Prune sonrası tekrar kontrol et",
+            )
+
+        # Benefit gate
+        if not benefit_report.is_beneficial:
+            return False, (
+                f"Ensemble tek modelden daha kötü "
+                f"(ensemble={benefit_report.ensemble_ic:.4f}, "
+                f"best={benefit_report.best_individual_ic:.4f} [{benefit_report.best_individual_name}]). "
+                f"En iyi tek modeli kullan."
+            )
+
+        return True, (
+            f"Ensemble faydalı: diversity={diversity_report.diversity_score:.4f}, "
+            f"IC improvement={benefit_report.ic_improvement:+.4f}"
+        )
+
     @property
     def is_loaded(self) -> bool:
         return self._state is not None
