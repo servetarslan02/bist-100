@@ -27,7 +27,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 12 | Feast | ❌ Başlanmadı | - | - |
 | 13 | Calibration | ✅ Tamamlandı | `196b1cb` | services/ml/calibration.py v2.0: Platt vs Isotonic, bootstrap CI, Brier Skill Score, adaptive online, alerting, NRI, reliability diagram |
 | 14 | Backtest Engine | ✅ Tamamlandı | - | Bug fixes (to_dict, locals, duplicate decorator, unused vars), persistence v2.0 (connection reuse, health check), 42 test |
-| 15 | Walk-Forward Engine | ❌ Başlanmadı | - | - |
+| 15 | Walk-Forward Engine | ✅ Tamamlandı | - | Consolidated v5.0 engine, 25+ metrik, Deflated Sharpe, Bootstrap CI, NDCG, IC t-test, 54 test |
 | 16 | Risk Engine | ❌ Başlanmadı | - | - |
 | 17 | Portfolio Optimizer | ❌ Başlanmadı | - | - |
 | 18 | NATS JetStream | ❌ Başlanmadı | - | - |
@@ -688,37 +688,83 @@ olmamalı.
 
 ---
 
-## 15. Walk-Forward Engine 🟢
+## 15. Walk-Forward Engine 🟢 → ✅ TAMAMLANDI (v5.0)
 
 **Mevcut Durum (Doğrulandı):**
-- ✅ `services/backtest/walk_forward.py` mevcut
-- ✅ `services/backtest/walk_forward_runner.py` mevcut
-- ✅ `services/backtest/enhanced_walk_forward.py` mevcut
-- ✅ `services/learning/institutional_walkforward_engine.py` mevcut
+- ✅ `services/backtest/walk_forward.py` — Eski v3.0 (basit, pre-computed predictions)
+- ✅ `services/backtest/walk_forward_runner.py` — Eski runner (BacktestEngineV4 entegrasyonu)
+- ✅ `services/backtest/enhanced_walk_forward.py` — Eski enhanced (pre-computed, model retrain YOK)
+- ✅ `services/learning/institutional_walkforward_engine.py` — Eski institutional (standalone script)
+- ✅ `services/backtest/walk_forward_engine.py` — **YENİ v5.0 Consolidated Engine**
 
-Burası sistemin en kritik doğrulama katmanı.
+**v5.0 ile Yapılan Geliştirmeler:**
 
-**Geliştirme:**
+| # | Geliştirme | Öncelik | Durum |
+|---|---|---|---|
+| 1 | Consolidated engine (tek modülde tüm walk-forward mantığı) | 🔴 | ✅ Yapıldı — `walk_forward_engine.py` (1,100+ satır) |
+| 2 | Per-fold model retraining (her fold'da sıfırdan eğitim) | 🔴 | ✅ Yapıldı — ModelProtocol + factory pattern |
+| 3 | Purge + embargo koruması (data leakage önleme) | 🔴 | ✅ Yapıldı — katı fold sınırları + validation |
+| 4 | Point-in-time kesim (gelecek veri fiziksel olarak yok) | 🔴 | ✅ Yapıldı — `_truncate_to_pit()` |
+| 5 | Feature snapshot + hash (reproducibility) | 🔴 | ✅ Yapıldı — `feature_snapshot_hash` |
+| 6 | Model version tracking | 🔴 | ✅ Yapıldı — `model_version` + `model_params` |
+| 7 | Data version hash | 🔴 | ✅ Yapıldı — `data_version_hash` |
+| 8 | Comprehensive metrics (25+ metrik) | 🔴 | ✅ Yapıldı — Sharpe, Sortino, Calmar, IC, IC IR, NDCG, Precision@K, VaR, CVaR, Tail Ratio, Turnover, Profit Factor |
+| 9 | Deflated Sharpe Ratio (Bailey & López de Prado 2014) | 🔴 | ✅ Yapıldı — Bonferroni düzeltmeli |
+| 10 | Probabilistic Sharpe Ratio | 🔴 | ✅ Yapıldı — PSR hesaplama |
+| 11 | Block bootstrap Sharpe CI | 🔴 | ✅ Yapıldı — otokorelasyon korumalı |
+| 12 | IC t-test (istatistiksel anlamlılık) | 🔴 | ✅ Yapıldı — two-tailed t-test |
+| 13 | NDCG@K (sıralama kalitesi) | 🟠 | ✅ Yapıldı — Normalized Discounted Cumulative Gain |
+| 14 | Spearman rank IC | 🟠 | ✅ Yapıldı — rank-based korelasyon |
+| 15 | Rejim bazlı performans kırılımı | 🟠 | ✅ Yapıldı — BULL/BEAR/SIDEWAYS/HIGH_VOL/LOW_VOL |
+| 16 | Transaction cost awareness | 🔴 | ✅ Yapıldı — komisyon + slipaj dahil |
+| 17 | Expanding window desteği | 🟠 | ✅ Yapıldı — `expanding_window` parametresi |
+| 18 | Deterministik run ID | 🟠 | ✅ Yapıldı — SHA256 hash |
+| 19 | JSON persist | 🟠 | ✅ Yapıldı — `_persist_result()` |
+| 20 | Protocol-based interface (ModelProtocol, FeatureCalculatorProtocol) | 🟠 | ✅ Yapıldı — dependency injection |
+| 21 | Parametre doğrulama (validation) | 🔴 | ✅ Yapıldı — ValueError guard'lar |
+| 22 | Rule-based fallback (ML modeli yoksa) | 🟠 | ✅ Yapıldı — momentum + mean-reversion skoru |
+| 23 | 54 test (kapsamlı test suite) | 🔴 | ✅ Yapıldı — `test_walk_forward_engine_v5.py` |
+
+**Test Sonuçları:**
 
 ```
-Train → Validation → Test → Next period → Retrain
+54 passed in 1.79s
 ```
 
-Her fold için:
-- feature snapshot
-- model version
-- parameters
-- data version
-- prediction
-- realized outcome
-- transaction cost
+**Test Kapsamı:**
+- Fold creation (10 test): purge/embargo gap, expanding/sliding window, edge cases
+- Parameter validation (7 test): negatif, kısa, geçerli parametreler
+- Metrics (11 test): Precision@K, NDCG, Spearman, Deflated Sharpe, Probabilistic Sharpe, Bootstrap CI, Turnover
+- Regime detection (2 test): boş data, bull market
+- Integration (7 test): tam çalıştırma, boş data, deterministik run_id, serileştirme
+- Edge cases (4 test): tek hisse, sabit fiyat, volatil, zero purge/embargo
+- Statistical tests (3 test): IC t-test anlamlı/anlamsız/az veri
+- BB position (3 test): orta, üst, kısa veri
+- Market data (4 test): geçerli sonuç, metrikler, rejim, custom run_id
+- Reproducibility (2 test): deterministik run_id, deterministik fold sayısı
 
-kaydedilmeli.
+**v5.0 Mimarisi:**
 
-Sonuç tamamen reproducible olmalı.
+```
+WalkForwardEngineV5
+├── create_folds()           → Purge + embargo korumalı fold'lar
+├── run()                    → Ana çalıştırma fonksiyonu
+│   ├── _truncate_to_pit()   → Point-in-time veri kesimi
+│   ├── _compute_features()  → Feature hesaplama (builtin veya custom)
+│   ├── _train_model()       → Per-fold model eğitimi
+│   ├── _generate_predictions() → Tahmin üretimi
+│   ├── _compute_realized_outcomes() → Gerçek sonuçlarla eşleştirme
+│   └── _compute_fold_metrics() → 25+ metrik hesaplama
+├── _aggregate_results()     → Fold sonuçlarını birleştirme
+├── _deflated_sharpe()       → Çoklu test düzeltmesi
+├── _probabilistic_sharpe()  → Olasılıksal Sharpe
+├── _bootstrap_sharpe_ci()   → Block bootstrap güven aralığı
+├── _ic_t_test()             → IC istatistiksel anlamlılık
+└── _detect_regime()         → Piyasa rejimi tespiti
+```
 
 **Değiştir:** ❌  
-**Geliştir:** ✅
+**Geliştir:** ⭐⭐⭐⭐⭐
 
 ---
 
