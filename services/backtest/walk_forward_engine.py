@@ -23,7 +23,7 @@ KURAL: Gelecek veriyi train'de kullanmak = ölüm.
 from __future__ import annotations
 
 import hashlib
-import json
+import orjson
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -1624,7 +1624,7 @@ class WalkForwardEngineV5:
         if not features:
             return ""
         # İlk 10 sample'ın hash'i (determinizm için)
-        sample_str = json.dumps(features[:10], sort_keys=True, default=str)
+        sample_str = orjson.dumps(features[:10], default=str).decode()
         return hashlib.sha256(sample_str.encode()).hexdigest()[:16]
 
     def _hash_data_version(
@@ -1643,8 +1643,8 @@ class WalkForwardEngineV5:
             filename = f"wf_{result.run_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             filepath = path / filename
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(result.to_dict(), f, indent=2, default=str)
+            with open(filepath, "wb") as f:
+                f.write(orjson.dumps(result.to_dict(), option=orjson.OPT_INDENT_2, default=str))
 
             logger.info("Walk-forward result persisted", path=str(filepath))
         except Exception as e:
