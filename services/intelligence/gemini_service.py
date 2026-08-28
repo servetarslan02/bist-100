@@ -30,23 +30,29 @@ def tool_get_stock_metrics(ticker: str) -> dict[str, Any]:
         from ..data.data_source import data_source
 
         df = data_source.get_stock_data(f"{t}.IS", period="6mo", interval="1d")
-        if df is not None and not df.empty and len(df) >= 2:
-            latest_price = round(float(df["Close"].iloc[-1]), 2)
-            prev_price = round(float(df["Close"].iloc[-2]), 2)
+        if df is not None and not df.is_empty() and len(df) >= 2:
+            closes = df["Close"].to_numpy()
+            latest_price = round(float(closes[-1]), 2)
+            prev_price = round(float(closes[-2]), 2)
             change = round(float(((latest_price - prev_price) / prev_price) * 100), 2)
 
-            delta = df["Close"].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / (loss + 1e-9)
-            rsi = 100 - (100 / (1 + rs))
-            rsi_14 = round(float(rsi.iloc[-1]), 1) if not np.isnan(rsi.iloc[-1]) else 50.0
+            # RSI hesapla (numpy ile)
+            delta = np.diff(closes)
+            gain = np.where(delta > 0, delta, 0)
+            loss = np.where(delta < 0, -delta, 0)
+            # Son 14 günün ortalaması
+            avg_gain = np.mean(gain[-14:]) if len(gain) >= 14 else np.mean(gain)
+            avg_loss = np.mean(loss[-14:]) if len(loss) >= 14 else np.mean(loss)
+            rs = avg_gain / (avg_loss + 1e-9)
+            rsi_14 = round(float(100 - (100 / (1 + rs))), 1)
 
-            sup = round(float(df["Low"].tail(20).min()), 2)
-            res = round(float(df["High"].tail(20).max()), 2)
+            lows = df["Low"].to_numpy()
+            highs = df["High"].to_numpy()
+            sup = round(float(np.min(lows[-20:])), 2)
+            res = round(float(np.max(highs[-20:])), 2)
             mom20 = (
-                round(float(((latest_price - df["Close"].iloc[-20]) / df["Close"].iloc[-20]) * 100), 2)
-                if len(df) >= 20
+                round(float(((latest_price - closes[-20]) / closes[-20]) * 100), 2)
+                if len(closes) >= 20
                 else change
             )
 
@@ -100,11 +106,11 @@ def tool_run_monte_carlo_forecast(ticker: str, days: int = 20, current_price: fl
         return {
             "ticker": ticker.upper(),
             "horizon_days": days,
-            "expected_price": round(res.expected_price, 2),
-            "median_price": round(res.median_price, 2),
-            "p5_worst_case": round(res.p5_worst, 2),
-            "p95_best_case": round(res.p95_best, 2),
-            "prob_profit_pct": round(res.prob_profit, 1),
+            "expected_price": round(res.p50, 2),
+            "median_price": round(res.p50, 2),
+            "p5_worst_case": round(res.p10, 2),
+            "p95_best_case": round(res.p90, 2),
+            "prob_profit_pct": round(res.prob_positive * 100, 1),
             "max_drawdown_sim_pct": round(res.max_drawdown_sim, 2),
         }
     except Exception:
