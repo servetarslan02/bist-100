@@ -30,9 +30,22 @@ Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 from datetime import datetime, time, timedelta, timezone
 from enum import Enum
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.market_session_fsm")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
@@ -126,6 +139,7 @@ class MarketSessionStateMachine:
         """Yarım gün tarihlerini güncelle (YYYY-MM-DD formatında)."""
         self._half_days = half_days
 
+    @otel_trace("fsm.trigger_circuit_breaker")
     def trigger_circuit_breaker(self, ticker: str, duration_minutes: int = None):
         """Hisse bazında devre kesici çağrı seansı başlatır.
 
@@ -140,6 +154,7 @@ class MarketSessionStateMachine:
             "BIST Pay Bazında Devre Kesici", ticker=ticker, expiry=expiry.isoformat(), duration_min=duration_minutes
         )
 
+    @otel_trace("fsm.trigger_ebdks")
     def trigger_ebdks(self, feature_code: str | None = None):
         """Endekse bağlı devre kesici (EBDKS) başlatır.
 
@@ -178,9 +193,11 @@ class MarketSessionStateMachine:
             late_session_rule=late_session,
         )
 
+    @otel_trace("fsm.clear_circuit_breaker")
     def clear_circuit_breaker(self, ticker: str):
         self._circuit_breaker_active.pop(ticker, None)
 
+    @otel_trace("fsm.clear_ebdks")
     def clear_ebdks(self):
         self._ebdks_active = None
         self._ebdks_triggered_at = None
@@ -203,6 +220,7 @@ class MarketSessionStateMachine:
             return False
         return self._ebdks_triggered_at.time() >= self.EBDKS_LATE_SESSION_CUTOFF
 
+    @otel_trace("fsm.get_phase")
     def get_phase(self, ticker: str | None = None, current_time: datetime | None = None) -> BISTMarketPhase:
         """Belirtilen an ve hisse için güncel seans fazını belirler.
 
@@ -296,6 +314,7 @@ class MarketSessionStateMachine:
     def is_closed(self) -> bool:
         return self.get_phase() == BISTMarketPhase.CLOSED
 
+    @otel_trace("fsm.get_status")
     def get_status(self) -> dict:
         """Durum bilgisi."""
         now = self.now_istanbul()

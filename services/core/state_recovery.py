@@ -13,8 +13,21 @@ from typing import Any
 
 import orjson
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.state_recovery")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class StateRecovery:
@@ -28,6 +41,7 @@ class StateRecovery:
         self._recovered_states: dict[str, dict] = {}
         self._recovery_errors: list[str] = []
 
+    @otel_trace("state_recovery.recover_all_states")
     async def recover_all_states(
         self,
         tickers: list[str],
@@ -181,6 +195,7 @@ class StateRecovery:
             logger.warning("ClickHouse recovery failed", ticker=ticker, error=str(e))
             return None
 
+    @otel_trace("state_recovery.save_snapshot")
     async def save_snapshot(self, ticker: str, state: dict, redis_client=None):
         """State snapshot'ını kaydet (Redis + SQLite — dual persistence)."""
         try:
@@ -217,6 +232,7 @@ class StateRecovery:
         """Recovery hatalarını döndür."""
         return self._recovery_errors
 
+    @otel_trace("state_recovery.validate_consistency")
     async def validate_consistency(self, redis_client=None) -> dict[str, Any]:
         """Recovery sonrası consistency kontrolü.
 

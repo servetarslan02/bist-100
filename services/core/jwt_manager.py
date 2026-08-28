@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” JWT Token Manager
 
 JWT tabanlÄ± kimlik doÄŸrulama ve yetkilendirme.
@@ -25,10 +25,23 @@ from datetime import timedelta
 from enum import StrEnum
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.jwt_manager")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class TokenType(StrEnum):
@@ -106,6 +119,7 @@ class JWTManager:
         self._algorithm = algorithm
         self._revoked_tokens: set[str] = set()  # revoked JTIs
 
+    @otel_trace("jwt_manager.generate_token")
     def generate_token(
         self,
         user_id: str,
@@ -160,6 +174,7 @@ class JWTManager:
 
         return token
 
+    @otel_trace("jwt_manager.validate_token")
     def validate_token(self, token: str) -> JWTClaims:
         """
         Token'Ä± doÄŸrula ve claims dÃ¶ndÃ¼r.
@@ -209,6 +224,7 @@ class JWTManager:
         except Exception as e:
             raise JWTError(f"Token validation failed: {e}") from e
 
+    @otel_trace("jwt_manager.refresh_token")
     def refresh_token(self, token: str) -> str:
         """
         Refresh token ile yeni access token oluÅŸtur.
@@ -235,6 +251,7 @@ class JWTManager:
             token_type=TokenType.ACCESS,
         )
 
+    @otel_trace("jwt_manager.revoke_token")
     def revoke_token(self, token: str) -> bool:
         """Token'Ä± iptal et."""
         try:
@@ -245,6 +262,7 @@ class JWTManager:
         except JWTError:
             return False
 
+    @otel_trace("jwt_manager.generate_api_key")
     def generate_api_key(
         self,
         user_id: str,
@@ -286,6 +304,7 @@ class JWTManager:
 
         return api_key
 
+    @otel_trace("jwt_manager.rotate_secret")
     def rotate_secret(self, new_secret: str):
         """
         Secret key'i deÄŸiÅŸtir.

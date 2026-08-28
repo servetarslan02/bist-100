@@ -35,7 +35,22 @@ try:
 except ImportError:
     HAS_PROTOBUF = False
 
-logger = structlog.get_logger()
+import structlog
+import functools
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.grpc_client")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def _get_correlation_metadata() -> list[tuple[str, str]]:
@@ -75,6 +90,7 @@ class BaseGRPCClient:
         self._stub = None
         self._default_deadline = 10.0  # saniye — gRPC çağrıları için varsayılan deadline
 
+    @otel_trace("grpc.connect")
     async def connect(self):
         if not HAS_GRPC:
             logger.warning("gRPC not available (grpcio not installed)")
@@ -128,6 +144,7 @@ class BaseGRPCClient:
             logger.warning("gRPC connection failed", hosts=self.hosts, port=self.port, error=str(e))
             return False
 
+    @otel_trace("grpc.close")
     async def close(self):
         if self._channel:
             try:
@@ -190,6 +207,7 @@ class MarketClient(BaseGRPCClient):
         except grpc.RpcError as e:
             logger.error("gRPC StreamTicks error", code=e.code(), details=e.details())
 
+    @otel_trace("grpc.market.get_tick")
     async def get_tick(self, ticker: str) -> dict[str, Any]:
         """Tek seferlik fiyat (Protobuf)."""
         if not self._stub:
@@ -254,6 +272,7 @@ class SignalClient(BaseGRPCClient):
         except grpc.RpcError as e:
             logger.error("gRPC StreamSignals error", code=e.code(), details=e.details())
 
+    @otel_trace("grpc.signal.get_recent_signals")
     async def get_recent_signals(self, min_confidence: float = 0.5) -> list[dict[str, Any]]:
         """Son sinyalleri al (Protobuf)."""
         if not self._stub:
@@ -293,6 +312,7 @@ class PortfolioClient(BaseGRPCClient):
             return True
         return False
 
+    @otel_trace("grpc.portfolio.get_portfolio")
     async def get_portfolio(self) -> dict[str, Any]:
         """Anlık portföy durumu (Protobuf)."""
         if not self._stub:
@@ -373,6 +393,7 @@ class RiskClient(BaseGRPCClient):
             return True
         return False
 
+    @otel_trace("grpc.risk.get_risk")
     async def get_risk(self) -> dict[str, Any]:
         """Anlık risk durumu (Protobuf)."""
         if not self._stub:

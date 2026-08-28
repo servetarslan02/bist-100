@@ -32,9 +32,22 @@ from typing import Any
 
 import duckdb
 import orjson
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.offline_queue")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class OfflineQueue:
@@ -95,10 +108,12 @@ class OfflineQueue:
         finally:
             conn.close()
 
+    @otel_trace("offline_queue.register_publish_handler")
     def register_publish_handler(self, event_type: str, handler: Callable):
         """Event type için publish handler kaydet."""
         self._publish_handlers[event_type] = handler
 
+    @otel_trace("offline_queue.enqueue")
     async def enqueue(
         self,
         event_type: str,
@@ -138,6 +153,7 @@ class OfflineQueue:
         logger.info("Event queued for offline delivery", entry_id=entry_id, event_type=event_type, priority=priority)
         return entry_id
 
+    @otel_trace("offline_queue.flush")
     async def flush(self) -> int:
         """Kuyruktaki tüm event'leri gönder.
 
@@ -221,6 +237,7 @@ class OfflineQueue:
                 self._total_expired += expired
                 logger.debug("Expired offline entries cleaned", count=expired)
 
+    @otel_trace("offline_queue.get_stats")
     async def get_stats(self) -> dict[str, Any]:
         """Kuyruk istatistikleri."""
         with self._connect() as conn:
@@ -245,6 +262,7 @@ class OfflineQueue:
             "flushing": self._flushing,
         }
 
+    @otel_trace("offline_queue.get_entries")
     async def get_entries(self, limit: int = 50) -> list[dict[str, Any]]:
         """Kuyruktaki kayıtları listele."""
         with self._connect() as conn:
@@ -258,6 +276,7 @@ class OfflineQueue:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    @otel_trace("offline_queue.clear")
     async def clear(self) -> int:
         """Tüm kuyruğu temizle."""
         with self._connect() as conn:

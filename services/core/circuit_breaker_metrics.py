@@ -8,13 +8,26 @@ Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.5
 """
 
+import functools
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.circuit_breaker_metrics")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -63,6 +76,7 @@ class CircuitBreakerMetricsCollector:
         self._history: list[dict[str, Any]] = []
         self._max_history = 1000
 
+    @otel_trace("circuit_breaker_metrics.track")
     def track(self, breaker: Any):
         """Circuit breaker'ı izleme altına al."""
         self._tracked_breakers[breaker.name] = breaker
@@ -103,6 +117,7 @@ class CircuitBreakerMetricsCollector:
         """Tüm circuit breaker snapshot'ları."""
         return [self.get_snapshot(name) for name in self._tracked_breakers]
 
+    @otel_trace("circuit_breaker_metrics.export_prometheus")
     def export_prometheus(self) -> str:
         """
         Prometheus formatında metrics export.
@@ -168,6 +183,7 @@ class CircuitBreakerMetricsCollector:
             },
         }
 
+    @otel_trace("circuit_breaker_metrics.record_state_change")
     def record_state_change(self, name: str, old_state: str, new_state: str):
         """State change kaydet."""
         entry = {

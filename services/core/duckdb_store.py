@@ -26,15 +26,28 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
+import functools
 import duckdb
 import structlog
+from opentelemetry import trace
 
 try:
     import orjson  # noqa: F401
 except ImportError:
     raise ImportError("orjson is required") from None
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.duckdb_store")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class DuckDBStore:
@@ -69,11 +82,13 @@ class DuckDBStore:
             self._init_connection()
             raise
 
+    @otel_trace("duckdb_store.execute")
     def execute(self, query: str, params: tuple = ()) -> None:
         """Sorgu çalıştır (write)."""
         with self._get_conn() as conn:
             conn.execute(query, params)
 
+    @otel_trace("duckdb_store.fetch")
     def fetch(self, query: str, params: tuple = ()) -> list[dict[str, Any]]:
         """Sorgu çalıştır ve sonuçları dict listesi olarak döndür."""
         with self._get_conn() as conn:
@@ -82,17 +97,20 @@ class DuckDBStore:
             rows = result.fetchall()
             return [dict(zip(columns, row, strict=False)) for row in rows]
 
+    @otel_trace("duckdb_store.fetchone")
     def fetchone(self, query: str, params: tuple = ()) -> dict[str, Any] | None:
         """Tek satır döndür."""
         rows = self.fetch(query, params)
         return rows[0] if rows else None
 
+    @otel_trace("duckdb_store.fetchval")
     def fetchval(self, query: str, params: tuple = ()) -> Any:
         """Tek değer döndür."""
         with self._get_conn() as conn:
             result = conn.execute(query, params).fetchone()
             return result[0] if result else None
 
+    @otel_trace("duckdb_store.executescript")
     def executescript(self, script: str) -> None:
         """Birden fazla SQL çalıştır.
 
@@ -144,6 +162,7 @@ class DuckDBStore:
 
         return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name))
 
+    @otel_trace("duckdb_store.get_stats")
     def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         with self._get_conn() as conn:

@@ -16,8 +16,21 @@ from datetime import UTC
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.short_selling")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -58,6 +71,7 @@ class ShortSellingMonitor:
                 self._bist50_cache = []
         return self._bist50_cache
 
+    @otel_trace("short_selling.refresh_bist50_cache")
     def refresh_bist50_cache(self):
         """BIST-50 listesini yenile (çeyrek dönemlerde güncellenir).
 
@@ -110,6 +124,7 @@ class ShortSellingMonitor:
         """Seans sonunda uptick rule sıfırla."""
         self._uptick_rule_active = False
 
+    @otel_trace("short_selling.can_short_sell")
     def can_short_sell(
         self,
         ticker: str,

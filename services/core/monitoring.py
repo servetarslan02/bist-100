@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Portfolio & Lock Monitoring Integration
 
 Prometheus metrics + FastAPI endpoints for production observability.
@@ -27,11 +27,26 @@ from typing import Any
 
 import structlog
 
+import functools
+import structlog
+from opentelemetry import trace
+
 from .alerting import alerting
 from .db_lock import get_all_metrics, get_health_report
 from .observability import health_checker, prometheus_metrics
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.monitoring")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class PortfolioMonitor:
@@ -43,13 +58,15 @@ class PortfolioMonitor:
         self._sync_interval_s = 5.0  # 5 saniyede bir metrik gÃ¼ncelle
         self._invariant_failure_count = 0
 
+    @otel_trace("monitoring.bind")
     def bind(self, portfolio_service):
-        """PortfolioService'i monitor'a baÄŸla."""
+        """PortfolioService'i monitor'a bağla."""
         self._portfolio_service = portfolio_service
         health_checker.register("portfolio_locks")
         health_checker.register("portfolio_accounting")
         logger.info("Portfolio monitor bound to service")
 
+    @otel_trace("monitoring.sync_metrics")
     async def sync_metrics(self):
         """Portfolio metriklerini Prometheus gauge'larÄ±na yaz."""
         now = time.time()
@@ -102,8 +119,9 @@ class PortfolioMonitor:
         except Exception as e:
             logger.warning("Metrics sync failed", error=str(e))
 
+    @otel_trace("monitoring.get_health_detailed")
     async def get_health_detailed(self) -> dict[str, Any]:
-        """DetaylÄ± saÄŸlÄ±k raporu (API endpoint iÃ§in)."""
+        """Detaylı sağlık raporu (API endpoint için)."""
         await self.sync_metrics()
 
         lock_health = get_health_report()
@@ -149,8 +167,9 @@ class PortfolioMonitor:
             "alerts": alerting.get_alert_summary(),
         }
 
+    @otel_trace("monitoring.get_prometheus_text")
     async def get_prometheus_text(self) -> str:
-        """Prometheus text formatÄ±nda metrics export."""
+        """Prometheus text formatında metrics export."""
         await self.sync_metrics()
 
         lines = []
@@ -182,6 +201,7 @@ class PortfolioMonitor:
 
         return "\n".join(lines) + "\n"
 
+    @otel_trace("monitoring.get_lock_metrics_api")
     async def get_lock_metrics_api(self) -> dict[str, Any]:
         """Lock metrikleri (API endpoint)."""
         metrics = get_all_metrics()
@@ -192,6 +212,7 @@ class PortfolioMonitor:
             "timestamp": datetime.now(UTC).isoformat(),
         }
 
+    @otel_trace("monitoring.get_portfolio_api")
     async def get_portfolio_api(self) -> dict[str, Any]:
         """Portfolio durumu (API endpoint)."""
         try:

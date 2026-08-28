@@ -12,8 +12,21 @@ Kaynak: GVK, SPK mevzuatı
 from dataclasses import dataclass
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.tax")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # BIST vergi oranları (2025-2026)
 # Hisse senedi kâr vergisi: Gelir vergisi dilimine göre değişir
@@ -62,6 +75,7 @@ class TaxResult:
     tax_bracket: str | None = None  # Hangi dilimde
 
 
+@otel_trace("tax.calculate_tax")
 def calculate_tax(
     buy_price: float,
     sell_price: float,

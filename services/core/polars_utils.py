@@ -13,10 +13,24 @@ from typing import Any
 
 import polars as pl
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.polars_utils")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
+@otel_trace("polars_utils.yf_to_polars")
 def yf_to_polars(raw_df: Any) -> pl.DataFrame:
     """yfinance pandas DataFrame'ini Polars'a çevir.
 
@@ -45,6 +59,7 @@ def yf_to_polars(raw_df: Any) -> pl.DataFrame:
     return pl.from_pandas(raw_df)
 
 
+@otel_trace("polars_utils.safe_polars_from_pandas")
 def safe_polars_from_pandas(df: Any) -> pl.DataFrame | None:
     """Güvenli pandas → Polars dönüşümü. Hata durumunda None döner.
 
@@ -67,6 +82,7 @@ def safe_polars_from_pandas(df: Any) -> pl.DataFrame | None:
         return None
 
 
+@otel_trace("polars_utils.duckdb_to_polars")
 def duckdb_to_polars(conn: Any, query: str) -> pl.DataFrame:
     """DuckDB sorgusunu doğrudan Polars DataFrame olarak döndür.
 
@@ -80,6 +96,7 @@ def duckdb_to_polars(conn: Any, query: str) -> pl.DataFrame:
     return conn.execute(query).pl()
 
 
+@otel_trace("polars_utils.polars_to_duckdb")
 def polars_to_duckdb(conn: Any, df: pl.DataFrame, table_name: str, if_exists: str = "replace") -> None:
     """Polars DataFrame'ini DuckDB tablosuna yaz (pandas ara adım yok).
 
@@ -100,6 +117,7 @@ def polars_to_duckdb(conn: Any, df: pl.DataFrame, table_name: str, if_exists: st
     conn.unregister(f"_tmp_{table_name}")
 
 
+@otel_trace("polars_utils.concat_dataframes")
 def concat_dataframes(dfs: list[pl.DataFrame]) -> pl.DataFrame:
     """Birden fazla Polars DataFrame'i güvenli şekilde birleştir.
 

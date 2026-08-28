@@ -2,6 +2,22 @@ from typing import Any
 
 import numpy as np
 import polars as pl
+import structlog
+import functools
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.risk_manager")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class RiskManager:
@@ -27,6 +43,7 @@ class RiskManager:
             "sector_exposure": {},
         }
 
+    @otel_trace("risk_manager.calculate_weights")
     def calculate_weights(
         self, predictions: list[dict[str, Any]], method: str = "equal", max_weight: float = 0.20
     ) -> dict[str, float]:
@@ -82,6 +99,7 @@ class RiskManager:
 
         return weights
 
+    @otel_trace("risk_manager.get_market_regime")
     def get_market_regime(self, bm_df: pl.DataFrame, target_date) -> float:
         """
         BIST100'un durumuna gore pazar rejimini dondurur.

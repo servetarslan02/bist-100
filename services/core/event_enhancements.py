@@ -29,9 +29,22 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.event_enhancements")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -85,6 +98,7 @@ class EventEnhancements:
     # IDEMPOTENCY
     # =====================================================
 
+    @otel_trace("event_enhancements.is_duplicate")
     def is_duplicate(self, event_id: str) -> bool:
         """Event daha önce işlendi mi?
 
@@ -102,6 +116,7 @@ class EventEnhancements:
 
         return False
 
+    @otel_trace("event_enhancements.mark_processed")
     def mark_processed(self, event_id: str) -> None:
         """Event'i işlenmiş olarak işaretle.
 
@@ -110,6 +125,7 @@ class EventEnhancements:
         """
         self._processed_events[event_id] = time.time()
 
+    @otel_trace("event_enhancements.process_with_idempotency")
     def process_with_idempotency(
         self,
         event_id: str,
@@ -138,6 +154,7 @@ class EventEnhancements:
     # RETRY POLICY
     # =====================================================
 
+    @otel_trace("event_enhancements.should_retry")
     def should_retry(self, event_id: str, attempt: int) -> bool:
         """Retry yapılmalı mı?
 
@@ -159,6 +176,7 @@ class EventEnhancements:
 
         return True
 
+    @otel_trace("event_enhancements.get_retry_delay")
     def get_retry_delay(self, attempt: int) -> float:
         """Retry gecikmesi hesapla (exponential backoff + jitter).
 
@@ -180,6 +198,7 @@ class EventEnhancements:
 
         return delay
 
+    @otel_trace("event_enhancements.schedule_retry")
     def schedule_retry(self, event_id: str, attempt: int) -> float:
         """Retry zamanla.
 
@@ -206,6 +225,7 @@ class EventEnhancements:
 
         return retry_time
 
+    @otel_trace("event_enhancements.reset_retry")
     def reset_retry(self, event_id: str) -> None:
         """Retry sayacını sıfırla.
 

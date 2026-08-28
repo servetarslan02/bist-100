@@ -167,7 +167,7 @@ export default function StrategyPage() {
             1.35
           </div>
           <span className="text-[10px] text-zinc-500 block">
-            Hedef > 1.20 Başarılı
+            Hedef &gt; 1.20 Başarılı
           </span>
         </div>
 

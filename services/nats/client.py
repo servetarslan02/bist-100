@@ -46,8 +46,22 @@ try:
     HAS_NATS = True
 except ImportError:
     HAS_NATS = False
+import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.nats_client")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class NatsClient:
@@ -64,6 +78,7 @@ class NatsClient:
         self._total_errors = 0
         self._total_dlq_routed = 0
 
+    @otel_trace("nats.connect")
     async def connect(self, servers: str = None) -> bool:
         """NATS'a bağlan (reconnect + JetStream handling ile)."""
         if not HAS_NATS:
@@ -127,6 +142,7 @@ class NatsClient:
     def is_connected(self) -> bool:
         return self._connected and self._nc is not None
 
+    @otel_trace("nats.publish")
     async def publish(self, subject: str, data: Any) -> bool:
         """Veri yayınla. Başarısız olursa False döner."""
         if not self.is_connected and not await self.connect():
@@ -143,6 +159,7 @@ class NatsClient:
             self._connected = False
             return False
 
+    @otel_trace("nats.publish_canonical_event")
     async def publish_canonical_event(self, subject: str, event: CanonicalEvent, durable: bool = False) -> bool:
         """Standart CanonicalEvent yayınlar."""
         is_valid, msg = event.validate()
@@ -154,6 +171,7 @@ class NatsClient:
             return await self.publish_durable(subject, event.to_dict())
         return await self.publish(subject, event.to_dict())
 
+    @otel_trace("nats.publish_durable")
     async def publish_durable(self, subject: str, data: Any, stream: str = None) -> bool:
         """JetStream ile kalıcı mesaj yayınla (At-least-once delivery)."""
         if not self.is_connected or not self._js:
@@ -178,6 +196,7 @@ class NatsClient:
             logger.debug("JetStream publish failed, falling back to basic publish", error=str(e))
             return await self.publish(subject, data)
 
+    @otel_trace("nats.subscribe")
     async def subscribe(self, subject: str, handler: Callable = None) -> AsyncIterator[dict[str, Any]]:
         """Konuya abone ol. handler verilirse callback, verilmezse async iterator döner."""
         if not self.is_connected and not await self.connect():
@@ -220,6 +239,7 @@ class NatsClient:
             self._total_errors += 1
             logger.debug("NATS subscribe failed", subject=subject, error=str(e))
 
+    @otel_trace("nats.subscribe_durable")
     async def subscribe_durable(
         self, subject: str, durable_name: str, handler: Callable = None, stream: str = None
     ) -> AsyncIterator[dict[str, Any]]:
@@ -285,6 +305,7 @@ class NatsClient:
             logger.debug("JetStream subscribe failed", subject=subject, error=str(e))
 
 
+    @otel_trace("nats.request")
     async def request(self, subject: str, data: Any, timeout: float = 5.0) -> dict[str, Any]:
         """İstek-yanıt (request-reply pattern)."""
         if not self.is_connected and not await self.connect():

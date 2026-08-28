@@ -7,7 +7,22 @@ This shim re-exports the production database functions so that existing
 test imports don't break.
 """
 
+import functools
 import warnings
+
+from opentelemetry import trace
+
+tracer = trace.get_tracer("alpha-bist.database_dev")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 from .database import (
     init_databases,
@@ -27,18 +42,23 @@ warnings.warn(
 class _DevDBCompat:
     """Compatibility wrapper that mimics the old dev_db interface."""
 
+    @otel_trace("database_dev.pg_fetch")
     async def pg_fetch(self, query, *args):
         return await pg_fetch(query, *args)
 
+    @otel_trace("database_dev.pg_fetchrow")
     async def pg_fetchrow(self, query, *args):
         return await pg_fetchrow(query, *args)
 
+    @otel_trace("database_dev.pg_fetchval")
     async def pg_fetchval(self, query, *args):
         return await pg_fetchval(query, *args)
 
+    @otel_trace("database_dev.pg_execute")
     async def pg_execute(self, query, *args):
         return await pg_execute(query, *args)
 
+    @otel_trace("database_dev.init")
     async def init(self):
         await init_databases()
 

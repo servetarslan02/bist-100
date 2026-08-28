@@ -14,9 +14,22 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.health_reporter")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class HealthReporter:
@@ -31,6 +44,7 @@ class HealthReporter:
         self._report_history: list[dict] = []
         self._max_history = 100
 
+    @otel_trace("health_reporter.generate_report")
     async def generate_report(
         self,
         clickhouse_client=None,

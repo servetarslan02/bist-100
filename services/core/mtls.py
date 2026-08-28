@@ -29,9 +29,22 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.mtls")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =====================================================
@@ -85,6 +98,7 @@ class MTLSConfig:
             logger.warning("mTLS CA certificate not found, disabling mTLS", path=self.ca_cert)
             self.enabled = False
 
+    @otel_trace("mtls.MTLSConfig.validate")
     def validate(self) -> bool:
         """Sertifika dosyalarının varlığını kontrol et."""
         if not self.enabled:
@@ -122,6 +136,7 @@ class CertificateManager:
     def __init__(self, config: MTLSConfig):
         self.config = config
 
+    @otel_trace("mtls.CertificateManager.check_expiry")
     def check_expiry(self, cert_path: str) -> datetime | None:
         """Sertifika son kullanma tarihini kontrol et."""
         try:
@@ -141,6 +156,7 @@ class CertificateManager:
             logger.warning("Certificate expiry check failed", path=cert_path, error=str(e))
         return None
 
+    @otel_trace("mtls.CertificateManager.needs_renewal")
     def needs_renewal(self, cert_path: str) -> bool:
         """Sertifika yenileme gerekiyor mu?"""
         expiry = self.check_expiry(cert_path)
@@ -154,6 +170,7 @@ class CertificateManager:
 
         return False
 
+    @otel_trace("mtls.CertificateManager.get_cert_info")
     def get_cert_info(self, cert_path: str) -> dict[str, Any]:
         """Sertifika bilgilerini al."""
         try:
@@ -176,6 +193,7 @@ class CertificateManager:
             logger.warning("Certificate info failed", path=cert_path, error=str(e))
         return {}
 
+    @otel_trace("mtls.CertificateManager.get_all_status")
     def get_all_status(self) -> dict[str, Any]:
         """Tüm sertifikaların durumu."""
         certs = {
@@ -221,6 +239,7 @@ class MTLSContext:
         if self.config.enabled:
             self.config.validate()
 
+    @otel_trace("mtls.MTLSContext.create_server_context")
     def create_server_context(self) -> ssl.SSLContext | None:
         """Server SSL context oluştur.
 
@@ -263,6 +282,7 @@ class MTLSContext:
             logger.error("Failed to create server SSL context", error=str(e))
             return None
 
+    @otel_trace("mtls.MTLSContext.create_client_context")
     def create_client_context(self) -> ssl.SSLContext | None:
         """Client SSL context oluştur.
 
@@ -301,6 +321,7 @@ class MTLSContext:
             logger.error("Failed to create client SSL context", error=str(e))
             return None
 
+    @otel_trace("mtls.MTLSContext.get_uvicorn_ssl_args")
     def get_uvicorn_ssl_args(self) -> dict[str, str]:
         """Uvicorn SSL argümanları."""
         if not self.config.enabled:
@@ -311,6 +332,7 @@ class MTLSContext:
             "ssl_certfile": self.config.server_cert,
         }
 
+    @otel_trace("mtls.MTLSContext.get_grpc_channel_credentials")
     def get_grpc_channel_credentials(self):
         """gRPC TLS channel credentials."""
         if not self.config.enabled:
@@ -340,6 +362,7 @@ class MTLSContext:
             logger.error("Failed to create gRPC TLS credentials", error=str(e))
             return None
 
+    @otel_trace("mtls.MTLSContext.get_grpc_server_credentials")
     def get_grpc_server_credentials(self):
         """gRPC TLS server credentials."""
         if not self.config.enabled:
@@ -369,6 +392,7 @@ class MTLSContext:
             logger.error("Failed to create gRPC server TLS credentials", error=str(e))
             return None
 
+    @otel_trace("mtls.MTLSContext.get_status")
     def get_status(self) -> dict[str, Any]:
         """mTLS durum bilgisi."""
         return {
@@ -387,6 +411,7 @@ class MTLSContext:
 _mtls_context: MTLSContext | None = None
 
 
+@otel_trace("mtls.get_mtls_context")
 def get_mtls_context() -> MTLSContext:
     """Global mTLS context (singleton)."""
     global _mtls_context
@@ -395,31 +420,37 @@ def get_mtls_context() -> MTLSContext:
     return _mtls_context
 
 
+@otel_trace("mtls.get_server_ssl")
 def get_server_ssl() -> ssl.SSLContext | None:
     """Server SSL context (shortcut)."""
     return get_mtls_context().create_server_context()
 
 
+@otel_trace("mtls.get_client_ssl")
 def get_client_ssl() -> ssl.SSLContext | None:
     """Client SSL context (shortcut)."""
     return get_mtls_context().create_client_context()
 
 
+@otel_trace("mtls.get_server_ssl_args")
 def get_server_ssl_args() -> dict[str, str]:
     """Uvicorn SSL argümanları (shortcut)."""
     return get_mtls_context().get_uvicorn_ssl_args()
 
 
+@otel_trace("mtls.get_grpc_client_credentials")
 def get_grpc_client_credentials():
     """gRPC client TLS credentials (shortcut)."""
     return get_mtls_context().get_grpc_channel_credentials()
 
 
+@otel_trace("mtls.get_grpc_server_credentials")
 def get_grpc_server_credentials():
     """gRPC server TLS credentials (shortcut)."""
     return get_mtls_context().get_grpc_server_credentials()
 
 
+@otel_trace("mtls.get_mtls_status")
 def get_mtls_status() -> dict[str, Any]:
     """mTLS durum bilgisi (shortcut)."""
     return get_mtls_context().get_status()
@@ -490,6 +521,7 @@ class MTLSMiddleware:
 # =====================================================
 
 
+@otel_trace("mtls.create_mtls_health_endpoint")
 def create_mtls_health_endpoint():
     """mTLS sağlık kontrolü endpoint'i.
 

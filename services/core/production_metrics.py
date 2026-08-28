@@ -9,8 +9,21 @@ from collections import defaultdict
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.production_metrics")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class ProductionMetrics:
@@ -26,25 +39,30 @@ class ProductionMetrics:
         self._histograms: dict[str, list] = defaultdict(list)
         self._last_reset = time.time()
 
+    @otel_trace("production_metrics.inc")
     def inc(self, name: str, value: float = 1.0, labels: dict | None = None):
         """Counter artır."""
         key = self._key(name, labels)
         self._counters[key] += value
 
+    @otel_trace("production_metrics.set_gauge")
     def set_gauge(self, name: str, value: float, labels: dict | None = None):
         """Gauge ayarla."""
         key = self._key(name, labels)
         self._gauges[key] = value
 
+    @otel_trace("production_metrics.observe")
     def observe(self, name: str, value: float, labels: dict | None = None):
         """Histogram gözlem."""
         key = self._key(name, labels)
         self._histograms[key].append(value)
 
+    @otel_trace("production_metrics.timer")
     def timer(self, name: str, labels: dict | None = None):
         """Context manager — zaman ölçümü."""
         return _Timer(self, name, labels)
 
+    @otel_trace("production_metrics.get_all")
     def get_all(self) -> dict[str, Any]:
         """Tüm metrikleri döndür."""
         result = {
@@ -67,6 +85,7 @@ class ProductionMetrics:
                 }
         return result
 
+    @otel_trace("production_metrics.reset")
     def reset(self):
         """Tüm metrikleri sıfırla."""
         self._counters.clear()

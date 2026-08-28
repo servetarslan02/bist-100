@@ -1,4 +1,4 @@
-﻿"""ALPHA BIST â€” Job Worker v1.0
+"""ALPHA BIST â€” Job Worker v1.0
 
 Production-grade job execution with:
 - Retry with exponential backoff
@@ -18,10 +18,23 @@ from typing import Any
 
 import orjson
 import structlog
+import functools
+from opentelemetry import trace
 
 from services.core.production_metrics import Metrics, production_metrics
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.worker")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class JobStatus(Enum):
@@ -67,6 +80,7 @@ class JobWorker:
         self._running = False
         self._active_jobs: dict[str, asyncio.Task] = {}
 
+    @otel_trace("worker.submit_job")
     async def submit_job(
         self,
         job_type: str,

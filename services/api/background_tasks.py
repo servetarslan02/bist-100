@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 
 import structlog
 
+import structlog
+from opentelemetry import trace
+
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.background_tasks")
 
 
 async def radar_cache_refresher():
@@ -25,7 +29,8 @@ async def radar_cache_refresher():
                 # Seans açık — gerçek veri çek
                 from .v1.market import _fetch_radar_fresh
 
-                await _fetch_radar_fresh(limit=1000)
+                with tracer.start_as_current_span("background.radar_cache_refresher.fetch"):
+                    await _fetch_radar_fresh(limit=1000)
             # else: Seans kapalı — cache'i koru, sahte veri üretme
 
         except Exception as e:
@@ -51,7 +56,8 @@ async def ml_learning_scheduler():
         pipeline = LearningPipeline()
         loop = asyncio.get_event_loop()
         logger.info("ml_scheduler: Başlangıç eksik eğitim/veri telafi kontrolü yapılıyor...")
-        await loop.run_in_executor(None, pipeline.check_and_catchup_if_needed)
+        with tracer.start_as_current_span("background.ml_learning_scheduler.catchup"):
+            await loop.run_in_executor(None, pipeline.check_and_catchup_if_needed)
         logger.info("ml_scheduler: Başlangıç telafi kontrolü tamamlandı.")
     except Exception as e:
         logger.warning(f"ml_scheduler startup catchup error: {e}")
@@ -64,7 +70,8 @@ async def ml_learning_scheduler():
             pipeline = LearningPipeline()
             loop = asyncio.get_event_loop()
             logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
-            await loop.run_in_executor(None, pipeline.run_learning_cycle)
+            with tracer.start_as_current_span("background.ml_learning_scheduler.cycle"):
+                await loop.run_in_executor(None, pipeline.run_learning_cycle)
             logger.info("ml_scheduler: Periyodik öğrenme başarıyla tamamlandı.")
         except Exception as e:
             logger.warning(f"ml_scheduler periodic error: {e}")
@@ -77,7 +84,8 @@ async def auto_storage_optimizer():
         try:
             from ..core.database import ch_execute
 
-            ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
+            with tracer.start_as_current_span("background.auto_storage_optimizer"):
+                ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
             logger.info("auto_storage_optimizer: Periyodik ZSTD disk sıkıştırması ve temizliği tamamlandı.")
         except Exception as e:
             logger.warning(f"auto_storage_optimizer: {e}")
@@ -101,7 +109,8 @@ async def paper_trading_scheduler():
                 positions=len(cur_pos),
                 pending=len(pending),
             )
-            await run_morning_execution_cycle()
+            with tracer.start_as_current_span("background.paper_trading_scheduler.morning_catchup"):
+                await run_morning_execution_cycle()
     except Exception as e:
         logger.warning(f"paper_trading_scheduler startup catchup error: {e}")
 
@@ -131,10 +140,12 @@ async def paper_trading_scheduler():
 
                 if phase == "MORNING":
                     logger.info("paper_trading_scheduler: Sabah açılışı yürütme döngüsü başlıyor...")
-                    await run_morning_execution_cycle()
+                    with tracer.start_as_current_span("background.paper_trading_scheduler.morning"):
+                        await run_morning_execution_cycle()
                 else:
                     logger.info("paper_trading_scheduler: EOD sinyal üretim ve MTM döngüsü başlıyor...")
-                    await run_eod_signal_cycle()
+                    with tracer.start_as_current_span("background.paper_trading_scheduler.eod"):
+                        await run_eod_signal_cycle()
             except Exception as e:
                 logger.error(f"paper_trading_scheduler error in {phase}: {e}")
             finally:

@@ -30,11 +30,24 @@ from pathlib import Path
 from typing import Any
 
 import duckdb
+import orjson
+import functools
 import structlog
 from opentelemetry import metrics, trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.dlq")
+meter = metrics.get_meter("alpha-bist.dlq")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 meter = metrics.get_meter("alpha-bist.dlq")
 
 dlq_push_counter = meter.create_counter("alpha.dlq.pushes", description="Total events pushed to DLQ")
@@ -156,10 +169,12 @@ class PersistentDeadLetterQueue:
         finally:
             conn.close()
 
+    @otel_trace("persistent_dlq.register_retry_handler")
     def register_retry_handler(self, event_type: str, handler: Callable):
         """Event type için retry handler kaydet."""
         self._retry_handlers[event_type] = handler
 
+    @otel_trace("persistent_dlq.push")
     async def push(
         self,
         event_id: str,
@@ -172,6 +187,7 @@ class PersistentDeadLetterQueue:
         """Başarısız event'i DLQ'ya kaydet."""
         return ""
 
+    @otel_trace("persistent_dlq.retry_failed")
     async def retry_failed(self, batch_size: int = 100) -> int:
         """DLQ'daki retry edilebilir event'leri tekrar dene."""
         retried = 0
@@ -261,6 +277,7 @@ class PersistentDeadLetterQueue:
 
         return retried
 
+    @otel_trace("persistent_dlq.get_stats")
     async def get_stats(self) -> dict[str, Any]:
         """DLQ istatistikleri."""
         with self._connect() as conn:
@@ -294,6 +311,7 @@ class PersistentDeadLetterQueue:
             "persistent": True,
         }
 
+    @otel_trace("persistent_dlq.get_entries")
     async def get_entries(
         self,
         status: str | None = None,
@@ -318,6 +336,7 @@ class PersistentDeadLetterQueue:
             rows = conn.execute(query, params).fetchall()
             return [dict(r) for r in rows]
 
+    @otel_trace("persistent_dlq.clear")
     async def clear(self) -> int:
         """Tüm DLQ'yı temizle."""
         with self._connect() as conn:

@@ -34,6 +34,8 @@ try:
 except ImportError:
     import orjson as orjson
 import structlog
+import functools
+from opentelemetry import trace
 from fastapi.responses import Response as FastAPIResponse
 
 from ..core.database import check_db_health, init_databases
@@ -41,7 +43,18 @@ from ..core.otel import setup_telemetry
 from .rate_limiter import rate_limiter
 from .v1 import v1_router
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.api_app")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @asynccontextmanager
@@ -95,6 +108,7 @@ def _start_background_tasks(refresh_task) -> dict:
     }
 
 
+@otel_trace("api.start_grpc")
 async def _start_grpc():
     """gRPC sunucusunu başlat."""
     try:
@@ -103,13 +117,14 @@ async def _start_grpc():
         grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
         server = await start_grpc_server(port=grpc_port)
         if server:
-            logger.info("gRPC server started", port=grpc_port)
+            logger.info("grpc_server_started", port=grpc_port)
         return server
     except Exception as e:
-        logger.warning("gRPC server not started", error=str(e))
+        logger.warning("grpc_server_failed", error=str(e))
         return None
 
 
+@otel_trace("api.start_nats")
 async def _start_nats():
     """NATS bağlantısını başlat."""
     try:
@@ -117,9 +132,10 @@ async def _start_nats():
 
         await nats_client.connect()
     except Exception as e:
-        logger.warning("NATS not connected", error=str(e))
+        logger.warning("nats_connection_failed", error=str(e))
 
 
+@otel_trace("api.start_service_mesh")
 async def _start_service_mesh():
     """Service mesh başlat."""
     try:
@@ -128,10 +144,11 @@ async def _start_service_mesh():
         init_service_mesh()
         return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
-        logger.warning(f"Service mesh not started: {e}")
+        logger.warning("service_mesh_failed", error=str(e))
         return None
 
 
+@otel_trace("api.shutdown")
 async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server):
     """Tüm servisleri düzgün şekilde kapat."""
     for task in background_tasks.values():

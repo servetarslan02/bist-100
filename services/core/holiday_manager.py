@@ -28,10 +28,23 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.holiday_manager")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 # =====================================================
 # 0. PROXY DESTEĞİ (BIST engelli bölgeler için)
@@ -603,6 +616,7 @@ class HolidayManager:
         self._blacklist: set[date] = set()  # Manuel kaldırılan tatiller
         self._load_cache()
 
+    @otel_trace("holiday_manager.get_holidays")
     def get_holidays(self, year: int | None = None) -> set[date]:
         """Belirli bir yılın tatil günlerini getir."""
         if year is None:
@@ -618,6 +632,7 @@ class HolidayManager:
 
         return result
 
+    @otel_trace("holiday_manager.get_half_days")
     def get_half_days(self, year: int | None = None) -> set[date]:
         """Belirli bir yılın yarım günlerini getir."""
         if year is None:
@@ -628,6 +643,7 @@ class HolidayManager:
 
         return self._half_days.get(year, set()).copy()
 
+    @otel_trace("holiday_manager.is_holiday")
     def is_holiday(self, d: date | None = None) -> bool:
         """Bu gün tatil mi?"""
         if d is None:
@@ -635,6 +651,7 @@ class HolidayManager:
         holidays = self.get_holidays(d.year)
         return d in holidays
 
+    @otel_trace("holiday_manager.is_half_day")
     def is_half_day(self, d: date | None = None) -> bool:
         """Bu gün yarım gün mü?"""
         if d is None:
@@ -642,6 +659,7 @@ class HolidayManager:
         half_days = self.get_half_days(d.year)
         return d in half_days
 
+    @otel_trace("holiday_manager.is_trading_day")
     def is_trading_day(self, d: date | None = None) -> bool:
         """Bu gün işlem günü mü? (hafta sonu + tatil değil)"""
         if d is None:
@@ -650,6 +668,7 @@ class HolidayManager:
             return False
         return not self.is_holiday(d)
 
+    @otel_trace("holiday_manager.add_manual_holiday")
     def add_manual_holiday(self, d: date, reason: str = "") -> None:
         """Manuel tatil ekle (anlık ilan edilen tatiller için)."""
         year = d.year
@@ -660,6 +679,7 @@ class HolidayManager:
         self._log_audit("add", d, reason)
         logger.info("Manual holiday added", date=d.isoformat(), reason=reason)
 
+    @otel_trace("holiday_manager.remove_holiday")
     def remove_holiday(self, d: date, reason: str = "") -> None:
         """Tatil gününü kaldır (iptal edilen tatiller için).
 
@@ -673,6 +693,7 @@ class HolidayManager:
         self._log_audit("remove", d, reason)
         logger.info("Holiday removed", date=d.isoformat(), reason=reason)
 
+    @otel_trace("holiday_manager.report_no_data")
     def report_no_data(self, d: date | None = None) -> bool:
         """Veri gelmediğini rapor et — anlık tatil tespiti."""
         if d is None:
@@ -686,6 +707,7 @@ class HolidayManager:
             self._log_audit("auto_detect", d, "SuddenHolidayDetector — no market data")
         return detected
 
+    @otel_trace("holiday_manager.check_kap_for_holidays")
     async def check_kap_for_holidays(self) -> list[date]:
         """KAP'ta yeni tatil duyurusu var mı? Varsa otomatik ekle."""
         new_holidays = await self._sudden_detector.check_kap_announcements()
@@ -698,6 +720,7 @@ class HolidayManager:
             self._save_cache()
         return new_holidays
 
+    @otel_trace("holiday_manager.sync_from_bist")
     async def sync_from_bist(self) -> bool:
         """BIST resmi web sitesinden tatilleri çek ve güncelle."""
         holidays = await fetch_bist_holidays_from_web()

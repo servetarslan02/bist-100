@@ -18,12 +18,25 @@ import time
 from collections import OrderedDict
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
 from . import redis_helper
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.feature_store")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class FeatureStore:
@@ -54,6 +67,7 @@ class FeatureStore:
         feat_hash = hashlib.md5(",".join(sorted(features)).encode()).hexdigest()[:8]
         return f"feat:{ticker}:{date}:{feat_hash}"
 
+    @otel_trace("feature_store.get")
     def get(
         self,
         ticker: str,
@@ -91,6 +105,7 @@ class FeatureStore:
         self._misses += 1
         return None
 
+    @otel_trace("feature_store.set")
     def set(
         self,
         ticker: str,
@@ -123,6 +138,7 @@ class FeatureStore:
             except Exception as e:
                 logger.debug("feature_store_redis_set_failed", key=key, error=str(e))
 
+    @otel_trace("feature_store.invalidate")
     def invalidate(self, ticker: str, date: str | None = None):
         """Cache'i temizle."""
         prefix = f"feat:{ticker}:"

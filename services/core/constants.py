@@ -92,20 +92,33 @@ DEFAULT_TAX_RATE = 0.23  # %23 kurumlar vergisi
 DEFAULT_TERMINAL_GROWTH = 0.03  # %3 (enflasyon + reel)
 
 
+import structlog
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.constants")
+
 def _load_risk_free_rate() -> float:
     """TCMB politika faizini config dosyasından oku."""
-    try:
-        from pathlib import Path
+    with tracer.start_as_current_span("constants._load_risk_free_rate") as span:
+        try:
+            from pathlib import Path
+            import orjson
 
-        import orjson
-
-        config_path = Path(__file__).parent.parent.parent / "config" / "risk_free_rate.json"
-        if config_path.exists():
-            data = orjson.loads(config_path.read_bytes())
-            return float(data.get("risk_free_rate", 0.45))
-    except Exception:
-        pass
-    return 0.45  # fallback
+            config_path = Path(__file__).parent.parent.parent / "config" / "risk_free_rate.json"
+            if config_path.exists():
+                data = orjson.loads(config_path.read_bytes())
+                rate = float(data.get("risk_free_rate", 0.45))
+                span.set_attribute("risk_free_rate", rate)
+                return rate
+            else:
+                logger.debug("risk_free_rate.json not found, using default 0.45")
+        except Exception as e:
+            logger.warning("Failed to load risk_free_rate.json, using default 0.45", error=str(e))
+            span.record_exception(e)
+            
+        span.set_attribute("risk_free_rate", 0.45)
+        return 0.45  # fallback
 
 
 DEFAULT_RISK_FREE_RATE = _load_risk_free_rate()  # config/risk_free_rate.json'dan okunur

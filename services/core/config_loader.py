@@ -14,14 +14,27 @@ Kullanım:
     secret = config.get_secret("jwt_secret")  # ENV'den okur
 """
 
+import functools
 import os
 from pathlib import Path
 from typing import Any, Optional
 
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.config_loader")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 
@@ -35,6 +48,7 @@ class ConfigLoader:
     _environment: str = "development"
 
     @classmethod
+    @otel_trace("config_loader.load")
     def load(cls, path: str = None, environment: str = None) -> "ConfigLoader":
         """Config yükle (singleton)."""
         if cls._instance is None:
@@ -134,6 +148,7 @@ class ConfigLoader:
         """Config dict (secrets hariç)."""
         return dict(self._config)
 
+    @otel_trace("config_loader._apply_env_overrides")
     def _apply_env_overrides(self):
         """ALPHA_ prefix ile gelen env değişkenlerini config'e uygula.
 

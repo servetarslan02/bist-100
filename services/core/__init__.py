@@ -26,7 +26,6 @@ except ImportError:
 from .distributed_tracing import (
     DistributedTracer,
     Span,
-    SpanContextManager,
     Trace,
     correlation_id_var,
     distributed_tracer,
@@ -95,7 +94,7 @@ __all__ = [
     "DistributedTracer",
     "Span",
     "Trace",
-    "SpanContextManager",
+
     "distributed_tracer",
     "correlation_id_var",
     "span_id_var",

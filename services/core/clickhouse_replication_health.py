@@ -7,13 +7,28 @@ Kullanım:
     python -m services.core.clickhouse_replication_health
 """
 
+import functools
+
 import structlog
+from opentelemetry import trace
 
 from .database import ch_execute
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.clickhouse_replication_health")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
+@otel_trace("clickhouse_replication_health.check_replication_health")
 def check_replication_health() -> dict:
     """ClickHouse replikasyon sağlık durumunu kontrol et."""
     health = {
@@ -80,6 +95,7 @@ def check_replication_health() -> dict:
     return health
 
 
+@otel_trace("clickhouse_replication_health.get_replication_metrics")
 def get_replication_metrics() -> dict:
     """Prometheus formatında replikasyon metrikleri."""
     health = check_replication_health()
@@ -101,5 +117,5 @@ def get_replication_metrics() -> dict:
 if __name__ == "__main__":
     import orjson
 
-    health = check_replication_health()
-    print(orjson.dumps(health, option=orjson.OPT_INDENT_2).decode())
+    _health = check_replication_health()
+    print(orjson.dumps(_health, option=orjson.OPT_INDENT_2).decode())

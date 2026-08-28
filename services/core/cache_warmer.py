@@ -9,11 +9,24 @@ Kullanım:
 """
 
 import asyncio
+import functools
 import time
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.cache_warmer")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class CacheWarmer:
@@ -23,6 +36,7 @@ class CacheWarmer:
         self._warmed = False
         self._warm_tasks: list[asyncio.Task] = []
 
+    @otel_trace("cache_warmer.warm_all")
     async def warm_all(self):
         """Tüm sıcak verileri paralel olarak yükle."""
         if self._warmed:
@@ -49,6 +63,7 @@ class CacheWarmer:
         self._warmed = True
         logger.info("Cache warming completed", success=f"{success}/{total}", duration_ms=round(duration, 1))
 
+    @otel_trace("cache_warmer._warm_bist_universe")
     async def _warm_bist_universe(self) -> bool:
         """BIST hisse listesini yükle."""
         try:
@@ -64,6 +79,7 @@ class CacheWarmer:
             logger.debug("BIST universe warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer._warm_market_calendar")
     async def _warm_market_calendar(self) -> bool:
         """BIST seans takvimini yükle + tatil takvimini senkronize et."""
         try:
@@ -93,6 +109,7 @@ class CacheWarmer:
             logger.debug("Market calendar warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer._warm_latest_prices")
     async def _warm_latest_prices(self) -> bool:
         """Son fiyatları yükle (radar cache)."""
         try:
@@ -113,6 +130,7 @@ class CacheWarmer:
             logger.debug("Latest prices warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer._warm_active_signals")
     async def _warm_active_signals(self) -> bool:
         """Aktif sinyalleri yükle."""
         try:
@@ -126,6 +144,7 @@ class CacheWarmer:
             logger.debug("Signals warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer._warm_portfolio_state")
     async def _warm_portfolio_state(self) -> bool:
         """Portföy durumunu yükle."""
         try:
@@ -139,6 +158,7 @@ class CacheWarmer:
             logger.debug("Portfolio warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer._warm_risk_metrics")
     async def _warm_risk_metrics(self) -> bool:
         """Risk metriklerini yükle."""
         try:
@@ -152,6 +172,7 @@ class CacheWarmer:
             logger.debug("Risk warm failed", error=str(e))
         return False
 
+    @otel_trace("cache_warmer.refresh_hot_keys")
     async def refresh_hot_keys(self):
         """Sıcak anahtarları periyodik olarak tazele (background task).
 

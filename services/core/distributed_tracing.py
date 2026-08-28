@@ -17,9 +17,10 @@ from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
+import functools
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 try:
     from opentelemetry import trace as otel_trace
@@ -143,6 +144,7 @@ def trace(operation: str | None = None, attributes: dict[str, Any] | None = None
     def decorator(func):
         op_name = operation or func.__name__
 
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with distributed_tracer.start_span(op_name, attributes):
                 return func(*args, **kwargs)
@@ -158,6 +160,7 @@ def trace_async(operation: str | None = None, attributes: dict[str, Any] | None 
     def decorator(func):
         op_name = operation or func.__name__
 
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             async with distributed_tracer.start_async_span(op_name, attributes):
                 return await func(*args, **kwargs)

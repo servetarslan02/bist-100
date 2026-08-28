@@ -1,4 +1,4 @@
-﻿"""ALPHA BIST â€” Risk Gate v1.0
+"""ALPHA BIST â€” Risk Gate v1.0
 
 Merkezi risk kontrolÃ¼ â€” order gÃ¶nderilmeden Ã¶nce.
 Fail-safe, fail-closed.
@@ -8,8 +8,21 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.risk_gate")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -48,6 +61,7 @@ class RiskGate:
         self._daily_pnl = 0.0
         self._macro_stress_result = None
 
+    @otel_trace("risk_gate.check_order")
     def check_order(
         self,
         ticker: str,
@@ -259,10 +273,12 @@ class RiskGate:
 
         return passed, failed, reasons
 
+    @otel_trace("risk_gate.set_macro_stress_result")
     def set_macro_stress_result(self, stress_result: dict[str, Any]):
         """Macro stres testi sonucunu risk gate'e besle."""
         self._macro_stress_result = stress_result
 
+    @otel_trace("risk_gate.check_macro_stress")
     def check_macro_stress(
         self,
         portfolio: dict[str, Any],
@@ -277,9 +293,11 @@ class RiskGate:
         except Exception as e:
             return {"error": str(e)}
 
+    @otel_trace("risk_gate.update_daily_pnl")
     def update_daily_pnl(self, pnl: float):
         self._daily_pnl = pnl
 
+    @otel_trace("risk_gate.sync_daily_pnl")
     def sync_daily_pnl(self):
         """PortfolioManager'dan gÃ¼nlÃ¼k P&L otomatik Ã§ek."""
         try:
@@ -296,6 +314,7 @@ class RiskGate:
         except Exception as e:
             logger.debug("Daily PnL sync skipped", error=str(e))
 
+    @otel_trace("risk_gate.reset_daily")
     def reset_daily(self):
         self._daily_pnl = 0.0
 

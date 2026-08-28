@@ -48,7 +48,7 @@ class _DummyDuckDBConn:
 class ModelMemoryStore:
     """Kalıcı model tahmin, sonuç ve metrik hafızası."""
 
-    def __init__(self, db_path: str = "data/model_memory.db"):
+    def __init__(self, db_path: str = "data/model_memory.duckdb"):
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         if HAS_DUCKDB:

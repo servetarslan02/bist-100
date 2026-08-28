@@ -2,14 +2,17 @@
 
 // === Portfolio ===
 export interface OrderData {
-  id: number | string;
+  id?: number | string;
+  order_id?: string;
   ticker: string;
   side: "BUY" | "SELL";
   quantity: number;
   price: number;
   status: string;
-  created_at: string;
+  created_at?: string;
+  date?: string;
   executed_at?: string;
+  [key: string]: any;
 }
 
 export interface PortfolioMetrics {

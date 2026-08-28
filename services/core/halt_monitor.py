@@ -13,9 +13,22 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.halt_monitor")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -44,6 +57,7 @@ class HaltMonitor:
         self._halted_tickers: dict[str, HaltStatus] = {}
         self._restore_state()
 
+    @otel_trace("halt_monitor.add_halt")
     def add_halt(
         self,
         ticker: str,
@@ -62,6 +76,7 @@ class HaltMonitor:
         self._persist_state(ticker)
         logger.info("Halt added", ticker=ticker, reason=reason, type=halt_type)
 
+    @otel_trace("halt_monitor.remove_halt")
     def remove_halt(self, ticker: str):
         """Hisse durdurma kaldır."""
         if ticker in self._halted_tickers:
@@ -69,6 +84,7 @@ class HaltMonitor:
             self._remove_persisted(ticker)
             logger.info("Halt removed", ticker=ticker)
 
+    @otel_trace("halt_monitor.check_halt")
     def check_halt(self, ticker: str) -> HaltStatus:
         """Hisse durdurulmuş mu kontrol et."""
         if ticker in self._halted_tickers:

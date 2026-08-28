@@ -20,10 +20,23 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.immutable_audit")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -99,6 +112,7 @@ class ImmutableAuditLog:
         self._total_entries: int = 0
         self._total_verified: int = 0
 
+    @otel_trace("immutable_audit.log")
     def log(
         self,
         user_id: str,
@@ -159,6 +173,7 @@ class ImmutableAuditLog:
 
         return entry
 
+    @otel_trace("immutable_audit.verify_integrity")
     def verify_integrity(self) -> tuple[bool, str | None]:
         """
         Audit log bütünlüğünü doğrula.
@@ -193,6 +208,7 @@ class ImmutableAuditLog:
         self._total_verified += 1
         return True, None
 
+    @otel_trace("immutable_audit.get_entries")
     def get_entries(
         self,
         user_id: str | None = None,
@@ -216,6 +232,7 @@ class ImmutableAuditLog:
         entries = sorted(entries, key=lambda e: e.timestamp, reverse=True)
         return [e.to_dict() for e in entries[:limit]]
 
+    @otel_trace("immutable_audit.get_stats")
     def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         by_action = {}
@@ -237,6 +254,7 @@ class ImmutableAuditLog:
             "by_resource_type": by_resource,
         }
 
+    @otel_trace("immutable_audit.generate_compliance_report")
     def generate_compliance_report(
         self,
         since: datetime | None = None,
@@ -290,6 +308,7 @@ class ImmutableAuditLog:
         except Exception as e:
             logger.error("Audit log persist error", error=str(e))
 
+    @otel_trace("immutable_audit.export_db_triggers")
     def export_db_triggers(self) -> str:
         """
         DB trigger SQL'i oluştur.

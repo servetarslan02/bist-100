@@ -4,6 +4,7 @@ Broker-independent order interface.
 Paper broker dahil — gerçek broker henüz bağlanmadı.
 """
 
+import functools
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -11,8 +12,20 @@ from enum import Enum
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.broker")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class OrderSide(Enum):
@@ -73,6 +86,7 @@ class PaperBroker(BrokerInterface):
         self._idempotency_keys: dict[str, str] = {}
         self._slippage_bps = slippage_bps  # basis points (5 bps = %0.05)
 
+    @otel_trace("broker.submit_order")
     def submit_order(self, order: Order) -> Order:
         # Idempotency kontrolü
         if order.idempotency_key:
@@ -138,6 +152,7 @@ class PaperBroker(BrokerInterface):
         )
         return order
 
+    @otel_trace("broker.cancel_order")
     def cancel_order(self, order_id: str) -> bool:
         order = self._orders.get(order_id)
         if order and order.status == OrderStatus.SUBMITTED.value:
@@ -145,9 +160,11 @@ class PaperBroker(BrokerInterface):
             return True
         return False
 
+    @otel_trace("broker.get_order_status")
     def get_order_status(self, order_id: str) -> Order | None:
         return self._orders.get(order_id)
 
+    @otel_trace("broker.get_positions")
     def get_positions(self) -> dict[str, Any]:
         return dict(self._positions)
 

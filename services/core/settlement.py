@@ -13,8 +13,21 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.settlement")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -57,6 +70,7 @@ class SettlementCalculator:
                 added += 1
         return current
 
+    @otel_trace("settlement.get_settlement_date")
     def get_settlement_date(
         self,
         trade_date: date,
@@ -72,6 +86,7 @@ class SettlementCalculator:
             return trade_date  # T+0
         return self.add_trading_days(trade_date, self.NORMAL_SETTLEMENT_DAYS)  # T+2
 
+    @otel_trace("settlement.get_settlement_info")
     def get_settlement_info(
         self,
         trade_date: date,
@@ -86,6 +101,7 @@ class SettlementCalculator:
             is_gross=is_gross,
         )
 
+    @otel_trace("settlement.is_settled")
     def is_settled(self, trade_date: date, current_date: date, is_gross: bool = False) -> bool:
         """İşlem takas olmuş mu?"""
         settlement_date = self.get_settlement_date(trade_date, is_gross)

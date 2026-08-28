@@ -14,11 +14,24 @@ Eylül 2025 güncel kurallar:
 from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
+import functools
 import structlog
+from opentelemetry import trace
 
 from .market_session_fsm import _TZ_ISTANBUL, BISTMarketPhase, bist_session_fsm
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.market_calendar")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class MarketSession(StrEnum):
@@ -79,6 +92,7 @@ class MarketCalendar:
             half_days=len(self._half_days),
         )
 
+    @otel_trace("market_calendar.is_half_day")
     def is_half_day(self, d: date | None = None) -> bool:
         """Bu gün yarım gün mü?"""
         if d is None:
@@ -88,6 +102,7 @@ class MarketCalendar:
             self._half_days = self._hm.get_half_days(d.year)
         return d in self._half_days
 
+    @otel_trace("market_calendar.is_trading_day")
     def is_trading_day(self, d: date | None = None) -> bool:
         if d is None:
             d = date.today()
@@ -97,6 +112,7 @@ class MarketCalendar:
         holidays = self._hm.get_holidays(d.year)
         return d not in holidays
 
+    @otel_trace("market_calendar.is_market_open")
     def is_market_open(self, dt: datetime | None = None) -> bool:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
@@ -105,6 +121,7 @@ class MarketCalendar:
         phase = bist_session_fsm.get_phase(current_time=dt)
         return bist_session_fsm.is_order_entry_allowed(phase)
 
+    @otel_trace("market_calendar.get_session")
     def get_session(self, dt: datetime | None = None) -> MarketSession:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
@@ -124,6 +141,7 @@ class MarketCalendar:
         }
         return mapping.get(phase, MarketSession.CLOSED)
 
+    @otel_trace("market_calendar.get_status")
     def get_status(self, dt: datetime | None = None) -> MarketStatus:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
@@ -137,6 +155,7 @@ class MarketCalendar:
         else:
             return MarketStatus.OPEN
 
+    @otel_trace("market_calendar.next_open")
     def next_open(self, dt: datetime | None = None) -> datetime:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
@@ -151,6 +170,7 @@ class MarketCalendar:
             check_date += timedelta(days=1)
         return dt + timedelta(days=1)
 
+    @otel_trace("market_calendar.next_close")
     def next_close(self, dt: datetime | None = None) -> datetime:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
@@ -167,6 +187,7 @@ class MarketCalendar:
             check_date += timedelta(days=1)
         return dt + timedelta(days=1)
 
+    @otel_trace("market_calendar.trading_days_between")
     def trading_days_between(self, start: date, end: date) -> int:
         count = 0
         current = start
@@ -176,15 +197,18 @@ class MarketCalendar:
             current += timedelta(days=1)
         return count
 
+    @otel_trace("market_calendar.add_halt")
     def add_halt(self, d: date, start: time, end: time):
         if d not in self._halts:
             self._halts[d] = []
         self._halts[d].append((start, end))
 
+    @otel_trace("market_calendar.report_no_data")
     def report_no_data(self, d: date | None = None) -> bool:
         """Veri gelmediğini rapor et — anlık tatil tespiti."""
         return self._hm.report_no_data(d)
 
+    @otel_trace("market_calendar.add_manual_holiday")
     def add_manual_holiday(self, d: date, reason: str = "") -> None:
         """Manuel tatil ekle (anlık ilan edilen tatiller için)."""
         self._hm.add_manual_holiday(d, reason)
@@ -192,14 +216,17 @@ class MarketCalendar:
         holiday_strs = {dd.strftime("%Y-%m-%d") for dd in self._hm.get_holidays(d.year)}
         bist_session_fsm.set_holidays(holiday_strs)
 
+    @otel_trace("market_calendar.sync_from_bist")
     async def sync_from_bist(self) -> bool:
         """BIST resmi web sitesinden tatilleri çek."""
         return await self._hm.sync_from_bist()
 
+    @otel_trace("market_calendar.get_holiday_info")
     def get_holiday_info(self, year: int | None = None) -> str:
         """Yılın tüm tatillerini okunabilir formatta döndür."""
         return self._hm.get_all_holidays_text(year)
 
+    @otel_trace("market_calendar.get_info")
     def get_info(self, dt: datetime | None = None) -> dict:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)

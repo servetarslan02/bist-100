@@ -10,9 +10,22 @@ Brüt takas kontrolü:
 from dataclasses import dataclass
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.gross_settlement")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -72,6 +85,7 @@ class GrossSettlementMonitor:
         self._gross_tickers.discard(ticker)
         self._gross_tickers_with_details.pop(ticker, None)
 
+    @otel_trace("gross_settlement.check_gross_settlement")
     def check_gross_settlement(self, ticker: str) -> GrossSettlementStatus:
         """Brüt takas kontrolü."""
         if ticker in self._gross_tickers:

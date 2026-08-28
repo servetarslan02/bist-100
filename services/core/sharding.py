@@ -38,7 +38,22 @@ except ImportError:
 
 from .config import settings
 
-logger = structlog.get_logger()
+import structlog
+import functools
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.sharding")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class ShardRouter:
@@ -142,30 +157,35 @@ class ShardRouter:
             return await get_pg_pool()
         return pool
 
+    @otel_trace("sharding.execute")
     async def execute(self, ticker: str, query: str, *args) -> str:
         """Ticker'ın shard'ında write query çalıştır."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
             return await conn.execute(query, *args)
 
+    @otel_trace("sharding.fetch")
     async def fetch(self, ticker: str, query: str, *args) -> list:
         """Ticker'ın shard'ından read query çalıştır."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
             return await conn.fetch(query, *args)
 
+    @otel_trace("sharding.fetchrow")
     async def fetchrow(self, ticker: str, query: str, *args):
         """Ticker'ın shard'ından tek satır çek."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
             return await conn.fetchrow(query, *args)
 
+    @otel_trace("sharding.fetchval")
     async def fetchval(self, ticker: str, query: str, *args) -> Any:
         """Ticker'ın shard'ından tek değer çek."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
             return await conn.fetchval(query, *args)
 
+    @otel_trace("sharding.query_all")
     async def query_all(self, query: str, *args) -> dict[int, list]:
         """Tüm shard'larda sorgu çalıştır. {shard_id: rows} döndür."""
         results = {}
@@ -179,6 +199,7 @@ class ShardRouter:
                 results[shard_id] = []
         return results
 
+    @otel_trace("sharding.aggregate")
     async def aggregate(self, query: str, *args) -> Any:
         """Tüm shard'larda aggregation çalıştır ve sonuçları birleştir."""
         all_results = await self.query_all(query, *args)

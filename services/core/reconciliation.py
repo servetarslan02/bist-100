@@ -15,8 +15,21 @@ from datetime import datetime
 
 import numpy as np
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.reconciliation")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -58,6 +71,7 @@ class CrossSourceReconciliation:
     WARNING_PCT = 2.0  # %2 — uyarı
     ANOMALY_PCT = 5.0  # %5 — anomali
 
+    @otel_trace("reconciliation.reconcile_price")
     def reconcile_price(
         self,
         sources: dict[str, float],
@@ -124,6 +138,7 @@ class CrossSourceReconciliation:
             anomaly_detected=anomaly_detected,
         )
 
+    @otel_trace("reconciliation.reconcile_multi_field")
     def reconcile_multi_field(
         self,
         ticker: str,
@@ -236,6 +251,7 @@ class CrossSourceReconciliation:
 
         return max(0, min(1, confidence))
 
+    @otel_trace("reconciliation.detect_price_jump")
     def detect_price_jump(
         self,
         ticker: str,

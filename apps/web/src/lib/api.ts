@@ -357,9 +357,11 @@ export interface MarketState {
 
 export interface Signal {
   ticker: string;
+  symbol?: string;
   name: string;
   score: number;
   direction: string;
+  signal?: string;
   risk_level: string;
   horizon: string;
   expected_return_pct: number;
@@ -389,7 +391,10 @@ export interface PortfolioData {
   };
   positions: Array<{
     ticker: string;
+    symbol?: string;
     name: string;
+    company_name?: string;
+    sector?: string;
     quantity: number;
     avg_cost: number;
     current_price: number;
@@ -397,6 +402,7 @@ export interface PortfolioData {
     unrealized_pnl: number;
     unrealized_pnl_pct: number;
     weight_pct: number;
+    [key: string]: any;
   }>;
 }
 
@@ -433,6 +439,7 @@ export interface WorldState {
   vix_level: number;
   inflation_pressure: number;
   timestamp: string;
+  updated_at?: string;
   dxy?: number;
   dxy_change_pct?: number;
   us10y?: number;
@@ -440,9 +447,15 @@ export interface WorldState {
   brent_crude?: number;
   brent_change_pct?: number;
   gold?: number;
+  gold_ounce?: number;
   gold_change_pct?: number;
   btc?: number;
   btc_change_pct?: number;
+  turkey_cds_5y?: number;
+  cds_change_pct?: number;
+  usd_try?: number;
+  usd_try_change_pct?: number;
+  [key: string]: any;
 }
 
 export interface SystemStatus {

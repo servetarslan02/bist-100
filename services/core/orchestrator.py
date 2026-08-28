@@ -25,10 +25,21 @@ import polars as pl
 import structlog
 from opentelemetry import metrics, trace
 
-# logger — tanımı her türlü kullanımından önce
+import functools
+
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.orchestrator")
 meter = metrics.get_meter("alpha-bist.orchestrator")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 _pipeline_runs = meter.create_counter(
     "alpha.orchestrator.pipeline_runs.total",
@@ -158,6 +169,7 @@ class MasterOrchestrator:
         ),
     ]
 
+    @otel_trace("orchestrator.initialize")
     async def initialize(self):
         """Tüm servisleri başlat."""
         if self._initialized:
@@ -913,6 +925,7 @@ class MasterOrchestrator:
     # PIPELINE ORKESTRASYONU
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+    @otel_trace("orchestrator.run_pipeline")
     def run_pipeline(self, ticker: str, market_data: dict[str, Any]) -> dict[str, Any]:
         """Tek hisse için tam pipeline çalıştır.
 
@@ -1033,6 +1046,7 @@ class MasterOrchestrator:
                 logger.error("Pipeline hatası", ticker=ticker, error=str(exc))
                 raise
 
+    @otel_trace("orchestrator.run_full_pipeline")
     def run_full_pipeline(
         self,
         date: str,
@@ -1237,6 +1251,7 @@ class MasterOrchestrator:
             learning_status=learning_status,
         )
 
+    @otel_trace("orchestrator.get_status")
     def get_status(self) -> dict[str, Any]:
         """Sistem durumu."""
         return {
@@ -1245,6 +1260,7 @@ class MasterOrchestrator:
             "services": list(self._services.keys()),
         }
 
+    @otel_trace("orchestrator.export_daily_report_json")
     def export_daily_report_json(self, date: str) -> str:
         """Günlük pipeline raporunu JSON olarak dışa aktar."""
         import orjson as _json
@@ -1256,6 +1272,7 @@ class MasterOrchestrator:
         }
         return _json.dumps(report, option=_json.OPT_INDENT_2).decode()
 
+    @otel_trace("orchestrator.get_pipeline_stats")
     def get_pipeline_stats(self) -> dict[str, Any]:
         """Pipeline istatistiklerini döndür."""
         return {

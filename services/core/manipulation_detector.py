@@ -11,10 +11,23 @@ Geliştirmeler:
 from dataclasses import dataclass
 from typing import Any
 
+import functools
 import numpy as np
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.manipulation_detector")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -32,6 +45,7 @@ class ManipulationAlert:
 class ManipulationDetector:
     """Manipülasyon tespit motoru — istatistiksel testler ile."""
 
+    @otel_trace("manipulation_detector.detect_wash_trading")
     def detect_wash_trading(self, trades: list[dict], window: int = 20) -> list[ManipulationAlert]:
         """Wash trading tespiti — adjacent + pencere bazlı anomali.
 
@@ -78,6 +92,7 @@ class ManipulationDetector:
 
         return alerts
 
+    @otel_trace("manipulation_detector.detect_spoofing")
     def detect_spoofing(self, orders: list[dict], window: int = 50) -> list[ManipulationAlert]:
         """Spoofing tespiti — iptal oranı + emir boyutu anomalisi.
 
@@ -130,6 +145,7 @@ class ManipulationDetector:
 
         return alerts
 
+    @otel_trace("manipulation_detector.detect_volume_manipulation")
     def detect_volume_manipulation(self, volumes: list[float], window: int = 20) -> list[ManipulationAlert]:
         """Hacim manipülasyonu tespiti — Z-score + percentil bazlı."""
         alerts = []
@@ -172,6 +188,7 @@ class ManipulationDetector:
 
         return alerts
 
+    @otel_trace("manipulation_detector.detect_price_clustering")
     def detect_price_clustering(self, prices: list[float], window: int = 50) -> list[ManipulationAlert]:
         """Fiyat kümeleme tespiti — yuvarlama anomalisi.
 
@@ -205,6 +222,7 @@ class ManipulationDetector:
 
         return alerts
 
+    @otel_trace("manipulation_detector.detect_all")
     def detect_all(
         self,
         trades: list[dict] = None,

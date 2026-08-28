@@ -23,11 +23,12 @@ Kullanım:
 """
 
 import os
+import asyncio
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 # Global tracer provider
 _tracer_provider = None
@@ -138,9 +139,33 @@ def get_tracer(name: str = __name__):
     if _tracer is None:
         # Fallback: noop tracer
         from opentelemetry import trace
-
         return trace.get_tracer(name)
     return _tracer
+
+
+import functools
+
+def otel_trace(span_name: str):
+    """
+    Decorator to wrap a method or function in an OpenTelemetry span.
+    Uses the global tracer from this module.
+    """
+    def decorator(func):
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                tracer = get_tracer(func.__module__)
+                with tracer.start_as_current_span(span_name):
+                    return await func(*args, **kwargs)
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                tracer = get_tracer(func.__module__)
+                with tracer.start_as_current_span(span_name):
+                    return func(*args, **kwargs)
+            return sync_wrapper
+    return decorator
 
 
 def shutdown_telemetry() -> None:

@@ -156,7 +156,7 @@ def run_real_bist_walkforward_backtest():
     logger.info(f"\n⚙️ {len(features_by_ticker)} hisse için {len(feature_cols)} teknik gösterge hesaplandı.")
 
     # 3. Model Memory Store'u Sıfırdan Gerçek Verilerle Başlat
-    store = ModelMemoryStore(db_path="data/model_memory.db")
+    store = ModelMemoryStore(db_path="data/model_memory.duckdb")
     with store._get_conn() as conn:
         conn.execute("DELETE FROM predictions;")
         conn.execute("DELETE FROM outcomes;")

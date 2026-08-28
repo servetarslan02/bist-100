@@ -19,13 +19,31 @@ Kullanım:
         await data_integrity_validator.auto_repair(results)
 """
 
+import asyncio
+import functools
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.data_integrity")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        async def async_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(self, *args, **kwargs)
+        @functools.wraps(func)
+        def sync_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+    return decorator
 
 
 class DataIntegrityValidator:
@@ -38,6 +56,7 @@ class DataIntegrityValidator:
         self._last_validation: float | None = None
         self._validation_history: list[dict] = []
 
+    @otel_trace("data_integrity.validate_on_startup")
     async def validate_on_startup(
         self,
         clickhouse_client=None,
@@ -106,6 +125,7 @@ class DataIntegrityValidator:
 
         return results
 
+    @otel_trace("data_integrity._check_clickhouse_gaps")
     async def _check_clickhouse_gaps(self, client=None) -> dict[str, Any]:
         """ClickHouse'da eksik bar'ları kontrol et."""
         result = {
@@ -177,6 +197,7 @@ class DataIntegrityValidator:
 
         return result
 
+    @otel_trace("data_integrity._check_postgres_consistency")
     async def _check_postgres_consistency(self, pg_pool=None) -> dict[str, Any]:
         """PostgreSQL tutarlılığını kontrol et."""
         result = {
@@ -225,6 +246,7 @@ class DataIntegrityValidator:
 
         return result
 
+    @otel_trace("data_integrity._check_feature_completeness")
     async def _check_feature_completeness(self, pg_pool=None) -> dict[str, Any]:
         """Feature hesaplama bütünlüğünü kontrol et."""
         result = {
@@ -266,6 +288,7 @@ class DataIntegrityValidator:
 
         return result
 
+    @otel_trace("data_integrity._check_redis_health")
     async def _check_redis_health(self, redis_client=None) -> dict[str, Any]:
         """Redis sağlık durumunu kontrol et."""
         result = {
@@ -295,6 +318,7 @@ class DataIntegrityValidator:
 
         return result
 
+    @otel_trace("data_integrity._check_data_freshness")
     async def _check_data_freshness(self, clickhouse_client=None, pg_pool=None) -> dict[str, Any]:
         """Veri tazelik kontrolü — son veri ne kadar eski?"""
         result = {
@@ -334,6 +358,7 @@ class DataIntegrityValidator:
 
         return result
 
+    @otel_trace("data_integrity.auto_repair")
     async def auto_repair(self, validation_results: dict[str, Any]):
         """Tespit edilen sorunları otomatik onar."""
         logger.info("Starting auto-repair based on validation results")

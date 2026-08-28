@@ -10,8 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev build-essential && \
     rm -rf /var/lib/apt/lists/*
 
+RUN python -m pip install --upgrade pip
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # ========================================================
 # STAGE 2: Runtime (Minimal Saldırı Yüzeyi & Non-Root)
@@ -26,15 +27,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Builder aşamasından derlenmiş Python paketlerini kopyala
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /install /usr/local
+ENV PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Uygulama kodunu kopyala
+COPY . /app
 
 # Non-root sistem kullanıcısı ve yetkilendirme
 RUN groupadd -r alpha && useradd -r -g alpha -d /app -s /sbin/nologin alpha && \
     chown -R alpha:alpha /app
-
-# Uygulama kodunu kopyala
-COPY --chown=alpha:alpha . /app
 
 USER alpha
 

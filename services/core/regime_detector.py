@@ -17,8 +17,21 @@ from typing import Any
 
 import numpy as np
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.regime_detector")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -43,6 +56,7 @@ class RegimeDetector:
         self._current_regime = "UNKNOWN"
         self._regime_duration = 0
 
+    @otel_trace("regime_detector.detect_regime")
     def detect_regime(
         self,
         market_data: dict[str, Any],  # {ticker: DataFrame}
@@ -286,6 +300,7 @@ class RegimeDetector:
 
         return transition_matrix.get(current_regime, {r: 0.2 for r in self.REGIMES})
 
+    @otel_trace("regime_detector.get_regime_history")
     def get_regime_history(self) -> list[dict]:
         return list(self._regime_history)
 

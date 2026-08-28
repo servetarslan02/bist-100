@@ -9,10 +9,23 @@ Geliştirmeler:
 
 from dataclasses import dataclass
 
+import functools
 import numpy as np
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.insider_detector")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -33,6 +46,7 @@ class InsiderDetector:
     Z_THRESHOLD_HIGH = 2.5  # p < 0.006
     Z_THRESHOLD_CRITICAL = 3.0  # p < 0.001
 
+    @otel_trace("insider_detector.detect_pre_kap_trade")
     def detect_pre_kap_trade(
         self,
         trades: list[dict],
@@ -123,6 +137,7 @@ class InsiderDetector:
 
         return alerts
 
+    @otel_trace("insider_detector.detect_price_move_before_kap")
     def detect_price_move_before_kap(
         self,
         prices: list[float],

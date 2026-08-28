@@ -35,8 +35,21 @@ from enum import Enum
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.service_mesh")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class ServiceStatus(Enum):
@@ -85,6 +98,7 @@ class ServiceDiscovery:
     # Service Registry
     # =====================================================
 
+    @otel_trace("service_mesh.register")
     def register(self, name: str, host: str, port: int, metadata: dict = None):
         """Servisi kaydet."""
         self._services[name] = ServiceInfo(
@@ -96,6 +110,7 @@ class ServiceDiscovery:
         self._health_history[name] = []
         logger.info("Service registered", name=name, address=f"{host}:{port}")
 
+    @otel_trace("service_mesh.unregister")
     def unregister(self, name: str):
         """Servis kaydını sil."""
         self._services.pop(name, None)
@@ -122,6 +137,7 @@ class ServiceDiscovery:
     # Health Check
     # =====================================================
 
+    @otel_trace("service_mesh.check_health")
     async def check_health(self, name: str) -> ServiceStatus:
         """Tek servisin sağlık durumunu kontrol et."""
         service = self._services.get(name)
@@ -168,6 +184,7 @@ class ServiceDiscovery:
             return 0.0
         return sum(history) / len(history) * 100
 
+    @otel_trace("service_mesh.check_all_health")
     async def check_all_health(self) -> dict[str, ServiceStatus]:
         """Tüm servislerin sağlık durumunu kontrol et."""
         results = {}
@@ -195,6 +212,7 @@ class ServiceDiscovery:
     # Background Health Monitor
     # =====================================================
 
+    @otel_trace("service_mesh.start_monitoring")
     async def start_monitoring(self):
         """Arka planda servis sağlık takibi başlat."""
         self._running = True

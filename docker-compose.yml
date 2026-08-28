@@ -68,7 +68,7 @@ services:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    mem_limit: 512m
+    mem_limit: 1536m
     cpus: 1.0
     storage_opt:
       size: 512M
@@ -104,7 +104,7 @@ services:
       PRIMARY_HOST: alpha-postgres
       PRIMARY_PORT: '5432'
       REPL_USER: replicator
-    mem_limit: 512m
+    mem_limit: 1536m
     cpus: 1.0
     storage_opt:
       size: 512M
@@ -128,8 +128,8 @@ services:
     image: clickhouse/clickhouse-server:26.3-alpine
     container_name: alpha-clickhouse
     ports:
-    - 8123:8123
-    - 9000:9000
+      - 8123:8123
+      - 9002:9000
     volumes:
     - clickhouse_data:/var/lib/clickhouse
     - ./database/clickhouse/config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
@@ -162,6 +162,8 @@ services:
     restart: unless-stopped
     stop_grace_period: 10s
     env_file: *id001
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: ruok
     networks: *id002
     logging: *id003
     image: zookeeper:3.9.5
@@ -234,9 +236,9 @@ services:
     command: "redis-server\n  --appendonly yes\n  --appendfsync everysec\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
       \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 10\n  --dynamic-hz yes\n\
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
-      \  --activedefrag yes\n  --active-defrag-enabled yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
+      \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
       \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.5
     storage_opt:
       size: 256M
@@ -355,12 +357,10 @@ services:
     ports:
     - 4222:4222
     - 8222:8222
-    command: "nats-server\n  --jetstream\n  --store_dir /data\n  --max_payload 2097152\n  --max_pending 134217728\n  --sync_interval\
-      \ 30s\n  --write_deadline 5s\n  --max_connections 1000\n  --max_control_line 4096\n  --max_payload 2MB\n\
-      \  --compress\n"
+    command: ["nats-server", "-js", "-sd", "/data", "-m", "8222"]
     volumes:
     - nats_data:/data
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.5
     storage_opt:
       size: 256M
@@ -428,7 +428,7 @@ services:
     - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`)
     - traefik.http.routers.api.entrypoints=web
     - traefik.http.services.api.loadbalancer.server.port=8000
-    mem_limit: 512m
+    mem_limit: 1536m
     cpus: 0.5
     healthcheck:
       test:
@@ -472,7 +472,7 @@ services:
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
     - NATS_URL=nats://nats:4222
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.25
     healthcheck:
       test:
@@ -523,7 +523,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.25
     healthcheck:
       test:
@@ -615,7 +615,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 512m
+    mem_limit: 1536m
     cpus: 0.5
     healthcheck:
       test:
@@ -666,7 +666,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.25
     healthcheck:
       test:
@@ -794,7 +794,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.25
     healthcheck:
       test:
@@ -837,7 +837,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
+    mem_limit: 1536m
     cpus: 0.25
     healthcheck:
       test:
@@ -919,7 +919,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: oliver006/redis_exporter:v1.73.0
+    image: oliver006/redis_exporter:v1.73.0-alpine
     container_name: alpha-redis-exporter
     ports:
     - 9121:9121
@@ -1038,7 +1038,7 @@ services:
     stop_grace_period: 10s
     networks: *id002
     logging: *id003
-    image: edoburu/pgbouncer:1.23.1
+    image: edoburu/pgbouncer:latest
     container_name: alpha-pgbouncer
     ports:
     - 6432:5432
@@ -1090,12 +1090,12 @@ services:
       QDB_HTTP_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_LINE_TCP_NET_BIND_TO: "0.0.0.0:9009"
-    mem_limit: 512m
+    mem_limit: 1536m
     cpus: 0.5
     healthcheck:
       test:
       - CMD-SHELL
-      - wget --no-verbose --tries=1 --spider http://localhost:9000/status || exit 1
+      - curl -f http://localhost:9000/ping || exit 1
       interval: 10s
       timeout: 5s
       retries: 5

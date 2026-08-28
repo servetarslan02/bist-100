@@ -16,14 +16,27 @@ Kullanım:
     validated = validate_ohlcv(raw_data)
 """
 
+import functools
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 import structlog
+from opentelemetry import trace
 from pydantic import BaseModel, Field, validator
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.data_schemas")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class OHLCVSchema(BaseModel):
@@ -96,6 +109,7 @@ class PositionSchema(BaseModel):
     current_price: float = Field(ge=0)
 
 
+@otel_trace("data_schemas.validate_ohlcv")
 def validate_ohlcv(data: dict[str, Any]) -> dict[str, Any]:
     """OHLCV verisini doğrula."""
     try:
@@ -106,6 +120,7 @@ def validate_ohlcv(data: dict[str, Any]) -> dict[str, Any]:
         return None
 
 
+@otel_trace("data_schemas.validate_features")
 def validate_features(data: dict[str, Any]) -> dict[str, Any]:
     """Feature vektörünü doğrula."""
     try:
@@ -116,6 +131,7 @@ def validate_features(data: dict[str, Any]) -> dict[str, Any]:
         return None
 
 
+@otel_trace("data_schemas.validate_prediction")
 def validate_prediction(data: dict[str, Any]) -> dict[str, Any]:
     """Model tahminini doğrula."""
     try:
@@ -126,6 +142,7 @@ def validate_prediction(data: dict[str, Any]) -> dict[str, Any]:
         return None
 
 
+@otel_trace("data_schemas.validate_signal")
 def validate_signal(data: dict[str, Any]) -> dict[str, Any]:
     """Sinyali doğrula."""
     try:
@@ -136,6 +153,7 @@ def validate_signal(data: dict[str, Any]) -> dict[str, Any]:
         return None
 
 
+@otel_trace("data_schemas.validate_position")
 def validate_position(data: dict[str, Any]) -> dict[str, Any]:
     """Pozisyonu doğrula."""
     try:

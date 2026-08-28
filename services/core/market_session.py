@@ -8,6 +8,9 @@ Geriye uyumluluk için korunmuştur.
 """
 
 from datetime import datetime
+import functools
+import structlog
+from opentelemetry import trace
 
 from .auto_circuit_breaker import auto_circuit_breaker
 from .market_session_fsm import (
@@ -15,6 +18,19 @@ from .market_session_fsm import (
     BISTMarketPhase,
     bist_session_fsm,
 )
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.market_session")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # Eski API'ye uyumluluk için enum mapping
@@ -39,6 +55,7 @@ class MarketSessionManager:
     def now_istanbul(self) -> datetime:
         return datetime.now(_TZ_ISTANBUL)
 
+    @otel_trace("market_session.current_phase")
     def current_phase(self) -> str:
         """Piyasanın şu anki durumu (eski API uyumluluğu)."""
         phase = bist_session_fsm.get_phase()
@@ -54,13 +71,16 @@ class MarketSessionManager:
         }
         return mapping.get(phase, MarketPhase.CLOSED)
 
+    @otel_trace("market_session.is_trading_hours")
     def is_trading_hours(self) -> bool:
         return bist_session_fsm.is_trading_hours()
 
+    @otel_trace("market_session.is_pre_market")
     def is_pre_market(self) -> bool:
         phase = bist_session_fsm.get_phase()
         return phase in (BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.OPENING_AUCTION_DETERMINATION)
 
+    @otel_trace("market_session.is_post_market")
     def is_post_market(self) -> bool:
         phase = bist_session_fsm.get_phase()
         return phase in (
@@ -69,17 +89,21 @@ class MarketSessionManager:
             BISTMarketPhase.CLOSING_PRICE_TRADING,
         )
 
+    @otel_trace("market_session.is_closed")
     def is_closed(self) -> bool:
         return bist_session_fsm.is_closed()
 
+    @otel_trace("market_session.should_run_trading_job")
     def should_run_trading_job(self) -> bool:
         """Trading job çalıştırılmalı mı?"""
         phase = bist_session_fsm.get_phase()
         return phase in (BISTMarketPhase.CONTINUOUS_AUCTION, BISTMarketPhase.OPENING_AUCTION_COLLECTION)
 
+    @otel_trace("market_session.get_status")
     def get_status(self) -> dict:
         return bist_session_fsm.get_status()
 
+    @otel_trace("market_session.update_price")
     def update_price(self, ticker: str, current_price: float, reference_price: float, market_type: str = "ana") -> dict:
         """Fiyat güncelle ve devre kesici kontrolü yap.
 
@@ -100,6 +124,7 @@ class MarketSessionManager:
             "ebdks_late_session": bist_session_fsm.is_ebdks_late_session(),
         }
 
+    @otel_trace("market_session.reset_daily_circuit_breakers")
     def reset_daily_circuit_breakers(self):
         """Günlük devre kesici sayaçlarını sıfırla (seans sonunda)."""
         auto_circuit_breaker.reset_daily()

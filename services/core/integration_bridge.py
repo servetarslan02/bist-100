@@ -40,10 +40,23 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+import functools
 import numpy as np
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.integration_bridge")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =====================================================
@@ -536,6 +549,7 @@ class IntegrationBridge:
     # PIPELINE ENHANCEMENT
     # =====================================================
 
+    @otel_trace("integration_bridge.enhance_pipeline_result")
     def enhance_pipeline_result(
         self,
         ticker: str,
@@ -679,6 +693,7 @@ class IntegrationBridge:
     # TRADE PLAN ENHANCEMENT
     # =====================================================
 
+    @otel_trace("integration_bridge.enhance_trade_plan")
     def enhance_trade_plan(
         self,
         ticker: str,
@@ -828,6 +843,7 @@ class IntegrationBridge:
     # LEARNING CYCLE ENHANCEMENT
     # =====================================================
 
+    @otel_trace("integration_bridge.enhance_learning_cycle")
     def enhance_learning_cycle(
         self,
         learning_result: dict[str, Any],
@@ -937,6 +953,7 @@ class IntegrationBridge:
     # EVENT ENHANCEMENT
     # =====================================================
 
+    @otel_trace("integration_bridge.enhance_event")
     def enhance_event(
         self,
         event_id: str,
@@ -999,6 +1016,7 @@ class IntegrationBridge:
     # PORTFOLIO ENHANCEMENT
     # =====================================================
 
+    @otel_trace("integration_bridge.enhance_portfolio_weights")
     def enhance_portfolio_weights(
         self,
         target_weights: dict[str, float],
@@ -1074,6 +1092,7 @@ class IntegrationBridge:
     # RECORD OUTCOME
     # =====================================================
 
+    @otel_trace("integration_bridge.record_model_outcome")
     def record_model_outcome(
         self,
         model_id: str,
@@ -1103,6 +1122,7 @@ class IntegrationBridge:
             return_pct,
         )
 
+    @otel_trace("integration_bridge.record_calibration_data")
     def record_calibration_data(
         self,
         brier_score: float,
@@ -1130,6 +1150,7 @@ class IntegrationBridge:
     # HEALTH CHECK
     # =====================================================
 
+    @otel_trace("integration_bridge.health_check")
     def health_check(self) -> dict[str, Any]:
         """Tüm modüllerin sağlık durumunu kontrol et.
 
@@ -1185,6 +1206,7 @@ class IntegrationBridge:
     # METRICS
     # =====================================================
 
+    @otel_trace("integration_bridge.get_metrics")
     def get_metrics(self) -> dict[str, Any]:
         """Tüm modüllerin metriklerini döndür.
 
@@ -1220,6 +1242,7 @@ class IntegrationBridge:
             },
         }
 
+    @otel_trace("integration_bridge.reset_metrics")
     def reset_metrics(self) -> None:
         """Tüm metrikleri sıfırla."""
         for metrics in self._metrics.values():
@@ -1230,6 +1253,7 @@ class IntegrationBridge:
             metrics.total_latency_ms = 0.0
             metrics.last_error = ""
 
+    @otel_trace("integration_bridge.reset_circuit_breakers")
     def reset_circuit_breakers(self) -> None:
         """Tüm circuit breaker'ları sıfırla."""
         for cb in self._circuits.values():
@@ -1239,6 +1263,7 @@ class IntegrationBridge:
     # CONFIGURATION
     # =====================================================
 
+    @otel_trace("integration_bridge.update_config")
     def update_config(self, **kwargs: Any) -> None:
         """Konfigürasyonu güncelle.
 
@@ -1252,6 +1277,7 @@ class IntegrationBridge:
             else:
                 logger.warning("bridge_config_unknown_key", key=key)
 
+    @otel_trace("integration_bridge.disable_module")
     def disable_module(self, module_name: str) -> None:
         """Modülü devre dışı bırak."""
         attr_name = f"enable_{module_name}"
@@ -1259,6 +1285,7 @@ class IntegrationBridge:
             setattr(self.config, attr_name, False)
             logger.info("bridge_module_disabled", module=module_name)
 
+    @otel_trace("integration_bridge.enable_module")
     def enable_module(self, module_name: str) -> None:
         """Modülü etkinleştir."""
         attr_name = f"enable_{module_name}"

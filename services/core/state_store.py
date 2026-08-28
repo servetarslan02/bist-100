@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Central State Store v1.0
 
 TÃ¼m in-memory state'lerin DuckDB tabanlÄ± persistansÄ±.
@@ -48,6 +48,8 @@ except ImportError:
     HAS_DUCKDB = False
 
 import structlog
+import functools
+from opentelemetry import trace
 
 try:
     import orjson
@@ -55,6 +57,17 @@ except ImportError:
     raise ImportError("orjson is required") from None
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.state_store")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class _DummyDuckDBConn:
@@ -202,6 +215,7 @@ class CentralStateStore:
 
     # ===================== CIRCUIT BREAKER =====================
 
+    @otel_trace("state_store.save_circuit_state")
     def save_circuit_state(
         self,
         name: str,
@@ -221,6 +235,7 @@ class CentralStateStore:
             (name, state, failure_count, last_failure, last_success, now),
         )
 
+    @otel_trace("state_store.load_circuit_state")
     def load_circuit_state(self, name: str) -> dict[str, Any] | None:
         """Circuit breaker durumunu yÃ¼kle."""
         self._flush_buffer()
@@ -285,6 +300,7 @@ class CentralStateStore:
 
     # ===================== LEARNING LOOP =====================
 
+    @otel_trace("state_store.save_learning_state")
     def save_learning_state(self, state: dict[str, Any]):
         """Learning loop durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
@@ -300,6 +316,7 @@ class CentralStateStore:
                 )
             conn.commit()
 
+    @otel_trace("state_store.load_learning_state")
     def load_learning_state(self) -> dict[str, Any]:
         """Learning loop durumunu yÃ¼kle."""
         self._flush_buffer()

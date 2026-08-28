@@ -15,8 +15,21 @@ from dataclasses import dataclass
 
 import numpy as np
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.streaming_anomaly")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -43,6 +56,7 @@ class StreamingAnomalyDetector:
         self._volume_history: dict[str, deque] = {}
         self._spread_history: dict[str, deque] = {}
 
+    @otel_trace("streaming_anomaly.check_price")
     def check_price(
         self,
         ticker: str,
@@ -94,6 +108,7 @@ class StreamingAnomalyDetector:
             zscore=round(zscore, 2),
         )
 
+    @otel_trace("streaming_anomaly.check_volume")
     def check_volume(
         self,
         ticker: str,
@@ -125,6 +140,7 @@ class StreamingAnomalyDetector:
             zscore=round(zscore, 2),
         )
 
+    @otel_trace("streaming_anomaly.check_spread")
     def check_spread(
         self,
         ticker: str,
@@ -170,6 +186,7 @@ class StreamingAnomalyDetector:
             zscore=round(zscore, 2),
         )
 
+    @otel_trace("streaming_anomaly.check_all")
     def check_all(
         self,
         ticker: str,

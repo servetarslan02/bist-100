@@ -15,6 +15,8 @@ import asyncio
 import os
 
 import structlog
+import functools
+from opentelemetry import trace
 
 try:
     import redis.asyncio as aioredis
@@ -24,7 +26,18 @@ try:
 except ImportError:
     HAS_REDIS = False
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.redis_sentinel")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =====================================================
@@ -65,6 +78,7 @@ _ha_redis = None
 _ha_loop = None
 
 
+@otel_trace("redis_sentinel.get_ha_redis")
 async def get_ha_redis():
     """High-Availability Redis client döndür.
 
@@ -127,6 +141,7 @@ async def get_ha_redis():
         raise
 
 
+@otel_trace("redis_sentinel.close_ha_redis")
 async def close_ha_redis():
     """HA Redis bağlantısını kapat."""
     global _ha_redis, _ha_loop

@@ -7,10 +7,23 @@ FAZ 4 model yapısını bozmaz; DB ile ilişkilendirme sağlar.
 import hashlib
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.model_persistence")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class ModelPersistence:
@@ -21,6 +34,7 @@ class ModelPersistence:
     """
 
     @staticmethod
+    @otel_trace("model_persistence.save_model_metadata")
     async def save_model_metadata(
         model_name: str,
         version: str,
@@ -121,6 +135,7 @@ class ModelPersistence:
             return None
 
     @staticmethod
+    @otel_trace("model_persistence.get_champion_model")
     async def get_champion_model(model_name: str) -> dict[str, Any] | None:
         """Champion model metadata'sını getir."""
         try:
@@ -145,6 +160,7 @@ class ModelPersistence:
             return None
 
     @staticmethod
+    @otel_trace("model_persistence.promote_to_champion")
     async def promote_to_champion(model_name: str, version: str) -> bool:
         """Modeli champion yap (eski champion'ı candidate'a düşür)."""
         try:
@@ -180,6 +196,7 @@ class ModelPersistence:
             return False
 
     @staticmethod
+    @otel_trace("model_persistence.list_model_versions")
     async def list_model_versions(model_name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Model versiyonlarını listele."""
         try:

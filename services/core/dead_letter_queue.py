@@ -4,12 +4,28 @@ v2.0: Artık PersistentDeadLetterQueue kullanılıyor — restart sonrası kaybo
 In-memory DLQ yerine DuckDB tabanlı persistent DLQ.
 """
 
+import functools
 import enum
 from datetime import UTC
-
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.dead_letter_queue")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        async def async_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(self, *args, **kwargs)
+        @functools.wraps(func)
+        def sync_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return async_wrapper if __import__('asyncio').iscoroutinefunction(func) else sync_wrapper
+    return decorator
 
 # Persistent DLQ kullan — restart sonrası kaybolmaz
 try:
@@ -92,6 +108,7 @@ except Exception as e:
         def register_retry_handler(self, event_type, handler):
             self._retry_handlers[event_type] = handler
 
+        @otel_trace("dead_letter_queue.push")
         async def push(self, event_id, event_type, payload, error, retry_count=0, max_retries=3):
             if len(self._entries) >= self._max_entries:
                 oldest_id = min(self._entries.keys(), key=lambda k: self._entries[k].created_at)
@@ -112,19 +129,24 @@ except Exception as e:
             self._total_pushed += 1
             return entry
 
+        @otel_trace("dead_letter_queue.retry_failed")
         async def retry_failed(self, batch_size=100):
             return 0
 
+        @otel_trace("dead_letter_queue.get_stats")
         async def get_stats(self):
             return {"total_entries": len(self._entries), "lifetime": {"total_pushed": self._total_pushed}}
 
+        @otel_trace("dead_letter_queue.get_entries")
         async def get_entries(self, status=None, event_type=None, limit=50):
             return [e.to_dict() for e in list(self._entries.values())[:limit]]
 
+        @otel_trace("dead_letter_queue.remove_entry")
         async def remove_entry(self, entry_id):
             self._entries.pop(entry_id, None)
             return True
 
+        @otel_trace("dead_letter_queue.clear")
         async def clear(self):
             count = len(self._entries)
             self._entries.clear()

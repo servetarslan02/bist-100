@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Audit Log v1.0
 
 Immutable audit trail:
@@ -11,14 +11,28 @@ Immutable audit trail:
 FAZ 14: Audit Log
 """
 
+import functools
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+from opentelemetry import metrics, trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.audit_log")
+meter = metrics.get_meter("alpha-bist.audit_log")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -47,6 +61,7 @@ class AuditLog:
         self._entries: list[AuditEntry] = []
         self._index: dict[str, list[int]] = {}  # entity_id â†’ [entry indices]
 
+    @otel_trace("audit_log.log")
     def log(self, entry: AuditEntry):
         """Audit kaydÄ± ekle (append-only)."""
         idx = len(self._entries)
@@ -64,6 +79,7 @@ class AuditLog:
             "Audit log", action=entry.action, entity=f"{entry.entity_type}:{entry.entity_id}", actor=entry.actor
         )
 
+    @otel_trace("audit_log.log_decision")
     def log_decision(
         self,
         ticker: str,
@@ -93,6 +109,7 @@ class AuditLog:
             )
         )
 
+    @otel_trace("audit_log.log_risk_check")
     def log_risk_check(
         self,
         ticker: str,
@@ -116,6 +133,7 @@ class AuditLog:
             )
         )
 
+    @otel_trace("audit_log.log_order")
     def log_order(
         self,
         order_id: str,
@@ -145,6 +163,7 @@ class AuditLog:
             )
         )
 
+    @otel_trace("audit_log.log_fill")
     def log_fill(
         self,
         fill_id: str,
@@ -176,6 +195,7 @@ class AuditLog:
             )
         )
 
+    @otel_trace("audit_log.log_state_change")
     def log_state_change(
         self,
         entity_type: str,
@@ -200,6 +220,7 @@ class AuditLog:
             )
         )
 
+    @otel_trace("audit_log.log_config_change")
     def log_config_change(
         self,
         config_key: str,

@@ -47,7 +47,28 @@ except ImportError:
 
 import orjson
 
-logger = structlog.get_logger()
+import structlog
+import functools
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.api_binary_ws")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    def async_decorator(func):
+        @functools.wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(self, *args, **kwargs)
+        return wrapper
+    return async_decorator
 
 
 class ProtobufMessage:
@@ -554,6 +575,7 @@ class BinaryWebSocket:
         """Mesaj handler'ı kaydet."""
         self._msg_handler = handler
 
+    @otel_trace("binary_ws.handler")
     async def handler(self, websocket, path=None):
         """WebSocket bağlantı handler'ı."""
         self._clients.add(websocket)
@@ -593,6 +615,7 @@ class BinaryWebSocket:
         finally:
             self._clients.discard(websocket)
 
+    @otel_trace("binary_ws.broadcast_tick")
     async def broadcast_tick(
         self, ticker: str, price: float, change: float, change_pct: float, volume: int, bid: float = 0, ask: float = 0
     ):
@@ -727,6 +750,7 @@ class BinaryWebSocket:
 
         self._clients -= disconnected
 
+    @otel_trace("binary_ws.start")
     async def start(self, host: str = "0.0.0.0", port: int = 8765):
         """Binary WebSocket sunucusunu başlat."""
         if not HAS_WEBSOCKETS:
@@ -745,6 +769,7 @@ class BinaryWebSocket:
             while self._running:
                 await asyncio.sleep(1)
 
+    @otel_trace("binary_ws.stop")
     async def stop(self):
         """Sunucuyu durdur."""
         self._running = False

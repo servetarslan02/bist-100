@@ -21,8 +21,21 @@ from dataclasses import dataclass
 
 import numpy as np
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.tradability_mask")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -50,6 +63,7 @@ class TradabilityMask:
     # Devre kesici eşiği (BIST: %5, %10, %15, %20)
     CIRCUIT_BREAKER_PCTS = [0.05, 0.10, 0.15, 0.20]
 
+    @otel_trace("tradability_mask.compute_mask")
     def compute_mask(
         self,
         ticker: str,

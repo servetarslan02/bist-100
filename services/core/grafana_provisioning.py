@@ -19,10 +19,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.grafana_provisioning")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 DASHBOARD_DIR = Path(__file__).parent.parent.parent / "monitoring"
 
@@ -84,6 +97,7 @@ class GrafanaProvisioner:
     # DATASOURCE
     # =====================================================
 
+    @otel_trace("grafana.provision_datasource")
     async def provision_datasource(self, ds_config: DatasourceConfig) -> bool:
         """Datasource oluştur veya güncelle."""
         try:
@@ -149,6 +163,7 @@ class GrafanaProvisioner:
     # DASHBOARD
     # =====================================================
 
+    @otel_trace("grafana.provision_dashboard")
     async def provision_dashboard(self, file_path: str, folder_id: int = 0, overwrite: bool = True) -> int | None:
         """Dashboard JSON dosyasını Grafana'ya yükle.
 
@@ -224,6 +239,7 @@ class GrafanaProvisioner:
             logger.error("Dashboard provisioning error", path=file_path, error=str(e))
             return None
 
+    @otel_trace("grafana.provision_all")
     async def provision_all(self) -> dict[str, Any]:
         """Tüm dashboard dosyalarını yükle."""
         results = {"dashboards": {}, "datasources": {}, "errors": []}

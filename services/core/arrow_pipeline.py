@@ -26,6 +26,7 @@ Kullanım:
 
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -34,8 +35,20 @@ if TYPE_CHECKING:
     import pyarrow as pa
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.arrow_pipeline")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class ArrowPipeline:
@@ -45,6 +58,7 @@ class ArrowPipeline:
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
 
+    @otel_trace("arrow_pipeline.from_polars")
     def from_polars(self, df) -> pa.Table:
         """Polars DataFrame'den Arrow Table'a çevir."""
         try:
@@ -53,6 +67,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
+    @otel_trace("arrow_pipeline.to_polars")
     def to_polars(self, table) -> pl.DataFrame:
         """Arrow Table'dan Polars DataFrame'e çevir."""
         try:
@@ -63,6 +78,7 @@ class ArrowPipeline:
             logger.error("Polars not installed")
             raise
 
+    @otel_trace("arrow_pipeline.to_parquet")
     def to_parquet(self, table, path: str, compression: str = "snappy") -> str:
         """Arrow Table'ı Parquet dosyasına yaz."""
         try:
@@ -87,6 +103,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
+    @otel_trace("arrow_pipeline.read_parquet")
     def read_parquet(self, path: str, columns: list[str] | None = None):
         """Parquet dosyasından Arrow Table oku."""
         try:
@@ -102,6 +119,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
+    @otel_trace("arrow_pipeline.scan_parquet")
     def scan_parquet(self, path: str):
         """Parquet dosyasını lazy olarak tara (büyük dosyalar için)."""
         try:
@@ -115,6 +133,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
+    @otel_trace("arrow_pipeline.merge_parquet")
     def merge_parquet(self, input_paths: list[str], output_path: str) -> str:
         """Birden fazla Parquet dosyasını birleştir."""
         try:
@@ -140,6 +159,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
+    @otel_trace("arrow_pipeline.get_metadata")
     def get_metadata(self, path: str) -> dict[str, Any]:
         """Parquet dosyası metadata'sını al."""
         try:

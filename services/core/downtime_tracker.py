@@ -28,10 +28,23 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import functools
 import duckdb
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.downtime_tracker")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class DowntimeTracker:
@@ -91,6 +104,7 @@ class DowntimeTracker:
         finally:
             conn.close()
 
+    @otel_trace("downtime_tracker.record_shutdown")
     def record_shutdown(self):
         """Kapanış zamanını kaydet (graceful shutdown'ta çağrılır)."""
         now = time.time()
@@ -112,6 +126,7 @@ class DowntimeTracker:
 
         logger.info("Shutdown time recorded", time=now_iso)
 
+    @otel_trace("downtime_tracker.record_startup")
     def record_startup(self):
         """Başlangıç zamanını kaydet ve downtime hesapla."""
         self._startup_time = time.time()
@@ -246,6 +261,7 @@ class DowntimeTracker:
         else:
             return "none"
 
+    @otel_trace("downtime_tracker.get_status")
     def get_status(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {

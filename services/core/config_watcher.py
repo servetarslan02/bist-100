@@ -16,6 +16,7 @@ Kullanım:
     watcher.stop()
 """
 
+import functools
 import asyncio
 import os
 import time
@@ -26,8 +27,20 @@ from typing import Any
 
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.config_watcher")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -75,6 +88,7 @@ class ConfigWatcher:
         self._reload_count = 0
         self._error_count = 0
 
+    @otel_trace("config_watcher.start")
     def start(self):
         """Watcher'ı başlat."""
         if self._running:
@@ -86,6 +100,7 @@ class ConfigWatcher:
             logger.warning("Runtime error in start", exc_info=True)
         logger.info("Config watcher started", path=self._config_path)
 
+    @otel_trace("config_watcher.stop")
     def stop(self):
         """Watcher'ı durdur."""
         self._running = False
@@ -111,6 +126,7 @@ class ConfigWatcher:
             except Exception as e:
                 logger.warning("Config watcher error", error=str(e))
 
+    @otel_trace("config_watcher._check_and_reload")
     async def _check_and_reload(self):
         """Dosya değişikliği kontrolü ve reload."""
         if not os.path.exists(self._config_path):
@@ -218,6 +234,7 @@ class ConfigWatcher:
             "watch_interval_s": self._watch_interval_s,
         }
 
+    @otel_trace("config_watcher.force_reload")
     def force_reload(self) -> bool:
         """Manuel reload tetikle."""
         try:

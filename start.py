@@ -222,6 +222,48 @@ def start_docker_desktop():
 
 
 # =====================================================
+# 2.1 mTLS SERTİFİKALARI KONTROLÜ
+# =====================================================
+
+
+def ensure_mtls_certs():
+    """mTLS sertifikaları yoksa otomatik oluştur."""
+    certs_dir = PROJECT_ROOT / "infrastructure" / "mtls" / "certs"
+    ca_crt = certs_dir / "ca.crt"
+    server_crt = certs_dir / "server.crt"
+    client_crt = certs_dir / "client.crt"
+
+    if ca_crt.exists() and server_crt.exists() and client_crt.exists():
+        print("[OK] mTLS güvenlik sertifikaları mevcut.")
+        return True
+
+    print("[*] mTLS sertifikaları oluşturuluyor...")
+    try:
+        mtls_dir = PROJECT_ROOT / "infrastructure" / "mtls"
+        res = subprocess.run(
+            [
+                "docker", "run", "--rm",
+                "-v", f"{mtls_dir}:/work",
+                "-w", "/work",
+                "alpine:latest",
+                "sh", "-c", "apk add --no-cache openssl bash >/dev/null 2>&1 && bash generate_certs.sh"
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if res.returncode == 0 and ca_crt.exists():
+            print("[OK] mTLS sertifikaları başarıyla oluşturuldu.")
+            return True
+        else:
+            print(f"[UYARI] Sertifika oluşturulamadı: {res.stderr}")
+            return False
+    except Exception as e:
+        print(f"[UYARI] Sertifika oluşturma hatası: {e}")
+        return False
+
+
+# =====================================================
 # 3. SSD YAZMA HIZI LİMİTİ
 # =====================================================
 
@@ -638,6 +680,9 @@ def main():
             sys.exit(1)
     else:
         print("[OK] Docker motoru aktif ve hazır.")
+
+    # 2.1 mTLS Sertifikaları kontrolü
+    ensure_mtls_certs()
 
     # 3. Docker Compose Up
     print("\n[ADIM 3/7] Mikro-servisler Docker Compose ile ayağa kaldırılıyor...")

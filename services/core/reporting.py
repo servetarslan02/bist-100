@@ -4,10 +4,24 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.reporting")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
+@otel_trace("reporting.generate_daily_report")
 def generate_daily_report(portfolio: dict, trades: list[dict], risk_metrics: dict) -> dict[str, Any]:
     """Günlük rapor oluştur."""
     return {
@@ -23,6 +37,7 @@ def generate_daily_report(portfolio: dict, trades: list[dict], risk_metrics: dic
     }
 
 
+@otel_trace("reporting.generate_report")
 def generate_report(report_type: str = "daily", **kwargs) -> dict[str, Any]:
     """Backward-compatible wrapper — queue.py bu metodu çağırır."""
     logger.info("Generating report", report_type=report_type)

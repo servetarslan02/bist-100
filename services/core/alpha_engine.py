@@ -1,18 +1,40 @@
+"""
+ALPHA BIST — Alpha Engine v2.0 (Enterprise-Grade)
+"""
+
+from __future__ import annotations
+
 import datetime
+import functools
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
 import polars as pl
 import structlog
 import yfinance as yf
+from opentelemetry import metrics, trace
 
 from services.core.safe_pickle import safe_pickle_dump, safe_pickle_load
 from services.ingestion.bist_universe import bist_universe
 from services.ml.feature_engine import compute_universe_features
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.alpha_engine")
+meter = metrics.get_meter("alpha-bist.alpha_engine")
+
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def _yf_to_polars(yf_df) -> pl.DataFrame:
@@ -60,6 +82,7 @@ class AlphaEngine:
         default_bad_features = ["momentum_accel", "roc_120d", "dist_sma200", "cs_zscore_ret_1d", "roc_5d"]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
+    @otel_trace("alpha_engine.fetch_data")
     def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None):
         if tickers is None:
             tickers = (
@@ -109,6 +132,7 @@ class AlphaEngine:
 
         return market_data, bm_df, sector_map
 
+    @otel_trace("alpha_engine.generate_training_samples")
     def generate_training_samples(
         self,
         market_data: dict[str, pl.DataFrame],
@@ -195,6 +219,7 @@ class AlphaEngine:
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         return X, y, all_keys
 
+    @otel_trace("alpha_engine.train")
     def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True):
         t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
         t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
@@ -229,6 +254,7 @@ class AlphaEngine:
         self._save_model()
         return True
 
+    @otel_trace("alpha_engine.predict")
     def predict(self, market_data, bm_df, sector_map, target_date_str: str):
         if not self.model:
             raise ValueError("Model not trained")
@@ -312,6 +338,7 @@ class AlphaEngine:
             logger.warning("Failed to load AlphaEngine model", error=str(e))
             return False
 
+    @otel_trace("alpha_engine.run_daily_pipeline")
     def run_daily_pipeline(self, date: str):
         end_date_dt = datetime.datetime.strptime(date, "%Y-%m-%d")
         start_date_dt = end_date_dt - datetime.timedelta(days=400)

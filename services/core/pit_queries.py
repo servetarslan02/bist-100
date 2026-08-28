@@ -17,8 +17,21 @@ from datetime import datetime
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.pit_queries")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =====================================================
@@ -78,6 +91,7 @@ PIT_QUERY_TEMPLATES = {
 # =====================================================
 
 
+@otel_trace("pit_queries.pit_fetch_as_of")
 async def pit_fetch_as_of(
     conn,
     table: str,
@@ -138,6 +152,7 @@ async def pit_fetch_as_of(
         raise
 
 
+@otel_trace("pit_queries.pit_fetch_latest")
 async def pit_fetch_latest(
     conn,
     table: str,
@@ -183,6 +198,7 @@ async def pit_fetch_latest(
         raise
 
 
+@otel_trace("pit_queries.pit_fetch_range")
 async def pit_fetch_range(
     conn,
     table: str,
@@ -238,6 +254,7 @@ async def pit_fetch_range(
         raise
 
 
+@otel_trace("pit_queries.pit_validate_no_leakage")
 async def pit_validate_no_leakage(
     conn,
     table: str,
@@ -294,6 +311,7 @@ async def pit_validate_no_leakage(
         raise
 
 
+@otel_trace("pit_queries.pit_fetch_snapshot")
 async def pit_fetch_snapshot(
     conn,
     table: str,
@@ -348,6 +366,7 @@ async def pit_fetch_snapshot(
 # =====================================================
 
 
+@otel_trace("pit_queries.pit_fetch_df")
 async def pit_fetch_df(
     conn,
     table: str,
@@ -380,6 +399,7 @@ async def pit_fetch_df(
 # =====================================================
 
 
+@otel_trace("pit_queries.pit_audit_all_tables")
 async def pit_audit_all_tables(
     conn,
     check_date: datetime | str,

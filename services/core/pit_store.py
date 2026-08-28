@@ -16,8 +16,21 @@ from datetime import datetime
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.pit_store")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -44,6 +57,7 @@ class PointInTimeStore:
         # ticker → field_name → [PITRecord] (zaman sıralı)
         self._store: dict[str, dict[str, list[PITRecord]]] = {}
 
+    @otel_trace("pit_store.insert")
     def insert(
         self,
         ticker: str,
@@ -77,6 +91,7 @@ class PointInTimeStore:
         )
         records.append(new_record)
 
+    @otel_trace("pit_store.get_as_of")
     def get_as_of(
         self,
         ticker: str,
@@ -99,11 +114,13 @@ class PointInTimeStore:
 
         return result
 
+    @otel_trace("pit_store.get_latest")
     def get_latest(self, ticker: str, field_name: str) -> Any | None:
         """En son kaydedilen değeri döndür."""
         records = self._store.get(ticker, {}).get(field_name, [])
         return records[-1].value if records else None
 
+    @otel_trace("pit_store.get_history")
     def get_history(
         self,
         ticker: str,
@@ -132,10 +149,12 @@ class PointInTimeStore:
 
         return result
 
+    @otel_trace("pit_store.get_revisions")
     def get_revisions(self, ticker: str, field_name: str) -> int:
         """Toplam revizyon sayısı."""
         return len(self._store.get(ticker, {}).get(field_name, []))
 
+    @otel_trace("pit_store.bulk_insert")
     def bulk_insert(
         self,
         ticker: str,
@@ -147,6 +166,7 @@ class PointInTimeStore:
         for field_name, value in data.items():
             self.insert(ticker, field_name, value, valid_from, source)
 
+    @otel_trace("pit_store.get_stats")
     def get_stats(self) -> dict:
         """İstatistikler."""
         total_records = sum(len(records) for fields in self._store.values() for records in fields.values())

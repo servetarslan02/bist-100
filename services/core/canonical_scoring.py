@@ -14,14 +14,27 @@ Bu modül:
 - Decision Engine'e yapılandırılmış girdi sağlar
 """
 
+import functools
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.canonical_scoring")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =====================================================
@@ -187,6 +200,7 @@ class CanonicalScoringPipeline:
         },
     }
 
+    @otel_trace("canonical_scoring.compute_score_vector")
     def compute_score_vector(
         self,
         ticker: str,
@@ -242,6 +256,7 @@ class CanonicalScoringPipeline:
 
         return sv
 
+    @otel_trace("canonical_scoring.compute_canonical_score")
     def compute_canonical_score(
         self,
         ticker: str,

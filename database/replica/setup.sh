@@ -63,11 +63,13 @@ else
     echo "Replica: Mevcut data bulundu. Replica olarak devam ediliyor."
 fi
 
+chmod 0700 "$PGDATA"
+
 # PostgreSQL'i başlat (postgres kullanıcısı olarak)
 exec gosu postgres postgres \
     -D "$PGDATA" \
     -c hot_standby=on \
-    -c max_connections=20 \
+    -c max_connections=100 \
     -c shared_buffers=64MB \
     -c work_mem=2MB \
     -c effective_cache_size=128MB

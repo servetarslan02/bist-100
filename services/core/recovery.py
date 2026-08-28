@@ -14,8 +14,21 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.recovery")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class EventReplay:
@@ -24,6 +37,7 @@ class EventReplay:
     def __init__(self):
         self._event_log: list[dict] = []
 
+    @otel_trace("recovery.log_event")
     def log_event(self, event_type: str, data: dict, timestamp: str = None):
         """Event kaydet (replay için)."""
         self._event_log.append(
@@ -36,6 +50,7 @@ class EventReplay:
         if len(self._event_log) > 1000:
             self._event_log = self._event_log[-1000:]
 
+    @otel_trace("recovery.replay_from")
     def replay_from(self, from_timestamp: str, handler: Callable) -> int:
         """Belirli timestamp'ten itibaren eventleri yeniden oynat."""
         count = 0
@@ -48,6 +63,7 @@ class EventReplay:
                     logger.error("Replay handler error", event_type=event["event_type"], error=str(e))
         return count
 
+    @otel_trace("recovery.replay_range")
     def replay_range(self, from_ts: str, to_ts: str, handler: Callable) -> int:
         """Belirli zaman aralığındaki eventleri yeniden oynat."""
         count = 0
@@ -60,6 +76,7 @@ class EventReplay:
                     logger.error("Replay handler error", error=str(e))
         return count
 
+    @otel_trace("recovery.get_log_count")
     def get_log_count(self) -> int:
         return len(self._event_log)
 
@@ -71,12 +88,14 @@ class GracefulShutdown:
         self._shutdown_handlers: list[Callable] = []
         self._is_shutting_down = False
 
+    @otel_trace("recovery.register_handler")
     def register_handler(self, handler: Callable):
         """Shutdown handler kaydet."""
         self._shutdown_handlers.append(handler)
         if len(self._shutdown_handlers) > 100:
             self._shutdown_handlers = self._shutdown_handlers[-100:]
 
+    @otel_trace("recovery.shutdown")
     async def shutdown(self, reason: str = "manual"):
         """Graceful shutdown başlat."""
         if self._is_shutting_down:
@@ -137,6 +156,7 @@ class StartupRecovery:
     def __init__(self):
         self._recovery_steps: list[dict] = []
 
+    @otel_trace("recovery.recover")
     async def recover(self, config: dict = None, snapshot: dict = None, event_log: list = None) -> dict[str, Any]:
         """Recovery pipeline."""
         results = {
@@ -215,26 +235,31 @@ class FailureInjector:
     def __init__(self):
         self._active_failures: dict[str, bool] = {}
 
+    @otel_trace("recovery.inject")
     def inject(self, component: str, failure_type: str = "down"):
         """Hata enjekte et."""
         key = f"{component}:{failure_type}"
         self._active_failures[key] = True
         logger.warning("Failure injected", component=component, type=failure_type)
 
+    @otel_trace("recovery.clear")
     def clear(self, component: str, failure_type: str = "down"):
         """Hatayı kaldır."""
         key = f"{component}:{failure_type}"
         self._active_failures.pop(key, None)
         logger.info("Failure cleared", component=component, type=failure_type)
 
+    @otel_trace("recovery.is_failing")
     def is_failing(self, component: str, failure_type: str = "down") -> bool:
         """Bu bileşende hata var mı?"""
         return self._active_failures.get(f"{component}:{failure_type}", False)
 
+    @otel_trace("recovery.clear_all")
     def clear_all(self):
         """Tüm hataları kaldır."""
         self._active_failures.clear()
 
+    @otel_trace("recovery.get_active")
     def get_active(self) -> dict[str, bool]:
         """Aktif hataları döndür."""
         return dict(self._active_failures)

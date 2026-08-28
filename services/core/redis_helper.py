@@ -4,8 +4,21 @@ from typing import Any
 
 import orjson
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.redis_helper")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 _redis_client = None
 _redis_available = None
@@ -60,6 +73,7 @@ def get_client():
         return None
 
 
+@otel_trace("redis_helper.get_cached")
 def get_cached(key: str) -> Any | None:
     r = get_client()
     if r is None:
@@ -76,6 +90,7 @@ def get_cached(key: str) -> Any | None:
     return None
 
 
+@otel_trace("redis_helper.set_cached")
 def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
     r = get_client()
     if r is None:
@@ -90,6 +105,7 @@ def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
         return False
 
 
+@otel_trace("redis_helper.delete_cached")
 def delete_cached(key: str) -> bool:
     r = get_client()
     if r is None:

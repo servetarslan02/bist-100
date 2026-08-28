@@ -26,10 +26,23 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
+import functools
 import orjson
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.event_schema")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class EventType(IntEnum):
@@ -67,6 +80,7 @@ class CanonicalEvent:
         if self.timestamp == 0:
             self.timestamp = int(time.time() * 1000)
 
+    @otel_trace("event_schema.validate")
     def validate(self) -> tuple[bool, str]:
         """Event şeması ve zorunlu alan doğrulaması."""
         if not isinstance(self.type, (EventType, int)):
@@ -77,6 +91,7 @@ class CanonicalEvent:
             return False, f"Desteklenmeyen şema versiyonu: {self.version}"
         return True, "OK"
 
+    @otel_trace("event_schema.to_json")
     def to_json(self) -> str:
         """JSON formatına çevir."""
         return orjson.dumps(
@@ -94,6 +109,7 @@ class CanonicalEvent:
             default=str,
         ).decode()
 
+    @otel_trace("event_schema.to_dict")
     def to_dict(self) -> dict[str, Any]:
         """Dict formatına çevir."""
         return {
@@ -108,6 +124,7 @@ class CanonicalEvent:
             "correlation_id": self.correlation_id,
         }
 
+    @otel_trace("event_schema.to_binary")
     def to_binary(self) -> bytes:
         """Binary formatına çevir — Protobuf uyumlu."""
         ticker_bytes = self.ticker.encode("utf-8")[:10].ljust(10, b"\x00")
@@ -125,12 +142,14 @@ class CanonicalEvent:
         return header + source_bytes + data_json
 
     @classmethod
+    @otel_trace("event_schema.from_json")
     def from_json(cls, json_str: str | bytes) -> "CanonicalEvent":
         """JSON'dan oluştur."""
         data = orjson.loads(json_str)
         return cls.from_dict(data)
 
     @classmethod
+    @otel_trace("event_schema.from_dict")
     def from_dict(cls, data: dict[str, Any]) -> "CanonicalEvent":
         """Dict'ten oluştur."""
         return cls(
@@ -146,6 +165,7 @@ class CanonicalEvent:
         )
 
     @classmethod
+    @otel_trace("event_schema.from_binary")
     def from_binary(cls, binary: bytes) -> "CanonicalEvent":
         """Binary'den oluştur."""
         if len(binary) < 26:

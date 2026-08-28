@@ -28,7 +28,9 @@ Kullanım:
 from pathlib import Path
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
 try:
     import duckdb
@@ -40,7 +42,22 @@ try:
 except ImportError:
     pl = None
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.duckdb_research")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        async def async_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return await func(self, *args, **kwargs)
+        @functools.wraps(func)
+        def sync_wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return async_wrapper if __import__('asyncio').iscoroutinefunction(func) else sync_wrapper
+    return decorator
 
 
 class DuckDBResearchEngine:
@@ -75,6 +92,7 @@ class DuckDBResearchEngine:
     # PARQUET OPERATIONS
     # =====================================================
 
+    @otel_trace("duckdb_research.query_parquet")
     def query_parquet(self, parquet_path: str, sql: str | None = None, params: dict | None = None) -> "pl.DataFrame":
         """Parquet dosyasını sorgula ve Polars DataFrame döndür.
 
@@ -112,6 +130,7 @@ class DuckDBResearchEngine:
             logger.error("Parquet query failed", path=parquet_path, error=str(e))
             raise
 
+    @otel_trace("duckdb_research.register_parquet")
     def register_parquet(self, name: str, parquet_path: str):
         """Parquet dosyasını sanal tablo olarak kaydet.
 
@@ -134,6 +153,7 @@ class DuckDBResearchEngine:
     # RESEARCH DB OPERATIONS
     # =====================================================
 
+    @otel_trace("duckdb_research.query_research")
     def query_research(self, sql: str, params: dict | None = None) -> "pl.DataFrame":
         """Research DB'den sorgula.
 
@@ -157,6 +177,7 @@ class DuckDBResearchEngine:
             logger.error("Research query failed", error=str(e))
             raise
 
+    @otel_trace("duckdb_research.execute_research")
     def execute_research(self, sql: str, params: dict | None = None) -> None:
         """Research DB'de sorgu çalıştır (write).
 
@@ -175,6 +196,7 @@ class DuckDBResearchEngine:
     # TIMESCALEDB → PARQUET EXPORT
     # =====================================================
 
+    @otel_trace("duckdb_research.export_timescaledb_to_parquet")
     async def export_timescaledb_to_parquet(
         self,
         table: str,
@@ -280,6 +302,7 @@ class DuckDBResearchEngine:
             "file_size_bytes": output_path.stat().st_size if output_path.exists() else 0,
         }
 
+    @otel_trace("duckdb_research.export_all_timescaledb")
     async def export_all_timescaledb(self, output_dir: str = "data/parquet") -> list[dict]:
         """Tüm TimescaleDB tablolarını Parquet'e aktar.
 

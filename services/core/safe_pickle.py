@@ -19,10 +19,24 @@ from pathlib import Path
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.safe_pickle")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
+@otel_trace("safe_pickle.safe_pickle_dump")
 def safe_pickle_dump(obj: Any, path: str, protocol: int = pickle.HIGHEST_PROTOCOL) -> None:
     """Pickle ile kaydet ve SHA256 hash dosyası oluştur.
 
@@ -45,6 +59,7 @@ def safe_pickle_dump(obj: Any, path: str, protocol: int = pickle.HIGHEST_PROTOCO
     logger.debug("safe_pickle_dump", path=str(file_path), hash=file_hash[:16])
 
 
+@otel_trace("safe_pickle.safe_pickle_load")
 def safe_pickle_load(path: str, verify_hash: bool = True) -> Any:
     """Pickle yükle — SHA256 hash doğrulaması ile.
 

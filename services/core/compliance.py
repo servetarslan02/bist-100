@@ -8,12 +8,25 @@ Sermaye Piyasası Kurulu uyumluluk:
 - Algoritmik trading bildirimi
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.compliance")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -50,6 +63,7 @@ class ComplianceChecker:
     ALGO_TRADING_ORDER_THRESHOLD = 1000  # Günde 1000+ emir = algoritmik trading
     ALGO_TRADING_VOLUME_THRESHOLD = 0.05  # Günlük hacmin %5'i = algoritmik trading
 
+    @otel_trace("compliance.check_spk_compliance")
     def check_spk_compliance(
         self,
         action: str,
@@ -114,6 +128,7 @@ class ComplianceChecker:
 
         return ComplianceResult(action="OK", details=details)
 
+    @otel_trace("compliance.check_algo_trading_notification")
     def check_algo_trading_notification(
         self,
         daily_order_count: int,

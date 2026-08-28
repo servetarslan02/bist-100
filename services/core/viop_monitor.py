@@ -11,8 +11,21 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.viop_monitor")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -53,6 +66,7 @@ class VIOPMonitor:
         """Özel teminat oranı ata."""
         self._custom_margin_rates[ticker] = rate
 
+    @otel_trace("viop_monitor.check_viop_margin")
     def check_viop_margin(
         self,
         position_value: float,

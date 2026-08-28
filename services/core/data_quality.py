@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Data Quality & Tradability Mask v3.0 (Great Expectations Style)
 
 ROADMAP v3.0: Enterprise Grade Data Contracts
@@ -16,8 +16,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import functools
 import structlog
-from opentelemetry import metrics
+from opentelemetry import metrics, trace
 
 try:
     import polars as pl
@@ -26,6 +27,17 @@ except ImportError:
 
 logger = structlog.get_logger(__name__)
 meter = metrics.get_meter("alpha.data.quality")
+tracer = trace.get_tracer("alpha-bist.data_quality")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 # OpenTelemetry Metrics
 VIOLATIONS_COUNTER = meter.create_counter(
@@ -276,6 +288,7 @@ class DataQualityEngine:
         self.suite = _build_financial_suite()
         logger.info("DataQualityEngine initialized with ExpectationsSuite")
 
+    @otel_trace("data_quality.check_tradability")
     def check_tradability(
         self,
         ticker: str,
@@ -287,7 +300,7 @@ class DataQualityEngine:
         prev_close: float,
         timestamp: datetime | None = None,
     ) -> TradabilityMask:
-        """Hisse tradability kontrolÃ¼."""
+        """Hisse tradability kontrolü."""
 
         data = {
             "open_price": open_price,
@@ -346,6 +359,7 @@ class DataQualityEngine:
 
         return mask
 
+    @otel_trace("data_quality.apply_mask")
     def apply_mask(self, raw_data: dict[str, Any], mask: TradabilityMask, *, copy: bool = False) -> dict[str, Any]:
         """Ham veriye mask uygula."""
         if copy:
@@ -434,6 +448,7 @@ class DataQualityChecker:
     def __init__(self):
         self.suite = _build_financial_suite()
 
+    @otel_trace("data_quality.full_quality_check")
     def full_quality_check(self, df: Any, ticker: str = "UNKNOWN") -> QualityReport:
         issues = []
         total_rows = len(df) if hasattr(df, "__len__") else 0

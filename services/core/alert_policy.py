@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Alert Policy Configuration v3.0
+ALPHA BIST — Alert Policy Configuration v3.0 (Enterprise-Grade)
 
 Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 
@@ -9,7 +9,10 @@ Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 - Policy change webhook notification
 - Batch silence işlemleri (transaction)
 - Audit log (her değişiklik)
+- OTel Tracing & Metrics
 """
+
+from __future__ import annotations
 
 import asyncio
 import copy
@@ -22,8 +25,20 @@ from typing import Any
 
 import orjson
 import structlog
+from opentelemetry import metrics, trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.alert_policy")
+meter = metrics.get_meter("alpha-bist.alert_policy")
+
+_policy_updates = meter.create_counter(
+    "alpha.alert_policy.updates.total",
+    description="Toplam policy güncellenme sayısı",
+)
+_policy_silences = meter.create_counter(
+    "alpha.alert_policy.silences.total",
+    description="Toplam eklenen silence sayısı",
+)
 
 DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "config" / "alert_policy.json"
 
@@ -251,54 +266,61 @@ class AlertPolicy:
             actor: Kim güncelledi
             expected_version: Beklenen versiyon (0 = kontrol yok)
         """
-        # Optimistic locking check
-        if expected_version > 0 and expected_version != self._version:
-            raise VersionConflictError(
-                f"Version conflict: expected {expected_version}, current {self._version}. "
-                f"Başka bir kullanıcı tarafından güncellenmiş olabilir."
+        with tracer.start_as_current_span("alert_policy.update") as span:
+            span.set_attribute("actor", actor)
+            span.set_attribute("expected_version", expected_version)
+            span.set_attribute("current_version", self._version)
+
+            # Optimistic locking check
+            if expected_version > 0 and expected_version != self._version:
+                raise VersionConflictError(
+                    f"Version conflict: expected {expected_version}, current {self._version}. "
+                    f"Başka bir kullanıcı tarafından güncellenmiş olabilir."
+                )
+
+            # Validate
+            test_policy = AlertPolicy._from_dict(new_config, "")
+            errors = test_policy.validate()
+            if errors:
+                return {"success": False, "errors": errors}
+
+            # Compute diff
+            old_dict = copy.deepcopy(self.to_dict())
+
+            # Save history
+            self._save_history()
+
+            # Apply changes
+            if "escalation_timeouts" in new_config:
+                self.escalation_timeouts = new_config["escalation_timeouts"]
+            if "notification_routing" in new_config:
+                self.notification_routing = new_config["notification_routing"]
+            if "severity_thresholds" in new_config:
+                self.severity_thresholds = new_config["severity_thresholds"]
+
+            self._version += 1
+            diff = self._compute_diff(old_dict, self.to_dict())
+
+            # Audit
+            self._add_audit(
+                "update",
+                {
+                    "actor": actor,
+                    "changes": list(new_config.keys()),
+                    "expected_version": expected_version,
+                },
+                diff,
             )
 
-        # Validate
-        test_policy = AlertPolicy._from_dict(new_config, "")
-        errors = test_policy.validate()
-        if errors:
-            return {"success": False, "errors": errors}
+            # Persist
+            self._save_to_file()
 
-        # Compute diff
-        old_dict = copy.deepcopy(self.to_dict())
+            # Webhook notification
+            self._notify_change("update", diff)
 
-        # Save history
-        self._save_history()
-
-        # Apply changes
-        if "escalation_timeouts" in new_config:
-            self.escalation_timeouts = new_config["escalation_timeouts"]
-        if "notification_routing" in new_config:
-            self.notification_routing = new_config["notification_routing"]
-        if "severity_thresholds" in new_config:
-            self.severity_thresholds = new_config["severity_thresholds"]
-
-        self._version += 1
-        diff = self._compute_diff(old_dict, self.to_dict())
-
-        # Audit
-        self._add_audit(
-            "update",
-            {
-                "actor": actor,
-                "changes": list(new_config.keys()),
-                "expected_version": expected_version,
-            },
-            diff,
-        )
-
-        # Persist
-        self._save_to_file()
-
-        # Webhook notification
-        self._notify_change("update", diff)
-
-        return {"success": True, "version": self._version, "diff": diff.to_dict()}
+            _policy_updates.add(1)
+            span.set_attribute("success", True)
+            return {"success": True, "version": self._version, "diff": diff.to_dict()}
 
     # =====================================================
     # POLICY DIFF

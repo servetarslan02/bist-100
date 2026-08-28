@@ -39,10 +39,23 @@ except ImportError:
     HAS_HTTPX = False
 
 import contextlib
+import functools
+from opentelemetry import trace
 
 from .config import settings
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.questdb_client")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class QuestDBClient:
@@ -56,6 +69,7 @@ class QuestDBClient:
         self._connected = False
         self._ilp_socket: socket.socket | None = None
 
+    @otel_trace("questdb_client.connect")
     async def connect(self) -> bool:
         """QuestDB'ye bağlan."""
         try:
@@ -71,6 +85,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.close")
     def close(self):
         """Bağlantıyı kapat."""
         if self._ilp_socket:
@@ -79,6 +94,7 @@ class QuestDBClient:
             self._ilp_socket = None
         self._connected = False
 
+    @otel_trace("questdb_client.insert_tick")
     def insert_tick(
         self,
         ticker: str,
@@ -106,6 +122,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.insert_ticks_batch")
     def insert_ticks_batch(self, ticks: list[dict[str, Any]]) -> bool:
         """Toplu tick verisi yaz."""
         if not self._connected and not self._sync_connect():
@@ -131,6 +148,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.insert_ohlcv")
     def insert_ohlcv(
         self,
         ticker: str,
@@ -163,6 +181,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.insert_event")
     def insert_event(
         self,
         event_type: str,
@@ -199,6 +218,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.query")
     async def query(self, sql: str) -> list[dict[str, Any]]:
         """SQL sorgusu çalıştır (HTTP API)."""
         if not HAS_HTTPX:
@@ -224,6 +244,7 @@ class QuestDBClient:
             logger.warning("QuestDB query error", error=str(e))
             return []
 
+    @otel_trace("questdb_client.query_df")
     async def query_df(self, sql: str):
         """SQL sorgusu çalıştır ve Polars DataFrame döndür."""
         import polars as pl
@@ -246,6 +267,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
+    @otel_trace("questdb_client.ensure_tables")
     async def ensure_tables(self) -> bool:
         """Gerekli tabloları oluştur."""
         tables_sql = [

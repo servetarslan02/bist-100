@@ -35,4 +35,4 @@ def setup_logging(log_level: str = "INFO"):
 setup_logging()
 
 # Export logger
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)

@@ -14,8 +14,21 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.price_limits")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -85,39 +98,48 @@ class PriceLimitMonitor:
         self._corp_action_tickers: set = set()  # Kurumsal işlem sonrası (bedelsiz/bölünme)
         self._market_type: dict[str, str] = {}  # Hisse → pazar tipi
 
+    @otel_trace("price_limits.set_custom_limit")
     def set_custom_limit(self, ticker: str, limit_pct: float):
         """Özel limit ata (volatil hisseler)."""
         self._custom_limits[ticker] = limit_pct
 
+    @otel_trace("price_limits.set_market_type")
     def set_market_type(self, ticker: str, market_type: str):
         """Hisse için pazar tipi ata (yildiz, ana, alt, vb.)."""
         self._market_type[ticker] = market_type
 
+    @otel_trace("price_limits.add_ipo_ticker")
     def add_ipo_ticker(self, ticker: str):
         """Halka arz günü limit yok."""
         self._ipo_tickers.add(ticker)
 
+    @otel_trace("price_limits.remove_ipo_ticker")
     def remove_ipo_ticker(self, ticker: str):
         """Halka arz gününü kaldır."""
         self._ipo_tickers.discard(ticker)
 
+    @otel_trace("price_limits.add_corporate_action_ticker")
     def add_corporate_action_ticker(self, ticker: str):
         """Kurumsal işlem sonrası (bedelsiz/bölünme) baz fiyat yeniden hesaplanır."""
         self._corp_action_tickers.add(ticker)
 
+    @otel_trace("price_limits.remove_corporate_action_ticker")
     def remove_corporate_action_ticker(self, ticker: str):
         """Kurumsal işlem sonrası takibi kaldır."""
         self._corp_action_tickers.discard(ticker)
 
+    @otel_trace("price_limits.set_post_circuit_breaker_limit")
     def set_post_circuit_breaker_limit(self, ticker: str):
         """Devre kesici sonrası marj daraltma uygula."""
         self._post_cb_tickers[ticker] = self.POST_CB_LIMIT
         logger.info("Post-CB margin tightened", ticker=ticker, new_limit=self.POST_CB_LIMIT)
 
+    @otel_trace("price_limits.clear_post_circuit_breaker_limit")
     def clear_post_circuit_breaker_limit(self, ticker: str):
         """Devre kesici sonrası marj daraltmayı kaldır."""
         self._post_cb_tickers.pop(ticker, None)
 
+    @otel_trace("price_limits.get_effective_limit")
     def get_effective_limit(self, ticker: str) -> float:
         """Hisseye uygulanan efektif limiti döndür."""
         # Halka arz günü → limit yok
@@ -139,6 +161,7 @@ class PriceLimitMonitor:
 
         return self.DEFAULT_LIMIT
 
+    @otel_trace("price_limits.check_price_limit")
     def check_price_limit(
         self,
         ticker: str,

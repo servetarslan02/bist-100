@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Decision Engine v2.0 (DÃ¼zeltilmiÅŸ)
 
 ATR field'Ä± eklendi.
@@ -7,13 +7,26 @@ Stop-loss ve target hesaplamasÄ± ATR bazlÄ±.
 FAZ 8: Decision Engine
 """
 
+import functools
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.decision_engine")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class Action(Enum):
@@ -109,6 +122,7 @@ class DecisionEngine:
             return 58.0, 0.60  # BoÄŸa piyasasÄ±nda trend takip
         return self._min_score, self._min_confidence
 
+    @otel_trace("decision_engine.decide")
     def decide(self, inp: DecisionInput) -> Decision:
         """Karar ver."""
 

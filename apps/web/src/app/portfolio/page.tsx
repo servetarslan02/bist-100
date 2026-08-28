@@ -65,7 +65,7 @@ export default function PortfolioPage() {
   };
   const marketOpen = isBistOpen();
 
-  const rawP = data?.portfolio ?? (data as Record<string, unknown>) ?? {};
+  const rawP = (data?.portfolio ?? ((data as unknown) as Record<string, any>) ?? {}) as Record<string, any>;
   const currentCapital = rawP.total_value ?? rawP.current_capital ?? 1000000;
   const investedValue = rawP.invested_value ?? 0;
   const cashBalance = rawP.cash ?? rawP.total_cash ?? rawP.settled_cash ?? 0;
@@ -85,7 +85,8 @@ export default function PortfolioPage() {
     if (!positions || positions.length === 0) return;
     const nextFlash: Record<string, "up" | "down"> = {};
     for (const pos of positions) {
-      const sym = pos.ticker || pos.symbol;
+      const sym = pos.ticker || pos.symbol || "";
+      if (!sym) continue;
       const price = Number(pos.current_price ?? pos.avg_cost ?? 0);
       const prev = prevPricesRef[sym];
       if (prev !== undefined && price > 0) {
@@ -341,11 +342,11 @@ export default function PortfolioPage() {
                 </tr>
               ) : (
                 positions.map((pos, i: number) => {
-                  const sym = pos.ticker || pos.symbol;
+                  const sym = pos.ticker || pos.symbol || "";
                   const pnlVal = Number(pos.unrealized_pnl ?? 0);
                   const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
                   const pnlPos = pnlVal >= 0;
-                  const flashDir = flashMap[sym];
+                  const flashDir = sym ? flashMap[sym] : undefined;
                   const flashClass = flashDir === "up" ? "flash-up" : (flashDir === "down" ? "flash-down" : "");
                   return (
                     <tr

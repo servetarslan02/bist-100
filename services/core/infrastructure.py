@@ -18,9 +18,23 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+import asyncio
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.infrastructure")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class EventPriority(StrEnum):
@@ -51,12 +65,14 @@ class EventOrchestrator:
         self._handlers: dict[str, list[Callable]] = {}
         self._priority_queue: list[dict] = []
 
+    @otel_trace("event_orchestrator.register")
     def register(self, event_type: str, handler: Callable, priority: EventPriority = EventPriority.NORMAL):
         """Handler kaydet."""
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append({"handler": handler, "priority": priority})
 
+    @otel_trace("event_orchestrator.dispatch")
     async def dispatch(self, event_type: str, data: dict, priority: EventPriority = EventPriority.NORMAL):
         """Event'i dispatch et."""
         handlers = self._handlers.get(event_type, [])
@@ -76,12 +92,14 @@ class CatalystEngine:
     def __init__(self):
         self._catalysts: list[CatalystEvent] = []
 
+    @otel_trace("catalyst_engine.add_catalyst")
     def add_catalyst(self, catalyst: CatalystEvent):
         """Yaklaşan olay ekle."""
         self._catalysts.append(catalyst)
         if len(self._catalysts) > 500:
             self._catalysts = self._catalysts[-500:]
 
+    @otel_trace("catalyst_engine.get_upcoming")
     def get_upcoming(self, days: int = 7) -> list[dict]:
         """Yaklaşan olayları getir."""
         now = datetime.now(UTC)
@@ -117,6 +135,7 @@ class NotificationSystem:
     def __init__(self):
         self._notifications: list[dict] = []
 
+    @otel_trace("notification_system.notify")
     def notify(self, category: str, title: str, message: str, severity: str = "INFO", data: dict = None):
         """Bildirim gönder."""
         notification = {
@@ -134,10 +153,12 @@ class NotificationSystem:
             self._notifications = self._notifications[-500:]
         logger.info("Notification", category=category, title=title, severity=severity)
 
+    @otel_trace("notification_system.get_unread")
     def get_unread(self, limit: int = 20) -> list[dict]:
         """Okunmamış bildirimler."""
         return [n for n in self._notifications if not n["read"]][-limit:]
 
+    @otel_trace("notification_system.mark_read")
     def mark_read(self, notification_id: str):
         """Bildirimi okundu olarak işaretle."""
         for n in self._notifications:
@@ -157,6 +178,7 @@ class AlertEngine:
             "sector_limit_pct": 30.0,
         }
 
+    @otel_trace("alert_engine.check_drawdown")
     def check_drawdown(self, current_drawdown: float):
         """Drawdown kontrolü."""
         threshold = self._thresholds["max_drawdown_pct"]
@@ -168,6 +190,7 @@ class AlertEngine:
                 severity="CRITICAL",
             )
 
+    @otel_trace("alert_engine.check_daily_loss")
     def check_daily_loss(self, daily_loss_pct: float):
         """Günlük zarar kontrolü."""
         threshold = self._thresholds["daily_loss_pct"]
@@ -179,6 +202,7 @@ class AlertEngine:
                 severity="HIGH",
             )
 
+    @otel_trace("alert_engine.check_position_limit")
     def check_position_limit(self, ticker: str, position_pct: float):
         """Pozisyon limiti kontrolü."""
         threshold = self._thresholds["position_limit_pct"]
@@ -197,6 +221,7 @@ class SnapshotSystem:
     def __init__(self):
         self._snapshots: list[dict] = []
 
+    @otel_trace("snapshot_system.take_snapshot")
     def take_snapshot(self, state: dict[str, Any]):
         """Snapshot al."""
         snapshot = {
@@ -209,10 +234,12 @@ class SnapshotSystem:
         # Son 100 snapshot tut
         self._snapshots = self._snapshots[-100:]
 
+    @otel_trace("snapshot_system.get_latest")
     def get_latest(self) -> dict | None:
         """Son snapshot."""
         return self._snapshots[-1] if self._snapshots else None
 
+    @otel_trace("snapshot_system.get_history")
     def get_history(self, limit: int = 10) -> list[dict]:
         """Snapshot geçmişi."""
         return self._snapshots[-limit:]
@@ -224,6 +251,7 @@ class CacheSystem:
     def __init__(self):
         self._cache: dict[str, dict] = {}
 
+    @otel_trace("cache_system.get")
     def get(self, key: str) -> Any | None:
         """Cache'den oku."""
         entry = self._cache.get(key)
@@ -234,6 +262,7 @@ class CacheSystem:
             return entry.get("value")
         return None
 
+    @otel_trace("cache_system.set")
     def set(self, key: str, value: Any, ttl_seconds: int = 3600):
         """Cache'e yaz."""
         self._cache[key] = {
@@ -242,10 +271,12 @@ class CacheSystem:
             "created_at": datetime.now(UTC).isoformat(),
         }
 
+    @otel_trace("cache_system.invalidate")
     def invalidate(self, key: str):
         """Cache'i temizle."""
         self._cache.pop(key, None)
 
+    @otel_trace("cache_system.get_stats")
     def get_stats(self) -> dict:
         """Cache istatistikleri."""
         return {"entries": len(self._cache)}
@@ -259,6 +290,7 @@ class JobQueue:
         self._running: list[dict] = []
         self._completed: list[dict] = []
 
+    @otel_trace("job_queue.enqueue")
     def enqueue(self, job_type: str, payload: dict, priority: str = "NORMAL"):
         """İş ekle."""
         job = {
@@ -274,6 +306,7 @@ class JobQueue:
             self._queue = self._queue[-100:]
         return job["job_id"]
 
+    @otel_trace("job_queue.dequeue")
     def dequeue(self) -> dict | None:
         """Sıradaki işi al."""
         if self._queue:
@@ -288,6 +321,7 @@ class JobQueue:
             return job
         return None
 
+    @otel_trace("job_queue.complete")
     def complete(self, job_id: str, result: Any = None):
         """İşi tamamla."""
         for i, job in enumerate(self._running):
@@ -300,6 +334,7 @@ class JobQueue:
                     self._completed = self._completed[-1000:]
                 return
 
+    @otel_trace("job_queue.get_stats")
     def get_stats(self) -> dict:
         """Kuyruk istatistikleri."""
         return {
@@ -308,8 +343,6 @@ class JobQueue:
             "completed": len(self._completed),
         }
 
-
-import asyncio
 
 # Singletons
 event_orchestrator = EventOrchestrator()

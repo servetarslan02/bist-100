@@ -12,9 +12,22 @@ BIST işlem maliyetleri:
 from dataclasses import dataclass
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.fee_calculator")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -56,6 +69,7 @@ class FeeCalculator:
         """
         self.broker_rate = broker_rate
 
+    @otel_trace("fee_calculator.calculate")
     def calculate(self, amount: float) -> FeeBreakdown:
         """İşlem maliyeti hesapla.
 

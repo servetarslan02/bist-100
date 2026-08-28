@@ -17,11 +17,23 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psutil
+import functools
 import structlog
 from opentelemetry import trace
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.observability")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 # Standart histogram bucket'ları (saniye cinsinden)
 DEFAULT_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
@@ -131,13 +143,16 @@ class PerformanceMonitor:
     def __init__(self):
         pass
 
+    @otel_trace("observability.PerformanceMonitor.record_latency")
     def record_latency(self, operation: str, latency_ms: float):
         """Gecikme kaydet."""
         prometheus_metrics.observe("operation_latency_seconds", latency_ms / 1000.0, labels={"operation": operation})
 
+    @otel_trace("observability.PerformanceMonitor.get_stats")
     def get_stats(self, operation: str) -> dict[str, float]:
         return {"note": "Metrics exported to Prometheus"}
 
+    @otel_trace("observability.PerformanceMonitor.get_all_stats")
     def get_all_stats(self) -> dict[str, dict]:
         return {}
 
@@ -148,6 +163,7 @@ class CostMonitor:
     def __init__(self):
         self._total_cost: float = 0.0
 
+    @otel_trace("observability.CostMonitor.record")
     def record(self, provider: str, model: str, tokens: int, cost_usd: float):
         """Maliyet kaydet."""
         self._total_cost += cost_usd
@@ -155,6 +171,7 @@ class CostMonitor:
         prometheus_metrics.inc("llm_cost_usd_total", cost_usd, labels={"provider": provider, "model": model})
         prometheus_metrics.set_gauge("llm_cost_usd_cumulative", self._total_cost)
 
+    @otel_trace("observability.CostMonitor.get_summary")
     def get_summary(self) -> dict[str, Any]:
         return {"total_cost_usd": self._total_cost}
 
@@ -167,6 +184,7 @@ class ResourceMonitor:
         self._running = False
         self._thread = None
 
+    @otel_trace("observability.ResourceMonitor.start_background_monitoring")
     def start_background_monitoring(self, interval_seconds: int = 15):
         if self._running:
             return
@@ -174,6 +192,7 @@ class ResourceMonitor:
         self._thread = threading.Thread(target=self._monitor_loop, args=(interval_seconds,), daemon=True)
         self._thread.start()
 
+    @otel_trace("observability.ResourceMonitor.stop_background_monitoring")
     def stop_background_monitoring(self):
         self._running = False
         if self._thread:
@@ -187,6 +206,7 @@ class ResourceMonitor:
                 logger.error("Resource monitoring failed", error=str(e))
             time.sleep(interval)
 
+    @otel_trace("observability.ResourceMonitor.snapshot")
     def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0):
         """Gerçek donanım verilerini okur ve Prometheus'a yazar."""
         actual_cpu = self._process.cpu_percent(interval=None)
@@ -201,6 +221,7 @@ class ResourceMonitor:
         except Exception:
             pass
 
+    @otel_trace("observability.ResourceMonitor.get_current")
     def get_current(self) -> dict[str, Any]:
         """Mevcut kaynak kullanımı."""
         return {
@@ -228,9 +249,11 @@ class ConfigManager:
             "market.close_hour": "18:00",
         }
 
+    @otel_trace("observability.ConfigManager.get")
     def get(self, key: str, default: Any = None) -> Any:
         return self._config.get(key, self._defaults.get(key, default))
 
+    @otel_trace("observability.ConfigManager.set")
     def set(self, key: str, value: Any, actor: str = "system", reason: str = ""):
         old_value = self._config.get(key)
         self._config[key] = value
@@ -250,9 +273,11 @@ class ConfigManager:
 
         logger.info("Config changed", key=key, old=old_value, new=value, actor=actor)
 
+    @otel_trace("observability.ConfigManager.get_history")
     def get_history(self, key: str) -> list[dict]:
         return [v for v in self._versions if v["key"] == key]
 
+    @otel_trace("observability.ConfigManager.get_all")
     def get_all(self) -> dict[str, Any]:
         result = dict(self._defaults)
         result.update(self._config)
@@ -265,6 +290,7 @@ class HealthChecker:
     def __init__(self):
         self._components: dict[str, dict] = {}
 
+    @otel_trace("observability.HealthChecker.register")
     def register(self, component: str, check_fn: Any = None):
         self._components[component] = {
             "status": "UNKNOWN",
@@ -272,6 +298,7 @@ class HealthChecker:
             "check_fn": check_fn,
         }
 
+    @otel_trace("observability.HealthChecker.update_status")
     def update_status(self, component: str, status: str, details: str = ""):
         if component in self._components:
             self._components[component]["status"] = status
@@ -282,6 +309,7 @@ class HealthChecker:
             status_val = 1 if status == "HEALTHY" else 0
             prometheus_metrics.set_gauge("component_health_status", status_val, labels={"component": component})
 
+    @otel_trace("observability.HealthChecker.check_all")
     def check_all(self) -> dict[str, Any]:
         results = {}
         overall = "HEALTHY"

@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Automatic Circuit Breaker Trigger Engine
 
 Otomatik devre kesici tetikleme:
@@ -10,15 +10,28 @@ Otomatik devre kesici tetikleme:
 Kaynak: Borsa Ä°stanbul, AÄŸustos 2025 duyurularÄ±
 """
 
+import functools
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import structlog
+from opentelemetry import trace
 
 from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.auto_circuit_breaker")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -71,6 +84,7 @@ class AutoCircuitBreakerEngine:
         """BIST-100 referans fiyatÄ±nÄ± (Ã¶nceki kapanÄ±ÅŸ) ayarla."""
         self._bist100_reference = reference_price
 
+    @otel_trace("auto_circuit_breaker.update_bist100_price")
     def update_bist100_price(self, current_price: float) -> CircuitBreakerEvent | None:
         """BIST-100 gÃ¼ncel fiyatÄ±nÄ± gÃ¼ncelle ve EBDKS kontrolÃ¼ yap.
 
@@ -133,6 +147,7 @@ class AutoCircuitBreakerEngine:
 
         return None
 
+    @otel_trace("auto_circuit_breaker.check_pay_circuit_breaker")
     def check_pay_circuit_breaker(
         self,
         ticker: str,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { usePolling, type SignalData } from "@/lib/api";
+import { usePolling } from "@/lib/api";
 import {
   FlaskConical, Sparkles, Brain, ArrowRight, MessageSquare,
   TrendingUp, TrendingDown, CheckCircle2, ShieldCheck, Zap, Loader2
@@ -47,7 +47,7 @@ export default function AIResearchPage() {
     signals.forEach((sig) => {
       const score = Math.round(sig.score ? (sig.score <= 1.0 ? sig.score * 1000 : sig.score) : 75);
       const normScore = Math.min(99, Math.max(50, score > 100 ? Math.round(50 + (score % 50)) : score));
-      const action = sig.action || (sig.score > 0 ? "AL" : "HOLD");
+      const action = sig.action || ((sig.score ?? 0) > 0 ? "AL" : "HOLD");
       const isBull = action === "BUY" || action === "AL" || (sig.score ?? 0) > 0;
 
       liveScannedReports.push({

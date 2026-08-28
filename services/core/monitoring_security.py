@@ -19,9 +19,22 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import functools
 import structlog
+from opentelemetry import trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.monitoring_security")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -54,18 +67,21 @@ class MonitoringAuth:
         if self._config.admin_token == "alpha_admin_default_2026":
             logger.warning("⚠️ DEFAULT admin token in use! Set ALPHA_ADMIN_TOKEN environment variable.")
 
+    @otel_trace("monitoring_security.verify_metrics_token")
     def verify_metrics_token(self, token: str) -> bool:
         """Metrics endpoint token doğrulama."""
         if not self._config.enabled:
             return True
         return self._constant_time_compare(token, self._config.metrics_token)
 
+    @otel_trace("monitoring_security.verify_admin_token")
     def verify_admin_token(self, token: str) -> bool:
         """Admin endpoint token doğrulama."""
         if not self._config.enabled:
             return True
         return self._constant_time_compare(token, self._config.admin_token)
 
+    @otel_trace("monitoring_security.check_rate_limit")
     def check_rate_limit(self, client_ip: str) -> bool:
         """Rate limit kontrolü (dakikada N istek)."""
         now = time.time()
@@ -84,12 +100,14 @@ class MonitoringAuth:
         self._rate_limiter[client_ip].append(now)
         return True
 
+    @otel_trace("monitoring_security.record_failed_attempt")
     def record_failed_attempt(self, client_ip: str):
         """Başarısız girişimi kaydet."""
         self._failed_attempts[client_ip] = self._failed_attempts.get(client_ip, 0) + 1
         if self._failed_attempts[client_ip] > 10:
             logger.warning("Multiple failed auth attempts", client_ip=client_ip, count=self._failed_attempts[client_ip])
 
+    @otel_trace("monitoring_security.get_auth_status")
     def get_auth_status(self) -> dict[str, Any]:
         """Authentication durumu."""
         return {
@@ -110,6 +128,7 @@ class MonitoringAuth:
 
 
 # Token extraction helpers
+@otel_trace("monitoring_security.extract_bearer_token")
 def extract_bearer_token(authorization: str | None) -> str | None:
     """Authorization header'dan Bearer token çıkar."""
     if not authorization:
@@ -120,6 +139,7 @@ def extract_bearer_token(authorization: str | None) -> str | None:
     return None
 
 
+@otel_trace("monitoring_security.extract_api_key")
 def extract_api_key(headers: dict) -> str | None:
     """X-API-Key header'dan key çıkar."""
     return headers.get("x-api-key") or headers.get("X-API-Key")
@@ -140,10 +160,12 @@ class AuthProvider:
             async def verify(self, token, request) -> AuthResult: ...
     """
 
+    @otel_trace("monitoring_security.AuthProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> "AuthResult":
         """Token doğrula."""
         raise NotImplementedError
 
+    @otel_trace("monitoring_security.AuthProvider.name")
     def name(self) -> str:
         return self.__class__.__name__
 
@@ -170,6 +192,7 @@ class StaticTokenProvider(AuthProvider):
         """
         self._tokens = tokens
 
+    @otel_trace("monitoring_security.StaticTokenProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not token:
             return AuthResult(authenticated=False, error="No token provided")
@@ -213,6 +236,7 @@ class JWTProvider(AuthProvider):
         self._jwks_cache: dict[str, Any] = {}
         self._jwks_last_fetch: float = 0
 
+    @otel_trace("monitoring_security.JWTProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not token:
             return AuthResult(authenticated=False, error="No token")
@@ -323,6 +347,7 @@ class OAuthProvider(AuthProvider):
             role_claim=role_claim,
         )
 
+    @otel_trace("monitoring_security.OAuthProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not self._secret:
             return AuthResult(authenticated=False, error="OAuth not configured (no secret)")
@@ -343,11 +368,13 @@ class AuthManager:
     def __init__(self):
         self._providers: list[AuthProvider] = []
 
+    @otel_trace("monitoring_security.AuthManager.add_provider")
     def add_provider(self, provider: AuthProvider):
         self._providers.append(provider)
         if len(self._providers) > 100:
             self._providers = self._providers[-100:]
 
+    @otel_trace("monitoring_security.AuthManager.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         """Tüm provider'ları dene — ilk başarılı olanı döndür."""
         for provider in self._providers:
@@ -356,6 +383,7 @@ class AuthManager:
                 return result
         return AuthResult(authenticated=False, error="No provider authenticated the token")
 
+    @otel_trace("monitoring_security.AuthManager.verify_permission")
     async def verify_permission(self, token: str, permission: str) -> AuthResult:
         """Token doğrula + belirli bir permission kontrolü."""
         result = await self.verify(token)
@@ -375,6 +403,7 @@ class AuthManager:
             error=f"Permission denied: {permission} (roles: {result.roles})",
         )
 
+    @otel_trace("monitoring_security.AuthManager.get_providers")
     def get_providers(self) -> list[str]:
         return [p.name() for p in self._providers]
 

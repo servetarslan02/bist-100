@@ -186,7 +186,7 @@ export default function ScenarioLab() {
     const mySeq = ++requestSeqRef.current;
     setRunning(true);
     try {
-      const data = await api<Record<string, unknown>>(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
+      const data = await api<SimulationResult>(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
       if (mySeq !== requestSeqRef.current) return;
       if (data && data.paths) {
         setSimResult(data);

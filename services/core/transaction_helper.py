@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST â€” Database Transaction Helper
 
 Atomic operations iÃ§in transaction yardÄ±mcÄ±sÄ±.
@@ -23,8 +23,21 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
+import functools
+from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.transaction_helper")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 @dataclass
@@ -226,6 +239,7 @@ class TransactionHelper:
             await conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
             raise
 
+    @otel_trace("transaction_helper.execute_batch")
     async def execute_batch(
         self,
         operations: list[Callable],
@@ -290,6 +304,7 @@ class TransactionConnection:
         self._conn = conn
         self._query_log = query_log
 
+    @otel_trace("transaction_connection.execute")
     async def execute(self, query: str, *args) -> Any:
         """Sorgu Ã§alÄ±ÅŸtÄ±r (metrics ile)."""
         start = time.monotonic()
@@ -321,6 +336,7 @@ class TransactionConnection:
             )
             raise
 
+    @otel_trace("transaction_connection.fetch")
     async def fetch(self, query: str, *args) -> list[Any]:
         """Fetch sorgusu."""
         start = time.monotonic()
@@ -353,6 +369,7 @@ class TransactionConnection:
             )
             raise
 
+    @otel_trace("transaction_connection.fetchval")
     async def fetchval(self, query: str, *args) -> Any:
         """Tek deÄŸer fetch."""
         start = time.monotonic()

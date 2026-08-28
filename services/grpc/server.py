@@ -29,7 +29,22 @@ try:
 except ImportError:
     HAS_PROTOBUF = False
 
-logger = structlog.get_logger()
+import structlog
+import functools
+from opentelemetry import trace
+
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.grpc_server")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def _extract_correlation_from_context(context) -> None:
@@ -48,6 +63,7 @@ def _extract_correlation_from_context(context) -> None:
 class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBUF else object):
     """Piyasa verisi gRPC servisi — Protobuf native."""
 
+    @otel_trace("grpc.server.StreamTicks")
     def StreamTicks(self, request, context):
         """Anlık fiyat stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
@@ -79,6 +95,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
 
         return _generate()
 
+    @otel_trace("grpc.server.GetTick")
     def GetTick(self, request, context):
         """Tek seferlik fiyat (Protobuf)."""
         _extract_correlation_from_context(context)
@@ -101,6 +118,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
 class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBUF else object):
     """Sinyal gRPC servisi — Protobuf native."""
 
+    @otel_trace("grpc.server.StreamSignals")
     def StreamSignals(self, request, context):
         """Sinyal stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
@@ -131,6 +149,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 
         return _generate()
 
+    @otel_trace("grpc.server.GetRecentSignals")
     def GetRecentSignals(self, request, context):
         """Son sinyalleri al (Protobuf)."""
         _extract_correlation_from_context(context)
@@ -159,6 +178,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_PROTOBUF else object):
     """Portföy gRPC servisi — Protobuf native."""
 
+    @otel_trace("grpc.server.StreamPortfolio")
     def StreamPortfolio(self, request, context):
         """Portföy durumu stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
@@ -197,6 +217,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
 
         return _generate()
 
+    @otel_trace("grpc.server.GetPortfolio")
     def GetPortfolio(self, request, context):
         """Anlık portföy durumu (Protobuf)."""
         _extract_correlation_from_context(context)
@@ -227,6 +248,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
 class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF else object):
     """Risk gRPC servisi — Protobuf native."""
 
+    @otel_trace("grpc.server.StreamRisk")
     def StreamRisk(self, request, context):
         """Risk metrikleri stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
@@ -254,6 +276,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
 
         return _generate()
 
+    @otel_trace("grpc.server.GetRisk")
     def GetRisk(self, request, context):
         """Anlık risk durumu (Protobuf)."""
         _extract_correlation_from_context(context)

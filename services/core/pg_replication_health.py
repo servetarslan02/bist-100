@@ -8,12 +8,26 @@ Kullanım:
 """
 
 import structlog
+import functools
+from opentelemetry import trace
 
 from .database import get_pg_pool, get_pg_replica_pool
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.pg_replication_health")
+
+def otel_trace(span_name: str):
+    """Decorator to wrap a method in an OTel span."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with tracer.start_as_current_span(span_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
+@otel_trace("pg_replication_health.check_replication_health")
 async def check_replication_health() -> dict:
     """PostgreSQL replikasyon sağlık durumunu kontrol et."""
     health = {
@@ -94,6 +108,7 @@ async def check_replication_health() -> dict:
     return health
 
 
+@otel_trace("pg_replication_health.get_replication_metrics")
 async def get_replication_metrics() -> dict:
     """Prometheus formatında replikasyon metrikleri."""
     health = await check_replication_health()

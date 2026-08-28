@@ -130,7 +130,7 @@ export default function OpportunitiesPage() {
             />
           </div>
           <button
-            onClick={() => refresh()}
+            onClick={() => refetch()}
             className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
             title="Yenile"
           >

@@ -9,12 +9,51 @@ import {
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
+interface ModelItem {
+  model_id: string;
+  model_version?: string;
+  evaluated_samples?: number;
+  hit_rate_pct?: number;
+  mean_return_pct?: number;
+  net_pnl?: number;
+  annualized_sharpe?: number;
+  max_drawdown_pct?: number;
+  brier_score?: number;
+  name?: string;
+  accuracy?: number;
+  f1?: number;
+  sharpe?: number;
+  win_rate?: number;
+  drift_detected?: boolean;
+  [key: string]: unknown;
+}
+
+interface TrustScoreItem {
+  model_id?: string;
+  model_name?: string;
+  reliability_score?: number;
+  recommended_fusion_weight?: number;
+  [key: string]: unknown;
+}
+
+interface LearningMatrixResponse {
+  models?: ModelItem[];
+  trust_scores?: TrustScoreItem[];
+  fusion_weights?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+interface LearningReportResponse {
+  markdown?: string;
+  [key: string]: unknown;
+}
+
 export default function LearningLabPage() {
   const [training, setTraining] = useState(false);
   const [activeTab, setActiveTab] = useState<"matrix" | "report" | "pipeline">("matrix");
 
-  const { data: matrixData, refetch: refetchMatrix } = usePolling<Record<string, unknown> | null>("/learning/performance-matrix", 15000);
-  const { data: repData, refetch: refetchReport } = usePolling<Record<string, unknown> | null>("/learning/report", 15000);
+  const { data: matrixData, refetch: refetchMatrix } = usePolling<LearningMatrixResponse | null>("/learning/performance-matrix", 15000);
+  const { data: repData, refetch: refetchReport } = usePolling<LearningReportResponse | null>("/learning/report", 15000);
 
   const modelsData = matrixData?.models || [];
   const trustScores = matrixData?.trust_scores || [];
@@ -174,7 +213,7 @@ export default function LearningLabPage() {
                       </td>
                       <td className="py-3 px-4 text-zinc-400">{m.evaluated_samples}</td>
                       <td className="py-3 px-4 font-bold text-emerald-400">%{m.hit_rate_pct?.toFixed(1)}</td>
-                      <td className="py-3 px-4 text-zinc-300">%{m.mean_return_pct > 0 ? `+${m.mean_return_pct?.toFixed(2)}` : m.mean_return_pct?.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-zinc-300">%{m.mean_return_pct !== undefined ? (m.mean_return_pct > 0 ? `+${m.mean_return_pct.toFixed(2)}` : m.mean_return_pct.toFixed(2)) : "0.00"}</td>
                       <td className="py-3 px-4 font-bold text-emerald-400">₺{m.net_pnl?.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</td>
                       <td className="py-3 px-4 text-zinc-300">{m.annualized_sharpe?.toFixed(2)}</td>
                       <td className="py-3 px-4 text-rose-400">%{m.max_drawdown_pct?.toFixed(1)}</td>

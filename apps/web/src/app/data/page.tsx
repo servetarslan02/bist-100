@@ -19,11 +19,17 @@ interface DatabaseInfo {
   tables: Array<{ name: string; rows: string; size: string }>;
 }
 
+interface OptResult {
+  message?: string;
+  reclaimed_space?: string;
+  [key: string]: unknown;
+}
+
 export default function DataCenterPage() {
   const { data: dbData, loading, refetch } = usePolling<{ databases: DatabaseInfo[] } | null>("/system/databases", 5000);
   const databases: DatabaseInfo[] = useMemo(() => dbData?.databases ?? [], [dbData]);
   const [optimizing, setOptimizing] = useState(false);
-  const [optResult, setOptResult] = useState<Record<string, unknown> | null>(null);
+  const [optResult, setOptResult] = useState<OptResult | null>(null);
 
   const handleOptimize = async () => {
     setOptimizing(true);
