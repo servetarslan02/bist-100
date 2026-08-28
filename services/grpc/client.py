@@ -73,6 +73,7 @@ class BaseGRPCClient:
         self.port = port
         self._channel = None
         self._stub = None
+        self._default_deadline = 10.0  # saniye — gRPC çağrıları için varsayılan deadline
 
     async def connect(self):
         if not HAS_GRPC:
@@ -200,7 +201,7 @@ class MarketClient(BaseGRPCClient):
         request = market_pb2.TickRequest(tickers=[ticker])
         metadata = _get_correlation_metadata()
         try:
-            tick = await self._stub.GetTick(request, metadata=metadata)
+            tick = await self._stub.GetTick(request, metadata=metadata, timeout=self._default_deadline)
             return {
                 "ticker": tick.ticker,
                 "price": tick.price,
@@ -264,7 +265,7 @@ class SignalClient(BaseGRPCClient):
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
         metadata = _get_correlation_metadata()
         try:
-            response = await self._stub.GetRecentSignals(request, metadata=metadata)
+            response = await self._stub.GetRecentSignals(request, metadata=metadata, timeout=self._default_deadline)
             direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
             return [
                 {
@@ -302,7 +303,7 @@ class PortfolioClient(BaseGRPCClient):
         request = market_pb2.PortfolioRequest(portfolio_id="default")
         metadata = _get_correlation_metadata()
         try:
-            pf = await self._stub.GetPortfolio(request, metadata=metadata)
+            pf = await self._stub.GetPortfolio(request, metadata=metadata, timeout=self._default_deadline)
             return {
                 "total_value": pf.total_value,
                 "cash": pf.cash,
@@ -382,7 +383,7 @@ class RiskClient(BaseGRPCClient):
         request = market_pb2.RiskRequest(portfolio_id="default")
         metadata = _get_correlation_metadata()
         try:
-            risk = await self._stub.GetRisk(request, metadata=metadata)
+            risk = await self._stub.GetRisk(request, metadata=metadata, timeout=self._default_deadline)
             return {
                 "var_95": risk.var_95,
                 "cvar_95": risk.cvar_95,

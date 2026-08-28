@@ -232,6 +232,8 @@ def create_app() -> FastAPI:
     async def request_id_middleware(request: Request, call_next):
         import uuid as _uuid
 
+        import structlog
+
         # Client'tan gelen X-Request-ID'yi kullan, yoksa üret
         request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
 
@@ -243,12 +245,47 @@ def create_app() -> FastAPI:
         except ImportError:
             pass
 
+        # Structlog context'e ekle (tüm loglarda otomatik görünür)
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+
         # Request state'e ekle (endpoint'lerden erişim için)
         request.state.request_id = request_id
 
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
+
+    # Request timeout middleware — uzun süren istekleri kes
+    @app.middleware("http")
+    async def timeout_middleware(request: Request, call_next):
+        import asyncio
+
+        # Health ve docs endpoint'leri timeout'suz
+        if request.url.path in ("/health", "/docs", "/redoc", "/openapi.json"):
+            return await call_next(request)
+
+        try:
+            return await asyncio.wait_for(call_next(request), timeout=30.0)
+        except asyncio.TimeoutError:
+            request_id = getattr(request.state, "request_id", None)
+            logger.error(
+                "request_timeout",
+                path=request.url.path,
+                method=request.method,
+                request_id=request_id,
+            )
+            return JSONResponse(
+                status_code=504,
+                content={
+                    "success": False,
+                    "error": "Gateway timeout",
+                    "detail": "Request 30 saniye içinde tamamlanamadı.",
+                    "status_code": 504,
+                    "request_id": request_id,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
 
     # Rate limit headers middleware
     @app.middleware("http")
@@ -284,6 +321,110 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(info.get("limit", 100))
         response.headers["X-RateLimit-Remaining"] = str(info.get("remaining", 0))
+        return response
+
+    # Global exception handlers — structured error responses
+    from fastapi.exceptions import RequestValidationError
+n    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        """HTTP hatalarını structured ErrorResponse formatında döndür."""
+        import uuid as _uuid
+
+        request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
+        logger.warning(
+            "http_error",
+            status_code=exc.status_code,
+            detail=str(exc.detail),
+            path=request.url.path,
+            method=request.method,
+            request_id=request_id,
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "success": False,
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+                "request_id": request_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Validation hatalarını structured ErrorResponse formatında döndür."""
+        import uuid as _uuid
+
+        request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
+        errors = exc.errors()
+        logger.warning(
+            "validation_error",
+            errors=errors,
+            path=request.url.path,
+            method=request.method,
+            request_id=request_id,
+        )
+        return JSONResponse(
+            status_code=422,
+            content={
+                "success": False,
+                "error": "Validation error",
+                "detail": errors,
+                "status_code": 422,
+                "request_id": request_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Beklenmedik hataları structured ErrorResponse formatında döndür."""
+        import uuid as _uuid
+
+        request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
+        logger.error(
+            "unhandled_exception",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            path=request.url.path,
+            method=request.method,
+            request_id=request_id,
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "Internal server error",
+                "detail": str(exc) if os.environ.get("DEBUG") else None,
+                "status_code": 500,
+                "request_id": request_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    # Deprecation tracking — eski endpoint'ler için Sunset header
+    DEPRECATED_ENDPOINTS: dict[str, str] = {
+        # path: sunset_date (ISO 8601)
+        # Örnek: "/api/v1/old endpoint": "2027-03-01",
+    }
+
+    @app.middleware("http")
+    async def deprecation_middleware(request: Request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path in DEPRECATED_ENDPOINTS:
+            response.headers["Sunset"] = DEPRECATED_ENDPOINTS[path]
+            response.headers["Deprecation"] = "true"
+            response.headers["Link"] = '</api/v1/docs>; rel="successor-version"'
+            logger.warning(
+                "deprecated_endpoint_used",
+                path=path,
+                sunset=DEPRECATED_ENDPOINTS[path],
+                request_id=getattr(request.state, "request_id", None),
+            )
         return response
 
     # v1 router

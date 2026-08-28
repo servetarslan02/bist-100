@@ -898,8 +898,8 @@ class UnifiedScheduler:
             # Market data handler'ın son veri zamanını kontrol et
             last_data = getattr(self, '_last_market_data_time', None)
             if last_data:
-                from datetime import datetime
-                diff_minutes = (datetime.now() - last_data).total_seconds() / 60
+                from datetime import UTC, datetime
+                diff_minutes = (datetime.now(UTC) - last_data).total_seconds() / 60
                 if diff_minutes > 30:  # 30 dakikadır veri gelmiyor
                     detected = holiday_manager.report_no_data(today)
                     if detected:

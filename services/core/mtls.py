@@ -25,7 +25,7 @@ Kullanım:
 import os
 import ssl
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -147,7 +147,7 @@ class CertificateManager:
         if not expiry:
             return True
 
-        days_left = (expiry - datetime.utcnow()).days
+        days_left = (expiry - datetime.now(UTC)).days
         if days_left <= self.config.renew_before_days:
             logger.warning("Certificate expiring soon", path=cert_path, days_left=days_left)
             return True
@@ -188,7 +188,7 @@ class CertificateManager:
         for name, path in certs.items():
             if Path(path).exists():
                 expiry = self.check_expiry(path)
-                days_left = (expiry - datetime.utcnow()).days if expiry else None
+                days_left = (expiry - datetime.now(UTC)).days if expiry else None
                 status[name] = {
                     "exists": True,
                     "path": path,

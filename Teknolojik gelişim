@@ -823,7 +823,7 @@ Market Data → NATS → Feature / Risk / ML
 | 4 | Dead-letter strategy | 🔴 | ✅ `services/core/dead_letter_queue.py` mevcut |
 | 5 | Message ordering | 🟠 | ⚠️ Kontrol edilmeli |
 | 6 | Correlation ID | 🟠 | ✅ Yapıldı — NATS publish/subscribe + gRPC client/server metadata propagation eklendi |
-| 7 | Timestamps | 🟠 | ⚠️ Kontrol edilmeli |
+| 7 | Timestamps | 🟠 | ✅ Yapıldı — 12 düzeltme (utcnow→now(UTC), timezone-aware), tüm DB TIMESTAMPTZ |
 | 8 | Observability | 🟠 | ✅ OpenTelemetry mevcut |
 
 Kafka'ya geçmeye gerek yok.
@@ -879,8 +879,8 @@ Celery → Dramatiq/arq geçişi şu an öncelik değil.
 | 1 | Pydantic validation | 🔴 | ✅ Mevcut |
 | 2 | Authentication | 🔴 | ✅ JWT mevcut |
 | 3 | Rate limiting | 🔴 | ✅ Mevcut |
-| 4 | Request IDs | 🟠 | ✅ Yapıldı — FastAPI `X-Request-ID` middleware + correlation_id_var entegrasyonu |
-| 5 | Structured errors | 🟠 | ⚠️ Kontrol edilmeli |
+| 4 | Request IDs | 🟠 | ✅ Yapıldı — Middleware + ErrorResponse + structlog context binding |
+| 5 | Structured errors | 🟠 | ✅ Yapıldı — Global exception handler (HTTP/Validation/General) → structured ErrorResponse |
 | 6 | Async I/O | 🔴 | ✅ Native |
 | 7 | Health/readiness endpoints | 🔴 | ✅ `/health` mevcut |
 | 8 | OpenAPI contract testing | 🟠 | ✅ Yapıldı — `tests/test_openapi_contract.py` + CI'da schemathesis job |
@@ -904,11 +904,11 @@ Servisler arası iletişim için kalsın.
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Protobuf versioning | 🔴 | ⚠️ Kontrol edilmeli |
-| 2 | Deadlines | 🟠 | ⚠️ Kontrol edilmeli |
+| 1 | Protobuf versioning | 🔴 | ✅ Yapıldı — Proto versioning kuralları + check_proto_compatibility.py scripti |
+| 2 | Deadlines | 🟠 | ✅ Yapıldı — gRPC unary timeout=10s + FastAPI 30s request timeout middleware |
 | 3 | Retry policy | 🟠 | ✅ Yapıldı — `services/core/event_enhancements.py` (RetryPolicy + get_retry_delay + schedule_retry) |
 | 4 | Health checks | 🔴 | ✅ `grpcio-health-checking` mevcut |
-| 5 | Backward compatibility | 🟠 | ⚠️ Kontrol edilmeli |
+| 5 | Backward compatibility | 🟠 | ✅ Yapıldı — API_CHANGELOG.md + deprecation middleware (Sunset header) + proto compatibility checker |
 | 6 | Request correlation ID | 🟠 | ✅ Yapıldı — gRPC metadata ile x-correlation-id propagation |
 
 **Değiştir:** ❌  

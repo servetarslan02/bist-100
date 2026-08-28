@@ -8,7 +8,7 @@ Bu modeller:
 - API sözleşmesini tanımlar
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -23,7 +23,8 @@ class BaseResponse(BaseModel):
 
     success: bool = True
     message: str | None = None
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    request_id: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -33,6 +34,8 @@ class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
     status_code: int = 500
+    request_id: str | None = None
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class PaginatedResponse(BaseModel):
@@ -343,5 +346,5 @@ class HealthCheck(BaseModel):
 
     status: str = "ok"
     version: str = "1.0"
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     services: dict[str, str] = {}

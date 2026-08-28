@@ -25,7 +25,7 @@ import asyncio
 import json
 import os
 import re
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -463,7 +463,7 @@ class KAPHolidayWatcher:
 
     async def check_for_new_announcements(self) -> list[date]:
         """KAP'ta yeni tatil duyurusu var mı?"""
-        now = datetime.now()
+        now = datetime.now(UTC)
 
         # Son kontrol üzerinden yeterli süre geçti mi?
         if self._last_check and (now - self._last_check).total_seconds() < self._check_interval_seconds:
@@ -522,7 +522,7 @@ class SuddenHolidayDetector:
         """Piyasa verisi güncel mi?"""
         if last_data_time is None:
             return False
-        now = datetime.now()
+        now = datetime.now(UTC)
         diff = (now - last_data_time).total_seconds() / 60
         return diff < expected_interval_minutes * 3
 
@@ -851,7 +851,7 @@ class HolidayManager:
             },
             "sudden": [d.isoformat() for d in sorted(self._sudden_detector.get_confirmed())],
             "blacklist": [d.isoformat() for d in sorted(self._blacklist)],
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
         try:
             with open(self._cache_file, "w") as f:
@@ -862,7 +862,7 @@ class HolidayManager:
     def _log_audit(self, action: str, d: date, reason: str = "") -> None:
         """Tatil değişiklik logu (audit trail)."""
         entry = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "action": action,
             "date": d.isoformat(),
             "reason": reason,

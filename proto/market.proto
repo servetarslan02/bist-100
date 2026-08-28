@@ -3,9 +3,20 @@ syntax = "proto3";
 package alpha_bist;
 
 // =====================================================
-// ALPHA BIST — Protobuf Tanımları v1.0
+// ALPHA BIST — Protobuf Tanımları v2.0
 // JSON'dan 10x küçük, 10x hızlı
 // =====================================================
+
+// Versiyon takibi — breaking change'lerde artırılır
+option java_package = "com.alpha_bist.proto";
+option go_package = "github.com/servetarslan02/bist-100/proto";
+
+// Proto backward compatibility kuralları:
+// 1. Yeni field'lar her zaman yeni field number ile eklenir
+// 2. Mevcut field'lar ASLA silinmez — reserved olarak işaretlenir
+// 3. Field type'ı ASLA değiştirilmez
+// 4. Enum degerleri ASLA degistirilmez — yeni degerler eklenir
+// 5. Breaking change icin major version artirilir
 
 // Piyasa verisi (anlık fiyat)
 message MarketTick {

@@ -167,9 +167,9 @@ class CacheWarmer:
                 if today.weekday() < 5:  # Hafta içi
                     from ..core.holiday_manager import holiday_manager
                     from ..core.market_calendar import get_market_calendar
-                    from datetime import datetime, time as dtime
+                    from datetime import UTC, datetime, time as dtime
 
-                    now = datetime.now()
+                    now = datetime.now(UTC)
                     market_open = dtime(10, 0)
                     market_close = dtime(18, 0)
 

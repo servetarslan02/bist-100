@@ -240,6 +240,7 @@ class ServiceDiscovery:
 
         try:
             import datetime
+            from datetime import UTC
 
             from cryptography import x509
             from cryptography.hazmat.primitives import hashes, serialization
@@ -261,8 +262,8 @@ class ServiceDiscovery:
                 .issuer_name(issuer)
                 .public_key(key.public_key())
                 .serial_number(x509.random_serial_number())
-                .not_valid_before(datetime.datetime.utcnow())
-                .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=3650))
+                .not_valid_before(datetime.datetime.now(UTC))
+                .not_valid_after(datetime.datetime.now(UTC) + datetime.timedelta(days=3650))
                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
                 .sign(key, hashes.SHA256())
             )
