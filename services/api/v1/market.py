@@ -99,7 +99,8 @@ async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit
         }
         return _INSTRUMENTS_CACHE
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/instruments/{ticker}")
@@ -110,7 +111,8 @@ async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depen
         result = {"ticker": ticker, "available": True}
         return result
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/instruments/{ticker}/ohlcv")
@@ -129,7 +131,8 @@ async def ohlcv(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 _KNOWN_COMPANIES = {
@@ -433,7 +436,8 @@ async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_
         FactorEngine()
         return {"ticker": ticker, "features_available": True, "message": "Requires historical data"}
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/sectors")

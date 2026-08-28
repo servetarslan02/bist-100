@@ -27,7 +27,8 @@ async def run_backtest(
             "message": "Backtest queued",
         }
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/results/{backtest_id}")
@@ -67,7 +68,8 @@ async def walk_forward(
     try:
         return {"status": "started", "ticker": ticker, "n_folds": n_folds}
     except Exception as e:
-        raise HTTPException(500, str(e)) from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/deflated-sharpe")

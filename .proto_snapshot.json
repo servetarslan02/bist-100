@@ -1,0 +1,365 @@
+{
+  "market.proto": {
+    "hash": "a1d92a9eaf65d575",
+    "fields": {
+      "MarketTick": {
+        "ticker": {
+          "type": "string",
+          "number": 1
+        },
+        "price": {
+          "type": "double",
+          "number": 2
+        },
+        "change": {
+          "type": "double",
+          "number": 3
+        },
+        "change_pct": {
+          "type": "double",
+          "number": 4
+        },
+        "volume": {
+          "type": "int64",
+          "number": 5
+        },
+        "bid": {
+          "type": "double",
+          "number": 6
+        },
+        "ask": {
+          "type": "double",
+          "number": 7
+        }
+      },
+      "OHLCV": {
+        "ticker": {
+          "type": "string",
+          "number": 1
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 2
+        },
+        "open": {
+          "type": "double",
+          "number": 3
+        },
+        "high": {
+          "type": "double",
+          "number": 4
+        },
+        "low": {
+          "type": "double",
+          "number": 5
+        },
+        "close": {
+          "type": "double",
+          "number": 6
+        },
+        "volume": {
+          "type": "int64",
+          "number": 7
+        }
+      },
+      "Signal": {
+        "ticker": {
+          "type": "string",
+          "number": 1
+        },
+        "direction": {
+          "type": "Direction",
+          "number": 2
+        },
+        "confidence": {
+          "type": "double",
+          "number": 3
+        },
+        "target_price": {
+          "type": "double",
+          "number": 4
+        },
+        "stop_loss": {
+          "type": "double",
+          "number": 5
+        },
+        "reason": {
+          "type": "string",
+          "number": 6
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 7
+        }
+      },
+      "enum:Direction": {},
+      "Position": {
+        "ticker": {
+          "type": "string",
+          "number": 1
+        },
+        "quantity": {
+          "type": "int32",
+          "number": 2
+        },
+        "avg_price": {
+          "type": "double",
+          "number": 3
+        },
+        "current_price": {
+          "type": "double",
+          "number": 4
+        },
+        "pnl": {
+          "type": "double",
+          "number": 5
+        },
+        "pnl_pct": {
+          "type": "double",
+          "number": 6
+        },
+        "weight": {
+          "type": "double",
+          "number": 7
+        }
+      },
+      "PortfolioState": {
+        "total_value": {
+          "type": "double",
+          "number": 1
+        },
+        "cash": {
+          "type": "double",
+          "number": 2
+        },
+        "daily_pnl": {
+          "type": "double",
+          "number": 3
+        },
+        "daily_pnl_pct": {
+          "type": "double",
+          "number": 4
+        },
+        "Position": {
+          "type": "repeated",
+          "number": 5
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 6
+        }
+      },
+      "RiskMetrics": {
+        "var_95": {
+          "type": "double",
+          "number": 1
+        },
+        "cvar_95": {
+          "type": "double",
+          "number": 2
+        },
+        "sharpe": {
+          "type": "double",
+          "number": 3
+        },
+        "max_drawdown": {
+          "type": "double",
+          "number": 4
+        },
+        "volatility": {
+          "type": "double",
+          "number": 5
+        },
+        "beta": {
+          "type": "double",
+          "number": 6
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 7
+        }
+      },
+      "MarketRegime": {
+        "regime": {
+          "type": "RegimeType",
+          "number": 1
+        },
+        "confidence": {
+          "type": "double",
+          "number": 2
+        },
+        "vix": {
+          "type": "double",
+          "number": 3
+        },
+        "breadth": {
+          "type": "double",
+          "number": 4
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 5
+        }
+      },
+      "enum:RegimeType": {},
+      "MarketEvent": {
+        "type": {
+          "type": "EventType",
+          "number": 1
+        },
+        "ticker": {
+          "type": "string",
+          "number": 2
+        },
+        "title": {
+          "type": "string",
+          "number": 3
+        },
+        "summary": {
+          "type": "string",
+          "number": 4
+        },
+        "impact_score": {
+          "type": "double",
+          "number": 6
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 7
+        }
+      },
+      "enum:EventType": {},
+      "Alert": {
+        "type": {
+          "type": "AlertType",
+          "number": 1
+        },
+        "ticker": {
+          "type": "string",
+          "number": 2
+        },
+        "message": {
+          "type": "string",
+          "number": 3
+        },
+        "severity": {
+          "type": "Severity",
+          "number": 4
+        },
+        "value": {
+          "type": "double",
+          "number": 5
+        },
+        "threshold": {
+          "type": "double",
+          "number": 6
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 7
+        }
+      },
+      "enum:AlertType": {},
+      "enum:Severity": {},
+      "StreamMessage": {
+        "type": {
+          "type": "MessageType",
+          "number": 1
+        },
+        "sequence": {
+          "type": "int64",
+          "number": 2
+        },
+        "timestamp": {
+          "type": "int64",
+          "number": 3
+        },
+        "tick": {
+          "type": "MarketTick",
+          "number": 4
+        },
+        "ohlcv": {
+          "type": "OHLCV",
+          "number": 5
+        },
+        "signal": {
+          "type": "Signal",
+          "number": 6
+        },
+        "portfolio": {
+          "type": "PortfolioState",
+          "number": 7
+        },
+        "risk": {
+          "type": "RiskMetrics",
+          "number": 8
+        },
+        "regime": {
+          "type": "MarketRegime",
+          "number": 9
+        },
+        "event": {
+          "type": "MarketEvent",
+          "number": 10
+        },
+        "alert": {
+          "type": "Alert",
+          "number": 11
+        }
+      },
+      "enum:MessageType": {},
+      "TickRequest": {
+        "string": {
+          "type": "repeated",
+          "number": 1
+        }
+      },
+      "OHLCVRequest": {
+        "string": {
+          "type": "repeated",
+          "number": 1
+        },
+        "timeframe": {
+          "type": "string",
+          "number": 2
+        },
+        "start_time": {
+          "type": "int64",
+          "number": 3
+        },
+        "end_time": {
+          "type": "int64",
+          "number": 4
+        }
+      },
+      "SignalRequest": {
+        "string": {
+          "type": "repeated",
+          "number": 1
+        },
+        "min_confidence": {
+          "type": "double",
+          "number": 2
+        }
+      },
+      "SignalList": {
+        "Signal": {
+          "type": "repeated",
+          "number": 1
+        }
+      },
+      "PortfolioRequest": {
+        "portfolio_id": {
+          "type": "string",
+          "number": 1
+        }
+      },
+      "RiskRequest": {
+        "portfolio_id": {
+          "type": "string",
+          "number": 1
+        }
+      }
+    }
+  }
+}

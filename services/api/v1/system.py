@@ -488,4 +488,5 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
             "timestamp": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
-        raise HTTPException(500, f"Storage optimization error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e

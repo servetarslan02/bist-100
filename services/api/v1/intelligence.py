@@ -116,7 +116,8 @@ async def simulation(
             "max_drawdown_sim": round(res.max_drawdown_sim, 2),
         }
     except Exception as e:
-        raise HTTPException(500, f"Monte Carlo simulation error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/analysis/{ticker}")

@@ -161,7 +161,8 @@ async def trigger_learning_cycle(
         res = _pipeline.run_learning_cycle(current_regime=regime)
         return res
     except Exception as e:
-        raise HTTPException(500, f"Learning cycle execution failed: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 def _run_learning_cycle(regime: str):
@@ -191,7 +192,8 @@ async def record_prediction(
         )
         return {"success": True, "prediction_id": pred_id}
     except Exception as e:
-        raise HTTPException(500, f"Record prediction failed: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/record_outcome")
@@ -208,7 +210,8 @@ async def record_outcome(
             raise HTTPException(404, "Prediction ID not found")
         return {"success": True, "outcome": res}
     except Exception as e:
-        raise HTTPException(500, f"Record outcome failed: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/calibration")

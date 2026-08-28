@@ -70,7 +70,8 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
         summary["positions"] = paper_orchestrator.portfolio.get_all_positions()
         return summary
     except Exception as e:
-        raise HTTPException(500, f"Portfolio summary error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/positions")
@@ -87,7 +88,8 @@ async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit))
             "total_value": total_val,
         }
     except Exception as e:
-        raise HTTPException(500, f"Positions error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/trades")
@@ -106,7 +108,8 @@ async def trades(
             "total_trades": len(all_trades),
         }
     except Exception as e:
-        raise HTTPException(500, f"Trades error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/pnl")
@@ -125,7 +128,8 @@ async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)):
             "return_on_equity_pct": summary.get("total_pnl_pct", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"P&L error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/equity-curve")
@@ -147,7 +151,8 @@ async def equity_curve(
             ),
         }
     except Exception as e:
-        raise HTTPException(500, f"Equity curve error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # =====================================================
@@ -171,7 +176,8 @@ async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limi
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk metrics error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/drawdown")
@@ -186,7 +192,8 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
             "current_drawdown_pct": summary.get("current_drawdown_pct", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Drawdown error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # =====================================================
@@ -203,7 +210,8 @@ async def performance_metrics(user=Depends(get_current_user), _=Depends(check_ra
         report = paper_orchestrator.get_full_report()
         return report.get("performance_metrics", {})
     except Exception as e:
-        raise HTTPException(500, f"Performance metrics error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/accounting")
@@ -226,7 +234,8 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
             "realized_pnl_total": summary.get("total_pnl", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Accounting error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/reset")
@@ -271,7 +280,8 @@ async def cash_ledger(
             "settled_cash": round(paper_orchestrator.portfolio.settled_cash, 2),
         }
     except Exception as e:
-        raise HTTPException(500, f"Cash ledger error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/orders")
@@ -319,7 +329,8 @@ async def position_history(
             "history": pm.get_position_history(ticker=ticker, limit=limit),
         }
     except Exception as e:
-        raise HTTPException(500, f"Position history error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/equity-snapshots")
@@ -339,7 +350,8 @@ async def equity_snapshots(
             "snapshots": pm.get_equity_snapshots(limit=limit),
         }
     except Exception as e:
-        raise HTTPException(500, f"Equity snapshots error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # =====================================================
@@ -380,7 +392,8 @@ async def attribution(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Attribution error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/tax")
@@ -406,7 +419,8 @@ async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limi
 
         return result
     except Exception as e:
-        raise HTTPException(500, f"Tax analysis error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.get("/tca")
@@ -432,7 +446,8 @@ async def transaction_cost_analysis(
 
         return tca_analyzer.analyze(order_value, daily_volume, volatility)
     except Exception as e:
-        raise HTTPException(500, f"TCA error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # =====================================================
@@ -471,7 +486,8 @@ async def rebalance_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Rebalance analysis error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/rebalance/orders")
@@ -506,7 +522,8 @@ async def rebalance_orders(
             "turnover_limit": turnover_limit,
         }
     except Exception as e:
-        raise HTTPException(500, f"Rebalance orders error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # =====================================================
@@ -537,7 +554,8 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
             "strict_t2": paper_orchestrator.portfolio.strict_t2,
         }
     except Exception as e:
-        raise HTTPException(500, f"Portfolio status error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/trigger_eod_signals")
@@ -553,7 +571,8 @@ async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_ra
             "details": res,
         }
     except Exception as e:
-        raise HTTPException(500, f"EOD trigger error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/trigger_morning_execution")
@@ -565,7 +584,8 @@ async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(ch
         res = await run_morning_execution_cycle()
         return {"status": "success", "message": "Sabah acilisi mikro-yapi yurutme dongusu tamamlandi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Morning execution trigger error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/trigger_phase18")
@@ -577,7 +597,8 @@ async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_l
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified Daily dongusu tetiklendi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Trigger error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/auto_rebalance")
@@ -593,7 +614,8 @@ async def trigger_auto_rebalance(
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Auto-rebalance error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 @router.post("/deposit")
@@ -615,7 +637,8 @@ async def deposit_funds(
             "total_value": pm.get_portfolio().get("total_value", 0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Deposit error: {e}") from e
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
 
 
 # In-memory fast cache

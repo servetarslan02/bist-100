@@ -254,6 +254,37 @@ def create_app() -> FastAPI:
 
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
+
+        # JSON response body'ye otomatik request_id enjekte et
+        if (
+            response.headers.get("content-type", "").startswith("application/json")
+            and request.url.path not in ("/health", "/docs", "/redoc", "/openapi.json")
+        ):
+            try:
+                import orjson
+
+                body = b""
+                async for chunk in response.body_iterator:
+                    if isinstance(chunk, str):
+                        body += chunk.encode()
+                    else:
+                        body += chunk
+
+                data = orjson.loads(body)
+                if isinstance(data, dict) and "request_id" not in data:
+                    data["request_id"] = request_id
+                    new_body = orjson.dumps(data)
+                    from starlette.responses import Response as StarletteResponse
+
+                    return StarletteResponse(
+                        content=new_body,
+                        status_code=response.status_code,
+                        headers=dict(response.headers),
+                        media_type="application/json",
+                    )
+            except Exception:
+                pass  # Response body okunamazsa header ile devam et
+
         return response
 
     # Request timeout middleware — uzun süren istekleri kes
@@ -261,8 +292,17 @@ def create_app() -> FastAPI:
     async def timeout_middleware(request: Request, call_next):
         import asyncio
 
-        # Health ve docs endpoint'leri timeout'suz
+        # Timeout'suz endpoint'ler
         if request.url.path in ("/health", "/docs", "/redoc", "/openapi.json"):
+            return await call_next(request)
+
+        # WebSocket ve SSE endpoint'leri timeout'dan muaf (uzun ömürlü bağlantılar)
+        if "/ws/" in request.url.path or request.url.path.endswith("/stream"):
+            return await call_next(request)
+
+        # Accept header'ı SSE ise timeout uygulama
+        accept = request.headers.get("accept", "")
+        if "text/event-stream" in accept:
             return await call_next(request)
 
         try:
@@ -325,7 +365,7 @@ def create_app() -> FastAPI:
 
     # Global exception handlers — structured error responses
     from fastapi.exceptions import RequestValidationError
-n    from starlette.exceptions import HTTPException as StarletteHTTPException
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -404,6 +444,15 @@ n    from starlette.exceptions import HTTPException as StarletteHTTPException
                 "timestamp": datetime.now(UTC).isoformat(),
             },
         )
+
+    # API version header — tüm response'larda
+    @app.middleware("http")
+    async def api_version_middleware(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["X-API-Version"] = "1.0.0"
+            response.headers["X-API-Deprecation-Policy"] = "https://github.com/servetarslan02/bist-100/blob/main/API_CHANGELOG.md"
+        return response
 
     # Deprecation tracking — eski endpoint'ler için Sunset header
     DEPRECATED_ENDPOINTS: dict[str, str] = {

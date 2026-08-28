@@ -167,9 +167,11 @@ class CacheWarmer:
                 if today.weekday() < 5:  # Hafta içi
                     from ..core.holiday_manager import holiday_manager
                     from ..core.market_calendar import get_market_calendar
-                    from datetime import UTC, datetime, time as dtime
+                    from datetime import UTC, datetime, time as dtime, timezone, timedelta
 
-                    now = datetime.now(UTC)
+                    # İstanbul timezone (UTC+3) — BIST piyasa saatleri
+                    ISTANBUL_TZ = timezone(timedelta(hours=3))
+                    now = datetime.now(ISTANBUL_TZ)
                     market_open = dtime(10, 0)
                     market_close = dtime(18, 0)
 
