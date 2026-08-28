@@ -7,6 +7,7 @@ DATA -> FEATURES -> TRAIN -> PREDICT -> STORE PREDICTION -> OUTCOME -> PERFORMAN
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
 import structlog
 
 from ..intelligence.signal_fusion import SignalFusionEngine
@@ -176,7 +177,7 @@ class LearningPipeline:
             window_comparison=window_comp,
         )
 
-        return {
+        result = {
             "success": True,
             "timestamp": datetime.now(UTC).isoformat(),
             "models_evaluated": len(all_metrics),
@@ -186,6 +187,41 @@ class LearningPipeline:
             "trust_scores": [t.__dict__ for t in all_trust_scores],
             "markdown_report": report_md,
         }
+
+        # Integration Bridge — yeni modüllerle zenginleştirme
+        try:
+            from services.core.integration_bridge import integration_bridge
+
+            # Model predictions'ları topla (diversity analizi için)
+            model_preds = {}
+            for m_info in self.registered_models:
+                m_id = m_info["id"]
+                evaluated = self.store.get_evaluated_predictions_for_model(m_id, limit=100)
+                if evaluated:
+                    preds = [e.get("confidence", 0.5) for e in evaluated]
+                    model_preds[m_id] = np.array(preds)
+
+            result = integration_bridge.enhance_learning_cycle(result, model_preds)
+
+            # Calibration verisini kaydet
+            for m in all_metrics:
+                integration_bridge.record_calibration_data(
+                    brier_score=m.brier_score,
+                    ece=abs(m.direction_accuracy - 0.5),  # Basitleştirilmiş ECE
+                )
+
+            # Model sonuçlarını degradation monitor'a kaydet
+            for m in all_metrics:
+                integration_bridge.record_model_outcome(
+                    model_id=m.model_id,
+                    predicted=m.direction_accuracy,
+                    actual=1.0 if m.direction_accuracy > 0.5 else 0.0,
+                    return_pct=m.mean_return_pct,
+                )
+        except Exception as e:
+            logger.debug("learning_integration_bridge_failed", error=str(e))
+
+        return result
 
     def simulate_walk_forward_learning_backtest(
         self,

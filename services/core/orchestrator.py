@@ -971,6 +971,30 @@ class MasterOrchestrator:
         result["context"] = self._build_context()
         self._record_prediction(ticker, decision, features)
 
+        # 11. Integration Bridge — yeni modüllerle zenginleştirme
+        try:
+            from services.core.integration_bridge import integration_bridge
+
+            # Pipeline sonucunu zenginleştir (feature stability, regime limits, lineage)
+            result = integration_bridge.enhance_pipeline_result(ticker, result, features, regime)
+
+            # Trade planını zenginleştir (T+1, market impact, regime-adjusted sizing)
+            confidence = fused_signal.get("confidence", 0.5) if isinstance(fused_signal, dict) else 0.5
+            result["decision"] = integration_bridge.enhance_trade_plan(
+                ticker, decision, prices, regime, confidence
+            )
+
+            # Model sonucunu degradation monitor'a kaydet
+            predicted_dir = 1.0 if decision.get("direction") == "BUY" else 0.0
+            integration_bridge.record_model_outcome(
+                model_id=decision.get("model_id", "ensemble"),
+                predicted=predicted_dir,
+                actual=0.0,  # Gerçek sonuç sonra güncellenir
+                return_pct=0.0,
+            )
+        except Exception as e:
+            logger.debug("integration_bridge_failed", ticker=ticker, error=str(e))
+
         return result
 
     def run_full_pipeline(
