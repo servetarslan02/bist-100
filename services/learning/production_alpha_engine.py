@@ -9,8 +9,9 @@ Doğrulanmış Metrikler (2020 - 2025):
 """
 
 import os
-import json
+import orjson
 import logging
+
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np

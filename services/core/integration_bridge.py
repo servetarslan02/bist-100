@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -54,9 +53,10 @@ logger = structlog.get_logger()
 
 class CircuitState(Enum):
     """Circuit breaker durumu."""
-    CLOSED = "closed"       # Normal çalışıyor
-    OPEN = "open"           # Devre açık — çağrılar reddediliyor
-    HALF_OPEN = "half_open" # Test modu — tek çağrıya izin ver
+
+    CLOSED = "closed"  # Normal çalışıyor
+    OPEN = "open"  # Devre açık — çağrılar reddediliyor
+    HALF_OPEN = "half_open"  # Test modu — tek çağrıya izin ver
 
 
 @dataclass
@@ -65,10 +65,11 @@ class CircuitBreaker:
 
     Kapalı (normal) → Açık (devre dışı) → Yarı açık (test) → Kapalı (normale döndü)
     """
+
     name: str
-    failure_threshold: int = 5          # Kaç hata sonrası devre açılsın
+    failure_threshold: int = 5  # Kaç hata sonrası devre açılsın
     recovery_timeout_seconds: float = 300.0  # Ne kadar süre açık kalsın (5 dk)
-    half_open_max_calls: int = 1        # Yarı açık modda kaç test çağrısı
+    half_open_max_calls: int = 1  # Yarı açık modda kaç test çağrısı
 
     _state: CircuitState = field(default=CircuitState.CLOSED, repr=False)
     _failure_count: int = field(default=0, repr=False)
@@ -151,6 +152,7 @@ class CircuitBreaker:
 @dataclass
 class ModuleMetrics:
     """Tek modül için metrikler."""
+
     name: str
     total_calls: int = 0
     successful_calls: int = 0
@@ -193,6 +195,7 @@ class ModuleMetrics:
 @dataclass
 class EnhancementResult:
     """Tek enhancement sonucu."""
+
     module: str
     success: bool
     data: dict[str, Any] | None = None
@@ -204,6 +207,7 @@ class EnhancementResult:
 @dataclass
 class PipelineEnhancementReport:
     """Pipeline enhancement raporu — tüm modüllerin sonuçları."""
+
     ticker: str
     correlation_id: str
     enhancements: list[EnhancementResult]
@@ -246,6 +250,7 @@ class PipelineEnhancementReport:
 @dataclass
 class BridgeConfig:
     """Integration Bridge konfigürasyonu."""
+
     # Modül enable/disable
     enable_feature_stability: bool = True
     enable_calibration_enhanced: bool = True
@@ -375,7 +380,9 @@ class IntegrationBridge:
         self._load_module("feature_stability", "services.ml.feature_stability", "feature_stability")
         self._load_module("calibration_enhanced", "services.ml.calibration_enhanced", "calibration_enhanced")
         self._load_module("regime_limits", "services.risk.regime_limits", "regime_limits")
-        self._load_module("portfolio_enhancements", "services.portfolio.portfolio_enhancements", "portfolio_enhancements")
+        self._load_module(
+            "portfolio_enhancements", "services.portfolio.portfolio_enhancements", "portfolio_enhancements"
+        )
         self._load_module("backtest_enhancements", "services.backtest.backtest_enhancements", "backtest_enhancements")
         self._load_module("event_enhancements", "services.core.event_enhancements", "event_enhancements")
         self._load_module("degradation_monitor", "services.learning.model_degradation_monitor", "degradation_monitor")
@@ -388,6 +395,7 @@ class IntegrationBridge:
         """Modülü güvenli şekilde yükle."""
         try:
             import importlib
+
             mod = importlib.import_module(module_path)
             instance = getattr(mod, singleton_name)
             setattr(self, f"_{attr_name}", instance)
@@ -569,7 +577,8 @@ class IntegrationBridge:
             er = self._execute_with_circuit_breaker(
                 "feature_stability",
                 self._check_feature_stability,
-                ticker, features,
+                ticker,
+                features,
             )
             enhancement_results.append(er)
             if er.success and er.data:
@@ -625,10 +634,7 @@ class IntegrationBridge:
 
     def _check_feature_stability(self, ticker: str, features: dict[str, float]) -> dict[str, Any]:
         """Feature stability kontrolü (circuit breaker tarafından çağrılır)."""
-        feature_data = {
-            k: np.array([v]) for k, v in features.items()
-            if isinstance(v, (int, float)) and np.isfinite(v)
-        }
+        feature_data = {k: np.array([v]) for k, v in features.items() if isinstance(v, (int, float)) and np.isfinite(v)}
         if not feature_data:
             return {"score": 1.0, "unstable": [], "note": "No numeric features"}
 
@@ -714,7 +720,9 @@ class IntegrationBridge:
             er = self._execute_with_circuit_breaker(
                 "regime_limits",
                 self._adjust_position_for_confidence,
-                decision, confidence, regime,
+                decision,
+                confidence,
+                regime,
             )
             enhancement_results.append(er)
             if er.success and er.data:
@@ -736,7 +744,8 @@ class IntegrationBridge:
             er = self._execute_with_circuit_breaker(
                 "backtest_enhancements",
                 self._estimate_market_impact,
-                ticker, decision,
+                ticker,
+                decision,
             )
             enhancement_results.append(er)
             if er.success and er.data:
@@ -747,7 +756,9 @@ class IntegrationBridge:
             er = self._execute_with_circuit_breaker(
                 "regime_limits",
                 self._check_liquidity,
-                ticker, decision, regime,
+                ticker,
+                decision,
+                regime,
             )
             enhancement_results.append(er)
             if er.success and er.data:
@@ -769,9 +780,7 @@ class IntegrationBridge:
 
         return decision
 
-    def _adjust_position_for_confidence(
-        self, decision: dict[str, Any], confidence: float, regime: str
-    ) -> float:
+    def _adjust_position_for_confidence(self, decision: dict[str, Any], confidence: float, regime: str) -> float:
         """Confidence'a göre pozisyon boyutu ayarla."""
         base_size = decision.get("position_pct", 0.05)
         return self._regime_limits.adjust_for_confidence(base_size, confidence, regime)
@@ -779,6 +788,7 @@ class IntegrationBridge:
     def _check_t_plus_1(self, ticker: str) -> dict[str, Any]:
         """T+1 execution kontrolü."""
         from datetime import UTC, datetime
+
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         t1_result = self._backtest_enhancements.check_t_plus_1(ticker, today)
         return {
@@ -804,9 +814,7 @@ class IntegrationBridge:
             "permanent_impact_pct": impact.permanent_impact_pct,
         }
 
-    def _check_liquidity(
-        self, ticker: str, decision: dict[str, Any], regime: str
-    ) -> dict[str, Any]:
+    def _check_liquidity(self, ticker: str, decision: dict[str, Any], regime: str) -> dict[str, Any]:
         """Likidite kontrolü."""
         liquidity_score = decision.get("liquidity_score", 0.5)
         is_sufficient = self._regime_limits.check_liquidity(ticker, liquidity_score, regime)
@@ -862,8 +870,7 @@ class IntegrationBridge:
                 enhancements["calibration_drift"] = er.data
 
         # 3. Ensemble diversity (eğer model predictions varsa)
-        if (self.config.enable_ensemble_diversity
-                and model_predictions and len(model_predictions) >= 2):
+        if self.config.enable_ensemble_diversity and model_predictions and len(model_predictions) >= 2:
             er = self._execute_with_circuit_breaker(
                 "ensemble_diversity",
                 self._check_ensemble_diversity,
@@ -896,10 +903,7 @@ class IntegrationBridge:
 
         alerts = self._degradation_monitor.check_all_models()
         if alerts:
-            result["alerts"] = [
-                {"model": a.model_id, "severity": a.severity, "message": a.message}
-                for a in alerts
-            ]
+            result["alerts"] = [{"model": a.model_id, "severity": a.severity, "message": a.message} for a in alerts]
 
         return result
 
@@ -920,6 +924,7 @@ class IntegrationBridge:
     def _check_ensemble_diversity(self, model_predictions: dict[str, np.ndarray]) -> dict[str, Any]:
         """Ensemble diversity analizi."""
         from services.ml.ensemble import EnsembleModel
+
         ens = EnsembleModel()
         diversity = ens.analyze_diversity(model_predictions)
         return {
@@ -956,7 +961,9 @@ class IntegrationBridge:
         er = self._execute_with_circuit_breaker(
             "event_enhancements",
             self._enhance_event_internal,
-            event_id, event_type, payload,
+            event_id,
+            event_type,
+            payload,
         )
 
         if er.success and er.data:
@@ -965,9 +972,7 @@ class IntegrationBridge:
         # Hata durumunda orijinal payload'ı döndür (graceful degradation)
         return payload
 
-    def _enhance_event_internal(
-        self, event_id: str, event_type: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _enhance_event_internal(self, event_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Event enhancement iç mantığı."""
         # Idempotency kontrolü
         if self._event_enhancements.is_duplicate(event_id):
@@ -979,6 +984,7 @@ class IntegrationBridge:
 
         # Timestamp ekle
         from datetime import UTC, datetime
+
         payload["_timestamp"] = datetime.now(UTC).isoformat()
 
         # Sequence number
@@ -1021,7 +1027,11 @@ class IntegrationBridge:
         er = self._execute_with_circuit_breaker(
             "portfolio_enhancements",
             self._enhance_portfolio_internal,
-            target_weights, current_weights, sector_map, liquidity_scores, regime,
+            target_weights,
+            current_weights,
+            sector_map,
+            liquidity_scores,
+            regime,
         )
 
         if er.success and er.data:
@@ -1040,21 +1050,15 @@ class IntegrationBridge:
     ) -> dict[str, float]:
         """Portfolio enhancement iç mantığı."""
         # 1. Hysteresis (küçük değişimleri filtrele)
-        adjusted = self._portfolio_enhancements.apply_hysteresis(
-            target_weights, current_weights
-        )
+        adjusted = self._portfolio_enhancements.apply_hysteresis(target_weights, current_weights)
 
         # 2. Sector constraints
         if sector_map:
-            adjusted = self._portfolio_enhancements.apply_sector_constraints(
-                adjusted, sector_map
-            )
+            adjusted = self._portfolio_enhancements.apply_sector_constraints(adjusted, sector_map)
 
         # 3. Liquidity constraints
         if liquidity_scores:
-            adjusted = self._portfolio_enhancements.apply_liquidity_constraints(
-                adjusted, liquidity_scores
-            )
+            adjusted = self._portfolio_enhancements.apply_liquidity_constraints(adjusted, liquidity_scores)
 
         # 4. Min position filter
         adjusted = self._portfolio_enhancements.apply_min_position(adjusted)
@@ -1062,9 +1066,7 @@ class IntegrationBridge:
         # 5. Position limits
         if self._regime_limits:
             limits = self._regime_limits.get_limits(regime)
-            adjusted = self._portfolio_enhancements.apply_position_limits(
-                adjusted, limits.max_position_pct
-            )
+            adjusted = self._portfolio_enhancements.apply_position_limits(adjusted, limits.max_position_pct)
 
         return adjusted
 
@@ -1095,7 +1097,10 @@ class IntegrationBridge:
         self._execute_with_circuit_breaker(
             "degradation_monitor",
             self._degradation_monitor.record_outcome,
-            model_id, predicted, actual, return_pct,
+            model_id,
+            predicted,
+            actual,
+            return_pct,
         )
 
     def record_calibration_data(
@@ -1117,7 +1122,8 @@ class IntegrationBridge:
         self._execute_with_circuit_breaker(
             "calibration_enhanced",
             self._calibration_enhanced.record_calibration_metrics,
-            brier_score, ece,
+            brier_score,
+            ece,
         )
 
     # =====================================================

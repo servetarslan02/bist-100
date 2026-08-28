@@ -341,6 +341,96 @@ class RiskMonitor:
         """Tüm alert kurallarını al."""
         return self._rules
 
+    # =====================================================
+    # STREAMING REAL-TIME MONITORING (CANLI FİYAT / ORDER BOOK)
+    # =====================================================
+    def ingest_price_tick(
+        self,
+        ticker: str,
+        price: float,
+        volume: float = 0.0,
+        best_bid: float | None = None,
+        best_ask: float | None = None,
+        reference_price: float | None = None,
+        price_margin_pct: float = 10.0,
+    ) -> list[Alert]:
+        """Gerçek zamanlı WebSocket/Market Data fiyat tick'ini işler ve ani risk anomalilerini yakalar."""
+        now = datetime.now(UTC).isoformat()
+        generated_alerts = []
+
+        if price <= 0:
+            return generated_alerts
+
+        # 1. Tavan / Taban Yakınlık Kontrolü (Limit Proximity Alert)
+        if reference_price and reference_price > 0:
+            upper_limit = reference_price * (1.0 + price_margin_pct / 100.0)
+            lower_limit = reference_price * (1.0 - price_margin_pct / 100.0)
+
+            # Tavana %1.5 kala uyarı
+            if price >= upper_limit * 0.985:
+                dist_pct = ((upper_limit - price) / upper_limit) * 100.0
+                alert = Alert(
+                    alert_id=f"limit_up_near_{ticker}_{now}",
+                    alert_type=AlertType.CUSTOM,
+                    severity=AlertSeverity.WARNING,
+                    title="Tavan Fiyat Yakınlığı Uyarısı",
+                    message=f"{ticker} tavana çok yakın! (Fiyat: {price:.2f}, Tavan: {upper_limit:.2f}, Kalan: %{dist_pct:.1f})",
+                    metric_name="limit_up_proximity",
+                    metric_value=float(dist_pct),
+                    threshold=1.5,
+                    ticker=ticker,
+                    timestamp=now,
+                )
+                generated_alerts.append(alert)
+
+            # Tabana %1.5 kala uyarı
+            elif price <= lower_limit * 1.015:
+                dist_pct = ((price - lower_limit) / lower_limit) * 100.0
+                alert = Alert(
+                    alert_id=f"limit_down_near_{ticker}_{now}",
+                    alert_type=AlertType.CUSTOM,
+                    severity=AlertSeverity.WARNING,
+                    title="Taban Fiyat Yakınlığı Uyarısı",
+                    message=f"{ticker} tabana çok yakın! (Fiyat: {price:.2f}, Taban: {lower_limit:.2f}, Kalan: %{dist_pct:.1f})",
+                    metric_name="limit_down_proximity",
+                    metric_value=float(dist_pct),
+                    threshold=1.5,
+                    ticker=ticker,
+                    timestamp=now,
+                )
+                generated_alerts.append(alert)
+
+        # 2. Alış-Satış Makası Açılması (Spread Blowout)
+        if best_bid and best_ask and best_bid > 0 and best_ask >= best_bid:
+            spread_bps = ((best_ask - best_bid) / best_bid) * 10000.0
+            if spread_bps > 150.0:  # %1.50 üzeri aşırı spread
+                alert = Alert(
+                    alert_id=f"spread_blowout_{ticker}_{now}",
+                    alert_type=AlertType.LIQUIDITY,
+                    severity=AlertSeverity.WARNING,
+                    title="Likidite Kuruması / Spread Açılması",
+                    message=f"{ticker} makası aşırı açıldı: {spread_bps:.0f} bps (Bid: {best_bid:.2f}, Ask: {best_ask:.2f})",
+                    metric_name="bid_ask_spread_bps",
+                    metric_value=float(spread_bps),
+                    threshold=150.0,
+                    ticker=ticker,
+                    timestamp=now,
+                )
+                generated_alerts.append(alert)
+
+        if generated_alerts:
+            self._alerts.extend(generated_alerts)
+            if len(self._alerts) > 500:
+                self._alerts = self._alerts[-500:]
+            for alert in generated_alerts:
+                for cb in self._alert_callbacks:
+                    try:
+                        cb(alert)
+                    except Exception as err:
+                        logger.error("Callback error", error=str(err))
+
+        return generated_alerts
+
     def ingest_pipeline_metrics(self, ticker: str, metrics: dict[str, Any]):
         """Pipeline'dan gelen risk metriklerini monitoring'e besle."""
         try:

@@ -1,286 +1,214 @@
 """
-ALPHA BIST — Observability & Monitoring v1.0
+ALPHA BIST — Observability & Monitoring v2.0
 
-- Prometheus Metrics
-- Distributed Tracing (correlation_id)
+- Prometheus Metrics (via official prometheus_client)
+- Distributed Tracing (via OpenTelemetry API)
 - Performance Monitoring
 - Cost Monitoring
-- Resource Management
+- Resource Management (via psutil)
 - Config System
-- Config Versioning
 - Health Check endpoints
 """
 
-import uuid
-from collections import defaultdict
+import os
+import threading
+import time
 from datetime import UTC, datetime
 from typing import Any
 
+import psutil
 import structlog
+from opentelemetry import trace
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
 
 logger = structlog.get_logger()
-
 
 # Standart histogram bucket'ları (saniye cinsinden)
 DEFAULT_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 
 
 class PrometheusMetrics:
-    """Prometheus uyumlu metric sistemi — histogram bucket desteği ile."""
+    """Prometheus uyumlu metric sistemi — resmi prometheus_client ile."""
 
     def __init__(self):
-        self._counters: dict[str, int] = defaultdict(int)
-        self._gauges: dict[str, float] = {}
-        self._histograms: dict[str, list[float]] = defaultdict(list)
-        self._histogram_buckets: dict[str, tuple] = {}
+        self._counters: dict[str, Counter] = {}
+        self._gauges: dict[str, Gauge] = {}
+        self._histograms: dict[str, Histogram] = {}
+
+    def _get_or_create_counter(self, name: str, labels: list[str] = None) -> Counter:
+        if name not in self._counters:
+            self._counters[name] = Counter(name, f"{name} counter", labels or [])
+        return self._counters[name]
+
+    def _get_or_create_gauge(self, name: str, labels: list[str] = None) -> Gauge:
+        if name not in self._gauges:
+            self._gauges[name] = Gauge(name, f"{name} gauge", labels or [])
+        return self._gauges[name]
+
+    def _get_or_create_histogram(
+        self, name: str, labels: list[str] = None, buckets: tuple = DEFAULT_BUCKETS
+    ) -> Histogram:
+        if name not in self._histograms:
+            self._histograms[name] = Histogram(name, f"{name} histogram", labels or [], buckets=buckets)
+        return self._histograms[name]
 
     def inc(self, name: str, value: int = 1, labels: dict[str, str] = None):
         """Counter artır."""
-        key = self._make_key(name, labels)
-        self._counters[key] += value
+        label_names = list(labels.keys()) if labels else []
+        counter = self._get_or_create_counter(name, label_names)
+        if labels:
+            counter.labels(**labels).inc(value)
+        else:
+            counter.inc(value)
 
     def set_gauge(self, name: str, value: float, labels: dict[str, str] = None):
         """Gauge ayarla."""
-        key = self._make_key(name, labels)
-        self._gauges[key] = value
+        label_names = list(labels.keys()) if labels else []
+        gauge = self._get_or_create_gauge(name, label_names)
+        if labels:
+            gauge.labels(**labels).set(value)
+        else:
+            gauge.set(value)
 
     def observe(self, name: str, value: float, labels: dict[str, str] = None, buckets: tuple = None):
         """Histogram gözlem (bucket desteği ile)."""
-        key = self._make_key(name, labels)
-        self._histograms[key].append(value)
-        self._histograms[key] = self._histograms[key][-1000:]
-        if buckets:
-            self._histogram_buckets[name] = buckets
+        label_names = list(labels.keys()) if labels else []
+        hist = self._get_or_create_histogram(name, label_names, buckets or DEFAULT_BUCKETS)
+        if labels:
+            hist.labels(**labels).observe(value)
+        else:
+            hist.observe(value)
 
     def timed(self, name: str, labels: dict[str, str] = None, buckets: tuple = None):
         """Context manager — işlem süresini ölçer."""
-        import time as _time
-
-        class _Timer:
-            def __init__(self, metrics, n, l, b):
-                self._metrics = metrics
-                self._name = n
-                self._labels = l
-                self._buckets = b
-                self._start = None
-
-            def __enter__(self):
-                self._start = _time.monotonic()
-                return self
-
-            def __exit__(self, *args):
-                elapsed = _time.monotonic() - self._start
-                self._metrics.observe(self._name, elapsed, self._labels, self._buckets)
-
-        return _Timer(self, name, labels, buckets)
+        label_names = list(labels.keys()) if labels else []
+        hist = self._get_or_create_histogram(name, label_names, buckets or DEFAULT_BUCKETS)
+        if labels:
+            return hist.labels(**labels).time()
+        return hist.time()
 
     def get_metrics(self) -> dict[str, Any]:
-        """Tüm metrikleri döndür."""
-        result = {
-            "counters": dict(self._counters),
-            "gauges": dict(self._gauges),
-            "histograms": {},
-        }
-        for key, values in self._histograms.items():
-            if values:
-                base_name = key.split("{")[0]
-                buckets = self._histogram_buckets.get(base_name, DEFAULT_BUCKETS)
-                bucket_counts = {}
-                for b in buckets:
-                    bucket_counts[str(b)] = sum(1 for v in values if v <= b)
-                bucket_counts["+Inf"] = len(values)
-                result["histograms"][key] = {
-                    "count": len(values),
-                    "sum": sum(values),
-                    "avg": sum(values) / len(values),
-                    "min": min(values),
-                    "max": max(values),
-                    "p50": sorted(values)[len(values) // 2],
-                    "p95": sorted(values)[int(len(values) * 0.95)],
-                    "p99": sorted(values)[int(len(values) * 0.99)],
-                    "buckets": bucket_counts,
-                }
-        return result
+        """Geriye dönük uyumluluk için. Artık doğrudan /metrics üzerinden exposition kullanılıyor."""
+        return {"note": "Use /metrics endpoint for exposition."}
 
     def get_prometheus_text(self) -> str:
-        """Prometheus text exposition format."""
-        lines = []
-        for key, value in self._counters.items():
-            name = key.split("{")[0]
-            lines.append(f"# TYPE {name} counter")
-            lines.append(f"{key} {value}")
-        for key, value in self._gauges.items():
-            name = key.split("{")[0]
-            lines.append(f"# TYPE {name} gauge")
-            lines.append(f"{key} {value}")
-        for key, stats in self.get_metrics()["histograms"].items():
-            name = key.split("{")[0]
-            lines.append(f"# TYPE {name} histogram")
-            for b, count in stats.get("buckets", {}).items():
-                lines.append(f'{name}_bucket{{le="{b}"}} {count}')
-            lines.append(f"{name}_count {stats['count']}")
-            lines.append(f"{name}_sum {stats['sum']:.6f}")
-        return "\n".join(lines) + "\n"
-
-    def _make_key(self, name: str, labels: dict[str, str] = None) -> str:
-        if labels:
-            label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
-            return f"{name}{{{label_str}}}"
-        return name
+        """Prometheus text exposition format (OpenMetrics compliant)."""
+        return generate_latest(REGISTRY).decode("utf-8")
 
 
 class DistributedTracing:
-    """Dağıtık izleme — correlation_id zinciri."""
+    """Dağıtık izleme — OpenTelemetry entegrasyonu ile."""
 
     def __init__(self):
-        self._traces: dict[str, list[dict]] = {}
+        self._tracer = trace.get_tracer(__name__)
 
     def start_trace(self, operation: str) -> str:
         """Yeni trace başlat."""
-        trace_id = str(uuid.uuid4())[:16]
-        self._traces[trace_id] = [
-            {
-                "trace_id": trace_id,
-                "operation": operation,
-                "timestamp": datetime.now(UTC).isoformat(),
-                "status": "started",
-            }
-        ]
+        span = self._tracer.start_span(operation)
+        ctx = span.get_span_context()
+        trace_id = format(ctx.trace_id, "032x")
+        span.set_attribute("status", "started")
         return trace_id
 
     def add_span(self, trace_id: str, operation: str, duration_ms: float = 0, status: str = "completed"):
-        """Span ekle."""
-        if trace_id not in self._traces:
-            self._traces[trace_id] = []
-
-        self._traces[trace_id].append(
-            {
-                "trace_id": trace_id,
-                "operation": operation,
-                "duration_ms": round(duration_ms, 2),
-                "status": status,
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        )
+        """Mevcut sisteme uyumlu dummy. Artık with tracer.start_as_current_span kullanılmalı."""
+        pass
 
     def get_trace(self, trace_id: str) -> list[dict]:
-        """Trace getir."""
-        return self._traces.get(trace_id, [])
+        """Geriye dönük uyumluluk (Mock). Trace'ler Jaeger/Tempo'da."""
+        return []
+
+    def get_spans(self, trace_id: str) -> list[dict]:
+        return []
 
     def get_recent_traces(self, limit: int = 20) -> list[dict]:
-        """Son trace'ler."""
-        all_traces = []
-        for trace_id, spans in self._traces.items():
-            if spans:
-                all_traces.append(
-                    {
-                        "trace_id": trace_id,
-                        "operation": spans[0].get("operation", ""),
-                        "span_count": len(spans),
-                        "total_ms": sum(s.get("duration_ms", 0) for s in spans),
-                        "timestamp": spans[0].get("timestamp", ""),
-                    }
-                )
-        return sorted(all_traces, key=lambda x: x["timestamp"], reverse=True)[:limit]
+        return []
 
 
 class PerformanceMonitor:
-    """Performans izleme."""
+    """Performans izleme - Prometheus Histogramlara entegre."""
 
     def __init__(self):
-        self._latencies: dict[str, list[float]] = defaultdict(list)
+        pass
 
     def record_latency(self, operation: str, latency_ms: float):
         """Gecikme kaydet."""
-        self._latencies[operation].append(latency_ms)
-        self._latencies[operation] = self._latencies[operation][-1000:]
+        prometheus_metrics.observe("operation_latency_seconds", latency_ms / 1000.0, labels={"operation": operation})
 
     def get_stats(self, operation: str) -> dict[str, float]:
-        """İşlem istatistikleri."""
-        values = self._latencies.get(operation, [])
-        if not values:
-            return {"count": 0}
-
-        return {
-            "count": len(values),
-            "avg_ms": round(sum(values) / len(values), 2),
-            "min_ms": round(min(values), 2),
-            "max_ms": round(max(values), 2),
-            "p50_ms": round(sorted(values)[len(values) // 2], 2),
-            "p95_ms": round(sorted(values)[int(len(values) * 0.95)], 2),
-        }
+        return {"note": "Metrics exported to Prometheus"}
 
     def get_all_stats(self) -> dict[str, dict]:
-        """Tüm işlem istatistikleri."""
-        return {op: self.get_stats(op) for op in self._latencies}
+        return {}
 
 
 class CostMonitor:
-    """Maliyet izleme."""
+    """Maliyet izleme - Prometheus Gaugelara entegre."""
 
     def __init__(self):
-        self._costs: list[dict] = []
         self._total_cost: float = 0.0
 
     def record(self, provider: str, model: str, tokens: int, cost_usd: float):
         """Maliyet kaydet."""
-        entry = {
-            "provider": provider,
-            "model": model,
-            "tokens": tokens,
-            "cost_usd": round(cost_usd, 6),
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        self._costs.append(entry)
-        if len(self._costs) > 1000:
-            self._costs = self._costs[-1000:]
         self._total_cost += cost_usd
-        self._costs = self._costs[-10000:]
+        prometheus_metrics.inc("llm_tokens_total", tokens, labels={"provider": provider, "model": model})
+        prometheus_metrics.inc("llm_cost_usd_total", cost_usd, labels={"provider": provider, "model": model})
+        prometheus_metrics.set_gauge("llm_cost_usd_cumulative", self._total_cost)
 
     def get_summary(self) -> dict[str, Any]:
-        """Maliyet özeti."""
-        by_provider = {}
-        by_model = {}
-        for c in self._costs:
-            p = c["provider"]
-            m = c["model"]
-            by_provider[p] = by_provider.get(p, 0) + c["cost_usd"]
-            by_model[m] = by_model.get(m, 0) + c["cost_usd"]
-
-        return {
-            "total_cost_usd": round(self._total_cost, 4),
-            "total_entries": len(self._costs),
-            "by_provider": {k: round(v, 4) for k, v in by_provider.items()},
-            "by_model": {k: round(v, 4) for k, v in by_model.items()},
-        }
+        return {"total_cost_usd": self._total_cost}
 
 
 class ResourceMonitor:
-    """Kaynak kullanımı izleme."""
+    """Kaynak kullanımı izleme - psutil tabanlı ve arka plan destekli."""
 
     def __init__(self):
-        self._snapshots: list[dict] = []
+        self._process = psutil.Process(os.getpid())
+        self._running = False
+        self._thread = None
+
+    def start_background_monitoring(self, interval_seconds: int = 15):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._monitor_loop, args=(interval_seconds,), daemon=True)
+        self._thread.start()
+
+    def stop_background_monitoring(self):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=2.0)
+
+    def _monitor_loop(self, interval: int):
+        while self._running:
+            try:
+                self.snapshot()
+            except Exception as e:
+                logger.error("Resource monitoring failed", error=str(e))
+            time.sleep(interval)
 
     def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0):
-        """Kaynak kullanımı snapshot."""
-        self._snapshots.append(
-            {
-                "cpu_pct": cpu_pct,
-                "memory_mb": memory_mb,
-                "gpu_pct": gpu_pct,
-                "disk_mb": disk_mb,
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        )
-        if len(self._snapshots) > 1000:
-            self._snapshots = self._snapshots[-1000:]
-        self._snapshots = self._snapshots[-1000]
+        """Gerçek donanım verilerini okur ve Prometheus'a yazar."""
+        actual_cpu = self._process.cpu_percent(interval=None)
+        actual_mem = self._process.memory_info().rss / (1024 * 1024)
+
+        prometheus_metrics.set_gauge("process_cpu_percent", actual_cpu)
+        prometheus_metrics.set_gauge("process_memory_mb", actual_mem)
+
+        try:
+            disk = psutil.disk_usage("/")
+            prometheus_metrics.set_gauge("system_disk_used_percent", disk.percent)
+        except Exception:
+            pass
 
     def get_current(self) -> dict[str, Any]:
         """Mevcut kaynak kullanımı."""
-        if self._snapshots:
-            return self._snapshots[-1]
-        return {"cpu_pct": 0, "memory_mb": 0, "gpu_pct": 0, "disk_mb": 0}
+        return {
+            "cpu_pct": self._process.cpu_percent(interval=None),
+            "memory_mb": self._process.memory_info().rss / (1024 * 1024),
+            "gpu_pct": 0,
+            "disk_mb": 0,
+        }
 
 
 class ConfigManager:
@@ -301,11 +229,9 @@ class ConfigManager:
         }
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Config değeri getir."""
         return self._config.get(key, self._defaults.get(key, default))
 
     def set(self, key: str, value: Any, actor: str = "system", reason: str = ""):
-        """Config değeri ayarla (versioned)."""
         old_value = self._config.get(key)
         self._config[key] = value
 
@@ -325,11 +251,9 @@ class ConfigManager:
         logger.info("Config changed", key=key, old=old_value, new=value, actor=actor)
 
     def get_history(self, key: str) -> list[dict]:
-        """Config değişiklik geçmişi."""
         return [v for v in self._versions if v["key"] == key]
 
     def get_all(self) -> dict[str, Any]:
-        """Tüm config."""
         result = dict(self._defaults)
         result.update(self._config)
         return result
@@ -342,7 +266,6 @@ class HealthChecker:
         self._components: dict[str, dict] = {}
 
     def register(self, component: str, check_fn: Any = None):
-        """Bileşen kaydet."""
         self._components[component] = {
             "status": "UNKNOWN",
             "last_check": None,
@@ -350,14 +273,16 @@ class HealthChecker:
         }
 
     def update_status(self, component: str, status: str, details: str = ""):
-        """Bileşen durumu güncelle."""
         if component in self._components:
             self._components[component]["status"] = status
             self._components[component]["details"] = details
             self._components[component]["last_check"] = datetime.now(UTC).isoformat()
 
+            # Update metric
+            status_val = 1 if status == "HEALTHY" else 0
+            prometheus_metrics.set_gauge("component_health_status", status_val, labels={"component": component})
+
     def check_all(self) -> dict[str, Any]:
-        """Tüm bileşenlerin sağlık durumu."""
         results = {}
         overall = "HEALTHY"
 

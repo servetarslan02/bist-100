@@ -17,12 +17,17 @@ Referanslar:
 - "Advances in Financial Machine Learning" (de Prado) - Ch.7
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 logger = structlog.get_logger()

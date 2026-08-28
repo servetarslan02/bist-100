@@ -1,4 +1,4 @@
-"""ALPHA BIST — Job Worker v1.0
+﻿"""ALPHA BIST â€” Job Worker v1.0
 
 Production-grade job execution with:
 - Retry with exponential backoff
@@ -21,7 +21,7 @@ import structlog
 
 from services.core.production_metrics import Metrics, production_metrics
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 class JobStatus(Enum):
@@ -49,8 +49,8 @@ class JobType(Enum):
 class JobWorker:
     """Job execution worker.
 
-    DB-backed idempotency: Aynı job_type + idempotency_key kombinasyonu
-    ikinci kez işlenmez.
+    DB-backed idempotency: AynÄ± job_type + idempotency_key kombinasyonu
+    ikinci kez iÅŸlenmez.
     """
 
     def __init__(
@@ -77,23 +77,23 @@ class JobWorker:
         timeout: int | None = None,
         max_retries: int | None = None,
     ) -> int | None:
-        """Job gönder.
+        """Job gÃ¶nder.
 
         Args:
             job_type: Job tipi (JobType enum value)
             handler: Async handler fonksiyonu
             payload: Job parametreleri
             idempotency_key: Duplicate prevention key
-            priority: Öncelük (yüksek = önce)
+            priority: Ã–ncelÃ¼k (yÃ¼ksek = Ã¶nce)
             timeout: Saniye cinsinden timeout
-            max_retries: Maksimum retry sayısı
+            max_retries: Maksimum retry sayÄ±sÄ±
 
         Returns:
             job_id veya None (duplicate ise)
         """
         idem_key = idempotency_key or self._generate_idempotency_key(job_type, payload)
 
-        # DB'de duplicate kontrolü
+        # DB'de duplicate kontrolÃ¼
         existing_id = await self._check_idempotency(idem_key)
         if existing_id is not None:
             logger.info("Job already exists (idempotent)", job_type=job_type, existing_id=existing_id)
@@ -112,7 +112,7 @@ class JobWorker:
             logger.error("Failed to create job", job_type=job_type)
             return None
 
-        # Async çalıştır
+        # Async Ã§alÄ±ÅŸtÄ±r
         task = asyncio.create_task(
             self._execute_job(
                 job_id,
@@ -154,7 +154,7 @@ class JobWorker:
             return False
 
     async def shutdown(self, timeout: int = 30):
-        """Graceful shutdown — tüm aktif job'ları bekle."""
+        """Graceful shutdown â€” tÃ¼m aktif job'larÄ± bekle."""
         logger.info("Worker shutting down", active_jobs=len(self._active_jobs))
         self._running = False
 
@@ -178,7 +178,7 @@ class JobWorker:
         timeout: int,
         max_retries: int,
     ):
-        """Job çalıştır — retry + timeout ile."""
+        """Job Ã§alÄ±ÅŸtÄ±r â€” retry + timeout ile."""
         last_error = None
 
         for attempt in range(max_retries + 1):
@@ -186,7 +186,7 @@ class JobWorker:
                 # Status = RUNNING
                 await self._update_job_status(job_id, JobStatus.RUNNING, retry_count=attempt)
 
-                # Timeout ile çalıştır
+                # Timeout ile Ã§alÄ±ÅŸtÄ±r
                 result = await asyncio.wait_for(handler(**payload), timeout=timeout)
 
                 # Success
@@ -214,18 +214,18 @@ class JobWorker:
                 logger.info("Retrying job", job_id=job_id, delay=delay)
                 await asyncio.sleep(delay)
 
-        # Tüm retry'lar başarısız
+        # TÃ¼m retry'lar baÅŸarÄ±sÄ±z
         await self._fail_job(job_id, last_error)
         logger.error("Job failed permanently", job_id=job_id, retries=max_retries)
         production_metrics.inc(Metrics.WORKER_JOB_FAILED)
 
     def _generate_idempotency_key(self, job_type: str, payload: dict | None) -> str:
-        """Idempotency key üret."""
+        """Idempotency key Ã¼ret."""
         content = f"{job_type}:{orjson.dumps(payload or {}, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
     async def _check_idempotency(self, idempotency_key: str) -> int | None:
-        """DB'de aynı idempotency_key ile completed/running job var mı?"""
+        """DB'de aynÄ± idempotency_key ile completed/running job var mÄ±?"""
         if not self._db_available():
             return None
         try:
@@ -275,7 +275,7 @@ class JobWorker:
 
     @staticmethod
     def _db_available() -> bool:
-        """DB hızlı erişim kontrolü (5s TTL cache)."""
+        """DB hÄ±zlÄ± eriÅŸim kontrolÃ¼ (5s TTL cache)."""
         now = time.monotonic()
         if now < JobWorker._db_cache_until:
             return JobWorker._db_cache_result
@@ -299,7 +299,7 @@ class JobWorker:
     _db_cache_result: bool = False
 
     async def _update_job_status(self, job_id: int, status: JobStatus, retry_count: int | None = None):
-        """Job durumunu güncelle."""
+        """Job durumunu gÃ¼ncelle."""
         if not self._db_available():
             return
         try:
@@ -322,7 +322,7 @@ class JobWorker:
             logger.error("Failed to update job status", job_id=job_id, error=str(e))
 
     async def _complete_job(self, job_id: int, result: Any):
-        """Job başarıyla tamamlandı."""
+        """Job baÅŸarÄ±yla tamamlandÄ±."""
         if not self._db_available():
             return
         try:
@@ -339,7 +339,7 @@ class JobWorker:
             logger.error("Failed to complete job", job_id=job_id, error=str(e))
 
     async def _fail_job(self, job_id: int, error_message: str):
-        """Job başarısız oldu."""
+        """Job baÅŸarÄ±sÄ±z oldu."""
         if not self._db_available():
             return
         try:
@@ -357,3 +357,4 @@ class JobWorker:
 
 # Singleton
 job_worker = JobWorker()
+

@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 
 try:
@@ -45,7 +45,7 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def _startup_services() -> asyncio.Task | None:
+async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
     await init_databases()
 
@@ -74,7 +74,7 @@ async def _startup_services() -> asyncio.Task | None:
         logger.error(f"PortfolioService baslatilamadi: {e}")
 
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
-    setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
+    setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint, app=app)
     return refresh_task
 
 
@@ -178,7 +178,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan — DB lifecycle dahil."""
     logger.info("ALPHA BIST API starting (canonical production server)")
 
-    refresh_task = await _startup_services()
+    refresh_task = await _startup_services(app)
     background_tasks = _start_background_tasks(refresh_task)
     grpc_server = await _start_grpc()
     await _start_nats()
@@ -199,7 +199,6 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
         lifespan=lifespan,
-        default_response_class=ORJSONResponse,
     )
 
     # CORS
@@ -568,9 +567,15 @@ def create_app() -> FastAPI:
     @app.get("/metrics")
     async def metrics():
         """Prometheus metrics endpoint."""
-        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
-        return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        try:
+            from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+            return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        except (ImportError, Exception):
+            from ..core.observability import prometheus_metrics
+            return FastAPIResponse(
+                content=prometheus_metrics.get_prometheus_text().encode("utf-8"),
+                media_type="text/plain; version=0.0.4; charset=utf-8",
+            )
 
     return app
 

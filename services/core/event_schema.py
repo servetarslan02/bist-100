@@ -60,36 +60,52 @@ class CanonicalEvent:
     source: str = ""
     confidence: float = 0.0
     sequence: int = 0
+    version: int = 1  # Event Schema Versiyonu (v1/v2)
+    correlation_id: str = ""
 
     def __post_init__(self):
         if self.timestamp == 0:
             self.timestamp = int(time.time() * 1000)
 
+    def validate(self) -> tuple[bool, str]:
+        """Event şeması ve zorunlu alan doğrulaması."""
+        if not isinstance(self.type, (EventType, int)):
+            return False, f"Geçersiz event type: {self.type}"
+        if self.timestamp <= 0:
+            return False, "Geçersiz timestamp: <= 0"
+        if self.version < 1:
+            return False, f"Desteklenmeyen şema versiyonu: {self.version}"
+        return True, "OK"
+
     def to_json(self) -> str:
         """JSON formatına çevir."""
         return orjson.dumps(
             {
-                "type": self.type.value,
+                "type": self.type.value if hasattr(self.type, "value") else int(self.type),
                 "ticker": self.ticker,
                 "data": self.data,
                 "timestamp": self.timestamp,
                 "source": self.source,
                 "confidence": self.confidence,
                 "sequence": self.sequence,
+                "version": self.version,
+                "correlation_id": self.correlation_id,
             },
             default=str,
-        )
+        ).decode()
 
     def to_dict(self) -> dict[str, Any]:
         """Dict formatına çevir."""
         return {
-            "type": self.type.value,
+            "type": self.type.value if hasattr(self.type, "value") else int(self.type),
             "ticker": self.ticker,
             "data": self.data,
             "timestamp": self.timestamp,
             "source": self.source,
             "confidence": self.confidence,
             "sequence": self.sequence,
+            "version": self.version,
+            "correlation_id": self.correlation_id,
         }
 
     def to_binary(self) -> bytes:
@@ -109,17 +125,24 @@ class CanonicalEvent:
         return header + source_bytes + data_json
 
     @classmethod
-    def from_json(cls, json_str: str) -> "CanonicalEvent":
+    def from_json(cls, json_str: str | bytes) -> "CanonicalEvent":
         """JSON'dan oluştur."""
         data = orjson.loads(json_str)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CanonicalEvent":
+        """Dict'ten oluştur."""
         return cls(
             type=EventType(data.get("type", 0)),
             ticker=data.get("ticker", ""),
             data=data.get("data", {}),
             timestamp=data.get("timestamp", 0),
             source=data.get("source", ""),
-            confidence=data.get("confidence", 0.0),
-            sequence=data.get("sequence", 0),
+            confidence=float(data.get("confidence", 0.0)),
+            sequence=int(data.get("sequence", 0)),
+            version=int(data.get("version", 1)),
+            correlation_id=str(data.get("correlation_id", "")),
         )
 
     @classmethod

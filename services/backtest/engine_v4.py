@@ -17,13 +17,18 @@ Optimizasyonlar:
 - DuckDB persistence
 """
 
+from __future__ import annotations
+
 import hashlib
 import time as _time
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 from .persistence import backtest_persistence

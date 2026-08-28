@@ -13,12 +13,17 @@ Referanslar:
 - arXiv Momentum-Gated Framework (2026) - bias prevention protocols
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 logger = structlog.get_logger()

@@ -29,7 +29,10 @@ from typing import Any
 import numpy as np
 import structlog
 
+from services.learning.drift_monitor import drift_monitor
+
 logger = structlog.get_logger()
+
 
 
 @dataclass
@@ -55,6 +58,7 @@ class DegradationReport:
     current_sharpe: float
     baseline_sharpe: float
     sharpe_drop: float
+    prediction_drift_score: float
     trend: str  # improving, stable, degrading, volatile
     z_score: float
     severity: str  # OK, WARNING, ALERT, CRITICAL
@@ -221,8 +225,21 @@ class ModelDegradationMonitor:
         # Trend analizi
         trend = self._compute_trend(outcomes)
 
-        # Severity
-        severity = self._compute_severity(accuracy_drop, sharpe_drop, z_score, trend)
+        # Prediction Drift hesapla (DriftMonitor üzerinden)
+        prediction_drift_score = 0.0
+        if len(baseline) >= 20 and len(recent) >= 20:
+            baseline_preds = [o.predicted for o in baseline]
+            recent_preds = [o.predicted for o in recent]
+            
+            # Baseline'ı referans olarak ayarla ve güncel window ile karşılaştır
+            ref_key = f"pred_{model_id}"
+            drift_monitor.set_reference(ref_key, baseline_preds)
+            drift_res = drift_monitor.check_prediction_drift(model_id, recent_preds)
+            if drift_res:
+                prediction_drift_score = drift_res.drift_score
+                # Eğer şiddetli bir drift varsa severity'i artır
+                if drift_res.is_drifted and severity in ("OK", "WARNING"):
+                    severity = "ALERT" if severity == "WARNING" else "WARNING"
 
         # Should remove
         should_remove = (
@@ -232,7 +249,7 @@ class ModelDegradationMonitor:
 
         # Recommendation
         recommendation = self._generate_recommendation(
-            model_id, accuracy_drop, sharpe_drop, trend, severity, should_remove
+            model_id, accuracy_drop, sharpe_drop, trend, severity, should_remove, prediction_drift_score
         )
 
         return DegradationReport(
@@ -244,6 +261,7 @@ class ModelDegradationMonitor:
             current_sharpe=round(current_sharpe, 4),
             baseline_sharpe=round(baseline_sharpe, 4),
             sharpe_drop=round(sharpe_drop, 4),
+            prediction_drift_score=round(prediction_drift_score, 4),
             trend=trend,
             z_score=round(z_score, 4),
             severity=severity,
@@ -433,6 +451,7 @@ class ModelDegradationMonitor:
         trend: str,
         severity: str,
         should_remove: bool,
+        prediction_drift_score: float = 0.0,
     ) -> str:
         """Öneri oluştur."""
         if should_remove:

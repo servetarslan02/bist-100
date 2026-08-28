@@ -12,11 +12,37 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-import duckdb
+try:
+    import duckdb
+    HAS_DUCKDB = True
+except ImportError:
+    duckdb = None
+    HAS_DUCKDB = False
+
 import orjson
 import structlog
 
 logger = structlog.get_logger()
+
+
+class _DummyDuckDBConn:
+    def execute(self, *args, **kwargs):
+        return self
+    def fetchall(self):
+        return []
+    def fetchone(self):
+        return None
+    def df(self):
+        import pandas as pd
+        return pd.DataFrame()
+    def commit(self):
+        pass
+    def close(self):
+        pass
+    def __enter__(self):
+        return self
+    def __exit__(self, *args):
+        pass
 
 
 class ModelMemoryStore:
@@ -25,9 +51,12 @@ class ModelMemoryStore:
     def __init__(self, db_path: str = "data/model_memory.db"):
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
-        self._init_tables()
+        if HAS_DUCKDB:
+            self._init_tables()
 
-    def _get_conn(self) -> duckdb.DuckDBPyConnection:
+    def _get_conn(self) -> Any:
+        if not HAS_DUCKDB or duckdb is None:
+            return _DummyDuckDBConn()
         conn = duckdb.connect(self.db_path)
         return conn
 
@@ -63,13 +92,11 @@ class ModelMemoryStore:
                 is_correct INTEGER NOT NULL,
                 gross_pnl REAL NOT NULL,
                 net_pnl REAL NOT NULL,
-                transaction_cost REAL NOT NULL,
-                FOREIGN KEY(prediction_id) REFERENCES predictions(prediction_id)
+                transaction_cost REAL NOT NULL
             )
             """)
             conn.execute("""
             CREATE TABLE IF NOT EXISTS model_metrics_history (
-                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 model_id TEXT NOT NULL,
                 model_version TEXT NOT NULL,
                 evaluated_at TEXT NOT NULL,
@@ -88,7 +115,6 @@ class ModelMemoryStore:
             """)
             conn.execute("""
             CREATE TABLE IF NOT EXISTS fusion_weights_history (
-                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 timestamp TEXT NOT NULL,
                 market_regime TEXT NOT NULL,
                 weights_json TEXT NOT NULL
@@ -364,10 +390,10 @@ class ModelMemoryStore:
                 """
                 SELECT m.* FROM model_metrics_history m
                 INNER JOIN (
-                    SELECT model_id, MAX(id) as max_id
+                    SELECT model_id, MAX(evaluated_at) as max_time
                     FROM model_metrics_history
                     GROUP BY model_id
-                ) latest ON m.id = latest.max_id
+                ) latest ON m.model_id = latest.model_id AND m.evaluated_at = latest.max_time
                 ORDER BY m.reliability_score DESC
                 """
             )

@@ -12,13 +12,20 @@ NIHAI-SPEC doğrultusunda entegrasyon testleri:
 8. Deterministic recovery
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta
 
-import numpy as np
-import polars as pl
 
-# Add project root to path
+import numpy as np
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import pytest
+
+pytestmark = pytest.mark.skipif(pl is None, reason="polars library required")
+
 
 # =====================================================
 # FIXTURES

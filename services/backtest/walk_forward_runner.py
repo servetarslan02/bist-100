@@ -17,12 +17,17 @@ Güvenceler:
 KURAL: Tahmin modeli / skor formülü DEĞİŞTİRİLMEZ — engine ne üretiyorsa o.
 """
 
+from __future__ import annotations
+
 import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 from .engine_v4 import BacktestConfig, BacktestEngineV4, BacktestResultV4

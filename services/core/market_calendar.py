@@ -57,6 +57,7 @@ class MarketCalendar:
 
     def __init__(self, holidays: list[date] | None = None, half_days: list[date] | None = None):
         from .holiday_manager import holiday_manager
+
         self._hm = holiday_manager
 
         # Dinamik tatil yöneticisinden al (yıl otomatik hesaplanır)

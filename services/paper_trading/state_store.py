@@ -1,13 +1,11 @@
 """
-ALPHA BIST — Paper Trading State Store v1.0
+ALPHA BIST — Paper Trading State Store v2.0
 
-Persistent state yonetimi: SQLite.
-- Portfoy durumu, pozisyonlar, islemler, equity curve, audit log
-- Program kapanip acilsa bile veri kaybolmaz
-- Atomic write (write-to-temp + rename)
-- Backup/rollback destegi
-
-Mevcut services.core.audit_log.AuditLog'i extend eder.
+Persistent state yönetimi: DuckDB.
+- Portföy durumu, pozisyonlar, işlemler, equity curve, audit log
+- Program kapanıp açılsa bile veri kaybolmaz
+- Atomic write & DuckDB sütunsal OLAP persistence
+- Backup/rollback desteği
 """
 
 import os
@@ -17,7 +15,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import duckdb
+try:
+    import duckdb
+except ImportError:
+    duckdb = None
 import orjson
 import structlog
 
@@ -25,13 +26,16 @@ logger = structlog.get_logger()
 
 
 class PaperStateStore:
-    """SQLite tabanli persistent state store — paper trading icin."""
+    """DuckDB tabanlı persistent state store — paper trading için."""
 
     def __init__(self, db_path: str = "data/paper_trading_state.db"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
-        logger.info("PaperStateStore initialized", db_path=str(self.db_path))
+        if duckdb is not None:
+            self._init_db()
+            logger.info("PaperStateStore initialized", db_path=str(self.db_path))
+        else:
+            logger.warning("PaperStateStore initialized without persistence (duckdb not installed)")
 
     def _init_db(self):
         """SQLite tablolarini olustur."""
@@ -158,6 +162,8 @@ class PaperStateStore:
 
     @contextmanager
     def _connect(self):
+        if duckdb is None:
+            raise RuntimeError("DuckDB module is not installed in the environment.")
         conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
@@ -197,6 +203,8 @@ class PaperStateStore:
 
     def load_portfolio_state(self) -> dict[str, Any] | None:
         """Portfoy durumunu yukle."""
+        if duckdb is None:
+            return None
         with self._connect() as conn:
             row = conn.execute("SELECT json_data FROM portfolio_state WHERE id = 1").fetchone()
             if row:

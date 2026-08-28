@@ -67,10 +67,11 @@ class CacheWarmer:
     async def _warm_market_calendar(self) -> bool:
         """BIST seans takvimini yükle + tatil takvimini senkronize et."""
         try:
+            from datetime import date
+
+            from ..core.holiday_manager import holiday_manager
             from ..core.market_calendar import get_market_calendar
             from ..core.redis_helper import set_cached
-            from ..core.holiday_manager import holiday_manager
-            from datetime import date
 
             # Tatil takvimini hesapla + BIST'ten çek
             today = date.today()
@@ -165,9 +166,11 @@ class CacheWarmer:
 
                 today = date.today()
                 if today.weekday() < 5:  # Hafta içi
+                    from datetime import datetime, timedelta, timezone
+                    from datetime import time as dtime
+
                     from ..core.holiday_manager import holiday_manager
                     from ..core.market_calendar import get_market_calendar
-                    from datetime import UTC, datetime, time as dtime, timezone, timedelta
 
                     # İstanbul timezone (UTC+3) — BIST piyasa saatleri
                     ISTANBUL_TZ = timezone(timedelta(hours=3))
@@ -191,6 +194,7 @@ class CacheWarmer:
                         calendar = get_market_calendar()
                         if calendar.is_trading_day(today):
                             from ..core.redis_helper import get_cached
+
                             radar = get_cached("radar:data")
                             if not radar:
                                 detected = holiday_manager.report_no_data(today)

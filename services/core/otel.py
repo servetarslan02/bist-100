@@ -23,6 +23,7 @@ Kullanım:
 """
 
 import os
+from typing import Any
 
 import structlog
 
@@ -37,6 +38,7 @@ def setup_telemetry(
     service_name: str = "alpha-bist",
     endpoint: str | None = None,
     enabled: bool = True,
+    app: Any = None,
 ) -> None:
     """OpenTelemetry'yi başlat.
 
@@ -44,6 +46,7 @@ def setup_telemetry(
         service_name: Servis adı
         endpoint: OTLP endpoint (örn: http://localhost:4317)
         enabled: Telemetry aktif mi
+        app: FastAPI uygulaması (varsa auto-instrumentation için)
     """
     global _tracer_provider, _tracer
 
@@ -63,6 +66,8 @@ def setup_telemetry(
             {
                 SERVICE_NAME: service_name,
                 "deployment.environment": os.getenv("APP_ENV", "development"),
+                "service.version": os.getenv("APP_VERSION", "2.1.0"),
+                "host.name": os.uname().nodename if hasattr(os, "uname") else os.getenv("COMPUTERNAME", "unknown"),
             }
         )
 
@@ -85,6 +90,39 @@ def setup_telemetry(
 
         # Tracer
         _tracer = trace.get_tracer(service_name)
+
+        # Auto-Instrumentation for HTTP, DB, Redis
+        try:
+            from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+            HTTPXClientInstrumentor().instrument()
+            logger.info("OpenTelemetry HTTPX instrumentation enabled")
+        except ImportError:
+            logger.warning("opentelemetry-instrumentation-httpx not installed")
+
+        try:
+            pass
+            logger.info("OpenTelemetry SQLAlchemy instrumentation available")
+        except ImportError:
+            logger.warning("opentelemetry-instrumentation-sqlalchemy not installed")
+
+        try:
+            from opentelemetry.instrumentation.redis import RedisInstrumentor
+
+            RedisInstrumentor().instrument()
+            logger.info("OpenTelemetry Redis instrumentation enabled")
+        except ImportError:
+            logger.warning("opentelemetry-instrumentation-redis not installed")
+
+        # FastAPI Auto-Instrumentation
+        if app is not None:
+            try:
+                from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+                FastAPIInstrumentor.instrument_app(app)
+                logger.info("OpenTelemetry FastAPI instrumentation enabled")
+            except ImportError:
+                logger.warning("opentelemetry-instrumentation-fastapi not installed")
 
         logger.info("OpenTelemetry initialized", service=service_name, endpoint=endpoint or "console")
 

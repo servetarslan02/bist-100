@@ -22,13 +22,13 @@ v2.0 DEĞİŞİKLİKLERİ:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import orjson
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -37,9 +37,15 @@ logger = structlog.get_logger(__name__)
 # 0. PROXY DESTEĞİ (BIST engelli bölgeler için)
 # =====================================================
 
+
 def _get_proxy() -> str | None:
     """HTTP_PROXY veya HTTPS_PROXY ortam değişkeninden proxy al."""
-    return os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("http_proxy") or os.environ.get("https_proxy")
+    return (
+        os.environ.get("HTTP_PROXY")
+        or os.environ.get("HTTPS_PROXY")
+        or os.environ.get("http_proxy")
+        or os.environ.get("https_proxy")
+    )
 
 
 # =====================================================
@@ -47,12 +53,12 @@ def _get_proxy() -> str | None:
 # =====================================================
 
 FIXED_HOLIDAYS: dict[int, tuple[int, int]] = {
-    1: (1, 1),    # Yılbaşı
-    2: (4, 23),   # Ulusal Egemenlik ve Çocuk Bayramı
-    3: (5, 1),    # Emek ve Dayanışma Günü
-    4: (5, 19),   # Atatürk'ü Anma, Gençlik ve Spor Bayramı
-    5: (7, 15),   # Demokrasi ve Millî Birlik Günü
-    6: (8, 30),   # Zafer Bayramı
+    1: (1, 1),  # Yılbaşı
+    2: (4, 23),  # Ulusal Egemenlik ve Çocuk Bayramı
+    3: (5, 1),  # Emek ve Dayanışma Günü
+    4: (5, 19),  # Atatürk'ü Anma, Gençlik ve Spor Bayramı
+    5: (7, 15),  # Demokrasi ve Millî Birlik Günü
+    6: (8, 30),  # Zafer Bayramı
     7: (10, 29),  # Cumhuriyet Bayramı
 }
 
@@ -65,6 +71,7 @@ HALF_DAY_EVES: dict[int, tuple[int, int]] = {
 # =====================================================
 # 2. DİNİ BAYRAM HESAPLAMA (Hicri Takvim)
 # =====================================================
+
 
 def _compute_hijri_holidays(gregorian_year: int) -> list[date]:
     """Hicri takvime göre Ramazan ve Kurban Bayramı tarihlerini hesapla.
@@ -168,6 +175,7 @@ def _compute_half_days_eves(gregorian_year: int, religious_holidays: list[date])
 # 3. BIST RESMİ TAKVİM ÇEKME (Retry + Alternatif Kaynaklar)
 # =====================================================
 
+
 async def _fetch_with_retry(
     url: str,
     max_retries: int = 3,
@@ -203,7 +211,7 @@ async def _fetch_with_retry(
             logger.warning("Fetch failed", url=url, error=str(e), attempt=attempt + 1)
 
         if attempt < max_retries - 1:
-            wait = 2 ** attempt  # 1s, 2s, 4s
+            wait = 2**attempt  # 1s, 2s, 4s
             await asyncio.sleep(wait)
 
     return None
@@ -250,8 +258,8 @@ def _parse_bist_holidays_html(html: str) -> list[date] | None:
     """BIST HTML sayfasından tatil tarihlerini parse et."""
     holidays: list[date] = []
     patterns = [
-        r'(\d{1,2})[./](\d{1,2})[./](\d{4})',
-        r'(\d{4})-(\d{2})-(\d{2})',
+        r"(\d{1,2})[./](\d{1,2})[./](\d{4})",
+        r"(\d{4})-(\d{2})-(\d{2})",
     ]
     for pattern in patterns:
         matches = re.findall(pattern, html)
@@ -333,8 +341,14 @@ def _parse_kap_holiday_notifications(data: Any) -> list[date] | None:
 
     # Tatil anahtar kelimeleri
     holiday_keywords = [
-        "tatil", "kapalı", "işlem yapılmayacak", "piyasa kapalı",
-        "resmi tatil", "bayram", "arife", "yarım gün",
+        "tatil",
+        "kapalı",
+        "işlem yapılmayacak",
+        "piyasa kapalı",
+        "resmi tatil",
+        "bayram",
+        "arife",
+        "yarım gün",
     ]
 
     for notification in data:
@@ -346,8 +360,8 @@ def _parse_kap_holiday_notifications(data: Any) -> list[date] | None:
         if any(kw in text for kw in holiday_keywords):
             # Tarih çıkar
             date_patterns = [
-                r'(\d{1,2})[./](\d{1,2})[./](\d{4})',
-                r'(\d{4})-(\d{2})-(\d{2})',
+                r"(\d{1,2})[./](\d{1,2})[./](\d{4})",
+                r"(\d{4})-(\d{2})-(\d{2})",
             ]
             for pattern in date_patterns:
                 matches = re.findall(pattern, text)
@@ -372,17 +386,17 @@ def _parse_kap_rss_for_holidays(xml_text: str) -> list[date] | None:
     holiday_keywords = ["tatil", "kapalı", "işlem yapılmayacak", "piyasa kapalı"]
 
     # RSS item'ları arasında tatil duyurusu ara
-    items = re.findall(r'<item>(.*?)</item>', xml_text, re.DOTALL)
+    items = re.findall(r"<item>(.*?)</item>", xml_text, re.DOTALL)
     for item in items:
-        title_match = re.search(r'<title>(.*?)</title>', item, re.DOTALL)
-        desc_match = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
+        title_match = re.search(r"<title>(.*?)</title>", item, re.DOTALL)
+        desc_match = re.search(r"<description>(.*?)</description>", item, re.DOTALL)
 
         title = title_match.group(1) if title_match else ""
         desc = desc_match.group(1) if desc_match else ""
         text = f"{title} {desc}".lower()
 
         if any(kw in text for kw in holiday_keywords):
-            date_matches = re.findall(r'(\d{1,2})[./](\d{1,2})[./](\d{4})', text)
+            date_matches = re.findall(r"(\d{1,2})[./](\d{1,2})[./](\d{4})", text)
             for match in date_matches:
                 try:
                     d = date(int(match[2]), int(match[1]), int(match[0]))
@@ -427,12 +441,12 @@ def _parse_investing_holidays(html: str) -> list[date] | None:
     holidays: list[date] = []
 
     # Tablo satırlarından tarih çıkar
-    rows = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.DOTALL)
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL)
     for row in rows:
-        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
         for cell in cells:
             # DD/MM/YYYY veya DD.MM.YYYY formatı
-            matches = re.findall(r'(\d{1,2})[./](\d{1,2})[./](\d{4})', cell)
+            matches = re.findall(r"(\d{1,2})[./](\d{1,2})[./](\d{4})", cell)
             for match in matches:
                 try:
                     d = date(int(match[2]), int(match[1]), int(match[0]))
@@ -447,6 +461,7 @@ def _parse_investing_holidays(html: str) -> list[date] | None:
 # =====================================================
 # 4. KAP ANLIK DUYURU İZLEYİCİ
 # =====================================================
+
 
 class KAPHolidayWatcher:
     """KAP'tan anlık tatil duyurularını izler.
@@ -497,6 +512,7 @@ class KAPHolidayWatcher:
 # =====================================================
 # 5. ANLIK TATİL TESPİTİ (Gelişmiş)
 # =====================================================
+
 
 class SuddenHolidayDetector:
     """Piyasa beklenmedik şekilde kapalıysa tespit et.
@@ -562,6 +578,7 @@ class SuddenHolidayDetector:
 # =====================================================
 # 6. ANA HOLIDAY MANAGER
 # =====================================================
+
 
 class HolidayManager:
     """BIST tatil yöneticisi — dinamik, otomatik, self-updating.
@@ -735,7 +752,7 @@ class HolidayManager:
             return []
         try:
             with open(self._audit_file) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             return data.get("entries", [])[-limit:]
         except Exception:
             return []
@@ -822,8 +839,8 @@ class HolidayManager:
         if not self._cache_file.exists():
             return
         try:
-            with open(self._cache_file) as f:
-                data = json.load(f)
+            with open(self._cache_file, "rb") as f:
+                data = orjson.loads(f.read())
             for year_str, dates in data.get("holidays", {}).items():
                 self._holidays[int(year_str)] = {date.fromisoformat(d) for d in dates}
             for year_str, dates in data.get("half_days", {}).items():
@@ -841,21 +858,15 @@ class HolidayManager:
     def _save_cache(self) -> None:
         """Tatilleri cache dosyasına kaydet."""
         data = {
-            "holidays": {
-                str(y): [d.isoformat() for d in sorted(dates)]
-                for y, dates in self._holidays.items()
-            },
-            "half_days": {
-                str(y): [d.isoformat() for d in sorted(dates)]
-                for y, dates in self._half_days.items()
-            },
+            "holidays": {str(y): [d.isoformat() for d in sorted(dates)] for y, dates in self._holidays.items()},
+            "half_days": {str(y): [d.isoformat() for d in sorted(dates)] for y, dates in self._half_days.items()},
             "sudden": [d.isoformat() for d in sorted(self._sudden_detector.get_confirmed())],
             "blacklist": [d.isoformat() for d in sorted(self._blacklist)],
             "updated_at": datetime.now(UTC).isoformat(),
         }
         try:
-            with open(self._cache_file, "w") as f:
-                json.dump(data, f, indent=2)
+            with open(self._cache_file, "wb") as f:
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
         except Exception as e:
             logger.warning("Holiday cache save failed", error=str(e))
 
@@ -871,7 +882,7 @@ class HolidayManager:
         try:
             if self._audit_file.exists():
                 with open(self._audit_file) as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
             else:
                 data = {"entries": []}
 
@@ -882,7 +893,7 @@ class HolidayManager:
                 data["entries"] = data["entries"][-1000:]
 
             with open(self._audit_file, "w") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode("utf-8"))
         except Exception as e:
             logger.debug("Audit log failed", error=str(e))
 

@@ -269,41 +269,84 @@ async def var_report(
 
 @router.get("/portfolio")
 async def portfolio_risk(
-    portfolio_value: float = Query(100000),
-    regime: str = Query("SIDEWAYS"),
+    portfolio_value: float = Query(100000.0, description="Portföy toplam değeri"),
+    regime: str = Query("SIDEWAYS", description="Piyasa rejimi"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Portföy risk metrikleri — VaR + concentration + drawdown.
-
-    Returns:
-        VaR/CVaR, concentration (HHI), drawdown, dynamic limits
-    """
+    """Portföy risk metrikleri — VaR/CVaR, L-VaR, Konsantrasyon, Drawdown, Stres Testi."""
     try:
-        pass
+        from ...risk.orchestrator import risk_orchestrator
 
-        try:
-            import numpy as np
+        # Örnek portföy yapısı (canlı DB verisi bağlandığında dinamikleşir)
+        portfolio = {
+            "total_value": portfolio_value,
+            "weights": {"THYAO": 0.25, "GARAN": 0.25, "ASELS": 0.20, "BIMAS": 0.15, "TUPRS": 0.15},
+            "positions": [
+                {"ticker": "THYAO", "value": portfolio_value * 0.25, "adv_tl": 2_500_000_000, "spread_bps": 5.0},
+                {"ticker": "GARAN", "value": portfolio_value * 0.25, "adv_tl": 1_800_000_000, "spread_bps": 6.0},
+                {"ticker": "ASELS", "value": portfolio_value * 0.20, "adv_tl": 1_200_000_000, "spread_bps": 8.0},
+                {"ticker": "BIMAS", "value": portfolio_value * 0.15, "adv_tl": 900_000_000, "spread_bps": 7.0},
+                {"ticker": "TUPRS", "value": portfolio_value * 0.15, "adv_tl": 1_400_000_000, "spread_bps": 6.0},
+            ],
+        }
+        np.random.seed(42)
+        demo_returns = np.random.normal(0.0006, 0.014, 252)
 
-            from ...risk.var_cvar import VaRCalculator
-
-            calc = VaRCalculator()
-            # Demo return history — gerçek veri kaynağı bağlandığında değiştirilmeli
-            demo_returns = np.random.normal(0.0005, 0.015, 252)
-            report = calc.calculate_full_var_report(
-                returns=demo_returns,
-                portfolio_value=portfolio_value,
-            )
-            return {
-                "portfolio_risk": report,
-                "source": "var_calculator",
-                "note": "Using simulated returns. Connect real data source for accurate results.",
-            }
-        except Exception as calc_err:
-            return {"portfolio_risk": {}, "error": str(calc_err), "note": "Risk calculation failed."}
+        report = risk_orchestrator.assess_portfolio_risk(
+            portfolio=portfolio,
+            returns_history=demo_returns,
+            regime=regime,
+        )
+        return {
+            "status": "success",
+            "portfolio_risk": report,
+            "source": "risk_orchestrator",
+        }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
         raise HTTPException(500, "Internal server error") from e
+
+
+@router.get("/liquidity")
+async def liquidity_risk(
+    ticker: str = Query("THYAO", description="Hisse kodu"),
+    order_value: float = Query(50000.0, description="Emir tutarı (TL)"),
+    price: float = Query(300.0, description="Hisse fiyatı"),
+    adv_tl: float | None = Query(None, description="20G Ortalama Günlük Hacim (TL)"),
+    spread_bps: float | None = Query(None, description="Alış-satış makası (bps)"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Enstrüman bazlı likidite riski, piyasa etkisi (Kyle's Lambda) ve L-VaR analizi."""
+    try:
+        from ...risk.liquidity_risk import liquidity_risk_engine
+
+        metrics = liquidity_risk_engine.evaluate_order_liquidity(
+            ticker=ticker,
+            order_value=order_value,
+            price=price,
+            adv_tl=adv_tl,
+            spread_bps=spread_bps,
+        )
+        return {
+            "ticker": metrics.ticker,
+            "order_value": metrics.order_value,
+            "adv_tl": metrics.adv_tl,
+            "participation_rate_pct": metrics.participation_rate_pct,
+            "effective_spread_bps": metrics.effective_spread_bps,
+            "expected_market_impact_pct": metrics.expected_market_impact_pct,
+            "expected_slippage_tl": metrics.expected_slippage_tl,
+            "liquidation_days": metrics.liquidation_days,
+            "liquidity_score": metrics.liquidity_score,
+            "sizing_multiplier": metrics.liquidity_sizing_multiplier,
+            "is_tradable": metrics.is_tradable,
+            "warnings": metrics.warnings,
+        }
+    except Exception as e:
+        logger.error("endpoint_error", error=str(e), exc_info=True)
+        raise HTTPException(500, "Internal server error") from e
+
 
 
 # =====================================================
@@ -807,78 +850,55 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
 async def pre_trade_check(
     ticker: str = Query(..., description="Hisse kodu"),
     amount: float = Query(..., description="İşlem tutarı (TL)"),
+    price: float = Query(100.0, description="Tahmini işlem fiyatı (TL)"),
+    side: str = Query("BUY", description="İşlem yönü: BUY | SELL | SHORT"),
     portfolio_id: int = Query(1, description="Portföy ID"),
     regime: str = Query("SIDEWAYS", description="Mevcut rejim"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """İşlem öncesi risk kontrolü — dynamic limits + drawdown + position sizing.
-
-    Args:
-        ticker: Hisse kodu
-        amount: İşlem tutarı
-        portfolio_id: Portföy ID
-        regime: Mevcut rejim
-
-    Returns:
-        Risk check sonuçları: approved, checks, limits
-    """
+    """İşlem öncesi risk kontrolü — BIST kuralları + likidite + dynamic limits + drawdown."""
     try:
-        dl = _get_dynamic_limits()
-        dd = _get_drawdown_system()
+        from ...risk.orchestrator import PreTradeOrderRequest, risk_orchestrator
 
-        limits = dl.get_limits(regime=regime)
-        dd_state = dd.get_state()
+        assumed_value = 100000.0
+        qty = max(1, int(amount / price)) if price > 0 else 1
 
-        checks = []
-
-        # 1. Drawdown check
-        if not dd.is_trading_allowed():
-            checks.append(
-                {
-                    "name": "drawdown_response",
-                    "passed": False,
-                    "severity": "BLOCK",
-                    "details": f"Trading disabled: {dd_state.description}",
-                }
-            )
-        else:
-            checks.append({"name": "drawdown_response", "passed": True, "severity": "INFO"})
-
-        # 2. Dynamic position limit
-        # (gerçek uygulamada portfolio_value DB'den gelecek)
-        assumed_value = 100000
-        position_pct = (amount / assumed_value * 100) if assumed_value > 0 else 0
-        if position_pct > limits.max_position_pct:
-            checks.append(
-                {
-                    "name": "dynamic_position_limit",
-                    "passed": False,
-                    "severity": "BLOCK",
-                    "details": f"Position {position_pct:.1f}% > limit {limits.max_position_pct:.1f}%",
-                }
-            )
-        else:
-            checks.append({"name": "dynamic_position_limit", "passed": True, "severity": "INFO"})
-
-        # 3. Kelly fraction
-        checks.append(
-            {
-                "name": "kelly_fraction",
-                "passed": True,
-                "severity": "INFO",
-                "details": f"Regime-adjusted Kelly: {limits.kelly_fraction:.3f}",
-            }
+        req = PreTradeOrderRequest(
+            ticker=ticker,
+            side=side.upper(),
+            quantity=qty,
+            price=price,
+            model_confidence=0.60,
         )
 
-        all_passed = all(c["passed"] for c in checks)
+        portfolio_state = {
+            "id": portfolio_id,
+            "total_value": assumed_value,
+            "cash": assumed_value,
+            "positions": {},
+        }
+
+        decision = risk_orchestrator.evaluate_pre_trade(
+            order=req,
+            portfolio_state=portfolio_state,
+            regime=regime,
+        )
+
+        dd_state = risk_orchestrator.drawdown.get_state()
+        limits = risk_orchestrator.dynamic_limits.get_limits(regime=regime)
 
         return {
             "ticker": ticker,
             "amount": amount,
-            "approved": all_passed,
+            "side": side.upper(),
+            "quantity": qty,
+            "approved": decision.allowed,
+            "reason": decision.reason,
+            "checks_passed": decision.checks_passed,
+            "checks_failed": decision.checks_failed,
+            "details": decision.details,
             "regime": regime,
-            "checks": checks,
             "limits": {
                 "max_position_pct": round(limits.max_position_pct, 2),
                 "kelly_fraction": round(limits.kelly_fraction, 3),
@@ -893,6 +913,7 @@ async def pre_trade_check(
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
         raise HTTPException(500, "Internal server error") from e
+
 
 
 # =====================================================

@@ -116,17 +116,20 @@ class VirtualPortfolio:
         """State store'dan yükle."""
         if not self._state_store:
             return
-        snapshot = self._state_store.load_portfolio_state()
-        if snapshot:
-            self.settled_cash = snapshot.get("settled_cash", snapshot.get("cash", self.initial_capital))
-            self.unsettled_cash_t1 = snapshot.get("unsettled_cash_t1", 0.0)
-            self.unsettled_cash_t2 = snapshot.get("unsettled_cash_t2", 0.0)
-            self.initial_capital = snapshot.get("initial_capital", self.initial_capital)
-            self._positions = {p["ticker"]: p for p in snapshot.get("positions", [])}
-            self._trades = snapshot.get("trades", [])
-            self._orders = snapshot.get("orders", [])
-            self._equity_curve = snapshot.get("equity_curve", [])
-            logger.info("VirtualPortfolio loaded from store", positions=len(self._positions), trades=len(self._trades))
+        try:
+            snapshot = self._state_store.load_portfolio_state()
+            if snapshot:
+                self.settled_cash = snapshot.get("settled_cash", snapshot.get("cash", self.initial_capital))
+                self.unsettled_cash_t1 = snapshot.get("unsettled_cash_t1", 0.0)
+                self.unsettled_cash_t2 = snapshot.get("unsettled_cash_t2", 0.0)
+                self.initial_capital = snapshot.get("initial_capital", self.initial_capital)
+                self._positions = {p["ticker"]: p for p in snapshot.get("positions", [])}
+                self._trades = snapshot.get("trades", [])
+                self._orders = snapshot.get("orders", [])
+                self._equity_curve = snapshot.get("equity_curve", [])
+                logger.info("VirtualPortfolio loaded from store", positions=len(self._positions), trades=len(self._trades))
+        except Exception as e:
+            logger.warning("VirtualPortfolio could not load state from store", error=str(e))
 
     def save_to_store(self, date: str):
         """State store'a kaydet."""

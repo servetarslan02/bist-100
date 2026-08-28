@@ -1,7 +1,8 @@
-﻿import os
+import os
 import sys
 import gc
-import json
+import orjson
+
 import traceback
 import pandas as pd
 import numpy as np

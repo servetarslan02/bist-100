@@ -738,7 +738,7 @@ class WalkForwardEngineV5:
 
             # 4. Model eğit
             model, model_version = self._train_model(
-                train_features, feature_names, model_factory
+                train_features, feature_names, model_factory, fold_id=fold_config.fold_id
             )
             snapshot.model_version = model_version
             snapshot.model_params = model.get_params() if model else {}
@@ -1154,6 +1154,7 @@ class WalkForwardEngineV5:
         train_features: list[dict[str, Any]],
         feature_names: list[str],
         model_factory: Any,
+        fold_id: int = 0,
     ) -> tuple[Any, str]:
         """Modeli train verisiyle eğit.
 
@@ -1165,15 +1166,22 @@ class WalkForwardEngineV5:
         Returns:
             (model, model_version) — model None ise rule-based fallback
         """
+        base_seed = self.random_seed if self.random_seed is not None else 42
+        fold_seed = int((base_seed + fold_id * 10007) % (2**31 - 1))
+        np.random.seed(fold_seed)
+
         if model_factory is not None:
             try:
                 model = model_factory()
                 # Seed propagation: model'e seed parametresi varsa ata
-                if hasattr(model, 'set_params') and self.random_seed:
+                if hasattr(model, 'set_params'):
                     try:
-                        model.set_params(random_state=self.random_seed)
+                        model.set_params(random_state=fold_seed)
                     except Exception:
-                        pass
+                        try:
+                            model.set_params(seed=fold_seed)
+                        except Exception:
+                            pass
                 X = self._features_to_matrix(train_features, feature_names)
                 y = self._extract_targets(train_features)
 
@@ -1191,7 +1199,7 @@ class WalkForwardEngineV5:
             y = self._extract_targets(train_features)
 
             if len(X) >= MIN_TRAINING_SAMPLES and len(y) >= MIN_TRAINING_SAMPLES:
-                config = MLModelConfig(num_boost_round=50, early_stopping_rounds=5)
+                config = MLModelConfig(num_boost_round=50, early_stopping_rounds=5, random_state=fold_seed)
                 trainer = LightGBMTrainer(config)
                 # LightGBMTrainer.train dict-based input bekler
                 features_map = {f"sample_{i}": f for i, f in enumerate(train_features)}

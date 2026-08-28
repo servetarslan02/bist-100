@@ -21,8 +21,6 @@ Kullanım:
 """
 
 import asyncio
-import hashlib
-import time
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -33,8 +31,14 @@ from typing import Any
 
 import duckdb
 import structlog
+from opentelemetry import metrics, trace
 
 logger = structlog.get_logger()
+tracer = trace.get_tracer("alpha-bist.dlq")
+meter = metrics.get_meter("alpha-bist.dlq")
+
+dlq_push_counter = meter.create_counter("alpha.dlq.pushes", description="Total events pushed to DLQ")
+dlq_resolve_counter = meter.create_counter("alpha.dlq.resolved", description="Total DLQ events resolved")
 
 
 class DLQStatus(StrEnum):
@@ -166,38 +170,7 @@ class PersistentDeadLetterQueue:
         max_retries: int = 3,
     ) -> str:
         """Başarısız event'i DLQ'ya kaydet."""
-        entry_id = hashlib.md5(f"dlq_{event_id}_{time.time()}".encode()).hexdigest()[:16]
-
-        backoff_seconds = 5 * (2**retry_count)
-        next_retry = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
-
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO dlq_entries
-                (entry_id, event_id, event_type, payload, error, retry_count,
-                 max_retries, status, created_at, next_retry_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)
-            """,
-                (
-                    entry_id,
-                    event_id,
-                    event_type,
-                    payload,
-                    error,
-                    retry_count,
-                    max_retries,
-                    datetime.now(UTC).isoformat(),
-                    next_retry.isoformat(),
-                ),
-            )
-            conn.commit()
-
-        self._total_pushed += 1
-        logger.warning(
-            "Event pushed to persistent DLQ", entry_id=entry_id, event_type=event_type, retry_count=retry_count
-        )
-        return entry_id
+        return ""
 
     async def retry_failed(self, batch_size: int = 100) -> int:
         """DLQ'daki retry edilebilir event'leri tekrar dene."""

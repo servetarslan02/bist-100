@@ -307,7 +307,7 @@ class DrawdownResponseSystem:
             force: True ise kill switch aktif olsa bile sıfırlar
             reason: Sıfırlama nedeni (audit trail için)
         """
-        if self._current_action == DrawdownAction.KILL_SWITCH and not force:
+        if self._current_action == DrawdownAction.HALT_SYSTEM and not force:
             logger.warning("Drawdown reset blocked — kill switch active. Use force=True to override.")
             return
         logger.warning(

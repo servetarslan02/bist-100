@@ -278,6 +278,17 @@ CREATE TABLE knowledge_relations (
     UNIQUE(source_entity_id, target_entity_id, relation_type)
 );
 
+CREATE TABLE market_event_embeddings (
+    item_id VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    embedding vector(1024),
+    metadata JSONB DEFAULT '{}',
+    text_content TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (item_id, category)
+);
+
 -- =====================================================
 -- ALERTS & AUDIT
 -- =====================================================
@@ -880,6 +891,12 @@ WITH NO DATA;
 -- cosine distance: benzerlik araması için
 CREATE INDEX IF NOT EXISTS idx_knowledge_entities_embedding_hnsw
 ON knowledge_entities
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 200);
+
+-- market_event_embeddings.embedding için HNSW index
+CREATE INDEX IF NOT EXISTS idx_market_event_embeddings_embedding_hnsw
+ON market_event_embeddings
 USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 200);
 

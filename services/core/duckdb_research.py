@@ -25,8 +25,6 @@ Kullanım:
     df = await research_engine.query_research("SELECT * FROM model_predictions WHERE confidence > 0.8")
 """
 
-import asyncio
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -100,7 +98,8 @@ class DuckDBResearchEngine:
         else:
             # FROM clause yoksa otomatik ekle (footgun önleme)
             import re
-            if not re.search(r'\bFROM\b', sql, re.IGNORECASE):
+
+            if not re.search(r"\bFROM\b", sql, re.IGNORECASE):
                 query = f"{sql} FROM read_parquet('{parquet_path}')"
             else:
                 query = sql
@@ -123,7 +122,7 @@ class DuckDBResearchEngine:
         if not self._is_valid_identifier(name):
             raise ValueError(f"Invalid view name: {name!r}")
         conn = self._get_conn()
-        conn.execute(f'CREATE OR REPLACE VIEW "{name}" AS SELECT * FROM read_parquet(\'{parquet_path}\')')
+        conn.execute(f"CREATE OR REPLACE VIEW \"{name}\" AS SELECT * FROM read_parquet('{parquet_path}')")
         self._parquet_cache[name] = parquet_path
         logger.info("Parquet registered as view", name=name, path=parquet_path)
 
@@ -260,6 +259,7 @@ class DuckDBResearchEngine:
                 if len(batch_files) == 1:
                     # Tek batch — doğrudan kopyala
                     import shutil
+
                     shutil.move(batch_files[0], str(output_path))
                 else:
                     # Çoklu batch — Polars ile birleştir (lazy, memory-efficient)
@@ -348,14 +348,15 @@ class DuckDBResearchEngine:
         if not self._is_valid_identifier(table):
             raise ValueError(f"Invalid table name: {table!r}")
         conn = self._get_conn()
-        conn.execute(f'INSERT INTO "{table}" SELECT * FROM read_parquet(\'{parquet_path}\')')
+        conn.execute(f"INSERT INTO \"{table}\" SELECT * FROM read_parquet('{parquet_path}')")
         logger.info("Data inserted from Parquet", table=table, path=parquet_path)
 
     @staticmethod
     def _is_valid_identifier(name: str) -> bool:
         """SQL identifier whitelist kontrolü — injection önleme."""
         import re
-        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name))
+
+        return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name))
 
     def get_stats(self) -> dict[str, Any]:
         """Research DB istatistikleri."""

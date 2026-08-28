@@ -12,6 +12,8 @@ Prensipler:
 5. Version lock - feature versiyonu sabitlenir
 """
 
+from __future__ import annotations
+
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,7 +21,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import orjson
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 logger = structlog.get_logger()

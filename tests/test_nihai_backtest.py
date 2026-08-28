@@ -12,11 +12,20 @@ Tüm yeni modüller için kapsamlı testler:
 8. Scanner Parity
 """
 
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta
 
+
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import pytest
+
+pytestmark = pytest.mark.skipif(pl is None, reason="polars library required")
+
 
 from services.backtest.benchmark import (
     BenchmarkComparator,

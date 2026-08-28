@@ -77,8 +77,12 @@ from .spec_engine import SPECEngine
 from .trade_planner import TradePlanner
 
 # Valuation
-from .valuation.engine import ValuationEngine
-from .world_state import WorldStateManager
+from .vector_memory import (
+    VectorMemoryStore,
+    MarketRegimeMemory,
+    vector_memory_store,
+    market_regime_memory,
+)
 
 __all__ = [
     # Pipeline
@@ -87,6 +91,8 @@ __all__ = [
     # Regime
     "RegimeEngine",
     "HMMRegimeDetector",
+    "MarketRegimeMemory",
+    "market_regime_memory",
     # Forecasting
     "EnsembleForecaster",
     "ForecastingEngine",
@@ -113,10 +119,13 @@ __all__ = [
     "KAPExtractor",
     "KAPLLMExtractor",
     "NewsPipeline",
-    # Knowledge
+    # Knowledge & Vector Memory
     "KnowledgeGraph",
     "ResearchMemory",
     "EvidenceVerificationEngine",
+    "VectorMemoryStore",
+    "vector_memory_store",
     # Valuation
     "ValuationEngine",
 ]
+

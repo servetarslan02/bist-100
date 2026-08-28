@@ -1,5 +1,5 @@
-"""
-ALPHA BIST — Audit Log v1.0
+﻿"""
+ALPHA BIST â€” Audit Log v1.0
 
 Immutable audit trail:
 - Decision lineage
@@ -18,12 +18,12 @@ from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
 class AuditEntry:
-    """Audit log kaydı (immutable)."""
+    """Audit log kaydÄ± (immutable)."""
 
     audit_id: str
     action: str  # DECISION, RISK_CHECK, ORDER, FILL, STATE_CHANGE, CONFIG_CHANGE
@@ -39,22 +39,22 @@ class AuditEntry:
 class AuditLog:
     """Immutable audit log.
 
-    Bir kararın tam zincirini takip edebilmek için:
-    RAW_DATA → FEATURE → SIGNAL → DECISION → RISK → ORDER → FILL
+    Bir kararÄ±n tam zincirini takip edebilmek iÃ§in:
+    RAW_DATA â†’ FEATURE â†’ SIGNAL â†’ DECISION â†’ RISK â†’ ORDER â†’ FILL
     """
 
     def __init__(self):
         self._entries: list[AuditEntry] = []
-        self._index: dict[str, list[int]] = {}  # entity_id → [entry indices]
+        self._index: dict[str, list[int]] = {}  # entity_id â†’ [entry indices]
 
     def log(self, entry: AuditEntry):
-        """Audit kaydı ekle (append-only)."""
+        """Audit kaydÄ± ekle (append-only)."""
         idx = len(self._entries)
         self._entries.append(entry)
         if len(self._entries) > 1000:
             self._entries = self._entries[-1000:]
 
-        # Index güncelle
+        # Index gÃ¼ncelle
         key = f"{entry.entity_type}:{entry.entity_id}"
         if key not in self._index:
             self._index[key] = []
@@ -74,7 +74,7 @@ class AuditLog:
         risks: list[str],
         correlation_id: str = "",
     ):
-        """Karar kaydı."""
+        """Karar kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -100,7 +100,7 @@ class AuditLog:
         checks: list[dict],
         correlation_id: str = "",
     ):
-        """Risk kontrolü kaydı."""
+        """Risk kontrolÃ¼ kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -126,7 +126,7 @@ class AuditLog:
         order_type: str,
         correlation_id: str = "",
     ):
-        """Emir kaydı."""
+        """Emir kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -156,7 +156,7 @@ class AuditLog:
         commission: float,
         correlation_id: str = "",
     ):
-        """Dolum kaydı."""
+        """Dolum kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -184,7 +184,7 @@ class AuditLog:
         new_value: Any,
         reason: str,
     ):
-        """State değişikliği kaydı."""
+        """State deÄŸiÅŸikliÄŸi kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -207,7 +207,7 @@ class AuditLog:
         new_value: Any,
         actor: str = "user",
     ):
-        """Config değişikliği kaydı."""
+        """Config deÄŸiÅŸikliÄŸi kaydÄ±."""
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -227,7 +227,7 @@ class AuditLog:
         entity_type: str,
         entity_id: str,
     ) -> list[dict[str, Any]]:
-        """Entity'nin tüm geçmişini getir."""
+        """Entity'nin tÃ¼m geÃ§miÅŸini getir."""
         key = f"{entity_type}:{entity_id}"
         indices = self._index.get(key, [])
         return [
@@ -243,10 +243,10 @@ class AuditLog:
         ]
 
     def get_decision_lineage(self, ticker: str) -> list[dict]:
-        """Bir ticker için tam karar zincirini getir."""
+        """Bir ticker iÃ§in tam karar zincirini getir."""
         history = self.get_entity_history("ticker", ticker)
 
-        # Sıralı: RAW_DATA → FEATURE → SIGNAL → DECISION → RISK → ORDER → FILL
+        # SÄ±ralÄ±: RAW_DATA â†’ FEATURE â†’ SIGNAL â†’ DECISION â†’ RISK â†’ ORDER â†’ FILL
         action_order = {
             "RAW_DATA": 0,
             "FEATURE": 1,
@@ -260,7 +260,7 @@ class AuditLog:
         return history
 
     def get_recent(self, limit: int = 50) -> list[dict]:
-        """Son audit kayıtları."""
+        """Son audit kayÄ±tlarÄ±."""
         recent = self._entries[-limit:]
         return [
             {
@@ -293,3 +293,4 @@ class AuditLog:
 
 # Singleton
 audit_log = AuditLog()
+

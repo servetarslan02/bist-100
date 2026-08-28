@@ -442,17 +442,16 @@ class TestRegimeDetection:
 
     def test_detect_regime_bull(self, engine):
         """Yükselen piyasa → BULL."""
-        import polars as pl
-        # Pozitif momentumlu data oluştur
+        # Pozitif momentumlu data oluştur (dict-based data)
         data = {}
         for ticker in ["A", "B", "C"]:
             close = list(np.linspace(100, 150, 60))  # %50 artış
-            data[ticker] = pl.DataFrame({
+            data[ticker] = {
                 "Close": close,
                 "High": close,
                 "Low": close,
                 "Volume": [1e6] * 60,
-            })
+            }
 
         regime = engine._detect_regime(data)
         # linspace verisi düşük volatiliteye sahip → LOW_VOLATILITY olabilir
@@ -462,6 +461,7 @@ class TestRegimeDetection:
             RegimeType.SIDEWAYS.value,
             RegimeType.LOW_VOLATILITY.value,
         ]
+
 
 
 # ============================================================================

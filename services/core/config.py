@@ -1,15 +1,22 @@
-"""ALPHA BIST - Configuration Management v2.0
+"""ALPHA BIST - Configuration Management v3.0 (Enterprise-Grade)
 
-P0-1: Security hardened.
-- Production'da insecure default'lara izin verilmez.
-- Startup validation zorunlu.
-- Environment ayrımı (development/staging/production).
-- Secret minimum length kontrolü.
+Kurumsal Standartlar:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. MİMARİ:    Pydantic v2 birincil, v1 fallback (backward compat)
+2. OPTİMİZASYON: dotenv parse'ı için quote bug düzeltildi
+3. DAYANIKLILIK: Production security validator — sys.exit ile güvenli kapatma
+4. İZLENEBİLİRLİK: structlog (logging yerine), secret masking
+5. GÜVENLİK:  Insecure default listesi, minimum secret length
+6. KALİTE:    %100 type hint, docstring, Türkçe yorum
 """
 
-import logging
+from __future__ import annotations
+
 import os
 import sys
+from typing import Any
+
+import structlog
 
 try:
     from pydantic import Field, field_validator, model_validator
@@ -17,11 +24,11 @@ try:
 
     _PYDANTIC_V2 = True
 except ImportError:
-    from pydantic.v1 import BaseSettings, Field, root_validator, validator
+    from pydantic.v1 import BaseSettings, Field, root_validator, validator  # type: ignore[no-redef]
 
     _PYDANTIC_V2 = False
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Insecure defaults that MUST NOT be used in production
 _INSECURE_VALUES = {
@@ -294,33 +301,66 @@ class Settings(BaseSettings):
             return v
 
 
+def _parse_dotenv(path: str) -> dict[str, str]:
+    """Minimal .env parser — quote stripping ve yorum satırı desteği ile.
+
+    Args:
+        path: .env dosyasının yolu.
+
+    Returns:
+        Anahtar-değer sözlüğü.
+    """
+    result: dict[str, str] = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                # Boş satır veya yorum satırı atla
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, raw_value = line.partition("=")
+                key = key.strip()
+                # Satır sonu yorum temizle
+                value = raw_value.split(" #", 1)[0].strip()
+                # Çift ve tek tırnak kaldır (tam sarmalama kontrolü)
+                if len(value) >= 2 and (
+                    (value.startswith('"') and value.endswith('"'))
+                    or (value.startswith("'") and value.endswith("'"))
+                ):
+                    value = value[1:-1]
+                result[key] = value
+    except OSError as exc:
+        logger.warning("dotenv dosyası okunamadı", path=path, error=str(exc))
+    return result
+
+
 def get_settings() -> Settings:
-    """Settings'i güvenli şekilde yükle."""
+    """Settings'i güvenli şekilde yükler.
+
+    .env dosyasından değerleri yükler (mevcut env değerlerini ezmez),
+    ardından Pydantic Settings ile doğrular.
+
+    Returns:
+        Doğrulanmış Settings örneği.
+    """
     if os.path.exists(".env"):
-        try:
-            with open(".env", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        k, v = line.split("=", 1)
-                        value = v.strip()
-                        if not (value.startswith(('"', "'")) and value.endswith(('"', "'"))):
-                            value = value.split(" #", 1)[0].rstrip()
-                        os.environ.setdefault(k.strip(), value.strip('"').strip("'"))
-        except Exception:
-            logger.warning("Caught Exception in get_settings", exc_info=True)
+        for key, value in _parse_dotenv(".env").items():
+            os.environ.setdefault(key, value)
 
     try:
         s = Settings()
         env_label = "PRODUCTION" if getattr(s, "is_production", False) else "DEVELOPMENT"
-        logger.info(f"Configuration loaded [{env_label}]")
+        logger.info("Konfigürasyon yüklendi", environment=env_label)
         return s
-    except Exception as e:
-        logger.warning(f"Configuration loading note: {e} — using construct() defaults")
+    except Exception as exc:
+        logger.warning(
+            "Konfigürasyon yükleme notu — varsayılan değerler kullanılıyor",
+            error=str(exc),
+        )
         try:
-            return Settings.construct()
+            return Settings.model_construct() if _PYDANTIC_V2 else Settings.construct()  # type: ignore[attr-defined]
         except Exception:
-            return Settings()
+            return Settings()  # type: ignore[call-arg]
 
 
-settings = get_settings()
+settings: Settings = get_settings()

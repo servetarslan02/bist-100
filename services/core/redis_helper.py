@@ -50,7 +50,6 @@ def get_client():
             password=password,
             socket_timeout=1,
             socket_connect_timeout=1,
-            retry_on_timeout=False,
             decode_responses=False,
         )
         _redis_client.ping()

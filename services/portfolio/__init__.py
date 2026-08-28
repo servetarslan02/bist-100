@@ -2,6 +2,8 @@
 #
 # Modüller:
 # - portfolio_manager: Pozisyon yönetimi, muhasebe, P&L, risk metrikleri, rebalancing
+# - portfolio_optimizer: Risk Parity, HRP, Mean-Variance, Black-Litterman çoklu optimizasyon motoru
+# - portfolio_enhancements: Turnover penalty, cost-aware rebalance, hysteresis, sector/liquidity constraints
 # - main: PortfolioService (DB-backed, atomic operations, lock)
 # - enhancements: Tax, dividend, benchmark, attribution, multi-currency, TCA
 
@@ -19,7 +21,20 @@ from .enhancements import (
     tax_model,
     tca,
 )
+from .portfolio_enhancements import (
+    PortfolioConstraints,
+    PortfolioEnhancements,
+    RebalanceDecision,
+    portfolio_enhancements,
+)
 from .portfolio_manager import PortfolioManager, Position, Trade, portfolio_manager
+from .portfolio_optimizer import (
+    OptimizationMethod,
+    OptimizationResult,
+    PortfolioOptimizer,
+    PortfolioOptimizerConstraints,
+    portfolio_optimizer,
+)
 
 __all__ = [
     # Portfolio Manager
@@ -27,7 +42,17 @@ __all__ = [
     "portfolio_manager",
     "Position",
     "Trade",
-    # Enhancements
+    # Portfolio Optimizer
+    "PortfolioOptimizer",
+    "portfolio_optimizer",
+    "OptimizationMethod",
+    "OptimizationResult",
+    "PortfolioOptimizerConstraints",
+    # Enhancements & Constraints
+    "PortfolioEnhancements",
+    "portfolio_enhancements",
+    "PortfolioConstraints",
+    "RebalanceDecision",
     "TaxModel",
     "tax_model",
     "DividendHandler",

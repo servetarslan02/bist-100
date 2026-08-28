@@ -16,12 +16,17 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - Katman 5 (Portfolio & Risk)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 from .bias_detector import BiasDetectorMiddleware, LookAheadBiasDetector

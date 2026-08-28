@@ -591,7 +591,8 @@ def assess_portfolio_risk(
 ) -> dict[str, Any]:
     """Gelişmiş portföy risk değerlendirmesi.
 
-    Tüm risk modüllerini çalıştırır ve kapsamlı risk raporu üretir.
+    Merkezi RiskOrchestrator üzerinden tüm risk modüllerini (VaR/CVaR, L-VaR,
+    Likidite, Dynamic Limits, Stres Testi, Tail Hedge, Drawdown) çalıştırır.
 
     Args:
         portfolio: Portföy bilgisi {"positions", "total_value", "weights"}
@@ -602,137 +603,25 @@ def assess_portfolio_risk(
     Returns:
         Kapsamlı risk raporu
     """
-    result = {
-        "timestamp": datetime.now(UTC).isoformat(),
-        "portfolio_value": portfolio.get("total_value", 0),
-        "regime": regime,
-    }
-
-    # 1. VaR/CVaR (getiri geçmişi varsa)
-    if returns_history is not None and len(returns_history) > 20:
-        try:
-            from .var_cvar import var_calculator
-
-            portfolio_value = portfolio.get("total_value", 100000)
-            var_report = var_calculator.calculate_full_var_report(
-                returns=returns_history,
-                portfolio_value=portfolio_value,
-            )
-            result["var_cvar"] = {
-                "consensus_var_95": var_report["consensus"]["var_95"],
-                "parametric_var_95": var_report["parametric"]["var_95"],
-                "historical_var_95": var_report["historical"]["var_95"],
-                "monte_carlo_var_95": var_report["monte_carlo"]["var_95"],
-                "cvar_95": var_report["historical"]["cvar_95"],
-                "method_agreement": var_report["consensus"]["method_agreement"],
-            }
-        except Exception as e:
-            result["var_cvar"] = {"error": str(e)}
-
-    # 2. Dynamic Limits
     try:
-        from .dynamic_limits import dynamic_limits
+        from .orchestrator import risk_orchestrator
 
-        volatility = float(np.std(returns_history or [0]) * np.sqrt(252)) if returns_history is not None else 0.20
-        current_dd = portfolio.get("current_drawdown_pct", 0)
-        limits = dynamic_limits.get_limits(
-            annualized_volatility=volatility,
-            regime=regime,
-            current_drawdown_pct=current_dd,
-        )
-        result["dynamic_limits"] = {
-            "max_position_pct": limits.max_position_pct,
-            "max_sector_pct": limits.max_sector_pct,
-            "max_exposure_pct": limits.max_exposure_pct,
-            "kelly_fraction": limits.kelly_fraction,
-            "min_confidence": limits.min_confidence,
-        }
-    except Exception as e:
-        result["dynamic_limits"] = {"error": str(e)}
-
-    # 3. Concentration Risk
-    try:
-        from .enhanced_risk import concentration_risk
-
-        weights = portfolio.get("weights", {})
-        if weights:
-            hhi = concentration_risk.compute_hhi(weights)
-            max_ticker, max_weight = concentration_risk.compute_max_concentration(weights)
-            result["concentration"] = {
-                "hhi": round(hhi, 4),
-                "max_position": max_ticker,
-                "max_weight": round(max_weight, 4),
-            }
-    except Exception as e:
-        result["concentration"] = {"error": str(e)}
-
-    # 4. Drawdown Response
-    try:
-        from .drawdown_response import drawdown_system
-
-        current_equity = portfolio.get("total_value", 0)
-        if current_equity > 0:
-            dd_state = drawdown_system.update_equity(current_equity)
-            result["drawdown"] = {
-                "current_pct": dd_state.current_drawdown_pct,
-                "max_pct": dd_state.max_drawdown_pct,
-                "action": dd_state.action.value,
-                "severity": dd_state.severity.value,
-                "position_scale": dd_state.position_scale,
-            }
-    except Exception as e:
-        result["drawdown"] = {"error": str(e)}
-
-    # 5. Stress Test (getiri geçmişi varsa)
-    if returns_history is not None and len(returns_history) > 20:
-        try:
-            from .stress_test import stress_test_engine
-
-            stress_report = stress_test_engine.run_all_scenarios(portfolio)
-            result["stress_test"] = {
-                "risk_score": stress_report.risk_score,
-                "worst_scenario": stress_report.worst_scenario.scenario_name if stress_report.worst_scenario else "N/A",
-                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct
-                if stress_report.worst_scenario
-                else 0,
-                "recommendations": stress_report.recommendations,
-            }
-        except Exception as e:
-            result["stress_test"] = {"error": str(e)}
-
-    # 6. Tail Hedge
-    try:
-        from .tail_hedge import tail_hedger
-
-        portfolio_value = portfolio.get("total_value", 100000)
-        hedge = tail_hedger.analyze(
-            portfolio_value=portfolio_value,
+        return risk_orchestrator.assess_portfolio_risk(
+            portfolio=portfolio,
+            market_data=market_data,
+            returns_history=returns_history,
             regime=regime,
         )
-        result["tail_hedge"] = {
-            "strategy": hedge.strategy,
-            "hedge_ratio": hedge.hedge_ratio,
-            "estimated_cost_pct": hedge.estimated_cost_pct,
-            "protection_level": hedge.protection_level,
-        }
     except Exception as e:
-        result["tail_hedge"] = {"error": str(e)}
+        logger.error("assess_portfolio_risk delegation failed, fallback to basic calculation", error=str(e))
+        return {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "portfolio_value": portfolio.get("total_value", 0),
+            "regime": regime,
+            "error": str(e),
+            "composite_risk_score": 50.0,
+        }
 
-    # 7. Monitoring Alert Check
-    try:
-        pass
-        # Basit risk skoru hesapla
-        risk_score = 50.0
-        if "var_cvar" in result and "error" not in result.get("var_cvar", {}):
-            var_pct = result["var_cvar"].get("consensus_var_95", 0) / max(portfolio.get("total_value", 1), 1) * 100
-            risk_score += min(30, var_pct * 6)
-        if "drawdown" in result and "error" not in result.get("drawdown", {}):
-            risk_score += min(20, result["drawdown"].get("current_pct", 0) * 2)
-        result["risk_score"] = round(min(100, risk_score), 1)
-    except Exception:
-        result["risk_score"] = 50.0
-
-    return result
 
 
 def assess_viop_risk(

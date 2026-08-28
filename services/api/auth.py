@@ -11,12 +11,22 @@ Roller:
 - SYSTEM: Servisler arası (API key)
 """
 
+import base64
+import hashlib
+import hmac
 import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import jwt
+try:
+    import jwt
+    HAS_JWT = True
+except ImportError:
+    jwt = None
+    HAS_JWT = False
+
+import orjson
 import structlog
 
 from services.core.security import Role
@@ -78,22 +88,56 @@ class JWTHandler:
         payload = {
             "sub": user_id,
             "username": username,
-            "role": role.value,
+            "role": role.value if hasattr(role, "value") else str(role),
             "permissions": ROLE_PERMISSIONS.get(role, []),
             "exp": now + (expires_hours * 3600),
             "iat": now,
         }
-        return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+        if HAS_JWT and jwt is not None:
+            return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+
+        # Standart kütüphane tabanlı HMAC fallback token
+        header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
+        body = base64.urlsafe_b64encode(orjson.dumps(payload)).decode().rstrip("=")
+        to_sign = f"{header}.{body}".encode()
+        sig = base64.urlsafe_b64encode(hmac.new(self.secret_key.encode(), to_sign, hashlib.sha256).digest()).decode().rstrip("=")
+        return f"{header}.{body}.{sig}"
 
     def verify_token(self, token: str) -> TokenPayload | None:
         """JWT token doğrula."""
+        if HAS_JWT and jwt is not None:
+            try:
+                payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+                return TokenPayload(**payload)
+            except jwt.ExpiredSignatureError:
+                logger.warning("JWT token expired")
+                return None
+            except jwt.InvalidTokenError as e:
+                logger.warning("JWT verification failed", error=str(e))
+                return None
+
+        # Fallback doğrulama
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            return TokenPayload(**payload)
-        except jwt.ExpiredSignatureError:
-            logger.warning("JWT token expired")
-            return None
-        except jwt.InvalidTokenError as e:
+            parts = token.split(".")
+            if len(parts) != 3:
+                return None
+            header, body, sig = parts
+            to_sign = f"{header}.{body}".encode()
+            expected_sig = base64.urlsafe_b64encode(hmac.new(self.secret_key.encode(), to_sign, hashlib.sha256).digest()).decode().rstrip("=")
+            if not hmac.compare_digest(sig, expected_sig):
+                logger.warning("JWT signature mismatch")
+                return None
+
+            # Padding ekle ve decode et
+            rem = len(body) % 4
+            if rem > 0:
+                body += "=" * (4 - rem)
+            payload_data = orjson.loads(base64.urlsafe_b64decode(body.encode()))
+            if payload_data.get("exp", 0) < time.time():
+                logger.warning("JWT token expired")
+                return None
+            return TokenPayload(**payload_data)
+        except Exception as e:
             logger.warning("JWT verification failed", error=str(e))
             return None
 

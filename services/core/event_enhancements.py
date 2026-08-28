@@ -22,11 +22,10 @@ Kullanım:
 
 from __future__ import annotations
 
-import hashlib
 import time
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -170,12 +169,13 @@ class EventEnhancements:
             Gecikme süresi (saniye)
         """
         delay = min(
-            self.retry_policy.base_delay * (self.retry_policy.exponential_base ** attempt),
+            self.retry_policy.base_delay * (self.retry_policy.exponential_base**attempt),
             self.retry_policy.max_delay,
         )
 
         if self.retry_policy.jitter:
             import random
+
             delay *= 0.5 + random.random()
 
         return delay
@@ -265,6 +265,24 @@ class EventEnhancements:
         """
         self._sequence_numbers[key] += 1
         return self._sequence_numbers[key]
+
+    def is_out_of_order(self, key: str, seq: int) -> bool:
+        """Gelen mesaj sırası bozulmuş mu (eski veya tekrar sequence mi)?
+
+        Args:
+            key: Sıralama anahtarı (ör: THYAO.ticks)
+            seq: Gelen mesajın sıra numarası
+
+        Returns:
+            True if out of order / stale sequence
+        """
+        last_seq = self._sequence_numbers.get(key, 0)
+        return seq <= last_seq if last_seq > 0 else False
+
+    def record_sequence(self, key: str, seq: int) -> None:
+        """En son işlenen sequence numarasını günceller."""
+        if seq > self._sequence_numbers.get(key, 0):
+            self._sequence_numbers[key] = seq
 
     def create_metadata(
         self,

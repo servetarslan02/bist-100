@@ -13,7 +13,7 @@ Kullanım:
     data = await pit_fetch(conn, "daily_performance", days=30)
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -113,9 +113,9 @@ async def pit_fetch_as_of(
     # PIT-safe sorgu: created_column <= as_of_date
     query = f"""
         SELECT {columns}
-        FROM {template['table']}
-        WHERE {template['identifier_column']} = $1
-            AND {template['created_column']} <= $2
+        FROM {template["table"]}
+        WHERE {template["identifier_column"]} = $1
+            AND {template["created_column"]} <= $2
     """
     params = [identifier, as_of_date]
 
@@ -164,9 +164,9 @@ async def pit_fetch_latest(
 
     query = f"""
         SELECT {columns}
-        FROM {template['table']}
-        WHERE {template['identifier_column']} = $1
-        ORDER BY {template['created_column']} DESC
+        FROM {template["table"]}
+        WHERE {template["identifier_column"]} = $1
+        ORDER BY {template["created_column"]} DESC
         LIMIT $2
     """
 
@@ -217,12 +217,12 @@ async def pit_fetch_range(
     # PIT-safe: Hem time_column hem created_column kontrolü
     query = f"""
         SELECT {columns}
-        FROM {template['table']}
-        WHERE {template['identifier_column']} = $1
-            AND {template['time_column']} >= $2
-            AND {template['time_column']} <= $3
-            AND {template['created_column']} <= $3
-        ORDER BY {template['time_column']} ASC
+        FROM {template["table"]}
+        WHERE {template["identifier_column"]} = $1
+            AND {template["time_column"]} >= $2
+            AND {template["time_column"]} <= $3
+            AND {template["created_column"]} <= $3
+        ORDER BY {template["time_column"]} ASC
     """
 
     try:
@@ -266,10 +266,10 @@ async def pit_validate_no_leakage(
     # check_date'ten SONRA oluşturulmuş ama check_date'ten ÖNCEki veriyi gösteren kayıtlar
     query = f"""
         SELECT COUNT(*) as leak_count
-        FROM {template['table']}
-        WHERE {template['identifier_column']} = $1
-            AND {template['created_column']} > $2
-            AND {template['time_column']} <= $2
+        FROM {template["table"]}
+        WHERE {template["identifier_column"]} = $1
+            AND {template["created_column"]} > $2
+            AND {template["time_column"]} <= $2
     """
 
     try:
@@ -322,11 +322,11 @@ async def pit_fetch_snapshot(
         snapshot_date = datetime.fromisoformat(snapshot_date)
 
     query = f"""
-        SELECT DISTINCT ON ({template['identifier_column']})
+        SELECT DISTINCT ON ({template["identifier_column"]})
             {columns}
-        FROM {template['table']}
-        WHERE {template['created_column']} <= $1
-        ORDER BY {template['identifier_column']}, {template['created_column']} DESC
+        FROM {template["table"]}
+        WHERE {template["created_column"]} <= $1
+        ORDER BY {template["identifier_column"]}, {template["created_column"]} DESC
         LIMIT $2
     """
 
@@ -401,9 +401,7 @@ async def pit_audit_all_tables(
             template = PIT_QUERY_TEMPLATES[table]
             id_col = template["identifier_column"]
 
-            identifiers = await conn.fetch(
-                f"SELECT DISTINCT {id_col} FROM {table} LIMIT 10"
-            )
+            identifiers = await conn.fetch(f"SELECT DISTINCT {id_col} FROM {table} LIMIT 10")
 
             for row in identifiers:
                 identifier = row[id_col]

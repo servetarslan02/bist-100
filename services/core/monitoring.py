@@ -1,24 +1,24 @@
-"""
-ALPHA BIST — Portfolio & Lock Monitoring Integration
+﻿"""
+ALPHA BIST â€” Portfolio & Lock Monitoring Integration
 
 Prometheus metrics + FastAPI endpoints for production observability.
 
 Endpoints:
-  GET /health/detailed     — Full system health (portfolio + locks)
-  GET /metrics             — Prometheus format metrics
-  GET /admin/lock-metrics  — Lock performance metrics
-  GET /admin/portfolio     — Portfolio health + accounting
+  GET /health/detailed     â€” Full system health (portfolio + locks)
+  GET /metrics             â€” Prometheus format metrics
+  GET /admin/lock-metrics  â€” Lock performance metrics
+  GET /admin/portfolio     â€” Portfolio health + accounting
 
 Metrics:
-  lock_acquisition_total      — Counter
-  lock_timeout_total          — Counter
-  lock_deadlock_total         — Counter
-  lock_renewal_total          — Counter
-  lock_wait_seconds           — Histogram
-  portfolio_equity            — Gauge
-  portfolio_cash              — Gauge
-  portfolio_positions_count   — Gauge
-  portfolio_invariant_failures — Counter
+  lock_acquisition_total      â€” Counter
+  lock_timeout_total          â€” Counter
+  lock_deadlock_total         â€” Counter
+  lock_renewal_total          â€” Counter
+  lock_wait_seconds           â€” Histogram
+  portfolio_equity            â€” Gauge
+  portfolio_cash              â€” Gauge
+  portfolio_positions_count   â€” Gauge
+  portfolio_invariant_failures â€” Counter
 """
 
 import time
@@ -31,27 +31,27 @@ from .alerting import alerting
 from .db_lock import get_all_metrics, get_health_report
 from .observability import health_checker, prometheus_metrics
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 class PortfolioMonitor:
-    """Portfolio ve lock monitoring — Prometheus + API integration."""
+    """Portfolio ve lock monitoring â€” Prometheus + API integration."""
 
     def __init__(self):
         self._portfolio_service = None
         self._last_sync_time: float | None = None
-        self._sync_interval_s = 5.0  # 5 saniyede bir metrik güncelle
+        self._sync_interval_s = 5.0  # 5 saniyede bir metrik gÃ¼ncelle
         self._invariant_failure_count = 0
 
     def bind(self, portfolio_service):
-        """PortfolioService'i monitor'a bağla."""
+        """PortfolioService'i monitor'a baÄŸla."""
         self._portfolio_service = portfolio_service
         health_checker.register("portfolio_locks")
         health_checker.register("portfolio_accounting")
         logger.info("Portfolio monitor bound to service")
 
     async def sync_metrics(self):
-        """Portfolio metriklerini Prometheus gauge'larına yaz."""
+        """Portfolio metriklerini Prometheus gauge'larÄ±na yaz."""
         now = time.time()
         if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
             return
@@ -93,7 +93,7 @@ class PortfolioMonitor:
             # Lock metrics
             lock_metrics = get_all_metrics()
             for key, m in lock_metrics.items():
-                prometheus_metrics.inc("lock_acquisition_total", m.get("total_acquisitions", 0), {"key": key})
+                prometheus_metrics.set_gauge("lock_acquisition_total", m.get("total_acquisitions", 0), {"key": key})
                 prometheus_metrics.set_gauge("lock_wait_seconds", m.get("avg_wait_ms", 0) / 1000, {"key": key})
             alerting.check_lock_metrics(lock_metrics)
 
@@ -103,7 +103,7 @@ class PortfolioMonitor:
             logger.warning("Metrics sync failed", error=str(e))
 
     async def get_health_detailed(self) -> dict[str, Any]:
-        """Detaylı sağlık raporu (API endpoint için)."""
+        """DetaylÄ± saÄŸlÄ±k raporu (API endpoint iÃ§in)."""
         await self.sync_metrics()
 
         lock_health = get_health_report()
@@ -125,7 +125,7 @@ class PortfolioMonitor:
         else:
             overall = "HEALTHY"
 
-        # Health checker bileşenlerini güncelle
+        # Health checker bileÅŸenlerini gÃ¼ncelle
         lock_status = lock_health.get("overall_status", "UNKNOWN")
         health_checker.update_status("portfolio_locks", lock_status, f"Lock status: {lock_status}")
 
@@ -137,7 +137,7 @@ class PortfolioMonitor:
             "portfolio_accounting", acc_status, f"Invariant: {'OK' if acc_status == 'HEALTHY' else 'FAILED'}"
         )
 
-        # Alert kontrolü
+        # Alert kontrolÃ¼
         alerting.check_health({"status": overall, "issues": []})
 
         return {
@@ -150,7 +150,7 @@ class PortfolioMonitor:
         }
 
     async def get_prometheus_text(self) -> str:
-        """Prometheus text formatında metrics export."""
+        """Prometheus text formatÄ±nda metrics export."""
         await self.sync_metrics()
 
         lines = []
@@ -217,3 +217,4 @@ class PortfolioMonitor:
 
 # Singleton
 portfolio_monitor = PortfolioMonitor()
+

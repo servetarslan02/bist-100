@@ -141,7 +141,8 @@ class DuckDBStore:
     def _is_valid_identifier(name: str) -> bool:
         """SQL identifier whitelist kontrolü — injection önleme."""
         import re
-        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name))
+
+        return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name))
 
     def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
@@ -156,7 +157,7 @@ class DuckDBStore:
                     stats[table] = 0
                     continue
                 try:
-                    count = conn.execute(f"SELECT COUNT(*) FROM \"{table}\"").fetchone()[0]
+                    count = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
                     stats[table] = count
                 except Exception as e:
                     logger.debug("Table count failed", table=table, error=str(e))

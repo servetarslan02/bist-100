@@ -1,21 +1,21 @@
-"""
-ALPHA BIST — Central State Store v1.0
+﻿"""
+ALPHA BIST â€” Central State Store v1.0
 
-Tüm in-memory state'lerin DuckDB tabanlı persistansı.
-Restart sonrası kaybolan tüm kritik state'ler burada saklanır.
+TÃ¼m in-memory state'lerin DuckDB tabanlÄ± persistansÄ±.
+Restart sonrasÄ± kaybolan tÃ¼m kritik state'ler burada saklanÄ±r.
 
-Kapsanan bileşenler:
-- Circuit Breaker durumları
-- Provider Reliability skorları
-- Rate Limiter token'ları
-- Learning Loop tahmin geçmişi ve accuracy
-- Signal Fusion adaptive ağırlıklar
-- Correlation Tracker geçmişi
-- Champion Challenger geçmişi
+Kapsanan bileÅŸenler:
+- Circuit Breaker durumlarÄ±
+- Provider Reliability skorlarÄ±
+- Rate Limiter token'larÄ±
+- Learning Loop tahmin geÃ§miÅŸi ve accuracy
+- Signal Fusion adaptive aÄŸÄ±rlÄ±klar
+- Correlation Tracker geÃ§miÅŸi
+- Champion Challenger geÃ§miÅŸi
 
 SSD dostu: WAL mode, batched writes, minimal I/O
 
-Kullanım:
+KullanÄ±m:
     from services.core.state_store import state_store
 
     # Circuit breaker
@@ -39,7 +39,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import duckdb
+try:
+    import duckdb
+
+    HAS_DUCKDB = True
+except ImportError:
+    duckdb = None
+    HAS_DUCKDB = False
+
 import structlog
 
 try:
@@ -47,23 +54,42 @@ try:
 except ImportError:
     raise ImportError("orjson is required") from None
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+
+class _DummyDuckDBConn:
+    def execute(self, *args, **kwargs):
+        return self
+
+    def fetchall(self):
+        return []
+
+    def fetchone(self):
+        return None
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
 
 
 class CentralStateStore:
-    """Merkezi state store — tüm in-memory state'ler için DuckDB."""
+    """Merkezi state store â€” tÃ¼m in-memory state'ler iÃ§in DuckDB."""
 
     def __init__(self, db_path: str = "data/central_state.db"):
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
+        self._memory_cache: dict[str, Any] = {}
+        if HAS_DUCKDB:
+            self._init_db()
         self._write_buffer: list[tuple] = []
-        self._buffer_size = 10  # Küçük buffer — crash safety için
+        self._buffer_size = 10  # KÃ¼Ã§Ã¼k buffer â€” crash safety iÃ§in
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
 
     def _init_db(self):
-        """Tabloları oluştur."""
+        """TablolarÄ± oluÅŸtur."""
         with self._connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS circuit_breakers (
@@ -140,6 +166,10 @@ class CentralStateStore:
 
     @contextmanager
     def _connect(self):
+        if not HAS_DUCKDB or duckdb is None:
+            yield _DummyDuckDBConn()
+            return
+
         conn = duckdb.connect(str(self._db_path))
         try:
             yield conn
@@ -147,7 +177,7 @@ class CentralStateStore:
             conn.close()
 
     def _flush_buffer(self):
-        """Write buffer'ı flush et (batched write — SSD dostu)."""
+        """Write buffer'Ä± flush et (batched write â€” SSD dostu)."""
         if not self._write_buffer:
             return
 
@@ -160,13 +190,13 @@ class CentralStateStore:
         self._last_flush = time.time()
 
     def _buffered_write(self, query: str, params: tuple):
-        """Buffered write — toplu yaz (SSD dostu)."""
+        """Buffered write â€” toplu yaz (SSD dostu)."""
         self._write_buffer.append((query, params))
         if len(self._write_buffer) >= self._buffer_size:
             self._flush_buffer()
 
     def periodic_flush(self):
-        """Periyodik flush (scheduler tarafından çağrılır)."""
+        """Periyodik flush (scheduler tarafÄ±ndan Ã§aÄŸrÄ±lÄ±r)."""
         if time.time() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
@@ -192,7 +222,7 @@ class CentralStateStore:
         )
 
     def load_circuit_state(self, name: str) -> dict[str, Any] | None:
-        """Circuit breaker durumunu yükle."""
+        """Circuit breaker durumunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM circuit_breakers WHERE name = ?", (name,)).fetchone()
@@ -201,7 +231,7 @@ class CentralStateStore:
         return None
 
     def load_all_circuit_states(self) -> dict[str, dict]:
-        """Tüm circuit breaker durumlarını yükle."""
+        """TÃ¼m circuit breaker durumlarÄ±nÄ± yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM circuit_breakers").fetchall()
@@ -223,7 +253,7 @@ class CentralStateStore:
         )
 
     def load_provider_reliability(self, name: str) -> dict[str, Any] | None:
-        """Provider reliability skorunu yükle."""
+        """Provider reliability skorunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM provider_reliability WHERE name = ?", (name,)).fetchone()
@@ -247,7 +277,7 @@ class CentralStateStore:
         )
 
     def load_rate_limiter(self, name: str) -> float | None:
-        """Rate limiter token durumunu yükle."""
+        """Rate limiter token durumunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute("SELECT tokens FROM rate_limiters WHERE name = ?", (name,)).fetchone()
@@ -271,7 +301,7 @@ class CentralStateStore:
             conn.commit()
 
     def load_learning_state(self) -> dict[str, Any]:
-        """Learning loop durumunu yükle."""
+        """Learning loop durumunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             rows = conn.execute("SELECT key, value FROM learning_state").fetchall()
@@ -308,7 +338,7 @@ class CentralStateStore:
             conn.commit()
 
     def update_prediction_outcome(self, ticker: str, outcome: dict):
-        """Tahmin sonucunu güncelle."""
+        """Tahmin sonucunu gÃ¼ncelle."""
         outcome_json = orjson.dumps(outcome, default=str).decode()
         with self._connect() as conn:
             conn.execute(
@@ -324,7 +354,7 @@ class CentralStateStore:
             conn.commit()
 
     def load_recent_predictions(self, limit: int = 100) -> list[dict]:
-        """Son tahminleri yükle."""
+        """Son tahminleri yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             rows = conn.execute(
@@ -359,7 +389,7 @@ class CentralStateStore:
     # ===================== SIGNAL FUSION =====================
 
     def save_fusion_weights(self, weights: dict[str, float]):
-        """Signal fusion ağırlıklarını kaydet."""
+        """Signal fusion aÄŸÄ±rlÄ±klarÄ±nÄ± kaydet."""
         now = datetime.now(UTC).isoformat()
         weights_json = orjson.dumps(weights).decode()
         with self._connect() as conn:
@@ -373,7 +403,7 @@ class CentralStateStore:
             conn.commit()
 
     def load_fusion_weights(self) -> dict[str, float] | None:
-        """Signal fusion ağırlıklarını yükle."""
+        """Signal fusion aÄŸÄ±rlÄ±klarÄ±nÄ± yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute("SELECT weights FROM fusion_weights WHERE key = 'adaptive'").fetchone()
@@ -384,7 +414,7 @@ class CentralStateStore:
     # ===================== CORRELATION TRACKER =====================
 
     def save_correlation_history(self, var1: str, var2: str, values: list[float]):
-        """Korelasyon geçmişini kaydet."""
+        """Korelasyon geÃ§miÅŸini kaydet."""
         now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(values).decode()
         f"{min(var1, var2)}:{max(var1, var2)}"
@@ -398,7 +428,7 @@ class CentralStateStore:
         )
 
     def load_correlation_history(self, var1: str, var2: str) -> list[float] | None:
-        """Korelasyon geçmişini yükle."""
+        """Korelasyon geÃ§miÅŸini yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute(
@@ -415,7 +445,7 @@ class CentralStateStore:
     # ===================== CHAMPION CHALLENGER =====================
 
     def save_champion_entry(self, data: dict):
-        """Champion challenger kaydı ekle."""
+        """Champion challenger kaydÄ± ekle."""
         now = datetime.now(UTC).isoformat()
         data_json = orjson.dumps(data, default=str).decode()
         with self._connect() as conn:
@@ -429,7 +459,7 @@ class CentralStateStore:
             conn.commit()
 
     def load_champion_history(self, limit: int = 100) -> list[dict]:
-        """Champion challenger geçmişini yükle."""
+        """Champion challenger geÃ§miÅŸini yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
             rows = conn.execute(
@@ -444,7 +474,7 @@ class CentralStateStore:
     # ===================== GENEL =====================
 
     def get_stats(self) -> dict[str, Any]:
-        """İstatistikler."""
+        """Ä°statistikler."""
         with self._connect() as conn:
             tables = [
                 "circuit_breakers",
@@ -482,7 +512,7 @@ state_store = CentralStateStore()
 
 # =====================================================
 # GRACEFUL SHUTDOWN: Signal handler + atexit
-# Elektrik kesintisi veya SIGTERM/SIGINT'te buffer'ı flush et
+# Elektrik kesintisi veya SIGTERM/SIGINT'te buffer'Ä± flush et
 # =====================================================
 
 
@@ -507,3 +537,4 @@ try:
     signal.signal(signal.SIGINT, _flush_on_signal)
 except (ValueError, OSError):
     logger.warning("Error in _flush_on_signal: (ValueError, OSError)", exc_info=True)
+

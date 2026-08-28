@@ -54,11 +54,7 @@ class RiskMetrics:
 
 
 class LedoitWolfCovariance:
-    """Ledoit-Wolf shrinkage covariance estimation.
-
-    Basit sample covariance yerine regularized tahmin.
-    Küçük sample'larda daha stabil.
-    """
+    """Ledoit-Wolf shrinkage covariance estimation with PSD guarantee."""
 
     def estimate(self, returns: np.ndarray, shrinkage: float | None = None) -> np.ndarray:
         """Kovaryans matrisi tahmin et.
@@ -67,10 +63,16 @@ class LedoitWolfCovariance:
             returns: Getiri matrisi (n_days × n_assets)
             shrinkage: Shrinkage katsayısı (0-1). None ise otomatik.
         """
-        n_days, n_assets = returns.shape
+        from .covariance import ensure_positive_semi_definite
+
+        returns = np.asarray(returns, dtype=float)
+        if np.isnan(returns).any() or np.isinf(returns).any():
+            returns = np.nan_to_num(returns, nan=0.0, posinf=0.0, neginf=0.0)
+
+        n_days, n_assets = returns.shape if returns.ndim == 2 else (len(returns), 1)
 
         if n_days < 2 or n_assets < 2:
-            return np.eye(n_assets)
+            return np.eye(max(1, n_assets))
 
         # Sample covariance
         sample_cov = np.cov(returns.T)
@@ -85,17 +87,21 @@ class LedoitWolfCovariance:
         # Shrunk covariance
         shrunk_cov = (1 - shrinkage) * sample_cov + shrinkage * target
 
-        return shrunk_cov
+        # Ensure positive semi-definiteness
+        psd_cov = ensure_positive_semi_definite(shrunk_cov)
+
+        return psd_cov
 
     def _estimate_shrinkage(self, returns: np.ndarray, sample_cov: np.ndarray, target: np.ndarray) -> float:
-        """Otomel shrinkage katsayısı tahmin et."""
+        """Otomatik shrinkage katsayısı tahmin et."""
         n = returns.shape[0]
         if n < 2:
             return 0.5
 
-        # Basit heuristic: daha az veri → daha fazla shrinkage
+        # Veri azaldıkça shrinkage artar
         shrinkage = min(0.9, max(0.1, 1 - n / 252))
         return shrinkage
+
 
 
 class VolatilityTargeter:

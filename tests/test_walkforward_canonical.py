@@ -11,7 +11,15 @@ import tempfile
 from datetime import datetime, timedelta
 
 import numpy as np
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+import pytest
+
+pytestmark = pytest.mark.skipif(pl is None, reason="polars library required")
+
+
 
 
 def _make_market_data(n_stocks=8, n_days=380, seed=42):

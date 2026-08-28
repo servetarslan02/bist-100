@@ -1,9 +1,9 @@
-"""
-ALPHA BIST — Database Transaction Helper
+﻿"""
+ALPHA BIST â€” Database Transaction Helper
 
-Atomic operations için transaction yardımcısı.
+Atomic operations iÃ§in transaction yardÄ±mcÄ±sÄ±.
 
-Özellikler:
+Ã–zellikler:
 1. Atomic multi-operation transactions
 2. Retry with exponential backoff
 3. Nested transaction support (savepoints)
@@ -24,7 +24,7 @@ from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -62,11 +62,11 @@ class QueryMetrics:
 
 class TransactionHelper:
     """
-    Database transaction yardımcısı.
+    Database transaction yardÄ±mcÄ±sÄ±.
 
-    Atomic operations, retry, timeout ve metrik takibi sağlar.
+    Atomic operations, retry, timeout ve metrik takibi saÄŸlar.
 
-    Kullanım:
+    KullanÄ±m:
         helper = TransactionHelper(pg_pool)
 
         # Simple atomic
@@ -107,7 +107,7 @@ class TransactionHelper:
         Atomic transaction context manager.
 
         Args:
-            timeout_seconds: Zaman aşımı
+            timeout_seconds: Zaman aÅŸÄ±mÄ±
             read_only: Salt okunur transaction
 
         Yields:
@@ -179,11 +179,11 @@ class TransactionHelper:
         """
         Retry ile atomic transaction.
 
-        Deadlock veya geçici hatalarda otomatik retry.
+        Deadlock veya geÃ§ici hatalarda otomatik retry.
 
         Args:
-            max_retries: Maksimum deneme sayısı
-            timeout_seconds: Zaman aşımı
+            max_retries: Maksimum deneme sayÄ±sÄ±
+            timeout_seconds: Zaman aÅŸÄ±mÄ±
             read_only: Salt okunur
         """
         retries = max_retries or self._max_retries
@@ -214,7 +214,7 @@ class TransactionHelper:
         """
         Nested transaction (savepoint).
 
-        Inner transaction başarısız olursa sadece savepoint rollback olur.
+        Inner transaction baÅŸarÄ±sÄ±z olursa sadece savepoint rollback olur.
         """
         sp_name = f"sp_{name}_{int(time.monotonic() * 1000)}"
         await conn.execute(f"SAVEPOINT {sp_name}")
@@ -232,17 +232,17 @@ class TransactionHelper:
         timeout_seconds: float | None = None,
     ) -> list[Any]:
         """
-        Toplu atomic işlem.
+        Toplu atomic iÅŸlem.
 
-        Tüm operasyonlar tek transaction'da çalışır.
-        Birisi başarısızsa hepsi rollback olur.
+        TÃ¼m operasyonlar tek transaction'da Ã§alÄ±ÅŸÄ±r.
+        Birisi baÅŸarÄ±sÄ±zsa hepsi rollback olur.
 
         Args:
             operations: Callable listesi (conn parametreli)
-            timeout_seconds: Zaman aşımı
+            timeout_seconds: Zaman aÅŸÄ±mÄ±
 
         Returns:
-            Her operasyonun dönüş değeri
+            Her operasyonun dÃ¶nÃ¼ÅŸ deÄŸeri
         """
         results = []
 
@@ -261,7 +261,7 @@ class TransactionHelper:
         return self._metrics.to_dict()
 
     def get_slow_queries(self, threshold_ms: float = 1000) -> list[dict[str, Any]]:
-        """Yavaş sorguları listele."""
+        """YavaÅŸ sorgularÄ± listele."""
         slow = [q for q in self._query_log if q.duration_ms > threshold_ms]
         return [
             {
@@ -274,7 +274,7 @@ class TransactionHelper:
         ]
 
     def reset_metrics(self):
-        """Metrikleri sıfırla."""
+        """Metrikleri sÄ±fÄ±rla."""
         self._metrics = TransactionMetrics()
         self._query_log.clear()
 
@@ -291,7 +291,7 @@ class TransactionConnection:
         self._query_log = query_log
 
     async def execute(self, query: str, *args) -> Any:
-        """Sorgu çalıştır (metrics ile)."""
+        """Sorgu Ã§alÄ±ÅŸtÄ±r (metrics ile)."""
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
@@ -354,7 +354,7 @@ class TransactionConnection:
             raise
 
     async def fetchval(self, query: str, *args) -> Any:
-        """Tek değer fetch."""
+        """Tek deÄŸer fetch."""
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
@@ -387,3 +387,4 @@ class TransactionConnection:
 
 # Singleton
 transaction_helper = TransactionHelper()
+

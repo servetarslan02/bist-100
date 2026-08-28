@@ -37,8 +37,9 @@ Endpoints:
 """
 
 import asyncio
-import json
+import orjson
 import os
+
 import sys
 import warnings
 from datetime import datetime, timezone

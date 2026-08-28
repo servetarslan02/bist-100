@@ -17,10 +17,15 @@ v2.0 Eklemeleri:
 Recovery: restart sonrası eksiksiz veri yükler.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
-import duckdb
+try:
+    import duckdb
+except ImportError:
+    duckdb = None
 import orjson
 import structlog
 
@@ -38,10 +43,13 @@ class BacktestPersistence:
     def __init__(self, db_path: str = DB_PATH):
         self._db_path = db_path
         self._conn: duckdb.DuckDBPyConnection | None = None
-        self._ensure_db()
+        if duckdb is not None:
+            self._ensure_db()
 
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
         """DuckDB bağlantısı al (lazy init + reuse)."""
+        if duckdb is None:
+            raise RuntimeError("DuckDB is not installed in the environment.")
         if self._conn is None:
             Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
             self._conn = duckdb.connect(self._db_path)

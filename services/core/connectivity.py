@@ -1,21 +1,17 @@
 """
-ALPHA BIST — İnternet Bağlantı İzleyici v1.0
+ALPHA BIST — İnternet Bağlantı İzleyici v2.0 (Enterprise-Grade)
 
-Kişisel PC senaryosu için kritik:
-- İnternet kesintisi tespiti
-- Offline/Online durum yönetimi
-- Offline süresi takibi
-- Otomatik recovery tetikleme
-- Birden fazla endpoint'e health check (tek nokta arızası önleme)
-
-Kullanım:
-    from services.core.connectivity import connectivity_monitor
-
-    if connectivity_monitor.is_online:
-        # Veri çek
-    else:
-        # Offline mod, bekle
+Kurumsal Standartlar:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. MİMARİ:    Callback registry DI-friendly, SRP korunur
+2. OPTİMİZASYON: aiohttp.ClientSession singleton (her check'te yeniden üretilmiyordu — bug çözüldü)
+3. DAYANIKLILIK: CancelledError propagate edilir
+4. İZLENEBİLİRLİK: OTel span durum geçişlerinde
+5. GÜVENLİK:  %100 type hint
+6. KALİTE:    dict → dict[str, Any], docstring
 """
+
+from __future__ import annotations
 
 import asyncio
 import time
@@ -23,10 +19,24 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
 import structlog
+from opentelemetry import metrics, trace
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+tracer = trace.get_tracer("alpha-bist.connectivity")
+meter = metrics.get_meter("alpha-bist.connectivity")
+
+_offline_counter = meter.create_counter(
+    "alpha.connectivity.offline.total",
+    description="Toplam bağlantı kesintisi sayısı",
+)
+_offline_duration_histogram = meter.create_histogram(
+    "alpha.connectivity.offline.duration_seconds",
+    description="Kesinti süreleri",
+    unit="s",
+)
 
 
 class ConnectivityState(StrEnum):
@@ -92,8 +102,12 @@ class ConnectivityMonitor:
         self._on_online: list[Callable[[float], Awaitable[None]]] = []  # arg: offline_duration
         self._on_degraded: list[Callable[[], Awaitable[None]]] = []
 
-        # Background task
-        self._monitor_task: asyncio.Task | None = None
+        # aiohttp.ClientSession — singleton (her check'te yeniden üretmek bellek sızıntısı yararır)
+        self._session: Any = None
+        self._session_lock: asyncio.Lock = asyncio.Lock()
+
+        # Arka plan görev referansı
+        self._monitor_task: asyncio.Task[None] | None = None
         self._running = False
 
     @property
@@ -149,16 +163,20 @@ class ConnectivityMonitor:
             failure_threshold=self._failure_threshold,
         )
 
-    async def stop(self):
-        """Arka plan izleyiciyi durdur."""
+    async def stop(self) -> None:
+        """Arka plan izleyiciyi durdurur ve session'u kapatır."""
         self._running = False
         if self._monitor_task:
             self._monitor_task.cancel()
             try:
                 await self._monitor_task
             except asyncio.CancelledError:
-                logger.warning("Timeout/cancellation in stop", exc_info=True)
-        logger.info("Connectivity monitor stopped", total_offline_seconds=round(self._total_offline_seconds, 1))
+                pass
+        # Session kapat (bellek temizleme)
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+        logger.info("Connectivity monitor durduruldu", total_offline_seconds=round(self._total_offline_seconds, 1))
 
     async def check_now(self) -> ConnectivityState:
         """Şu an bağlantı kontrolü yap (anlık)."""
@@ -197,20 +215,23 @@ class ConnectivityMonitor:
                 await asyncio.sleep(self._check_interval)
 
     async def _do_check(self) -> ConnectivityState:
-        """Gerçek bağlantı kontrolü yap."""
+        """Paralel endpoint kontrolü yapar ve bağlantı durumunu günceller."""
         import aiohttp
 
         self._last_check_time = time.time()
         successful = 0
         total = len(self.CHECK_ENDPOINTS)
 
-        # Paralel kontrol — timeout ile
-        timeout = aiohttp.ClientTimeout(total=self._timeout)
+        # Singleton session — kapatılmışsa yeniden oluştur
+        async with self._session_lock:
+            if self._session is None or self._session.closed:
+                timeout = aiohttp.ClientTimeout(total=self._timeout)
+                self._session = aiohttp.ClientSession(timeout=timeout)
+
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                tasks = [self._check_endpoint(session, url) for url in self.CHECK_ENDPOINTS]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                successful = sum(1 for r in results if r is True)
+            tasks = [self._check_endpoint(self._session, url) for url in self.CHECK_ENDPOINTS]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            successful = sum(1 for r in results if r is True)
         except Exception:
             successful = 0
 
@@ -218,35 +239,37 @@ class ConnectivityMonitor:
         old_state = self._state
 
         if successful >= self._recovery_threshold:
-            # Online veya degraded
             new_state = ConnectivityState.ONLINE if successful == total else ConnectivityState.DEGRADED
 
             self._consecutive_successes += 1
             self._consecutive_failures = 0
 
             if old_state == ConnectivityState.OFFLINE:
-                # Offline'dan online'a geçiş
                 offline_duration = self.offline_duration_seconds
                 self._total_offline_seconds += offline_duration
                 self._offline_since = None
                 self._last_online_time = time.time()
 
+                _offline_duration_histogram.record(offline_duration)
                 self._log_event("connected", offline_duration)
+                with tracer.start_as_current_span("connectivity.online") as span:
+                    span.set_attribute("offline_seconds", round(offline_duration, 1))
+                    span.set_attribute("successful_endpoints", successful)
                 logger.info(
-                    "Internet restored", offline_seconds=round(offline_duration, 1), successful_endpoints=successful
+                    "Bağlantı geri geldi",
+                    offline_seconds=round(offline_duration, 1),
+                    successful_endpoints=successful,
                 )
 
-                # Online callback'leri çağır
                 for cb in self._on_online:
                     try:
                         await cb(offline_duration)
-                    except Exception as e:
-                        logger.error("Online callback error", error=str(e))
+                    except Exception as exc:
+                        logger.error("Online callback hatası", error=str(exc))
 
             self._state = new_state
 
         else:
-            # Offline
             self._consecutive_failures += 1
             self._consecutive_successes = 0
 
@@ -255,14 +278,19 @@ class ConnectivityMonitor:
                     self._offline_since = time.time()
                     self._state = ConnectivityState.OFFLINE
                     self._log_event("disconnected")
-                    logger.warning("Internet lost", consecutive_failures=self._consecutive_failures)
+                    _offline_counter.add(1)
+                    with tracer.start_as_current_span("connectivity.offline") as span:
+                        span.set_attribute("consecutive_failures", self._consecutive_failures)
+                    logger.warning(
+                        "Bağlantı kesildi",
+                        consecutive_failures=self._consecutive_failures,
+                    )
 
-                    # Offline callback'leri çağır
                     for cb in self._on_offline:
                         try:
                             await cb()
-                        except Exception as e:
-                            logger.error("Offline callback error", error=str(e))
+                        except Exception as exc:
+                            logger.error("Offline callback hatası", error=str(exc))
 
         return self._state
 
@@ -286,21 +314,25 @@ class ConnectivityMonitor:
         if len(self._event_log) > self._max_event_log:
             self._event_log = self._event_log[-self._max_event_log :]
 
-    def get_status(self) -> dict:
-        """Durum bilgisi."""
+    def get_status(self) -> dict[str, Any]:
+        """Mevcut bağlantı durumunu döndürür."""
         return {
             "state": self._state.value,
             "is_online": self.is_online,
-            "offline_since": datetime.fromtimestamp(self._offline_since, tz=UTC).isoformat()
-            if self._offline_since
-            else None,
+            "offline_since": (
+                datetime.fromtimestamp(self._offline_since, tz=UTC).isoformat()
+                if self._offline_since
+                else None
+            ),
             "offline_duration_seconds": round(self.offline_duration_seconds, 1),
             "total_offline_seconds": round(self.total_offline_seconds, 1),
             "consecutive_failures": self._consecutive_failures,
             "consecutive_successes": self._consecutive_successes,
-            "last_check": datetime.fromtimestamp(self._last_check_time, tz=UTC).isoformat()
-            if self._last_check_time
-            else None,
+            "last_check": (
+                datetime.fromtimestamp(self._last_check_time, tz=UTC).isoformat()
+                if self._last_check_time
+                else None
+            ),
             "recent_events": [
                 {
                     "type": e.event_type,
@@ -311,8 +343,8 @@ class ConnectivityMonitor:
             ],
         }
 
-    def get_offline_report(self) -> dict:
-        """Offline raporu — kaçırılan süre ve etki."""
+    def get_offline_report(self) -> dict[str, Any]:
+        """Toplam offline raporu."""
         return {
             "total_offline_seconds": round(self.total_offline_seconds, 1),
             "total_offline_minutes": round(self.total_offline_seconds / 60, 1),

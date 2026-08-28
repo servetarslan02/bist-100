@@ -1,8 +1,8 @@
-"""
-ALPHA BIST — Decision Engine v2.0 (Düzeltilmiş)
+﻿"""
+ALPHA BIST â€” Decision Engine v2.0 (DÃ¼zeltilmiÅŸ)
 
-ATR field'ı eklendi.
-Stop-loss ve target hesaplaması ATR bazlı.
+ATR field'Ä± eklendi.
+Stop-loss ve target hesaplamasÄ± ATR bazlÄ±.
 
 FAZ 8: Decision Engine
 """
@@ -13,7 +13,7 @@ from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 class Action(Enum):
@@ -48,7 +48,7 @@ class DecisionInput:
     macro_regime: str = "UNKNOWN"
     macro_stance: float = 0.0  # -1.0 (negatif) ile +1.0 (pozitif)
     macro_confidence: float = 0.0
-    macro_impact: float = 0.0  # Sektör bazlı makro etki
+    macro_impact: float = 0.0  # SektÃ¶r bazlÄ± makro etki
     # Geriye uyumlu ek alanlar (test_phase10_13)
     ml_return_5d: float = 0.0
     ml_return_20d: float = 0.0
@@ -68,7 +68,7 @@ class DecisionInput:
 
 @dataclass
 class Decision:
-    """Karar çıktısı."""
+    """Karar Ã§Ä±ktÄ±sÄ±."""
 
     ticker: str
     action: str  # BUY, SELL, HOLD, NO_ACTION
@@ -83,15 +83,15 @@ class Decision:
     time_horizon: str = "1-5D"
     expected_return: float = 0.0
     conviction: str = "LOW"  # Geriye uyumlu
-    # LLM Ajan Türkçe Açıklama
-    llm_narrative: str = ""  # LLM Agent tarafından üretilen karar özeti
+    # LLM Ajan TÃ¼rkÃ§e AÃ§Ä±klama
+    llm_narrative: str = ""  # LLM Agent tarafÄ±ndan Ã¼retilen karar Ã¶zeti
 
 
 class DecisionEngine:
     """Karar motoru."""
 
-    # ATR olmadığında kullanılacak varsayılan stop yüzdesi
-    DEFAULT_STOP_FALLBACK = 6.5  # %6.5 — BIST ortalaması için makul
+    # ATR olmadÄ±ÄŸÄ±nda kullanÄ±lacak varsayÄ±lan stop yÃ¼zdesi
+    DEFAULT_STOP_FALLBACK = 6.5  # %6.5 â€” BIST ortalamasÄ± iÃ§in makul
 
     def __init__(self):
         self._min_confidence = 0.65
@@ -99,14 +99,14 @@ class DecisionEngine:
         logger.info("DecisionEngine initialized")
 
     def _get_dynamic_thresholds(self, regime: str) -> tuple[float, float]:
-        """Piyasa rejimine göre dinamik skor ve güven eşikleri."""
+        """Piyasa rejimine gÃ¶re dinamik skor ve gÃ¼ven eÅŸikleri."""
         regime_upper = (regime or "").upper()
         if "BEAR" in regime_upper or "PANIC" in regime_upper or "CRASH" in regime_upper:
-            return 68.0, 0.70  # Ayı piyasasında katı eşik (sermaye koruma)
+            return 68.0, 0.70  # AyÄ± piyasasÄ±nda katÄ± eÅŸik (sermaye koruma)
         elif "VOLATILE" in regime_upper or "HIGH_VOL" in regime_upper or "SIDEWAYS" in regime_upper:
-            return 63.0, 0.65  # Yatay/oynak piyasada seçici
+            return 63.0, 0.65  # Yatay/oynak piyasada seÃ§ici
         elif "BULL" in regime_upper or "TREND" in regime_upper:
-            return 58.0, 0.60  # Boğa piyasasında trend takip
+            return 58.0, 0.60  # BoÄŸa piyasasÄ±nda trend takip
         return self._min_score, self._min_confidence
 
     def decide(self, inp: DecisionInput) -> Decision:
@@ -115,7 +115,7 @@ class DecisionEngine:
         # 1. Composite skor hesapla
         score = self._calculate_composite_score(inp)
 
-        # 2. Rejime duyarlı dinamik eşik kontrolü
+        # 2. Rejime duyarlÄ± dinamik eÅŸik kontrolÃ¼
         min_score, min_conf = self._get_dynamic_thresholds(inp.regime)
         if score < min_score or inp.ml_confidence < min_conf:
             return Decision(
@@ -125,20 +125,20 @@ class DecisionEngine:
                 confidence=inp.ml_confidence,
                 score=score,
                 reasons=[
-                    f"Skor ({score:.1f} < {min_score}) veya güven ({inp.ml_confidence:.2f} < {min_conf}) rejim eşiğinin altında ({inp.regime})"
+                    f"Skor ({score:.1f} < {min_score}) veya gÃ¼ven ({inp.ml_confidence:.2f} < {min_conf}) rejim eÅŸiÄŸinin altÄ±nda ({inp.regime})"
                 ],
             )
 
-        # 3. Yön belirle
+        # 3. YÃ¶n belirle
         direction = self._determine_direction(inp)
 
         # 4. Action belirle
         action = self._determine_action(inp, direction)
 
-        # 5. Stop ve target hesapla (ATR bazlı)
+        # 5. Stop ve target hesapla (ATR bazlÄ±)
         stop_price, target_price = self._calculate_stop_and_target(inp, direction)
 
-        # 6. Risk kontrolü
+        # 6. Risk kontrolÃ¼
         risks = self._assess_risks(inp)
 
         # 7. Nedenler
@@ -169,24 +169,24 @@ class DecisionEngine:
     def _calculate_composite_score(self, inp: DecisionInput) -> float:
         """Composite skor hesapla.
 
-        Düzeltmeler (v2.1):
-        1. max() yerine güven-ağırlıklı ortalama (optimistic bias kaldırıldı)
+        DÃ¼zeltmeler (v2.1):
+        1. max() yerine gÃ¼ven-aÄŸÄ±rlÄ±klÄ± ortalama (optimistic bias kaldÄ±rÄ±ldÄ±)
         2. ML return sinyalleri simetrik (pozitif VE negatif)
-        3. Ağırlıklar toplamı = 1.0 garantisi
+        3. AÄŸÄ±rlÄ±klar toplamÄ± = 1.0 garantisi
         """
-        # ML skor: max() yerine güven-ağırlıklı ortalama
-        # max() kullanmak systematic bullish bias yaratıyordu:
-        # ml_score=40 (bearish) + spec_score=60 (bullish) → max(40, 54) = 54
-        # Oysa her iki sinyal de dikkate alınmalı
+        # ML skor: max() yerine gÃ¼ven-aÄŸÄ±rlÄ±klÄ± ortalama
+        # max() kullanmak systematic bullish bias yaratÄ±yordu:
+        # ml_score=40 (bearish) + spec_score=60 (bullish) â†’ max(40, 54) = 54
+        # Oysa her iki sinyal de dikkate alÄ±nmalÄ±
         if inp.spec_score > 0:
-            # Güven ağırlıklı ortalama: ml_confidence yüksekse ml_score'a daha çok güven
+            # GÃ¼ven aÄŸÄ±rlÄ±klÄ± ortalama: ml_confidence yÃ¼ksekse ml_score'a daha Ã§ok gÃ¼ven
             ml_weight = max(inp.ml_confidence, 0.5)
             spec_weight = 1.0 - ml_weight
             ml_component = inp.ml_score * ml_weight + (inp.spec_score * 0.9) * spec_weight
         else:
             ml_component = inp.ml_score
 
-        # Agent skor: agent_confidence > 0.5 ise ağırlık ver
+        # Agent skor: agent_confidence > 0.5 ise aÄŸÄ±rlÄ±k ver
         agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
 
         components = {
@@ -203,8 +203,8 @@ class DecisionEngine:
 
         total = sum(components.values())
 
-        # ML return sinyalleri — SİMETRİK (pozitif VE negatif)
-        # Eski kod sadece pozitif return'ler için bonus veriyordu → BUY bias
+        # ML return sinyalleri â€” SÄ°METRÄ°K (pozitif VE negatif)
+        # Eski kod sadece pozitif return'ler iÃ§in bonus veriyordu â†’ BUY bias
         if inp.ml_return_5d > 3:
             total += 5
         elif inp.ml_return_5d < -3:
@@ -224,24 +224,24 @@ class DecisionEngine:
         return min(100, max(0, total))
 
     def _monte_carlo_score(self, inp: DecisionInput) -> float:
-        """Monte Carlo simülasyon skoru.
+        """Monte Carlo simÃ¼lasyon skoru.
 
-        Düşük VaR (düşük risk) = yüksek skor, yüksek VaR = düşük skor.
-        Pozitif expected return ve yüksek prob_positive bonus.
+        DÃ¼ÅŸÃ¼k VaR (dÃ¼ÅŸÃ¼k risk) = yÃ¼ksek skor, yÃ¼ksek VaR = dÃ¼ÅŸÃ¼k skor.
+        Pozitif expected return ve yÃ¼ksek prob_positive bonus.
         """
         score = 50.0
 
-        # sim_var_95: negatif getiri yüzdesi (örn -12.5 = %12.5 kayıp riski)
-        # Daha düşük (daha az negatif) VaR = daha iyi
+        # sim_var_95: negatif getiri yÃ¼zdesi (Ã¶rn -12.5 = %12.5 kayÄ±p riski)
+        # Daha dÃ¼ÅŸÃ¼k (daha az negatif) VaR = daha iyi
         if inp.sim_var_95 != 0:
-            # VaR negatif gelir (kayıp); mutlak değeri ne kadar küçükse o kadar iyi
+            # VaR negatif gelir (kayÄ±p); mutlak deÄŸeri ne kadar kÃ¼Ã§Ã¼kse o kadar iyi
             var_abs = abs(inp.sim_var_95)
             if var_abs < 5:
-                score += 15  # Düşük risk
+                score += 15  # DÃ¼ÅŸÃ¼k risk
             elif var_abs < 10:
                 score += 5
             elif var_abs > 20:
-                score -= 15  # Yüksek risk
+                score -= 15  # YÃ¼ksek risk
             elif var_abs > 15:
                 score -= 10
 
@@ -297,8 +297,8 @@ class DecisionEngine:
         roe = f.get("roe", 0)
 
         score += fundamental * 0.4
-        score += (20 - pe) * 1.0  # Düşük PE iyi
-        score += (2 - pb) * 10.0  # Düşük PB iyi
+        score += (20 - pe) * 1.0  # DÃ¼ÅŸÃ¼k PE iyi
+        score += (2 - pb) * 10.0  # DÃ¼ÅŸÃ¼k PB iyi
         score += roe * 0.2
 
         return min(100, max(0, score))
@@ -306,7 +306,7 @@ class DecisionEngine:
     def _sentiment_score(self, inp: DecisionInput) -> float:
         """Sentiment skor."""
         sentiment = inp.news_sentiment
-        return 50 + sentiment * 50  # -1 to 1 → 0 to 100
+        return 50 + sentiment * 50  # -1 to 1 â†’ 0 to 100
 
     def _regime_score(self, inp: DecisionInput) -> float:
         """Rejim skoru."""
@@ -325,48 +325,48 @@ class DecisionEngine:
         return regime_scores.get(inp.regime, 50)
 
     def _risk_score(self, inp: DecisionInput) -> float:
-        """Risk skoru (yüksek = düşük risk = yüksek skor)."""
+        """Risk skoru (yÃ¼ksek = dÃ¼ÅŸÃ¼k risk = yÃ¼ksek skor)."""
         f = inp.features
         score = 50.0
 
-        # ATR bazlı risk (düşük ATR = düşük risk = yüksek skor)
+        # ATR bazlÄ± risk (dÃ¼ÅŸÃ¼k ATR = dÃ¼ÅŸÃ¼k risk = yÃ¼ksek skor)
         atr_pct = f.get("atr_pct", inp.atr_pct)
         if atr_pct > 0:
-            score -= atr_pct * 2  # Yüksek volatilite = düşük skor
+            score -= atr_pct * 2  # YÃ¼ksek volatilite = dÃ¼ÅŸÃ¼k skor
 
-        # ADX (trend gücü)
+        # ADX (trend gÃ¼cÃ¼)
         adx = f.get("adx", 25)
         score += (adx - 25) * 0.5
 
-        # Volume (yüksek hacim = likidite = iyi)
+        # Volume (yÃ¼ksek hacim = likidite = iyi)
         volume = f.get("volume_zscore", 0)
         score += volume * 0.5
 
-        # Monte Carlo VaR_95 (düşük VaR = düşük risk = yüksek skor)
+        # Monte Carlo VaR_95 (dÃ¼ÅŸÃ¼k VaR = dÃ¼ÅŸÃ¼k risk = yÃ¼ksek skor)
         if inp.sim_var_95 != 0:
             var_abs = abs(inp.sim_var_95)
-            # VaR yüzdesi ne kadar düşükse risk o kadar düşük
+            # VaR yÃ¼zdesi ne kadar dÃ¼ÅŸÃ¼kse risk o kadar dÃ¼ÅŸÃ¼k
             score += max(-15, min(10, (10 - var_abs) * 0.8))
 
         return min(100, max(0, score))
 
     def _macro_score(self, inp: DecisionInput) -> float:
-        """Macro skor — makro rejim ve etki."""
+        """Macro skor â€” makro rejim ve etki."""
         score = 50.0
 
-        # Macro stance (pozitif = yukarı, negatif = aşağı)
+        # Macro stance (pozitif = yukarÄ±, negatif = aÅŸaÄŸÄ±)
         if inp.macro_stance != 0:
-            score += inp.macro_stance * 20  # -20 ile +20 arası
+            score += inp.macro_stance * 20  # -20 ile +20 arasÄ±
 
-        # Macro confidence (yüksek güven = daha güçlü sinyal)
+        # Macro confidence (yÃ¼ksek gÃ¼ven = daha gÃ¼Ã§lÃ¼ sinyal)
         if inp.macro_confidence > 0.5:
-            score += inp.macro_stance * 10  # Güvenli sinyalleri güçlendir
+            score += inp.macro_stance * 10  # GÃ¼venli sinyalleri gÃ¼Ã§lendir
 
-        # Macro impact (sektör bazlı etki)
+        # Macro impact (sektÃ¶r bazlÄ± etki)
         if inp.macro_impact != 0:
-            score += inp.macro_impact * 15  # Düzeltme: 100→15, aşırı skor bozulması önlendi
+            score += inp.macro_impact * 15  # DÃ¼zeltme: 100â†’15, aÅŸÄ±rÄ± skor bozulmasÄ± Ã¶nlendi
 
-        # Macro regime bonusları
+        # Macro regime bonuslarÄ±
         regime_bonuses = {
             "EXPANSION": 5,
             "RISK_ON": 5,
@@ -380,12 +380,12 @@ class DecisionEngine:
         return min(100, max(0, score))
 
     def _determine_direction(self, inp: DecisionInput) -> str:
-        """Yön belirle.
+        """YÃ¶n belirle.
 
-        Düzeltme (v2.1): Eşikler simetrik yapıldı.
+        DÃ¼zeltme (v2.1): EÅŸikler simetrik yapÄ±ldÄ±.
         Eski: RSI > 55 / < 45 (10 puan gap), ML > 60 / < 40 (20 puan gap)
         Yeni: RSI > 52 / < 48 (4 puan gap), ML > 55 / < 45 (10 puan gap)
-        Neden: Asimetrik eşikler BUY bias yaratıyordu.
+        Neden: Asimetrik eÅŸikler BUY bias yaratÄ±yordu.
         """
         f = inp.features
 
@@ -393,13 +393,13 @@ class DecisionEngine:
         roc = f.get("roc_5d", 0)
         rsi = f.get("rsi_14", 50)
 
-        # SİMETRİK eşikler (BUY bias kaldırıldı)
+        # SÄ°METRÄ°K eÅŸikler (BUY bias kaldÄ±rÄ±ldÄ±)
         bullish_signals = sum(
             [
                 momentum > 0,
                 roc > 0,
-                rsi > 52,  # Eski: 55 → Yeni: 52 (simetrik)
-                inp.ml_score > 55,  # Eski: 60 → Yeni: 55 (simetrik)
+                rsi > 52,  # Eski: 55 â†’ Yeni: 52 (simetrik)
+                inp.ml_score > 55,  # Eski: 60 â†’ Yeni: 55 (simetrik)
             ]
         )
 
@@ -407,8 +407,8 @@ class DecisionEngine:
             [
                 momentum < 0,
                 roc < 0,
-                rsi < 48,  # Eski: 45 → Yeni: 48 (simetrik)
-                inp.ml_score < 45,  # Eski: 40 → Yeni: 45 (simetrik)
+                rsi < 48,  # Eski: 45 â†’ Yeni: 48 (simetrik)
+                inp.ml_score < 45,  # Eski: 40 â†’ Yeni: 45 (simetrik)
             ]
         )
 
@@ -432,7 +432,7 @@ class DecisionEngine:
         return "HOLD"
 
     def _calculate_stop_and_target(self, inp: DecisionInput, direction: str) -> tuple:
-        """Stop ve target hesapla (ATR bazlı)."""
+        """Stop ve target hesapla (ATR bazlÄ±)."""
         price = inp.price
         atr = inp.atr
         atr_pct = inp.atr_pct
@@ -440,7 +440,7 @@ class DecisionEngine:
         if price <= 0:
             return 0, 0
 
-        # ATR bazlı stop mesafesi (Canonical Strateji Parametreleri: frozen_strategy_engine.py ile senkronize)
+        # ATR bazlÄ± stop mesafesi (Canonical Strateji Parametreleri: frozen_strategy_engine.py ile senkronize)
         if atr > 0:
             stop_distance = atr * 2.5  # Canonical: 2.5x ATR
             stop_pct = (stop_distance / price) * 100
@@ -449,10 +449,10 @@ class DecisionEngine:
         else:
             stop_pct = self.DEFAULT_STOP_FALLBACK  # Config'den okunabilir
 
-        # Sınırla: min %4.0 (min_atr_pct), max %10.0
+        # SÄ±nÄ±rla: min %4.0 (min_atr_pct), max %10.0
         stop_pct = max(4.0, min(10.0, stop_pct))
 
-        # Risk/Ödül oranı 1:2
+        # Risk/Ã–dÃ¼l oranÄ± 1:2
         target_pct = stop_pct * 2.0
 
         if direction == "LONG":
@@ -467,34 +467,34 @@ class DecisionEngine:
         return round(stop_price, 2), round(target_price, 2)
 
     def _assess_risks(self, inp: DecisionInput) -> list[str]:
-        """Risk değerlendirmesi."""
+        """Risk deÄŸerlendirmesi."""
         risks = []
         f = inp.features
 
         if f.get("atr_pct", inp.atr_pct) > 5:
-            risks.append("Yüksek volatilite")
+            risks.append("YÃ¼ksek volatilite")
 
         if f.get("rsi_14", 50) > 80 or f.get("rsi_14", 50) < 20:
-            risks.append("Aşırı alım/satım (RSI)")
+            risks.append("AÅŸÄ±rÄ± alÄ±m/satÄ±m (RSI)")
 
         if inp.news_sentiment < -0.5:
             risks.append("Negatif haber sentimenti")
 
         if inp.ml_confidence < 0.75:
-            risks.append("Düşük model güveni")
+            risks.append("DÃ¼ÅŸÃ¼k model gÃ¼veni")
 
         # Monte Carlo risk metrikleri
         if inp.sim_var_95 != 0 and abs(inp.sim_var_95) > 15:
-            risks.append(f"MC VaR yüksek: %{abs(inp.sim_var_95):.1f}")
+            risks.append(f"MC VaR yÃ¼ksek: %{abs(inp.sim_var_95):.1f}")
 
         if inp.sim_prob_positive < 0.35:
-            risks.append(f"MC olasılık düşük: %{inp.sim_prob_positive * 100:.0f}")
+            risks.append(f"MC olasÄ±lÄ±k dÃ¼ÅŸÃ¼k: %{inp.sim_prob_positive * 100:.0f}")
 
         if inp.sim_expected_return < -5:
             risks.append(f"MC beklenen getiri negatif: %{inp.sim_expected_return:.1f}")
 
         if not risks:
-            risks.append("Düşük risk profili")
+            risks.append("DÃ¼ÅŸÃ¼k risk profili")
 
         return risks
 
@@ -504,34 +504,34 @@ class DecisionEngine:
         f = inp.features
 
         if f.get("momentum_20d", 0) > 5:
-            reasons.append("Güçlü momentum")
+            reasons.append("GÃ¼Ã§lÃ¼ momentum")
 
         if f.get("roc_5d", 0) > 3:
-            reasons.append("Pozitif kısa vadeli getiri")
+            reasons.append("Pozitif kÄ±sa vadeli getiri")
 
         if f.get("volume_zscore", 0) > 1:
-            reasons.append("Yüksek hacim onayı")
+            reasons.append("YÃ¼ksek hacim onayÄ±")
 
         if inp.news_sentiment > 0.3:
             reasons.append("Pozitif haber sentimenti")
 
         if score > 80:
-            reasons.append("Çok yüksek composite skor")
+            reasons.append("Ã‡ok yÃ¼ksek composite skor")
 
         if not reasons:
-            reasons.append("Teknik ve temel göstergeler uyumlu")
+            reasons.append("Teknik ve temel gÃ¶stergeler uyumlu")
 
         return reasons
 
     def _calculate_expected_return(self, inp: DecisionInput, direction: str) -> float:
-        """Çok kaynaklı harmanlanmış beklenen getiri hesapla."""
+        """Ã‡ok kaynaklÄ± harmanlanmÄ±ÅŸ beklenen getiri hesapla."""
         if direction not in ("LONG", "SHORT"):
             return 0.0
 
         f = inp.features
         raw_momentum = (f.get("momentum_20d", 0) + f.get("roc_5d", 0)) / 2.0
 
-        # Eğer ML ve Monte Carlo modelleri tahmin üretmişse bunları ağırlıklandır
+        # EÄŸer ML ve Monte Carlo modelleri tahmin Ã¼retmiÅŸse bunlarÄ± aÄŸÄ±rlÄ±klandÄ±r
         if inp.ml_return_5d != 0 or inp.sim_expected_return != 0:
             expected = (raw_momentum * 0.3) + (inp.ml_return_5d * 0.4) + (inp.sim_expected_return * 0.3)
         else:
@@ -545,21 +545,21 @@ class DecisionEngine:
         return round(float(expected), 2)
 
     def decide_from_canonical(self, score, price: float = 0):
-        """CanonicalScore'tan karar üret.
+        """CanonicalScore'tan karar Ã¼ret.
 
-        Bu, tek canonical karar noktasıdır.
-        Ranking, scoring, risk burada birleşir.
+        Bu, tek canonical karar noktasÄ±dÄ±r.
+        Ranking, scoring, risk burada birleÅŸir.
 
         Args:
             score: CanonicalScore instance
-            price: Güncel fiyat (stop/target hesaplama için)
+            price: GÃ¼ncel fiyat (stop/target hesaplama iÃ§in)
         """
         from services.core.canonical_scoring import CanonicalScore
 
         if not isinstance(score, CanonicalScore):
             raise TypeError(f"Expected CanonicalScore, got {type(score)}")
 
-        # Eşik kontrolü
+        # EÅŸik kontrolÃ¼
         if score.confidence < self._min_confidence:
             return Decision(
                 ticker=score.ticker,
@@ -567,7 +567,7 @@ class DecisionEngine:
                 direction="NEUTRAL",
                 confidence=score.confidence,
                 score=score.opportunity_score,
-                reasons=[f"Confidence çok düşük: {score.confidence:.2f} < {self._min_confidence}"],
+                reasons=[f"Confidence Ã§ok dÃ¼ÅŸÃ¼k: {score.confidence:.2f} < {self._min_confidence}"],
             )
 
         if score.opportunity_score < self._min_score:
@@ -577,10 +577,10 @@ class DecisionEngine:
                 direction="NEUTRAL",
                 confidence=score.confidence,
                 score=score.opportunity_score,
-                reasons=[f"Skor eşik altında: {score.opportunity_score:.1f} < {self._min_score}"],
+                reasons=[f"Skor eÅŸik altÄ±nda: {score.opportunity_score:.1f} < {self._min_score}"],
             )
 
-        # Yön ve action
+        # YÃ¶n ve action
         direction = score.direction
         if direction == "NEUTRAL":
             action = "HOLD"
@@ -589,12 +589,12 @@ class DecisionEngine:
         else:
             action = "SELL"
 
-        # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
+        # Risk kontrolÃ¼ â€” risk_score dÃ¼ÅŸÃ¼kse pozisyon kÃ¼Ã§Ã¼lt veya engelle
         if score.risk_score < 30 and action in ("BUY", "SELL"):
-            action = "HOLD"  # Çok riskli — pozisyon açma
+            action = "HOLD"  # Ã‡ok riskli â€” pozisyon aÃ§ma
             direction = "NEUTRAL"
 
-        # Stop ve Target hesaplama (price verilmişse — ATR bazlı)
+        # Stop ve Target hesaplama (price verilmiÅŸse â€” ATR bazlÄ±)
         stop_price = 0.0
         target_price = 0.0
         if price > 0 and action in ("BUY", "SELL"):
@@ -629,28 +629,28 @@ class DecisionEngine:
         reasons = []
         v = score.vector
         if v.momentum > 65:
-            reasons.append(f"Momentum güçlü: {v.momentum:.0f}")
+            reasons.append(f"Momentum gÃ¼Ã§lÃ¼: {v.momentum:.0f}")
         if v.relative_strength > 65:
-            reasons.append(f"Relatif güç yüksek: {v.relative_strength:.0f}")
+            reasons.append(f"Relatif gÃ¼Ã§ yÃ¼ksek: {v.relative_strength:.0f}")
         if v.fundamental > 65:
             reasons.append(f"Fundamental pozitif: {v.fundamental:.0f}")
         if v.news_sentiment > 65:
             reasons.append(f"Sentiment olumlu: {v.news_sentiment:.0f}")
         if v.catalyst > 65:
-            reasons.append(f"Katalizör var: {v.catalyst:.0f}")
+            reasons.append(f"KatalizÃ¶r var: {v.catalyst:.0f}")
         if v.mean_reversion > 65:
-            reasons.append(f"Mean reversion fırsatı: {v.mean_reversion:.0f}")
+            reasons.append(f"Mean reversion fÄ±rsatÄ±: {v.mean_reversion:.0f}")
         if not reasons:
-            reasons.append("Genel skor eşiği aşıldı")
+            reasons.append("Genel skor eÅŸiÄŸi aÅŸÄ±ldÄ±")
 
         # Riskler
         risks = []
         if v.risk < 40:
-            risks.append(f"Yüksek risk: {v.risk:.0f}")
+            risks.append(f"YÃ¼ksek risk: {v.risk:.0f}")
         if v.data_quality < 60:
-            risks.append(f"Düşük veri kalitesi: {v.data_quality:.0f}")
+            risks.append(f"DÃ¼ÅŸÃ¼k veri kalitesi: {v.data_quality:.0f}")
         if v.momentum < 35:
-            risks.append(f"Momentum zayıf: {v.momentum:.0f}")
+            risks.append(f"Momentum zayÄ±f: {v.momentum:.0f}")
         if not risks:
             risks.append("Belirgin risk tespit edilmedi")
 
@@ -670,3 +670,4 @@ class DecisionEngine:
 
 # Singleton
 decision_engine = DecisionEngine()
+

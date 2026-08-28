@@ -16,11 +16,16 @@ Referanslar:
 - Marcos López de Prado - "Advances in Financial Machine ML" Ch.7
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 logger = structlog.get_logger()

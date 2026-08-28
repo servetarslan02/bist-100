@@ -19,6 +19,8 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency ve tekrar-oynatılabilirlik
 """
 
+from __future__ import annotations
+
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -26,7 +28,10 @@ from datetime import datetime
 from typing import Any
 
 import orjson
-import polars as pl
+try:
+    import polars as pl
+except ImportError:
+    pl = None
 import structlog
 
 logger = structlog.get_logger()
