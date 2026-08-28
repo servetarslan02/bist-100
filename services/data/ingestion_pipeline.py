@@ -301,12 +301,14 @@ class HistoricalIngestionPipeline:
 
         for ticker in tickers:
             # KAP event'lerinden catalyst türlerini belirle
-            rows = conn.execute(
+            result = conn.execute(
                 """SELECT * FROM event_snapshots
                    WHERE ticker = ? AND source = 'kap'
                    ORDER BY published_at DESC""",
                 (ticker,),
-            ).fetchall()
+            )
+            columns = [desc[0] for desc in result.description]
+            rows = [dict(zip(columns, row)) for row in result.fetchall()]
 
             saved = 0
             for row in rows:

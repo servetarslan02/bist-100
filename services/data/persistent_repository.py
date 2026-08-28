@@ -36,7 +36,14 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
         if self._conn is None:
             self._conn = duckdb.connect(self._db_path)
+            self._conn.execute("SET enable_progress_bar = false")
         return self._conn
+
+    def _fetchall_dicts(self, conn, query: str, params: tuple = ()) -> list[dict]:
+        """DuckDB'den dict listesi olarak sonuç çek."""
+        result = conn.execute(query, params)
+        columns = [desc[0] for desc in result.description]
+        return [dict(zip(columns, row)) for row in result.fetchall()]
 
     def _init_db(self):
         """Tabloları oluştur."""
@@ -109,12 +116,13 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         as_of_date: str,
     ) -> list[FundamentalSnapshot]:
         conn = self._get_conn()
-        rows = conn.execute(
+        rows = self._fetchall_dicts(
+            conn,
             """SELECT * FROM fundamental_snapshots
                WHERE ticker = ? AND available_at <= ?
                ORDER BY available_at DESC""",
             (ticker, as_of_date),
-        ).fetchall()
+        )
 
         return [
             FundamentalSnapshot(
@@ -137,20 +145,22 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         conn = self._get_conn()
         if event_types:
             placeholders = ",".join("?" * len(event_types))
-            rows = conn.execute(
+            rows = self._fetchall_dicts(
+                conn,
                 f"""SELECT * FROM event_snapshots
                     WHERE ticker = ? AND published_at <= ?
                     AND event_type IN ({placeholders})
                     ORDER BY published_at DESC""",
                 [ticker, as_of_date] + list(event_types),
-            ).fetchall()
+            )
         else:
-            rows = conn.execute(
+            rows = self._fetchall_dicts(
+                conn,
                 """SELECT * FROM event_snapshots
                    WHERE ticker = ? AND published_at <= ?
                    ORDER BY published_at DESC""",
                 (ticker, as_of_date),
-            ).fetchall()
+            )
 
         return [
             EventSnapshot(
@@ -173,12 +183,13 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         as_of_date: str,
     ) -> list[CatalystSnapshot]:
         conn = self._get_conn()
-        rows = conn.execute(
+        rows = self._fetchall_dicts(
+            conn,
             """SELECT * FROM catalyst_snapshots
                WHERE ticker = ? AND announcement_date <= ?
                ORDER BY announcement_date DESC""",
             (ticker, as_of_date),
-        ).fetchall()
+        )
 
         return [
             CatalystSnapshot(
@@ -204,9 +215,16 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
         try:
             conn.execute(
-                """INSERT OR REPLACE INTO fundamental_snapshots
+                """INSERT INTO fundamental_snapshots
                    (ticker, period_end, available_at, values_json, source, status, fetched_at, checksum)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(ticker, period_end, available_at)
+                   DO UPDATE SET
+                       values_json = excluded.values_json,
+                       source = excluded.source,
+                       status = excluded.status,
+                       fetched_at = excluded.fetched_at,
+                       checksum = excluded.checksum""",
                 (
                     snapshot.ticker,
                     snapshot.period_end,
@@ -232,10 +250,11 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
         try:
             conn.execute(
-                """INSERT OR IGNORE INTO event_snapshots
+                """INSERT INTO event_snapshots
                    (event_id, ticker, published_at, event_type, title,
                     sentiment, importance, source, content, fetched_at, checksum)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(event_id) DO NOTHING""",
                 (
                     snapshot.event_id,
                     snapshot.ticker,
@@ -264,10 +283,11 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
         try:
             conn.execute(
-                """INSERT OR IGNORE INTO catalyst_snapshots
+                """INSERT INTO catalyst_snapshots
                    (event_id, ticker, announcement_date, event_date,
                     catalyst_type, importance, source, fetched_at, checksum)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(event_id) DO NOTHING""",
                 (
                     snapshot.event_id,
                     snapshot.ticker,
@@ -291,8 +311,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def get_last_ingestion_time(self, key: str) -> str | None:
         """Son ingestion timestamp'ini getir."""
         conn = self._get_conn()
-        row = conn.execute("SELECT value FROM ingestion_state WHERE key = ?", (key,)).fetchone()
-        return row["value"] if row else None
+        rows = self._fetchall_dicts(conn, "SELECT value FROM ingestion_state WHERE key = ?", (key,))
+        return rows[0]["value"] if rows else None
 
     def set_last_ingestion_time(self, key: str, timestamp: str):
         """Son ingestion timestamp'ini kaydet."""

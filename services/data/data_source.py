@@ -78,9 +78,15 @@ class DataSourceManager:
             source_priority = ["warehouse", "local", "yahoo", "bist"]
         if self.use_cache:
             cached = self._load_from_cache(ticker, interval)
-            if cached is not None and not cached.empty:
-                cache_min_date = cached.index.min().strftime("%Y-%m-%d")
-                cache_max_date = cached.index.max().strftime("%Y-%m-%d")
+            if cached is not None and not cached.is_empty():
+                cache_min_date = cached["Date"].min()
+                cache_max_date = cached["Date"].max()
+                if isinstance(cache_min_date, str):
+                    cache_min_date = cache_min_date[:10]
+                    cache_max_date = cache_max_date[:10]
+                else:
+                    cache_min_date = str(cache_min_date)[:10]
+                    cache_max_date = str(cache_max_date)[:10]
 
                 cache_is_valid = True
                 if start_date and start_date < cache_min_date:
@@ -90,10 +96,10 @@ class DataSourceManager:
 
                 if cache_is_valid:
                     if start_date:
-                        cached = cached[cached.index >= start_date]
+                        cached = cached.filter(pl.col("Date") >= start_date)
                     if end_date:
-                        cached = cached[cached.index <= end_date]
-                    if not cached.empty:
+                        cached = cached.filter(pl.col("Date") <= end_date)
+                    if not cached.is_empty():
                         logger.info("Data loaded from cache", ticker=ticker, rows=len(cached))
                         return cached
 
@@ -105,12 +111,12 @@ class DataSourceManager:
 
             try:
                 df = source.fetch(ticker, start_date, end_date, period, interval)
-                if df is not None and not df.empty:
+                if df is not None and not df.is_empty():
                     # NaN ve 0 fiyatlı geçersiz satırları temizle
                     if "Close" in df.columns:
-                        df = df.dropna(subset=["Close"])
+                        df = df.drop_nulls(subset=["Close"])
                         df = df.filter(pl.col("Close") > 0)
-                    if df.empty:
+                    if df.is_empty():
                         continue
 
                     # Cache'e kaydet
@@ -149,7 +155,7 @@ class DataSourceManager:
                 ticker = future_to_ticker[future]
                 try:
                     df = future.result()
-                    if df is not None and not df.empty:
+                    if df is not None and not df.is_empty():
                         results[ticker] = df
                 except Exception as e:
                     logger.warning("Stock fetch failed", ticker=ticker, error=str(e))
@@ -223,9 +229,9 @@ class DataSourceManager:
             if cache_file.suffix == ".parquet":
                 df = pl.read_parquet(cache_file)
             else:
-                df = pl.read_csv(cache_file, index_col=0, parse_dates=True)
-            if df is not None and not df.empty and "Close" in df.columns:
-                df = df.dropna(subset=["Close"])
+                df = pl.read_csv(cache_file, try_parse_dates=True)
+            if df is not None and not df.is_empty() and "Close" in df.columns:
+                df = df.drop_nulls(subset=["Close"])
                 df = df.filter(pl.col("Close") > 0)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
@@ -294,11 +300,23 @@ class YahooFinanceSource:
             if df.empty:
                 return None
 
+            # Pandas DataFrame'i Polars'a çevir
+            df = pl.from_pandas(df.reset_index())
+
             # Kolon isimlerini düzelt
-            df.columns = [
-                c.replace("Stock Splits", "StockSplits").replace("Capital Gains", "CapitalGains") for c in df.columns
-            ]
-            df.columns = [c[0].upper() + c[1:].lower() if c else c for c in df.columns]
+            rename_map = {}
+            for c in df.columns:
+                new_c = c.replace("Stock Splits", "StockSplits").replace("Capital Gains", "CapitalGains")
+                if new_c and new_c[0].islower():
+                    new_c = new_c[0].upper() + new_c[1:]
+                if new_c != c:
+                    rename_map[c] = new_c
+            if rename_map:
+                df = df.rename(rename_map)
+
+            # Date kolonunu datetime'a çevir
+            if "Date" in df.columns:
+                df = df.with_columns(pl.col("Date").cast(pl.Datetime).alias("Date"))
 
             return df
 
@@ -348,7 +366,7 @@ class BISTSource:
         # Yontem 1: BIST API
         try:
             df = self._fetch_from_api(ticker_clean, start_date, end_date)
-            if df is not None and not df.empty:
+            if df is not None and not df.is_empty():
                 logger.info("BIST API data fetched", ticker=ticker_clean, rows=len(df))
                 return df
         except Exception as e:
@@ -357,7 +375,7 @@ class BISTSource:
         # Yontem 2: Web scrape (son fiyat)
         try:
             df = self._fetch_from_web(ticker_clean)
-            if df is not None and not df.empty:
+            if df is not None and not df.is_empty():
                 logger.info("BIST web data fetched", ticker=ticker_clean)
                 return df
         except Exception as e:
@@ -371,11 +389,11 @@ class BISTSource:
         # Borsa Istanbul'un hisse detay API'si
         url = f"{self.API_URL}/stock/{ticker}/history"
 
-        params = {}
+        params: dict[str, str] = {}
         if start_date:
-            params = params.with_columns(pl.lit(start_date).alias("from"))
+            params["from"] = start_date
         if end_date:
-            params = params.with_columns(pl.lit(end_date).alias("to"))
+            params["to"] = end_date
 
         resp = self.session.get(url, params=params, timeout=self.timeout)
         if resp.status_code != 200:
@@ -389,7 +407,7 @@ class BISTSource:
         for item in data.get("data", []):
             rows.append(
                 {
-                    "Date": pl.Series(item.get("date", "")),
+                    "Date": item.get("date", ""),
                     "Open": float(item.get("open", 0)),
                     "High": float(item.get("high", 0)),
                     "Low": float(item.get("low", 0)),
@@ -479,10 +497,10 @@ class BISTSource:
         prev_close = close / (1 + change / 100) if change != 0 else close
 
         # Tek gunluk DataFrame olustur
-        today = pl.Series("Date", [pl.Series.now().normalize()])
+        today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         df = pl.DataFrame(
             {
-                "Date": today,
+                "Date": [today],
                 "Open": [prev_close],
                 "High": [max(close, prev_close)],
                 "Low": [min(close, prev_close)],
@@ -502,10 +520,10 @@ class BISTSource:
             if resp.status_code == 200:
                 data = resp.json()
                 if data:
-                    today = pl.Series("Date", [pl.Series.now().normalize()])
+                    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
                     df = pl.DataFrame(
                         {
-                            "Date": today,
+                            "Date": [today],
                             "Open": [float(data.get("open", 0))],
                             "High": [float(data.get("high", 0))],
                             "Low": [float(data.get("low", 0))],
@@ -545,9 +563,9 @@ class LocalParquetSource:
 
             # Tarih filtresi
             if start_date:
-                df = df[df.index >= start_date]
+                df = df.filter(pl.col("Date") >= start_date)
             if end_date:
-                df = df[df.index <= end_date]
+                df = df.filter(pl.col("Date") <= end_date)
 
             return df
         except Exception as e:
@@ -586,11 +604,10 @@ class WarehouseSource:
                 df = pl.read_database(query, conn, params=(sym, f"{sym}.IS"))
             conn.close()
 
-            if df.empty:
+            if df.is_empty():
                 return None
 
-            df = df.with_columns(pl.col("date").alias("Date")).drop("date")
-            df = df.sort("Date")
+            df = df.rename({"date": "Date"}).sort("Date")
 
             if start_date:
                 df = df.filter(pl.col("Date") >= start_date)
