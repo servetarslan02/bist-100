@@ -822,7 +822,7 @@ Market Data → NATS → Feature / Risk / ML
 | 3 | Retry | 🔴 | ⚠️ Kontrol edilmeli |
 | 4 | Dead-letter strategy | 🔴 | ✅ `services/core/dead_letter_queue.py` mevcut |
 | 5 | Message ordering | 🟠 | ⚠️ Kontrol edilmeli |
-| 6 | Correlation ID | 🟠 | ⚠️ Kontrol edilmeli |
+| 6 | Correlation ID | 🟠 | ✅ Yapıldı — NATS publish/subscribe + gRPC client/server metadata propagation eklendi |
 | 7 | Timestamps | 🟠 | ⚠️ Kontrol edilmeli |
 | 8 | Observability | 🟠 | ✅ OpenTelemetry mevcut |
 
@@ -909,7 +909,7 @@ Servisler arası iletişim için kalsın.
 | 3 | Retry policy | 🟠 | ✅ Yapıldı — `services/core/event_enhancements.py` (RetryPolicy + get_retry_delay + schedule_retry) |
 | 4 | Health checks | 🔴 | ✅ `grpcio-health-checking` mevcut |
 | 5 | Backward compatibility | 🟠 | ⚠️ Kontrol edilmeli |
-| 6 | Request correlation ID | 🟠 | ⚠️ Kontrol edilmeli |
+| 6 | Request correlation ID | 🟠 | ✅ Yapıldı — gRPC metadata ile x-correlation-id propagation |
 
 **Değiştir:** ❌  
 **Geliştir:** ✅

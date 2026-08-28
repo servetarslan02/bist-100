@@ -38,6 +38,19 @@ except ImportError:
 logger = structlog.get_logger()
 
 
+def _get_correlation_metadata() -> list[tuple[str, str]]:
+    """Correlation ID'yi gRPC metadata'ya ekle."""
+    try:
+        from ..core.distributed_tracing import correlation_id_var
+
+        cid = correlation_id_var.get()
+        if cid:
+            return [("x-correlation-id", cid)]
+    except ImportError:
+        pass
+    return []
+
+
 class BaseGRPCClient:
     """gRPC istemci taban sınıfı — generated stub'lar ile.
 
@@ -160,8 +173,9 @@ class MarketClient(BaseGRPCClient):
             return
 
         request = market_pb2.TickRequest(tickers=tickers)
+        metadata = _get_correlation_metadata()
         try:
-            async for tick in self._stub.StreamTicks(request):
+            async for tick in self._stub.StreamTicks(request, metadata=metadata):
                 yield {
                     "ticker": tick.ticker,
                     "price": tick.price,
@@ -184,8 +198,9 @@ class MarketClient(BaseGRPCClient):
             return data or {"ticker": ticker, "price": 0}
 
         request = market_pb2.TickRequest(tickers=[ticker])
+        metadata = _get_correlation_metadata()
         try:
-            tick = await self._stub.GetTick(request)
+            tick = await self._stub.GetTick(request, metadata=metadata)
             return {
                 "ticker": tick.ticker,
                 "price": tick.price,
@@ -222,9 +237,10 @@ class SignalClient(BaseGRPCClient):
             return
 
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
+        metadata = _get_correlation_metadata()
         try:
             direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
-            async for signal in self._stub.StreamSignals(request):
+            async for signal in self._stub.StreamSignals(request, metadata=metadata):
                 yield {
                     "ticker": signal.ticker,
                     "direction": direction_map.get(signal.direction, "HOLD"),
@@ -246,8 +262,9 @@ class SignalClient(BaseGRPCClient):
             return [s for s in signals if s.get("confidence", 0) >= min_confidence]
 
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
+        metadata = _get_correlation_metadata()
         try:
-            response = await self._stub.GetRecentSignals(request)
+            response = await self._stub.GetRecentSignals(request, metadata=metadata)
             direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
             return [
                 {
@@ -283,8 +300,9 @@ class PortfolioClient(BaseGRPCClient):
             return get_cached("portfolio:state") or {}
 
         request = market_pb2.PortfolioRequest(portfolio_id="default")
+        metadata = _get_correlation_metadata()
         try:
-            pf = await self._stub.GetPortfolio(request)
+            pf = await self._stub.GetPortfolio(request, metadata=metadata)
             return {
                 "total_value": pf.total_value,
                 "cash": pf.cash,
@@ -321,8 +339,9 @@ class PortfolioClient(BaseGRPCClient):
             return
 
         request = market_pb2.PortfolioRequest(portfolio_id="default")
+        metadata = _get_correlation_metadata()
         try:
-            async for pf in self._stub.StreamPortfolio(request):
+            async for pf in self._stub.StreamPortfolio(request, metadata=metadata):
                 yield {
                     "cash": pf.cash,
                     "daily_pnl": pf.daily_pnl,
@@ -361,8 +380,9 @@ class RiskClient(BaseGRPCClient):
             return get_cached("risk:metrics") or {}
 
         request = market_pb2.RiskRequest(portfolio_id="default")
+        metadata = _get_correlation_metadata()
         try:
-            risk = await self._stub.GetRisk(request)
+            risk = await self._stub.GetRisk(request, metadata=metadata)
             return {
                 "var_95": risk.var_95,
                 "cvar_95": risk.cvar_95,
@@ -389,8 +409,9 @@ class RiskClient(BaseGRPCClient):
             return
 
         request = market_pb2.RiskRequest(portfolio_id="default")
+        metadata = _get_correlation_metadata()
         try:
-            async for risk in self._stub.StreamRisk(request):
+            async for risk in self._stub.StreamRisk(request, metadata=metadata):
                 yield {
                     "cvar_95": risk.cvar_95,
                     "sharpe": risk.sharpe,

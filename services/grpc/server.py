@@ -32,11 +32,25 @@ except ImportError:
 logger = structlog.get_logger()
 
 
+def _extract_correlation_from_context(context) -> None:
+    """gRPC context'ten correlation_id'yi çıkar ve context variable'a kaydet."""
+    try:
+        from ..core.distributed_tracing import correlation_id_var
+
+        metadata = dict(context.invocation_metadata())
+        cid = metadata.get("x-correlation-id")
+        if cid:
+            correlation_id_var.set(cid)
+    except (ImportError, Exception):
+        pass
+
+
 class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBUF else object):
     """Piyasa verisi gRPC servisi — Protobuf native."""
 
     def StreamTicks(self, request, context):
         """Anlık fiyat stream'i (Protobuf binary)."""
+        _extract_correlation_from_context(context)
         tickers = list(request.tickers)
         logger.info("gRPC StreamTicks started", tickers=tickers)
 
@@ -67,6 +81,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
 
     def GetTick(self, request, context):
         """Tek seferlik fiyat (Protobuf)."""
+        _extract_correlation_from_context(context)
         ticker = request.tickers[0] if request.tickers else ""
         from ..core.redis_helper import get_cached
 
@@ -88,6 +103,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 
     def StreamSignals(self, request, context):
         """Sinyal stream'i (Protobuf binary)."""
+        _extract_correlation_from_context(context)
         min_confidence = request.min_confidence if hasattr(request, "min_confidence") else 0.5
 
         async def _generate():
@@ -117,6 +133,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
 
     def GetRecentSignals(self, request, context):
         """Son sinyalleri al (Protobuf)."""
+        _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
         signals = get_cached("signals:latest") or []
@@ -144,6 +161,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
 
     def StreamPortfolio(self, request, context):
         """Portföy durumu stream'i (Protobuf binary)."""
+        _extract_correlation_from_context(context)
 
         async def _generate():
             while True:
@@ -181,6 +199,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
 
     def GetPortfolio(self, request, context):
         """Anlık portföy durumu (Protobuf)."""
+        _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
         pf = get_cached("portfolio:state") or {}
@@ -210,6 +229,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
 
     def StreamRisk(self, request, context):
         """Risk metrikleri stream'i (Protobuf binary)."""
+        _extract_correlation_from_context(context)
 
         async def _generate():
             while True:
@@ -236,6 +256,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
 
     def GetRisk(self, request, context):
         """Anlık risk durumu (Protobuf)."""
+        _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
 
         risk = get_cached("risk:metrics") or {}

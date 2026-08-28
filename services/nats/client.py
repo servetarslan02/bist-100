@@ -110,12 +110,25 @@ class NatsClient:
         return self._connected and self._nc is not None
 
     async def publish(self, subject: str, data: Any) -> bool:
-        """Veri yayınla. Başarısız olursa False döner."""
+        """Veri yayınla. Başarısız olursa False döner.
+
+        Correlation ID otomatik olarak mesaja eklenir (distributed tracing).
+        """
         if not self.is_connected and not await self.connect():
             return False
 
         try:
+            # Correlation ID'yi mesaja ekle
             if isinstance(data, dict):
+                if "_correlation_id" not in data:
+                    try:
+                        from ..core.distributed_tracing import correlation_id_var
+
+                        cid = correlation_id_var.get()
+                        if cid:
+                            data = {**data, "_correlation_id": cid}
+                    except ImportError:
+                        pass
                 payload = orjson.dumps(data, default=str).decode()
             elif isinstance(data, bytes):
                 payload = data
@@ -142,6 +155,15 @@ class NatsClient:
                 async def _msg_handler(msg):
                     try:
                         data = orjson.loads(msg.data.decode())
+                        # Correlation ID'yi propagate et
+                        cid = data.get("_correlation_id")
+                        if cid:
+                            try:
+                                from ..core.distributed_tracing import correlation_id_var
+
+                                correlation_id_var.set(cid)
+                            except ImportError:
+                                pass
                         if asyncio.iscoroutinefunction(handler):
                             await handler(data)
                         else:
@@ -160,6 +182,15 @@ class NatsClient:
                 async for msg in sub.messages:
                     try:
                         data = orjson.loads(msg.data.decode())
+                        # Correlation ID'yi propagate et
+                        cid = data.get("_correlation_id")
+                        if cid:
+                            try:
+                                from ..core.distributed_tracing import correlation_id_var
+
+                                correlation_id_var.set(cid)
+                            except ImportError:
+                                pass
                         yield data
                     except orjson.JSONDecodeError:
                         yield {"raw": msg.data.decode()}
@@ -177,7 +208,17 @@ class NatsClient:
             return await self.publish(subject, data)
 
         try:
+            # Correlation ID'yi mesaja ekle
             if isinstance(data, dict):
+                if "_correlation_id" not in data:
+                    try:
+                        from ..core.distributed_tracing import correlation_id_var
+
+                        cid = correlation_id_var.get()
+                        if cid:
+                            data = {**data, "_correlation_id": cid}
+                    except ImportError:
+                        pass
                 payload = orjson.dumps(data, default=str).decode()
             elif isinstance(data, bytes):
                 payload = data
