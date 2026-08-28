@@ -105,17 +105,18 @@ class EpisodicMemory:
     Uzun süreli, outcome odaklı.
     """
 
-    def __init__(self, max_items: int = 1000):
+    def __init__(self, max_items: int = 1000, min_confidence_for_episode: float = 0.6):
         self.episodes: list[MemoryEntry] = []
         self.outcomes: dict[str, dict] = {}  # task_id → outcome
         self.accuracy_by_regime: dict[str, list[float]] = {}
         self.accuracy_by_ticker: dict[str, list[float]] = {}
         self.max_items = max_items
+        self._min_confidence = min_confidence_for_episode
 
     def add(self, entry: MemoryEntry):
         """Önemli olay ekle."""
         # Sadece yüksek güven veya başarısız olayları kaydet
-        if entry.confidence > 0.6 or entry.direction == "NO_TRADE":
+        if entry.confidence > self._min_confidence or entry.direction == "NO_TRADE":
             self.episodes.append(entry)
             if len(self.episodes) > self.max_items:
                 self.episodes = self.episodes[-self.max_items :]
@@ -133,7 +134,13 @@ class EpisodicMemory:
             return
 
         predicted = episode.direction
-        correct = (predicted == "LONG" and actual_return > 0) or (predicted == "SHORT" and actual_return < 0)
+        # NO_TRADE tahmini her zaman "doğru" sayılır (risk almamak = korunma)
+        if predicted == "NO_TRADE":
+            correct = True
+        elif predicted == "NEUTRAL":
+            correct = abs(actual_return) < 2.0  # Küçük hareket = doğru tahmin
+        else:
+            correct = (predicted == "LONG" and actual_return > 0) or (predicted == "SHORT" and actual_return < 0)
 
         self.outcomes[task_id] = {
             "predicted": predicted,
@@ -196,8 +203,16 @@ class EpisodicMemory:
         regime: str | None = None,
         limit: int = 5,
     ) -> list[MemoryEntry]:
-        """Benzer olayları bul."""
+        """Benzer olayları bul (ticker + opsiyonel rejim bazlı)."""
         filtered = [e for e in self.episodes if e.ticker == ticker]
+        if regime:
+            # Outcome'lardan rejim eşleşmesi bul
+            regime_matches = [
+                e for e in filtered
+                if e.task_id in self.outcomes and self.outcomes[e.task_id].get("regime") == regime
+            ]
+            if regime_matches:
+                return regime_matches[-limit:]
         return filtered[-limit:]
 
     def get_confidence_calibration(self) -> dict:
@@ -205,7 +220,7 @@ class EpisodicMemory:
         if len(self.outcomes) < 10:
             return {"calibrated": False, "reason": "insufficient_data"}
 
-        bins = [(0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]
+        bins = [(0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.01)]  # 1.0 dahil
         calibration = []
 
         for low, high in bins:
@@ -300,9 +315,16 @@ class SemanticMemory:
         return results[-limit:]
 
     def prune_low_accuracy(self, threshold: float = 0.4):
-        """Düşük doğruluklu kalıpları temizle."""
+        """Düşük doğruluklu kalıpları temizle.
+
+        Not: Kalıplarda "accuracy" anahtarı yoksa, "confidence" kullanılır.
+        İkisi de yoksa kalıp korunur (varsayılan: güvenli).
+        """
         for ticker in list(self.patterns.keys()):
-            self.patterns[ticker] = [p for p in self.patterns[ticker] if p.get("accuracy", 0.5) >= threshold]
+            self.patterns[ticker] = [
+                p for p in self.patterns[ticker]
+                if p.get("accuracy", p.get("confidence", 0.5)) >= threshold
+            ]
 
     def to_dict(self) -> dict:
         return {
@@ -427,15 +449,25 @@ class AgentMemory:
             with open(load_path) as f:
                 data = orjson.loads(f.read())
 
-            # Working memory
+            # Working memory — her item'ı ayrı ayrı yükle, hatalı olanı atla
             for item in data.get("working", {}).get("items", []):
-                self.working.add(MemoryEntry(**item))
+                try:
+                    self.working.add(MemoryEntry(**item))
+                except (TypeError, KeyError) as e:
+                    logger.debug("Skipping invalid working memory entry", error=str(e))
 
             # Episodic memory
             for item in data.get("episodic", {}).get("items", []):
-                self.episodic.add(MemoryEntry(**item))
+                try:
+                    self.episodic.add(MemoryEntry(**item))
+                except (TypeError, KeyError) as e:
+                    logger.debug("Skipping invalid episodic memory entry", error=str(e))
 
-            logger.info("Memory loaded", path=load_path)
+            logger.info("Memory loaded", path=load_path, working=len(self.working.items), episodic=len(self.episodic.episodes))
+        except orjson.JSONDecodeError as e:
+            logger.warning("Corrupted memory file", path=load_path, error=str(e))
+        except FileNotFoundError:
+            logger.debug("Memory file not found", path=load_path)
         except Exception as e:
             logger.warning("Failed to load memory", path=load_path, error=str(e))
 

@@ -64,16 +64,22 @@ class AgentCommunicationBus:
     - CONTEXT: Bağlam paylaşımı
     """
 
-    def __init__(self):
+    def __init__(self, max_queue_per_role: int = 100, max_log: int = 1000):
         self._message_queue: dict[AgentRole, list[AgentMessage]] = {role: [] for role in AgentRole}
         self._message_log: list[AgentMessage] = []
+        self._max_queue = max_queue_per_role
+        self._max_log = max_log
 
     def send(self, message: AgentMessage):
         """Mesaj gönder."""
-        self._message_queue[message.receiver].append(message)
+        queue = self._message_queue[message.receiver]
+        queue.append(message)
+        # Kuyruk sınırı
+        if len(queue) > self._max_queue:
+            self._message_queue[message.receiver] = queue[-self._max_queue :]
         self._message_log.append(message)
-        if len(self._message_log) > 1000:
-            self._message_log = self._message_log[-1000:]
+        if len(self._message_log) > self._max_log:
+            self._message_log = self._message_log[-self._max_log :]
 
     def receive(self, role: AgentRole) -> list[AgentMessage]:
         """Mesaj al (ve kuyruktan sil)."""
@@ -200,11 +206,11 @@ class ConflictResolver:
                 conflict=False,
             )
 
-        # Debate consensus varsa onu kullan
-        if debate_consensus and debate_consensus != "NO_TRADE":
+        # Debate consensus varsa onu kullan (NO_TRADE dahil)
+        if debate_consensus:
             return Resolution(
                 direction=debate_consensus,
-                confidence=0.7,  # Debate'ten gelen consensus güvenilir
+                confidence=0.7 if debate_consensus != "NO_TRADE" else 0.0,
                 method="debate_consensus",
                 conflict=False,
             )

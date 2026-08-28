@@ -234,7 +234,7 @@ class SynthesisEngine:
         return weighted_sum / total_weight if total_weight > 0 else 50.0
 
     def _simple_majority(self, results: dict[AgentRole, AgentResult]) -> str:
-        """Basit çoğunluk oyu."""
+        """Basit çoğunluk oyu — beraberlik durumunda NO_TRADE."""
         valid = {r: res for r, res in results.items() if res.success}
         directions = {}
         for _role, result in valid.items():
@@ -244,11 +244,19 @@ class SynthesisEngine:
         if not directions:
             return "NO_TRADE"
 
-        max_dir = max(directions, key=directions.get)
-        # LONG veya SHORT çoğunlukta değilse NO_TRADE
-        if max_dir in ["LONG", "SHORT"]:
-            return max_dir
-        return "NEUTRAL"
+        # Sadece LONG/SHORT oylarını say
+        directional = {d: c for d, c in directions.items() if d in ["LONG", "SHORT"]}
+        if not directional:
+            return "NEUTRAL"
+
+        max_votes = max(directional.values())
+        top_dirs = [d for d, v in directional.items() if v == max_votes]
+
+        # Beraberlik varsa NO_TRADE
+        if len(top_dirs) > 1:
+            return "NO_TRADE"
+
+        return top_dirs[0]
 
     def _simple_confidence(self, results: dict[AgentRole, AgentResult]) -> float:
         """Basit ortalama güven."""

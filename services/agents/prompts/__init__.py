@@ -6,6 +6,7 @@ BIST-specific kurallar dahil.
 Version tracking ile.
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 import orjson
@@ -523,8 +524,6 @@ class PromptFactory:
                 missing_key=str(e),
             )
             # Eksik anahtarları boş string ile doldur ve tekrar dene
-            import re
-
             all_keys = set(re.findall(r"\{(\w+)\}", template["system"] + template["user"]))
             for k in all_keys:
                 format_vars.setdefault(k, "")

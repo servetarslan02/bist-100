@@ -108,7 +108,7 @@ class RiskAssessmentSchema(BaseModel):
 
     risk_level: RiskLevel = RiskLevel.MEDIUM
     risk_score: float = Field(default=50.0, ge=0.0, le=100.0)
-    approved: bool = True
+    approved: bool = False  # Fail-closed: LLM onaylamazsa reddet
     veto_reason: str | None = None
     risk_factors: list[str] = Field(default_factory=list)
     max_position_pct: float = Field(default=5.0, ge=0.0, le=100.0)
@@ -162,7 +162,6 @@ def validate_agent_output(data: dict[str, Any], schema_class=None) -> tuple:
         return True, parsed.model_dump(), []
     except Exception as e:
         errors = [str(e)]
-        # Fallback: temel alanları kontrol et
-        if "direction" in data and data["direction"] in [d.value for d in Direction]:
-            return True, data, errors
+        # Fallback: temel alanları kontrol et ama validation başarısız
+        # direction geçerli olsa bile diğer alanlar doğrulanmadı → False
         return False, data, errors

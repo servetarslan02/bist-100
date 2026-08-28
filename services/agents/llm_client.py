@@ -56,6 +56,15 @@ class LLMConfig:
     max_retries: int = 3
     retry_delay: float = 1.0
 
+    def __repr__(self):
+        """API key'i gizle."""
+        masked_key = "***" if self.api_key else None
+        return (
+            f"LLMConfig(provider={self.provider!r}, model={self.model!r}, "
+            f"base_url={self.base_url!r}, api_key={masked_key!r}, "
+            f"temperature={self.temperature}, max_tokens={self.max_tokens})"
+        )
+
 
 class BaseLLMClient(ABC):
     """Abstract LLM client interface."""
@@ -437,7 +446,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
     try:
         return orjson.loads(content)
     except orjson.JSONDecodeError:
-        logger.warning("JSON parse error in parse_llm_json", exc_info=True)
+        pass  # Normal durum — LLM her zaman düzgün JSON üretmez
 
     # 2. ```json ... ``` bloğu
     json_block = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
@@ -445,7 +454,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         try:
             return orjson.loads(json_block.group(1))
         except orjson.JSONDecodeError:
-            logger.warning("JSON parse error in parse_llm_json", exc_info=True)
+            pass
 
     # 3. İlk { ... }
     json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, re.DOTALL)
@@ -453,7 +462,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         try:
             return orjson.loads(json_match.group())
         except orjson.JSONDecodeError:
-            logger.warning("JSON parse error in parse_llm_json", exc_info=True)
+            pass
 
     # 4. Metinden fallback extraction
     return _extract_from_text(content)

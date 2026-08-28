@@ -231,9 +231,9 @@ class AgentSelfEvaluator:
 
     def _outcome_distribution(self, memory: AgentMemory) -> dict[str, int]:
         """Sonuç dağılımı."""
-        outcomes = memory.episodic.outcomes.values()
+        outcomes = list(memory.episodic.outcomes.values())  # Listeye çevir (generator değil)
         return {
-            "total": len(list(outcomes)),
+            "total": len(outcomes),
             "correct": sum(1 for o in outcomes if o["correct"]),
             "wrong": sum(1 for o in outcomes if not o["correct"]),
             "long_correct": sum(1 for o in outcomes if o["predicted"] == "LONG" and o["correct"]),

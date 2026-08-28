@@ -152,9 +152,9 @@ class DebateEngine:
 
             history.append(round_result)
 
-            # Son argümanları güncelle
-            bull_arg = round_result
-            bear_arg = round_result
+            # Son argümanları güncelle (bir sonraki tur için)
+            bull_arg = round_result  # Bull'ın son argümanı
+            bear_arg = round_result  # Bear'ın son argümanı
 
             # Erken konsensüs kontrolü
             if round_result.bull_direction == round_result.bear_direction:
@@ -223,13 +223,15 @@ class DebateEngine:
 
         # === BULL ARGÜMAN ===
         bull_prompt_vars = self._create_bull_prompt_vars(round_num, ticker, context, bear_arg, history)
+        # Template adı: tur 1-3 için özel, sonrası için genel
+        bull_template = f"bull_tur{round_num + 1}" if round_num < 3 else "bull_tur3"
         bull_task = AgentTask(
             task_id=f"bull-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BULL,
             ticker=ticker,
             prompt=f"[Tur {round_num + 1}] {ticker} için BULL argümanı",
             context={**context, "prompt_vars": bull_prompt_vars},
-            template_name=f"bull_tur{round_num + 1}",
+            template_name=bull_template,
         )
         bull_result = await bull_agent.execute(bull_task, llm_client)
 
@@ -238,13 +240,14 @@ class DebateEngine:
 
         # === BEAR CEVAP ===
         bear_prompt_vars = self._create_bear_prompt_vars(round_num, ticker, context, bull_result, history)
+        bear_template = f"bear_tur{round_num + 1}" if round_num < 3 else "bear_tur3"
         bear_task = AgentTask(
             task_id=f"bear-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BEAR,
             ticker=ticker,
             prompt=f"[Tur {round_num + 1}] {ticker} için BEAR argümanı",
             context={**context, "prompt_vars": bear_prompt_vars},
-            template_name=f"bear_tur{round_num + 1}",
+            template_name=bear_template,
         )
         bear_result = await bear_agent.execute(bear_task, llm_client)
 

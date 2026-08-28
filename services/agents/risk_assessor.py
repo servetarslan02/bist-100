@@ -202,11 +202,13 @@ class RiskAssessor:
 
     def _calculate_max_position(self, risk_level: str, risk_score: float) -> float:
         """Maksimum pozisyon yüzdesi hesapla."""
+        if risk_level == "CRITICAL":
+            return 0.0  # CRITICAL = veto, pozisyon yok
+
         base = {
             "LOW": 10.0,
             "MEDIUM": 7.0,
             "HIGH": 5.0,
-            "CRITICAL": 0.0,
         }.get(risk_level, 5.0)
 
         # Risk skoru arttıkça pozisyon azalır
@@ -263,7 +265,9 @@ class RiskAssessor:
 
                 return parse_llm_json(response.content)
 
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.warning("LLM risk assessment connection error", error=str(e))
         except Exception as e:
-            logger.warning("LLM risk assessment failed", error=str(e))
+            logger.error("LLM risk assessment unexpected error", error=str(e), exc_info=True)
 
         return None

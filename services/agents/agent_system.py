@@ -461,33 +461,47 @@ Kurallar: Sadece verilen verilere dayan. JSON formatında yanıt ver. Confidence
             user_prompt = task.prompt
 
         # LLM çağrısı (retry mekanizmalı)
-        response = await client.generate_with_retry(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-        )
+        try:
+            response = await client.generate_with_retry(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.warning(
+                "LLM connection error, using rule-based fallback",
+                error=str(e),
+                ticker=task.ticker,
+                agent_role=task.agent_role.value,
+            )
+            return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
+        except Exception as e:
+            logger.error(
+                "LLM unexpected error, using rule-based fallback",
+                error=str(e),
+                ticker=task.ticker,
+                agent_role=task.agent_role.value,
+                exc_info=True,
+            )
+            return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
         if not response.success:
-            # F-029: LLM fallback detaylı logging
             logger.warning(
                 "LLM call failed, using rule-based fallback",
                 error=response.error,
                 ticker=task.ticker,
-                agent_role=task.agent_role,
+                agent_role=task.agent_role.value,
                 model=getattr(client, "_model", "unknown"),
-                fallback_type="rule_based_analysis",
             )
             return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
         # JSON parse
         parsed = parse_llm_json(response.content)
         if parsed is None:
-            # F-029: Parse hatası detaylı logging
             logger.warning(
                 "Failed to parse LLM output, using rule-based fallback",
                 ticker=task.ticker,
-                agent_role=task.agent_role,
+                agent_role=task.agent_role.value,
                 content_preview=response.content[:200] if response.content else "empty",
-                fallback_type="rule_based_analysis",
             )
             return AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
 
@@ -617,25 +631,28 @@ agent_orchestrator = AgentOrchestrator()
 
 
 def run_agent_analysis(ticker: str, features: dict, news: list = None) -> dict[str, Any]:
-    """Agent tabanlı analiz çalıştır (sync wrapper)."""
+    """Agent tabanlı analiz çalıştır (sync wrapper).
+
+    Singleton orchestrator kullanır — memory ve sonuçlar korunur.
+    """
     result = {"ticker": ticker}
     try:
-        orch = AgentOrchestrator()
         context = {"features": features, "news": news or []}
 
         # Async loop varsa kullan, yoksa yeni oluştur
         try:
             asyncio.get_running_loop()
-            # Zaten bir loop içindeyiz — task oluştur
+            # Zaten bir loop içindeyiz — async fonksiyon çağrılmalı
             result["agent_available"] = True
             result["note"] = "Use async run_research_pipeline instead"
         except RuntimeError:
-            # Loop yok — yeni oluştur
-            report = asyncio.run(orch.run_research_pipeline(ticker, context))
+            # Loop yok — singleton orchestrator kullan
+            report = asyncio.run(agent_orchestrator.run_research_pipeline(ticker, context))
             result.update(report)
             result["agent_available"] = True
 
     except Exception as e:
+        logger.error("run_agent_analysis failed", ticker=ticker, error=str(e))
         result["agent_available"] = False
         result["error"] = str(e)
     return result

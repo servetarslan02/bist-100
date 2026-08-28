@@ -16,6 +16,7 @@ Akış:
 FAZ 6: Full Pipeline Integration
 """
 
+import os
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -120,8 +121,6 @@ class AgentPipelineOrchestrator:
         self._memories: dict[str, AgentMemory] = {}
         if enable_memory:
             _default_path = memory_path or "data/agent_memory"
-            import os
-
             os.makedirs(_default_path, exist_ok=True)
             for role in ["TECHNICAL", "FUNDAMENTAL", "NEWS", "MACRO", "RISK", "SYNTHESIS"]:
                 path = f"{_default_path}/{role}_memory.json"
@@ -192,20 +191,36 @@ class AgentPipelineOrchestrator:
         # === PHASE 3: BULL/BEAR DEBATE (eğer çelişki varsa) ===
         debate_result = None
         if self.enable_debate and conflict_report.requires_debate:
-            debate_result = await self.debate_engine.run_debate(
-                ticker=ticker,
-                context=full_context,
-                llm_client=self.llm_client,
-            )
+            try:
+                debate_result = await self.debate_engine.run_debate(
+                    ticker=ticker,
+                    context=full_context,
+                    llm_client=self.llm_client,
+                )
+            except Exception as e:
+                logger.warning("Debate failed, continuing without", error=str(e))
 
         # === PHASE 4: RISK ASSESSMENT ===
-        risk_assessment = await self.risk_assessor.assess(
-            ticker=ticker,
-            agent_results=parallel_result.results,
-            features=features,
-            portfolio_info=portfolio_info,
-            llm_client=self.llm_client,
-        )
+        try:
+            risk_assessment = await self.risk_assessor.assess(
+                ticker=ticker,
+                agent_results=parallel_result.results,
+                features=features,
+                portfolio_info=portfolio_info,
+                llm_client=self.llm_client,
+            )
+        except Exception as e:
+            logger.error("Risk assessment failed, using conservative default", error=str(e))
+            from .risk_assessor import RiskAssessment
+            risk_assessment = RiskAssessment(
+                approved=False,
+                risk_level="HIGH",
+                risk_score=80.0,
+                max_position_pct=0.0,
+                stop_loss_pct=10.0,
+                risk_factors=[f"Risk assessment error: {e}"],
+                veto_reason="Risk assessment failed",
+            )
 
         # === PHASE 5: CONFLICT RESOLUTION ===
         resolution = self.conflict_resolver.resolve(
@@ -271,13 +286,28 @@ class AgentPipelineOrchestrator:
 
         tasks = {}
         for role in roles:
+            template = template_map.get(role)
+            # Template varsa prompt_factory'den al, yoksa genel prompt kullan
+            if template:
+                try:
+                    from .prompts import PromptFactory
+                    _, user_prompt = PromptFactory.get_prompts(
+                        template_name=template,
+                        ticker=ticker,
+                        context=context,
+                    )
+                except Exception:
+                    user_prompt = f"Analyze {ticker} from {role.value} perspective"
+            else:
+                user_prompt = f"Analyze {ticker} from {role.value} perspective"
+
             tasks[role] = AgentTask(
                 task_id=f"{ticker}-{role.value}-{int(time.time())}",
                 agent_role=role,
                 ticker=ticker,
-                prompt=f"Analyze {ticker} from {role.value} perspective",
+                prompt=user_prompt,
                 context=context,
-                template_name=template_map.get(role),
+                template_name=template,
             )
         return tasks
 
@@ -287,7 +317,7 @@ class AgentPipelineOrchestrator:
         results: dict[AgentRole, Any],
         synthesis: SynthesisResult,
     ):
-        """Memory'leri güncelle."""
+        """Memory'leri güncelle — task + outcome."""
         for role, result in results.items():
             role_name = role.value
             if role_name in self._memories:
@@ -298,6 +328,14 @@ class AgentPipelineOrchestrator:
                     confidence=result.confidence,
                     reasoning=result.reasoning,
                 )
+                # Outcome kaydet (eğer gerçek getiri varsa)
+                actual_return = result.output.get("actual_return")
+                if actual_return is not None:
+                    self._memories[role_name].record_outcome(
+                        task_id=result.task_id,
+                        actual_return=float(actual_return),
+                        regime=result.output.get("regime", "UNKNOWN"),
+                    )
 
     async def evaluate_agents(self) -> dict[str, Any]:
         """Tüm agent'ları değerlendir."""
