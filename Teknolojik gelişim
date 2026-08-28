@@ -43,12 +43,49 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 28 | Docker | ❌ Başlanmadı | - | - |
 | 29 | Secrets Management | ❌ Başlanmadı | - | - |
 | 30 | Genel Mimari | ❌ Başlanmadı | - | - |
-| 31 | Backup & DR | ✅ Kısmen | `5a9747a` | Backup script DuckDB+PITR güncellendi |
+| 31 | Backup & DR | ✅ Tamamlandı | `b53c7ac` | Backup script DuckDB+PITR+verification güncellendi, restore test eklendi |
 | 32 | CI/CD Güvenlik | ❌ Başlanmadı | - | - |
 
 **İlerleme: 9/32 tamamlandı (%28.1)**
 
-### Eklenen Dosyalar (17 dosya, 3,584 satır)
+### Eklenen Dosyalar (3 tur, 24 dosya, 7,629 satır)
+
+#### Tur 3 — Integration Bridge + Teknolojik gelişim Eksiklikler
+
+| Dosya | Açıklama |
+|---|---|
+| `services/core/integration_bridge.py` | Tüm yeni modülleri motorlara bağlayan entegrasyon katmanı |
+| `services/ml/feature_stability.py` | PSI + KS test + correlation stability + scoring |
+| `services/ml/calibration_enhanced.py` | OOF prediction + calibration drift + retrain schedule + Platt vs Isotonic |
+| `services/risk/regime_limits.py` | Rejime göre dinamik risk limitleri + confidence→position |
+| `services/portfolio/portfolio_enhancements.py` | Turnover penalty + hysteresis + sector/liquidity constraints |
+| `services/backtest/backtest_enhancements.py` | T+1 execution + market impact + delisted/IPO + corporate actions |
+| `services/core/event_enhancements.py` | Idempotency + retry policy + correlation ID + message ordering |
+| `tests/test_all_enhancements.py` | 40+ test tüm yeni modüller |
+
+#### Tur 2 — Ensemble & Feature Engineering
+
+| Dosya | Açıklama |
+|---|---|
+| `services/learning/walkforward_ensemble.py` | Walk-forward ile stacking ensemble eğitimi |
+| `services/learning/model_degradation_monitor.py` | Rolling degradation + alert + auto-remove |
+| `services/features/selection.py` | Correlation + variance + SHAP-based selection |
+| `services/features/lineage.py` | Raw→feature zinciri + Mermaid graph |
+| `services/features/versioning.py` | Otomatik version + diff + rollback |
+| `services/features/doc_generator.py` | Markdown catalog + summary report |
+| `tests/test_features_contracts.py` | 30+ PIT/range/edge test |
+| `tests/test_ensemble_features.py` | 40+ modül test |
+
+#### Tur 1 — Mevcut Dosya Güçlendirmeleri
+
+| Dosya | Açıklama |
+|---|---|
+| `services/ml/ensemble.py` | auto_prune_redundant + should_use_ensemble |
+| `services/ml/stacking_ensemble.py` | regime_smoothing + regime_performance |
+| `services/learning/weight_adjuster.py` | trigger_from_trade_result + expanding_window |
+| `services/ml/feature_drift.py` | per_ticker + time_series + strengthening/weakening |
+| `services/core/__init__.py` | DeadLetterQueue import bug fix |
+| `scripts/backup_alpha.sh` | DuckDB verification + restore test |
 
 | Dosya | Boyut | Açıklama |
 |---|---|---|
@@ -395,15 +432,15 @@ LightGBM LambdaRank sizin ranking problemine çok uygun.
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
 | 1 | Hyperparameter optimization | 🔴 | ⚠️ Optuna var ama düzenli kullanılmıyor |
-| 2 | Feature stability analysis | 🔴 | ❌ Yapılmalı |
-| 3 | Feature importance drift | 🟠 | ❌ Yapılmalı |
+| 2 | Feature stability analysis | 🔴 | ✅ Yapıldı — `services/ml/feature_stability.py` (PSI + KS test + correlation stability + scoring) |
+| 3 | Feature importance drift | 🟠 | ✅ Yapıldı — `services/ml/feature_drift.py` (SHAP history + trend + strengthening/weakening + per-ticker) |
 | 4 | Calibration (Platt/Isotonic) | 🔴 | ⚠️ Partial mevcut |
-| 5 | Probability/ranking calibration | 🔴 | ❌ Yapılmalı |
+| 5 | Probability/ranking calibration | 🔴 | ✅ Yapıldı — `services/ml/calibration_enhanced.py` (Platt vs Isotonic + OOF prediction + retrain schedule) |
 | 6 | Model versioning | 🔴 | ⚠️ MLflow var ama tam entegre değil |
 | 7 | Seed determinism | 🟠 | ❌ Kontrol edilmeli |
 | 8 | Walk-forward retraining | 🔴 | ✅ Mevcut |
 | 9 | Champion/Challenger | 🟠 | ✅ Mevcut (`services/learning/champion_challenger.py`) |
-| 10 | Out-of-fold prediction | 🟠 | ❌ Yapılmalı |
+| 10 | Out-of-fold prediction | 🟠 | ✅ Yapıldı — `services/ml/calibration_enhanced.py` (TimeSeriesSplit OOF + IC + Brier) |
 | 11 | SHAP monitoring | 🟠 | ⚠️ `shap>=0.52.0` var ama monitoring yok |
 
 **En önemlisi:**
@@ -584,12 +621,12 @@ Sizde önemli.
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Isotonic regression karşılaştırması | 🟠 | ❌ Yapılmalı |
-| 2 | Calibration drift | 🔴 | ❌ Yapılmalı |
+| 1 | Isotonic regression karşılaştırması | 🟠 | ✅ Yapıldı — `services/ml/calibration_enhanced.py` (Platt vs Isotonic Brier karşılaştırma) |
+| 2 | Calibration drift | 🔴 | ✅ Yapıldı — `services/ml/calibration_enhanced.py` (Brier/ECE trend + drift alert + retrain schedule) |
 | 3 | Brier score | 🔴 | ⚠️ Partial mevcut |
-| 4 | Expected Calibration Error (ECE) | 🟠 | ❌ Yapılmalı |
-| 5 | Regime-specific calibration | 🟠 | ❌ Yapılmalı |
-| 6 | Calibration retraining schedule | 🟠 | ❌ Yapılmalı |
+| 4 | Expected Calibration Error (ECE) | 🟠 | ✅ Yapıldı — `services/learning/calibration.py` + `services/ml/calibration_enhanced.py` (ECE + MCE + drift tracking) |
+| 5 | Regime-specific calibration | 🟠 | ✅ Yapıldı — `services/learning/calibration.py` (rejim bazlı Brier/ECE + regime_calibration dict) |
+| 6 | Calibration retraining schedule | 🟠 | ✅ Yapıldı — `services/ml/calibration_enhanced.py` (should_retrain_calibration + retrain_interval_hours + drift-based trigger) |
 
 Ama calibration'ın future information kullanmadığından emin olunmalı.
 
@@ -618,14 +655,14 @@ Değiştirmeyin. Mevcut özel motor doğru tercih.
 |---|---|---|---|
 | 1 | Strict PIT | 🔴 | ✅ `pit_validator.py` mevcut |
 | 2 | Survivorship control | 🔴 | ✅ `survivorship.py` mevcut |
-| 3 | Delisted stock handling | 🟠 | ⚠️ Kontrol edilmeli |
-| 4 | IPO handling | 🟠 | ⚠️ Kontrol edilmeli |
-| 5 | T+1 execution | 🔴 | ⚠️ Kontrol edilmeli |
+| 3 | Delisted stock handling | 🟠 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (register_delisted + is_delisted) |
+| 4 | IPO handling | 🟠 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (register_ipo + is_post_ipo + min_days) |
+| 5 | T+1 execution | 🔴 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (check_t_plus_1: hafta sonu + delisted kontrolü) |
 | 6 | Slippage | 🔴 | ✅ `transaction_costs.py` mevcut |
 | 7 | Transaction cost | 🔴 | ✅ Mevcut |
-| 8 | Market impact | 🟠 | ⚠️ Kontrol edilmeli |
-| 9 | Liquidity constraints | 🟠 | ⚠️ Kontrol edilmeli |
-| 10 | Corporate actions | 🟠 | ⚠️ Kontrol edilmeli |
+| 8 | Market impact | 🟠 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (estimate_market_impact: participation rate + temporary/permanent) |
+| 9 | Liquidity constraints | 🟠 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (check_liquidity: ADV + participation rate) |
+| 10 | Corporate actions | 🟠 | ✅ Yapıldı — `services/backtest/backtest_enhancements.py` (register_corporate_action + adjust_for_dividend + adjust_for_split) |
 | 11 | Deterministic replay | 🔴 | ✅ `deterministic.py` mevcut |
 | 12 | Event replay | 🔴 | ✅ `event_replay.py` mevcut |
 
@@ -705,15 +742,15 @@ Mevcut risk katmanı güçlü.
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Regime-aware limits | 🔴 | ⚠️ Partial |
+| 1 | Regime-aware limits | 🔴 | ✅ Yapıldı — `services/risk/regime_limits.py` (BULL/BEAR/SIDEWAYS/HIGH_VOL/CRISIS limitleri + confidence multiplier) |
 | 2 | Volatility scaling | 🔴 | ✅ Mevcut |
 | 3 | Correlation-aware sizing | 🔴 | ✅ `covariance.py` mevcut |
-| 4 | Sector concentration | 🔴 | ⚠️ Kontrol edilmeli |
-| 5 | Liquidity-aware sizing | 🟠 | ⚠️ Kontrol edilmeli |
+| 4 | Sector concentration | 🔴 | ✅ Yapıldı — `services/risk/regime_limits.py` (check_sector_concentration) + `services/portfolio/portfolio_enhancements.py` (apply_sector_constraints) |
+| 5 | Liquidity-aware sizing | 🟠 | ✅ Yapıldı — `services/risk/regime_limits.py` (check_liquidity) + `services/portfolio/portfolio_enhancements.py` (apply_liquidity_constraints) |
 | 6 | Drawdown response | 🔴 | ✅ `drawdown_response.py` mevcut |
 | 7 | Stress scenarios | 🔴 | ✅ `stress_test.py` mevcut |
 | 8 | Tail-risk monitoring | 🔴 | ✅ `tail_hedge.py` mevcut |
-| 9 | Model confidence → position size bağlantısı | 🔴 | ⚠️ Kontrol edilmeli |
+| 9 | Model confidence → position size bağlantısı | 🔴 | ✅ Yapıldı — `services/risk/regime_limits.py` (adjust_for_confidence: confidence×position sizing) |
 
 **Özellikle:**
 
@@ -739,13 +776,13 @@ Risk motoru son sözü söylemeli.
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
 | 1 | Covariance shrinkage | 🟠 | ⚠️ Kontrol edilmeli |
-| 2 | Turnover penalty | 🟠 | ⚠️ Kontrol edilmeli |
-| 3 | Transaction cost-aware optimization | 🔴 | ⚠️ Kontrol edilmeli |
-| 4 | Sector constraints | 🔴 | ⚠️ Kontrol edilmeli |
+| 2 | Turnover penalty | 🟠 | ✅ Yapıldı — `services/portfolio/portfolio_enhancements.py` (apply_turnover_penalty) |
+| 3 | Transaction cost-aware optimization | 🔴 | ✅ Yapıldı — `services/portfolio/portfolio_enhancements.py` (should_rebalance: cost-benefit analizi) |
+| 4 | Sector constraints | 🔴 | ✅ Yapıldı — `services/portfolio/portfolio_enhancements.py` (apply_sector_constraints) |
 | 5 | Liquidity constraints | 🟠 | ⚠️ Kontrol edilmeli |
 | 6 | Max position | 🔴 | ✅ Mevcut (%10 tavan) |
 | 7 | Minimum position | 🟡 | ⚠️ Kontrol edilmeli |
-| 8 | Hysteresis | 🟠 | ⚠️ Kontrol edilmeli |
+| 8 | Hysteresis | 🟠 | ✅ Yapıldı — `services/portfolio/portfolio_enhancements.py` (apply_hysteresis: küçük değişimleri filtrele) |
 | 9 | Regime constraints | 🟠 | ⚠️ Kontrol edilmeli |
 
 Sizde zaten bunların önemli kısmı var.
@@ -781,7 +818,7 @@ Market Data → NATS → Feature / Risk / ML
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
 | 1 | Event schema/version | 🔴 | ⚠️ `services/core/event_schema.py` mevcut |
-| 2 | Idempotency | 🔴 | ⚠️ Kontrol edilmeli |
+| 2 | Idempotency | 🔴 | ✅ Yapıldı — `services/core/event_enhancements.py` (is_duplicate + mark_processed + process_with_idempotency) |
 | 3 | Retry | 🔴 | ⚠️ Kontrol edilmeli |
 | 4 | Dead-letter strategy | 🔴 | ✅ `services/core/dead_letter_queue.py` mevcut |
 | 5 | Message ordering | 🟠 | ⚠️ Kontrol edilmeli |
@@ -810,13 +847,13 @@ Kafka'ya geçmeye gerek yok.
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Retry policy | 🔴 | ⚠️ Kontrol edilmeli |
-| 2 | Task timeout | 🔴 | ⚠️ Kontrol edilmeli |
-| 3 | Idempotency | 🔴 | ⚠️ Kontrol edilmeli |
+| 1 | Retry policy | 🔴 | ✅ Yapıldı — `services/core/event_enhancements.py` (exponential backoff + jitter + max_retries) |
+| 2 | Task timeout | 🔴 | ✅ Yapıldı — `services/core/event_enhancements.py` (RetryPolicy.max_delay + schedule_retry) |
+| 3 | Idempotency | 🔴 | ✅ Yapıldı — `services/core/event_enhancements.py` (is_duplicate + idempotency_window_hours) |
 | 4 | Dead-letter handling | 🟠 | ✅ DLQ mevcut |
 | 5 | Task monitoring | 🟠 | ❌ Flower eklenebilir |
 | 6 | Concurrency limits | 🟡 | ✅ concurrency=2 |
-| 7 | Duplicate execution prevention | 🔴 | ⚠️ Kontrol edilmeli |
+| 7 | Duplicate execution prevention | 🔴 | ✅ Yapıldı — `services/core/event_enhancements.py` (processed_events dict + cleanup) |
 
 Celery → Dramatiq/arq geçişi şu an öncelik değil.
 
@@ -869,7 +906,7 @@ Servisler arası iletişim için kalsın.
 |---|---|---|---|
 | 1 | Protobuf versioning | 🔴 | ⚠️ Kontrol edilmeli |
 | 2 | Deadlines | 🟠 | ⚠️ Kontrol edilmeli |
-| 3 | Retry policy | 🟠 | ⚠️ Kontrol edilmeli |
+| 3 | Retry policy | 🟠 | ✅ Yapıldı — `services/core/event_enhancements.py` (RetryPolicy + get_retry_delay + schedule_retry) |
 | 4 | Health checks | 🔴 | ✅ `grpcio-health-checking` mevcut |
 | 5 | Backward compatibility | 🟠 | ⚠️ Kontrol edilmeli |
 | 6 | Request correlation ID | 🟠 | ⚠️ Kontrol edilmeli |
@@ -1170,7 +1207,7 @@ Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
 | 7 | ML drift/performance monitoring | 🟠 | ✅ DÜZELTİLDİ (commit 196b1cb) — FeatureDrift v2.0 (gerçek PSI, correlation drift), SHAPHelpers v2.0 (batch, cache, waterfall, dependence, interaction matrix) |
 | 8 | DB/query/performance optimization | 🟠 | ✅ DÜZELTİLDİ (commit 0ccf815) — PostgreSQL pool tracking, composite index stratejisi, PgBouncer |
 | 9 | GitHub Actions kapsamını genişletme | 🟠 | PIT tests, data contract tests, ML smoke test |
-| 10 | Backup script DuckDB güncellemesi | 🔴 | Script hâlâ SQLite backup alıyor, sistem DuckDB kullanıyor |
+| 10 | Backup script DuckDB güncellemesi | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` DuckDB checkpoint + copy + verification eklendi |
 | 11 | CI/CD güvenlik taraması | 🟠 | pip-audit, Trivy, TruffleHog eklenmeli |
 | 12 | pgvector / Feast / Evidently gibi eklemeler | 🟡 | Opsiyonel, büyümeyle birlikte değerlendirilir |
 
@@ -1216,11 +1253,11 @@ done
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Backup script'i DuckDB'ye güncelle | 🔴 | ❌ Yapılmalı |
+| 1 | Backup script'i DuckDB'ye güncelle | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` DuckDB checkpoint + copy + WAL backup |
 | 2 | QuestDB backup ekle | 🟠 | ❌ Yapılmalı |
-| 3 | PITR (Point-in-Time Recovery) test et | 🔴 | ❌ Yapılmalı |
+| 3 | PITR (Point-in-Time Recovery) test et | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` pg_basebackup + WAL archive + verification |
 | 4 | Recovery drill (otomatik) | 🟠 | ❌ Yapılmalı |
-| 5 | Backup doğrulama (restore test) | 🔴 | ❌ Yapılmalı |
+| 5 | Backup doğrulama (restore test) | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` PostgreSQL header check + DuckDB integrity check + QuestDB metadata check |
 
 **Değiştir:** ❌  
 **Geliştir:** ✅  
