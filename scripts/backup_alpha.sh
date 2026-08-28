@@ -86,16 +86,47 @@ tar czf "$BACKUP_DIR/config.tar.gz" config/ .env 2>/dev/null && \
 log "Backing up QuestDB..."
 QUESTDB_BACKUP_DIR="$BACKUP_DIR/questdb"
 mkdir -p "$QUESTDB_BACKUP_DIR"
-# QuestDB snapshot via HTTP API
-if curl -s -o "$QUESTDB_BACKUP_DIR/snapshot_metadata.json" "http://localhost:9000/questdb/snapshot" 2>/dev/null; then
-    # Copy QuestDB data directory if accessible
-    if [ -d "/var/lib/questdb" ]; then
-        cp -r /var/lib/questdb/db "$QUESTDB_BACKUP_DIR/" 2>/dev/null || true
+
+# QuestDB tablolarini CSV olarak export et (daha guvenilir)
+QUESTDB_TABLES=("market_ticks" "ohlcv" "events")
+QUESTDB_EXPORT_OK=0
+QUESTDB_EXPORT_FAIL=0
+
+for table in "${QUESTDB_TABLES[@]}"; do
+    # QuestDB PostgreSQL wire protocol ile export
+    if docker exec alpha-questdb psql -U admin -h localhost -p 8812 -q \
+        -c "COPY $table TO '$table.csv' WITH HEADER true;" 2>/dev/null; then
+        # Container'dan kopyala
+        docker cp "alpha-questdb:/var/lib/questdb/$table.csv" "$QUESTDB_BACKUP_DIR/$table.csv" 2>/dev/null || true
+        if [ -f "$QUESTDB_BACKUP_DIR/$table.csv" ] && [ -s "$QUESTDB_BACKUP_DIR/$table.csv" ]; then
+            log "QuestDB $table export OK ($(du -h "$QUESTDB_BACKUP_DIR/$table.csv" | cut -f1))"
+            QUESTDB_EXPORT_OK=$((QUESTDB_EXPORT_OK + 1))
+        else
+            log "WARNING: QuestDB $table export - file empty or missing"
+            QUESTDB_EXPORT_FAIL=$((QUESTDB_EXPORT_FAIL + 1))
+        fi
+    else
+        log "WARNING: QuestDB $table export failed (table may not exist)"
+        QUESTDB_EXPORT_FAIL=$((QUESTDB_EXPORT_FAIL + 1))
     fi
-    log "QuestDB backup OK"
-else
-    log "WARNING: QuestDB backup failed (container may be down or snapshot API unavailable)"
+done
+
+# QuestDB snapshot metadata (row counts)
+QUESTDB_COUNTS=$(curl -s "http://localhost:9000/exp?query=SELECT+count()+FROM+market_ticks" 2>/dev/null || echo '{}')
+echo "$QUESTDB_COUNTS" > "$QUESTDB_BACKUP_DIR/row_counts.json"
+log "QuestDB row counts saved"
+
+# QuestDB data directory snapshot (cold backup)
+if docker exec alpha-questdb ls /var/lib/questdb/db >/dev/null 2>&1; then
+    docker exec alpha-questdb tar czf /tmp/questdb_snapshot.tar.gz -C /var/lib/questdb db 2>/dev/null || true
+    docker cp alpha-questdb:/tmp/questdb_snapshot.tar.gz "$QUESTDB_BACKUP_DIR/" 2>/dev/null || true
+    docker exec alpha-questdb rm -f /tmp/questdb_snapshot.tar.gz 2>/dev/null || true
+    if [ -f "$QUESTDB_BACKUP_DIR/questdb_snapshot.tar.gz" ] && [ -s "$QUESTDB_BACKUP_DIR/questdb_snapshot.tar.gz" ]; then
+        log "QuestDB cold snapshot OK ($(du -h "$QUESTDB_BACKUP_DIR/questdb_snapshot.tar.gz" | cut -f1))"
+    fi
 fi
+
+log "QuestDB backup summary: $QUESTDB_EXPORT_OK tables exported, $QUESTDB_EXPORT_FAIL failed"
 
 # --- Backup Verification (Restore Test) ---
 log "Verifying backup integrity..."
@@ -133,11 +164,26 @@ for db_file in data/central_state.db data/offline_queue.db data/downtime.db data
 done
 
 # QuestDB backup verification
-if [ -f "$BACKUP_DIR/questdb/snapshot_metadata.json" ]; then
-    log "QuestDB backup verification PASSED (metadata exists)"
-    VERIFICATION_PASSED=$((VERIFICATION_PASSED + 1))
+QUESTDB_VERIFIED=0
+for table in market_ticks ohlcv events; do
+    if [ -f "$BACKUP_DIR/questdb/$table.csv" ] && [ -s "$BACKUP_DIR/questdb/$table.csv" ]; then
+        ROW_COUNT=$(wc -l < "$BACKUP_DIR/questdb/$table.csv")
+        if [ "$ROW_COUNT" -gt 0 ]; then
+            log "QuestDB $table verification PASSED ($ROW_COUNT rows)"
+            QUESTDB_VERIFIED=$((QUESTDB_VERIFIED + 1))
+        else
+            log "WARNING: QuestDB $table verification FAILED (empty)"
+        fi
+    fi
+done
+if [ -f "$BACKUP_DIR/questdb/questdb_snapshot.tar.gz" ] && [ -s "$BACKUP_DIR/questdb/questdb_snapshot.tar.gz" ]; then
+    log "QuestDB cold snapshot verification PASSED"
+    QUESTDB_VERIFIED=$((QUESTDB_VERIFIED + 1))
+fi
+if [ $QUESTDB_VERIFIED -gt 0 ]; then
+    VERIFICATION_PASSED=$((VERIFICATION_PASSED + QUESTDB_VERIFIED))
 else
-    log "WARNING: QuestDB backup verification FAILED (no metadata)"
+    log "WARNING: QuestDB backup verification FAILED (no valid exports)"
     VERIFICATION_FAILED=$((VERIFICATION_FAILED + 1))
 fi
 

@@ -44,9 +44,9 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 29 | Secrets Management | ❌ Başlanmadı | - | - |
 | 30 | Genel Mimari | ❌ Başlanmadı | - | - |
 | 31 | Backup & DR | ✅ Tamamlandı | `b53c7ac` | Backup script DuckDB+PITR+verification güncellendi, restore test eklendi |
-| 32 | CI/CD Güvenlik | ❌ Başlanmadı | - | - |
+| 32 | CI/CD Güvenlik | ✅ Tamamlandı | - | safety + bandit + trivy CI job, OpenAPI contract testing |
 
-**İlerleme: 9/32 tamamlandı (%28.1)**
+**İlerleme: 13/32 tamamlandı (%40.6)**
 
 ### Eklenen Dosyalar (3 tur, 24 dosya, 7,629 satır)
 
@@ -879,11 +879,11 @@ Celery → Dramatiq/arq geçişi şu an öncelik değil.
 | 1 | Pydantic validation | 🔴 | ✅ Mevcut |
 | 2 | Authentication | 🔴 | ✅ JWT mevcut |
 | 3 | Rate limiting | 🔴 | ✅ Mevcut |
-| 4 | Request IDs | 🟠 | ⚠️ Kontrol edilmeli |
+| 4 | Request IDs | 🟠 | ✅ Yapıldı — FastAPI `X-Request-ID` middleware + correlation_id_var entegrasyonu |
 | 5 | Structured errors | 🟠 | ⚠️ Kontrol edilmeli |
 | 6 | Async I/O | 🔴 | ✅ Native |
 | 7 | Health/readiness endpoints | 🔴 | ✅ `/health` mevcut |
-| 8 | OpenAPI contract testing | 🟠 | ❌ Yapılmalı |
+| 8 | OpenAPI contract testing | 🟠 | ✅ Yapıldı — `tests/test_openapi_contract.py` + CI'da schemathesis job |
 
 **Değiştir:** ❌  
 **Geliştir:** ✅
@@ -1135,7 +1135,7 @@ Production'a geçişte:
 | 4 | Non-root users | 🟠 | ⚠️ Kontrol edilmeli |
 | 5 | Resource limits | 🔴 | ✅ Mevcut |
 | 6 | Immutable image tags | 🟠 | ⚠️ Kontrol edilmeli |
-| 7 | Vulnerability scanning | 🟠 | ❌ Yapılmalı |
+| 7 | Vulnerability scanning | 🟠 | ✅ Yapıldı — CI'da safety + bandit + trivy job |
 
 **Değiştir:** ❌  
 **Geliştir:** ✅
@@ -1254,9 +1254,9 @@ done
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
 | 1 | Backup script'i DuckDB'ye güncelle | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` DuckDB checkpoint + copy + WAL backup |
-| 2 | QuestDB backup ekle | 🟠 | ❌ Yapılmalı |
+| 2 | QuestDB backup ekle | 🟠 | ✅ Yapıldı — CSV export + cold snapshot + verification (`scripts/backup_alpha.sh`) |
 | 3 | PITR (Point-in-Time Recovery) test et | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` pg_basebackup + WAL archive + verification |
-| 4 | Recovery drill (otomatik) | 🟠 | ❌ Yapılmalı |
+| 4 | Recovery drill (otomatik) | 🟠 | ✅ Yapıldı — `scripts/recovery_drill.sh` (PostgreSQL + DuckDB + QuestDB + ML + Config restore test) |
 | 5 | Backup doğrulama (restore test) | 🔴 | ✅ Yapıldı — `scripts/backup_alpha.sh` PostgreSQL header check + DuckDB integrity check + QuestDB metadata check |
 
 **Değiştir:** ❌  

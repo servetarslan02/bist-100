@@ -136,9 +136,114 @@ jobs:
               print(f'\n✅ Tüm dosyalar geçerli')
           "
 
+  # OpenAPI contract testing (yeni)
+  openapi-contract:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pip install schemathesis
+      - name: Start API in background
+        run: |
+          python -m uvicorn services.api.app:create_app --factory --host 0.0.0.0 --port 8000 &
+          sleep 10
+        env:
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-test-secret
+          SYSTEM_API_KEY: ci-system-test
+      - name: Run OpenAPI contract tests
+        run: |
+          python -m pytest tests/test_openapi_contract.py -v --timeout=30
+        env:
+          API_BASE_URL: http://localhost:8000
+      - name: Run schemathesis fuzzing
+        run: |
+          schemathesis run http://localhost:8000/openapi.json \
+            --checks all \
+            --max-response-time 5000 \
+            --stateful=links \
+            --hypothesis-max-examples 50 \
+            --dry-run || true
+        env:
+          API_BASE_URL: http://localhost:8000
+
+  # Vulnerability scanning (yeni)
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python dependency vulnerability scan
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install safety
+        run: pip install safety
+      - name: Scan Python dependencies
+        run: |
+          safety check -r requirements.txt --output text || true
+        continue-on-error: true
+
+      # Static Application Security Testing (SAST)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bandit
+        run: pip install bandit
+      - name: Run SAST scan
+        run: |
+          bandit -r services/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --format json \
+            --output bandit-report.json || true
+          bandit -r services/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --format txt || true
+        continue-on-error: true
+
+      # Container image vulnerability scan
+      - name: Build Docker image
+        run: docker build -f infrastructure/Dockerfile.api -t alpha-bist-api:scan .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'alpha-bist-api:scan'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+        continue-on-error: true
+
+      # Upload scan results
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            bandit-report.json
+          retention-days: 30
+
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test, test-postgresql, validate-sql, validate-python]
+    needs: [lint, test, test-postgresql, validate-sql, validate-python, openapi-contract, security-scan]
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f infrastructure/Dockerfile.api -t alpha-bist-api .

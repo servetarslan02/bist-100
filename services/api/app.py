@@ -227,6 +227,29 @@ def create_app() -> FastAPI:
         response.headers["X-Process-Time-Ms"] = str(round(duration, 2))
         return response
 
+    # Request ID middleware — her isteğe unique ID ata
+    @app.middleware("http")
+    async def request_id_middleware(request: Request, call_next):
+        import uuid as _uuid
+
+        # Client'tan gelen X-Request-ID'yi kullan, yoksa üret
+        request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
+
+        # Context variable'a kaydet (distributed tracing ile uyumlu)
+        try:
+            from services.core.distributed_tracing import correlation_id_var
+
+            correlation_id_var.set(request_id)
+        except ImportError:
+            pass
+
+        # Request state'e ekle (endpoint'lerden erişim için)
+        request.state.request_id = request_id
+
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
     # Rate limit headers middleware
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):
