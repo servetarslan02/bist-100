@@ -54,7 +54,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 
 | Dosya | Açıklama |
 |---|---|
-| `services/core/integration_bridge.py` | Tüm yeni modülleri motorlara bağlayan entegrasyon katmanı |
+| `services/core/integration_bridge.py` | **v2.0** — Circuit breaker, health check, metrics, config, input validation, correlation ID, graceful degradation, 59 test |
 | `services/ml/feature_stability.py` | PSI + KS test + correlation stability + scoring |
 | `services/ml/calibration_enhanced.py` | OOF prediction + calibration drift + retrain schedule + Platt vs Isotonic |
 | `services/risk/regime_limits.py` | Rejime göre dinamik risk limitleri + confidence→position |
@@ -62,6 +62,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | `services/backtest/backtest_enhancements.py` | T+1 execution + market impact + delisted/IPO + corporate actions |
 | `services/core/event_enhancements.py` | Idempotency + retry policy + correlation ID + message ordering |
 | `tests/test_all_enhancements.py` | 40+ test tüm yeni modüller |
+| `tests/test_integration_bridge.py` | **YENİ** — 59 test: circuit breaker, metrics, health check, validation, edge cases |
 
 #### Tur 2 — Ensemble & Feature Engineering
 
