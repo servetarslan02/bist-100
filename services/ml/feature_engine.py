@@ -28,6 +28,21 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Feature contract integration (lazy import to avoid circular dependency)
+_feature_registry = None
+
+
+def _get_feature_registry():
+    """Feature registry'i lazy yükle."""
+    global _feature_registry
+    if _feature_registry is None:
+        try:
+            from services.features.contract import feature_registry
+            _feature_registry = feature_registry
+        except ImportError:
+            _feature_registry = None
+    return _feature_registry
+
 
 def _safe_float(v) -> float:
     """Güvenli float dönüşümü — None/NaN → np.nan."""
@@ -89,6 +104,38 @@ class FeatureEngine:
             df = df.sort("Date")
         return df
 
+    @staticmethod
+    def get_feature_metadata(feature_name: str) -> dict | None:
+        """Feature contract metadata'sını döndür.
+
+        Args:
+            feature_name: Feature adı
+
+        Returns:
+            Feature metadata dict veya None
+        """
+        registry = _get_feature_registry()
+        if registry is None:
+            return None
+        contract = registry.get(feature_name)
+        return contract.to_dict() if contract else None
+
+    @staticmethod
+    def list_pit_safe_features() -> list[str]:
+        """PIT-safe feature isimlerini döndür."""
+        registry = _get_feature_registry()
+        if registry is None:
+            return []
+        return [c.name for c in registry.list_pit_safe()]
+
+    @staticmethod
+    def get_feature_summary() -> dict:
+        """Feature registry özet istatistikleri."""
+        registry = _get_feature_registry()
+        if registry is None:
+            return {"error": "registry not available"}
+        return registry.get_summary()
+
     def compute_all(
         self,
         ticker: str,
@@ -139,7 +186,28 @@ class FeatureEngine:
         # G) Fundamental Proxy
         features.update(self._fundamental_proxy(close, volume))
 
-        return {k: _safe_float(v) for k, v in features.items() if v is not None}
+        # Contract-based validation
+        result = {}
+        registry = _get_feature_registry()
+        for k, v in features.items():
+            if v is None:
+                continue
+            fv = _safe_float(v)
+            # Contract validation (varsa)
+            if registry is not None:
+                contract = registry.get(k)
+                if contract is not None and not contract.validate_value(fv):
+                    logger.debug(
+                        "feature_validation_failed",
+                        ticker=ticker,
+                        feature=k,
+                        value=fv,
+                        range=contract.value_range,
+                    )
+                    # Validation fail olsa bile degeri koru — sadece log
+                    # Model zaten NaN'ları handle ediyor
+            result[k] = fv
+        return result
 
     # ------------------------------------------------------------------ #
     # A) Price Context
