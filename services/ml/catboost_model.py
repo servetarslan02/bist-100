@@ -148,7 +148,7 @@ class CatBoostModel:
                 fit_params["loss_function"] = custom_loss
                 fit_params["eval_metric"] = "RMSE"
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="catboost_model.py:152")
+                logger.warning("catboost_handled_exception", error=str(e), context="custom_loss_setup")
 
         # Pool oluştur (daha efficient)
         train_pool = Pool(
@@ -257,10 +257,14 @@ class CatBoostModel:
             closest = min(available, key=lambda h: abs(h - horizon))
             model = self._models[closest]
 
-        if self._is_classifier:
-            return model.predict_proba(X)[:, 1]
-        else:
-            return model.predict(X)
+        try:
+            if self._is_classifier:
+                return model.predict_proba(X)[:, 1]
+            else:
+                return model.predict(X)
+        except Exception as e:
+            logger.warning("catboost_predict_failed", horizon=horizon, error=str(e))
+            return np.zeros(len(X))
 
     def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
         """Tüm horizon'lar için tahmin."""
@@ -294,7 +298,8 @@ class CatBoostModel:
                 if self._feature_names:
                     return dict(zip(self._feature_names, importance.tolist(), strict=False))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
-        except Exception:
+        except Exception as e:
+            logger.warning("catboost_feature_importance_failed", type=importance_type, error=str(e))
             return None
 
     def get_feature_interactions(self, horizon: int = 5) -> dict[str, float] | None:
@@ -313,7 +318,7 @@ class CatBoostModel:
                     result[f"{f1}×{f2}"] = round(float(score), 4)
                 return result
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="catboost_model.py:317")
+            logger.warning("catboost_handled_exception", error=str(e), context="feature_interactions")
         return None
 
     def get_cat_feature_stats(self, horizon: int = 5) -> dict[str, Any] | None:
@@ -336,7 +341,8 @@ class CatBoostModel:
                     "type": "categorical",
                 }
             return stats
-        except Exception:
+        except Exception as e:
+            logger.warning("catboost_cat_feature_stats_failed", error=str(e))
             return None
 
     def _create_model(self):
@@ -422,7 +428,7 @@ class CatBoostModel:
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
                     metrics["val_log_loss"] = round(float(log_loss(y_val, val_pred)), 4)
                 except Exception as e:
-                    logger.debug("Handled exception", error=str(e), context="catboost_model.py:421")
+                    logger.warning("catboost_handled_exception", error=str(e), context="classifier_metrics")
             else:
                 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
@@ -437,7 +443,7 @@ class CatBoostModel:
                     if len(np.unique(val_pred)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
                 except Exception as e:
-                    logger.debug("Handled exception", error=str(e), context="catboost_model.py:435")
+                    logger.warning("catboost_handled_exception", error=str(e), context="regressor_metrics")
 
         return metrics
 
@@ -478,7 +484,7 @@ class CatBoostModel:
                     result[f"{f1}×{f2}"] = round(float(score), 4)
                 self._feature_interactions = result
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="catboost_model.py:467")
+            logger.warning("catboost_handled_exception", error=str(e), context="feature_interaction_compute")
 
     def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
         """Overfitting kontrolü — train-val gap."""

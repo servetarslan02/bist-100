@@ -199,7 +199,8 @@ class StackingEnsemble:
             if hasattr(meta_learner, "predict_proba"):
                 return meta_learner.predict_proba(meta_features)[:, 1]
             return meta_learner.predict(meta_features)
-        except Exception:
+        except Exception as e:
+            logger.warning("stacking_meta_learner_predict_failed", error=str(e))
             return np.zeros(len(X))
 
     def predict_with_confidence(
@@ -229,7 +230,7 @@ class StackingEnsemble:
                     preds = model.predict(X)
                 all_preds.append(preds)
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:224")
+                logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:224")
 
         if not all_preds:
             return np.zeros(len(X)), np.zeros(len(X))
@@ -275,7 +276,8 @@ class StackingEnsemble:
                 else:
                     pred = model.predict(X[:1])
                 model_preds[name] = float(pred[0]) if len(pred) > 0 else 0.5
-            except Exception:
+            except Exception as e:
+                logger.warning("stacking_detail_predict_failed", model=name, error=str(e))
                 model_preds[name] = 0.5
 
         # Weighted prediction
@@ -325,7 +327,7 @@ class StackingEnsemble:
                         for (name, _), c in zip(self._base_models.items(), model_coefs, strict=False)
                     }
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:318")
+            logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:318")
 
         return self._model_weights
 
@@ -350,7 +352,8 @@ class StackingEnsemble:
                     meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
                 else:
                     meta_features[:, model_idx] = model.predict(X)
-            except Exception:
+            except Exception as e:
+                logger.warning("stacking_meta_feature_failed", model=name, error=str(e))
                 meta_features[:, model_idx] = 0.5
 
         if self._config.passthrough:
@@ -381,7 +384,7 @@ class StackingEnsemble:
         unique_regimes = np.unique(regimes)
         for regime in unique_regimes:
             mask = regimes == regime
-            if np.sum(mask) < 10:  # Minimum sample
+            if np.sum(mask) < 30:  # Minimum sample — 10 cok dusuktu
                 continue
 
             try:
@@ -403,7 +406,7 @@ class StackingEnsemble:
                     preds = model.predict(X)
                 all_preds.append((name, preds))
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:396")
+                logger.warning("stacking_handled_exception", error=str(e), context="stacking_ensemble.py:396")
 
         if len(all_preds) < 2:
             return
@@ -435,7 +438,7 @@ class StackingEnsemble:
 
         for regime in unique_regimes:
             mask = regimes == regime
-            if np.sum(mask) < 10:
+            if np.sum(mask) < 30:  # Minimum sample
                 continue
 
             try:
@@ -453,7 +456,8 @@ class StackingEnsemble:
                         if np.isnan(ic):
                             ic = 0.0
                         regime_scores[name] = abs(ic)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning("stacking_regime_score_failed", model=name, regime=regime, error=str(e))
                         regime_scores[name] = 0.0
 
                 # Normalize to weights
@@ -472,14 +476,7 @@ class StackingEnsemble:
         """Validation metrics hesapla."""
         val_pred = self.predict(X_val)
 
-        from sklearn.metrics import roc_auc_score
-
-        try:
-            auc = float(roc_auc_score(y_val, val_pred))
-        except Exception:
-            auc = 0.0
-
-        # IC
+        # IC (Information Coefficient)
         try:
             ic = float(np.corrcoef(val_pred, y_val)[0, 1])
             if np.isnan(ic):
@@ -487,17 +484,28 @@ class StackingEnsemble:
         except Exception:
             ic = 0.0
 
-        # Directional accuracy
-        pred_dir = (val_pred > 0.5).astype(int)
-        true_dir = (y_val > 0.5).astype(int)
-        directional_accuracy = float(np.mean(pred_dir == true_dir))
+        # Directional accuracy — sign-based (regression icin dogru)
+        try:
+            pred_sign = np.sign(val_pred)
+            true_sign = np.sign(y_val)
+            directional_accuracy = float(np.mean(pred_sign == true_sign))
+        except Exception:
+            directional_accuracy = 0.0
+
+        # Rank IC (Spearman)
+        try:
+            from scipy.stats import spearmanr
+            rank_ic, _ = spearmanr(val_pred, y_val)
+            rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
+        except Exception:
+            rank_ic = 0.0
 
         return {
             "n_base_models": len(self._base_models),
             "cv_folds": self._config.cv_folds,
             "meta_learner": self._config.meta_learner_type,
-            "val_auc": round(auc, 4),
             "val_ic": round(ic, 4),
+            "val_rank_ic": round(rank_ic, 4),
             "val_directional_accuracy": round(directional_accuracy, 4),
             "diversity_score": round(
                 float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4

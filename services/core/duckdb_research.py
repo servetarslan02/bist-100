@@ -117,11 +117,13 @@ class DuckDBResearchEngine:
         """Parquet dosyasını sanal tablo olarak kaydet.
 
         Args:
-            name: Sanal tablo adı
+            name: Sanal tablo adı (geçerli SQL identifier olmalı)
             parquet_path: Parquet dosya yolu
         """
+        if not self._is_valid_identifier(name):
+            raise ValueError(f"Invalid view name: {name!r}")
         conn = self._get_conn()
-        conn.execute(f"CREATE OR REPLACE VIEW {name} AS SELECT * FROM read_parquet('{parquet_path}')")
+        conn.execute(f'CREATE OR REPLACE VIEW "{name}" AS SELECT * FROM read_parquet(\'{parquet_path}\')')
         self._parquet_cache[name] = parquet_path
         logger.info("Parquet registered as view", name=name, path=parquet_path)
 
@@ -198,6 +200,9 @@ class DuckDBResearchEngine:
         if pl is None:
             raise RuntimeError("polars not installed")
 
+        if not self._is_valid_identifier(table):
+            raise ValueError(f"Invalid table name: {table!r}")
+
         import tempfile
 
         from .database import pg_fetch
@@ -206,7 +211,7 @@ class DuckDBResearchEngine:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Toplam satır sayısını al
-        count_query = f"SELECT COUNT(*) FROM {table}"
+        count_query = f'SELECT COUNT(*) FROM "{table}"'
         if where:
             count_query += f" WHERE {where}"
 
@@ -320,24 +325,37 @@ class DuckDBResearchEngine:
         """Research tablosu oluştur.
 
         Args:
-            name: Tablo adı
+            name: Tablo adı (geçerli SQL identifier olmalı)
             schema: Sütun adı → tip eşleme
         """
+        if not self._is_valid_identifier(name):
+            raise ValueError(f"Invalid table name: {name!r}")
+        for col in schema:
+            if not self._is_valid_identifier(col):
+                raise ValueError(f"Invalid column name: {col!r}")
         conn = self._get_conn()
-        columns = ", ".join(f"{col} {dtype}" for col, dtype in schema.items())
-        conn.execute(f"CREATE TABLE IF NOT EXISTS {name} ({columns})")
+        columns = ", ".join(f'"{col}" {dtype}' for col, dtype in schema.items())
+        conn.execute(f'CREATE TABLE IF NOT EXISTS "{name}" ({columns})')
         logger.info("Research table created", name=name)
 
     def insert_from_parquet(self, table: str, parquet_path: str):
         """Parquet dosyasından research tablosuna veri aktar.
 
         Args:
-            table: Hedef tablo adı
+            table: Hedef tablo adı (geçerli SQL identifier olmalı)
             parquet_path: Kaynak Parquet dosya yolu
         """
+        if not self._is_valid_identifier(table):
+            raise ValueError(f"Invalid table name: {table!r}")
         conn = self._get_conn()
-        conn.execute(f"INSERT INTO {table} SELECT * FROM read_parquet('{parquet_path}')")
+        conn.execute(f'INSERT INTO "{table}" SELECT * FROM read_parquet(\'{parquet_path}\')')
         logger.info("Data inserted from Parquet", table=table, path=parquet_path)
+
+    @staticmethod
+    def _is_valid_identifier(name: str) -> bool:
+        """SQL identifier whitelist kontrolü — injection önleme."""
+        import re
+        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name))
 
     def get_stats(self) -> dict[str, Any]:
         """Research DB istatistikleri."""
@@ -350,10 +368,15 @@ class DuckDBResearchEngine:
 
             stats = {}
             for (table,) in tables:
+                if not self._is_valid_identifier(table):
+                    logger.warning("Skipping invalid table name", table=table)
+                    stats[table] = 0
+                    continue
                 try:
-                    count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                    count = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
                     stats[table] = count
-                except Exception:
+                except Exception as e:
+                    logger.debug("Table count failed", table=table, error=str(e))
                     stats[table] = 0
 
             return {

@@ -257,12 +257,21 @@ class XGBoostModel:
             if isinstance(model, xgb.Booster):
                 dmat = xgb.DMatrix(X, feature_names=self._feature_names)
                 preds = model.predict(dmat)
-                return preds if len(preds) == len(X) else np.zeros(len(X))
+                if len(preds) != len(X):
+                    logger.warning(
+                        "xgboost_predict_length_mismatch",
+                        expected=len(X),
+                        got=len(preds),
+                        horizon=horizon,
+                    )
+                    return np.zeros(len(X))
+                return preds
             else:
                 if hasattr(model, "predict_proba"):
                     return model.predict_proba(X)[:, 1]
                 return model.predict(X)
-        except Exception:
+        except Exception as e:
+            logger.warning("xgboost_predict_failed", horizon=horizon, error=str(e))
             return np.zeros(len(X))
 
     def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
@@ -307,7 +316,8 @@ class XGBoostModel:
                 if self._feature_names:
                     return dict(zip(self._feature_names, importance.tolist(), strict=False))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
-        except Exception:
+        except Exception as e:
+            logger.warning("xgboost_feature_importance_failed", type=importance_type, error=str(e))
             return None
 
     def shap_values(self, X: np.ndarray) -> np.ndarray | None:
@@ -388,18 +398,11 @@ class XGBoostModel:
 
         if model is not None:
             try:
-                import xgboost as xgb
-
-                if isinstance(model, xgb.Booster):
-                    metrics["best_iteration"] = (
-                        model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
-                    )
-                else:
-                    metrics["best_iteration"] = (
-                        model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
-                    )
+                metrics["best_iteration"] = (
+                    model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
+                )
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="xgboost_model.py:388")
+                logger.warning("xgboost_handled_exception", error=str(e), context="best_iteration_lookup")
 
         if X_val is not None and y_val is not None:
             val_pred = self.predict(X_val, horizon)
@@ -411,7 +414,7 @@ class XGBoostModel:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
                 except Exception as e:
-                    logger.debug("Handled exception", error=str(e), context="xgboost_model.py:399")
+                    logger.warning("xgboost_handled_exception", error=str(e), context="classifier_metrics")
             else:
                 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
@@ -426,7 +429,7 @@ class XGBoostModel:
                     if len(np.unique(val_pred)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
                 except Exception as e:
-                    logger.debug("Handled exception", error=str(e), context="xgboost_model.py:413")
+                    logger.warning("xgboost_handled_exception", error=str(e), context="regressor_metrics")
 
         return metrics
 
@@ -470,7 +473,7 @@ class XGBoostModel:
                 if importance:
                     self._feature_importance_cache[f"{horizon}_{imp_type}"] = importance
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="xgboost_model.py:456")
+                logger.warning("xgboost_handled_exception", error=str(e), context="feature_importance_cache")
 
     def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
         """Overfitting kontrolü."""
@@ -573,7 +576,7 @@ def compare_xgboost_vs_lightgbm(
 
     # Impute
     impute_values = trainer._compute_impute_values(X, feature_names)
-    X = trainer._impute(X, impute_values)
+    X = trainer._impute(X, impute_values, feature_names)
 
     # Train/val split (son %20)
     n = len(X)

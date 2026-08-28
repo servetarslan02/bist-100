@@ -94,7 +94,11 @@ class DuckDBStore:
             return result[0] if result else None
 
     def executescript(self, script: str) -> None:
-        """Birden fazla SQL çalıştır."""
+        """Birden fazla SQL çalıştır.
+
+        UYARI: Noktalı virgülle (;) ayırır — string literal içinde ; varsa
+        bu yöntem çalışmaz. Böyle durumlarda ayrı execute() kullanın.
+        """
         with self._get_conn() as conn:
             for stmt in script.split(";"):
                 stmt = stmt.strip()
@@ -133,6 +137,12 @@ class DuckDBStore:
             self._conn.close()
             self._conn = None
 
+    @staticmethod
+    def _is_valid_identifier(name: str) -> bool:
+        """SQL identifier whitelist kontrolü — injection önleme."""
+        import re
+        return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name))
+
     def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         with self._get_conn() as conn:
@@ -141,10 +151,15 @@ class DuckDBStore:
             ).fetchall()
             stats = {}
             for (table,) in tables:
+                if not self._is_valid_identifier(table):
+                    logger.warning("Skipping invalid table name", table=table)
+                    stats[table] = 0
+                    continue
                 try:
-                    count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                    count = conn.execute(f"SELECT COUNT(*) FROM \"{table}\"").fetchone()[0]
                     stats[table] = count
-                except Exception:
+                except Exception as e:
+                    logger.debug("Table count failed", table=table, error=str(e))
                     stats[table] = 0
         return {
             "db_path": str(self._db_path),

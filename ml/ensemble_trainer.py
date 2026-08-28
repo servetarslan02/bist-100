@@ -92,7 +92,6 @@ class BistEnsembleTrainer:
                 random_state=42,
             )
             lgb_model.fit(X_train, y_train)
-            lgb_model.predict(X_train)
             lgb_oos_pred = lgb_model.predict(X_oos)
 
             lgb_r2 = r2_score(y_oos, lgb_oos_pred)
@@ -171,21 +170,52 @@ class BistEnsembleTrainer:
         self.models["extratrees"] = et_model
         safe_pickle_dump(et_model, str(self.save_dir / "extratrees_model.pkl"))
 
-        # 5. Ensemble Tahmini (Ağırlıklı Ortalama — ExtraTrees dahil)
+        # 5. Ensemble Tahmini (IC-bazlı ağırlıklı ortalama)
+        # Ağırlıklar her modelin OOS IC'sine göre belirlenir (veriye dayalı)
+        model_ics = {}
+        for m_name in ["lightgbm", "xgboost", "catboost", "extratrees"]:
+            if m_name in self.models:
+                if m_name in results and "ic" in results[m_name]:
+                    model_ics[m_name] = max(results[m_name]["ic"], 0.0)  # Negatif IC → 0
+                else:
+                    # ExtraTrees icin IC hesapla
+                    try:
+                        et_pred = self.models[m_name].predict(X_oos)
+                        et_ic = float(np.corrcoef(y_oos, et_pred)[0, 1])
+                        model_ics[m_name] = max(et_ic, 0.0) if np.isfinite(et_ic) else 0.0
+                    except Exception:
+                        model_ics[m_name] = 0.0
+
+        # Normalize et
+        total_ic = sum(model_ics.values())
+        if total_ic > 0:
+            ensemble_weights = {name: ic / total_ic for name, ic in model_ics.items()}
+        else:
+            # Tum modellerin IC'si 0 veya negatif → eşit ağırlık
+            ensemble_weights = {name: 1.0 / len(model_ics) for name in model_ics}
+
         preds = []
-        if "lightgbm" in self.models:
-            preds.append(self.models["lightgbm"].predict(X_oos) * 0.35)
-        if "xgboost" in self.models:
-            preds.append(self.models["xgboost"].predict(X_oos) * 0.25)
-        if "catboost" in self.models:
-            preds.append(self.models["catboost"].predict(X_oos) * 0.25)
-        if "extratrees" in self.models:
-            preds.append(self.models["extratrees"].predict(X_oos) * 0.15)
+        for m_name, weight in ensemble_weights.items():
+            if m_name in self.models:
+                preds.append(self.models[m_name].predict(X_oos) * weight)
 
         ensemble_pred = np.sum(preds, axis=0) if preds else et_oos_pred
 
+        # Ensemble benefit check: ensemble tek modelden daha iyi mi?
+        ensemble_ic = float(np.corrcoef(y_oos, ensemble_pred)[0, 1]) if len(y_oos) > 10 else 0.0
+        best_individual_ic = max(model_ics.values()) if model_ics else 0.0
+        ensemble_beneficial = ensemble_ic >= best_individual_ic * 0.95  # %5 tolerans
+
+        if not ensemble_beneficial:
+            logger.warning(
+                "ensemble_not_beneficial",
+                ensemble_ic=round(ensemble_ic, 4),
+                best_individual_ic=round(best_individual_ic, 4),
+                recommendation="Use best individual model instead",
+            )
+
         ens_r2 = r2_score(y_oos, ensemble_pred)
-        ens_ic = float(np.corrcoef(y_oos, ensemble_pred)[0, 1]) if len(y_oos) > 10 else 0.0
+        ens_ic = ensemble_ic
 
         # Birleşik SHAP / Feature Importance Ağırlıkları
         combined_importance = {}
@@ -208,7 +238,13 @@ class BistEnsembleTrainer:
             "features": self.feature_cols,
             "models_trained": list(self.models.keys()),
             "individual_results": results,
-            "ensemble_metrics": {"oos_information_coefficient_ic": round(ens_ic, 4), "oos_r2_score": round(ens_r2, 4)},
+            "ensemble_metrics": {
+                "oos_information_coefficient_ic": round(ens_ic, 4),
+                "oos_r2_score": round(ens_r2, 4),
+                "ensemble_weights": {k: round(v, 4) for k, v in ensemble_weights.items()},
+                "ensemble_beneficial": ensemble_beneficial,
+                "best_individual_ic": round(best_individual_ic, 4),
+            },
             "top_feature_importances": sorted_importance,
         }
 

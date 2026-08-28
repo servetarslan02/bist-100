@@ -326,7 +326,8 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dic
                 r, _ = spearmanr(yt[half:], yp[half:])
                 ic2 = float(r) if np.isfinite(r) else 0.0
             defaults["ic_stability"] = float(1.0 - abs(ic1 - ic2))
-        except Exception:
+        except Exception as e:
+            logger.debug("ic_stability_calculation_failed", error=str(e))
             defaults["ic_stability"] = 0.0
 
     if n >= 10:
@@ -455,7 +456,7 @@ class LightGBMTrainer:
 
         # Impute — tüm veriden hesaplanır ama sadece TRAIN'de kullanılır
         impute_values = self._compute_impute_values(X, feature_names)
-        X = self._impute(X, impute_values)
+        X = self._impute(X, impute_values, feature_names)
 
         # Scale — tüm veriden, ama train/val split'ten ÖNCE
         # (scaler train split'inden öğrenilmeli — aşağıda düzeltildi)
@@ -540,7 +541,7 @@ class LightGBMTrainer:
                 for rank, idx in enumerate(sorted_indices):
                     y_rank[indices[idx]] = rank
 
-        y[train_indices]
+        y_train = y[train_indices]
         y_val = y[val_indices]
         y_rank_train = y_rank[train_indices]
         y_rank_val = y_rank[val_indices]
@@ -672,7 +673,7 @@ class LightGBMTrainer:
             X.append(vec)
             y.append(returns[key])
             tickers.append(key)
-        return np.array(X), np.array(y), [], tickers
+        return np.array(X), np.array(y), [], tickers  # groups boş — train'de _compute_groups_from_indices ile hesaplanır
 
     def _compute_impute_values(self, X: np.ndarray, feature_names: list[str]) -> dict[str, float]:
         impute = {}
@@ -685,12 +686,30 @@ class LightGBMTrainer:
                 impute[name] = 0.0
         return impute
 
-    def _impute(self, X: np.ndarray, impute_values: dict[str, float]) -> np.ndarray:
+    def _impute(
+        self,
+        X: np.ndarray,
+        impute_values: dict[str, float],
+        feature_names: list[str] | None = None,
+    ) -> np.ndarray:
+        """Missing values'ları doldur.
+
+        Args:
+            X: Feature matrix
+            impute_values: Feature adı → impute değeri sözlüğü
+            feature_names: Feature isimleri (sıralı). Verilirse index yerine
+                          isim tabanlı güvenli eşleme kullanılır.
+        """
         X_imputed = X.copy()
         for i in range(X.shape[1]):
             mask = np.isnan(X_imputed[:, i])
             if mask.any():
-                col_name = list(impute_values.keys())[i] if i < len(impute_values) else None
+                if feature_names and i < len(feature_names):
+                    col_name = feature_names[i]
+                elif i < len(impute_values):
+                    col_name = list(impute_values.keys())[i]
+                else:
+                    col_name = None
                 X_imputed[mask, i] = impute_values.get(col_name, 0.0) if col_name else 0.0
         return X_imputed
 
@@ -780,7 +799,7 @@ def optimize_hyperparameters(
 
     # Impute
     impute_values = trainer._compute_impute_values(X, feature_names)
-    X = trainer._impute(X, impute_values)
+    X = trainer._impute(X, impute_values, feature_names)
 
     optimizer = HyperOptimizer(n_trials=n_trials)
     best_params = optimizer.optimize(X, y, feature_names)
@@ -970,7 +989,7 @@ def compute_oof_predictions(
 
     # Impute
     impute_values = trainer._compute_impute_values(X, feature_names)
-    X = trainer._impute(X, impute_values)
+    X = trainer._impute(X, impute_values, feature_names)
 
     # Unique tarihleri sırala
     unique_dates = sorted(set(date_groups.values()))
