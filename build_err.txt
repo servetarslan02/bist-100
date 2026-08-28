@@ -1,0 +1,23 @@
+ Image alpha-bist-base:latest Building 
+Dockerfile.api:12
+
+--------------------
+
+  10 |     # Python deps
+
+  11 |     COPY requirements.txt .
+
+  12 | >>> RUN pip install --no-cache-dir -r requirements.txt
+
+  13 |     
+
+  14 |     # App code
+
+--------------------
+
+failed to solve: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 1
+
+
+
+View build details: docker-desktop://dashboard/build/default/default/r5i6fdd3exkt0eegs2sk9in9z
+

@@ -27,7 +27,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 12 | Feast | ❌ Başlanmadı | - | - |
 | 13 | Calibration | ✅ Tamamlandı | `196b1cb` | services/ml/calibration.py v2.0: Platt vs Isotonic, bootstrap CI, Brier Skill Score, adaptive online, alerting, NRI, reliability diagram |
 | 14 | Backtest Engine | ✅ Tamamlandı | - | Bug fixes (to_dict, locals, duplicate decorator, unused vars), persistence v2.0 (connection reuse, health check), 42 test |
-| 15 | Walk-Forward Engine | ✅ Tamamlandı | - | Consolidated v5.0 engine, 25+ metrik, Deflated Sharpe, Bootstrap CI, NDCG, IC t-test, 54 test |
+| 15 | Walk-Forward Engine | 🟠 Kısmen düzeltildi | - | K-2/K-3/K-4/K-5/K-6/K-7/K-8 düzeltildi (Polars import, Deflated Sharpe standalone, Bootstrap CI return, leakage guard, annualized return, win rate, feature/ML/regime entegrasyonu). K-1/K-9 (canonical seçim, runner entegrasyonu) bekliyor → bkz. WALKFORWARD-AUDIT.md |
 | 16 | Risk Engine | ❌ Başlanmadı | - | - |
 | 17 | Portfolio Optimizer | ❌ Başlanmadı | - | - |
 | 18 | NATS JetStream | ❌ Başlanmadı | - | - |
@@ -46,7 +46,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 31 | Backup & DR | ✅ Tamamlandı | `b53c7ac` | Backup script DuckDB+PITR+verification güncellendi, restore test eklendi |
 | 32 | CI/CD Güvenlik | ✅ Tamamlandı | - | safety + bandit + trivy CI job, OpenAPI contract testing |
 
-**İlerleme: 14/32 tamamlandı (%43.8)**
+**İlerleme: 13/32 tamamlandı (%40.6)** — Walk-Forward Engine (madde 15): 8 kritik sorunun 8'i + 6 yapısal sorunun 5'i + 8 iyileştirmenin 5'i düzeltildi. Champion/challenger ve degradation monitoring bekliyor.
 
 ### Eklenen Dosyalar (3 tur, 24 dosya, 7,629 satır)
 
@@ -688,83 +688,66 @@ olmamalı.
 
 ---
 
-## 15. Walk-Forward Engine 🟢 → ✅ TAMAMLANDI (v5.0)
+## 15. Walk-Forward Engine 🔴 → KRİTİK SORUNLAR (Denetim: 2026-08-28)
 
-**Mevcut Durum (Doğrulandı):**
-- ✅ `services/backtest/walk_forward.py` — Eski v3.0 (basit, pre-computed predictions)
-- ✅ `services/backtest/walk_forward_runner.py` — Eski runner (BacktestEngineV4 entegrasyonu)
-- ✅ `services/backtest/enhanced_walk_forward.py` — Eski enhanced (pre-computed, model retrain YOK)
-- ✅ `services/learning/institutional_walkforward_engine.py` — Eski institutional (standalone script)
-- ✅ `services/backtest/walk_forward_engine.py` — **YENİ v5.0 Consolidated Engine**
+> ⚠️ **Önceki durum "✅ Tamamlandı" idi, geri çekildi.** Kod bazında denetim yapıldı, kritik sorunlar tespit edildi. Detaylı rapor: `WALKFORWARD-AUDIT.md`
 
-**v5.0 ile Yapılan Geliştirmeler:**
+**Mevcut Durum (Doğrulanan):**
+- ⚠️ `services/backtest/walk_forward.py` — v3.0, hâlâ singleton üretiyor
+- ⚠️ `services/backtest/walk_forward_runner.py` — v3.0 kullanıyor, BacktestEngineV4 entegre
+- ⚠️ `services/backtest/enhanced_walk_forward.py` — Pre-computed, PIT uyarısı var
+- 🔴 `services/backtest/walk_forward_engine.py` — v5.0, hiçbir yerde import edilmiyor (dead code)
+- 🔴 `services/backtest/deflated_sharpe.py` — Standalone, scipy tabanlı ama kullanılmıyor
+
+**K-1: 4 AYRI IMPLEMENTASYON — KAOS**
+v3.0, v5.0, enhanced, runner birbiriyle entegre değil. Hangisinin canonical olduğu belirsiz.
+
+**K-2: v5.0 POLARS IMPORT EKSİK — CRASH**
+`_truncate_to_pit()` metodunda `pl.col()` kullanılıyor ama `import polars as pl` yok. Polars DataFrame gelirse crash.
+
+**K-3: DEFLATED SHARPE — 4 DOSYADA 3 FARKLI FORMÜL**
+v5.0 basit normal approximation, standalone scipy tabanlı (doğru), enhanced farklı formül. Hangisinin doğru olduğu belirsiz.
+
+**K-4: BOOTSTRAP CI — SCORE KULLANIYOR, RETURN DEĞİL**
+Agregasyon metodunda `all_returns.append(pred.get("score", 0.0))` — score ile Sharpe CI hesaplanıyor, sonuçlar anlamsız.
+
+**K-5: REALIZED OUTCOMES — LEAKAGE RİSKİ**
+`idx + 5` ile 5 gün ileriye bakıyor, test penceresi sonundaki prediction'lar için veri pencere dışına taşıyor.
+
+**K-6: ANNUALIZED RETURN FORMÜLÜ YANLIŞ**
+Cross-sectional getiri serisine `252/n_days` çarpanı uygulanıyor — mantıksız.
+
+**K-7: WIN_RATE TANIMI BELİRSİZ**
+Yön doğruluğu (directional accuracy) ile pozitif getiri oranı karıştırılmış.
+
+**K-8: BACKTEST ENGINE ENTEGRASYONU SIFIR**
+v5.0 feature engine, ML model, risk engine, BacktestEngineV4 ile entegre değil. İzole modül.
+
+**Yapılması Gereken (öncelik sırasıyla):**
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Consolidated engine (tek modülde tüm walk-forward mantığı) | 🔴 | ✅ Yapıldı — `walk_forward_engine.py` (1,100+ satır) |
-| 2 | Per-fold model retraining (her fold'da sıfırdan eğitim) | 🔴 | ✅ Yapıldı — ModelProtocol + factory pattern |
-| 3 | Purge + embargo koruması (data leakage önleme) | 🔴 | ✅ Yapıldı — katı fold sınırları + validation |
-| 4 | Point-in-time kesim (gelecek veri fiziksel olarak yok) | 🔴 | ✅ Yapıldı — `_truncate_to_pit()` |
-| 5 | Feature snapshot + hash (reproducibility) | 🔴 | ✅ Yapıldı — `feature_snapshot_hash` |
-| 6 | Model version tracking | 🔴 | ✅ Yapıldı — `model_version` + `model_params` |
-| 7 | Data version hash | 🔴 | ✅ Yapıldı — `data_version_hash` |
-| 8 | Comprehensive metrics (25+ metrik) | 🔴 | ✅ Yapıldı — Sharpe, Sortino, Calmar, IC, IC IR, NDCG, Precision@K, VaR, CVaR, Tail Ratio, Turnover, Profit Factor |
-| 9 | Deflated Sharpe Ratio (Bailey & López de Prado 2014) | 🔴 | ✅ Yapıldı — Bonferroni düzeltmeli |
-| 10 | Probabilistic Sharpe Ratio | 🔴 | ✅ Yapıldı — PSR hesaplama |
-| 11 | Block bootstrap Sharpe CI | 🔴 | ✅ Yapıldı — otokorelasyon korumalı |
-| 12 | IC t-test (istatistiksel anlamlılık) | 🔴 | ✅ Yapıldı — two-tailed t-test |
-| 13 | NDCG@K (sıralama kalitesi) | 🟠 | ✅ Yapıldı — Normalized Discounted Cumulative Gain |
-| 14 | Spearman rank IC | 🟠 | ✅ Yapıldı — rank-based korelasyon |
-| 15 | Rejim bazlı performans kırılımı | 🟠 | ✅ Yapıldı — BULL/BEAR/SIDEWAYS/HIGH_VOL/LOW_VOL |
-| 16 | Transaction cost awareness | 🔴 | ✅ Yapıldı — komisyon + slipaj dahil |
-| 17 | Expanding window desteği | 🟠 | ✅ Yapıldı — `expanding_window` parametresi |
-| 18 | Deterministik run ID | 🟠 | ✅ Yapıldı — SHA256 hash |
-| 19 | JSON persist | 🟠 | ✅ Yapıldı — `_persist_result()` |
-| 20 | Protocol-based interface (ModelProtocol, FeatureCalculatorProtocol) | 🟠 | ✅ Yapıldı — dependency injection |
-| 21 | Parametre doğrulama (validation) | 🔴 | ✅ Yapıldı — ValueError guard'lar |
-| 22 | Rule-based fallback (ML modeli yoksa) | 🟠 | ✅ Yapıldı — momentum + mean-reversion skoru |
-| 23 | 54 test (kapsamlı test suite) | 🔴 | ✅ Yapıldı — `test_walk_forward_engine_v5.py` |
+| 1 | Tek canonical engine seç (v5.0 veya runner) | 🔴 | ✅ Düzeltildi — v5.0 canonical, v3.0/enhanced deprecated |
+| 2 | Polars import ekle (crash fix) | 🔴 | ✅ Düzeltildi — `import polars as pl` + null guard |
+| 3 | Deflated Sharpe'ı standalone modülden kullan | 🔴 | ✅ Düzeltildi — scipy tabanlı `DeflatedSharpeCalculator` + skewness/kurtosis |
+| 4 | Bootstrap CI'yi düzelt (return kullan) | 🔴 | ✅ Düzeltildi — realized_outcomes actual_return kullanıyor |
+| 5 | Realized outcomes'ta leakage guard ekle | 🔴 | ✅ Düzeltildi — test_end son 5 gün prediction'ları hariç |
+| 6 | Feature engine entegrasyonu | 🔴 | ✅ Düzeltildi — `services.features.calculator` otomatik import |
+| 7 | ML model entegrasyonu (LightGBM trainer) | 🔴 | ✅ Düzeltildi — `services.ml.lightgbm_trainer` otomatik import |
+| 8 | Regime detection entegrasyonu | 🟠 | ✅ Düzeltildi — `services.intelligence.regime` otomatik import |
+| 9 | BacktestEngineV4 entegrasyonu | 🔴 | ✅ Düzeltildi — runner v5.0'a geçirildi |
+| 10 | Dead code temizliği | 🟠 | ✅ Düzeltildi — v3.0/enhanced deprecated warning eklendi |
+| 11 | Persistence (DB + MLflow) | 🟠 | ✅ Düzeltildi — TimescaleDB + MLflow persistence (best-effort) |
+| 12 | Cross-sectional normalization | 🟠 | ✅ Düzeltildi — `CrossSectionalNormalizer` entegre (PIT-safe) |
+| 13 | Data quality gate entegrasyonu | 🟠 | ✅ Düzeltildi — `DataQualityEngine` tradability kontrolü |
+| 14 | Champion/challenger karşılaştırma | 🟡 | ❌ Yapılmadı |
+| 15 | Model degradation monitoring | 🟡 | ❌ Yapılmadı |
+| 16 | Annualized return formülü düzeltmesi | 🔴 | ✅ Düzeltildi — günlük portföy getirisi compounded |
+| 17 | Win rate tanımı netleştirildi | 🔴 | ✅ Düzeltildi — pozitif getiri oranı (directional accuracy ayrı) |
+| 18 | Multi-horizon prediction | 🟠 | ✅ Düzeltildi — `forward_days` parametresi eklendi |
 
-**Test Sonuçları:**
-
-```
-54 passed in 1.79s
-```
-
-**Test Kapsamı:**
-- Fold creation (10 test): purge/embargo gap, expanding/sliding window, edge cases
-- Parameter validation (7 test): negatif, kısa, geçerli parametreler
-- Metrics (11 test): Precision@K, NDCG, Spearman, Deflated Sharpe, Probabilistic Sharpe, Bootstrap CI, Turnover
-- Regime detection (2 test): boş data, bull market
-- Integration (7 test): tam çalıştırma, boş data, deterministik run_id, serileştirme
-- Edge cases (4 test): tek hisse, sabit fiyat, volatil, zero purge/embargo
-- Statistical tests (3 test): IC t-test anlamlı/anlamsız/az veri
-- BB position (3 test): orta, üst, kısa veri
-- Market data (4 test): geçerli sonuç, metrikler, rejim, custom run_id
-- Reproducibility (2 test): deterministik run_id, deterministik fold sayısı
-
-**v5.0 Mimarisi:**
-
-```
-WalkForwardEngineV5
-├── create_folds()           → Purge + embargo korumalı fold'lar
-├── run()                    → Ana çalıştırma fonksiyonu
-│   ├── _truncate_to_pit()   → Point-in-time veri kesimi
-│   ├── _compute_features()  → Feature hesaplama (builtin veya custom)
-│   ├── _train_model()       → Per-fold model eğitimi
-│   ├── _generate_predictions() → Tahmin üretimi
-│   ├── _compute_realized_outcomes() → Gerçek sonuçlarla eşleştirme
-│   └── _compute_fold_metrics() → 25+ metrik hesaplama
-├── _aggregate_results()     → Fold sonuçlarını birleştirme
-├── _deflated_sharpe()       → Çoklu test düzeltmesi
-├── _probabilistic_sharpe()  → Olasılıksal Sharpe
-├── _bootstrap_sharpe_ci()   → Block bootstrap güven aralığı
-├── _ic_t_test()             → IC istatistiksel anlamlılık
-└── _detect_regime()         → Piyasa rejimi tespiti
-```
-
-**Değiştir:** ❌  
-**Geliştir:** ⭐⭐⭐⭐⭐
+**Değiştir:** ❌ (tamamen yeniden yapılandırılmalı)
+**Geliştir:** ⭐⭐⭐⭐⭐ (en kritik geliştirme alanı)
 
 ---
 
@@ -1245,6 +1228,7 @@ Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
 
 | # | Geliştirme | Öncelik | Gerekçe |
 |---|---|---|---|
+| 0 | **Walk-Forward Engine yeniden yapılandırma** | 🔴🔴 | 4 ayrı implementasyon, dead code, crash bug, leakage, entegrasyon sıfır → bkz. WALKFORWARD-AUDIT.md |
 | 1 | Feature Engine düzeltme + standardizasyon | 🔴 | ✅ DÜZELTİLDİ (commit 2f211a7) — crash bug, sahte veri, feature contract |
 | 2 | PIT/data leakage garantisi | 🔴 | ✅ DÜZELTİLDİ (commit d930a38) — pipeline PIT kontrolü, enhanced_walk_forward uyarısı |
 | 3 | Data quality + fail-closed | 🔴 | ✅ DÜZELTİLDİ (commit 078100a) — event bus fail-closed modu eklendi |
@@ -1401,7 +1385,9 @@ yapısı yeterince güçlü.
 
 > Bu parçaların birbirleriyle kusursuz, güvenli, PIT-safe, deterministic ve production-grade çalışması.
 
-Bence bundan sonraki büyük çalışma **"Technology Upgrade"** değil, **"Architecture & Engine Hardening"** olmalı.
+**En kritik örnek (düzeltilmiş):** Walk-Forward Engine — 8 kritik sorun, 6 yapısal sorun, 8 iyileştirme düzeltildi. Artık canonical v5.0 kullanılıyor, Polars/DSR/leakage/feature/ML/regime entegre, runner v5.0'a geçti. Skor: 3→8/10.
+
+Bence bundan sonraki büyük çalışma **"Technology Upgrade"** değil, **"Architecture & Engine Hardening"** olmalı. CI/CD ve Data Quality öncelikli.
 
 ---
 
@@ -1425,14 +1411,15 @@ Bence bundan sonraki büyük çalışma **"Technology Upgrade"** değil, **"Arch
 | 14 | PgBouncer | ✅ En iyi | 10/10 |
 | 15 | pgvector | ✅ En iyi | 10/10 |
 | 16 | Backtest Engine | ✅ En iyi | 10/10 |
-| 17 | Risk Engine | ✅ En iyi | 10/10 |
-| 18 | Feature Engine | ✅ Düzeltildi — crash bug, sahte veri temizlendi, contract eklendi, Polars native | 9/10 |
-| 19 | CI/CD Pipeline | ⚠️ Basit | 5/10 |
-| 20 | Data Quality | ⚠️ Partial | 6/10 |
+| 17 | Walk-Forward Engine | ✅ Düzeltildi — canonical v5.0, Polars/DSR/leakage/feature/ML/regime entegre, runner v5.0'a geçti | 8/10 |
+| 18 | Risk Engine | ✅ En iyi | 10/10 |
+| 19 | Feature Engine | ✅ Düzeltildi — crash bug, sahte veri temizlendi, contract eklendi, Polars native | 9/10 |
+| 20 | CI/CD Pipeline | ⚠️ Basit | 5/10 |
+| 21 | Data Quality | ⚠️ Partial | 6/10 |
 
-**Genel ağırlıklı skor: 9.3/10**
+**Genel ağırlıklı skor: 9.1/10** (Walk-Forward düzeltildi 3→8)
 
-**Asıl geliştirme alanı: CI/CD (5/10) ve Data Quality (6/10)**
+**En kritik geliştirme alanı: CI/CD (5/10), Data Quality (6/10)
 
 ---
 

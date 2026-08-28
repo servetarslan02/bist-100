@@ -34,6 +34,18 @@ from typing import Any, Protocol
 import numpy as np
 import structlog
 
+try:
+    import polars as pl
+except ImportError:
+    pl = None  # Polars yoksa Pandas/dict fallback kullan
+
+# Standalone Deflated Sharpe (scipy tabanlı, skewness + kurtosis düzeltmeli)
+try:
+    from .deflated_sharpe import DeflatedSharpeCalculator, ProbabilisticSharpeRatio
+    _has_standalone_sharpe = True
+except ImportError:
+    _has_standalone_sharpe = False
+
 logger = structlog.get_logger(__name__)
 
 
@@ -334,6 +346,17 @@ class WalkForwardResult:
             and self.all_leakage_ok()
         )
 
+    # Geriye uyumluluk property'leri (v3.0 interface)
+    @property
+    def avg_test_drawdown(self) -> float:
+        """v3.0 uyumluluğu: avg_test_max_drawdown alias."""
+        return self.avg_test_max_drawdown
+
+    @property
+    def avg_precision_at_20(self) -> float:
+        """v3.0 uyumluluğu: avg_precision_at_20 (v5.0'da yoksa 0.0)."""
+        return getattr(self, '_avg_precision_at_20', 0.0)
+
     def all_leakage_ok(self) -> bool:
         """Tüm fold'larda leakage kontrolü geçti mi?"""
         return all(
@@ -379,6 +402,7 @@ class WalkForwardEngineV5:
         risk_free_rate: float = 0.40,
         n_bootstrap: int = 1000,
         random_seed: int = 42,
+        forward_days: int = 5,
     ):
         # Parametre doğrulama
         if purge_days < 0:
@@ -404,6 +428,7 @@ class WalkForwardEngineV5:
         self.risk_free_rate = risk_free_rate
         self.n_bootstrap = n_bootstrap
         self.random_seed = random_seed
+        self.forward_days = forward_days
 
         self._rng = np.random.RandomState(random_seed)
 
@@ -413,6 +438,7 @@ class WalkForwardEngineV5:
             embargo=embargo_days,
             train=train_days,
             test=test_days,
+            forward_days=forward_days,
             step=step_days,
             expanding=expanding_window,
             cost_pct=transaction_cost_pct,
@@ -675,8 +701,8 @@ class WalkForwardEngineV5:
             predictions = self._generate_predictions(model, test_features, feature_names)
             snapshot.predictions = predictions
 
-            # 6. Gerçekleşen sonuçlarla eşleştir
-            realized = self._compute_realized_outcomes(test_data, predictions)
+            # 6. Gerçekleşen sonuçlarla eşleştir (leakage guard: test_end son 5 gün hariç)
+            realized = self._compute_realized_outcomes(test_data, predictions, test_end=fold_config.test_end)
             snapshot.realized_outcomes = realized
 
             # 7. Metrikleri hesapla
@@ -728,7 +754,7 @@ class WalkForwardEngineV5:
 
             try:
                 # Polars DataFrame
-                if hasattr(df, "filter") and hasattr(df, "columns"):
+                if pl is not None and hasattr(df, "filter") and hasattr(df, "columns"):
                     if "Date" in df.columns:
                         cut = df.filter(pl.col("Date") <= cutoff_date)
                     else:
@@ -765,7 +791,7 @@ class WalkForwardEngineV5:
 
             try:
                 # Polars DataFrame
-                if hasattr(df, "filter") and hasattr(df, "columns"):
+                if pl is not None and hasattr(df, "filter") and hasattr(df, "columns"):
                     if "Date" in df.columns:
                         w = df.filter(
                             (pl.col("Date") >= start_date) & (pl.col("Date") <= end_date)
@@ -831,23 +857,105 @@ class WalkForwardEngineV5:
     ) -> tuple[list[dict[str, Any]], list[str]]:
         """Feature'ları hesapla.
 
+        Öncelik sırası:
+        1. Data quality gate (tradability kontrolü)
+        2. Dışarıdan verilen feature_calculator
+        3. Projenin gerçek feature engine'i (services.features.calculator)
+        4. Dahili basit feature seti (fallback)
+
         Returns:
             (samples, feature_names) — her sample {ticker, date, features...}
         """
+        # Data quality gate: tradability kontrolü
+        filtered_data = self._apply_data_quality_gate(data)
+
         if feature_calculator is not None:
-            return self._compute_with_calculator(data, feature_calculator, as_of_date)
-        return self._compute_builtin_features(data, as_of_date)
+            return self._compute_with_calculator(filtered_data, feature_calculator, as_of_date)
+
+        # Projenin gerçek feature engine'ini kullan
+        try:
+            from services.features.calculator import feature_calculator as real_calc
+            return self._compute_with_calculator(filtered_data, real_calc, as_of_date)
+        except ImportError:
+            pass
+
+        # Fallback: dahili basit feature seti
+        return self._compute_builtin_features(filtered_data, as_of_date)
+
+    def _apply_data_quality_gate(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Data quality gate: tradability kontrolü.
+
+        Anormal fiyat, devre kesici, negatif fiyat gibi durumları filtreler.
+        """
+        try:
+            from services.core.data_quality import DataQualityEngine
+            dq = DataQualityEngine()
+            filtered = {}
+
+            for ticker, df in data.items():
+                if df is None:
+                    continue
+
+                try:
+                    # Son günün verisini al
+                    if hasattr(df, "columns") and "Close" in df.columns:
+                        close_arr = df["Close"].to_numpy() if hasattr(df["Close"], "to_numpy") else df["Close"].values
+                        if len(close_arr) < 2:
+                            filtered[ticker] = df
+                            continue
+
+                        last_close = float(close_arr[-1])
+                        prev_close = float(close_arr[-2])
+                        last_high = float(df["High"].to_numpy()[-1]) if "High" in df.columns else last_close
+                        last_low = float(df["Low"].to_numpy()[-1]) if "Low" in df.columns else last_close
+                        last_open = float(df["Open"].to_numpy()[-1]) if "Open" in df.columns else last_close
+                        last_vol = float(df["Volume"].to_numpy()[-1]) if "Volume" in df.columns else 0.0
+
+                        mask = dq.check_tradability(
+                            ticker=ticker,
+                            open_price=last_open,
+                            high=last_high,
+                            low=last_low,
+                            close=last_close,
+                            volume=last_vol,
+                            prev_close=prev_close,
+                        )
+
+                        if mask.is_tradable:
+                            filtered[ticker] = df
+                        else:
+                            logger.debug("Data quality gate: ticker filtered", ticker=ticker, reasons=mask.reasons)
+                    else:
+                        filtered[ticker] = df
+                except Exception:
+                    filtered[ticker] = df
+
+            return filtered if filtered else data  # Fallback: tüm data
+        except ImportError:
+            return data  # Data quality modülü yoksa filtreleme yapma
+        except Exception:
+            return data
 
     def _compute_with_calculator(
         self, data: dict[str, Any], calc: Any, as_of_date: str
     ) -> tuple[list[dict[str, Any]], list[str]]:
-        """Harici feature calculator ile hesapla."""
+        """Harici feature calculator ile hesapla.
+
+        Hem compute_features hem compute_all_features arayüzünü destekler.
+        """
         samples = []
         feature_names_set: set[str] = set()
 
         for ticker, df in data.items():
             try:
-                features = calc.compute_features(df, ticker, as_of_date)
+                # Önce compute_all_features dene (services.features.calculator)
+                if hasattr(calc, "compute_all_features"):
+                    features = calc.compute_all_features(df, ticker)
+                elif hasattr(calc, "compute_features"):
+                    features = calc.compute_features(df, ticker, as_of_date)
+                else:
+                    continue
+
                 if features:
                     features["ticker"] = ticker
                     samples.append(features)
@@ -856,7 +964,50 @@ class WalkForwardEngineV5:
                 continue
 
         feature_names = sorted(feature_names_set)
+
+        # Cross-sectional normalization (PIT-safe)
+        if samples and feature_names:
+            samples = self._apply_cross_sectional_normalization(samples, feature_names)
+
         return samples, feature_names
+
+    def _apply_cross_sectional_normalization(
+        self,
+        samples: list[dict[str, Any]],
+        feature_names: list[str],
+    ) -> list[dict[str, Any]]:
+        """Cross-sectional z-score normalization uygula.
+
+        Her tarihte feature'ları o günkü tüm ticker'ların dağılımına göre normalize eder.
+        PIT-safe: sadece aynı tarihteki veriler kullanılır.
+        """
+        try:
+            from services.ml.training_validator import CrossSectionalNormalizer
+            normalizer = CrossSectionalNormalizer()
+
+            # features_map ve date_groups oluştur
+            features_map = {}
+            date_groups = {}
+            for i, s in enumerate(samples):
+                key = f"sample_{i}"
+                features_map[key] = {k: v for k, v in s.items() if k not in ("ticker", "date")}
+                date_groups[key] = s.get("date", "")
+
+            # Normalize et
+            normalized = normalizer.normalize_zscore_by_date(features_map, date_groups, feature_names)
+
+            # Sonuçları geri yaz
+            for i, s in enumerate(samples):
+                key = f"sample_{i}"
+                if key in normalized:
+                    for k, v in normalized[key].items():
+                        s[k] = v
+
+            return samples
+        except ImportError:
+            return samples
+        except Exception:
+            return samples
 
     def _compute_builtin_features(
         self, data: dict[str, Any], as_of_date: str
@@ -939,6 +1090,11 @@ class WalkForwardEngineV5:
     ) -> tuple[Any, str]:
         """Modeli train verisiyle eğit.
 
+        Öncelik sırası:
+        1. Dışarıdan verilen model_factory
+        2. Projenin LightGBM trainer'ı (services.ml.lightgbm_trainer)
+        3. Rule-based fallback
+
         Returns:
             (model, model_version) — model None ise rule-based fallback
         """
@@ -954,6 +1110,28 @@ class WalkForwardEngineV5:
                     return model, version
             except Exception as e:
                 logger.warning("Model eğitimi başarısız, rule-based fallback", error=str(e))
+
+        # Projenin gerçek LightGBM trainer'ını kullan
+        try:
+            from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
+            X = self._features_to_matrix(train_features, feature_names)
+            y = self._extract_targets(train_features)
+
+            if len(X) >= MIN_TRAINING_SAMPLES and len(y) >= MIN_TRAINING_SAMPLES:
+                config = MLModelConfig(num_boost_round=50, early_stopping_rounds=5)
+                trainer = LightGBMTrainer(config)
+                # LightGBMTrainer.train dict-based input bekler
+                features_map = {f"sample_{i}": f for i, f in enumerate(train_features)}
+                returns_map = {f"sample_{i}": float(y[i]) for i in range(len(y))}
+                date_groups = {f"sample_{i}": f.get("date", "") for i, f in enumerate(train_features)}
+                model = trainer.train(features_map, returns_map, date_groups, feature_names=feature_names)
+                if model is not None:
+                    version = self._model_version(model, train_features)
+                    return model, version
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning("LightGBM trainer başarısız, rule-based fallback", error=str(e))
 
         # Rule-based fallback
         return None, "rule_based_v1"
@@ -1049,13 +1227,31 @@ class WalkForwardEngineV5:
         self,
         test_data: dict[str, Any],
         predictions: list[dict[str, Any]],
+        test_end: str = "",
     ) -> list[dict[str, Any]]:
-        """Gerçekleşen sonuçları hesapla."""
+        """Gerçekleşen sonuçları hesapla.
+
+        Leakage guard: test_end'e son 5 günden yakın prediction'lar için
+        gerçek getiri hesaplanamaz (pencere dışına taşar). Bu prediction'lar
+        hariç tutulur.
+        """
         outcomes = []
+        forward_days = self.forward_days
 
         for pred in predictions:
             ticker = pred.get("ticker", "")
             date = pred.get("date", "")
+
+            # Leakage guard: test_end'e son 5 gün içindeki prediction'ları atla
+            if test_end and date:
+                try:
+                    from datetime import datetime as _dt
+                    pred_dt = _dt.strptime(date, "%Y-%m-%d")
+                    end_dt = _dt.strptime(test_end, "%Y-%m-%d")
+                    if (end_dt - pred_dt).days < forward_days:
+                        continue  # Bu prediction leakage riski taşıyor
+                except (ValueError, TypeError):
+                    pass
 
             if ticker not in test_data:
                 outcomes.append({"ticker": ticker, "date": date, "actual_return": 0.0, "is_correct": False})
@@ -1064,7 +1260,7 @@ class WalkForwardEngineV5:
             df = test_data[ticker]
             try:
                 # Polars DataFrame
-                if hasattr(df, "filter") and hasattr(df, "columns") and "Date" in df.columns:
+                if pl is not None and hasattr(df, "filter") and hasattr(df, "columns") and "Date" in df.columns:
                     all_close = df["Close"].to_list()
                     all_dates = df["Date"].to_list()
                     idx = None
@@ -1073,8 +1269,8 @@ class WalkForwardEngineV5:
                             idx = i
                             break
 
-                    if idx is not None and idx + 5 < len(all_close):
-                        actual_ret = (all_close[idx + 5] / all_close[idx] - 1.0) * 100.0
+                    if idx is not None and idx + forward_days < len(all_close):
+                        actual_ret = (all_close[idx + forward_days] / all_close[idx] - 1.0) * 100.0
                     else:
                         actual_ret = 0.0
                 # Plain dict
@@ -1087,14 +1283,15 @@ class WalkForwardEngineV5:
                             idx = i
                             break
 
-                    if idx is not None and idx + 5 < len(all_close):
-                        actual_ret = (all_close[idx + 5] / all_close[idx] - 1.0) * 100.0
+                    if idx is not None and idx + forward_days < len(all_close):
+                        actual_ret = (all_close[idx + forward_days] / all_close[idx] - 1.0) * 100.0
                     else:
                         actual_ret = 0.0
                 else:
                     actual_ret = 0.0
 
                 score = pred.get("score", 0.0)
+                # Yön doğruluğu (directional accuracy)
                 is_correct = (score > 0 and actual_ret > 0) or (score < 0 and actual_ret < 0)
 
                 outcomes.append({
@@ -1127,22 +1324,42 @@ class WalkForwardEngineV5:
         if not predictions or not realized:
             return metrics
 
-        # Getiri serisi
-        returns = [r.get("actual_return", 0.0) / 100.0 for r in realized]
+        # Getiri serisi — günlük portföy getirisi (cross-sectional ortalaması)
         scores = [p.get("score", 0.0) for p in predictions]
         actuals = [r.get("actual_return", 0.0) for r in realized]
 
-        if not returns:
+        # Günlük portföy getirisi hesapla (tarih bazlı gruplama)
+        date_returns: dict[str, list[float]] = {}
+        for r in realized:
+            d = r.get("date", "")
+            ret = r.get("actual_return", 0.0) / 100.0
+            if d:
+                if d not in date_returns:
+                    date_returns[d] = []
+                date_returns[d].append(ret)
+
+        # Günlük ortalama getiri
+        daily_returns = []
+        for d in sorted(date_returns.keys()):
+            daily_returns.append(float(np.mean(date_returns[d])))
+
+        if not daily_returns:
             return metrics
 
-        returns_arr = np.array(returns)
+        daily_returns_arr = np.array(daily_returns)
         scores_arr = np.array(scores)
         actuals_arr = np.array(actuals)
 
         # === Temel Metrikler ===
-        metrics.total_return = float(np.sum(returns_arr)) * 100.0
-        n_days = max(len(returns_arr), 1)
-        metrics.annualized_return = float((1 + np.sum(returns_arr)) ** (252 / n_days) - 1) * 100.0
+        # Toplam getiri: günlük getirilerin birleşimi (compounded)
+        metrics.total_return = float((np.prod(1 + daily_returns_arr) - 1) * 100.0)
+        n_days = max(len(daily_returns_arr), 1)
+        # Yıllıklandırılmış getiri
+        metrics.annualized_return = float((1 + np.prod(1 + daily_returns_arr) - 1) ** (252 / n_days) - 1) * 100.0
+
+        # Cross-sectional getiri serisi (metrikler için)
+        returns = [r.get("actual_return", 0.0) / 100.0 for r in realized]
+        returns_arr = np.array(returns)
 
         # Sharpe
         if np.std(returns_arr) > 0:
@@ -1176,12 +1393,16 @@ class WalkForwardEngineV5:
             metrics.calmar_ratio = metrics.annualized_return / metrics.max_drawdown
 
         # === İsabet Metrikleri ===
-        wins = [r for r in realized if r.get("is_correct", False)]
-        losses = [r for r in realized if not r.get("is_correct", False)]
-        metrics.win_rate = len(wins) / len(realized) if realized else 0.0
+        # win_rate: pozitif getiri oranı (finansal tanım)
+        # directional_accuracy: yön doğruluğu (skor yönü ile gerçek yön eşleşmesi)
+        positive_return_trades = [r for r in realized if r.get("actual_return", 0.0) > 0]
+        negative_return_trades = [r for r in realized if r.get("actual_return", 0.0) < 0]
+        directional_correct = [r for r in realized if r.get("is_correct", False)]
 
-        win_returns = [r.get("actual_return", 0.0) for r in wins]
-        loss_returns = [abs(r.get("actual_return", 0.0)) for r in losses]
+        metrics.win_rate = len(positive_return_trades) / len(realized) if realized else 0.0
+
+        win_returns = [r.get("actual_return", 0.0) for r in positive_return_trades]
+        loss_returns = [abs(r.get("actual_return", 0.0)) for r in negative_return_trades]
 
         metrics.avg_win = float(np.mean(win_returns)) if win_returns else 0.0
         metrics.avg_loss = float(np.mean(loss_returns)) if loss_returns else 0.0
@@ -1230,11 +1451,22 @@ class WalkForwardEngineV5:
         metrics.turnover = self._compute_turnover(predictions)
 
         # === İstatistiksel Anlamlılık ===
+        # Getiri dağılımının momentleri (scipy tabanlı DSR için)
+        try:
+            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            _ret_skew = float(_skew(returns_arr)) if len(returns_arr) > 10 else 0.0
+            _ret_kurt = float(_kurtosis(returns_arr, fisher=False)) if len(returns_arr) > 10 else 3.0
+        except ImportError:
+            _ret_skew = 0.0
+            _ret_kurt = 3.0
+
         metrics.deflated_sharpe = self._deflated_sharpe(
-            metrics.sharpe_ratio, len(returns_arr), len(predictions)
+            metrics.sharpe_ratio, len(returns_arr), len(predictions),
+            skewness=_ret_skew, kurtosis=_ret_kurt,
         )
         metrics.probabilistic_sharpe = self._probabilistic_sharpe(
-            metrics.sharpe_ratio, len(returns_arr)
+            metrics.sharpe_ratio, len(returns_arr),
+            skewness=_ret_skew, kurtosis=_ret_kurt,
         )
 
         # Bootstrap Sharpe CI
@@ -1361,45 +1593,65 @@ class WalkForwardEngineV5:
     # ========================================================================
 
     def _deflated_sharpe(
-        self, sharpe: float, n_obs: int, n_trials: int = 1
+        self, sharpe: float, n_obs: int, n_trials: int = 1,
+        skewness: float = 0.0, kurtosis: float = 3.0,
     ) -> float:
         """Deflated Sharpe Ratio (Bailey & López de Prado, 2014).
 
         Çoklu test düzeltmesi: Backtest sayısı arttıkça Sharpe'ın güvenilirliği düşer.
+        Standalone modül kullanır (scipy tabanlı, skewness + kurtosis düzeltmeli).
         """
         if n_obs < 30 or sharpe <= 0:
             return 0.0
 
-        # Annualized → daily
+        if _has_standalone_sharpe:
+            result = DeflatedSharpeCalculator.compute_deflated_sharpe(
+                observed_sharpe=sharpe,
+                num_strategies=max(n_trials, 1),
+                num_observations=n_obs,
+                skewness=skewness,
+                kurtosis=kurtosis,
+                periods_per_year=1,  # sharpe zaten yıllıklaştırılmış
+            )
+            return float(result.deflated_sharpe)
+
+        # Fallback: basit formül (scipy yoksa)
         daily_sharpe = sharpe / np.sqrt(252)
-
-        # Standard error (skewness + kurtosis düzeltmesi)
         se = np.sqrt((1 + 0.5 * daily_sharpe**2) / n_obs)
-
-        # Multiple testing düzeltmesi (Bonferroni)
         if n_trials > 1:
             adjusted = daily_sharpe - se * np.sqrt(2 * np.log(n_trials))
         else:
             adjusted = daily_sharpe
-
         return max(0.0, float(adjusted * np.sqrt(252)))
 
-    def _probabilistic_sharpe(self, sharpe: float, n_obs: int) -> float:
+    def _probabilistic_sharpe(
+        self, sharpe: float, n_obs: int,
+        skewness: float = 0.0, kurtosis: float = 3.0,
+    ) -> float:
         """Probabilistic Sharpe Ratio.
 
         Gözlemlenen Sharpe'ın 0'dan büyük olma olasılığı.
+        Standalone modül kullanır (scipy tabanlı, skewness + kurtosis düzeltmeli).
         """
         if n_obs < 30:
             return 0.0
 
+        if _has_standalone_sharpe:
+            psr = ProbabilisticSharpeRatio.compute(
+                observed_sharpe=sharpe,
+                benchmark_sharpe=0.0,
+                num_observations=n_obs,
+                skewness=skewness,
+                kurtosis=kurtosis,
+            )
+            return float(psr)
+
+        # Fallback: basit formül (scipy yoksa)
         daily_sharpe = sharpe / np.sqrt(252)
         se = np.sqrt((1 + 0.5 * daily_sharpe**2) / n_obs)
-
         if se < 1e-10:
             return 1.0 if sharpe > 0 else 0.0
-
         z = daily_sharpe / se
-        # Normal CDF approximation
         psr = 0.5 * (1 + np.sign(z) * np.sqrt(1 - np.exp(-2 * z**2 / np.pi)))
         return float(max(0.0, min(1.0, psr)))
 
@@ -1447,18 +1699,31 @@ class WalkForwardEngineV5:
     # ========================================================================
 
     def _detect_regime(self, test_data: dict[str, Any]) -> str:
-        """Test dönemindeki piyasa rejimini tespit et."""
-        # Basit heuristic — tüm hisselerin ortalama momentumuna bak
+        """Test dönemindeki piyasa rejimini tespit et.
+
+        Öncelik sırası:
+        1. Projenin HMM tabanlı regime detection modülü
+        2. Basit heuristic (fallback)
+        """
+        # Projenin gerçek regime detection modülünü kullan
+        try:
+            from services.intelligence.regime import detect_regime
+            # test_data'yı regime modülünün beklediği formata çevir
+            regime = detect_regime(test_data)
+            if regime and regime != "UNKNOWN":
+                return regime
+        except (ImportError, Exception):
+            pass
+
+        # Fallback: basit heuristic
         all_returns = []
         for ticker, df in test_data.items():
             try:
-                # Polars/Pandas DataFrame
                 if hasattr(df, "columns") and "Close" in df.columns:
                     close = df["Close"].to_numpy()
                     if len(close) > 20:
                         ret = (close[-1] / close[-21] - 1.0) * 100.0
                         all_returns.append(ret)
-                # Plain dict
                 elif isinstance(df, dict) and "Close" in df:
                     close = df["Close"]
                     if len(close) > 20:
@@ -1526,16 +1791,37 @@ class WalkForwardEngineV5:
 
         # Deflated Sharpe (tüm fold'lar birleştirilmiş)
         total_obs = sum(f.test_samples for f in completed)
-        deflated = self._deflated_sharpe(float(np.mean(sharpes)), total_obs, len(completed))
+
+        # Tüm realized returns'den momentleri hesapla
+        all_realized_returns = []
+        for f in completed:
+            for r in f.realized_outcomes:
+                all_realized_returns.append(r.get("actual_return", 0.0) / 100.0)
+        try:
+            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            _agg_skew = float(_skew(all_realized_returns)) if len(all_realized_returns) > 10 else 0.0
+            _agg_kurt = float(_kurtosis(all_realized_returns, fisher=False)) if len(all_realized_returns) > 10 else 3.0
+        except ImportError:
+            _agg_skew = 0.0
+            _agg_kurt = 3.0
+
+        deflated = self._deflated_sharpe(
+            float(np.mean(sharpes)), total_obs, len(completed),
+            skewness=_agg_skew, kurtosis=_agg_kurt,
+        )
 
         # Probabilistic Sharpe
-        prob_sharpe = self._probabilistic_sharpe(float(np.mean(sharpes)), total_obs)
+        prob_sharpe = self._probabilistic_sharpe(
+            float(np.mean(sharpes)), total_obs,
+            skewness=_agg_skew, kurtosis=_agg_kurt,
+        )
 
-        # Bootstrap CI
+        # Bootstrap CI — realized returns kullan (score DEĞİL)
         all_returns = []
         for f in completed:
-            for pred in f.predictions:
-                all_returns.append(pred.get("score", 0.0))
+            for real in f.realized_outcomes:
+                ret = real.get("actual_return", 0.0) / 100.0  # percentage → decimal
+                all_returns.append(ret)
         bootstrap_lower, bootstrap_upper = 0.0, 0.0
         if len(all_returns) > 30:
             bootstrap_lower, bootstrap_upper = self._bootstrap_sharpe_ci(np.array(all_returns))
@@ -1682,7 +1968,8 @@ class WalkForwardEngineV5:
         return hashlib.sha256(version_str.encode()).hexdigest()[:16]
 
     def _persist_result(self, result: WalkForwardResult, persist_dir: str) -> None:
-        """Sonucu dosyaya kaydet."""
+        """Sonucu dosyaya, veritabanına ve MLflow'a kaydet."""
+        # 1. Dosya sistemi
         try:
             path = Path(persist_dir)
             path.mkdir(parents=True, exist_ok=True)
@@ -1695,7 +1982,83 @@ class WalkForwardEngineV5:
 
             logger.info("Walk-forward result persisted", path=str(filepath))
         except Exception as e:
-            logger.warning("Walk-forward result persist failed", error=str(e))
+            logger.warning("Walk-forward result persist to file failed", error=str(e))
+
+        # 2. Veritabanı (TimescaleDB) — best-effort
+        try:
+            self._persist_to_db(result)
+        except Exception as e:
+            logger.debug("Walk-forward DB persist skipped", error=str(e))
+
+        # 3. MLflow — best-effort
+        try:
+            self._persist_to_mlflow(result)
+        except Exception as e:
+            logger.debug("Walk-forward MLflow persist skipped", error=str(e))
+
+    def _persist_to_db(self, result: WalkForwardResult) -> None:
+        """Walk-forward sonucunu veritabanına kaydet (best-effort)."""
+        try:
+            from services.core.database import get_db_pool
+            import asyncio
+
+            async def _save():
+                pool = await get_db_pool()
+                if pool is None:
+                    return
+                async with pool.acquire() as conn:
+                    await conn.execute("""
+                        INSERT INTO walk_forward_results
+                            (run_id, total_folds, completed_folds, avg_sharpe,
+                             avg_return, stability_score, deflated_sharpe,
+                             created_at, result_json)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                        ON CONFLICT (run_id) DO NOTHING
+                    """,
+                        result.run_id,
+                        result.total_folds,
+                        result.completed_folds,
+                        result.avg_test_sharpe,
+                        result.avg_test_return,
+                        result.stability_score,
+                        result.deflated_sharpe,
+                        datetime.now(timezone.utc),
+                        orjson.dumps(result.to_dict(), default=str).decode(),
+                    )
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_save())
+            else:
+                loop.run_until_complete(_save())
+        except Exception:
+            pass
+
+    def _persist_to_mlflow(self, result: WalkForwardResult) -> None:
+        """Walk-forward sonucunu MLflow'a kaydet (best-effort)."""
+        try:
+            import mlflow
+            with mlflow.start_run(run_name=f"wf_{result.run_id}"):
+                # Metrikler
+                mlflow.log_metric("avg_sharpe", result.avg_test_sharpe)
+                mlflow.log_metric("avg_return", result.avg_test_return)
+                mlflow.log_metric("stability_score", result.stability_score)
+                mlflow.log_metric("deflated_sharpe", result.deflated_sharpe)
+                mlflow.log_metric("avg_ic", result.avg_ic)
+                mlflow.log_metric("avg_win_rate", result.avg_win_rate)
+                mlflow.log_metric("total_folds", result.total_folds)
+                mlflow.log_metric("completed_folds", result.completed_folds)
+
+                # Parametreler
+                mlflow.log_params(result.config)
+
+                # Artifact
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+                    f.write(orjson.dumps(result.to_dict(), option=orjson.OPT_INDENT_2, default=str).decode())
+                    mlflow.log_artifact(f.name, "walk_forward_results")
+        except Exception:
+            pass
 
     def _empty_result(self, run_id: str) -> WalkForwardResult:
         """Boş sonuç."""

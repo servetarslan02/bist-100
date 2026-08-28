@@ -1,5 +1,10 @@
 """
-ALPHA BIST — Walk-Forward Validation v3.0
+ALPHA BIST — Walk-Forward Validation v3.0 (DEPRECATED)
+
+.. deprecated:: 5.0
+    Bu modül yerine ``walk_forward_engine.WalkForwardEngineV5`` kullanin.
+    v3.0 sadece geriye uyumluluk icin tutulmaktadir.
+    Yeni kod yazarken bu modulu KULLANMAYIN.
 
 ROADMAP v3.0 FAZ 1, 4:
 - Purge: train sonu → test başı arası gap (5 gün)
@@ -448,5 +453,11 @@ class WalkForwardEngine:
         )
 
 
-# Singleton
+# Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
+import warnings
+warnings.warn(
+    "walk_forward.WalkForwardEngine deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
+    DeprecationWarning,
+    stacklevel=2,
+)
 walk_forward_engine = WalkForwardEngine()

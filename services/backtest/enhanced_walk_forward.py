@@ -1,5 +1,10 @@
 """
-ALPHA BIST — Enhanced Walk-Forward & Evaluation v1.0
+ALPHA BIST — Enhanced Walk-Forward & Evaluation v1.0 (DEPRECATED)
+
+.. deprecated:: 5.0
+    Bu modül yerine ``walk_forward_engine.WalkForwardEngineV5`` kullanın.
+    v1.0 sadece geriye uyumluluk için tutulmaktadır.
+    Yeni kod yazarken bu modülü KULLANMAYIN.
 
 Walk-Forward with purge + embargo:
 - Purge: Gap between train end and test start (prevents leakage)
@@ -10,11 +15,7 @@ Evaluation metrics:
 - Deflated Sharpe Ratio (overfitting detection)
 
 ⚠️ PIT UYARISI: Bu modül pre-computed predictions üzerinde çalışır.
-Modeli her fold'da YENİDEN EĞİTMEZ. Gerçek walk-forward doğrulama için
-`walk_forward_runner.py` kullanılmalıdır — o modül her fold'da modeli
-sıfırdan eğitir.
-
-Bu modül sadece evaluation/metrik hesaplama amaçlıdır.
+Modeli her fold'da YENİDEN EĞİTMEZ.
 
 Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
@@ -388,5 +389,11 @@ class PurgeEmbargoWalkForward:
         return float(deflated)
 
 
-# Singleton
+# Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
+import warnings
+warnings.warn(
+    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
+    DeprecationWarning,
+    stacklevel=2,
+)
 purge_embargo_wf_engine = PurgeEmbargoWalkForward()

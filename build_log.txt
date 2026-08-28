@@ -1,0 +1,596 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 576B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile.api
+#2 transferring dockerfile: 449B done
+#2 DONE 0.0s
+
+#3 [auth] library/python:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.13-slim
+#4 DONE 1.3s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 239B done
+#5 DONE 0.0s
+
+#6 [1/6] FROM docker.io/library/python:3.13-slim@sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a
+#6 resolve docker.io/library/python:3.13-slim@sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 1.33MB 1.0s done
+#7 DONE 1.0s
+
+#8 [2/6] WORKDIR /app
+#8 CACHED
+
+#9 [3/6] RUN apt-get update && apt-get install -y --no-install-recommends     gcc libpq-dev curl &&     rm -rf /var/lib/apt/lists/*
+#9 CACHED
+
+#10 [4/6] COPY requirements.txt .
+#10 CACHED
+
+#11 [5/6] RUN pip install --no-cache-dir -r requirements.txt
+#11 2.296 Collecting aiohappyeyeballs==2.7.1 (from -r requirements.txt (line 1))
+#11 2.814   Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+#11 6.040 Collecting aiohttp==3.14.3 (from -r requirements.txt (line 2))
+#11 6.108   Downloading aiohttp-3.14.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+#11 6.204 Collecting aiosignal==1.4.0 (from -r requirements.txt (line 3))
+#11 6.271   Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+#11 6.380 Collecting alembic==1.19.1 (from -r requirements.txt (line 4))
+#11 6.444   Downloading alembic-1.19.1-py3-none-any.whl.metadata (7.3 kB)
+#11 6.522 Collecting annotated-doc==0.0.5 (from -r requirements.txt (line 5))
+#11 6.614   Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+#11 6.683 Collecting annotated-types==0.8.0 (from -r requirements.txt (line 6))
+#11 6.748   Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+#11 6.858 Collecting anyio==4.14.2 (from -r requirements.txt (line 7))
+#11 6.919   Downloading anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+#11 7.250 Collecting ast_serialize==0.8.0 (from -r requirements.txt (line 8))
+#11 7.314   Downloading ast_serialize-0.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.4 kB)
+#11 7.500 Collecting asyncpg==0.31.0 (from -r requirements.txt (line 9))
+#11 7.567   Downloading asyncpg-0.31.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.4 kB)
+#11 7.662 Collecting attrs==26.1.0 (from -r requirements.txt (line 10))
+#11 7.724   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+#11 7.945 Collecting backports.zstd==1.7.0 (from -r requirements.txt (line 11))
+#11 8.164   Downloading backports_zstd-1.7.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (6.8 kB)
+#11 8.984 Collecting bcrypt==5.0.0 (from -r requirements.txt (line 12))
+#11 9.480   Downloading bcrypt-5.0.0-cp39-abi3-manylinux_2_34_x86_64.whl.metadata (10 kB)
+#11 9.718 Collecting beautifulsoup4==4.15.0 (from -r requirements.txt (line 13))
+#11 9.845   Downloading beautifulsoup4-4.15.0-py3-none-any.whl.metadata (3.8 kB)
+#11 10.79 Collecting black==26.5.1 (from -r requirements.txt (line 14))
+#11 10.87   Downloading black-26.5.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (95 kB)
+#11 12.00 Collecting blinker==1.9.0 (from -r requirements.txt (line 15))
+#11 12.31   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#11 12.73 Collecting cachetools==7.1.7 (from -r requirements.txt (line 16))
+#11 12.97   Downloading cachetools-7.1.7-py3-none-any.whl.metadata (5.5 kB)
+#11 14.44 Collecting catboost==1.2.10 (from -r requirements.txt (line 17))
+#11 14.56   Downloading catboost-1.2.10-cp313-cp313-manylinux2014_x86_64.whl.metadata (1.4 kB)
+#11 14.74 Collecting certifi==2026.7.22 (from -r requirements.txt (line 18))
+#11 14.95   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+#11 16.31 Collecting cffi==2.1.1 (from -r requirements.txt (line 19))
+#11 16.74   Downloading cffi-2.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+#11 18.66 Collecting charset-normalizer==3.5.1 (from -r requirements.txt (line 20))
+#11 18.73   Downloading charset_normalizer-3.5.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (45 kB)
+#11 19.22 Collecting click==8.4.2 (from -r requirements.txt (line 21))
+#11 19.30   Downloading click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+#11 21.39 Collecting clickhouse-connect==1.7.2 (from -r requirements.txt (line 22))
+#11 21.48   Downloading clickhouse_connect-1.7.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (6.8 kB)
+#11 21.64 Collecting cloudpickle==3.1.2 (from -r requirements.txt (line 23))
+#11 21.90   Downloading cloudpickle-3.1.2-py3-none-any.whl.metadata (7.1 kB)
+#11 22.15 Collecting colorlog==6.12.0 (from -r requirements.txt (line 24))
+#11 22.22   Downloading colorlog-6.12.0-py3-none-any.whl.metadata (11 kB)
+#11 22.71 Collecting contourpy==1.3.3 (from -r requirements.txt (line 25))
+#11 22.77   Downloading contourpy-1.3.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (5.5 kB)
+#11 25.39 Collecting coverage==7.15.4 (from -r requirements.txt (line 26))
+#11 25.45   Downloading coverage-7.15.4-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (8.6 kB)
+#11 26.28 Collecting cryptography==49.0.0 (from -r requirements.txt (line 27))
+#11 26.36   Downloading cryptography-49.0.0-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+#11 26.50 Collecting cuda-bindings==13.3.1 (from -r requirements.txt (line 28))
+#11 26.57   Downloading cuda_bindings-13.3.1-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (2.5 kB)
+#11 26.66 Collecting cuda-pathfinder==1.6.1 (from -r requirements.txt (line 29))
+#11 26.72   Downloading cuda_pathfinder-1.6.1-py3-none-any.whl.metadata (1.9 kB)
+#11 26.84 Collecting cuda-toolkit==13.0.3.0 (from -r requirements.txt (line 30))
+#11 26.91   Downloading cuda_toolkit-13.0.3.0-py2.py3-none-any.whl.metadata (17 kB)
+#11 27.33 Collecting curl_cffi==0.16.1 (from -r requirements.txt (line 31))
+#11 27.43   Downloading curl_cffi-0.16.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (17 kB)
+#11 27.66 Collecting cycler==0.12.1 (from -r requirements.txt (line 32))
+#11 27.74   Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+#11 27.87 Collecting databricks-sdk==0.133.0 (from -r requirements.txt (line 33))
+#11 27.95   Downloading databricks_sdk-0.133.0-py3-none-any.whl.metadata (44 kB)
+#11 30.09 Collecting docker==7.2.0 (from -r requirements.txt (line 34))
+#11 30.54   Downloading docker-7.2.0-py3-none-any.whl.metadata (3.8 kB)
+#11 30.93 Collecting ecdsa==0.19.2 (from -r requirements.txt (line 35))
+#11 31.01   Downloading ecdsa-0.19.2-py2.py3-none-any.whl.metadata (29 kB)
+#11 31.76 Collecting fastapi==0.141.1 (from -r requirements.txt (line 36))
+#11 31.85   Downloading fastapi-0.141.1-py3-none-any.whl.metadata (27 kB)
+#11 32.08 Collecting feedparser==6.0.14 (from -r requirements.txt (line 37))
+#11 32.14   Downloading feedparser-6.0.14-py3-none-any.whl.metadata (2.7 kB)
+#11 32.22 Collecting feedparser-sgmllib==2.1.0 (from -r requirements.txt (line 38))
+#11 32.29   Downloading feedparser_sgmllib-2.1.0-py3-none-any.whl.metadata (926 bytes)
+#11 32.40 Collecting filelock==3.32.3 (from -r requirements.txt (line 39))
+#11 32.48   Downloading filelock-3.32.3-py3-none-any.whl.metadata (2.0 kB)
+#11 32.59 Collecting Flask==3.1.3 (from -r requirements.txt (line 40))
+#11 32.69   Downloading flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+#11 32.83 Collecting flask-cors==6.0.5 (from -r requirements.txt (line 41))
+#11 32.90   Downloading flask_cors-6.0.5-py3-none-any.whl.metadata (5.4 kB)
+#11 33.79 Collecting fonttools==4.63.0 (from -r requirements.txt (line 42))
+#11 33.88   Downloading fonttools-4.63.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (118 kB)
+#11 34.91 Collecting frozenlist==1.8.0 (from -r requirements.txt (line 43))
+#11 34.97   Downloading frozenlist-1.8.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+#11 35.15 Collecting fsspec==2026.7.0 (from -r requirements.txt (line 44))
+#11 35.22   Downloading fsspec-2026.7.0-py3-none-any.whl.metadata (10 kB)
+#11 35.34 Collecting gitdb==4.0.12 (from -r requirements.txt (line 45))
+#11 35.43   Downloading gitdb-4.0.12-py3-none-any.whl.metadata (1.2 kB)
+#11 36.08 Collecting GitPython==3.1.59 (from -r requirements.txt (line 46))
+#11 36.16   Downloading gitpython-3.1.59-py3-none-any.whl.metadata (13 kB)
+#11 36.47 Collecting google-auth==2.56.3 (from -r requirements.txt (line 47))
+#11 36.53   Downloading google_auth-2.56.3-py3-none-any.whl.metadata (6.0 kB)
+#11 36.71 Collecting graphene==3.4.3 (from -r requirements.txt (line 48))
+#11 36.77   Downloading graphene-3.4.3-py2.py3-none-any.whl.metadata (6.9 kB)
+#11 36.95 Collecting graphql-core==3.2.11 (from -r requirements.txt (line 49))
+#11 37.01   Downloading graphql_core-3.2.11-py3-none-any.whl.metadata (11 kB)
+#11 37.15 Collecting graphql-relay==3.2.0 (from -r requirements.txt (line 50))
+#11 37.22   Downloading graphql_relay-3.2.0-py3-none-any.whl.metadata (12 kB)
+#11 37.36 Collecting graphviz==0.21 (from -r requirements.txt (line 51))
+#11 37.46   Downloading graphviz-0.21-py3-none-any.whl.metadata (12 kB)
+#11 38.22 Collecting greenlet==3.5.5 (from -r requirements.txt (line 52))
+#11 38.32   Downloading greenlet-3.5.5-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+#11 38.46 Collecting gunicorn==26.1.0 (from -r requirements.txt (line 53))
+#11 38.55   Downloading gunicorn-26.1.0-py3-none-any.whl.metadata (5.5 kB)
+#11 38.67 Collecting h11==0.16.0 (from -r requirements.txt (line 54))
+#11 38.74   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#11 38.87 Collecting httpcore==1.0.9 (from -r requirements.txt (line 55))
+#11 38.95   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#11 39.84 Collecting httptools==0.8.0 (from -r requirements.txt (line 56))
+#11 40.05   Downloading httptools-0.8.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+#11 40.23 Collecting httpx==0.28.1 (from -r requirements.txt (line 57))
+#11 40.40   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#11 40.63 Collecting huey==3.3.4 (from -r requirements.txt (line 58))
+#11 40.72   Downloading huey-3.3.4-py3-none-any.whl.metadata (5.6 kB)
+#11 40.82 Collecting idna==3.19 (from -r requirements.txt (line 59))
+#11 40.88   Downloading idna-3.19-py3-none-any.whl.metadata (9.2 kB)
+#11 41.10 Collecting importlib_metadata==9.0.0 (from -r requirements.txt (line 60))
+#11 41.19   Downloading importlib_metadata-9.0.0-py3-none-any.whl.metadata (4.5 kB)
+#11 41.29 Collecting iniconfig==2.3.0 (from -r requirements.txt (line 61))
+#11 41.36   Downloading iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+#11 41.44 Collecting itsdangerous==2.2.0 (from -r requirements.txt (line 62))
+#11 41.51   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#11 41.60 Collecting Jinja2==3.1.6 (from -r requirements.txt (line 63))
+#11 41.66   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#11 41.79 Collecting joblib==1.5.3 (from -r requirements.txt (line 64))
+#11 41.86   Downloading joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+#11 42.17 Collecting kiwisolver==1.5.0 (from -r requirements.txt (line 65))
+#11 42.24   Downloading kiwisolver-1.5.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.1 kB)
+#11 42.73 Collecting librt==0.15.0 (from -r requirements.txt (line 66))
+#11 42.79   Downloading librt-0.15.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (1.3 kB)
+#11 43.26 Collecting lightgbm==4.7.0 (from -r requirements.txt (line 67))
+#11 43.32   Downloading lightgbm-4.7.0-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (18 kB)
+#11 44.27 Collecting llvmlite==0.49.0 (from -r requirements.txt (line 68))
+#11 44.35   Downloading llvmlite-0.49.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.0 kB)
+#11 45.91 Collecting lxml==6.1.2 (from -r requirements.txt (line 69))
+#11 45.98   Downloading lxml-6.1.2-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (3.3 kB)
+#11 46.48 Collecting lz4==4.4.5 (from -r requirements.txt (line 70))
+#11 46.54   Downloading lz4-4.4.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+#11 46.66 Collecting Mako==1.4.1 (from -r requirements.txt (line 71))
+#11 46.74   Downloading mako-1.4.1-py3-none-any.whl.metadata (2.9 kB)
+#11 47.06 Collecting MarkupSafe==3.0.3 (from -r requirements.txt (line 72))
+#11 47.14   Downloading markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+#11 47.99 Collecting matplotlib==3.11.1 (from -r requirements.txt (line 73))
+#11 48.05   Downloading matplotlib-3.11.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (80 kB)
+#11 48.84 Collecting mlflow==3.15.1 (from -r requirements.txt (line 74))
+#11 48.96   Downloading mlflow-3.15.1-py3-none-any.whl.metadata (49 kB)
+#11 49.34 Collecting mlflow-skinny==3.15.1 (from -r requirements.txt (line 75))
+#11 49.40   Downloading mlflow_skinny-3.15.1-py3-none-any.whl.metadata (50 kB)
+#11 49.68 Collecting mlflow-tracing==3.15.1 (from -r requirements.txt (line 76))
+#11 49.75   Downloading mlflow_tracing-3.15.1-py3-none-any.whl.metadata (19 kB)
+#11 49.90 Collecting mpmath==1.3.0 (from -r requirements.txt (line 77))
+#11 49.96   Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+#11 51.13 Collecting multidict==6.7.1 (from -r requirements.txt (line 78))
+#11 51.20   Downloading multidict-6.7.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (5.3 kB)
+#11 51.29 Collecting multitasking==0.0.13 (from -r requirements.txt (line 79))
+#11 51.35   Downloading multitasking-0.0.13-py3-none-any.whl.metadata (16 kB)
+#11 52.10 Collecting mypy==2.3.1 (from -r requirements.txt (line 80))
+#11 52.17   Downloading mypy-2.3.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#11 52.24 Collecting mypy_extensions==1.1.0 (from -r requirements.txt (line 81))
+#11 52.31   Downloading mypy_extensions-1.1.0-py3-none-any.whl.metadata (1.1 kB)
+#11 52.66 Collecting narwhals==2.25.0 (from -r requirements.txt (line 82))
+#11 52.72   Downloading narwhals-2.25.0-py3-none-any.whl.metadata (15 kB)
+#11 52.91 Collecting networkx==3.6.1 (from -r requirements.txt (line 83))
+#11 52.98   Downloading networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+#11 53.68 Collecting numba==0.67.0 (from -r requirements.txt (line 84))
+#11 53.87   Downloading numba-0.67.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.7 kB)
+#11 55.92 Collecting numpy==2.5.2 (from -r requirements.txt (line 85))
+#11 55.99   Downloading numpy-2.5.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+#11 56.07 Collecting nvidia-cublas==13.1.1.3 (from -r requirements.txt (line 86))
+#11 56.14   Downloading nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+#11 56.24 Collecting nvidia-cuda-cupti==13.0.85 (from -r requirements.txt (line 87))
+#11 56.31   Downloading nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl.metadata (1.7 kB)
+#11 56.38 Collecting nvidia-cuda-nvrtc==13.0.88 (from -r requirements.txt (line 88))
+#11 56.45   Downloading nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.7 kB)
+#11 56.55 Collecting nvidia-cuda-runtime==13.0.96 (from -r requirements.txt (line 89))
+#11 56.64   Downloading nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+#11 56.73 Collecting nvidia-cudnn-cu13==9.20.0.48 (from -r requirements.txt (line 90))
+#11 56.81   Downloading nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_x86_64.whl.metadata (1.9 kB)
+#11 56.89 Collecting nvidia-cufft==12.0.0.61 (from -r requirements.txt (line 91))
+#11 56.96   Downloading nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+#11 57.04 Collecting nvidia-cufile==1.15.1.6 (from -r requirements.txt (line 92))
+#11 57.12   Downloading nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+#11 57.20 Collecting nvidia-curand==10.4.0.35 (from -r requirements.txt (line 93))
+#11 57.27   Downloading nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl.metadata (1.7 kB)
+#11 57.35 Collecting nvidia-cusolver==12.0.4.66 (from -r requirements.txt (line 94))
+#11 57.42   Downloading nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+#11 57.53 Collecting nvidia-cusparse==12.6.3.3 (from -r requirements.txt (line 95))
+#11 57.59   Downloading nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+#11 57.67 Collecting nvidia-cusparselt-cu13==0.8.1 (from -r requirements.txt (line 96))
+#11 57.73   Downloading nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl.metadata (12 kB)
+#11 57.85 Collecting nvidia-nccl-cu13==2.29.7 (from -r requirements.txt (line 97))
+#11 57.92   Downloading nvidia_nccl_cu13-2.29.7-py3-none-manylinux_2_18_x86_64.whl.metadata (2.1 kB)
+#11 58.00 Collecting nvidia-nvjitlink==13.3.33 (from -r requirements.txt (line 98))
+#11 58.07   Downloading nvidia_nvjitlink-13.3.33-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.8 kB)
+#11 58.14 Collecting nvidia-nvshmem-cu13==3.4.5 (from -r requirements.txt (line 99))
+#11 58.21   Downloading nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.1 kB)
+#11 58.30 Collecting nvidia-nvtx==13.0.85 (from -r requirements.txt (line 100))
+#11 58.39   Downloading nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl.metadata (1.8 kB)
+#11 58.53 Collecting opentelemetry-api==1.44.0 (from -r requirements.txt (line 101))
+#11 58.59   Downloading opentelemetry_api-1.44.0-py3-none-any.whl.metadata (1.4 kB)
+#11 58.91 Collecting opentelemetry-proto==1.44.0 (from -r requirements.txt (line 102))
+#11 59.33   Downloading opentelemetry_proto-1.44.0-py3-none-any.whl.metadata (2.3 kB)
+#11 60.65 Collecting opentelemetry-sdk==1.44.0 (from -r requirements.txt (line 103))
+#11 60.75   Downloading opentelemetry_sdk-1.44.0-py3-none-any.whl.metadata (1.6 kB)
+#11 61.04 Collecting opentelemetry-semantic-conventions==0.65b0 (from -r requirements.txt (line 104))
+#11 61.14   Downloading opentelemetry_semantic_conventions-0.65b0-py3-none-any.whl.metadata (2.4 kB)
+#11 61.78 Collecting optuna==4.9.0 (from -r requirements.txt (line 105))
+#11 62.00   Downloading optuna-4.9.0-py3-none-any.whl.metadata (15 kB)
+#11 66.79 Collecting orjson==3.12.0 (from -r requirements.txt (line 106))
+#11 66.87   Downloading orjson-3.12.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (41 kB)
+#11 67.13 Collecting packaging==26.3 (from -r requirements.txt (line 107))
+#11 67.26   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+#11 69.62 Collecting pandas==2.3.3 (from -r requirements.txt (line 108))
+#11 69.71   Downloading pandas-2.3.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (91 kB)
+#11 70.36 Collecting passlib==1.7.4 (from -r requirements.txt (line 109))
+#11 70.53   Downloading passlib-1.7.4-py2.py3-none-any.whl.metadata (1.7 kB)
+#11 70.74 Collecting pathspec==1.1.1 (from -r requirements.txt (line 110))
+#11 70.84   Downloading pathspec-1.1.1-py3-none-any.whl.metadata (14 kB)
+#11 71.19 Collecting peewee==4.3.0 (from -r requirements.txt (line 111))
+#11 71.28   Downloading peewee-4.3.0-py3-none-any.whl.metadata (10 kB)
+#11 73.16 Collecting pillow==12.3.0 (from -r requirements.txt (line 112))
+#11 73.26   Downloading pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+#11 73.36 Collecting platformdirs==4.11.3 (from -r requirements.txt (line 113))
+#11 73.44   Downloading platformdirs-4.11.3-py3-none-any.whl.metadata (5.5 kB)
+#11 73.65 Collecting plotly==6.9.0 (from -r requirements.txt (line 114))
+#11 73.72   Downloading plotly-6.9.0-py3-none-any.whl.metadata (9.0 kB)
+#11 73.83 Collecting pluggy==1.6.0 (from -r requirements.txt (line 115))
+#11 73.91   Downloading pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+#11 74.76 Collecting polars==1.43.2 (from -r requirements.txt (line 116))
+#11 74.84   Downloading polars-1.43.2-py3-none-any.whl.metadata (11 kB)
+#11 75.00 Collecting polars-runtime-32==1.43.2 (from -r requirements.txt (line 117))
+#11 75.06   Downloading polars_runtime_32-1.43.2-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.5 kB)
+#11 75.15 Collecting prettytable==3.18.0 (from -r requirements.txt (line 118))
+#11 75.66   Downloading prettytable-3.18.0-py3-none-any.whl.metadata (37 kB)
+#11 75.88 Collecting prometheus_client==0.26.0 (from -r requirements.txt (line 119))
+#11 75.96   Downloading prometheus_client-0.26.0-py3-none-any.whl.metadata (2.1 kB)
+#11 76.66 Collecting propcache==0.5.2 (from -r requirements.txt (line 120))
+#11 76.73   Downloading propcache-0.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (16 kB)
+#11 78.15 Collecting protobuf==6.33.6 (from -r requirements.txt (line 121))
+#11 78.22   Downloading protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl.metadata (593 bytes)
+#11 79.27 Collecting pyarrow==25.0.1 (from -r requirements.txt (line 122))
+#11 79.34   Downloading pyarrow-25.0.1-cp313-cp313-manylinux_2_28_x86_64.whl.metadata (3.0 kB)
+#11 79.53 Collecting pyasn1==0.6.4 (from -r requirements.txt (line 123))
+#11 79.65   Downloading pyasn1-0.6.4-py3-none-any.whl.metadata (8.4 kB)
+#11 79.84 Collecting pyasn1_modules==0.4.2 (from -r requirements.txt (line 124))
+#11 79.91   Downloading pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+#11 80.02 Collecting pycparser==3.0 (from -r requirements.txt (line 125))
+#11 80.09   Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+#11 80.97 Collecting pydantic==2.13.4 (from -r requirements.txt (line 126))
+#11 81.06   Downloading pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+#11 81.68 Collecting pydantic-settings==2.15.0 (from -r requirements.txt (line 127))
+#11 81.78   Downloading pydantic_settings-2.15.0-py3-none-any.whl.metadata (3.9 kB)
+#11 86.48 Collecting pydantic_core==2.46.4 (from -r requirements.txt (line 128))
+#11 86.58   Downloading pydantic_core-2.46.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+#11 86.68 Collecting Pygments==2.21.0 (from -r requirements.txt (line 129))
+#11 86.76   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+#11 86.89 Collecting pyparsing==3.3.2 (from -r requirements.txt (line 130))
+#11 86.96   Downloading pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+#11 87.13 Collecting pytest==9.1.1 (from -r requirements.txt (line 131))
+#11 87.20   Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+#11 87.35 Collecting pytest-asyncio==1.4.0 (from -r requirements.txt (line 132))
+#11 87.42   Downloading pytest_asyncio-1.4.0-py3-none-any.whl.metadata (4.1 kB)
+#11 87.52 Collecting pytest-cov==7.1.0 (from -r requirements.txt (line 133))
+#11 87.58   Downloading pytest_cov-7.1.0-py3-none-any.whl.metadata (32 kB)
+#11 87.76 Collecting pytest-timeout==2.4.0 (from -r requirements.txt (line 134))
+#11 87.93   Downloading pytest_timeout-2.4.0-py3-none-any.whl.metadata (20 kB)
+#11 88.31 Collecting python-dateutil==2.9.0.post0 (from -r requirements.txt (line 135))
+#11 88.39   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#11 88.58 Collecting python-dotenv==1.2.3 (from -r requirements.txt (line 136))
+#11 88.68   Downloading python_dotenv-1.2.3-py3-none-any.whl.metadata (29 kB)
+#11 88.85 Collecting python-jose==3.5.0 (from -r requirements.txt (line 137))
+#11 88.92   Downloading python_jose-3.5.0-py2.py3-none-any.whl.metadata (5.5 kB)
+#11 89.01 Collecting python-multipart==0.0.32 (from -r requirements.txt (line 138))
+#11 89.08   Downloading python_multipart-0.0.32-py3-none-any.whl.metadata (2.1 kB)
+#11 89.17 Collecting pytokens==0.4.1 (from -r requirements.txt (line 139))
+#11 89.23   Downloading pytokens-0.4.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+#11 89.46 Collecting pytz==2026.3.post1 (from -r requirements.txt (line 140))
+#11 89.53   Downloading pytz-2026.3.post1-py2.py3-none-any.whl.metadata (22 kB)
+#11 89.76 Collecting PyYAML==6.0.3 (from -r requirements.txt (line 141))
+#11 89.82   Downloading pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#11 89.97 Collecting redis==8.1.0 (from -r requirements.txt (line 142))
+#11 90.09   Downloading redis-8.1.0-py3-none-any.whl.metadata (16 kB)
+#11 90.27 Collecting requests==2.34.2 (from -r requirements.txt (line 143))
+#11 90.34   Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+#11 90.45 Collecting rsa==4.9.1 (from -r requirements.txt (line 144))
+#11 90.53   Downloading rsa-4.9.1-py3-none-any.whl.metadata (5.6 kB)
+#11 92.23 Collecting ruff==0.16.4 (from -r requirements.txt (line 145))
+#11 92.51   Downloading ruff-0.16.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (26 kB)
+#11 92.90 Collecting scikit-learn==1.9.0 (from -r requirements.txt (line 146))
+#11 92.97   Downloading scikit_learn-1.9.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+#11 93.65 Collecting scipy==1.18.1 (from -r requirements.txt (line 147))
+#11 93.71   Downloading scipy-1.18.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+#11 94.43 Collecting setuptools==84.0.0 (from -r requirements.txt (line 148))
+#11 94.51   Downloading setuptools-84.0.0-py3-none-any.whl.metadata (6.6 kB)
+#11 94.74 Collecting shap==0.52.0 (from -r requirements.txt (line 149))
+#11 94.82   Downloading shap-0.52.0-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (26 kB)
+#11 95.01 Collecting six==1.17.0 (from -r requirements.txt (line 150))
+#11 95.08   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#11 95.22 Collecting skops==0.14.0 (from -r requirements.txt (line 151))
+#11 95.28   Downloading skops-0.14.0-py3-none-any.whl.metadata (4.4 kB)
+#11 95.36 Collecting slicer==0.0.8 (from -r requirements.txt (line 152))
+#11 95.43   Downloading slicer-0.0.8-py3-none-any.whl.metadata (4.0 kB)
+#11 95.52 Collecting smmap==5.0.3 (from -r requirements.txt (line 153))
+#11 95.58   Downloading smmap-5.0.3-py3-none-any.whl.metadata (4.6 kB)
+#11 95.78 Collecting soupsieve==2.9.2 (from -r requirements.txt (line 154))
+#11 95.88   Downloading soupsieve-2.9.2-py3-none-any.whl.metadata (4.6 kB)
+#11 97.39 Collecting SQLAlchemy==2.0.52 (from -r requirements.txt (line 155))
+#11 97.51   Downloading sqlalchemy-2.0.52-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.6 kB)
+#11 98.17 Collecting sqlparse==0.6.0 (from -r requirements.txt (line 156))
+#11 98.24   Downloading sqlparse-0.6.0-py3-none-any.whl.metadata (6.0 kB)
+#11 98.39 Collecting starlette==1.6.0 (from -r requirements.txt (line 157))
+#11 98.45   Downloading starlette-1.6.0-py3-none-any.whl.metadata (6.4 kB)
+#11 98.79 Collecting structlog==26.1.0 (from -r requirements.txt (line 158))
+#11 98.86   Downloading structlog-26.1.0-py3-none-any.whl.metadata (9.7 kB)
+#11 99.04 Collecting sympy==1.14.0 (from -r requirements.txt (line 159))
+#11 99.10   Downloading sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+#11 99.24 Collecting threadpoolctl==3.6.0 (from -r requirements.txt (line 160))
+#11 99.31   Downloading threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+#11 99.67 Collecting torch==2.13.0 (from -r requirements.txt (line 161))
+#11 99.74   Downloading torch-2.13.0-cp313-cp313-manylinux_2_28_x86_64.whl.metadata (38 kB)
+#11 100.1 Collecting tqdm==4.70.0 (from -r requirements.txt (line 162))
+#11 100.1   Downloading tqdm-4.70.0-py3-none-any.whl.metadata (57 kB)
+#11 100.5 Collecting triton==3.7.1 (from -r requirements.txt (line 163))
+#11 100.5   Downloading triton-3.7.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (1.7 kB)
+#11 100.6 Collecting typing-inspection==0.4.4 (from -r requirements.txt (line 164))
+#11 100.7   Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+#11 100.8 Collecting typing_extensions==4.16.0 (from -r requirements.txt (line 165))
+#11 100.8   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#11 101.0 Collecting tzdata==2026.3 (from -r requirements.txt (line 166))
+#11 101.0   Downloading tzdata-2026.3-py2.py3-none-any.whl.metadata (1.4 kB)
+#11 101.1 Collecting urllib3==2.7.0 (from -r requirements.txt (line 167))
+#11 101.2   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#11 101.5 Collecting uvicorn==0.52.4 (from -r requirements.txt (line 168))
+#11 101.5   Downloading uvicorn-0.52.4-py3-none-any.whl.metadata (6.6 kB)
+#11 101.8 Collecting uvloop==0.22.1 (from -r requirements.txt (line 169))
+#11 101.8   Downloading uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.9 kB)
+#11 102.2 Collecting watchfiles==1.2.0 (from -r requirements.txt (line 170))
+#11 102.3   Downloading watchfiles-1.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+#11 102.4 Collecting wcwidth==0.8.2 (from -r requirements.txt (line 171))
+#11 102.4   Downloading wcwidth-0.8.2-py3-none-any.whl.metadata (43 kB)
+#11 103.1 Collecting websockets==17.0.1 (from -r requirements.txt (line 172))
+#11 103.2   Downloading websockets-17.0.1-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.3 kB)
+#11 103.3 Collecting Werkzeug==3.1.8 (from -r requirements.txt (line 173))
+#11 103.4   Downloading werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+#11 103.6 Collecting xgboost==3.4.1 (from -r requirements.txt (line 174))
+#11 103.6   Downloading xgboost-3.4.1-py3-none-manylinux_2_28_x86_64.whl.metadata (2.0 kB)
+#11 105.6 Collecting yarl==1.24.5 (from -r requirements.txt (line 175))
+#11 105.7   Downloading yarl-1.24.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (103 kB)
+#11 106.7 Collecting yfinance==1.6.0 (from -r requirements.txt (line 176))
+#11 106.7   Downloading yfinance-1.6.0-py3-none-any.whl.metadata (6.7 kB)
+#11 107.0 Collecting zipp==4.1.0 (from -r requirements.txt (line 177))
+#11 107.6   Downloading zipp-4.1.0-py3-none-any.whl.metadata (3.6 kB)
+#11 108.2 Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+#11 108.4 Downloading aiohttp-3.14.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.8 MB)
+#11 116.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 287.3 kB/s  0:00:07
+#11 116.4 Downloading multidict-6.7.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (254 kB)
+#11 116.8 Downloading yarl-1.24.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (110 kB)
+#11 117.0 Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+#11 117.1 Downloading alembic-1.19.1-py3-none-any.whl (265 kB)
+#11 117.7 Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+#11 117.8 Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#11 117.9 Downloading anyio-4.14.2-py3-none-any.whl (125 kB)
+#11 118.1 Downloading ast_serialize-0.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (1.3 MB)
+#11 120.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 642.3 kB/s  0:00:01
+#11 120.1 Downloading asyncpg-0.31.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.5 MB)
+#11 124.4    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.5/3.5 MB 911.6 kB/s  0:00:04
+#11 124.4 Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#11 124.5 Downloading backports_zstd-1.7.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (492 kB)
+#11 125.0 Downloading bcrypt-5.0.0-cp39-abi3-manylinux_2_34_x86_64.whl (278 kB)
+#11 125.4 Downloading beautifulsoup4-4.15.0-py3-none-any.whl (109 kB)
+#11 125.6 Downloading black-26.5.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.9 MB)
+#11 127.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 1.5 MB/s  0:00:01
+#11 127.1 Downloading pytokens-0.4.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (268 kB)
+#11 127.4 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#11 127.5 Downloading cachetools-7.1.7-py3-none-any.whl (16 kB)
+#11 127.5 Downloading catboost-1.2.10-cp313-cp313-manylinux2014_x86_64.whl (97.1 MB)
+#11 246.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 97.1/97.1 MB 670.5 kB/s  0:01:58
+#11 246.2 Downloading numpy-2.5.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.7 MB)
+#11 265.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 871.1 kB/s  0:00:19
+#11 265.3 Downloading pandas-2.3.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.3 MB)
+#11 281.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 754.8 kB/s  0:00:16
+#11 281.6 Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+#11 281.8 Downloading cffi-2.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+#11 282.1 Downloading charset_normalizer-3.5.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (250 kB)
+#11 282.4 Downloading click-8.4.2-py3-none-any.whl (119 kB)
+#11 282.5 Downloading clickhouse_connect-1.7.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.4 MB)
+#11 283.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 1.2 MB/s  0:00:01
+#11 283.8 Downloading cloudpickle-3.1.2-py3-none-any.whl (22 kB)
+#11 283.9 Downloading colorlog-6.12.0-py3-none-any.whl (12 kB)
+#11 284.0 Downloading contourpy-1.3.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (362 kB)
+#11 285.1 Downloading coverage-7.15.4-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (256 kB)
+#11 286.3 Downloading cryptography-49.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+#11 308.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 210.0 kB/s  0:00:22
+#11 308.9 Downloading cuda_bindings-13.3.1-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (6.5 MB)
+#11 318.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.5/6.5 MB 716.0 kB/s  0:00:09
+#11 318.4 Downloading cuda_pathfinder-1.6.1-py3-none-any.whl (60 kB)
+#11 318.5 Downloading cuda_toolkit-13.0.3.0-py2.py3-none-any.whl (2.5 kB)
+#11 318.6 Downloading curl_cffi-0.16.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (13.5 MB)
+#11 368.4    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.5/13.5 MB 278.5 kB/s  0:00:49
+#11 369.3 Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+#11 369.6 Downloading databricks_sdk-0.133.0-py3-none-any.whl (1.1 MB)
+#11 374.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.1/1.1 MB 278.1 kB/s  0:00:04
+#11 374.3 Downloading google_auth-2.56.3-py3-none-any.whl (259 kB)
+#11 374.7 Downloading protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl (323 kB)
+#11 375.4 Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+#11 375.5 Downloading idna-3.19-py3-none-any.whl (68 kB)
+#11 375.7 Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+#11 375.9 Downloading docker-7.2.0-py3-none-any.whl (148 kB)
+#11 376.2 Downloading ecdsa-0.19.2-py2.py3-none-any.whl (150 kB)
+#11 376.5 Downloading fastapi-0.141.1-py3-none-any.whl (131 kB)
+#11 376.7 Downloading feedparser-6.0.14-py3-none-any.whl (80 kB)
+#11 376.9 Downloading feedparser_sgmllib-2.1.0-py3-none-any.whl (11 kB)
+#11 377.0 Downloading filelock-3.32.3-py3-none-any.whl (98 kB)
+#11 377.2 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+#11 377.5 Downloading flask_cors-6.0.5-py3-none-any.whl (16 kB)
+#11 377.6 Downloading fonttools-4.63.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.0 MB)
+#11 389.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.0/5.0 MB 428.5 kB/s  0:00:11
+#11 389.1 Downloading frozenlist-1.8.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (234 kB)
+#11 391.8 Downloading fsspec-2026.7.0-py3-none-any.whl (206 kB)
+#11 392.8 Downloading gitdb-4.0.12-py3-none-any.whl (62 kB)
+#11 393.1 Downloading smmap-5.0.3-py3-none-any.whl (24 kB)
+#11 393.2 Downloading gitpython-3.1.59-py3-none-any.whl (220 kB)
+#11 393.8 Downloading graphene-3.4.3-py2.py3-none-any.whl (114 kB)
+#11 394.1 Downloading graphql_core-3.2.11-py3-none-any.whl (214 kB)
+#11 394.7 Downloading graphql_relay-3.2.0-py3-none-any.whl (16 kB)
+#11 394.9 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#11 395.5 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#11 395.7 Downloading graphviz-0.21-py3-none-any.whl (47 kB)
+#11 396.8 Downloading greenlet-3.5.5-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (623 kB)
+#11 399.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 623.9/623.9 kB 270.0 kB/s  0:00:02
+#11 399.4 Downloading gunicorn-26.1.0-py3-none-any.whl (216 kB)
+#11 400.3 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#11 400.5 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#11 400.9 Downloading httptools-0.8.0-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (486 kB)
+#11 402.3 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#11 402.6 Downloading huey-3.3.4-py3-none-any.whl (123 kB)
+#11 402.9 Downloading importlib_metadata-9.0.0-py3-none-any.whl (27 kB)
+#11 403.0 Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+#11 403.1 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#11 403.3 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#11 403.6 Downloading joblib-1.5.3-py3-none-any.whl (309 kB)
+#11 404.3 Downloading kiwisolver-1.5.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.5 MB)
+#11 407.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 460.1 kB/s  0:00:03
+#11 407.5 Downloading librt-0.15.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (531 kB)
+#11 408.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 531.7/531.7 kB 858.3 kB/s  0:00:00
+#11 408.4 Downloading lightgbm-4.7.0-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (3.5 MB)
+#11 413.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.5/3.5 MB 624.2 kB/s  0:00:05
+#11 414.0 Downloading llvmlite-0.49.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (59.9 MB)
+#11 528.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.9/59.9 MB 649.5 kB/s  0:01:54
+#11 529.0 Downloading lxml-6.1.2-cp313-cp313-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.2 MB)
+#11 534.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 889.3 kB/s  0:00:05
+#11 534.9 Downloading lz4-4.4.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.4 MB)
+#11 536.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 877.9 kB/s  0:00:01
+#11 536.5 Downloading mako-1.4.1-py3-none-any.whl (80 kB)
+#11 536.7 Downloading markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+#11 536.8 Downloading matplotlib-3.11.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (10.0 MB)
+#11 554.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.0/10.0 MB 566.0 kB/s  0:00:17
+#11 554.6 Downloading mlflow-3.15.1-py3-none-any.whl (11.2 MB)
+#11 587.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.2/11.2 MB 347.5 kB/s  0:00:32
+#11 587.6 Downloading pyarrow-25.0.1-cp313-cp313-manylinux_2_28_x86_64.whl (50.1 MB)
+#11 714.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 50.1/50.1 MB 299.8 kB/s  0:02:06
+#11 714.1 Downloading scikit_learn-1.9.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.1 MB)
+#11 738.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.1/9.1 MB 374.9 kB/s  0:00:24
+#11 738.4 Downloading scipy-1.18.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+#11 810.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 589.5 kB/s  0:01:11
+#11 810.2 Downloading skops-0.14.0-py3-none-any.whl (132 kB)
+#11 810.8 Downloading sqlalchemy-2.0.52-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.3 MB)
+#11 816.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 654.0 kB/s  0:00:05
+#11 816.1 Downloading mlflow_skinny-3.15.1-py3-none-any.whl (3.6 MB)
+#11 822.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.6/3.6 MB 553.3 kB/s  0:00:06
+#11 822.5 Downloading opentelemetry_api-1.44.0-py3-none-any.whl (60 kB)
+#11 822.7 Downloading opentelemetry_proto-1.44.0-py3-none-any.whl (72 kB)
+#11 822.8 Downloading opentelemetry_sdk-1.44.0-py3-none-any.whl (137 kB)
+#11 823.1 Downloading packaging-26.3-py3-none-any.whl (129 kB)
+#11 823.4 Downloading pydantic-2.13.4-py3-none-any.whl (472 kB)
+#11 824.6 Downloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+#11 824.7 Downloading pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (801 kB)
+#11 826.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 801.6/801.6 kB 726.8 kB/s  0:00:01
+#11 826.2 Downloading sqlparse-0.6.0-py3-none-any.whl (50 kB)
+#11 826.3 Downloading starlette-1.6.0-py3-none-any.whl (75 kB)
+#11 826.4 Downloading uvicorn-0.52.4-py3-none-any.whl (79 kB)
+#11 826.6 Downloading mlflow_tracing-3.15.1-py3-none-any.whl (1.8 MB)
+#11 828.6    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 900.7 kB/s  0:00:02
+#11 828.7 Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+#11 830.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 221.8 kB/s  0:00:01
+#11 830.4 Downloading multitasking-0.0.13-py3-none-any.whl (16 kB)
+#11 830.5 Downloading mypy-2.3.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (15.2 MB)
+#11 863.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.2/15.2 MB 452.6 kB/s  0:00:32
+#11 863.2 Downloading mypy_extensions-1.1.0-py3-none-any.whl (5.0 kB)
+#11 863.3 Downloading narwhals-2.25.0-py3-none-any.whl (467 kB)
+#11 864.5 Downloading networkx-3.6.1-py3-none-any.whl (2.1 MB)
+#11 869.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 509.6 kB/s  0:00:04
+#11 869.1 Downloading numba-0.67.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (3.9 MB)
+#11 879.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.9/3.9 MB 369.8 kB/s  0:00:10
+#11 879.7 Downloading nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl (423.1 MB)
+#11 2130.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 423.1/423.1 MB 482.4 kB/s  0:20:50
+#11 2131.9 Downloading nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl (10.7 MB)
+#11 2144.4    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.7/10.7 MB 909.4 kB/s  0:00:12
+#11 2144.6 Downloading nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (90.2 MB)
+#11 2232.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.2/90.2 MB 732.7 kB/s  0:01:28
+#11 2232.7 Downloading nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+#11 2234.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 1.2 MB/s  0:00:01
+#11 2234.6 Downloading nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_x86_64.whl (366.2 MB)
+#11 2517.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 366.2/366.2 MB 1.3 MB/s  0:04:41
+#11 2518.0 Downloading nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (214.1 MB)
+#11 2665.8 WARNING: Connection interrupted while downloading.
+#11 2665.8 WARNING: Attempting to resume incomplete download (186.6 MB/214.1 MB, attempt 1)
+#11 2665.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━      186.6/214.1 MB 718.1 kB/s eta 0:00:39
+#11 2666.5 WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2667.0 WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2668.1 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2670.8 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2677.9 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2677.9 WARNING: Attempting to resume incomplete download (186.6 MB/214.1 MB, attempt 2)
+#11 2677.9 WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2678.5 WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2679.9 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2683.4 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2689.3 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2695.6 WARNING: Attempting to resume incomplete download (186.6 MB/214.1 MB, attempt 3)
+#11 2695.6 WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2695.6 WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2697.0 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2700.4 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2705.9 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2709.8 WARNING: Attempting to resume incomplete download (186.6 MB/214.1 MB, attempt 4)
+#11 2709.7 WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2713.2 WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2715.5 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2716.7 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2722.0 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2725.9 WARNING: Attempting to resume incomplete download (186.6 MB/214.1 MB, attempt 5)
+#11 2725.9 WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2726.8 WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2728.4 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2731.4 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2738.9 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2739.5 error: incomplete-download
+#11 2739.5 
+#11 2739.5 × Download failed after 6 attempts because not enough bytes were received (186.6 MB/214.1 MB)
+#11 2739.5 ╰─> URL: https://files.pythonhosted.org/packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+#11 2739.5 
+#11 2739.5 note: This is an issue with network connectivity, not pip.
+#11 2739.5 hint: Use --resume-retries to configure resume attempt limit.
+#11 ERROR: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 1
+------
+ > [5/6] RUN pip install --no-cache-dir -r requirements.txt:
+2728.4 WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+2731.4 WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+2738.9 WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NameResolutionError("HTTPSConnection(host='files.pythonhosted.org', port=443): Failed to resolve 'files.pythonhosted.org' ([Errno -2] Name or service not known)")': /packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+2739.5 error: incomplete-download
+2739.5 
+2739.5 × Download failed after 6 attempts because not enough bytes were received (186.6 MB/214.1 MB)
+2739.5 ╰─> URL: https://files.pythonhosted.org/packages/a8/2f/7b57e29836ea8714f81e9898409196f47d772d5ddedddf1592eadb8ab743/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+2739.5 
+2739.5 note: This is an issue with network connectivity, not pip.
+2739.5 hint: Use --resume-retries to configure resume attempt limit.
+------

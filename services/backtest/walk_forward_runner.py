@@ -1,7 +1,8 @@
 """
-ALPHA BIST — Walk-Forward Backtest Runner v1.0
+ALPHA BIST — Walk-Forward Backtest Runner v2.0
 
-BacktestEngineV4 + WalkForwardEngine (purge + embargo) gerçek entegrasyonu.
+BacktestEngineV4 + WalkForwardEngineV5 (purge + embargo) gerçek entegrasyonu.
+v5.0 canonical engine olarak kullanılır (scipy tabanlı Deflated Sharpe, leakage guard, feature engine entegrasyonu).
 
 Güvenceler:
 1. POINT-IN-TIME: Her fold için piyasa verisi test_end'e kadar KESİLİR.
@@ -25,7 +26,7 @@ import polars as pl
 import structlog
 
 from .engine_v4 import BacktestConfig, BacktestEngineV4, BacktestResultV4
-from .walk_forward import WalkForwardEngine
+from .walk_forward_engine import WalkForwardEngineV5 as WalkForwardEngine
 
 logger = structlog.get_logger()
 
@@ -149,10 +150,10 @@ class WalkForwardBacktestRunner:
 
         for fold_id, fold in enumerate(folds, 1):
             fold_run_id = f"{run_id}_fold{fold_id:03d}"
-            test_start = fold["test_start"]
-            test_end = fold["test_end"]
-            train_start = fold["train_start"]
-            train_end = fold["train_end"]
+            test_start = fold.test_start
+            test_end = fold.test_end
+            train_start = fold.train_start
+            train_end = fold.train_end
 
             # ====== POINT-IN-TIME KESİT (gelecek veri fiziksel olarak yok) ======
             pit_data = self._truncate(market_data, test_end)
@@ -187,14 +188,14 @@ class WalkForwardBacktestRunner:
             fold_results.append(
                 FoldBacktestResult(
                     fold_id=fold_id,
-                    train_start=fold["train_start"],
-                    train_end=fold["train_end"],
-                    purge_start=fold["purge_start"],
-                    purge_end=fold["purge_end"],
+                    train_start=fold.train_start,
+                    train_end=fold.train_end,
+                    purge_start=fold.purge_start,
+                    purge_end=fold.purge_end,
                     test_start=test_start,
                     test_end=test_end,
-                    embargo_start=fold["embargo_start"],
-                    embargo_end=fold["embargo_end"],
+                    embargo_start=fold.embargo_start,
+                    embargo_end=fold.embargo_end,
                     run_id=fold_run_id,
                     total_return_pct=m.total_return_pct,
                     cagr_pct=m.cagr_pct,
@@ -568,14 +569,14 @@ class WalkForwardBacktestRunner:
         errors = []
 
         # 1-2. Fold sınır bütünlüğü
-        if not (fold["train_end"] < fold["purge_start"] <= fold["purge_end"] < fold["test_start"]):
+        if not (fold.train_end < fold.purge_start <= fold.purge_end < fold.test_start):
             errors.append(
-                f"Purge ihlali: train_end={fold['train_end']} "
-                f"purge=[{fold['purge_start']},{fold['purge_end']}] "
-                f"test_start={fold['test_start']}"
+                f"Purge ihlali: train_end={fold.train_end} "
+                f"purge=[{fold.purge_start},{fold.purge_end}] "
+                f"test_start={fold.test_start}"
             )
-        if fold["embargo_start"] < fold["test_end"] and fold["embargo_start"] != fold["test_end"]:
-            errors.append(f"Embargo ihlali: test_end={fold['test_end']} embargo_start={fold['embargo_start']}")
+        if fold.embargo_start < fold.test_end and fold.embargo_start != fold.test_end:
+            errors.append(f"Embargo ihlali: test_end={fold.test_end} embargo_start={fold.embargo_start}")
 
         # 3. Point-in-time veri kontrolü
         for ticker, df in pit_data.items():
@@ -587,11 +588,11 @@ class WalkForwardBacktestRunner:
 
         # 4-5. Trade / equity pencere kontrolü
         for t in result.trades:
-            if not (fold["test_start"] <= t["date"] <= fold["test_end"]):
+            if not (fold.test_start <= t["date"] <= fold.test_end):
                 errors.append(f"Trade pencere dışı: {t['ticker']} @ {t['date']}")
                 break
         for s in result.equity_curve:
-            if not (fold["test_start"] <= s["date"] <= fold["test_end"]):
+            if not (fold.test_start <= s["date"] <= fold.test_end):
                 errors.append(f"Equity pencere dışı: {s['date']}")
                 break
 
@@ -616,11 +617,18 @@ class WalkForwardBacktestRunner:
         std_ret = float(np.std(returns))
         stability = max(0.0, 1.0 - std_ret / (abs(mean_ret) + 0.01))
 
-        # Deflated Sharpe (WalkForwardEngine ile aynı formül)
+        # Deflated Sharpe (v5.0 — scipy tabanlı, skewness/kurtosis düzeltmeli)
+        try:
+            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            _sk = float(_skew(returns)) if len(returns) > 10 else 0.0
+            _kt = float(_kurtosis(returns, fisher=False)) if len(returns) > 10 else 3.0
+        except ImportError:
+            _sk, _kt = 0.0, 3.0
         deflated = self._wf._deflated_sharpe(
             float(np.mean(sharpes)),
             max(sum(f.total_scans for f in folds), 1),
             len(folds),
+            skewness=_sk, kurtosis=_kt,
         )
 
         return WalkForwardBacktestResult(
@@ -645,7 +653,7 @@ class WalkForwardBacktestRunner:
                 "test_days": self._wf.test_days,
                 "step_days": self._wf.step_days,
                 "use_panel_features": self._use_panel,
-                "engine": "BacktestEngineV4",
+                "engine": "BacktestEngineV4 + WalkForwardEngineV5",
             },
         )
 
