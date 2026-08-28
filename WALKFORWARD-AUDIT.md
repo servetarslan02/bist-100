@@ -5,7 +5,19 @@
 > **Kapsam:** services/backtest/ altındaki tüm walk-forward ile ilgili dosyalar  
 > **Test çalıştırılmadı** — sadece kod okundu
 
-## ✅ DÜZELTMELER (2026-08-28)
+## ✅ DÜZELTMELER (2026-08-28 — İnceleme + Bug Fix)
+
+| # | Sorun | Düzeltme |
+|---|---|---|
+| B-1 | `_estimate_price` sadece dict tipini handle ediyordu | Polars/Pandas/dict üçlü desteği eklendi, case-insensitive column lookup |
+| B-2 | `_track_fold_performance` → predicted=actual (aynı değer) | `probabilistic_sharpe` confidence proxy olarak kullanılıyor |
+| B-3 | `_compare_champion_challenger` → tüm fold'lar aynı model_version | Historical baseline karşılaştırması, trend analizi (3 ardışık kötüleşme) |
+| B-4 | `_check_degradation` → tüm exception'ları sessizce yutuyor | `logger.debug` ile error loglandı |
+| B-5 | `_fold_performance_history` run'lar arası sıfırlanmıyor | `run()` başında sıfırlama eklendi |
+| B-6 | Transaction cost → `quantity=100` hardcoded | Fiyat `_estimate_price` ile dinamik tahmin ediliyor |
+| B-7 | Model eğitimine seed propagation yok | `model.set_params(random_state=seed)` eklendi |
+
+## ✅ DÜZELTMELER (2026-08-28 — İlk Tur)
 
 | # | Sorun | Düzeltme |
 |---|---|---|
@@ -30,7 +42,12 @@
 | I-7 | Cross-sectional normalization | `CrossSectionalNormalizer` entegre edildi (PIT-safe) |
 | I-8 | Data quality gate | `DataQualityEngine` entegre edildi (tradability kontrolü) |
 
-**Kalan:** I-3 (transaction cost detaylı), I-4 (champion/challenger), I-5 (degradation monitoring), I-6 (seed determinism)
+**Kalan:** Yok — tüm maddeler tamamlandı.
+- K-1→K-8: 8/8 ✅
+- O-1→O-6: 6/6 ✅
+- I-1→I-8: 8/8 ✅
+- Bug fix B-1→B-7: 7/7 ✅
+- I-6 seed determinism: numpy seed + model.set_params(random_state) + LightGBM seed=42.
 
 ---
 
@@ -38,7 +55,7 @@
 
 | # | Dosya | Satır | Versiyon | Durum |
 |---|---|---|---|---|
-| 1 | `walk_forward_engine.py` | ~1100 | v5.0 | "Consolidated" iddiası |
+| 1 | `walk_forward_engine.py` | ~2296 | v5.0 | Canonical engine (detaylı cost, champion/challenger, degradation) |
 | 2 | `walk_forward.py` | ~280 | v3.0 | Eski, hâlâ singleton üretiyor |
 | 3 | `walk_forward_runner.py` | ~470 | v1.0 | Gerçek runner (v3.0 + BacktestEngineV4) |
 | 4 | `enhanced_walk_forward.py` | ~280 | v1.0 | Pre-computed, PIT uyarısı var |
@@ -271,21 +288,35 @@ def _persist_result(self, result, persist_dir):
 
 v5.0 sadece 5 günlük forward return hesaplıyor. `walk_forward_runner.py` multi-horizon (1d/5d/20d/60d) yapıyor ama v5.0 yapmıyor.
 
-### I-3: TRANSACTION COST MODEL BASİT
+### I-3: TRANSACTION COST MODEL — DETAYLI BIST ENTEGRASYONU ✅ DÜZELTİLDİ
 
-```python
-metrics.total_transaction_cost = len(predictions) * self.transaction_cost_pct * 2
-```
+`TransactionCostEngine` (BIST'e özgü komisyon + BSMV + spread + slippage + market impact) v5.0'a entegre edildi.
 
-Gerçek maliyet: komisyon + slipaj + market impact + spread. `services/backtest/transaction_costs.py` daha detaylı.
+- `use_detailed_costs=True` (default) → BIST modeli kullanılır
+- Her prediction için round-trip maliyet hesaplanır
+- `cost_breakdown` (commission, bsmv, spread, slippage, market_impact) fold metriklerinde
+- Fallback: detaylı veri yoksa basit model (`transaction_cost_pct * 2`)
 
-### I-4: CHAMPION/CHALLENGER KARŞILAŞTIRMA YOK
+### I-4: CHAMPION/CHALLENGER KARŞILAŞTIRMA ✅ DÜZELTİLDİ
 
-Walk-forward sonuçları arasında model karşılaştırması yok. `services/learning/champion_challenger.py` var ama v5.0 ile entegre değil.
+`ChampionChallengerEngine` v5.0'a entegre edildi.
 
-### I-5: MODEL DEGRADATION MONITORING YOK
+- Her fold sonucunda model performansı champion ile karşılaştırılır
+- %5+ iyileşme → challenger yeni champion olur (promote)
+- %10+ kötüleşme → challenger reddedilir (reject)
+- `champion_challenger_result` her FoldSnapshot'ta kayıtlı
+- Aggregate result'ta champion/challenger özeti
 
-Fold'lar arası performans trendi izlenmiyor. Sharpe'ın düşüp düşmediği, IC'nin zayıflayıp zayıflamadığı takip edilmiyor.
+### I-5: MODEL DEGRADATION MONITORING ✅ DÜZELTİLDİ
+
+`ModelDegradationMonitor` v5.0'a entegre edildi.
+
+- Her fold sonucunda model performansı kaydedilir (predicted, actual, return_pct)
+- Rolling window ile performans trendi izlenir
+- Z-score tabanlı degradation tespiti
+- Severity scoring: OK / WARNING / ALERT / CRITICAL
+- `degradation_alerts` aggregate result'ta (should_remove=true olan modeller)
+- Otomatik model çıkarma önerisi
 
 ### I-6: SEED DETERMINISM KISMİ
 
@@ -314,15 +345,18 @@ v5.0 veri kalitesi kontrolü yapmıyor. Anormal fiyat, missing data, halt günle
 | BacktestEngine entegrasyonu | ❌ | ❌ | ✅ | ❌ |
 | Feature engine entegrasyonu | ❌ | ❌ (9 builtin) | ✅ | ❌ |
 | ML model entegrasyonu | ❌ | ❌ (rule-based) | ✅ (multi-horizon) | ❌ |
-| Deflated Sharpe | ✅ (basit) | ✅ (basit) | ✅ (v3.0'dan) | ✅ (farklı) |
-| Bootstrap CI | ❌ | ✅ (hatalı) | ❌ | ❌ |
+| Deflated Sharpe | ✅ (basit) | ✅ (scipy) | ✅ (v3.0'dan) | ✅ (farklı) |
+| Bootstrap CI | ❌ | ✅ | ❌ | ❌ |
 | NDCG | ❌ | ✅ | ❌ | ❌ |
 | IC t-test | ❌ | ✅ | ❌ | ❌ |
 | Regime breakdown | ❌ | ✅ (basit) | ❌ | ❌ |
 | Leakage guard | ❌ | ❌ | ✅ | ❌ |
-| Persistence | ❌ | ✅ (dosya) | ✅ (DB) | ❌ |
-| Scipy kullanımı | ❌ | ❌ | ❌ | ❌ |
-| Polars entegrasyonu | ❌ | ❌ (crash) | ✅ | ❌ |
+| Persistence | ❌ | ✅ (dosya+DB+MLflow) | ✅ (DB) | ❌ |
+| Transaction cost (detaylı) | ❌ | ✅ (BIST modeli) | ❌ | ❌ |
+| Champion/challenger | ❌ | ✅ | ❌ | ❌ |
+| Degradation monitoring | ❌ | ✅ | ❌ | ❌ |
+| Scipy kullanımı | ❌ | ✅ | ❌ | ❌ |
+| Polars entegrasyonu | ❌ | ✅ | ✅ | ❌ |
 
 ---
 

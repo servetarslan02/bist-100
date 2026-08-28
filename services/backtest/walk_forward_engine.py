@@ -46,6 +46,26 @@ try:
 except ImportError:
     _has_standalone_sharpe = False
 
+# BIST'e özgü gerçekçi transaction cost modeli
+try:
+    from .transaction_costs import TransactionCostEngine, bist_transaction_cost
+    _has_detailed_costs = True
+except ImportError:
+    _has_detailed_costs = False
+
+# Champion-Challenger ve Degradation Monitor
+try:
+    from services.learning.champion_challenger import ChampionChallengerEngine
+    _has_champion_challenger = True
+except ImportError:
+    _has_champion_challenger = False
+
+try:
+    from services.learning.model_degradation_monitor import ModelDegradationMonitor
+    _has_degradation_monitor = True
+except ImportError:
+    _has_degradation_monitor = False
+
 logger = structlog.get_logger(__name__)
 
 
@@ -169,6 +189,7 @@ class FoldMetrics:
     total_transaction_cost: float = 0.0
     turnover: float = 0.0
     avg_holding_days: float = 0.0
+    cost_breakdown: dict[str, float] = field(default_factory=dict)
 
     # Güven
     deflated_sharpe: float = 0.0
@@ -216,6 +237,7 @@ class FoldSnapshot:
     completed_at: str = ""
     elapsed_seconds: float = 0.0
     error_message: str = ""
+    champion_challenger_result: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serileştirme."""
@@ -232,11 +254,13 @@ class FoldSnapshot:
             "elapsed_seconds": round(self.elapsed_seconds, 3),
         }
         d.update(self._metrics_dict())
+        if self.champion_challenger_result:
+            d["champion_challenger"] = self.champion_challenger_result
         return d
 
     def _metrics_dict(self) -> dict[str, Any]:
         m = self.metrics
-        return {
+        d = {
             "total_return": round(m.total_return, 4),
             "sharpe_ratio": round(m.sharpe_ratio, 4),
             "sortino_ratio": round(m.sortino_ratio, 4),
@@ -250,9 +274,13 @@ class FoldSnapshot:
             "ndcg_at_10": round(m.ndcg_at_10, 4),
             "deflated_sharpe": round(m.deflated_sharpe, 4),
             "total_trades": m.total_trades,
+            "total_transaction_cost": round(m.total_transaction_cost, 4),
             "turnover": round(m.turnover, 4),
             "regime": m.regime,
         }
+        if m.cost_breakdown:
+            d["cost_breakdown"] = m.cost_breakdown
+        return d
 
     @staticmethod
     def _days_between(d1: str, d2: str) -> int:
@@ -403,6 +431,7 @@ class WalkForwardEngineV5:
         n_bootstrap: int = 1000,
         random_seed: int = 42,
         forward_days: int = 5,
+        use_detailed_costs: bool = True,
     ):
         # Parametre doğrulama
         if purge_days < 0:
@@ -432,6 +461,32 @@ class WalkForwardEngineV5:
 
         self._rng = np.random.RandomState(random_seed)
 
+        # Transaction cost engine (BIST'e özgü detaylı model)
+        self.use_detailed_costs = use_detailed_costs and _has_detailed_costs
+        if self.use_detailed_costs:
+            self._cost_engine = bist_transaction_cost
+        else:
+            self._cost_engine = None
+
+        # Champion-Challenger motoru
+        self._champion_challenger: Any = None
+        if _has_champion_challenger:
+            try:
+                self._champion_challenger = ChampionChallengerEngine()
+            except Exception:
+                pass
+
+        # Degradation Monitor
+        self._degradation_monitor: Any = None
+        if _has_degradation_monitor:
+            try:
+                self._degradation_monitor = ModelDegradationMonitor()
+            except Exception:
+                pass
+
+        # Fold performans geçmişi (degradation tracking için)
+        self._fold_performance_history: list[dict[str, Any]] = []
+
         logger.info(
             "WalkForwardEngineV5 initialized",
             purge=purge_days,
@@ -442,6 +497,9 @@ class WalkForwardEngineV5:
             step=step_days,
             expanding=expanding_window,
             cost_pct=transaction_cost_pct,
+            detailed_costs=self.use_detailed_costs,
+            champion_challenger=_has_champion_challenger,
+            degradation_monitor=_has_degradation_monitor,
         )
 
     # ========================================================================
@@ -567,6 +625,9 @@ class WalkForwardEngineV5:
             WalkForwardResult — kapsamlı walk-forward sonucu
         """
         start_time = time.time()
+
+        # Her run başında performans geçmişini sıfırla
+        self._fold_performance_history = []
 
         # Run ID
         if run_id is None:
@@ -715,7 +776,13 @@ class WalkForwardEngineV5:
             )
             snapshot.metrics = metrics
 
-            # 8. Data version hash
+            # 8. Champion/Challenger ve Degradation Tracking
+            self._track_fold_performance(fold_config.fold_id, metrics, snapshot.model_version)
+            cc_result = self._compare_champion_challenger(metrics, snapshot.model_version)
+            if cc_result:
+                snapshot.champion_challenger_result = cc_result
+
+            # 9. Data version hash
             snapshot.data_version_hash = self._hash_data_version(pit_data, fold_config)
 
             snapshot.status = FoldStatus.COMPLETED
@@ -1101,6 +1168,12 @@ class WalkForwardEngineV5:
         if model_factory is not None:
             try:
                 model = model_factory()
+                # Seed propagation: model'e seed parametresi varsa ata
+                if hasattr(model, 'set_params') and self.random_seed:
+                    try:
+                        model.set_params(random_state=self.random_seed)
+                    except Exception:
+                        pass
                 X = self._features_to_matrix(train_features, feature_names)
                 y = self._extract_targets(train_features)
 
@@ -1443,9 +1516,30 @@ class WalkForwardEngineV5:
             p5 = abs(np.percentile(returns_arr, 5))
             metrics.tail_ratio = float(p95 / p5) if p5 > 0 else 0.0
 
-        # === İşlem Maliyeti ===
+        # === İşlem Maliyeti (Detaylı BIST Modeli) ===
         metrics.total_trades = len(predictions)
-        metrics.total_transaction_cost = len(predictions) * self.transaction_cost_pct * 2  # al+sat
+
+        if self.use_detailed_costs and self._cost_engine and predictions:
+            total_cost = 0.0
+            cost_breakdown = {"commission": 0.0, "bsmv": 0.0, "spread": 0.0, "slippage": 0.0, "market_impact": 0.0}
+            for pred in predictions:
+                ticker = pred.get("ticker", "")
+                price = pred.get("price", 0.0)
+                if price <= 0:
+                    price = self._estimate_price(test_data, ticker)
+                if price <= 0:
+                    price = 100.0
+                rt = self._cost_engine.estimate_round_trip_cost(
+                    ticker=ticker, entry_price=price, quantity=100,
+                    avg_daily_volume=0, volatility_ratio=1.0,
+                )
+                total_cost += rt["round_trip_cost"]
+                for k in cost_breakdown:
+                    cost_breakdown[k] += rt["buy"]["costs"].get(k, 0.0) + rt["sell"]["costs"].get(k, 0.0)
+            metrics.total_transaction_cost = total_cost
+            metrics.cost_breakdown = cost_breakdown
+        else:
+            metrics.total_transaction_cost = len(predictions) * self.transaction_cost_pct * 2
 
         # Turnover
         metrics.turnover = self._compute_turnover(predictions)
@@ -1587,6 +1681,175 @@ class WalkForwardEngineV5:
                 turnovers.append(changed / max(len(curr_set), 1))
 
         return float(np.mean(turnovers)) if turnovers else 0.0
+
+    def _estimate_price(self, test_data: dict[str, Any], ticker: str) -> float:
+        """Test verisinden hisse fiyatını tahmin et.
+
+        Polars DataFrame, Pandas DataFrame ve dict tiplerini destekler.
+        """
+        if not test_data or not ticker:
+            return 0.0
+        ticker_data = test_data.get(ticker)
+        if ticker_data is None:
+            return 0.0
+
+        try:
+            # Polars DataFrame
+            if pl is not None and isinstance(ticker_data, pl.DataFrame):
+                for col in ("Close", "close", "CLOSE"):
+                    if col in ticker_data.columns:
+                        vals = ticker_data[col].to_list()
+                        return float(vals[-1]) if vals else 0.0
+            # Pandas DataFrame
+            elif hasattr(ticker_data, "iloc"):
+                for col in ("Close", "close", "CLOSE"):
+                    if col in ticker_data.columns:
+                        return float(ticker_data[col].iloc[-1])
+            # Dict
+            elif isinstance(ticker_data, dict):
+                for col in ("Close", "close", "CLOSE"):
+                    closes = ticker_data.get(col, [])
+                    if closes:
+                        return float(closes[-1]) if isinstance(closes, list) else float(closes)
+        except (IndexError, KeyError, TypeError, ValueError):
+            pass
+        return 0.0
+
+    def _track_fold_performance(self, fold_id: int, metrics: FoldMetrics, model_version: str) -> None:
+        """Fold performansını kaydet (champion/challenger ve degradation için)."""
+        record = {
+            "fold_id": fold_id,
+            "model_version": model_version,
+            "sharpe": metrics.sharpe_ratio,
+            "return": metrics.total_return,
+            "win_rate": metrics.win_rate,
+            "ic": metrics.ic,
+            "max_dd": metrics.max_drawdown,
+            "deflated_sharpe": metrics.deflated_sharpe,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self._fold_performance_history.append(record)
+
+        # Degradation monitor'a kaydet
+        # predicted = model'in beklediği win_rate (confidence proxy)
+        # actual = gerçekleşen win_rate
+        if self._degradation_monitor:
+            try:
+                # Probabilistic sharpe'ı confidence proxy olarak kullan
+                confidence = metrics.probabilistic_sharpe if metrics.probabilistic_sharpe > 0 else metrics.win_rate
+                self._degradation_monitor.record_outcome(
+                    model_id=model_version,
+                    predicted=confidence,
+                    actual=metrics.win_rate,
+                    return_pct=metrics.total_return,
+                )
+            except Exception as e:
+                logger.debug("Degradation monitor record_outcome failed", error=str(e))
+
+    def _check_degradation(self) -> list[dict[str, Any]]:
+        """Model degradation kontrolü yap."""
+        if not self._degradation_monitor or len(self._fold_performance_history) < 3:
+            return []
+
+        alerts = []
+        try:
+            reports = self._degradation_monitor.check_all_models()
+            for report in reports:
+                if hasattr(report, 'should_remove') and report.should_remove:
+                    alerts.append({
+                        "model_id": report.model_id,
+                        "severity": report.severity,
+                        "accuracy_drop": report.accuracy_drop,
+                        "sharpe_drop": report.sharpe_drop,
+                        "trend": report.trend,
+                        "recommendation": report.recommendation,
+                    })
+                    logger.warning(
+                        "Model degradation detected",
+                        model=report.model_id,
+                        severity=report.severity,
+                        sharpe_drop=report.sharpe_drop,
+                    )
+        except Exception as e:
+            logger.debug("Degradation check failed", error=str(e))
+        return alerts
+
+    def _compare_champion_challenger(
+        self, current_metrics: FoldMetrics, model_version: str
+    ) -> dict[str, Any] | None:
+        """Champion/challenger karşılaştırması yap.
+
+        Walk-forward bağlamında tüm fold'lar aynı model_factory ile çalışır.
+        Bu nedenle karşılaştırma: mevcut fold performansı vs historical average.
+        Amaç: model degradation veya improvement trendi tespit etmek.
+        """
+        if not self._champion_challenger:
+            return None
+
+        try:
+            # İlk fold → champion olarak kaydet
+            if len(self._fold_performance_history) < 2:
+                self._champion_challenger.promote(
+                    challenger_id=model_version,
+                    version=model_version,
+                    metrics={
+                        "sharpe": current_metrics.sharpe_ratio,
+                        "return": current_metrics.total_return,
+                        "ic": current_metrics.ic,
+                    },
+                )
+                return {"action": "promoted", "model": model_version, "reason": "initial_champion"}
+
+            # Son 5 fold'un ortalama performansı (mevcut hariç)
+            history = self._fold_performance_history[:-1]  # mevcut hariç
+            recent = history[-5:] if len(history) >= 5 else history
+            baseline_sharpe = np.mean([r["sharpe"] for r in recent])
+            baseline_return = np.mean([r["return"] for r in recent])
+
+            current_sharpe = current_metrics.sharpe_ratio
+            current_return = current_metrics.total_return
+
+            # Champion var mı?
+            champion = self._champion_challenger._current_champion
+            if champion is None:
+                self._champion_challenger.promote(
+                    challenger_id=model_version,
+                    version=model_version,
+                    metrics={"sharpe": baseline_sharpe, "return": baseline_return},
+                )
+                return {"action": "promoted", "model": model_version}
+
+            # Mevcut fold vs historical baseline
+            champion_sharpe = champion.metrics_at_promotion.get("sharpe", 0)
+            improvement = (current_sharpe - champion_sharpe) / max(abs(champion_sharpe), 0.01)
+
+            # Trend analizi: son 3 fold kötüleşiyor mu?
+            if len(self._fold_performance_history) >= 3:
+                last_3_sharpes = [r["sharpe"] for r in self._fold_performance_history[-3:]]
+                trend_degrading = all(last_3_sharpes[i] < last_3_sharpes[i-1] for i in range(1, len(last_3_sharpes)))
+            else:
+                trend_degrading = False
+
+            if improvement > 0.05:  # %5+ iyileşme
+                self._champion_challenger.promote(
+                    challenger_id=model_version,
+                    version=model_version,
+                    metrics={"sharpe": current_sharpe, "return": current_return, "improvement_pct": improvement * 100},
+                )
+                return {"action": "promoted", "model": model_version, "improvement_pct": round(improvement * 100, 2)}
+            elif trend_degrading:
+                # 3 ardışık kötüleşme → reject
+                self._champion_challenger.reject(
+                    challenger_id=model_version,
+                    reason=f"3 consecutive degrading folds, last improvement: {improvement*100:.1f}%",
+                    metrics={"sharpe": current_sharpe, "return": current_return},
+                )
+                return {"action": "rejected", "model": model_version, "reason": "trend_degrading"}
+            else:
+                return {"action": "unchanged", "model": model_version, "improvement_pct": round(improvement * 100, 2)}
+        except Exception as e:
+            logger.debug("Champion/challenger comparison failed", error=str(e))
+            return None
 
     # ========================================================================
     # STATISTICAL TESTS
@@ -1832,6 +2095,22 @@ class WalkForwardEngineV5:
         # Rejim bazlı performans
         regime_perf = self._aggregate_regime_performance(completed)
 
+        # Degradation check (tüm fold'lar tamamlandıktan sonra)
+        degradation_alerts = self._check_degradation()
+
+        # Champion/Challenger özeti
+        cc_summary = None
+        if self._champion_challenger:
+            try:
+                cc = self._champion_challenger
+                cc_summary = {
+                    "current_champion": cc._current_champion.model_id if cc._current_champion else None,
+                    "total_promotions": len(cc._champion_history),
+                    "total_rejections": len(cc._rejected_challengers),
+                }
+            except Exception:
+                pass
+
         # Summary
         summary = {
             "purge_days": self.purge_days,
@@ -1844,6 +2123,9 @@ class WalkForwardEngineV5:
             "risk_free_rate": self.risk_free_rate,
             "total_predictions": sum(f.test_samples for f in completed),
             "elapsed_seconds": round(time.time() - start_time, 2),
+            "degradation_alerts": degradation_alerts,
+            "champion_challenger": cc_summary,
+            "detailed_costs": self.use_detailed_costs,
         }
 
         config = {
