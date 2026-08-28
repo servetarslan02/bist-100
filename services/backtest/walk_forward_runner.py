@@ -85,7 +85,7 @@ class WalkForwardBacktestResult:
 
     def to_dict(self) -> dict[str, Any]:
         d = {k: v for k, v in self.__dict__.items() if k != "folds"}
-        d = d.with_columns(pl.lit([f.to_dict() for f in self.folds]).alias("folds"))
+        d["folds"] = [f.to_dict() for f in self.folds]
         return d
 
 
@@ -517,10 +517,6 @@ class WalkForwardBacktestRunner:
         return self._feature_names_cache
 
     # ------------------------------------------------------------------
-    # GUARDS
-    # ------------------------------------------------------------------
-
-    @staticmethod  # ------------------------------------------------------------------
     # GUARDS
     # ------------------------------------------------------------------
 

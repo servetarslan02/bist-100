@@ -114,8 +114,8 @@ class BenchmarkComparator:
 
         # Annualized returns
         years = min_len / periods_per_year
-        ((1 + strategy_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
-        ((1 + benchmark_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
+        strategy_annualized = ((1 + strategy_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
+        benchmark_annualized = ((1 + benchmark_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
 
         # Daily risk-free
         daily_rf = risk_free_rate / periods_per_year

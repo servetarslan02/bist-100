@@ -513,9 +513,7 @@ class BacktestEngineV4:
                 if next_date not in df.index:
                     continue
                 price = float(df.loc[next_date, "Open"])
-                atr = 2.0
-                if "day_features" in locals() and ticker in locals().get("day_features", {}):
-                    atr = day_features[ticker].get("atr_pct", 2.0)
+                atr = day_features.get(ticker, {}).get("atr_pct", 2.0) if day_features else 2.0
                 vol_ratio = max(0.5, float(atr) / 2.5)
                 sim.execute_buy(ticker, price, date_str, volatility_ratio=vol_ratio)
                 signals_count += 1
@@ -779,9 +777,7 @@ class BacktestEngineV4:
                 if loc >= len(idx) or idx[loc] != next_date:
                     continue
                 price = float(open_arr[loc])
-                atr = 2.0
-                if "day_features_fast" in locals() and ticker in locals().get("day_features_fast", {}):
-                    atr = day_features_fast[ticker].get("atr_pct", 2.0)
+                atr = day_features_fast.get(ticker, {}).get("atr_pct", 2.0) if day_features_fast else 2.0
                 vol_ratio = max(0.5, float(atr) / 2.5)
                 sim.execute_buy(ticker, price, date_str, volatility_ratio=vol_ratio)
                 signals_count += 1

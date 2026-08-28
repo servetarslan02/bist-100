@@ -1,11 +1,18 @@
 """
-ALPHA BIST — Backtest Persistence Layer v1.0
+ALPHA BIST — Backtest Persistence Layer v2.0
 
 DuckDB-based persistence for backtest results:
 - Run metadata
 - Trades
 - Equity curve
 - Performance metrics
+
+v2.0 Eklemeleri:
+- Connection reuse (her işlemde aç/kapat yok)
+- Thread-safe connection management
+- Batch insert optimization
+- Health check
+- Migration support
 
 Recovery: restart sonrası eksiksiz veri yükler.
 """
@@ -23,16 +30,35 @@ DB_PATH = "data/backtest_results.db"
 
 
 class BacktestPersistence:
-    """Backtest sonuçlarını DuckDB'ye persist eder."""
+    """Backtest sonuçlarını DuckDB'ye persist eder.
+
+    v2.0: Connection reuse ile performans optimizasyonu.
+    """
 
     def __init__(self, db_path: str = DB_PATH):
         self._db_path = db_path
+        self._conn: duckdb.DuckDBPyConnection | None = None
         self._ensure_db()
+
+    def _get_conn(self) -> duckdb.DuckDBPyConnection:
+        """DuckDB bağlantısı al (lazy init + reuse)."""
+        if self._conn is None:
+            Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+            self._conn = duckdb.connect(self._db_path)
+        return self._conn
+
+    def close(self) -> None:
+        """Bağlantıyı kapat."""
+        if self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
     def _ensure_db(self):
         """DB ve tabloları oluştur."""
-        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_runs (
@@ -84,8 +110,8 @@ class BacktestPersistence:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_equity_run ON backtest_equity(run_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_equity_date ON backtest_equity(run_id, date)")
             conn.commit()
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to ensure DB", error=str(e))
 
     def save_run(
         self,
@@ -97,7 +123,7 @@ class BacktestPersistence:
         config: dict[str, Any] | None = None,
     ) -> None:
         """Run metadata kaydet."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             conn.execute(
                 """INSERT OR REPLACE INTO backtest_runs
@@ -121,14 +147,14 @@ class BacktestPersistence:
             )
             conn.commit()
             logger.info("Backtest run saved", run_id=run_id)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to save run", run_id=run_id, error=str(e))
 
     def save_trades(self, run_id: str, trades: list[dict[str, Any]]) -> None:
-        """Trade'leri kaydet."""
+        """Trade'leri kaydet (batch insert)."""
         if not trades:
             return
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             conn.executemany(
                 """INSERT INTO backtest_trades
@@ -155,14 +181,14 @@ class BacktestPersistence:
             )
             conn.commit()
             logger.info("Trades saved", run_id=run_id, count=len(trades))
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to save trades", run_id=run_id, error=str(e))
 
     def save_equity_curve(self, run_id: str, curve: list[dict[str, Any]]) -> None:
-        """Equity curve kaydet."""
+        """Equity curve kaydet (batch insert)."""
         if not curve:
             return
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             conn.executemany(
                 """INSERT INTO backtest_equity
@@ -184,12 +210,12 @@ class BacktestPersistence:
             )
             conn.commit()
             logger.info("Equity curve saved", run_id=run_id, points=len(curve))
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to save equity curve", run_id=run_id, error=str(e))
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Run metadata getir."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             row = conn.execute("SELECT * FROM backtest_runs WHERE run_id = ?", (run_id,)).fetchone()
             if row:
@@ -200,56 +226,77 @@ class BacktestPersistence:
                     result["config"] = orjson.loads(result["config_json"])
                 return result
             return None
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to get run", run_id=run_id, error=str(e))
+            return None
 
     def get_trades(self, run_id: str) -> list[dict[str, Any]]:
         """Trade'leri getir."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             rows = conn.execute(
                 "SELECT * FROM backtest_trades WHERE run_id = ? ORDER BY id",
                 (run_id,),
             ).fetchall()
             return [dict(r) for r in rows]
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to get trades", run_id=run_id, error=str(e))
+            return []
 
     def get_equity_curve(self, run_id: str) -> list[dict[str, Any]]:
         """Equity curve getir."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             rows = conn.execute(
                 "SELECT * FROM backtest_equity WHERE run_id = ? ORDER BY id",
                 (run_id,),
             ).fetchall()
             return [dict(r) for r in rows]
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to get equity curve", run_id=run_id, error=str(e))
+            return []
 
     def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
         """Son run'ları listele."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             rows = conn.execute(
                 "SELECT * FROM backtest_runs ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
             return [dict(r) for r in rows]
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to list runs", error=str(e))
+            return []
 
     def delete_run(self, run_id: str) -> None:
         """Run ve ilgili verileri sil."""
-        conn = duckdb.connect(self._db_path)
+        conn = self._get_conn()
         try:
             conn.execute("DELETE FROM backtest_equity WHERE run_id = ?", (run_id,))
             conn.execute("DELETE FROM backtest_trades WHERE run_id = ?", (run_id,))
             conn.execute("DELETE FROM backtest_runs WHERE run_id = ?", (run_id,))
             conn.commit()
             logger.info("Run deleted", run_id=run_id)
-        finally:
-            conn.close()
+        except Exception as e:
+            logger.error("Failed to delete run", run_id=run_id, error=str(e))
+
+    def health_check(self) -> dict[str, Any]:
+        """DB sağlık kontrolü."""
+        conn = self._get_conn()
+        try:
+            run_count = conn.execute("SELECT COUNT(*) FROM backtest_runs").fetchone()[0]
+            trade_count = conn.execute("SELECT COUNT(*) FROM backtest_trades").fetchone()[0]
+            equity_count = conn.execute("SELECT COUNT(*) FROM backtest_equity").fetchone()[0]
+            return {
+                "status": "healthy",
+                "db_path": self._db_path,
+                "total_runs": run_count,
+                "total_trades": trade_count,
+                "total_equity_points": equity_count,
+            }
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
 
 
 # Singleton

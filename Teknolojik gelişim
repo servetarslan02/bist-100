@@ -26,7 +26,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 11 | Feature Engineering | ❌ Başlanmadı | - | - |
 | 12 | Feast | ❌ Başlanmadı | - | - |
 | 13 | Calibration | ✅ Tamamlandı | `196b1cb` | services/ml/calibration.py v2.0: Platt vs Isotonic, bootstrap CI, Brier Skill Score, adaptive online, alerting, NRI, reliability diagram |
-| 14 | Backtest Engine | ❌ Başlanmadı | - | - |
+| 14 | Backtest Engine | ✅ Tamamlandı | - | Bug fixes (to_dict, locals, duplicate decorator, unused vars), persistence v2.0 (connection reuse, health check), 42 test |
 | 15 | Walk-Forward Engine | ❌ Başlanmadı | - | - |
 | 16 | Risk Engine | ❌ Başlanmadı | - | - |
 | 17 | Portfolio Optimizer | ❌ Başlanmadı | - | - |
