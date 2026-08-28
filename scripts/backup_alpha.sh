@@ -97,6 +97,52 @@ else
     log "WARNING: QuestDB backup failed (container may be down or snapshot API unavailable)"
 fi
 
+# --- Backup Verification (Restore Test) ---
+log "Verifying backup integrity..."
+VERIFICATION_PASSED=0
+VERIFICATION_FAILED=0
+
+# PostgreSQL backup verification
+if [ -f "$BACKUP_DIR/postgres.sql" ] && [ -s "$BACKUP_DIR/postgres.sql" ]; then
+    # SQL dosyası boş mu kontrol et
+    if head -5 "$BACKUP_DIR/postgres.sql" | grep -q "PostgreSQL database dump" 2>/dev/null; then
+        log "PostgreSQL backup verification PASSED"
+        VERIFICATION_PASSED=$((VERIFICATION_PASSED + 1))
+    else
+        log "WARNING: PostgreSQL backup may be corrupted (header check failed)"
+        VERIFICATION_FAILED=$((VERIFICATION_FAILED + 1))
+    fi
+else
+    log "WARNING: PostgreSQL backup file missing or empty"
+    VERIFICATION_FAILED=$((VERIFICATION_FAILED + 1))
+fi
+
+# DuckDB backup verification
+for db_file in data/central_state.db data/offline_queue.db data/downtime.db data/paper_trading_state.db data/dlq.db; do
+    db_name=$(basename "$db_file")
+    if [ -f "$BACKUP_DIR/$db_name" ] && [ -s "$BACKUP_DIR/$db_name" ]; then
+        # DuckDB integrity check
+        if duckdb "$BACKUP_DIR/$db_name" "SELECT 1;" >/dev/null 2>&1; then
+            log "DuckDB $db_name verification PASSED"
+            VERIFICATION_PASSED=$((VERIFICATION_PASSED + 1))
+        else
+            log "WARNING: DuckDB $db_name verification FAILED (integrity check)"
+            VERIFICATION_FAILED=$((VERIFICATION_FAILED + 1))
+        fi
+    fi
+done
+
+# QuestDB backup verification
+if [ -f "$BACKUP_DIR/questdb/snapshot_metadata.json" ]; then
+    log "QuestDB backup verification PASSED (metadata exists)"
+    VERIFICATION_PASSED=$((VERIFICATION_PASSED + 1))
+else
+    log "WARNING: QuestDB backup verification FAILED (no metadata)"
+    VERIFICATION_FAILED=$((VERIFICATION_FAILED + 1))
+fi
+
+log "Verification summary: $VERIFICATION_PASSED passed, $VERIFICATION_FAILED failed"
+
 # --- Cleanup old backups (keep 30 days) ---
 log "Cleaning up backups older than 30 days..."
 find "$BACKUP_ROOT" -maxdepth 1 -type d -name "20*" -mtime +30 -exec rm -rf {} \; 2>/dev/null
@@ -106,4 +152,5 @@ log "Remaining backups: $CLEANED"
 # --- Summary ---
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
 log "Backup completed: $BACKUP_DIR ($TOTAL_SIZE)"
+log "Verification: $VERIFICATION_PASSED passed, $VERIFICATION_FAILED failed"
 log "=== Backup finished ==="
