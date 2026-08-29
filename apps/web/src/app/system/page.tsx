@@ -4,6 +4,7 @@ import { usePolling, type SystemStatus } from "@/lib/api";
 import { Activity, Cpu, HardDrive, MemoryStick, Server, Zap, Database, Radio, CheckCircle2, XCircle } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { formatIstanbulDateTime } from "@/lib/time";
 
 const RESOURCES = [
   { label: "İşlemci (CPU)", value: 34, icon: Cpu },
@@ -176,7 +177,7 @@ export default function SystemHealth() {
           </div>
           <div className="px-5 py-2">
             {systemDetails.map((item: { label: string; value: string }) => <InfoRow key={item.label} label={item.label} value={item.value} />)}
-            <InfoRow label="Son Veri Güncellemesi" value={status?.timestamp ? new Date(status.timestamp).toLocaleString("tr-TR") : "Canlı Akış"} />
+            <InfoRow label="Son Veri Güncellemesi (TSI)" value={status?.timestamp ? formatIstanbulDateTime(status.timestamp) : "Canlı Akış"} />
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { usePolling, useDebounce } from "@/lib/api";
 import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff, Filter, TrendingUp, Zap, Target } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { formatIstanbulTime } from "@/lib/time";
 
 interface RadarRow {
   symbol: string;
@@ -166,7 +167,7 @@ export default function MarketRadar() {
             </span>
             {lastUpdated && (
               <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
-                · Son Güncelleme: {lastUpdated.toLocaleTimeString("tr-TR")}
+                · Son Güncelleme (TSI): {formatIstanbulTime(lastUpdated)}
               </span>
             )}
           </div>

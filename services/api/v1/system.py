@@ -58,6 +58,35 @@ def _get_system_resources() -> dict[str, Any]:
         }
 
 
+@router.get("/time")
+async def get_server_time() -> dict[str, Any]:
+    """Sunucu ve Türkiye/İstanbul (TSI) referans saatini döner."""
+    now_utc = datetime.now(UTC)
+    try:
+        from zoneinfo import ZoneInfo
+        ist_tz = ZoneInfo("Europe/Istanbul")
+    except Exception:
+        from datetime import timedelta, timezone
+        ist_tz = timezone(timedelta(hours=3))
+    now_ist = now_utc.astimezone(ist_tz)
+
+    is_weekday = now_ist.weekday() < 5
+    current_time_val = now_ist.hour * 60 + now_ist.minute
+    is_market_open = is_weekday and (10 * 60 <= current_time_val < 18 * 60)
+
+    return {
+        "utc": now_utc.isoformat(),
+        "istanbul": now_ist.isoformat(),
+        "timestamp_ms": int(now_utc.timestamp() * 1000),
+        "timezone": "Europe/Istanbul",
+        "offset": "+03:00",
+        "formatted_date": now_ist.strftime("%d.%m.%Y"),
+        "formatted_time": now_ist.strftime("%H:%M:%S"),
+        "is_market_open": is_market_open,
+        "market_status": "AÇIK (Sürekli Müzayede)" if is_market_open else "KAPALI (Seans Dışı)",
+    }
+
+
 @router.get("/status")
 @router.get("/health")
 async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:

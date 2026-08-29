@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { formatIstanbulTime } from "@/lib/time";
 
 interface EventItem {
   id: string;
@@ -49,7 +50,7 @@ export default function EventCenterPage() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-zinc-400">
-            Son Güncelleme: <span className="text-zinc-200 font-mono">{lastUpdated?.toLocaleTimeString()}</span>
+            Son Güncelleme (TSI): <span className="text-zinc-200 font-mono">{formatIstanbulTime(lastUpdated)}</span>
           </span>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
             <div className="w-1.5 h-1.5 rounded-full live-dot animate-ping" />

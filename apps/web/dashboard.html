@@ -1156,11 +1156,36 @@
       window.location.href = `/asset?ticker=${ticker}`;
     }
 
+    let serverOffsetMs = 0;
+    async function syncTimeOffset() {
+      try {
+        const t0 = Date.now();
+        const res = await fetch('/api/v1/system/time');
+        if (!res.ok) return;
+        const data = await res.json();
+        const t1 = Date.now();
+        if (data.timestamp_ms) {
+          serverOffsetMs = (data.timestamp_ms + (t1 - t0) / 2) - t1;
+        }
+      } catch (e) {}
+    }
+
     function updateTime() {
-      const now = new Date();
-      const options = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+      const now = new Date(Date.now() + serverOffsetMs);
+      const options = {
+        timeZone: 'Europe/Istanbul',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
       const el = document.getElementById('current-time');
-      if (el) el.textContent = now.toLocaleDateString('tr-TR', options);
+      if (el) {
+        el.innerHTML = `🇹🇷 <strong>${now.toLocaleDateString('tr-TR', options)}</strong> <span style="opacity:0.75;font-size:10px;">(TSI UTC+3)</span>`;
+      }
     }
 
     // ===================== INIT =====================
@@ -1173,8 +1198,10 @@
       renderHealthPanel();
       renderNotifications();
       initPortfolioChart();
+      syncTimeOffset();
+      setInterval(syncTimeOffset, 60000);
       updateTime();
-      setInterval(updateTime, 60000);
+      setInterval(updateTime, 1000);
       
       // Live Polling
       fetchLiveDashboardData();

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { formatIstanbulDateTime } from "@/lib/time";
 
 interface ScannerSignal {
   ticker: string;
@@ -55,7 +56,7 @@ export default function AIResearchPage() {
         ticker: sig.ticker,
         title: `${sig.ticker} AlphaEngine Nicel Değerleme & Sinyal Analizi`,
         model: "Optuna-LightGBM (Phase 18) + Quant Engine",
-        date: sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString("tr-TR") : "Canlı Model",
+        date: sig.timestamp ? formatIstanbulDateTime(sig.timestamp) : "Canlı Model",
         sentiment: isBull ? "BULLISH" : "NEUTRAL",
         confidence: normScore,
         summary: `${sig.ticker} hissesi için AlphaEngine tarafından ${action} sinyali üretilmiştir. Modelin 20 günlük beklenen endeks üstü getiri tahmini pozitif bölgededir. Giriş fiyatı ₺${sig.current_price ? sig.current_price.toFixed(2) : (sig.price ? sig.price.toFixed(2) : "—")}, dinamik ATR hedefi ₺${sig.target_price ? sig.target_price.toFixed(2) : "—"}, stop seviyesi ₺${sig.stop_loss ? sig.stop_loss.toFixed(2) : "—"} olarak hesaplanmıştır.`,
@@ -97,7 +98,7 @@ export default function AIResearchPage() {
         ticker: detectedTicker,
         title: query,
         model: "Google Gemini 3.7 Flash (Canlı Analiz)",
-        date: new Date().toLocaleTimeString("tr-TR"),
+        date: formatIstanbulDateTime(new Date()),
         sentiment: answer.includes("GÜÇLÜ AL") || answer.includes("AL") ? "BULLISH" : "NEUTRAL",
         confidence: 94,
         summary: answer,
