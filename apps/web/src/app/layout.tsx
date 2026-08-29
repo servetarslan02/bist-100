@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { TopNav } from "@/components/layout/TopNav";
 import { GlobalTelemetrySync } from "@/components/providers/GlobalTelemetrySync";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
@@ -40,6 +41,7 @@ export default function RootLayout({
             style={{ background: "var(--color-bg-primary)" }}
           >
             <GlobalTelemetrySync />
+            <TopNav />
             <main className="flex-1 overflow-y-auto">
               <ErrorBoundary name="page">
                 {children}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, useDebounce } from "@/lib/api";
 import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff, Filter, TrendingUp, Zap, Target } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { formatIstanbulTime } from "@/lib/time";
+import { formatIstanbulTime, useIstanbulClock } from "@/lib/time";
 
 interface RadarRow {
   symbol: string;
@@ -18,6 +18,9 @@ interface RadarRow {
   rsi: number | null;
   score: number;
   isBist100: boolean;
+  score_diff?: number;
+  momentum?: number;
+  sparkline?: number[];
 }
 
 interface RadarResponse {
@@ -28,18 +31,6 @@ interface RadarResponse {
 }
 
 type FilterCategory = "ALL" | "BIST100" | "GAINERS" | "LOSERS" | "OVERSOLD" | "OVERBOUGHT" | "HIGH_SCORE";
-
-// BIST: 10:00 - 18:00 İstanbul (UTC+3)
-function isBistOpen(): boolean {
-  const now = new Date();
-  const istanbul = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Istanbul" }));
-  const day = istanbul.getDay(); // 0=Sun, 6=Sat
-  if (day === 0 || day === 6) return false;
-  const h = istanbul.getHours();
-  const m = istanbul.getMinutes();
-  const minutes = h * 60 + m;
-  return minutes >= 600 && minutes < 1080; // 10:00 - 18:00
-}
 
 function TableHeader({
   field,
@@ -59,43 +50,58 @@ function TableHeader({
   return (
     <th
       onClick={() => onSort(field)}
-      className={`py-3 px-4 cursor-pointer hover:text-zinc-100 select-none whitespace-nowrap transition-colors ${right ? "text-right" : ""}`}
+      className={`py-3 px-3.5 text-[10px] uppercase tracking-wider font-semibold cursor-pointer select-none transition-colors hover:text-zinc-200 ${
+        right ? "text-right" : "text-left"
+      }`}
+      style={{
+        color: sortField === field ? "var(--color-accent-green)" : "var(--color-text-muted)",
+      }}
     >
-      {label}{sortField === field ? (sortAsc ? " ↑" : " ↓") : ""}
+      <div className={`flex items-center gap-1 ${right ? "justify-end" : "justify-start"}`}>
+        <span>{label}</span>
+        {sortField === field && (
+          <span className="text-[9px]">{sortAsc ? "▲" : "▼"}</span>
+        )}
+      </div>
     </th>
   );
 }
 
-export default function MarketRadar() {
+export default function RadarPage() {
   const router = useRouter();
+  const clock = useIstanbulClock();
+  const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 150);
+  const debouncedSearch = useDebounce(search, 200);
   const [activeCategory, setActiveCategory] = useState<FilterCategory>("ALL");
-  const [sortField, setSortField] = useState<keyof RadarRow>("score");
+  const [sortField, setSortField] = useState<keyof RadarRow>("volume");
   const [sortAsc, setSortAsc] = useState(false);
-  const [marketOpen, setMarketOpen] = useState(isBistOpen());
-  const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
-  const prevPricesRef = useState<Record<string, number>>({})[0];
 
-  // 0 gecikmeli canlı Borsa akışı: 1.5 saniyede bir milisaniyelik mikro-tick yenilemesi
-  const pollInterval = 1500;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const { data: rawData, loading, lastUpdated } = usePolling<RadarResponse>(
-    "/market/radar?limit=1000",
+  const marketOpen = mounted ? clock.isMarketOpen : false;
+  const pollInterval = marketOpen ? 1500 : 8000;
+
+  const { data: rawData, loading, lastUpdated } = usePolling<RadarResponse | null>(
+    "/market/radar?limit=250",
     pollInterval
   );
 
-  // Canlı fiyat adımı yanıp sönme kontrolü (Green / Red Flash)
+  const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
+  const prevPricesRef = useRef<Record<string, number>>({});
+
   useEffect(() => {
-    if (!rawData?.data) return;
+    if (!rawData?.data || rawData.data.length === 0) return;
     const nextFlash: Record<string, "up" | "down"> = {};
     for (const r of rawData.data) {
-      const prev = prevPricesRef[r.symbol];
-      if (prev !== undefined && r.price !== undefined) {
+      const prev = prevPricesRef.current[r.symbol];
+      if (prev !== undefined && r.price !== prev) {
         if (r.price > prev) nextFlash[r.symbol] = "up";
         else if (r.price < prev) nextFlash[r.symbol] = "down";
       }
-      prevPricesRef[r.symbol] = r.price;
+      prevPricesRef.current[r.symbol] = r.price;
     }
     if (Object.keys(nextFlash).length > 0) {
       setFlashMap(nextFlash);
@@ -103,12 +109,6 @@ export default function MarketRadar() {
       return () => clearTimeout(timer);
     }
   }, [rawData]);
-
-  // Her dakika borsa durumunu kontrol et
-  useEffect(() => {
-    const timer = setInterval(() => setMarketOpen(isBistOpen()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
 
   const allRows: RadarRow[] = useMemo(() => rawData?.data ?? [], [rawData]);
 

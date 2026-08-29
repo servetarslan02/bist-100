@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { useIstanbulClock } from "@/lib/time";
 
 function MetricCard({
   title,
@@ -18,50 +19,68 @@ function MetricCard({
   value,
   subtitle,
   subtext,
+  change,
+  isPositive,
   icon: Icon,
-  trend,
-  color,
+  badge,
   prefix,
   suffix,
+  color,
 }: {
   title?: string;
   label?: string;
   value: string | number;
   subtitle?: string;
   subtext?: string;
+  change?: string;
+  isPositive?: boolean;
   icon?: React.ElementType;
-  trend?: "up" | "down" | "neutral";
-  color?: string;
+  badge?: string;
   prefix?: string;
   suffix?: string;
+  color?: string;
 }) {
   const displayTitle = title || label || "";
-  const displaySub = subtitle || subtext || "";
+  const displaySub = subtitle || subtext;
   const formattedVal = typeof value === "number" ? value.toLocaleString("tr-TR") : String(value);
-  const displayVal = `${prefix || ""}${formattedVal}${suffix || ""}`;
-
-  let displayColor = color;
-  if (color === "auto") {
-    const num = parseFloat(String(value).replace(/[^0-9.-]/g, ""));
-    displayColor = num > 0 ? "#00e5a0" : num < 0 ? "#ff4466" : "var(--color-text-primary)";
-  }
 
   return (
-    <div className="rounded-xl p-4 space-y-1.5 select-none transition-all hover:border-zinc-700" style={{
-      background: "var(--color-bg-card)",
-      border: "1px solid var(--color-border-subtle)",
-    }}>
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>{displayTitle}</p>
+    <div
+      className="p-4 rounded-xl relative overflow-hidden transition-all duration-200 hover:translate-y-[-2px] shadow-sm"
+      style={{
+        background: "var(--color-bg-card)",
+        border: "1px solid var(--color-border-subtle)",
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          {displayTitle}
+        </span>
         {Icon && (
-          <div className="p-1.5 rounded-lg" style={{ background: displayColor ? `${displayColor}15` : "var(--color-bg-secondary)" }}>
-            <Icon size={14} style={{ color: displayColor || "var(--color-text-secondary)" }} />
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <Icon size={14} className="text-zinc-300" />
           </div>
         )}
       </div>
-      <p className="text-2xl font-bold font-data tracking-tight" style={{ color: displayColor || "var(--color-text-primary)" }}>{displayVal}</p>
+      <div className="flex items-baseline gap-1">
+        {prefix && <span className="text-sm font-semibold text-zinc-400">{prefix}</span>}
+        <span className="text-xl font-bold font-data text-zinc-100">{formattedVal}</span>
+        {suffix && <span className="text-xs text-zinc-500">{suffix}</span>}
+      </div>
       {displaySub && (
-        <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>{displaySub}</p>
+        <p className="text-[10px] text-zinc-500 mt-1 truncate">{displaySub}</p>
+      )}
+      {change && (
+        <span
+          className={`text-[10px] font-bold mt-1 inline-block ${
+            isPositive ? "text-emerald-400" : "text-rose-400"
+          }`}
+        >
+          {change}
+        </span>
       )}
     </div>
   );
@@ -69,6 +88,7 @@ function MetricCard({
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const clock = useIstanbulClock();
   const { data, loading, refetch } = usePolling<PortfolioData | null>("/portfolio", 1500);
   const { data: ordersData, refetch: refetchOrders } = usePolling<{ orders: OrderData[] } | null>("/portfolio/orders", 3000);
   const { data: metricsData } = usePolling<PortfolioMetrics | null>("/portfolio/metrics", 5000);
@@ -84,15 +104,7 @@ export default function PortfolioPage() {
     setMounted(true);
   }, []);
 
-  const isBistOpen = () => {
-    const now = new Date();
-    const istanbul = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Istanbul" }));
-    const day = istanbul.getDay();
-    if (day === 0 || day === 6) return false;
-    const minutes = istanbul.getHours() * 60 + istanbul.getMinutes();
-    return minutes >= 600 && minutes < 1080;
-  };
-  const marketOpen = mounted ? isBistOpen() : false;
+  const marketOpen = mounted ? clock.isMarketOpen : false;
 
   const rawP = (data?.portfolio ?? ((data as unknown) as Record<string, any>) ?? {}) as Record<string, any>;
   const currentCapital = rawP.total_value ?? rawP.current_capital ?? 1000000;
