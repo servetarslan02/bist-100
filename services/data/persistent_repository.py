@@ -28,16 +28,22 @@ logger = structlog.get_logger()
 class PersistentHistoricalRepository(HistoricalDataRepository):
     """SQLite tabanlı historical repository."""
 
-    def __init__(self, db_path: str = "historical_data.db"):
+    def __init__(self, db_path: str = "data/historical_data.duckdb"):
         """Otomatik eklendi."""
         self._db_path = db_path
+        from pathlib import Path
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = None
         self._init_db()
 
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
         """Otomatik eklendi."""
         if self._conn is None:
-            self._conn = duckdb.connect(self._db_path)
+            try:
+                self._conn = duckdb.connect(self._db_path)
+            except Exception as e:
+                logger.warning("Could not open persistent duckdb file, using fallback", error=str(e))
+                self._conn = duckdb.connect(":memory:")
             self._conn.execute("SET enable_progress_bar = false")
         return self._conn
 

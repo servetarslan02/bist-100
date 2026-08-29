@@ -53,3 +53,5 @@ v1_router.include_router(scanner_router, prefix="", tags=["Scanner (Direct)"])
 v1_router.include_router(system_router, prefix="", tags=["System (Direct)"])
 v1_router.include_router(portfolio_router, prefix="/strategy", tags=["Strategy (Direct)"])
 v1_router.include_router(holidays_router, prefix="/tatil", tags=["Tatil (Direct)"])
+
+router = v1_router

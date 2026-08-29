@@ -594,25 +594,25 @@ class WarehouseSource:
         """Otomatik eklendi."""
         if not self.db_path.exists():
             return None
-        import duckdb
+        import sqlite3
 
         sym = ticker.upper().replace(".IS", "").strip()
         try:
-            conn = duckdb.connect(str(self.db_path), read_only=True)
-            tbl = "benchmark_data" if sym in ["XU100", "^XU100", "BIST100"] else "stock_data"
+            conn = sqlite3.connect(str(self.db_path))
+            tbl = "benchmark_xu100" if sym in ["XU100", "^XU100", "BIST100"] else "stock_candles"
 
-            if tbl == "benchmark_data":
-                query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM benchmark_data"
+            if tbl == "benchmark_xu100":
+                query = "SELECT Date, Open, High, Low, Close, Volume FROM benchmark_xu100"
                 df = pl.read_database(query, conn)
             else:
-                query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM stock_data WHERE symbol = ? OR symbol = ?"
-                df = pl.read_database(query, conn, params=(sym, f"{sym}.IS"))
+                query = "SELECT Date, Open, High, Low, Close, Volume FROM stock_candles WHERE symbol = ? OR symbol = ?"
+                df = pl.read_database(query, conn, execute_options={"parameters": (sym, f"{sym}.IS")})
             conn.close()
 
             if df.is_empty():
                 return None
 
-            df = df.rename({"date": "Date"}).sort("Date")
+            df = df.sort("Date")
 
             if start_date:
                 df = df.filter(pl.col("Date") >= start_date)

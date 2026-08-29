@@ -567,6 +567,9 @@ def get_ch_client() -> Any:
     return _ch_client
 
 
+get_clickhouse = get_ch_client
+
+
 def close_ch_client() -> None:
     """ClickHouse istemcisini kapatır ve global state'i sıfırlar."""
     global _ch_client, _ch_healthy

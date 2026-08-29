@@ -38,6 +38,7 @@ out/
 *.db-wal
 *.db-journal
 *.sqlite
+*.duckdb
 
 # ML Models
 ml/saved_models/*.pkl
