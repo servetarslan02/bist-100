@@ -77,6 +77,7 @@ export default function PortfolioPage() {
   const [triggering, setTriggering] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
+  const [orderTab, setOrderTab] = useState<"ALL" | "BUY" | "SELL">("ALL");
   const prevPricesRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -105,6 +106,11 @@ export default function PortfolioPage() {
   const totalReturnPct = rawP.total_return_pct ?? 0;
   const positions = data?.positions ?? (rawP.positions as PortfolioData["positions"]) ?? [];
   const orders = ordersData?.orders ?? [];
+  const filteredOrders = orders.filter((ord) => {
+    if (orderTab === "BUY") return ord.side === "BUY";
+    if (orderTab === "SELL") return ord.side === "SELL";
+    return true;
+  });
   const sectorWeights = rawP.sector_weights ?? {};
   const totalPnlPos = totalPnl >= 0;
 
@@ -456,7 +462,7 @@ export default function PortfolioPage() {
         style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
       >
         <div
-          className="flex items-center justify-between px-5 py-3.5"
+          className="flex items-center justify-between px-5 py-3.5 flex-wrap gap-3"
           style={{ borderBottom: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.01)" }}
         >
           <div className="flex items-center gap-2.5">
@@ -465,12 +471,46 @@ export default function PortfolioPage() {
             </div>
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-100">
-                Son Gerçekleşen Emirler & Mikro-Yapı Defteri
+                Emir Defteri & Realize Kâr/Zarar Geçmişi
               </h2>
-              <p className="text-[10px] text-zinc-400">BIST sentetik derinlik eşleşmesi, komisyon ve kayma (slippage) denetim izi</p>
+              <p className="text-[10px] text-zinc-400">Alış/satış yürütmeleri, kâr/zarar tutarları ve BIST mikro-yapı denetim izi</p>
             </div>
           </div>
-          <span className="text-[10px] text-zinc-400 font-medium">Toplam {orders.length} Emir Kaydı</span>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-zinc-900/80 p-1 rounded-lg border border-zinc-800">
+              <button
+                onClick={() => setOrderTab("ALL")}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                  orderTab === "ALL"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Tümü ({orders.length})
+              </button>
+              <button
+                onClick={() => setOrderTab("BUY")}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                  orderTab === "BUY"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Alışlar ({orders.filter(o => o.side === "BUY").length})
+              </button>
+              <button
+                onClick={() => setOrderTab("SELL")}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                  orderTab === "SELL"
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Satışlar & Kâr/Zarar ({orders.filter(o => o.side === "SELL").length})
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -489,28 +529,34 @@ export default function PortfolioPage() {
                 <th className="text-left py-3 px-3">Hisse</th>
                 <th className="text-center py-3 px-3">İşlem Yönü</th>
                 <th className="text-right py-3 px-3">Miktar (Lot)</th>
-                <th className="text-right py-3 px-3">Sinyal Fiyatı</th>
-                <th className="text-right py-3 px-3">Gerçekleşme Fiyatı</th>
-                <th className="text-right py-3 px-3">Kayma (Slippage)</th>
-                <th className="text-right py-3 px-3">Komisyon (₺)</th>
+                <th className="text-right py-3 px-3">Alış / Sinyal Fiyatı</th>
+                <th className="text-right py-3 px-3">Gerçekleşme / Çıkış</th>
+                <th className="text-right py-3 px-4">Elde Edilen Kâr / Zarar</th>
+                <th className="text-right py-3 px-3">Komisyon</th>
                 <th className="text-right py-3 px-5">Durum</th>
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-10 text-xs text-zinc-500">
-                    Henüz işlem emri kaydı bulunmuyor
+                    Seçili kategoride işlem kaydı bulunmuyor.
                   </td>
                 </tr>
               ) : (
-                orders.map((ord, i: number) => {
+                filteredOrders.map((ord, i: number) => {
                   const isBuy = ord.side === "BUY";
+                  const pnl = ord.realized_pnl !== undefined ? Number(ord.realized_pnl) : null;
+                  const pnlPct = ord.realized_pnl_pct !== undefined ? Number(ord.realized_pnl_pct) : null;
+                  const isPos = (pnl ?? 0) >= 0;
+
                   return (
                     <tr key={i} className="text-[12px] border-b border-zinc-800/40 hover:bg-zinc-800/20">
-                      <td className="py-2.5 px-5 font-data text-zinc-400">{ord.date || "2026-08-24"}</td>
+                      <td className="py-2.5 px-5 font-data text-zinc-400">{ord.date || "2026-08-29"}</td>
                       <td className="py-2.5 px-3 font-data text-zinc-500 text-[11px] truncate max-w-[120px]">{ord.order_id || `ORD_${i+1}`}</td>
-                      <td className="py-2.5 px-3 font-bold font-data text-zinc-200">{ord.ticker}</td>
+                      <td className="py-2.5 px-3 font-bold font-data text-cyan-400 cursor-pointer hover:underline" onClick={() => router.push(`/asset?ticker=${ord.ticker}`)}>
+                        {ord.ticker}
+                      </td>
                       <td className="py-2.5 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           isBuy ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
@@ -519,13 +565,32 @@ export default function PortfolioPage() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-data font-semibold text-zinc-200">{ord.quantity?.toLocaleString("tr-TR")}</td>
-                      <td className="py-2.5 px-3 text-right font-data text-zinc-400">₺{Number(ord.signal_price ?? 0).toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-data font-bold text-zinc-100">₺{Number(ord.execution_price ?? 0).toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-data text-amber-400/90 text-[11px]">%{Number(ord.slippage_pct ?? 0).toFixed(3)}</td>
+                      <td className="py-2.5 px-3 text-right font-data text-zinc-400">
+                        ₺{Number(ord.entry_price ?? ord.signal_price ?? 0).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-data font-bold text-zinc-100">
+                        ₺{Number(ord.execution_price ?? ord.exit_price ?? 0).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-data">
+                        {pnl !== null ? (
+                          <div className="flex flex-col items-end">
+                            <span className={`font-bold text-[12px] ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+                              {isPos ? "+" : ""}₺{pnl.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            {pnlPct !== null && (
+                              <span className={`text-[10px] font-semibold ${isPos ? "text-emerald-400/80" : "text-rose-400/80"}`}>
+                                ({isPos ? "+" : ""}%{pnlPct.toFixed(2)})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 font-sans">Açık Pozisyon</span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-right font-data text-zinc-400">₺{Number(ord.commission ?? 0).toFixed(2)}</td>
                       <td className="py-2.5 px-5 text-right">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                          {ord.status === "FILLED" ? "GERÇEKLEŞTİ" : ord.status}
+                          {ord.status === "FILLED" ? "GERÇEKLEŞTİ" : (ord.status || "KAPANDI")}
                         </span>
                       </td>
                     </tr>
