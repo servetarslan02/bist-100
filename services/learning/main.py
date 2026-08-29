@@ -67,7 +67,7 @@ class LearningService:
                 last_training = await self._get_last_training_time()
                 hours_since = (datetime.now(UTC) - last_training).total_seconds() / 3600 if last_training else 999
 
-                if hours_since >= 168:  # Weekly
+                if hours_since >= 24:  # Günlük seans sonrası eğitim
                     await self._train_all_models()
                 else:
                     logger.info("Training not needed yet", hours_since=round(hours_since, 1))
@@ -162,6 +162,14 @@ class LearningService:
 
                 except Exception as e:
                     logger.error("Model training failed", name=model_name, error=str(e))
+
+            # 4-Direkli Master Swing Ranking Modelini (Tum 629 hisse) de senkron egit ve guncelle
+            try:
+                from services.ml.train_all_models import train_all_models
+                train_all_models()
+                logger.info("Master 4-pillar swing ranking models updated successfully")
+            except Exception as e:
+                logger.warning("Master 4-pillar ranking training notice", error=str(e))
 
         except Exception as e:
             logger.error("Training cycle failed", error=str(e))

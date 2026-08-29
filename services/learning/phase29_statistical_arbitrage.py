@@ -1,5 +1,9 @@
-from typing import Any
 """FAZ 29 v2 - Duzeltilmis PnL hesabi (getiri bazli)"""
+
+from typing import Any
+import structlog
+
+logger = structlog.get_logger()
 
 import sys
 import warnings

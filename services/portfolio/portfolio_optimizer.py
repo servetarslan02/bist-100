@@ -51,9 +51,9 @@ class PortfolioOptimizerConstraints:
 
     max_position_pct: float = 0.10  # Tek hissede maksimum ağırlık (%10)
     min_position_pct: float = 0.015  # Minimum pozisyon eşiği (%1.5, tozluluk filtresi)
-    max_sector_pct: float = 0.30  # Sektör tavanı (%30)
-    max_total_exposure: float = 1.00  # Toplam hisse maruziyeti (kaldıraçsız = 1.0)
-    min_cash_buffer_pct: float = 0.05  # Zorunlu nakit rezervi (%5)
+    max_sector_pct: float = 0.35  # Sektör tavanı (%35)
+    max_total_exposure: float = 0.92  # Fırsatlar için %8 nakit tamponu, max %92 maruziyet
+    min_cash_buffer_pct: float = 0.08  # Zorunlu nakit rezervi (%8 fırsat payı)
     turnover_penalty_lambda: float = 0.015  # Aşırı rebalance turnover ceza katsayısı
     transaction_cost_pct: float = 0.0015  # %0.15 ortalama BIST işlem maliyeti
     hysteresis_threshold: float = 0.02  # %2 altındaki küçük sapmalarda işlem yapmama

@@ -1516,7 +1516,7 @@ def run():
     low  = sev_counts["LOW"]
 
     total_pen = crit * 10 + high * 4 + med * 1 + low * 0.2
-    health = max(0, min(100, int(100 - (total_pen / max(len(py_files), 1) * 8))))
+    health = max(0, min(100, round(100 - (total_pen / max(len(py_files), 1) * 8))))
 
     print(f"\n  ✓ Tamamlandı: {elapsed:.2f}s")
     print(f"  Dosya: {len(py_files):,}  Satır: {total_lines:,}  SyntaxHata: {syntax_errors}")

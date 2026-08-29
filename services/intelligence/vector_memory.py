@@ -231,7 +231,7 @@ class VectorMemoryStore:
                             # asyncpg can return strings or parsed JSON based on configuration, safe parse:
                             meta = r["metadata"]
                             if isinstance(meta, str):
-                                meta = json.loads(meta)
+                                meta = orjson.loads(meta)
 
                             results.append(
                                 SimilarityResult(

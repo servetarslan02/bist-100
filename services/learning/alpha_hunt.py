@@ -1,11 +1,11 @@
-from typing import Any
 """
-import structlog
-logger = structlog.get_logger()
-
 ALPHA HUNT - Tum stratejileri dene, basarili olana kadar dur.
 Holdout: 2025-10-31 sonrasi DOKUNULMUYOR.
 """
+
+from typing import Any
+import structlog
+logger = structlog.get_logger()
 
 import time
 import warnings

@@ -1,4 +1,3 @@
-from typing import Any
 """
 ALPHA BIST — BIST Universe Auto-Discovery Provider v2.0
 TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfeder ve günceller.
@@ -8,9 +7,10 @@ import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
-import orjson
 import httpx
+import orjson
 import structlog
 
 logger = structlog.get_logger()

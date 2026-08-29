@@ -367,8 +367,8 @@ class CatBoostModel:
         try:
             from services.core.hardware_orchestrator import hardware_orchestrator
             params = hardware_orchestrator.get_catboost_params(params)
-        except Exception:
-            pass
+        except Exception as h_err:
+            logger.debug("CatBoost GPU hardware check fallback", error=str(h_err))
 
         if self._is_classifier:
             params["loss_function"] = self._config.loss_function

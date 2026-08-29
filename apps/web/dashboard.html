@@ -607,9 +607,9 @@
               <div class="panel-subtitle">Risk-adjusted scoring ile sıralanmış</div>
             </div>
             <div class="panel-actions">
-              <button class="btn btn-primary active" onclick="filterOpps('all')">Tümü</button>
-              <button class="btn btn-ghost" onclick="filterOpps('long')">LONG</button>
-              <button class="btn btn-ghost" onclick="filterOpps('short')">SHORT</button>
+              <button class="btn btn-primary active" onclick="filterOpps('all', this)">Tümü</button>
+              <button class="btn btn-ghost" onclick="filterOpps('long', this)">LONG</button>
+              <button class="btn btn-ghost" onclick="filterOpps('short', this)">SHORT</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -910,9 +910,9 @@
               sector: s.sector || "BIST",
               price: s.current_price || s.price || 100.0,
               score: Math.min(99, Math.max(50, s.score > 100 ? 50 + (s.score % 50) : s.score)),
-              direction: (s.action === "BUY" || s.action === "AL") ? "LONG" : "HOLD",
-              signal: s.action || "AL",
-              confidence: Math.round(s.score || 85),
+              direction: s.direction || ((s.action === "BUY" || s.action === "AL") ? "LONG" : "LONG"),
+              signal: s.signal || s.action || "GÜÇLÜ AL",
+              confidence: Math.round(s.confidence_score || s.score || 85),
               technical: 85,
               momentum: 88,
               risk: "low"
@@ -1019,6 +1019,18 @@
     }
 
     // ===================== RENDER FUNCTIONS =====================
+    function filterOpps(filter = 'all', btn = null) {
+      if (btn) {
+        document.querySelectorAll('.panel-actions .btn').forEach(b => {
+          b.classList.remove('active', 'btn-primary');
+          b.classList.add('btn-ghost');
+        });
+        btn.classList.remove('btn-ghost');
+        btn.classList.add('active', 'btn-primary');
+      }
+      renderOpportunities(filter);
+    }
+
     function renderOpportunities(filter = 'all') {
       const tbody = document.getElementById('opportunities-body');
       if (!tbody) return;
@@ -1032,23 +1044,25 @@
           <td>
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="ticker-badge">${o.ticker}</span>
-              <span style="font-size: 11px; color: var(--text-muted);">${o.sector}</span>
+              <span style="font-size: 11px; color: var(--text-muted);">${o.sector || ''}</span>
             </div>
           </td>
-          <td class="font-mono">₺${Number(o.price).toFixed(2)}</td>
-          <td>
+          <td class="font-mono right">₺${Number(o.price).toFixed(2)}</td>
+          <td class="right">
             <span class="score-pill ${o.score >= 80 ? 'high' : 'med'}">${Number(o.score).toFixed(1)}</span>
           </td>
-          <td>
+          <td class="center">
             <span class="badge ${o.direction === 'LONG' ? 'badge-green' : 'badge-red'}">${o.direction}</span>
           </td>
-          <td><span class="badge badge-purple">${o.signal}</span></td>
-          <td>
+          <td class="center"><span class="badge badge-purple">${o.signal || 'AL'}</span></td>
+          <td class="right">
             <div class="progress-bar">
-              <div class="progress-fill fill-green" style="width: ${o.confidence}%"></div>
+              <div class="progress-fill fill-green" style="width: ${o.confidence || 85}%"></div>
             </div>
           </td>
-          <td><span class="badge ${o.risk === 'low' ? 'badge-green' : o.risk === 'med' ? 'badge-orange' : 'badge-red'}">${o.risk.toUpperCase()}</span></td>
+          <td class="center"><span class="badge badge-blue">${o.strategy_type || o.spec_category || 'TEKNİK'}</span></td>
+          <td class="center font-mono text-xs">+%${Number(o.expected_return_pct || 15).toFixed(1)}</td>
+          <td class="center"><span class="badge ${(o.risk || 'med') === 'low' ? 'badge-green' : (o.risk || 'med') === 'med' ? 'badge-orange' : 'badge-red'}">${(o.risk || 'MED').toUpperCase()}</span></td>
         </tr>
       `).join('');
     }

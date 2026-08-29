@@ -1,8 +1,8 @@
-from typing import Any
 """ALPHA BIST - Data Ingestion Service (Main Entry Point)"""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
 
@@ -20,19 +20,33 @@ from ..core.event_bus import (
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.logging import setup_logging
+from ..core.questdb_client import questdb_client
 from .bist_universe import BIST_INDICES, bist_universe, get_sector
 
 # Dinamik hisse listesi — otomatik keşif aktif (tüm 600+ hisse)
 BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
+from .providers.investing_provider import investing_provider
 from .providers.kap_provider import kap_provider
 from .providers.news_provider import news_provider
 from .providers.social_provider import social_provider
 from .providers.tcmb_provider import tcmb_provider
+from .providers.tradingview_provider import tradingview_provider
 from .providers.yfinance_provider import yfinance_provider
 from .questdb_consumer import questdb_tick_consumer
 
 logger = structlog.get_logger()
+
+
+def is_bist_session_active() -> bool:
+    """BIST seans saatlerini (Hafta içi 09:55 - 18:10 TSİ / UTC+3) kontrol eder."""
+    now_utc = datetime.now(UTC)
+    if now_utc.weekday() >= 5:  # Cumartesi veya Pazar
+        return False
+    now_minute = now_utc.hour * 60 + now_utc.minute
+    market_open = 6 * 60 + 55  # 06:55 UTC (09:55 TSİ)
+    market_close = 15 * 60 + 10  # 15:10 UTC (18:10 TSİ)
+    return market_open <= now_minute <= market_close
 
 
 class IngestionService:
@@ -96,7 +110,7 @@ class IngestionService:
         self._running = False
         await questdb_tick_consumer.stop()
         await connectivity_monitor.stop()
-        flush_producer()
+        await flush_producer()
         await close_databases()
         logger.info("Ingestion Service stopped")
 
@@ -196,53 +210,92 @@ class IngestionService:
 
                 logger.info("Starting market data fetch cycle")
 
-                # NOT: Onceden bu dongu 629 hisseyi TEK TEK, senkron
-                # fetch_current_price() cagrisiyla cekiyordu; her cagri kendi
-                # ThreadPoolExecutor'ini ve (curl_cffi tarafinda) yeni bir HTTP
-                # session'ini yaratiyordu. Bu, sureklilikte bellek tuketimini
-                # container'in mem_limit'ini asacak sekilde artiriyor,
-                # OOMKilled (exit 137) + restart:unless-stopped ile sonsuz
-                # crash-loop'a ve sonunda WSL VM'inin tamamen donmasina
-                # (docker komutlarinin yanit vermemesine) sebep oluyordu.
-                # Artik kucuk gruplar (chunk) halinde, gruplar arasi kisa
-                # bekleme ile cekiliyor; bellek kullanimi sabit ve dusuk kalir.
-                CHUNK_SIZE = 20
-                for i in range(0, len(BIST_STOCKS), CHUNK_SIZE):
-                    if not self._running:
-                        break
-                    chunk = BIST_STOCKS[i : i + CHUNK_SIZE]
-                    for ticker in chunk:
+                # 1. PRIMARY: TradingView Scanner API (Tüm BIST tek pakette ~150ms)
+                tv_stocks = await tradingview_provider.fetch_all_bist_stocks()
+                if tv_stocks:
+                    logger.info("TradingView primary market feed active", count=len(tv_stocks))
+                    ticks_list: list[dict[str, Any]] = []
+                    now_utc = datetime.now(UTC)
+                    for ticker, data in tv_stocks.items():
                         if not self._running:
                             break
+                        ticks_list.append({
+                            "ticker": ticker,
+                            "price": float(data["price"]),
+                            "volume": int(data.get("volume", 0) or 0),
+                            "bid": float(data.get("low", 0.0) or 0.0),
+                            "ask": float(data.get("high", 0.0) or 0.0),
+                            "timestamp": now_utc,
+                        })
+                        instrument_id = self._instrument_map.get(ticker)
+                        if instrument_id:
+                            event = CanonicalEvent(
+                                event_type=EventType.MARKET_TICK,
+                                source="tradingview",
+                                data={
+                                    "instrument_id": instrument_id,
+                                    "ticker": ticker,
+                                    "price": data["price"],
+                                    "close": data["close"],
+                                    "volume": data.get("volume", 0),
+                                    "value_traded": data.get("value_traded", 0),
+                                    "open": data.get("open"),
+                                    "high": data.get("high"),
+                                    "low": data.get("low"),
+                                    "change_pct": data.get("change_pct", 0),
+                                    "rsi": data.get("rsi"),
+                                    "macd": data.get("macd"),
+                                    "sma50": data.get("sma50"),
+                                    "sma200": data.get("sma200"),
+                                    "market_cap": data.get("market_cap"),
+                                    "pe_ratio": data.get("pe_ratio"),
+                                    "pb_ratio": data.get("pb_ratio"),
+                                    "recommendation": data.get("recommendation"),
+                                    "source": "tradingview",
+                                },
+                            )
+                            publish_event(event, key=ticker)
 
+                    # Toplu olarak yüksek performanslı QuestDB ILP'ye yaz
+                    if ticks_list:
                         try:
-                            data = yfinance_provider.fetch_current_price(ticker)
-                            if data and data.get("price"):
-                                instrument_id = self._instrument_map.get(ticker)
-                                if instrument_id:
-                                    # Publish tick event
-                                    event = CanonicalEvent(
-                                        event_type=EventType.MARKET_TICK,
-                                        source="yfinance",
-                                        data={
-                                            "instrument_id": instrument_id,
-                                            "ticker": ticker,
-                                            "price": data["price"],
-                                            "volume": data.get("volume", 0),
-                                            "bid": data.get("bid"),
-                                            "ask": data.get("ask"),
-                                            "source": "yfinance",
-                                        },
-                                    )
-                                    publish_event(event, key=ticker)
-
-                        except Exception as e:
-                            logger.warning("Failed to fetch ticker", ticker=ticker, error=str(e))
-                            continue
-
-                    # Chunk'lar arasi kisa bekleme: bellek/baglanti birikimini
-                    # ve rate-limit riskini azaltir, event loop'u da nefes aldirir.
-                    await asyncio.sleep(1)
+                            questdb_client.insert_ticks_batch(ticks_list)
+                        except Exception as q_exc:
+                            logger.debug("Direct QuestDB batch write notice", error=str(q_exc))
+                else:
+                    # 2. FALLBACK: yfinance chunked retrieval
+                    logger.info("TradingView scan unavailable, running yfinance fallback...")
+                    CHUNK_SIZE = 20
+                    for i in range(0, len(BIST_STOCKS), CHUNK_SIZE):
+                        if not self._running:
+                            break
+                        chunk = BIST_STOCKS[i : i + CHUNK_SIZE]
+                        for ticker in chunk:
+                            if not self._running:
+                                break
+                            try:
+                                data = yfinance_provider.fetch_current_price(ticker)
+                                if data and data.get("price"):
+                                    instrument_id = self._instrument_map.get(ticker)
+                                    if instrument_id:
+                                        event = CanonicalEvent(
+                                            event_type=EventType.MARKET_TICK,
+                                            source="yfinance",
+                                            data={
+                                                "instrument_id": instrument_id,
+                                                "ticker": ticker,
+                                                "price": data["price"],
+                                                "volume": data.get("volume", 0),
+                                                "bid": data.get("bid"),
+                                                "ask": data.get("ask"),
+                                                "source": "yfinance",
+                                            },
+                                        )
+                                        publish_event(event, key=ticker)
+                            except Exception as e:
+                                logger.warning("Failed to fetch ticker fallback", ticker=ticker, error=str(e))
+                                continue
+                        await asyncio.sleep(1)
 
                 # Fetch indices
                 for index_symbol, index_name in BIST_INDICES.items():
@@ -264,14 +317,15 @@ class IngestionService:
                     except Exception:
                         logger.warning("Caught Exception in _market_data_loop", exc_info=True)
 
-                flush_producer()
+                await flush_producer()
                 import gc
 
                 gc.collect()
                 logger.info("Market data fetch cycle completed")
 
-                # Wait before next cycle (5 minutes for delayed data)
-                await asyncio.sleep(300)
+                # Optimum bekleme: Seans içi 4 saniye, Seans dışı / Gece 60 saniye
+                sleep_interval = 4 if is_bist_session_active() else 60
+                await asyncio.sleep(sleep_interval)
 
             except Exception as e:
                 logger.error("Market data loop error", error=str(e))
@@ -292,14 +346,37 @@ class IngestionService:
 
                 logger.info("Starting KAP fetch cycle")
 
-                # Fetch recent disclosures
-                from_date = (datetime.now(UTC) - timedelta(hours=1)).strftime("%Y-%m-%d")
-                to_date = datetime.now(UTC).strftime("%Y-%m-%d")
+                # 1. Official KAP RSS feed (En güvenilir ve hızlı)
+                disclosures = []
+                try:
+                    official_disclosures = await news_provider.fetch_official_kap_disclosures()
+                    if official_disclosures:
+                        for item in official_disclosures:
+                            disclosures.append({
+                                "kap_id": item.get("id", ""),
+                                "ticker": item.get("ticker", ""),
+                                "title": item.get("title", ""),
+                                "summary": item.get("summary", ""),
+                                "category": item.get("category", "Genel"),
+                                "sentiment": item.get("sentiment", 0),
+                                "importance": 0.5,
+                                "is_price_sensitive": False,
+                                "publish_date": item.get("publish_date", ""),
+                            })
+                except Exception:
+                    logger.debug("KAP RSS fetch fallback notice")
 
-                disclosures = await kap_provider.fetch_disclosures(
-                    from_date=from_date,
-                    to_date=to_date,
-                )
+                # 2. JSON API fallback if needed
+                if not disclosures:
+                    try:
+                        from_date = (datetime.now(UTC) - timedelta(hours=1)).strftime("%Y-%m-%d")
+                        to_date = datetime.now(UTC).strftime("%Y-%m-%d")
+                        disclosures = await kap_provider.fetch_disclosures(
+                            from_date=from_date,
+                            to_date=to_date,
+                        )
+                    except Exception:
+                        logger.debug("KAP direct API fetch fallback notice")
 
                 if disclosures:
                     for disc in disclosures:
@@ -324,11 +401,12 @@ class IngestionService:
                         )
                         publish_event(event, key=ticker or "kap")
 
-                    flush_producer()
+                    await flush_producer()
                 logger.info("KAP fetch cycle completed", count=len(disclosures) if disclosures else 0)
 
-                # Wait 5 minutes
-                await asyncio.sleep(300)
+                # Optimum bekleme: Seans içi 20 saniye, Seans dışı 60 saniye
+                sleep_interval = 20 if is_bist_session_active() else 60
+                await asyncio.sleep(sleep_interval)
 
             except Exception as e:
                 logger.error("KAP loop error", error=str(e))
@@ -371,11 +449,25 @@ class IngestionService:
                 )
                 publish_event(event, key="macro_yf")
 
-                flush_producer()
+                # Fetch investing / global macro summary
+                try:
+                    global_macro = await investing_provider.fetch_global_macro_summary()
+                    if global_macro:
+                        event = CanonicalEvent(
+                            event_type=EventType.MACRO_EVENT,
+                            source="investing",
+                            data=global_macro,
+                        )
+                        publish_event(event, key="macro_global")
+                except Exception:
+                    logger.debug("Investing global macro fetch skipped")
+
+                await flush_producer()
                 logger.info("Macro data fetch cycle completed")
 
-                # Wait 15 minutes
-                await asyncio.sleep(900)
+                # Optimum bekleme: Küresel makro varlıklar için seans içi 30s, seans dışı 60s
+                sleep_interval = 30 if is_bist_session_active() else 60
+                await asyncio.sleep(sleep_interval)
 
             except Exception as e:
                 logger.error("Macro loop error", error=str(e))
@@ -420,11 +512,12 @@ class IngestionService:
                 except Exception:
                     logger.warning("Caught Exception in _news_loop", exc_info=True)
 
-                flush_producer()
+                await flush_producer()
                 logger.info("News fetch cycle completed", count=len(rss_articles) if rss_articles else 0)
 
-                # Wait 10 minutes
-                await asyncio.sleep(600)
+                # Optimum bekleme: Finansal haberler için seans içi 60s, seans dışı 180s (3 dk)
+                sleep_interval = 60 if is_bist_session_active() else 180
+                await asyncio.sleep(sleep_interval)
 
             except Exception as e:
                 logger.error("News loop error", error=str(e))
@@ -460,13 +553,12 @@ class IngestionService:
                     except Exception:
                         logger.warning("Caught Exception in _social_loop", exc_info=True)
 
-                # Fetch social / community sentiment from financial feeds
-
-                flush_producer()
+                await flush_producer()
                 logger.info("Social media fetch cycle completed")
 
-                # Wait 15 minutes
-                await asyncio.sleep(900)
+                # Optimum bekleme: Sosyal medya NLP için seans içi 60s, seans dışı 180s (3 dk)
+                sleep_interval = 60 if is_bist_session_active() else 180
+                await asyncio.sleep(sleep_interval)
 
             except Exception as e:
                 logger.debug("Social loop note", error=str(e))

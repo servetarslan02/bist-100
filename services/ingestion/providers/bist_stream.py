@@ -1,4 +1,3 @@
-from typing import Any
 """
 ALPHA BIST — BIST Market Data Stream v1.0
 
@@ -14,6 +13,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 import orjson
 import structlog

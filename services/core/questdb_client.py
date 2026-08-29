@@ -119,8 +119,8 @@ class QuestDBClient:
         ts = timestamp or datetime.now(UTC)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
 
-        # ILP format: measurement,tag=value field=value timestamp
-        line = f"market_ticks,ticker={ticker} price={price},volume={volume},bid={bid},ask={ask} {ts_ns}\n"
+        # ILP format: measurement,tag=value field=value timestamp (volume must be integer with 'i' suffix)
+        line = f"market_ticks,ticker={ticker} price={float(price)},volume={int(volume)}i,bid={float(bid)},ask={float(ask)} {ts_ns}\n"
 
         try:
             self._ilp_socket.sendall(line.encode("utf-8"))
@@ -140,10 +140,11 @@ class QuestDBClient:
         for tick in ticks:
             ts = tick.get("timestamp", datetime.now(UTC))
             ts_ns = int(ts.timestamp() * 1_000_000_000)
+            vol = int(tick.get("volume", 0) or 0)
             line = (
                 f"market_ticks,ticker={tick['ticker']} "
-                f"price={tick['price']},volume={tick.get('volume', 0)},"
-                f"bid={tick.get('bid', 0.0)},ask={tick.get('ask', 0.0)} "
+                f"price={float(tick['price'])},volume={vol}i,"
+                f"bid={float(tick.get('bid', 0.0) or 0.0)},ask={float(tick.get('ask', 0.0) or 0.0)} "
                 f"{ts_ns}\n"
             )
             lines.append(line)
@@ -174,10 +175,11 @@ class QuestDBClient:
 
         ts = timestamp or datetime.now(UTC)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
+        vol = int(volume or 0)
 
         line = (
             f"ohlcv,ticker={ticker},timeframe={timeframe} "
-            f"open={open_p},high={high},low={low},close={close},volume={volume} "
+            f"open={float(open_p)},high={float(high)},low={float(low)},close={float(close)},volume={vol}i "
             f"{ts_ns}\n"
         )
 

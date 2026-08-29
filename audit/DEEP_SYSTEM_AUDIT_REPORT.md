@@ -1,10 +1,10 @@
 # ALPHA BIST — Derin Sistem Bütünlük Denetim Raporu
 
-> **Tarih:** 2026-08-29 20:18:18  
+> **Tarih:** 2026-08-29 23:51:59  
 > **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  
 > **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  
-> **Taranan:** 802 dosya, 249,642 satır  
-> **Süre:** 7.02 saniye  
+> **Taranan:** 819 dosya, 254,105 satır  
+> **Süre:** 4.64 saniye  
 > **Sistem Sağlık Puanı:** **100 / 100**
 
 ---
@@ -16,8 +16,8 @@
 | **KRİTİK** | **0** | Sistem çökebilir, data bütünlüğü tehlikede, güvenlik açığı |
 | **YÜKSEK**  | **0** | Motor zinciri kırık, hata maskeleme, mimari ihlal |
 | **ORTA**    | **0** | Kod kalitesi, standart ihlali, uyarı |
-| **DÜŞÜK**   | **0** | Dokümantasyon, tip eksikliği, biçim |
-| **TOPLAM**  | **1** | |
+| **DÜŞÜK**   | **3** | Dokümantasyon, tip eksikliği, biçim |
+| **TOPLAM**  | **4** | |
 
 ## 2. 36 Boyut Bazlı Analiz
 
@@ -38,7 +38,7 @@
 | **B13** | Loglama Standardi | 0 | ✅ TEMİZ |
 | **B14** | Kaynak Sizintisi | 0 | ✅ TEMİZ |
 | **B15** | Test Kapsami | 0 | ✅ TEMİZ |
-| **B16** | Dokumantasyon Butunlugu | 0 | ✅ TEMİZ |
+| **B16** | Dokumantasyon Butunlugu | 3 | 🟡 ORTA |
 | **B17** | Orchestrator Servis Kaydi | 0 | ✅ TEMİZ |
 | **B18** | Servis Arayzü Uyumu | 0 | ✅ TEMİZ |
 | **B19** | Sinyal Fuzyon Agirlik Butunlugu | 0 | ✅ TEMİZ |
@@ -64,6 +64,7 @@
 
 | Kategori | Boyut | Adet | Seviye |
 |---|---|---|---|
+| `FUNC_MISSING_DOCSTRING` | B16 | **3** | LOW |
 | `MLFLOW_TRACKING_USED` | B31 | **1** | INFO |
 
 ## 4. Kritik & Yüksek Öncelikli Duzeltme Listesi (0 adet)
@@ -81,4 +82,4 @@ Motor ve sinyal zincirinde sorun tespit edilmedi. ✅
 |---|---|---|---|---|
 
 ---
-*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260829_201818.json`*
+*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260829_235159.json`*

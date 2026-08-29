@@ -167,13 +167,26 @@ class PaperStateStore:
     @contextmanager
     def _connect(self) -> Any:
         """Otomatik eklendi."""
+        import time
         if duckdb is None:
             raise RuntimeError("DuckDB module is not installed in the environment.")
-        conn = duckdb.connect(str(self.db_path))
+        
+        conn = None
+        for attempt in range(5):
+            try:
+                conn = duckdb.connect(str(self.db_path))
+                break
+            except Exception as e:
+                if "lock" in str(e).lower() and attempt < 4:
+                    time.sleep(0.3 * (attempt + 1))
+                else:
+                    raise
+
         try:
             yield conn
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     # ===================== PORTFOLIO STATE =====================
 

@@ -123,13 +123,19 @@ class InternalEventBus:
 
         if self._redis is None or self._redis_loop is not current_loop:
             try:
-                import redis.asyncio as aioredis
+                from .redis_sentinel import get_ha_redis
 
-                self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+                self._redis = await get_ha_redis()
                 self._redis_loop = current_loop
-            except (ImportError, Exception):
-                self._redis = InMemoryRedis()
-                self._redis_loop = current_loop
+            except Exception:
+                try:
+                    import redis.asyncio as aioredis
+
+                    self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+                    self._redis_loop = current_loop
+                except (ImportError, Exception):
+                    self._redis = InMemoryRedis()
+                    self._redis_loop = current_loop
         return self._redis
 
     async def publish(self, channel: str, event: CanonicalEvent) -> Any:
@@ -325,7 +331,7 @@ event_bus = InternalEventBus()
 # =====================================================
 
 
-def publish_event(event: CanonicalEvent) -> Any:
+def publish_event(event: CanonicalEvent, key: str | None = None, **kwargs: Any) -> Any:
     """Publish to NATS (primary) + Redis Pub/Sub (push) + Redis Stream (durable).
 
     v2.0: Kafka/Redpanda kaldırıldı. NATS ana mesajlaşma, Redis Pub/Sub yardımcı.
@@ -449,15 +455,24 @@ async def _get_redis() -> Any:
 
     if _redis_conn is None or _redis_loop is not current_loop:
         try:
+            from .redis_sentinel import get_ha_redis
+
+            r = await get_ha_redis()
+            if r:
+                _redis_conn = r
+                _redis_loop = current_loop
+                return _redis_conn
+        except Exception as exc:
+            logger.debug("Sentinel unavailable, falling back to direct url", error=str(exc))
+
+        try:
             import redis.asyncio as aioredis
 
             r = aioredis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=0.5)
-            # Quick ping to verify reachability
             await asyncio.wait_for(r.ping(), timeout=0.5)
             _redis_conn = r
             _redis_loop = current_loop
         except Exception:
-            _redis_unavailable = True
             _redis_conn = InMemoryRedis()
             _redis_loop = current_loop
     return _redis_conn
@@ -487,8 +502,8 @@ async def _check_and_mark_published(event_id: str, critical: bool = False) -> bo
                 if result is not None:
                     _published_events_in_memory.add(event_id)
                 return result is not None
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Redis idempotency check skipped, falling back", error=str(exc))
 
     # 2. PostgreSQL dene (if available)
     if not _pg_unavailable:
@@ -518,6 +533,7 @@ async def _publish_to_stream(event: CanonicalEvent) -> Any:
     """Durable event ledger'a yaz.
     Öncelik: Redis Stream > PostgreSQL > Log
     """
+    global _pg_unavailable
     # 1. Redis Stream dene (reuse connection)
     try:
         r = await _get_redis()

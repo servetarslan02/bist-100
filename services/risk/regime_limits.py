@@ -37,6 +37,8 @@ class RegimeRiskLimits:
     stop_loss_pct: float  # Stop-loss %
     confidence_multiplier: float  # Confidence çarpanı
     description: str
+    max_positions: int = 30  # Rejim bazlı maksimum hisse sayısı (0 ile max arası dinamik)
+    min_cash_pct: float = 0.08  # Fırsatlar için nakit rezerv tamponu (%5-10)
 
 
 class RegimeLimitsManager:
@@ -54,79 +56,93 @@ class RegimeLimitsManager:
     REGIME_LIMITS: dict[str, RegimeRiskLimits] = {
         "BULL": RegimeRiskLimits(
             regime="BULL",
-            max_position_pct=0.12,
-            max_total_exposure=1.0,
-            max_sector_concentration=0.30,
+            max_position_pct=0.20,  # Kullanıcı Kuralı: Bir hisse en fazla %20 (Alt sınır serbest)
+            max_total_exposure=0.92,  # %8 nakit tamponu (fırsatlar için %5-10 arası)
+            max_sector_concentration=0.35,
             min_liquidity_score=0.3,
             max_leverage=1.0,
             stop_loss_pct=0.06,
             confidence_multiplier=1.1,
-            description="Boğa piyasası — daha geniş limitler",
+            max_positions=30,  # Boğada 0 ile 30 hisseye kadar esnek
+            min_cash_pct=0.08,
+            description="Boğa piyasası — 0-30 hisse, tek hisse max %20, min %8 nakit",
         ),
         "BEAR": RegimeRiskLimits(
             regime="BEAR",
-            max_position_pct=0.06,
-            max_total_exposure=0.5,
-            max_sector_concentration=0.20,
+            max_position_pct=0.05,
+            max_total_exposure=0.40,  # %60 nakit kalesi (çöküş koruması)
+            max_sector_concentration=0.18,
             min_liquidity_score=0.5,
             max_leverage=0.5,
             stop_loss_pct=0.04,
             confidence_multiplier=0.7,
-            description="Ayı piyasası — sıkı limitler",
+            max_positions=6,  # Ayıda sadece 0-6 defansif lider
+            min_cash_pct=0.60,
+            description="Ayı piyasası — 0-6 hisse, %60 nakit koruması",
         ),
         "SIDEWAYS": RegimeRiskLimits(
             regime="SIDEWAYS",
-            max_position_pct=0.08,
-            max_total_exposure=0.7,
+            max_position_pct=0.07,
+            max_total_exposure=0.75,  # %25 nakit tamponu
             max_sector_concentration=0.25,
             min_liquidity_score=0.4,
             max_leverage=0.7,
             stop_loss_pct=0.05,
             confidence_multiplier=0.9,
-            description="Yatay piyasa — orta limitler",
+            max_positions=15,  # Normal/yatayda 0-15 seçkin hisse
+            min_cash_pct=0.25,
+            description="Yatay/Normal piyasa — 0-15 hisse, %25 nakit",
         ),
         "HIGH_VOL": RegimeRiskLimits(
             regime="HIGH_VOL",
-            max_position_pct=0.05,
-            max_total_exposure=0.4,
+            max_position_pct=0.04,
+            max_total_exposure=0.35,
             max_sector_concentration=0.15,
             min_liquidity_score=0.6,
             max_leverage=0.4,
             stop_loss_pct=0.03,
             confidence_multiplier=0.6,
-            description="Yüksek volatilite — en sıkı limitler",
+            max_positions=5,
+            min_cash_pct=0.65,
+            description="Yüksek volatilite — sıkı limitler, %65 nakit",
         ),
         "LOW_VOL": RegimeRiskLimits(
             regime="LOW_VOL",
             max_position_pct=0.10,
-            max_total_exposure=0.9,
-            max_sector_concentration=0.28,
+            max_total_exposure=0.90,
+            max_sector_concentration=0.30,
             min_liquidity_score=0.3,
             max_leverage=0.9,
             stop_loss_pct=0.05,
             confidence_multiplier=1.0,
-            description="Düşük volatilite — normal limitler",
+            max_positions=25,
+            min_cash_pct=0.10,
+            description="Düşük volatilite — genişleme, %10 nakit",
         ),
         "CRISIS": RegimeRiskLimits(
             regime="CRISIS",
             max_position_pct=0.03,
-            max_total_exposure=0.2,
+            max_total_exposure=0.15,  # %85 nakit kalesi (tam çöküş savunması)
             max_sector_concentration=0.10,
             min_liquidity_score=0.7,
             max_leverage=0.2,
             stop_loss_pct=0.02,
             confidence_multiplier=0.4,
-            description="Kriz modu — minimum maruziyet",
+            max_positions=3,  # Krizde en fazla 0-3 altın/maden/savunma hissesi
+            min_cash_pct=0.85,
+            description="Kriz modu — %85 nakit kalesi, max 3 hisse",
         ),
         "UNKNOWN": RegimeRiskLimits(
             regime="UNKNOWN",
             max_position_pct=0.06,
-            max_total_exposure=0.5,
+            max_total_exposure=0.50,
             max_sector_concentration=0.20,
             min_liquidity_score=0.5,
             max_leverage=0.5,
             stop_loss_pct=0.04,
             confidence_multiplier=0.7,
+            max_positions=10,
+            min_cash_pct=0.50,
             description="Bilinmeyen rejim — muhafazakar",
         ),
     }

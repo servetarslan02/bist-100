@@ -96,22 +96,13 @@ async def paper_trading_scheduler() -> Any:
 
     await asyncio.sleep(5)
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
-        from services.pipeline.run_unified_daily import run_morning_execution_cycle
+        from services.pipeline.startup_catchup import master_catchup
 
-        cur_pos = paper_orchestrator.portfolio.get_all_positions()
-        pending = paper_orchestrator.store.load_pending_signals()
-        now_tr = datetime.now(TR_TZ)
-        if now_tr.weekday() < 5 and (len(cur_pos) == 0 or len(pending) > 0):
-            logger.info(
-                "paper_trading_scheduler: Başlangıç otonom portföy başlatma/telafi döngüsü çalıştırılıyor...",
-                positions=len(cur_pos),
-                pending=len(pending),
-            )
-            with tracer.start_as_current_span("background.paper_trading_scheduler.morning_catchup"):
-                await run_morning_execution_cycle()
+        logger.info("paper_trading_scheduler: Başlangıç Master Catch-up (Tüm eksik seanslar ve eğitimler) başlatılıyor...")
+        with tracer.start_as_current_span("background.paper_trading_scheduler.master_catchup"):
+            await master_catchup.execute_full_catchup()
     except Exception as e:
-        logger.warning(f"paper_trading_scheduler startup catchup error: {e}")
+        logger.warning(f"paper_trading_scheduler startup master catchup error: {e}")
 
     while True:
         now = datetime.now(TR_TZ)

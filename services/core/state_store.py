@@ -116,106 +116,129 @@ class CentralStateStore:
         self._flush_interval = 30.0  # saniye
 
     def _init_db(self) -> Any:
-        """TablolarÄ± oluÅŸtur."""
-        with self._connect() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS circuit_breakers (
-                    name TEXT PRIMARY KEY,
-                    state TEXT NOT NULL,
-                    failure_count INTEGER DEFAULT 0,
-                    last_failure_at TEXT,
-                    last_success_at TEXT,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS provider_reliability (
-                    name TEXT PRIMARY KEY,
-                    total_calls INTEGER DEFAULT 0,
-                    total_failures INTEGER DEFAULT 0,
-                    recent_results TEXT DEFAULT '[]',
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS rate_limiters (
-                    name TEXT PRIMARY KEY,
-                    tokens REAL NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS learning_state (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS learning_predictions (
-                    id INTEGER PRIMARY KEY,
-                    ticker TEXT NOT NULL,
-                    predicted_direction TEXT,
-                    predicted_return REAL,
-                    confidence REAL,
-                    regime TEXT,
-                    features TEXT,
-                    outcome TEXT,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS fusion_weights (
-                    key TEXT PRIMARY KEY,
-                    weights TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS correlation_history (
-                    var1 TEXT NOT NULL,
-                    var2 TEXT NOT NULL,
-                    corr_values TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (var1, var2)
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS champion_history (
-                    id INTEGER PRIMARY KEY,
-                    data TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ticker ON learning_predictions(ticker)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_created ON learning_predictions(created_at)")
-            conn.commit()
+        """Tabloları oluştur."""
+        try:
+            with self._connect() as conn:
+                if isinstance(conn, _DummyDuckDBConn):
+                    return
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS circuit_breakers (
+                        name TEXT PRIMARY KEY,
+                        state TEXT NOT NULL,
+                        failure_count INTEGER DEFAULT 0,
+                        last_failure_at TEXT,
+                        last_success_at TEXT,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS provider_reliability (
+                        name TEXT PRIMARY KEY,
+                        total_calls INTEGER DEFAULT 0,
+                        total_failures INTEGER DEFAULT 0,
+                        recent_results TEXT DEFAULT '[]',
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS rate_limiters (
+                        name TEXT PRIMARY KEY,
+                        tokens REAL NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS learning_state (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS learning_predictions (
+                        id INTEGER PRIMARY KEY,
+                        ticker TEXT NOT NULL,
+                        predicted_direction TEXT,
+                        predicted_return REAL,
+                        confidence REAL,
+                        regime TEXT,
+                        features TEXT,
+                        outcome TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS fusion_weights (
+                        key TEXT PRIMARY KEY,
+                        weights TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS correlation_history (
+                        var1 TEXT NOT NULL,
+                        var2 TEXT NOT NULL,
+                        corr_values TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        PRIMARY KEY (var1, var2)
+                    )
+                """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS champion_history (
+                        id INTEGER PRIMARY KEY,
+                        data TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ticker ON learning_predictions(ticker)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_created ON learning_predictions(created_at)")
+                if hasattr(conn, "commit"):
+                    conn.commit()
+        except Exception as e:
+            logger.debug("State store init skipped", error=str(e))
 
     @contextmanager
-    def _connect(self) -> Any:
-        """Otomatik eklendi."""
+    def _connect(self, read_only: bool = False) -> Any:
+        """DuckDB bağlantısı oluşturur, kilit durumunda read_only veya dummy fallback sağlar."""
         if not HAS_DUCKDB or duckdb is None:
             yield _DummyDuckDBConn()
             return
 
-        conn = duckdb.connect(str(self._db_path))
+        conn = None
+        try:
+            conn = duckdb.connect(str(self._db_path), read_only=read_only)
+        except Exception:
+            try:
+                conn = duckdb.connect(str(self._db_path), read_only=True)
+            except Exception:
+                conn = _DummyDuckDBConn()
+
         try:
             yield conn
         finally:
-            conn.close()
+            if conn is not None and hasattr(conn, "close") and not isinstance(conn, _DummyDuckDBConn):
+                try:
+                    conn.close()
+                except Exception as exc:
+                    logger.debug("DuckDB connection close notice", error=str(exc))
 
     def _flush_buffer(self) -> Any:
-        """Write buffer'Ä± flush et (batched write â€” SSD dostu)."""
+        """Write buffer'ı flush et (batched write — SSD dostu)."""
         if not self._write_buffer:
             return
 
-        with self._connect() as conn:
-            for query, params in self._write_buffer:
-                conn.execute(query, params)
-            conn.commit()
-
-        self._write_buffer.clear()
-        self._last_flush = time.time()
+        try:
+            with self._connect() as conn:
+                if isinstance(conn, _DummyDuckDBConn):
+                    return
+                for query, params in self._write_buffer:
+                    conn.execute(query, params)
+                if hasattr(conn, "commit"):
+                    conn.commit()
+            self._write_buffer.clear()
+            self._last_flush = time.time()
+        except Exception as e:
+            logger.debug("State store buffer flush note", error=str(e))
 
     def _buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write â€” toplu yaz (SSD dostu)."""

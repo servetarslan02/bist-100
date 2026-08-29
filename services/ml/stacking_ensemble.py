@@ -347,14 +347,14 @@ class StackingEnsemble:
     def _get_meta_features(self, X: np.ndarray) -> np.ndarray:
         """Base model predictions'ı meta-feature olarak oluştur."""
         meta_features = np.zeros((len(X), len(self._base_models)))
-        for model_idx, (_name, model) in enumerate(self._base_models.items()):
+        for model_idx, (model_name, model) in enumerate(self._base_models.items()):
             try:
                 if self._config.use_proba and hasattr(model, "predict_proba"):
                     meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
                 else:
                     meta_features[:, model_idx] = model.predict(X)
             except Exception as e:
-                logger.warning("stacking_meta_feature_failed", model=name, error=str(e))
+                logger.warning("stacking_meta_feature_failed", model=model_name, error=str(e))
                 meta_features[:, model_idx] = 0.5
 
         if self._config.passthrough:

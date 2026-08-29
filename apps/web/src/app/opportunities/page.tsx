@@ -47,7 +47,7 @@ export default function OpportunitiesPage() {
   const router = useRouter();
   const { data: rawSignals, loading, refetch } = usePolling<OpportunitySignal[] | { signals: OpportunitySignal[] }>(
     "/scanner/signals?limit=50",
-    2500
+    10000
   );
 
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
@@ -83,21 +83,48 @@ export default function OpportunitiesPage() {
   }, [rawSignals]);
 
   const filteredSignals = useMemo(() => {
-    return signals.filter((s) => {
+    const matched = signals.filter((s) => {
       // Kategori filtresi
-      if (activeFilter === "HIGH_CONVICTION" && s.spec_category !== "HIGH_CONVICTION") return false;
-      if (activeFilter === "VOLUME_BREAKOUT" && s.signal_type !== "VOLUME_BREAKOUT") return false;
-      if (activeFilter === "PULLBACK_BOUNCE" && s.signal_type !== "PULLBACK_BOUNCE") return false;
-      if (activeFilter === "MOMENTUM_LEADER" && s.signal_type !== "MOMENTUM_LEADER") return false;
+      if (activeFilter !== "ALL") {
+        const cat = String(s.spec_category || "");
+        const stype = String(s.signal_type || (s as any).strategy_type || "");
+        const sig = String(s.signal || "").toUpperCase();
+        const tags = Array.isArray((s as any).tags) ? (s as any).tags : [];
+        const isHigh = Boolean((s as any).is_high_conviction) || Number(s.score ?? 0) >= 80 || cat === "HIGH_CONVICTION" || tags.includes("HIGH_CONVICTION");
+
+        if (activeFilter === "HIGH_CONVICTION") {
+          if (!isHigh) return false;
+        } else if (activeFilter === "VOLUME_BREAKOUT") {
+          const isVol = stype === "VOLUME_BREAKOUT" || cat === "VOLUME_BREAKOUT" || tags.includes("VOLUME_BREAKOUT") || sig.includes("HACİM") || sig.includes("KIRILIM") || Number(s.volume_ratio ?? 0) >= 1.2;
+          if (!isVol) return false;
+        } else if (activeFilter === "PULLBACK_BOUNCE") {
+          const isDip = stype === "PULLBACK_BOUNCE" || cat === "PULLBACK_BOUNCE" || tags.includes("PULLBACK_BOUNCE") || sig.includes("DİP") || sig.includes("DÖNÜŞ") || Number(s.rsi ?? 50) <= 50;
+          if (!isDip) return false;
+        } else if (activeFilter === "MOMENTUM_LEADER") {
+          const isMom = stype === "MOMENTUM_LEADER" || cat === "MOMENTUM_LEADER" || tags.includes("MOMENTUM_LEADER") || sig.includes("TREND") || sig.includes("MOMENTUM");
+          if (!isMom) return false;
+        }
+      }
 
       // Arama filtresi with debounce
       if (debouncedSearch) {
-        const q = debouncedSearch.toLowerCase();
+        const q = debouncedSearch.toLowerCase().trim();
         const sym = (s.symbol || s.ticker || "").toLowerCase();
+        const nm = (s.name || s.company_name || "").toLowerCase();
         const rsn = (s.spec_reason || "").toLowerCase();
-        return sym.includes(q) || rsn.includes(q);
+        return sym.includes(q) || nm.includes(q) || rsn.includes(q);
       }
       return true;
+    });
+
+    // 4. KURAL: Sıralama daima En Çok Güven (score) ve En Yüksek Getiri (expected_return_pct) olmalı
+    return [...matched].sort((a, b) => {
+      const scoreA = Number(a.score ?? a.confidence_score ?? 0);
+      const scoreB = Number(b.score ?? b.confidence_score ?? 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      const retA = Number(a.expected_return_pct ?? 0);
+      const retB = Number(b.expected_return_pct ?? 0);
+      return retB - retA;
     });
   }, [signals, activeFilter, debouncedSearch]);
 
@@ -170,7 +197,7 @@ export default function OpportunitiesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredSignals.map((sig) => {
             const sym = sig.symbol || sig.ticker;
-            const isHighConviction = sig.spec_category === "HIGH_CONVICTION";
+            const isHighConviction = Boolean((sig as any).is_high_conviction) || sig.spec_category === "HIGH_CONVICTION" || (sig.score ?? 0) >= 80;
             const flashDir = flashMap[sym];
             const flashClass = flashDir === "up" ? "flash-up" : (flashDir === "down" ? "flash-down" : "");
             return (

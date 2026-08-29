@@ -228,6 +228,9 @@ class ModelDegradationMonitor:
         # Trend analizi
         trend = self._compute_trend(outcomes)
 
+        # Severity hesapla
+        severity = self._compute_severity(accuracy_drop, sharpe_drop, z_score, trend)
+
         # Prediction Drift hesapla (DriftMonitor üzerinden)
         prediction_drift_score = 0.0
         if len(baseline) >= 20 and len(recent) >= 20:

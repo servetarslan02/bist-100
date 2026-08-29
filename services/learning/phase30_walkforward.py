@@ -1,12 +1,12 @@
-from typing import Any
 """
-import structlog
-logger = structlog.get_logger()
-
 FAZ 30 - WALK-FORWARD VALIDASYON + ENSEMBLE
 3 kazanan strateji: Momentum-252-top5, Momentum-126-top10, VolKirisi
 Yil yil performans + kombinasyon analizi
 """
+
+from typing import Any
+import structlog
+logger = structlog.get_logger()
 
 import warnings
 

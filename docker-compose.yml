@@ -24,11 +24,7 @@ services:
     - ./infrastructure/traefik/dynamic:/etc/traefik/dynamic:ro
     - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
-    - traefik.enable=true
-    - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`)
-    - traefik.http.routers.api.entrypoints=web
-    - traefik.http.services.api.loadbalancer.server.port=8000
-    - traefik.http.routers.api.middlewares=rate-limit@file,compress@file
+    - traefik.enable=false
     mem_limit: 64m
     cpus: 0.15
     healthcheck:
@@ -425,9 +421,10 @@ services:
     - MTLS_CLIENT_KEY=/app/certs/client.key
     labels:
     - traefik.enable=true
-    - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`)
+    - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`) || PathPrefix(`/openapi.json`)
     - traefik.http.routers.api.entrypoints=web
     - traefik.http.services.api.loadbalancer.server.port=8000
+    - traefik.http.routers.api.middlewares=rate-limit@file,compress@file
     mem_limit: 1536m
     cpus: 0.5
     healthcheck:

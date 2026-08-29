@@ -56,8 +56,8 @@ def inspect_hardware_and_execution_layer():
         if cuda_available:
             gpu_name = torch.cuda.get_device_name(0)
             vram_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Torch GPU check fallback", error=str(exc))
 
     # Fallback to nvidia-smi if torch-cpu is installed
     if not cuda_available:
@@ -68,8 +68,8 @@ def inspect_hardware_and_execution_layer():
                 parts = smi_out.strip().split(",")
                 gpu_name = parts[0].strip() + " (Fiziksel Kart Mevcut)"
                 vram_total = float(parts[1].strip()) / 1024.0
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("nvidia-smi fallback notice", error=str(exc))
 
     # 2. RAM Check
     mem = psutil.virtual_memory()

@@ -122,42 +122,57 @@ class RankingModel:
             "cs_zscore_roc_5d",
             "cs_zscore_roc_20d",
             # Risk
+            # Risk
             "atr_pct",
             "volatility_20d",
             "realized_vol_20d",
             # Market Breadth
             "market_breadth",
             "market_ad_ratio",
+            # Price Action & Mum Motoru (Verified Alpha Engine)
+            "buyer_pressure_pct",
+            "candle_score",
+            "has_bullish_pattern",
+            "has_fvg",
+            "vol_adj_mom",
         ]
 
-        # Rejim bazlı feature ağırlıkları
+        # Rejim bazlı feature ağırlıkları (Master Hyper-Search ile Doğrulanan Zirve Ağırlıklar)
         self._regime_feature_weights = {
             "BULL": {
-                "momentum_20d": 1.5,
-                "roc_5d": 1.3,
+                "volume_trend": 1.6,
+                "sector_rel_return_5d": 1.5,
+                "vol_adj_mom": 1.4,
+                "momentum_20d": 1.4,
+                "buyer_pressure_pct": 1.3,
+                "has_bullish_pattern": 1.2,
+                "roc_5d": 1.2,
+                "trend_r2_20d": 1.2,
                 "trend_slope_20d": 1.2,
-                "volume_zscore": 1.1,
-                "rs_vs_bist_5d": 1.2,
+                "volume_zscore": 1.2,
+                "rs_vs_bist_5d": 1.3,
                 "breakout_failure": 0.5,
                 "drawdown_20d": 0.5,
             },
             "BEAR": {
+                "trend_r2_20d": 1.5,
+                "balance_sheet_quality": 1.4,
+                "falling_is_temporary": 1.3,
                 "momentum_20d": 0.5,
                 "roc_5d": 0.6,
                 "trend_slope_20d": 0.5,
                 "volume_zscore": 1.2,
                 "rs_vs_bist_5d": 0.8,
                 "breakout_failure": 1.5,
-                "drawdown_20d": 1.3,
-                "falling_is_temporary": 1.2,
-                "balance_sheet_quality": 1.3,
+                "drawdown_20d": 1.4,
             },
             "SIDEWAYS": {
-                "momentum_20d": 0.8,
-                "roc_5d": 0.8,
+                "rs_vs_bist_5d": 1.3,
+                "roc_5d": 1.2,
+                "momentum_20d": 0.9,
                 "bb_position": 1.3,
-                "volume_zscore": 1.0,
-                "rs_vs_bist_5d": 1.0,
+                "volume_zscore": 1.1,
+                "buyer_pressure_pct": 1.2,
                 "sector_norm_pe_ratio": 1.2,
                 "fcf_yield_pct": 1.2,
             },
@@ -171,7 +186,29 @@ class RankingModel:
         self._feature_importance = {}
         self._feature_importance_history = []
 
-        logger.info("RankingModel v3.0 initialized", features=len(self._feature_names))
+        self._try_load_pretrained()
+
+        logger.info("RankingModel v3.0 initialized", features=len(self._feature_names), is_trained=self._is_trained)
+
+    def _try_load_pretrained(self) -> None:
+        """Disk üzerinde önceden eğitilmiş LambdaRank modeli varsa otomatik yükle."""
+        try:
+            from pathlib import Path
+
+            from services.core.safe_pickle import safe_pickle_load
+
+            p = Path("models/lightgbm_lambdarank.pkl")
+            if p.exists():
+                loaded = safe_pickle_load(str(p))
+                if hasattr(loaded, "model") and loaded.model is not None:
+                    self._lgbm_model = loaded.model
+                    self._is_trained = True
+                elif loaded is not None:
+                    self._lgbm_model = loaded
+                    self._is_trained = True
+                logger.info("RankingModel pre-trained LambdaRank model loaded", path=str(p))
+        except Exception as e:
+            logger.debug("RankingModel pre-trained model load notice", error=str(e))
 
     def train(
         self,
@@ -522,6 +559,27 @@ class RankingModel:
         falling_temp = _s(features.get("falling_is_temporary", 0.5))
         if falling_temp > 0.7 and regime in ("BEAR", "HIGH_VOL", "HIGH_VOLATILITY"):
             score += 3.0  # Geçici düşüş + kötü rejim = fırsat
+
+        # === MUM & PRICE ACTION INTELLIGENCE (CandlePatternEngine Bulguları) ===
+        buyer_pressure = _s(features.get("buyer_pressure_pct", 50.0))
+        candle_score = _s(features.get("candle_score", 50.0))
+        has_bull_pat = bool(features.get("has_bullish_pattern", False))
+        has_fvg = bool(features.get("has_fvg", False))
+
+        if buyer_pressure >= 55.0:
+            score += (buyer_pressure - 50.0) * 0.15  # Alıcı gücü katkısı
+        elif buyer_pressure <= 40.0:
+            score -= (50.0 - buyer_pressure) * 0.15  # Satıcı baskısı cezası
+
+        if has_bull_pat:
+            score += 4.0  # Çekiç/Engulfing dip dönüş onayı
+        if has_fvg:
+            score += 3.0  # Smart Money likidite giriş boşluğu
+
+        # Volatilite ayarlı momentum (Sharpe proxy)
+        vol_adj = _s(features.get("vol_adj_mom", 0.0))
+        if vol_adj != 0:
+            score += float(np.clip(vol_adj, -3.0, 3.0)) * 1.5
 
         # === Sınırla ===
         return max(0.0, min(100.0, float(score)))

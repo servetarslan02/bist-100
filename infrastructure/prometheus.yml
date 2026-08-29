@@ -58,11 +58,12 @@ scrape_configs:
     scrape_interval: 15s
 
   # === Infrastructure ===
-  - job_name: 'nats'
-    static_configs:
-      - targets: ['nats:8222']
-    metrics_path: '/varz'
-    scrape_interval: 10s
+  # NATS varz returns JSON; uncomment when nats-prometheus-exporter is active
+  # - job_name: 'nats'
+  #   static_configs:
+  #     - targets: ['nats:8222']
+  #   metrics_path: '/varz'
+  #   scrape_interval: 10s
 
   - job_name: 'traefik'
     static_configs:

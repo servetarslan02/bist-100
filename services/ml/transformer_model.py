@@ -37,8 +37,8 @@ class TransformerConfig:
             import torch
             if os.environ.get("FORCE_CPU") != "1" and torch.cuda.is_available():
                 self.device = "cuda"
-        except Exception:
-            pass
+        except Exception as d_err:
+            logger.debug("Transformer device check notice", error=str(d_err))
 
 
 class PositionalEncoding:

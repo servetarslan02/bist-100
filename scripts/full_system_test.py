@@ -64,8 +64,8 @@ def cleanup_db(path):
     try:
         if path and os.path.exists(path):
             os.unlink(path)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Cleanup db notice", error=str(exc))
 
 def make_portfolio(capital=CAPITAL, strict_t2=True):
     from services.paper_trading.virtual_portfolio import VirtualPortfolio

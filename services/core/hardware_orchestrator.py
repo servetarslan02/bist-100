@@ -74,7 +74,7 @@ class SSDThrottledWriter:
         self._worker_thread = threading.Thread(target=self._flusher_loop, daemon=True, name="SSDThrottledWriter")
         self._worker_thread.start()
 
-    def enqueue_write(self, target_path: str, data: str | bytes, append: bool = True):
+    def enqueue_write(self, target_path: str, data: str | bytes, append: bool = True) -> None:
         """Diske yazılacak veriyi RAM kuyruğuna ekler (Gecikmesiz / Non-blocking)."""
         try:
             self._write_queue.put_nowait((target_path, data, append))
@@ -82,7 +82,7 @@ class SSDThrottledWriter:
             # Kuyruk aşırı dolarsa hemen doğrudan senkron yaz
             self._direct_write(target_path, data, append)
 
-    def _direct_write(self, target_path: str, data: str | bytes, append: bool):
+    def _direct_write(self, target_path: str, data: str | bytes, append: bool) -> None:
         try:
             mode = "a" if append else "w"
             if isinstance(data, bytes):
@@ -96,12 +96,12 @@ class SSDThrottledWriter:
         except Exception as e:
             logger.error("Direct SSD write error", path=target_path, error=str(e))
 
-    def _flusher_loop(self):
+    def _flusher_loop(self) -> None:
         while self._running:
             time.sleep(self.flush_interval_sec)
             self.flush()
 
-    def flush(self):
+    def flush(self) -> None:
         """RAM tamponundaki tüm birikmiş yazma işlemlerini tek blokta SSD'ye yazar."""
         if self._write_queue.empty():
             return
@@ -147,7 +147,7 @@ class SSDThrottledWriter:
                 "total_mb_written": round(self._total_bytes_written / (1024 * 1024), 3),
             }
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self._running = False
         self.flush()
 
@@ -167,7 +167,7 @@ class HardwareOrchestrator:
         
         self._detect_and_configure_hardware()
 
-    def _detect_and_configure_hardware(self):
+    def _detect_and_configure_hardware(self) -> None:
         """Donanımı algılar ve GPU/CUDA optimizasyonlarını devreye sokar."""
         try:
             import torch

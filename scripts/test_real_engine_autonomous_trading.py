@@ -20,6 +20,15 @@ sys.path.insert(0, str(ROOT))
 
 from datetime import datetime, timedelta
 import polars as pl
+import sys
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception as exc:
+        sys.stderr.write(f"Encoding warning: {exc}\n")
+
 import structlog
 
 from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
@@ -80,8 +89,8 @@ def run_real_engine_simulation():
     if test_db_path.exists():
         try:
             test_db_path.unlink()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Test db unlink notice", error=str(exc))
 
     store = PaperStateStore(db_path=str(test_db_path))
     risk_gate = PaperRiskGate(max_position_pct=25.0, max_sector_pct=35.0)

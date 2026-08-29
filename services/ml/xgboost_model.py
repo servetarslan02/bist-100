@@ -353,8 +353,8 @@ class XGBoostModel:
             import torch
             if torch.cuda.is_available():
                 gpu_params = {"tree_method": "hist", "device": "cuda"}
-        except Exception:
-            pass
+        except Exception as t_err:
+            logger.debug("XGBoost GPU check fallback", error=str(t_err))
 
         if is_classifier:
             return xgb_module.XGBClassifier(

@@ -138,7 +138,7 @@ STALE_DATA_THRESHOLD_HOURS = 24  # Eski veri eşiği (saat)
 # =====================================================
 
 DEFAULT_INITIAL_CAPITAL = 10_000_000.0  # Varsayılan başlangıç sermayesi (TL)
-MAX_POSITIONS = 20  # Max pozisyon sayısı
+MAX_POSITIONS = 30  # Max pozisyon sayısı (Boğada 0-30 hisseye kadar dinamik)
 REBALANCE_THRESHOLD_PCT = 5.0  # Rebalance eşik (%)
 MAX_TURNOVER = 0.30  # Max turnover (0-1)
 

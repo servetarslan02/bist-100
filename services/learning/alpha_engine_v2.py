@@ -1,8 +1,4 @@
-from typing import Any
 """
-import structlog
-logger = structlog.get_logger()
-
 ALPHA ENGINE v2 (Vectorized Ultra-Fast)
 =======================================
 BIST Gercekleri:
@@ -11,6 +7,10 @@ BIST Gercekleri:
 3. Katı Stop-Loss (%8) ile buyuk dususlerden tam koruma
 4. Piyasa Genisligi (Market Breadth) filtresi
 """
+
+from typing import Any
+import structlog
+logger = structlog.get_logger()
 
 import time
 import warnings
