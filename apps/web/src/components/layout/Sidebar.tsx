@@ -53,60 +53,13 @@ const NAV_ITEMS = [
   },
 ];
 
-import { useState, useEffect } from "react";
 import { useGlobalSyncStatus } from "@/lib/api";
-import { useIstanbulClock } from "@/lib/time";
-
-function IstanbulClockWidget() {
-  const clock = useIstanbulClock();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 mb-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-mono font-bold text-zinc-400">--:--:-- TSI</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">BİST</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-2.5 rounded-lg bg-white/[0.03] border border-white/10 mb-2">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <Clock size={11} className="text-emerald-400" />
-          <span className="text-[13px] font-mono font-bold text-emerald-400 tracking-wider">
-            {clock.time}
-          </span>
-          <span className="text-[9px] font-bold text-zinc-400 uppercase">TSI</span>
-        </div>
-        <span className={`text-[8.5px] font-semibold px-1.5 py-0.5 rounded ${
-          clock.isMarketOpen 
-            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
-            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
-        }`}>
-          {clock.marketStatus}
-        </span>
-      </div>
-      <div className="flex items-center justify-between text-[10px] text-zinc-400">
-        <span>{clock.date}</span>
-        <span className="text-zinc-500 font-medium">{clock.dayName}</span>
-      </div>
-    </div>
-  );
-}
 
 function LiveEnginePulse() {
   const { secondsAgo } = useGlobalSyncStatus();
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 px-2 py-1">
       <div
         className={`w-2 h-2 rounded-full flex-shrink-0 ${
           secondsAgo < 10
@@ -127,7 +80,7 @@ function LiveEnginePulse() {
               : "#ff4466",
         }}
       >
-        CANLI MOTOR
+        CANLI MOTOR ({secondsAgo < 15 ? "AKTİF" : `${secondsAgo}s`})
       </span>
     </div>
   );
@@ -206,7 +159,6 @@ export function Sidebar() {
       </nav>
 
       <div className="px-3 py-3" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
-        <IstanbulClockWidget />
         <LiveEnginePulse />
       </div>
     </aside>

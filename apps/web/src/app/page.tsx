@@ -217,17 +217,6 @@ export default function ClientPageRoot() {
         </div>
 
         <div className="flex items-center gap-3">
-          {mounted && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 shadow-sm">
-              <Clock size={12} className="text-emerald-400" />
-              <span className="text-emerald-400 font-bold">{clock.time}</span>
-              <span className="text-[10px] text-zinc-400 font-sans">TSI</span>
-              <span className="text-zinc-700">|</span>
-              <span className={clock.isMarketOpen ? "text-emerald-400 font-semibold" : "text-zinc-400"}>
-                {clock.marketStatus}
-              </span>
-            </div>
-          )}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium"
             style={{
               background: systemOk ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)",

@@ -165,11 +165,6 @@ export default function RadarPage() {
                 : <><WifiOff size={9} /> Borsa Kapalı</>
               }
             </span>
-            {lastUpdated && (
-              <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
-                · Son Güncelleme (TSI): {formatIstanbulTime(lastUpdated)}
-              </span>
-            )}
           </div>
         </div>
 

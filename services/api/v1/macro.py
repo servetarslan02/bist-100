@@ -1,6 +1,7 @@
 """Macro API — Gerçek canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
 
 import asyncio
+from datetime import datetime, UTC
 import time
 from typing import Any
 
@@ -38,7 +39,7 @@ _cached_macro_data: dict[str, Any] = {
     "inflation_pressure": 0.41,
     "us_rate_pressure": 0.55,
     "fed_rate_cut_prob": 0.72,
-    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    "updated_at": datetime.now(UTC).isoformat(),
     "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
     "macro_commentary": "Dolar ve CDS dengeli seviyelerde. Risk iştahı pozitif.",
     "bist_macro_bias": "POZİTİF",
@@ -87,7 +88,7 @@ def _fetch_live_macro_data() -> dict[str, Any]:
         "inflation_pressure": 0.41,
         "us_rate_pressure": 0.55,
         "fed_rate_cut_prob": 0.72,
-        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "updated_at": datetime.now(UTC).isoformat(),
         "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
     }
 
