@@ -42,6 +42,7 @@ class OptimizationMethod(StrEnum):
     MIN_VARIANCE = "MIN_VARIANCE"
     BLACK_LITTERMAN = "BLACK_LITTERMAN"
     EQUAL_WEIGHT = "EQUAL_WEIGHT"
+    AUTONOMOUS_CONVICTION = "AUTONOMOUS_CONVICTION"
 
 
 @dataclass
@@ -270,6 +271,14 @@ class PortfolioOptimizer:
                 tickers=tickers,
                 constraints=constraints,
             )
+
+        elif method == OptimizationMethod.AUTONOMOUS_CONVICTION:
+            variances = np.maximum(np.diag(cov_matrix), 1e-4)
+            pos_rets = np.maximum(expected_returns, 1e-4)
+            raw_w = (pos_rets ** 1.5) / variances
+            if np.sum(raw_w) > 0:
+                return raw_w / np.sum(raw_w), True
+            return np.ones(n) / n, True
 
         return np.ones(n) / n, True
 

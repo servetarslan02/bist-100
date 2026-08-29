@@ -1,0 +1,619 @@
+{
+  "run_timestamp": "2026-08-29T20:42:14.398199",
+  "total": 76,
+  "pass": 43,
+  "fail": 28,
+  "warn": 5,
+  "skip": 0,
+  "score_pct": 63.2,
+  "scenarios": [
+    {
+      "id": "RG-01",
+      "name": "Kill Switch Aktif → Tüm Emirler Reddedilmeli",
+      "status": "PASS",
+      "details": "Kill switch aktif → 5/5 emir reddedildi ✓",
+      "duration_ms": 466.4,
+      "error": ""
+    },
+    {
+      "id": "RG-02",
+      "name": "Veri Kalitesi FAIL → NO_TRADE",
+      "status": "PASS",
+      "details": "Veri kalitesi FAIL → data_quality NO_TRADE ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "RG-03",
+      "name": "Tek Hisse Max %10 Limiti → BLOCK",
+      "status": "PASS",
+      "details": "Tek hisse %10.5 > %10 → BLOCK ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "RG-04",
+      "name": "Sektör Konsantrasyon Max %30 → BLOCK",
+      "status": "PASS",
+      "details": "Sektör toplam > %30 → BLOCK ✓",
+      "duration_ms": 33839.9,
+      "error": ""
+    },
+    {
+      "id": "RG-05",
+      "name": "Portföy %100 Dolu → Alım Gücü Yetersiz",
+      "status": "WARN",
+      "details": "Portföy doluluk: 10000₺ alım gücü hala var",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "RG-06",
+      "name": "Günlük Kayıp %5 → NO_TRADE",
+      "status": "WARN",
+      "details": "Günlük kayıp check: 'PASS' — detay: Not enough history",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "RG-07",
+      "name": "Max Drawdown %25 → Kill Switch",
+      "status": "PASS",
+      "details": "Max drawdown > %25 → BLOCK ✓  (Max drawdown 26.0% >= kill-switch 25.0%)",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "RG-08",
+      "name": "SELL Emirleri Pozisyon Boyutu Limitinden Muaf",
+      "status": "PASS",
+      "details": "SELL emirleri pozisyon boyutu limitinden muaf ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "EX-01",
+      "name": "BIST Tavan Fiyatta Alım → REJECTED",
+      "status": "PASS",
+      "details": "Tavan kilitli alım → REJECTED ✓  (PRICE_LIMIT: fill price outside BIST daily price band)",
+      "duration_ms": 1.5,
+      "error": ""
+    },
+    {
+      "id": "EX-02",
+      "name": "BIST Taban Fiyatta Satış → REJECTED",
+      "status": "PASS",
+      "details": "Taban kilitli satış → REJECTED ✓  (BIST_LIMIT_DOWN_LOCKED: GARAN taban fiyatta (%-9.90). Satış )",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "EX-03",
+      "name": "Normal Alım: Komisyon + BSMV Hesabı",
+      "status": "PASS",
+      "details": "Fiyat=40.02₺  Komisyon=14.96₺  (3.7bps) ✓",
+      "duration_ms": 170.9,
+      "error": ""
+    },
+    {
+      "id": "EX-04",
+      "name": "Seans Kapalı → Tüm Emirler Reddedilmeli",
+      "status": "PASS",
+      "details": "Kapalı seans → REJECTED ✓  (MARKET_CLOSED_OR_HALTED: CLOSED)",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-05",
+      "name": "Halt Aktif → REJECTED",
+      "status": "PASS",
+      "details": "Halt aktif → REJECTED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-06",
+      "name": "Limit Emir Fiyata Ulaşmadı → UNFILLED",
+      "status": "PASS",
+      "details": "Limit fiyata ulaşmadı → UNFILLED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-07",
+      "name": "Desteklenmeyen Emir Tipi → REJECTED",
+      "status": "PASS",
+      "details": "Desteklenmeyen emir tipi → REJECTED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-08",
+      "name": "Büyük Emir Hacmi → Slippage Artar / Likidite Kısıtı",
+      "status": "WARN",
+      "details": "Slippage skalalaması: 0.0250% → 0.0000%, büyük=PARTIAL_FILL",
+      "duration_ms": 1.0,
+      "error": ""
+    },
+    {
+      "id": "EX-09",
+      "name": "Açılış Açık Artırması → Emir Kabul",
+      "status": "PASS",
+      "details": "Açılış açık artırması → FILLED ✓",
+      "duration_ms": 0.4,
+      "error": ""
+    },
+    {
+      "id": "EX-10",
+      "name": "Kapanış Sonrası Emir → REJECTED",
+      "status": "PASS",
+      "details": "Kapanış sonrası emir → REJECTED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "T2-01",
+      "name": "Aynı Gün Alım-Satış Yasağı (Brüt Takas)",
+      "status": "PASS",
+      "details": "Brüt Takas: aynı gün alınan hisse aynı gün satılamaz ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "T2-02",
+      "name": "Satış Geliri T+2 Valör Zinciri",
+      "status": "PASS",
+      "details": "T+2→T+1→Settled zinciri ✓ (Settled:1,005,000₺)",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "T2-03",
+      "name": "Alım Gücü Formülü: Settled+T1+T2-Bloke",
+      "status": "PASS",
+      "details": "Alım gücü = Settled+T1+T2-Bloke = 500,000₺ ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "T2-04",
+      "name": "Temettü: %10 Stopaj Düşülerek Net Ödeme",
+      "status": "PASS",
+      "details": "Temettü: 2.000₺ brüt → 1800₺ net (%10 stopaj) ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "T2-05",
+      "name": "Bedelsiz Hisse: Lot Artışı + Maliyet Revizyonu",
+      "status": "PASS",
+      "details": "Bedelsiz: 1000→1250 lot, maliyet 60→48.00₺ ✓",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "T2-06",
+      "name": "Çoklu Gün T+2 Roll Zinciri",
+      "status": "PASS",
+      "details": "T+2→T+1→Settled 2 günlük roll zinciri ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "T2-07",
+      "name": "Kısmi Satış + Ağırlıklı Ortalama Maliyet",
+      "status": "PASS",
+      "details": "Kısmi satış: 300 lot @ 210₺ → Kâr 3,000₺, kalan 700 lot ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "T2-08",
+      "name": "Tam Pozisyon Kapama → Realized P&L Doğruluğu",
+      "status": "PASS",
+      "details": "Tam kapama: 2000 lot 80→92₺ → Kâr 24,000₺ ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "FL-01",
+      "name": "BIST Tatil Günleri Doğru Tespit Ediliyor mu?",
+      "status": "FAIL",
+      "details": "İstisna: 'str' object has no attribute 'weekday'",
+      "duration_ms": 1.8,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 443, in t_fl01\n    if not cal.is_trading_day(cur.isoformat()) and cu"
+    },
+    {
+      "id": "FL-02",
+      "name": "50 Farklı Hisse Döngüsü — Her Hareket Kayıt",
+      "status": "FAIL",
+      "details": "İstisna: Constraint Error: NOT NULL constraint failed: audit_log.entry_id",
+      "duration_ms": 712.5,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\paper_trading\\paper_orchestrator.py\", line 214, in process_daily_cycle\n    res = self._process_signal(\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\paper_"
+    },
+    {
+      "id": "FL-03",
+      "name": "SELL Önce BUY Sonra Sıralama Mantığı",
+      "status": "FAIL",
+      "details": "İstisna: Constraint Error: NOT NULL constraint failed: audit_log.entry_id",
+      "duration_ms": 78.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\paper_trading\\paper_orchestrator.py\", line 214, in process_daily_cycle\n    res = self._process_signal(\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\paper_"
+    },
+    {
+      "id": "FL-04",
+      "name": "Çift Alım → Tek Pozisyon Ağırlıklı Ortalama",
+      "status": "PASS",
+      "details": "Çift alım → tek pozisyon (1000 lot, avg=51.00₺) ✓",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "FL-05",
+      "name": "Fiyat Güncelleme + Equity Curve Kaydı",
+      "status": "PASS",
+      "details": "Fiyat güncellemesi + equity curve ✓  (Son equity: 1,006,000₺)",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "FL-06",
+      "name": "Stop-Loss Satış Zinciri → Zarar Hesabı",
+      "status": "PASS",
+      "details": "Stop-loss: zarar -15,000₺ ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "FL-07",
+      "name": "PC Kapalıyken Geçen Günleri Telafi (Recovery)",
+      "status": "PASS",
+      "details": "İlk çalıştırma → FIRST_RUN (recovery gerekmiyor) ✓",
+      "duration_ms": 60.4,
+      "error": ""
+    },
+    {
+      "id": "FL-08",
+      "name": "Boş Sinyal Listesi → NO_TRADE Güvenlik",
+      "status": "FAIL",
+      "details": "İstisna: Constraint Error: NOT NULL constraint failed: audit_log.entry_id",
+      "duration_ms": 61.5,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 543, in t_fl08\n    res=daily_cycle(orch,\"2025-06-15\",[],{\"GARAN\":50."
+    },
+    {
+      "id": "VAR-01",
+      "name": "Parametrik VaR %95/%99 Hesabı",
+      "status": "FAIL",
+      "details": "İstisna: 'float' object has no attribute 'var_95'",
+      "duration_ms": 938.4,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 561, in t_var01\n    if res and res.var_95>0 and res.var_99>res.var_9"
+    },
+    {
+      "id": "VAR-02",
+      "name": "Tarihsel VaR %99 + CVaR (Expected Shortfall)",
+      "status": "FAIL",
+      "details": "İstisna: 'float' object has no attribute 'var_99'",
+      "duration_ms": 1.9,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 574, in t_var02\n    if res and res.var_99>0:\n               ^^^^^^^^"
+    },
+    {
+      "id": "VAR-03",
+      "name": "Monte Carlo VaR (5000 Simülasyon Yolu)",
+      "status": "FAIL",
+      "details": "İstisna: 'MonteCarloResult' object has no attribute 'var_95_amount'",
+      "duration_ms": 2127.8,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 588, in t_var03\n    r.ok(f\"Monte Carlo VaR %95: {res.var_95_amount:,"
+    },
+    {
+      "id": "VAR-04",
+      "name": "Portföy VaR + Diversifikasyon Etkisi",
+      "status": "FAIL",
+      "details": "İstisna: VaRCalculator.calculate_full_var_report() got an unexpected keyword argument 'positions'",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 603, in t_var04\n    res = vc.calculate_full_var_report(positions=pos"
+    },
+    {
+      "id": "VAR-05",
+      "name": "VaR Tabanlı Pozisyon Büyüklüğü Limiti",
+      "status": "FAIL",
+      "details": "İstisna: VaRCalculator.calculate_var_based_position_limit() got an unexpected keyword argument 'max_var_amount'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 617, in t_var05\n    limit_pct = vc.calculate_var_based_position_limi"
+    },
+    {
+      "id": "VAR-06",
+      "name": "Component VaR — Her Pozisyonun Risk Katkısı",
+      "status": "FAIL",
+      "details": "İstisna: VaRCalculator.calculate_component_var() got an unexpected keyword argument 'positions'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 636, in t_var06\n    cvars = vc.calculate_component_var(positions=pos"
+    },
+    {
+      "id": "ST-01",
+      "name": "2008 Global Finansal Kriz Stres Senaryosu",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.run_scenario() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 663, in t_st01\n    res = eng.run_scenario(port, \"2008_GLOBAL_CRISIS\""
+    },
+    {
+      "id": "ST-02",
+      "name": "COVID-19 2020 Çöküşü Stres Senaryosu",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.run_scenario() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 675, in t_st02\n    res = eng.run_scenario(port, \"2020_COVID\", portfo"
+    },
+    {
+      "id": "ST-03",
+      "name": "USDTRY +%50 Kriz Senaryosu (Özel)",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.run_scenario() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 695, in t_st03\n    res = eng.run_scenario(port, \"USDTRY_CRASH_50PCT\""
+    },
+    {
+      "id": "ST-04",
+      "name": "Tüm Tarihsel + Hipotetik Senaryolar Raporu",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.run_all_scenarios() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 706, in t_st04\n    report = eng.run_all_scenarios(port, portfolio_va"
+    },
+    {
+      "id": "ST-05",
+      "name": "Monte Carlo Stres Testi (1000 Senaryo, 21 Gün)",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.run_monte_carlo_stress() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 718, in t_st05\n    mc_res = eng.run_monte_carlo_stress(port, portfol"
+    },
+    {
+      "id": "ST-06",
+      "name": "Portföy Kırılma Noktası (Breaking Point)",
+      "status": "FAIL",
+      "details": "İstisna: StressTestEngine.find_breaking_point() got an unexpected keyword argument 'portfolio_value'",
+      "duration_ms": 0.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 731, in t_st06\n    bp = eng.find_breaking_point(port, portfolio_valu"
+    },
+    {
+      "id": "PS-01",
+      "name": "Fractional Kelly Pozisyon Boyutlandırma",
+      "status": "PASS",
+      "details": "Kelly pozisyon boyutu: 3 hisse, max=0.6%, toplam=1.6% ✓",
+      "duration_ms": 6.2,
+      "error": ""
+    },
+    {
+      "id": "PS-02",
+      "name": "Aşırı Kelly → Max Pozisyon Sınırına Kırpma",
+      "status": "PASS",
+      "details": "Aşırı Kelly → max %10'a kırpıldı ✓ (weight=1.0%)",
+      "duration_ms": 0.5,
+      "error": ""
+    },
+    {
+      "id": "PS-03",
+      "name": "Volatilite Hedefleme: Yüksek Vol → Küçük Pozisyon",
+      "status": "PASS",
+      "details": "Vol targeting: yüksek vol → 0.2%, düşük vol → 0.6% ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "PS-04",
+      "name": "Max Toplam Portföy Exposure Sınırı",
+      "status": "PASS",
+      "details": "Max toplam exposure %80: toplam=8.4% ✓",
+      "duration_ms": 5.3,
+      "error": ""
+    },
+    {
+      "id": "PS-05",
+      "name": "Negatif Beklentili Fırsatta Pozisyon Açılmamalı",
+      "status": "WARN",
+      "details": "Negatif Kelly fırsatı için pozisyon açıldı: 0.4%",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "PS-06",
+      "name": "BIST İşlem Maliyetleri: Fee + Market Impact + Slippage",
+      "status": "FAIL",
+      "details": "İstisna: MarketImpactModel.estimate_impact() got an unexpected keyword argument 'quantity_tl'",
+      "duration_ms": 736.0,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 830, in t_ps06\n    impact = mim.estimate_impact(quantity_tl=1_000_00"
+    },
+    {
+      "id": "CC-01",
+      "name": "Champion Terfi (Promote) Mekanizması",
+      "status": "PASS",
+      "details": "Champion terfi: v1_baseline başarıyla champion ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "CC-02",
+      "name": "Challenger Reddi → Champion Korunuyor",
+      "status": "PASS",
+      "details": "Challenger reddedildi → champion korundu ✓",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "CC-03",
+      "name": "Rollback: Önceki Champion Versiyonuna Geri Dön",
+      "status": "FAIL",
+      "details": "İstisna: ChampionChallengerEngine.rollback() missing 1 required positional argument: 'to_version'",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 870, in t_cc03\n    cc.rollback()\nTypeError: ChampionChallengerEngine"
+    },
+    {
+      "id": "CC-04",
+      "name": "Canary Deployment: Yeni Model %10 Trafik",
+      "status": "FAIL",
+      "details": "İstisna: ChampionChallengerEngine.canary_deploy() got an unexpected keyword argument 'allocation'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 883, in t_cc04\n    cc.canary_deploy(\"v2_canary\",\"v2_canary_ver\",allo"
+    },
+    {
+      "id": "CC-05",
+      "name": "Champion Geçmişi ve Audit Trail",
+      "status": "PASS",
+      "details": "Champion geçmişi: 2 kayıt tutuldu ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "CC-06",
+      "name": "Model Governance: Bağımsız Doğrulama Gerekliliği",
+      "status": "PASS",
+      "details": "Governance: Champion kaydı + tam rapor mevcut ✓ (prod'da yalnızca Yönetişim Beyni promota edebilir)",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "CC-07",
+      "name": "Feature Drift Detection: Model Bozunması Alarmı",
+      "status": "FAIL",
+      "details": "İstisna: FeatureDriftDetector.check_drift() got an unexpected keyword argument 'baseline_features'",
+      "duration_ms": 34.4,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 931, in t_cc07\n    result = fd.check_drift(baseline_features=baselin"
+    },
+    {
+      "id": "CC-08",
+      "name": "Model Degradation Monitor: IC Bozunması Tespiti",
+      "status": "FAIL",
+      "details": "İstisna: 'ModelDegradationMonitor' object has no attribute 'update'",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 949, in t_cc08\n    mon.update(ic_value=ic, date=f\"2025-{i+1:03d}\")\n "
+    },
+    {
+      "id": "BT-01",
+      "name": "PIT: Gelecek Veri Train'e Sızmıyor mu?",
+      "status": "PASS",
+      "details": "PIT uyumu: train 2022-12-31 → purge → test 2023-01-06 ✓ (6 gün fark)",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "BT-02",
+      "name": "Purge + Embargo Aralıkları Uygulanıyor mu?",
+      "status": "PASS",
+      "details": "Purge=5gün, Embargo=5gün ✓",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "BT-03",
+      "name": "Backtest İşlem Maliyetleri Dahil mi?",
+      "status": "FAIL",
+      "details": "İstisna: MarketImpactModel.estimate_impact() got an unexpected keyword argument 'quantity_tl'",
+      "duration_ms": 0.4,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 994, in t_bt03\n    impact = mim.estimate_impact(quantity_tl=500_000,"
+    },
+    {
+      "id": "BT-04",
+      "name": "Survivorship Bias: De-Liste Hisseler Dahil mi?",
+      "status": "FAIL",
+      "details": "İstisna: DelistingEvent.__init__() got an unexpected keyword argument 'delist_date'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1010, in t_bt04\n    sbh.register_delisting(DelistingEvent(\n         "
+    },
+    {
+      "id": "BT-05",
+      "name": "Deflated Sharpe Ratio (Çoklu Test Düzeltmesi)",
+      "status": "FAIL",
+      "details": "İstisna: cannot import name 'from_returns' from 'services.backtest.deflated_sharpe' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\deflated_sharpe.py)",
+      "duration_ms": 0.8,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1024, in t_bt05\n    from services.backtest.deflated_sharpe import fr"
+    },
+    {
+      "id": "BT-06",
+      "name": "Look-Ahead Bias Dedektörü",
+      "status": "FAIL",
+      "details": "İstisna: LookAheadBiasDetector.validate_label_feature_alignment() got an unexpected keyword argument 'lookahead_days'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1041, in t_bt06\n    res = ld.validate_label_feature_alignment([featu"
+    },
+    {
+      "id": "BT-07",
+      "name": "Fold Sınır Doğrulaması (Purge Yeterliliği)",
+      "status": "FAIL",
+      "details": "İstisna: LookAheadBiasDetector.validate_fold_boundaries() got an unexpected keyword argument 'min_purge_days'",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1057, in t_bt07\n    res = ld.validate_fold_boundaries(folds, min_pur"
+    },
+    {
+      "id": "BT-08",
+      "name": "Rolling Window Feature PIT Doğrulaması",
+      "status": "FAIL",
+      "details": "İstisna: LookAheadBiasDetector.validate_rolling_window() missing 2 required positional arguments: 'window_size' and 'feature_name'",
+      "duration_ms": 0.2,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1072, in t_bt08\n    res = ld.validate_rolling_window(window_data)\n  "
+    },
+    {
+      "id": "PM-01",
+      "name": "1 Yıllık CAGR + Sharpe + MaxDD Metrikleri",
+      "status": "PASS",
+      "details": "Yıllık metrikler: CAGR≈-4.0%  Sharpe≈-0.14  MaxDD≈15.6% ✓",
+      "duration_ms": 0.8,
+      "error": ""
+    },
+    {
+      "id": "PM-02",
+      "name": "Win Rate + Profit Factor + Avg Holding",
+      "status": "PASS",
+      "details": "Trade istatistikleri: WinRate=0.5%  ProfitFactor=1.27  AvgHold=10gün ✓",
+      "duration_ms": 0.9,
+      "error": ""
+    },
+    {
+      "id": "PM-03",
+      "name": "Alfa Hesabı: Sistem Getirisi vs BIST100",
+      "status": "WARN",
+      "details": "Alfa negatif: -20.11% — model gözden geçirilmeli",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "PM-04",
+      "name": "Max Drawdown ≤ %25 Hedef Kontrolü",
+      "status": "PASS",
+      "details": "Max drawdown: %14.5 ≤ hedef %25.0 ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "PM-05",
+      "name": "Sortino Ratio (Sadece Negatif Volatilite)",
+      "status": "PASS",
+      "details": "Sortino Ratio: -0.786 (sadece negatif sapma) ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "PM-06",
+      "name": "Calmar Ratio (CAGR / Max Drawdown)",
+      "status": "PASS",
+      "details": "Calmar Ratio: -0.253 (CAGR/MaxDD) ✓",
+      "duration_ms": 0.7,
+      "error": ""
+    },
+    {
+      "id": "PM-07",
+      "name": "Yıllık Turnover Oranı",
+      "status": "PASS",
+      "details": "Yıllık Turnover: 0.0x ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "PM-08",
+      "name": "Deflated Sharpe: Çoklu Test Cezalandırması",
+      "status": "FAIL",
+      "details": "İstisna: cannot import name 'from_returns' from 'services.backtest.deflated_sharpe' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\deflated_sharpe.py)",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 67, in run\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1202, in t_pm08\n    from services.backtest.deflated_sharpe import fr"
+    }
+  ]
+}

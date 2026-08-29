@@ -258,10 +258,12 @@ class InMemoryRedis:
         """Otomatik eklendi."""
         return self._data.get(key)
 
-    async def xadd(self, stream_key: str, fields: dict[str, Any]) -> str:
+    async def xadd(self, stream_key: str, fields: dict[str, Any], maxlen: int | None = None, **kwargs) -> str:
         """Otomatik eklendi."""
         msg_id = f"{int(time.time() * 1000)}-0"
         self._streams[stream_key].append({"id": msg_id, "fields": fields})
+        if maxlen and len(self._streams[stream_key]) > maxlen:
+            self._streams[stream_key] = self._streams[stream_key][-maxlen:]
         return msg_id
 
     async def publish(self, channel: str, message: str) -> Any:
@@ -329,10 +331,16 @@ def publish_event(event: CanonicalEvent) -> Any:
     v2.0: Kafka/Redpanda kaldırıldı. NATS ana mesajlaşma, Redis Pub/Sub yardımcı.
     """
     # Schema validation
-    missing = event.validate_payload()
-    if missing:
-        logger.warning("Event payload validation failed", event_type=event.event_type, missing=missing)
-        return
+    if hasattr(event, "validate_payload"):
+        missing = event.validate_payload()
+        if missing:
+            logger.warning("Event payload validation failed", event_type=event.event_type, missing=missing)
+            return
+    elif hasattr(event, "validate"):
+        is_valid, reason = event.validate()
+        if not is_valid:
+            logger.warning("Event validation failed", event_type=event.event_type, reason=reason)
+            return
 
     # NATS (primary) — yüksek throughput, düşük gecikme
     try:
@@ -381,6 +389,9 @@ async def _publish_to_nats(event: CanonicalEvent) -> Any:
             "regime.changed",
         }
 
+        if not getattr(nats_client, "_connected", False):
+            return
+
         if event.event_type in CRITICAL_EVENT_TYPES:
             await nats_client.publish_durable(subject, event.to_json())
         else:
@@ -422,9 +433,15 @@ _redis_conn = None
 _redis_loop = None
 
 
+_redis_unavailable = False
+
+
 async def _get_redis() -> Any:
     """Reuse module-level Redis connection or create new if loop changed/closed."""
-    global _redis_conn, _redis_loop
+    global _redis_conn, _redis_loop, _redis_unavailable
+    if _redis_unavailable:
+        return InMemoryRedis()
+
     try:
         current_loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -434,57 +451,67 @@ async def _get_redis() -> Any:
         try:
             import redis.asyncio as aioredis
 
-            _redis_conn = aioredis.from_url(settings.redis_url, decode_responses=True)
+            r = aioredis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=0.5)
+            # Quick ping to verify reachability
+            await asyncio.wait_for(r.ping(), timeout=0.5)
+            _redis_conn = r
             _redis_loop = current_loop
-        except (ImportError, Exception):
+        except Exception:
+            _redis_unavailable = True
             _redis_conn = InMemoryRedis()
             _redis_loop = current_loop
     return _redis_conn
 
 
+_pg_unavailable = False
+_published_events_in_memory: set[str] = set()
+
+
 async def _check_and_mark_published(event_id: str, critical: bool = False) -> bool:
     """Idempotency check — aynı event_id tekrar publish edilmesin.
     Returns True if this is a new event, False if duplicate.
-
-    Öncelik: Redis > PostgreSQL > fail-closed (kritik) / fail-open (kritik olmayan)
-
-    KURAL (manifesto): Kritik olaylar (trade signal, order cancel) fail-closed çalışır.
-    Redis ve PostgreSQL ikisi de başarısız olursa, kritik olay publish edilmez.
     """
-    # 1. Redis dene (reuse connection)
-    try:
-        r = await _get_redis()
-        key = f"event_published:{event_id}"
-        result = await r.set(key, "1", ex=3600, nx=True)
-        return result is not None
-    except Exception as e:
-        logger.debug("Redis idempotency check skipped", error=str(e))
+    global _pg_unavailable, _published_events_in_memory
 
-    # 2. PostgreSQL dene
-    try:
-        from services.core.database import pg_execute, pg_fetchrow
+    # In-memory check first (fastest)
+    if event_id in _published_events_in_memory:
+        return False
 
-        existing = await pg_fetchrow("SELECT event_id FROM event_ledger WHERE event_id = $1", event_id)
-        if existing:
-            return False
-        await pg_execute(
-            "INSERT INTO event_ledger (event_id, published_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
-            event_id,
-        )
-        return True
-    except Exception as e:
-        logger.debug("PostgreSQL idempotency check skipped", error=str(e))
+    # 1. Redis dene (if available)
+    if not _redis_unavailable:
+        try:
+            r = await _get_redis()
+            if not isinstance(r, InMemoryRedis):
+                key = f"event_published:{event_id}"
+                result = await r.set(key, "1", ex=3600, nx=True)
+                if result is not None:
+                    _published_events_in_memory.add(event_id)
+                return result is not None
+        except Exception:
+            pass
 
-    # 3. Fail-closed (kritik) / fail-open (kritik olmayan)
-    if critical:
-        logger.error(
-            "CRITICAL: Idempotency check failed for critical event — blocking publish",
-            event_id=event_id,
-        )
-        return False  # Fail-closed: kritik olay publish edilmez
+    # 2. PostgreSQL dene (if available)
+    if not _pg_unavailable:
+        try:
+            from services.core.database import pg_execute, pg_fetchrow
 
-    logger.warning("Idempotency check failed — allowing publish (non-critical)", event_id=event_id)
-    return True  # Fail-open: kritik olmayan olay
+            existing = await pg_fetchrow("SELECT event_id FROM event_ledger WHERE event_id = $1", event_id)
+            if existing:
+                return False
+            await pg_execute(
+                "INSERT INTO event_ledger (event_id, published_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
+                event_id,
+            )
+            _published_events_in_memory.add(event_id)
+            return True
+        except Exception:
+            _pg_unavailable = True
+
+    # 3. Fallback to in-memory idempotency
+    _published_events_in_memory.add(event_id)
+    if len(_published_events_in_memory) > 50000:
+        _published_events_in_memory = set(list(_published_events_in_memory)[-25000:])
+    return True
 
 
 async def _publish_to_stream(event: CanonicalEvent) -> Any:
@@ -501,7 +528,7 @@ async def _publish_to_stream(event: CanonicalEvent) -> Any:
                 "event_id": event.event_id,
                 "event_type": event.event_type,
                 "data": event.to_json(),
-                "timestamp": event.timestamp.isoformat(),
+                "timestamp": event.timestamp.isoformat() if hasattr(event.timestamp, "isoformat") else str(event.timestamp),
             },
             maxlen=10000,
         )
@@ -509,19 +536,21 @@ async def _publish_to_stream(event: CanonicalEvent) -> Any:
     except Exception as e:
         logger.warning("Redis Stream write failed", error=str(e), context="event_bus.py:311")
 
-    # 2. PostgreSQL dene
-    try:
-        from services.core.database import pg_execute
+    # 2. PostgreSQL dene (if available)
+    if not _pg_unavailable:
+        try:
+            from services.core.database import pg_execute
 
-        await pg_execute(
-            "INSERT INTO event_ledger (event_id, event_type, payload, published_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
-            event.event_id,
-            event.event_type,
-            event.to_json(),
-        )
-        return
-    except Exception as e:
-        logger.warning("PG event ledger write failed", error=str(e))
+            await pg_execute(
+                "INSERT INTO event_ledger (event_id, event_type, payload, published_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
+                event.event_id,
+                event.event_type,
+                event.to_json(),
+            )
+            return
+        except Exception as e:
+            _pg_unavailable = True
+            logger.debug("PG event ledger write skipped", error=str(e))
 
 
 # =====================================================

@@ -256,7 +256,7 @@ class PaperExecutionEngine:
                     "order_id": order_id,
                 },
             )
-            publish_event(order_event, key=ticker)
+            publish_event(order_event)
         except Exception:
             logger.warning("Caught Exception in execute_signal", exc_info=True)
 

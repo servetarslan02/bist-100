@@ -1,0 +1,543 @@
+{
+  "run_timestamp": "2026-08-29T21:08:34.353384",
+  "total": 76,
+  "pass": 76,
+  "fail": 0,
+  "warn": 0,
+  "skip": 0,
+  "score_pct": 100.0,
+  "scenarios": [
+    {
+      "id": "RG-01",
+      "name": "Kill Switch Aktif -> Tüm Emirler Reddedilmeli",
+      "status": "PASS",
+      "details": "Kill switch aktif -> 5/5 emir reddedildi",
+      "duration_ms": 285.1
+    },
+    {
+      "id": "RG-02",
+      "name": "Veri Kalitesi FAIL -> NO_TRADE",
+      "status": "PASS",
+      "details": "Veri kalitesi FAIL -> data_quality NO_TRADE",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "RG-03",
+      "name": "Tek Hisse Max %10 Limiti -> BLOCK",
+      "status": "PASS",
+      "details": "Tek hisse %10.5 > %10 -> BLOCK",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "RG-04",
+      "name": "Sektör Konsantrasyon Max %30 -> BLOCK",
+      "status": "PASS",
+      "details": "Sektör toplam > %30 -> BLOCK",
+      "duration_ms": 33924.4
+    },
+    {
+      "id": "RG-05",
+      "name": "Portföy %100 Dolu -> Alım Gücü Yetersiz",
+      "status": "PASS",
+      "details": "Alım gücü kalan: 10000TL",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "RG-06",
+      "name": "Günlük Kayıp %5 -> NO_TRADE",
+      "status": "PASS",
+      "details": "Günlük kayıp kontrolü devrede",
+      "duration_ms": 0.3
+    },
+    {
+      "id": "RG-07",
+      "name": "Max Drawdown %25 -> Kill Switch",
+      "status": "PASS",
+      "details": "Max drawdown limiti ve kill-switch devrede",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "RG-08",
+      "name": "SELL Emirleri Pozisyon Boyutu Limitinden Muaf",
+      "status": "PASS",
+      "details": "SELL emirleri pozisyon boyutu limitinden muaf",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "EX-01",
+      "name": "BIST Tavan Fiyatta Alım -> REJECTED",
+      "status": "PASS",
+      "details": "Tavan kilitli emir kontrolü tamam",
+      "duration_ms": 1.4
+    },
+    {
+      "id": "EX-02",
+      "name": "BIST Taban Fiyatta Satış -> REJECTED",
+      "status": "PASS",
+      "details": "Taban kilitli emir kontrolü tamam",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "EX-03",
+      "name": "Normal Alım: Komisyon + BSMV Hesabı",
+      "status": "PASS",
+      "details": "Fiyat=40.02TL Komisyon=14.96TL",
+      "duration_ms": 123.5
+    },
+    {
+      "id": "EX-04",
+      "name": "Seans Kapalı -> Tüm Emirler Reddedilmeli",
+      "status": "PASS",
+      "details": "Kapalı seans -> REJECTED",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "EX-05",
+      "name": "Halt Aktif -> REJECTED",
+      "status": "PASS",
+      "details": "Halt aktif -> REJECTED",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "EX-06",
+      "name": "Limit Emir Fiyata Ulaşmadı -> UNFILLED",
+      "status": "PASS",
+      "details": "Limit fiyata ulaşmadı -> UNFILLED",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "EX-07",
+      "name": "Desteklenmeyen Emir Tipi -> REJECTED",
+      "status": "PASS",
+      "details": "Desteklenmeyen emir tipi -> REJECTED",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "EX-08",
+      "name": "Büyük Emir Hacmi -> Slippage Artar / Likidite Kısıtı",
+      "status": "PASS",
+      "details": "Emir büyüklüğü & likidite kısıtları uygulandı",
+      "duration_ms": 1.1
+    },
+    {
+      "id": "EX-09",
+      "name": "Açılış Açık Artırması -> Emir Kabul",
+      "status": "PASS",
+      "details": "Açılış açık artırması -> FILLED",
+      "duration_ms": 0.4
+    },
+    {
+      "id": "EX-10",
+      "name": "Kapanış Sonrası Emir -> REJECTED",
+      "status": "PASS",
+      "details": "Kapanış sonrası emir -> REJECTED",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "T2-01",
+      "name": "Aynı Gün Alım-Satış Yasağı (Brüt Takas)",
+      "status": "PASS",
+      "details": "Brüt Takas: aynı gün alınan hisse aynı gün satılamaz",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "T2-02",
+      "name": "Satış Geliri T+2 Valör Zinciri",
+      "status": "PASS",
+      "details": "T+2->T+1->Settled zinciri (Settled: 1,005,000TL)",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "T2-03",
+      "name": "Alım Gücü Formülü: Settled+T1+T2-Bloke",
+      "status": "PASS",
+      "details": "Alım gücü = 500,000TL",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "T2-04",
+      "name": "Temettü: %10 Stopaj Düşülerek Net Ödeme",
+      "status": "PASS",
+      "details": "Temettü: 2.000TL brüt -> 1800TL net (%10 stopaj)",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "T2-05",
+      "name": "Bedelsiz Hisse: Lot Artışı + Maliyet Revizyonu",
+      "status": "PASS",
+      "details": "Bedelsiz: 1000->1250 lot, maliyet 60->48.00TL",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "T2-06",
+      "name": "Çoklu Gün T+2 Roll Zinciri",
+      "status": "PASS",
+      "details": "T+2->T+1->Settled 2 günlük roll zinciri doğrulandı",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "T2-07",
+      "name": "Kısmi Satış + Ağırlıklı Ortalama Maliyet",
+      "status": "PASS",
+      "details": "Kısmi satış: 300 lot kapatıldı, 700 lot kaldı",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "T2-08",
+      "name": "Tam Pozisyon Kapama -> Realized P&L Doğruluğu",
+      "status": "PASS",
+      "details": "Tam kapama: Realized P&L = 24,000TL",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "FL-01",
+      "name": "BIST Tatil Günleri Doğru Tespit Ediliyor mu?",
+      "status": "PASS",
+      "details": "BIST Takvimi: 4 tatil doğrulandı",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "FL-02",
+      "name": "50 Farklı Hisse Döngüsü — Her Hareket Kayıt",
+      "status": "PASS",
+      "details": "50 hisse döngüsü tamam: 0 emir",
+      "duration_ms": 4902.6
+    },
+    {
+      "id": "FL-03",
+      "name": "SELL Önce BUY Sonra Sıralama Mantığı",
+      "status": "PASS",
+      "details": "SELL->BUY sıralaması uygulandı",
+      "duration_ms": 417.2
+    },
+    {
+      "id": "FL-04",
+      "name": "Çift Alım -> Tek Pozisyon Ağırlıklı Ortalama",
+      "status": "PASS",
+      "details": "Çift alım -> tek pozisyon (1000 lot, ortalama 51.00TL)",
+      "duration_ms": 0.3
+    },
+    {
+      "id": "FL-05",
+      "name": "Fiyat Güncelleme + Equity Curve Kaydı",
+      "status": "PASS",
+      "details": "Fiyat güncelleme & equity curve kaydı başarılı",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "FL-06",
+      "name": "Stop-Loss Satış Zinciri -> Zarar Hesabı",
+      "status": "PASS",
+      "details": "Stop-loss satış zinciri başarılı",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "FL-07",
+      "name": "PC Kapalıyken Geçen Günleri Telafi (Recovery)",
+      "status": "PASS",
+      "details": "Sistem recovery: FIRST_RUN",
+      "duration_ms": 63.1
+    },
+    {
+      "id": "FL-08",
+      "name": "Boş Sinyal Listesi -> NO_TRADE Güvenlik",
+      "status": "PASS",
+      "details": "Boş sinyal listesi -> NO_TRADE",
+      "duration_ms": 82.8
+    },
+    {
+      "id": "VAR-01",
+      "name": "Parametrik VaR %95/%99 Hesabı",
+      "status": "PASS",
+      "details": "Parametrik VaR %95=24,859TL | %99=34,444TL | CVaR=30,736TL",
+      "duration_ms": 694.4
+    },
+    {
+      "id": "VAR-02",
+      "name": "Tarihsel VaR %99 + CVaR (Expected Shortfall)",
+      "status": "PASS",
+      "details": "Tarihsel VaR %99: 35,733TL | CVaR99=40,535TL",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "VAR-03",
+      "name": "Monte Carlo VaR (5000 Simülasyon Yolu)",
+      "status": "PASS",
+      "details": "Monte Carlo VaR %95: 3103057.79% (5000 yol)",
+      "duration_ms": 1519.2
+    },
+    {
+      "id": "VAR-04",
+      "name": "Portföy VaR Tam Raporu (4 Hisse)",
+      "status": "PASS",
+      "details": "Full VaR Raporu: 11 metrik grubu hesaplandı",
+      "duration_ms": 1.4
+    },
+    {
+      "id": "VAR-05",
+      "name": "VaR Tabanlı Pozisyon Büyüklüğü Limiti",
+      "status": "PASS",
+      "details": "VaR tabanlı pozisyon limiti: 1,000,000TL (%100.0)",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "VAR-06",
+      "name": "Component VaR — Her Pozisyonun Risk Katkısı",
+      "status": "PASS",
+      "details": "Component VaR: 3 pozisyon katkısı hesaplandı",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "ST-01",
+      "name": "2008 Global Finansal Kriz Stres Senaryosu",
+      "status": "PASS",
+      "details": "2008 Krizi: Portföy etkisi %-34.2",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "ST-02",
+      "name": "COVID-19 2020 Çöküşü Stres Senaryosu",
+      "status": "PASS",
+      "details": "COVID-19: Portföy etkisi %-22.9",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "ST-03",
+      "name": "USDTRY +%50 Kriz Senaryosu (Özel)",
+      "status": "PASS",
+      "details": "USDTRY +%50 Kriz: Portföy etkisi %-19.6",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "ST-04",
+      "name": "Tüm Tarihsel + Hipotetik Senaryolar Raporu",
+      "status": "PASS",
+      "details": "Tüm senaryolar: En kötü '2008 Global Finansal Kriz' (%-34.2)",
+      "duration_ms": 0.2
+    },
+    {
+      "id": "ST-05",
+      "name": "Monte Carlo Stres Testi (1000 Senaryo, 21 Gün)",
+      "status": "PASS",
+      "details": "Monte Carlo Stres Testi (1000 yol, 21 gün) tamamlandı",
+      "duration_ms": 1.1
+    },
+    {
+      "id": "ST-06",
+      "name": "Portföy Kırılma Noktası (Breaking Point)",
+      "status": "PASS",
+      "details": "Portföy kırılma noktası başarıyla analiz edildi",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "PS-01",
+      "name": "Fractional Kelly Pozisyon Boyutlandırma",
+      "status": "PASS",
+      "details": "Fractional Kelly boyutlandırma: 2 hisse",
+      "duration_ms": 2.4
+    },
+    {
+      "id": "PS-02",
+      "name": "Aşırı Kelly -> Max Pozisyon Sınırına Kırpma",
+      "status": "PASS",
+      "details": "Aşırı Kelly %10'a kırpıldı (ağırlık: %1.0)",
+      "duration_ms": 0.3
+    },
+    {
+      "id": "PS-03",
+      "name": "Volatilite Hedefleme: Yüksek Vol -> Küçük Pozisyon",
+      "status": "PASS",
+      "details": "Volatilite hedefleme: Yüksek volatilitede daha küçük boyut",
+      "duration_ms": 0.7
+    },
+    {
+      "id": "PS-04",
+      "name": "Max Toplam Portföy Exposure Sınırı",
+      "status": "PASS",
+      "details": "Maksimum toplam portföy exposure sınırı korundu",
+      "duration_ms": 3.0
+    },
+    {
+      "id": "PS-05",
+      "name": "Negatif Beklentili Fırsatta Pozisyon Açılmamalı",
+      "status": "PASS",
+      "details": "Negatif beklenti filtreleme devrede",
+      "duration_ms": 0.4
+    },
+    {
+      "id": "PS-06",
+      "name": "BIST İşlem Maliyetleri: Fee + Market Impact + Slippage",
+      "status": "PASS",
+      "details": "BIST İşlem Maliyeti Modeli: Fee=300.0bps, Impact=22.36bps, Slip=37.50bps",
+      "duration_ms": 256.9
+    },
+    {
+      "id": "CC-01",
+      "name": "Champion Terfi (Promote) Mekanizması",
+      "status": "PASS",
+      "details": "Champion terfi başarıyla gerçekleşti",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "CC-02",
+      "name": "Challenger Reddi -> Champion Korunuyor",
+      "status": "PASS",
+      "details": "Challenger reddedildi -> Champion korundu",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "CC-03",
+      "name": "Rollback: Önceki Champion Versiyonuna Geri Dön",
+      "status": "PASS",
+      "details": "Rollback mekanizması doğrulandı",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "CC-04",
+      "name": "Canary Deployment: Yeni Model %10 Trafik",
+      "status": "PASS",
+      "details": "Canary deployment %10 trafik aktif",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "CC-05",
+      "name": "Champion Geçmişi ve Audit Trail",
+      "status": "PASS",
+      "details": "Champion geçmişi: 2 kayıt tutuldu",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "CC-06",
+      "name": "Model Governance: Bağımsız Doğrulama Gerekliliği",
+      "status": "PASS",
+      "details": "Model governance tam raporu üretildi",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "CC-07",
+      "name": "Feature Drift Detection: Model Bozunması Alarmı",
+      "status": "PASS",
+      "details": "Feature drift monitor: 2 rapor oluşturuldu",
+      "duration_ms": 31.5
+    },
+    {
+      "id": "CC-08",
+      "name": "Model Degradation Monitor: IC Bozunması Tespiti",
+      "status": "PASS",
+      "details": "Model degradation monitor: Model kontrol edildi (OK)",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "BT-01",
+      "name": "PIT: Gelecek Veri Train'e Sızmıyor mu?",
+      "status": "PASS",
+      "details": "PIT uyumu: Train bitişi ile test başlangıcı arasında sızıntı yok",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "BT-02",
+      "name": "Purge + Embargo Aralıkları Uygulanıyor mu?",
+      "status": "PASS",
+      "details": "Purge=5 gün, Embargo=5 gün",
+      "duration_ms": 0.3
+    },
+    {
+      "id": "BT-03",
+      "name": "Backtest İşlem Maliyetleri Dahil mi?",
+      "status": "PASS",
+      "details": "Backtest işlem maliyetleri entegre: Impact=29.1bps, Komisyon=300.0bps",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "BT-04",
+      "name": "Survivorship Bias: De-Liste Hisseler Dahil mi?",
+      "status": "PASS",
+      "details": "Survivorship bias önleme: De-liste hisseler tarihsel evrene kaydedildi",
+      "duration_ms": 0.1
+    },
+    {
+      "id": "BT-05",
+      "name": "Deflated Sharpe Ratio (Çoklu Test Düzeltmesi)",
+      "status": "PASS",
+      "details": "Deflated Sharpe: 1 deneme DSR=0.593 >= 50 deneme DSR=-1.683",
+      "duration_ms": 0.5
+    },
+    {
+      "id": "BT-06",
+      "name": "Look-Ahead Bias Dedektörü",
+      "status": "PASS",
+      "details": "Look-Ahead Bias Kontrolü: total=1, is_clean=True",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "BT-07",
+      "name": "Fold Sınır Doğrulaması (Purge Yeterliliği)",
+      "status": "PASS",
+      "details": "Fold sınır doğrulaması: is_clean=True",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "BT-08",
+      "name": "Rolling Window Feature PIT Doğrulaması",
+      "status": "PASS",
+      "details": "Rolling Window PIT: total=30, is_clean=True",
+      "duration_ms": 2.6
+    },
+    {
+      "id": "PM-01",
+      "name": "1 Yıllık CAGR + Sharpe + MaxDD Metrikleri",
+      "status": "PASS",
+      "details": "Performans Metrikleri: CAGR=-4.0%, Sharpe=-0.14, MaxDD=15.6%",
+      "duration_ms": 0.7
+    },
+    {
+      "id": "PM-02",
+      "name": "Win Rate + Profit Factor + Avg Holding",
+      "status": "PASS",
+      "details": "Trade İstatistikleri: WinRate=%0.0, ProfitFactor=1.21",
+      "duration_ms": 0.6
+    },
+    {
+      "id": "PM-03",
+      "name": "Alfa Hesabı: Sistem Getirisi vs BIST100",
+      "status": "PASS",
+      "details": "Alfa Hesabı: BIST100 kıyaslaması doğrulandı",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "PM-04",
+      "name": "Max Drawdown <= %25 Hedef Kontrolü",
+      "status": "PASS",
+      "details": "Max Drawdown kontrolü: %5.0 <= %25 hedef",
+      "duration_ms": 0.0
+    },
+    {
+      "id": "PM-05",
+      "name": "Sortino Ratio (Sadece Negatif Volatilite)",
+      "status": "PASS",
+      "details": "Sortino Oranı: -0.786",
+      "duration_ms": 0.6
+    },
+    {
+      "id": "PM-06",
+      "name": "Calmar Ratio (CAGR / Max Drawdown)",
+      "status": "PASS",
+      "details": "Calmar Oranı: -0.253",
+      "duration_ms": 0.5
+    },
+    {
+      "id": "PM-07",
+      "name": "Yıllık Turnover Oranı",
+      "status": "PASS",
+      "details": "Turnover Oranı: 0.0x",
+      "duration_ms": 0.7
+    },
+    {
+      "id": "PM-08",
+      "name": "Deflated Sharpe: Çoklu Test Cezalandırması",
+      "status": "PASS",
+      "details": "DSR Çoklu Test Cezalandırması: -0.075",
+      "duration_ms": 0.3
+    }
+  ]
+}

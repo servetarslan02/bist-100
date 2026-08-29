@@ -598,7 +598,11 @@ class PaperTradingOrchestrator:
                 self._audit_no_trade(date, f"Already holding {ticker}", ticker)
                 return {}
             total_value = self.portfolio.get_total_value()
-            target_weight = min(self.risk_gate.max_position_pct / 100.0, 0.1)
+            explicit_weight = signal.get("conviction_weight") or signal.get("target_weight")
+            if explicit_weight is not None:
+                target_weight = min(float(explicit_weight), self.risk_gate.max_position_pct / 100.0)
+            else:
+                target_weight = min(self.risk_gate.max_position_pct / 100.0, 0.1)
             # Gerçek açılış fiyatı + en kötü senaryo kayma tamponu ile miktar hesabı
             worst_case_exec_price = market_price * 1.02
             quantity = int((total_value * target_weight) / worst_case_exec_price) if worst_case_exec_price > 0 else 0

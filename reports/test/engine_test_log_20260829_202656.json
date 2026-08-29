@@ -1,0 +1,347 @@
+{
+  "run_timestamp": "2026-08-29T20:26:56.660185",
+  "total": 42,
+  "pass": 29,
+  "fail": 7,
+  "warn": 6,
+  "skip": 0,
+  "score_pct": 83.3,
+  "scenarios": [
+    {
+      "id": "RG-01",
+      "name": "Kill Switch Aktif → Tüm Emirler Reddedilmeli",
+      "status": "PASS",
+      "details": "Kill switch aktif → 5/5 emir reddedildi ✓",
+      "duration_ms": 860.8,
+      "error": ""
+    },
+    {
+      "id": "RG-02",
+      "name": "Veri Kalitesi FAIL → NO_TRADE",
+      "status": "PASS",
+      "details": "Veri kalitesi FAIL → data_quality check NO_TRADE ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "RG-03",
+      "name": "Tek Hisse Max %10 Limit → BLOCK",
+      "status": "PASS",
+      "details": "Pozisyon %10.5 > %10 → BLOCK ✓  (Position 10.5% > limit 10.0%)",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "RG-04",
+      "name": "Sektör Konsantrasyon Max %30 → BLOCK",
+      "status": "WARN",
+      "details": "Sektör %30 testi — portföy değeri hesabı beklenmedik sonuç verdi; kuralı kontrol et",
+      "duration_ms": 33595.0,
+      "error": ""
+    },
+    {
+      "id": "RG-05",
+      "name": "Portföy %100 Dolu → Ek Alış BLOCK",
+      "status": "PASS",
+      "details": "Portföy neredeyse dolu — alım gücü yetersiz, nakit: 1000 TL ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "RG-06",
+      "name": "Günlük Kayıp %5 → NO_TRADE",
+      "status": "WARN",
+      "details": "Günlük kayıp testi beklenen sonucu vermedi — [{'check_name': 'daily_loss', 'result': 'PASS', 'details': 'Not enough history', 'severity': 'INFO'}]",
+      "duration_ms": 0.4,
+      "error": ""
+    },
+    {
+      "id": "RG-07",
+      "name": "Max Drawdown %25 → Kill Switch Devreye",
+      "status": "PASS",
+      "details": "Max drawdown kuralı aktif → Max drawdown 26.0% >= kill-switch 25.0% ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "RG-08",
+      "name": "SELL Emirleri Pozisyon Limitinden Muaf",
+      "status": "PASS",
+      "details": "SELL tarafı pozisyon boyutu limitinden muaf ✓",
+      "duration_ms": 0.4,
+      "error": ""
+    },
+    {
+      "id": "EX-01",
+      "name": "BIST Tavan Fiyatta Alım → REJECTED",
+      "status": "PASS",
+      "details": "Emir reddedildi (farklı sebep): PRICE_LIMIT: fill price outside BIST daily price band — tavan testi tamamlandı",
+      "duration_ms": 2.8,
+      "error": ""
+    },
+    {
+      "id": "EX-02",
+      "name": "BIST Taban Fiyatta Satış → REJECTED",
+      "status": "PASS",
+      "details": "Taban kilitli satış → REJECTED ✓  (BIST_LIMIT_DOWN_LOCKED: GARAN taban fiyatta (%-9.90). Satış kuyruğunda likidite yok.)",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "EX-03",
+      "name": "Normal Alım: Komisyon + Kayma Hesabı",
+      "status": "PASS",
+      "details": "Fiyat=40.02₺  Komisyon=14.96₺  Kayma=%0.050 ✓",
+      "duration_ms": 220.6,
+      "error": ""
+    },
+    {
+      "id": "EX-04",
+      "name": "Seans Kapalı → REJECTED",
+      "status": "PASS",
+      "details": "Kapalı seans → REJECTED ✓  (MARKET_CLOSED_OR_HALTED: CLOSED)",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-05",
+      "name": "Halt Aktif → REJECTED",
+      "status": "PASS",
+      "details": "Halt aktif → REJECTED ✓  (MARKET_HALTED: instrument is not tradable)",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-06",
+      "name": "Limit Emir: Fiyata Ulaşmadı → UNFILLED",
+      "status": "PASS",
+      "details": "Limit emir fiyata ulaşmadı → UNFILLED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-07",
+      "name": "Desteklenmeyen Emir Tipi → REJECTED",
+      "status": "PASS",
+      "details": "Desteklenmeyen emir tipi → REJECTED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "EX-08",
+      "name": "Büyük Emir → Slippage Artar",
+      "status": "WARN",
+      "details": "Slippage skalalaması: küçük=0.0250%, büyük=0.0000%",
+      "duration_ms": 1.2,
+      "error": ""
+    },
+    {
+      "id": "EX-09",
+      "name": "Açılış Açık Artırması → Emir Kabul",
+      "status": "PASS",
+      "details": "Açılış açık artırması → FILLED ✓",
+      "duration_ms": 0.6,
+      "error": ""
+    },
+    {
+      "id": "EX-10",
+      "name": "Kapanış Sonrası Emir → REJECTED",
+      "status": "PASS",
+      "details": "Kapanış sonrası emir → REJECTED ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "T2-01",
+      "name": "Aynı Gün Alım → Aynı Gün Satış Yasak (Brüt Takas)",
+      "status": "PASS",
+      "details": "Aynı gün alınan hisse aynı gün satılamaz (Brüt Takas) ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "T2-02",
+      "name": "Satış Geliri T+2 Valörü Zinciri",
+      "status": "PASS",
+      "details": "T+2 → T+1 → Settled zinciri doğru ✓  (Settled: 950000 → 1005000 TL)",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "T2-03",
+      "name": "Alım Gücü = Settled + T1 + T2 - Bloke",
+      "status": "PASS",
+      "details": "Alım gücü formülü doğru: 500,000 TL ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "T2-04",
+      "name": "Temettü: Net %10 Stopaj Düşülerek Ödeme",
+      "status": "PASS",
+      "details": "Temettü (brüt 2.000₺ → net 1.800₺ stopaj sonrası) ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "T2-05",
+      "name": "Bedelsiz Hisse: Lot Artışı + Maliyet Revizyonu",
+      "status": "PASS",
+      "details": "Bedelsiz hisse: 1000→1250 lot, maliyet 60.00→48.00₺ ✓",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "T2-06",
+      "name": "Çoklu Gün T+2 Valör Roll Zinciri",
+      "status": "PASS",
+      "details": "T+2 → T+1 → Settled 2 günlük roll zinciri doğru ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "T2-07",
+      "name": "Kısmi Satış + Ağırlıklı Ortalama Maliyet",
+      "status": "PASS",
+      "details": "Kısmi satış: 300 lot @ 210₺ → Kâr 3,000₺, kalan 700 lot ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "T2-08",
+      "name": "Tam Pozisyon Kapama → Realized P&L Doğruluğu",
+      "status": "PASS",
+      "details": "Tam pozisyon kapama: 2000 lot 80₺→92₺ → Realized P&L=24,000₺ ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "FL-01",
+      "name": "6 Aylık Simülasyon + Tatil Günü Atlama",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: IO Error: The file \"C:\\Users\\serve\\AppData\\Local\\Temp\\tmpvdbt4ul6.db\" exists, but it is not a valid DuckDB database file!",
+      "duration_ms": 18.9,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 709, in test_fl01_annual_simulation\n    orch = PaperTradingOrch"
+    },
+    {
+      "id": "FL-02",
+      "name": "50 Farklı Hisse Döngüsü — Tam Kayıt",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: IO Error: The file \"C:\\Users\\serve\\AppData\\Local\\Temp\\tmpirjzlu47.db\" exists, but it is not a valid DuckDB database file!",
+      "duration_ms": 9.1,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 761, in test_fl02_full_cycle_50_stocks\n    orch = PaperTradingO"
+    },
+    {
+      "id": "FL-03",
+      "name": "SELL Önce BUY Sonra Sıralama Mantığı",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: IO Error: The file \"C:\\Users\\serve\\AppData\\Local\\Temp\\tmpe_eiiomc.db\" exists, but it is not a valid DuckDB database file!",
+      "duration_ms": 6.9,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 800, in test_fl03_sell_before_buy\n    orch = PaperTradingOrches"
+    },
+    {
+      "id": "FL-04",
+      "name": "Çift Alım → Tek Pozisyon Ağırlıklı Ortalama",
+      "status": "PASS",
+      "details": "Çift alım: 2 ayrı emir → tek pozisyon (1000 lot, avg=51.00₺) ✓",
+      "duration_ms": 0.5,
+      "error": ""
+    },
+    {
+      "id": "FL-05",
+      "name": "Fiyat Güncelleme + Equity Curve Kaydı",
+      "status": "PASS",
+      "details": "Fiyat güncellemesi + equity curve kaydı ✓  (Son equity: 1,006,000₺)",
+      "duration_ms": 0.3,
+      "error": ""
+    },
+    {
+      "id": "FL-06",
+      "name": "Stop-Loss Satış Zinciri → Zarar Hesabı",
+      "status": "PASS",
+      "details": "Stop-loss zinciri: zarar -15,000₺ doğru hesaplandı ✓",
+      "duration_ms": 0.2,
+      "error": ""
+    },
+    {
+      "id": "BT-01",
+      "name": "PIT: Gelecek Veri Train'e Sızmıyor mu?",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: cannot import name 'WalkForwardConfig' from 'services.backtest.walk_forward_engine' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\walk_forward_engine.py)",
+      "duration_ms": 2558.4,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 888, in test_bt01_no_lookahead\n    from services.backtest.walk_"
+    },
+    {
+      "id": "BT-02",
+      "name": "Purge + Embargo Aralıkları Tanımlı mı?",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: cannot import name 'WalkForwardConfig' from 'services.backtest.walk_forward_engine' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\walk_forward_engine.py)",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 912, in test_bt02_purge_embargo\n    from services.backtest.walk"
+    },
+    {
+      "id": "BT-03",
+      "name": "Backtest İşlem Maliyetleri Dahil mi?",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: cannot import name 'BISTCostParams' from 'services.backtest.transaction_costs' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\transaction_costs.py)",
+      "duration_ms": 0.3,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 923, in test_bt03_transaction_costs\n    from services.backtest."
+    },
+    {
+      "id": "BT-04",
+      "name": "Survivorship Bias Corrector Mevcut mu?",
+      "status": "WARN",
+      "details": "Survivorship bias: cannot import name 'SurvivorshipBiasCorrector' from 'services.backtest.survivorship' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\survivorship.py) — kontrol et",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "BT-05",
+      "name": "Deflated Sharpe Ratio Hesaplanıyor mu?",
+      "status": "WARN",
+      "details": "Deflated Sharpe: 'DeflatedSharpeCalculator' object has no attribute 'sharpe_ratio'",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "BT-06",
+      "name": "Bias Detector Modülü Mevcut mu?",
+      "status": "WARN",
+      "details": "Bias detector: cannot import name 'BiasDetector' from 'services.backtest.bias_detector' (C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\services\\backtest\\bias_detector.py)",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "PM-01",
+      "name": "1 Yıllık Sharpe + CAGR Hesabı",
+      "status": "FAIL",
+      "details": "Beklenmedik istisna: PerformanceTracker.compute_full_metrics() missing 2 required positional arguments: 'equity_curve' and 'trades'",
+      "duration_ms": 4.5,
+      "error": "Traceback (most recent call last):\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 94, in run_test\n    fn(r)\n  File \"C:\\Users\\serve\\Downloads\\Compressed\\bist-100\\scripts\\full_system_test.py\", line 1011, in test_pm01_annual_simulation_metrics\n    metrics = trac"
+    },
+    {
+      "id": "PM-02",
+      "name": "Win Rate + Ortalama Tutma Süresi",
+      "status": "PASS",
+      "details": "Win rate: %62 (5/8), Ort. tutma: 12 gün, Profit factor: 3.20 ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    },
+    {
+      "id": "PM-03",
+      "name": "Alfa Hesabı (Sistem - BIST100)",
+      "status": "PASS",
+      "details": "Pozitif alfa: +%7.38 (sistem %17.3 vs BIST100 %10.0) ✓",
+      "duration_ms": 0.1,
+      "error": ""
+    },
+    {
+      "id": "PM-04",
+      "name": "Max Drawdown ≤ %25 Hedef Kontrolü",
+      "status": "PASS",
+      "details": "Max drawdown: %0.0 ≤ hedef %25.0 ✓",
+      "duration_ms": 0.0,
+      "error": ""
+    }
+  ]
+}

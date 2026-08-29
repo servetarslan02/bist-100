@@ -172,6 +172,7 @@ class ModelDegradationMonitor:
                 current_sharpe=0.0,
                 baseline_sharpe=0.0,
                 sharpe_drop=0.0,
+                prediction_drift_score=0.0,
                 trend="stable",
                 z_score=0.0,
                 severity="OK",

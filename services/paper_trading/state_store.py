@@ -95,8 +95,11 @@ class PaperStateStore:
                 )
             """)
             conn.execute("""
+                CREATE SEQUENCE IF NOT EXISTS audit_log_seq START 1
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
-                    entry_id INTEGER PRIMARY KEY,
+                    entry_id INTEGER DEFAULT nextval('audit_log_seq') PRIMARY KEY,
                     timestamp TEXT NOT NULL,
                     date TEXT NOT NULL,
                     entry_type TEXT NOT NULL,

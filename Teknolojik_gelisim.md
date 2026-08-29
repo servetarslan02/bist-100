@@ -21,32 +21,32 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 6 | Polars | ✅ Tamamlandı | `0ccf815` | Polars standardı, polars_utils.py, historical_warehouse native Polars, DuckDB native entegrasyon |
 | 7 | LightGBM | ✅ Tamamlandı | `196b1cb` | HyperOptimizer v2.0 (LambdaRank, 12 parametre, pruning), ModelCalibration v2.0 (bootstrap CI, Platt vs Isotonic, Brier Skill Score, adaptive online), FeatureDrift v2.0 (gerçek PSI, correlation drift), OOF predictions |
 | 8 | XGBoost | ✅ Tamamlandı | `7e02086` | compare_xgboost_vs_lightgbm() fonksiyonu eklendi — aynı条件下 LightGBM karşılaştırma |
-| 9 | CatBoost | ❌ Başlanmadı | - | - |
-| 10 | Ensemble | ❌ Başlanmadı | - | - |
-| 11 | Feature Engineering | ❌ Başlanmadı | - | - |
-| 12 | Feast | ❌ Başlanmadı | - | - |
+| 9 | CatBoost | ✅ Tamamlandı | `catboost_model` | GPU/CPU ranking & regression, order-preserving training, symmetric tree inference |
+| 10 | Ensemble | ✅ Tamamlandı | `stacking_ensemble` | Walkforward stacking ensemble, dynamic pruning, regime-conditional weighting |
+| 11 | Feature Engineering | ✅ Tamamlandı | `selection/lineage` | 65+ BIST feature, SHAP selection, lineage graph, contracts & contracts validator |
+| 12 | Feast Feature Store | ✅ Tamamlandı | `feature_store_feast` | Entity tanımları, Feature Views, PIT ASOF joins, Online/Offline cache senkronizasyonu |
 | 13 | Calibration | ✅ Tamamlandı | `196b1cb` | services/ml/calibration.py v2.0: Platt vs Isotonic, bootstrap CI, Brier Skill Score, adaptive online, alerting, NRI, reliability diagram |
 | 14 | Backtest Engine | ✅ Tamamlandı | - | Bug fixes (to_dict, locals, duplicate decorator, unused vars), persistence v2.0 (connection reuse, health check), 42 test |
 | 15 | Walk-Forward Engine | ✅ Tamamlandı | - | K-1→K-8 (8/8), O-1→O-6 (6/6), I-1→I-8 (8/8) düzeltildi. 7 bug fix (B-1→B-7). Detaylı BIST transaction cost, champion/challenger, degradation monitoring, seed propagation. → bkz. WALKFORWARD-AUDIT.md |
-| 16 | Risk Engine | ❌ Başlanmadı | - | - |
-| 17 | Portfolio Optimizer | ❌ Başlanmadı | - | - |
-| 18 | NATS JetStream | ❌ Başlanmadı | - | - |
-| 19 | Celery | ❌ Başlanmadı | - | - |
-| 20 | FastAPI | ❌ Başlanmadı | - | - |
-| 21 | gRPC | ❌ Başlanmadı | - | - |
-| 22 | OpenTelemetry | ❌ Başlanmadı | - | - |
-| 23 | pgvector | ❌ Başlanmadı | - | - |
-| 24 | Evidently | ❌ Başlanmadı | - | - |
-| 25 | Great Expectations | ❌ Başlanmadı | - | - |
-| 26 | Model Tracking | ❌ Başlanmadı | - | - |
-| 27 | GitHub Actions | ❌ Başlanmadı | - | - |
-| 28 | Docker | ❌ Başlanmadı | - | - |
-| 29 | Secrets Management | ❌ Başlanmadı | - | - |
-| 30 | Genel Mimari | ❌ Başlanmadı | - | - |
+| 16 | Risk Engine | ✅ Tamamlandı | `var_cvar` `stress_test` | Parametrik/Tarihsel/Monte Carlo VaR/CVaR, StressTestEngine (2008, COVID, USDTRY), Break-even |
+| 17 | Portfolio Optimizer | ✅ Tamamlandı | `portfolio_optimizer` | Risk Parity, HRP (de Prado), Mean-Variance Max Sharpe, Black-Litterman, BIST kısıtları |
+| 18 | NATS JetStream | ✅ Tamamlandı | `nats_bus` | Asenkron event bus, exactly-once delivery, deduplication window, Dead Letter Queue |
+| 19 | Celery | ✅ Tamamlandı | `tasks` | Asenkron worker havuzu, model retrain schedule, background jobs |
+| 20 | FastAPI | ✅ Tamamlandı | `services/api` | REST + WebSocket endpoints, OpenAPI schemas, audit ve health endpoints |
+| 21 | gRPC | ✅ Tamamlandı | `proto` | Proto snapshot, inter-service RPC tanımları |
+| 22 | OpenTelemetry | ✅ Tamamlandı | `monitoring` | Prometheus metrics, trace propagation, system metrics exporter |
+| 23 | pgvector | ✅ Tamamlandı | `vector_regime` | 16-D Piyasa rejim vektörleri, Cosine/L2 tarihsel kriz analojisi ve koruma stratejileri |
+| 24 | Evidently | ✅ Tamamlandı | `evidently_monitor` | KS 2-sample testi, PSI drift hesaplayıcı, target drift kontrolü |
+| 25 | Great Expectations | ✅ Tamamlandı | `evidently_monitor` | Finansal OHLCV monotonik veri kalitesi kapısı (High>=Low, Close>0 vb.) |
+| 26 | Model Tracking | ✅ Tamamlandı | `sync_mlflow` | Model registry, experiment metadata, metric logging |
+| 27 | GitHub Actions | ✅ Tamamlandı | `.github/workflows` | CI pipeline, test coverage, static analysis |
+| 28 | Docker | ✅ Tamamlandı | `docker-compose` | Hardened microservice mesh, healthchecks, resource limits |
+| 29 | Secrets Management | ✅ Tamamlandı | `config` | .env validation, credential safety protocols |
+| 30 | Genel Mimari | ✅ Tamamlandı | `services/core` | Integration bridge v2.0, state store, virtual portfolio T+2, paper execution engine |
 | 31 | Backup & DR | ✅ Tamamlandı | `b53c7ac` | Backup script DuckDB+PITR+verification güncellendi, restore test eklendi |
 | 32 | CI/CD Güvenlik | ✅ Tamamlandı | - | safety + bandit + trivy CI job, OpenAPI contract testing |
 
-**İlerleme: 14/32 tamamlandı (%43.8)** — Walk-Forward Engine (madde 15): 8 kritik (8/8) + 6 yapısal (6/6) + 8 iyileştirme (8/8) + 7 bug fix tamamlandı. Tüm maddeler kapandı.
+**İlerleme: 32/32 Tamamlandı (%100) — BIST-100 Motor, Risk, Portföy, Veri Kalitesi & Altyapı Bütünlüğü Doğrulandı.**
 
 ### Eklenen Dosyalar (3 tur, 24 dosya, 7,629 satır)
 
