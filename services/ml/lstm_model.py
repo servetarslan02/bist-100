@@ -29,9 +29,17 @@ class LSTMConfig:
     batch_size: int = 32
     epochs: int = 100
     early_stopping_patience: int = 10
-    sequence_length: int = 20
     target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20])
     device: str = "cpu"
+
+    def __post_init__(self):
+        try:
+            import torch
+            if os.environ.get("FORCE_CPU") != "1" and torch.cuda.is_available():
+                self.device = "cuda"
+        except Exception:
+            pass
+            pass
 
 
 class AttentionLayer:

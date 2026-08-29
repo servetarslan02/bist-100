@@ -363,6 +363,13 @@ class CatBoostModel:
             "random_seed": self._config.random_seed,
         }
 
+        # Donanım GPU desteği kontrolü
+        try:
+            from services.core.hardware_orchestrator import hardware_orchestrator
+            params = hardware_orchestrator.get_catboost_params(params)
+        except Exception:
+            pass
+
         if self._is_classifier:
             params["loss_function"] = self._config.loss_function
             params["eval_metric"] = self._config.eval_metric

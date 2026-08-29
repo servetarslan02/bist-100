@@ -27,12 +27,18 @@ class TransformerConfig:
     output_size: int = 1
     learning_rate: float = 0.0001
     batch_size: int = 32
-    epochs: int = 100
-    early_stopping_patience: int = 10
     sequence_length: int = 20
     max_position_encoding: int = 500
     warmup_steps: int = 100
     device: str = "cpu"
+
+    def __post_init__(self):
+        try:
+            import torch
+            if os.environ.get("FORCE_CPU") != "1" and torch.cuda.is_available():
+                self.device = "cuda"
+        except Exception:
+            pass
 
 
 class PositionalEncoding:

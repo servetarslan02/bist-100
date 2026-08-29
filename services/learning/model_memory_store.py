@@ -274,23 +274,26 @@ class ModelMemoryStore:
         """Bekleyen tahmine gerçek piyasa sonucunu bağlar ve net PnL hesaplar."""
         now = evaluated_at or datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
-            row = conn.execute("SELECT * FROM predictions WHERE prediction_id = ?", (prediction_id,)).fetchone()
+            row = conn.execute(
+                "SELECT prediction_id, model_id, model_version, ticker, predicted_direction, entry_price FROM predictions WHERE prediction_id = ?",
+                (prediction_id,),
+            ).fetchone()
             if not row:
                 return None
 
-            entry_price = float(row["entry_price"])
+            p_id, m_id, m_ver, ticker, pred_dir_raw, entry_p = row
+            entry_price = float(entry_p)
             if entry_price <= 0:
                 entry_price = 1.0
 
             actual_ret = ((actual_price - entry_price) / entry_price) * 100.0
-            pred_dir = row["predicted_direction"].upper()
+            pred_dir = str(pred_dir_raw).upper()
             act_dir = "UP" if actual_ret >= 0 else "DOWN"
-            is_correct = 1 if (pred_dir == act_dir) else 0
+            is_correct = 1 if (pred_dir in ["UP", "LONG", "BUY"] and actual_ret >= 0) or (pred_dir in ["DOWN", "SHORT", "SELL"] and actual_ret < 0) else 0
 
             # Roundtrip BIST işlem maliyeti (%0.074)
             cost_pct = 0.074
             trade_ret = actual_ret if pred_dir in ["UP", "LONG", "BUY"] else -actual_ret
-            trade_ret - cost_pct
 
             pos_val = 10000.0  # Standart lot
             gross_pnl = pos_val * (trade_ret / 100.0)
@@ -307,9 +310,9 @@ class ModelMemoryStore:
                 """,
                 (
                     prediction_id,
-                    row["model_id"],
-                    row["model_version"],
-                    row["ticker"],
+                    m_id,
+                    m_ver,
+                    ticker,
                     now,
                     actual_price,
                     entry_price,
@@ -326,8 +329,8 @@ class ModelMemoryStore:
 
             return {
                 "prediction_id": prediction_id,
-                "model_id": row["model_id"],
-                "ticker": row["ticker"],
+                "model_id": m_id,
+                "ticker": ticker,
                 "predicted_direction": pred_dir,
                 "actual_direction": act_dir,
                 "actual_return": actual_ret,

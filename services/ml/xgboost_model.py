@@ -348,6 +348,14 @@ class XGBoostModel:
 
     def _create_model(self, xgb_module, is_classifier: bool) -> Any:
         """XGBoost sklearn API model oluştur."""
+        gpu_params = {}
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_params = {"tree_method": "hist", "device": "cuda"}
+        except Exception:
+            pass
+
         if is_classifier:
             return xgb_module.XGBClassifier(
                 max_depth=self._config.max_depth,
@@ -363,6 +371,7 @@ class XGBoostModel:
                 gamma=self._config.gamma,
                 verbosity=self._config.verbose,
                 random_state=self._config.random_state,
+                **gpu_params,
             )
         else:
             return xgb_module.XGBRegressor(
@@ -378,6 +387,7 @@ class XGBoostModel:
                 gamma=self._config.gamma,
                 verbosity=self._config.verbose,
                 random_state=self._config.random_state,
+                **gpu_params,
             )
 
     def _compute_metrics(
