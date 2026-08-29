@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ALPHA BIST — DERİN SİSTEM BÜTÜNLÜK DENETÇİSİ (FULL SPECTRUM ENGINE) v3.0
+ALPHA BIST — DERİN SİSTEM BÜTÜNLÜK DENETÇİSİ (FULL SPECTRUM ENGINE) v4.0
 ==========================================================================
-28 Boyut | 0 Token | AST + Semantik + Veri Akışı + Sinyal Zinciri
+36 Boyut | 0 Token | AST + Semantik + Veri Akışı + Sinyal Zinciri
 
 Bu motor yalnızca kod kalitesini değil, sistemin İŞ MANTIĞINI,
-MOTORLARINIn BÜTÜNLÜĞÜNÜ ve VERİ AKIŞ ZİNCİRİNİN DOĞRULUĞUNU denetler.
+MOTORLARININ BÜTÜNLÜĞÜNÜ ve VERİ AKIŞ ZİNCİRİNİN DOĞRULUĞUNU denetler.
 
 === TAM KAPSAM ===
 
@@ -41,6 +41,16 @@ B25: Portfolio Manager Bağlantısı (risk_gate → portfolio zinciri kırık m�
 B26: Ölü Kod & Erişilemeyen Fonksiyonlar (tanımlı ama hiç çağrılmayan)
 B27: Çoklu Tanım Çakışması (aynı isimde class/func birden fazla modülde)
 B28: Şüpheli Özel Dosya (non-Python, garip isim, gizli içerik)
+
+[ALTYAPI, DAĞITIK SİSTEM & ENTEGRASYON BOYUTLARI]
+B29: Docker Compose Derin Validasyon (service tags, health checks, ports, volumes)
+B30: pyproject.toml Bağımlılık Uyumu (import edilen paketlerin tanımlılığı)
+B31: ML Model Dosya Varlığı (.pkl, .onnx, weights mevcudiyeti)
+B32: NATS/Redis Mesaj Şeması Tutarlılığı (pub/sub eşleşmesi, key namespace)
+B33: Çoklu Adım Döngüsel Bağımlılık (A->B->C->A DFS analizi)
+B34: Config-Docker Cross-Reference (tanımlı port ve servis referansları)
+B35: Veritabanı Şema-SQL Tutarlılığı (tablo/kolon adları uyumu)
+B36: Async Güvenlik ve Yarış Koşulu Analizi (unawaited coroutine, unreferenced tasks)
 """
 
 from __future__ import annotations
@@ -1345,8 +1355,8 @@ def run():
     all_findings: list[Finding] = []
 
     print("=" * 72)
-    print("  ALPHA BIST — DERİN SİSTEM BÜTÜNLÜK DENETÇİSİ (FULL SPECTRUM) v3.0")
-    print("  28 Boyut | 0 Token | Kod + Motor + Sinyal Zinciri + Veri Akışı")
+    print("  ALPHA BIST — DERİN SİSTEM BÜTÜNLÜK DENETÇİSİ (FULL SPECTRUM) v4.0")
+    print("  36 Boyut | 0 Token | Kod + Motor + Sinyal Zinciri + Veri Akışı")
     print("=" * 72)
     print(f"\n  Proje: {PROJECT_ROOT}\n  Tarama başlıyor...\n")
 
@@ -1567,7 +1577,7 @@ def run():
         w("# ALPHA BIST — Derin Sistem Bütünlük Denetim Raporu")
         w()
         w(f"> **Tarih:** {time.strftime('%Y-%m-%d %H:%M:%S')}  ")
-        w(f"> **Motor:** Deep System Integrity Auditor v3.0 (28 Boyut, 0 Token)  ")
+        w(f"> **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  ")
         w(f"> **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  ")
         w(f"> **Taranan:** {len(py_files):,} dosya, {total_lines:,} satır  ")
         w(f"> **Süre:** {elapsed:.2f} saniye  ")
@@ -1585,7 +1595,7 @@ def run():
         w(f"| **DÜŞÜK**   | **{low}** | Dokümantasyon, tip eksikliği, biçim |")
         w(f"| **TOPLAM**  | **{len(all_findings)}** | |")
         w()
-        w("## 2. 28 Boyut Bazlı Analiz")
+        w("## 2. 36 Boyut Bazlı Analiz")
         w()
         w("| Boyut | Alan | Bulunan | Durum |")
         w("|---|---|---|---|")
