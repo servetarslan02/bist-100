@@ -22,6 +22,7 @@ class CrossSectionalFeatures:
     """Cross-sectional feature hesaplama."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._sector_data: dict[str, list[dict]] = defaultdict(list)
         self._market_data: dict[str, Any] = {}
         logger.info("CrossSectionalFeatures initialized")
@@ -153,6 +154,7 @@ class TemporalFeatures:
     """Temporal (zaman serisi) feature'lar."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         logger.info("TemporalFeatures initialized")
 
     def calculate_trend_features(

@@ -35,6 +35,7 @@ class TimeframeState:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timeframe": self.timeframe,
             "regime": self.regime,
@@ -57,6 +58,7 @@ class MultiTimeframeResult:
     dominant_timeframe: str = "daily"  # En güvenilir timeframe
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "states": {tf: s.to_dict() for tf, s in self.states.items()},
             "alignment_score": round(self.alignment_score, 4),

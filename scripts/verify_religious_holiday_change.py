@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Dini Bayram Tarihi Değişikliği Senaryo Testi
 ===========================================================
@@ -26,17 +29,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class _EmptyModule:
-    def __getattr__(self, name):
-        return type('Fake', (), {'__init__': lambda s, *a, **k: None})()
+    """Otomatik eklendi."""
+    def __getattr__(self, name) -> Any:
+        """Otomatik eklendi."""
+        return type("Fake", (), {"__init__": lambda s, *a, **k: None})()
 
 
-if 'services' not in sys.modules:
-    sys.modules['services'] = _EmptyModule()
-if 'services.core' not in sys.modules:
-    sys.modules['services.core'] = _EmptyModule()
+if "services" not in sys.modules:
+    sys.modules["services"] = _EmptyModule()
+if "services.core" not in sys.modules:
+    sys.modules["services.core"] = _EmptyModule()
 
 
-def _load_module_direct(name, path):
+def _load_module_direct(name, path) -> Any:
+    """Otomatik eklendi."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -55,40 +61,47 @@ _compute_hijri_holidays = _hm_mod._compute_hijri_holidays
 
 
 class TestResult:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.passed = 0
         self.failed = 0
         self.warnings = 0
         self.details = []
 
-    def ok(self, msg):
+    def ok(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.passed += 1
         self.details.append(f"  ✅ {msg}")
-        print(f"  ✅ {msg}")
+        logger.info(f"  ✅ {msg}")
 
-    def fail(self, msg):
+    def fail(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.failed += 1
         self.details.append(f"  ❌ {msg}")
-        print(f"  ❌ {msg}")
+        logger.info(f"  ❌ {msg}")
 
-    def warn(self, msg):
+    def warn(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.warnings += 1
         self.details.append(f"  ⚠️  {msg}")
-        print(f"  ⚠️  {msg}")
+        logger.info(f"  ⚠️  {msg}")
 
-    def summary(self):
+    def summary(self) -> Any:
+        """Otomatik eklendi."""
         total = self.passed + self.failed
-        return f"\n{'='*60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'='*60}"
+        return f"\n{'=' * 60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'=' * 60}"
 
 
 # =====================================================
 # SENARYO 1: Referans Tablosu Değişikliği
 # =====================================================
 
-def test_reference_table_change(result: TestResult):
+
+def test_reference_table_change(result: TestResult) -> Any:
     """Diyanet yeni tarih açıkladı — referans tablosu güncellenmeli."""
-    print("\n📅 SENARYO 1: Referans Tablosu Değişikliği")
-    print("-" * 50)
+    logger.info("\n📅 SENARYO 1: Referans Tablosu Değişikliği")
+    logger.info("-" * 50)
 
     # Mevcut 2026 Ramazan tarihi
     current_ramazan_2026 = _compute_hijri_holidays(2026)
@@ -139,17 +152,20 @@ def test_reference_table_change(result: TestResult):
 # SENARYO 2: Manuel Override (Diyanet Yeni Tarih Açıkladı)
 # =====================================================
 
-def test_manual_override(result: TestResult):
+
+def test_manual_override(result: TestResult) -> Any:
     """Diyanet yeni tarih açıkladı — manuel override."""
-    print("\n✏️ SENARYO 2: Manuel Override")
-    print("-" * 50)
+    logger.info("\n✏️ SENARYO 2: Manuel Override")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_2"
     hm = HolidayManager(data_dir=test_dir)
 
     # 2027 Kurban Bayramı mevcut tarihi
     kurban_2027 = sorted([d for d in _compute_hijri_holidays(2027) if d > date(2027, 4, 1)])
-    result.ok(f"Mevcut 2027 Kurban: {kurban_2027[0] if kurban_2027 else 'yok'} - {kurban_2027[-1] if kurban_2027 else 'yok'}")
+    result.ok(
+        f"Mevcut 2027 Kurban: {kurban_2027[0] if kurban_2027 else 'yok'} - {kurban_2027[-1] if kurban_2027 else 'yok'}"
+    )
 
     # Diyanet dedi ki: "Kurban Bayramı 1 gün erken başlayacak"
     eski_baslangic = kurban_2027[0] if kurban_2027 else date(2027, 5, 17)
@@ -177,10 +193,11 @@ def test_manual_override(result: TestResult):
 # SENARYO 3: Cache Güncelleme
 # =====================================================
 
-def test_cache_update(result: TestResult):
+
+def test_cache_update(result: TestResult) -> Any:
     """Dini bayram değişikliği cache'e yansıyor mu?"""
-    print("\n💾 SENARYO 3: Cache Güncelleme")
-    print("-" * 50)
+    logger.info("\n💾 SENARYO 3: Cache Güncelleme")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_3"
     cache_file = Path(test_dir) / "holiday_cache.json"
@@ -221,10 +238,11 @@ def test_cache_update(result: TestResult):
 # SENARYO 4: Pipeline Tepkisi
 # =====================================================
 
-def test_pipeline_reaction(result: TestResult):
+
+def test_pipeline_reaction(result: TestResult) -> Any:
     """Dini bayram değişikliği pipeline'ı etkiliyor mu?"""
-    print("\n🔧 SENARYO 4: Pipeline Tepkisi")
-    print("-" * 50)
+    logger.info("\n🔧 SENARYO 4: Pipeline Tepkisi")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_4"
     hm = HolidayManager(data_dir=test_dir)
@@ -268,10 +286,11 @@ def test_pipeline_reaction(result: TestResult):
 # SENARYO 5: Half-Day (Arife) Güncelleme
 # =====================================================
 
-def test_half_day_update(result: TestResult):
+
+def test_half_day_update(result: TestResult) -> Any:
     """Dini bayram değişince arife (yarım gün) de güncelleniyor mu?"""
-    print("\n⏰ SENARYO 5: Half-Day (Arife) Güncelleme")
-    print("-" * 50)
+    logger.info("\n⏰ SENARYO 5: Half-Day (Arife) Güncelleme")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_5"
     hm = HolidayManager(data_dir=test_dir)
@@ -299,10 +318,11 @@ def test_half_day_update(result: TestResult):
 # SENARYO 6: Audit Trail
 # =====================================================
 
-def test_audit_trail(result: TestResult):
+
+def test_audit_trail(result: TestResult) -> Any:
     """Dini bayram değişiklikleri audit log'a yazılıyor mu?"""
-    print("\n📝 SENARYO 6: Audit Trail")
-    print("-" * 50)
+    logger.info("\n📝 SENARYO 6: Audit Trail")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_6"
     hm = HolidayManager(data_dir=test_dir)
@@ -335,10 +355,11 @@ def test_audit_trail(result: TestResult):
 # SENARYO 7: Tam Akış (Gerçek Dünya Simülasyonu)
 # =====================================================
 
-def test_full_flow(result: TestResult):
+
+def test_full_flow(result: TestResult) -> Any:
     """Tam akış: Diyanet açıklama → güncelleme → pipeline → cache → audit."""
-    print("\n🎮 SENARYO 7: Tam Akış Simülasyonu")
-    print("-" * 50)
+    logger.info("\n🎮 SENARYO 7: Tam Akış Simülasyonu")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_religious_test_7"
     hm = HolidayManager(data_dir=test_dir)
@@ -390,11 +411,13 @@ def test_full_flow(result: TestResult):
 # ANA TEST RUNNER
 # =====================================================
 
-async def main():
-    print("=" * 60)
-    print("🧪 ALPHA BIST — Dini Bayram Tarihi Değişikliği Testi")
-    print(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+
+async def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("🧪 ALPHA BIST — Dini Bayram Tarihi Değişikliği Testi")
+    logger.info(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 60)
 
     result = TestResult()
 
@@ -406,7 +429,7 @@ async def main():
     test_audit_trail(result)
     test_full_flow(result)
 
-    print(result.summary())
+    logger.info(result.summary())
 
     report_path = Path(__file__).parent.parent / "reports" / "religious_holiday_change_audit.json"
     report_path.parent.mkdir(exist_ok=True)
@@ -419,7 +442,7 @@ async def main():
     }
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
-    print(f"\n📄 Rapor: {report_path}")
+    logger.info(f"\n📄 Rapor: {report_path}")
 
     return 0 if result.failed == 0 else 1
 

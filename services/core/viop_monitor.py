@@ -7,29 +7,36 @@ Vadeli İşlem ve Opsiyon Piyasası takibi:
 - Margin call tespiti
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.viop_monitor")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class MarginStatus:
+    """Otomatik eklendi."""
     margin_call: bool
     required: float = 0.0
     available: float = 0.0
@@ -38,10 +45,12 @@ class MarginStatus:
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "margin_call": self.margin_call,
             "required": round(self.required, 2),
@@ -60,9 +69,10 @@ class VIOPMonitor:
     MARGIN_CALL_THRESHOLD = 0.13  # %13 margin call eşiği
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._custom_margin_rates: dict[str, float] = {}
 
-    def set_margin_rate(self, ticker: str, rate: float):
+    def set_margin_rate(self, ticker: str, rate: float) -> Any:
         """Özel teminat oranı ata."""
         self._custom_margin_rates[ticker] = rate
 

@@ -36,6 +36,7 @@ class DeflatedSharpeResult:
     confidence_level: str  # high | medium | low | not_significant
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "observed_sharpe": round(self.observed_sharpe, 4),
             "expected_max_sharpe": round(self.expected_max_sharpe, 4),

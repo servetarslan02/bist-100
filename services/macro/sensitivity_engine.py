@@ -42,6 +42,7 @@ class SensitivityResult:
     window_days: int = 60
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "sector": self.sector,
             "usdtry_sensitivity": round(self.usdtry_sensitivity, 4),
@@ -98,6 +99,7 @@ class DynamicSensitivityEngine:
     }
 
     def __init__(self, window: int = 60, min_observations: int = 20):
+        """Otomatik eklendi."""
         self._window = window
         self._min_observations = min_observations
 
@@ -112,7 +114,7 @@ class DynamicSensitivityEngine:
         self._sensitivity_cache: dict[str, SensitivityResult] = {}
         self._last_cache_update: datetime | None = None
 
-    def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]):
+    def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]) -> Any:
         """Günlük güncelleme — rolling window'a veri ekle.
 
         Args:
@@ -139,7 +141,7 @@ class DynamicSensitivityEngine:
         # Cache invalidation
         self._last_cache_update = None
 
-    def register_company_override(self, ticker: str, sector: str, override: CompanySensitivity):
+    def register_company_override(self, ticker: str, sector: str, override: CompanySensitivity) -> Any:
         """Şirket bazlı hassasiyet override kaydet."""
         override.ticker = ticker
         override.sector = sector

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Any
 """
 Policy Resilience Testleri
 
@@ -36,6 +37,7 @@ class MockWebhookServer:
     """Test amaçlı mock HTTP server."""
 
     def __init__(self, port: int = 18923):
+        """Otomatik eklendi."""
         self.port = port
         self.received: list = []
         self.fail_until_attempt: int = 0  # Kaçıncı denemeye kadar başarısız
@@ -43,7 +45,8 @@ class MockWebhookServer:
         self._runner = None
         self._site = None
 
-    async def start(self):
+    async def start(self) -> Any:
+        """Otomatik eklendi."""
         app = web.Application()
         app.router.add_post("/webhook", self._handler)
         self._runner = web.AppRunner(app)
@@ -51,13 +54,15 @@ class MockWebhookServer:
         self._site = web.TCPSite(self._runner, "localhost", self.port)
         await self._site.start()
 
-    async def stop(self):
+    async def stop(self) -> Any:
+        """Otomatik eklendi."""
         if self._site:
             await self._site.stop()
         if self._runner:
             await self._runner.cleanup()
 
-    async def _handler(self, request):
+    async def _handler(self, request) -> Any:
+        """Otomatik eklendi."""
         self._attempt_count += 1
         body = await request.json()
         self.received.append({"attempt": self._attempt_count, "body": body})
@@ -67,7 +72,8 @@ class MockWebhookServer:
         return web.Response(status=200, text="OK")
 
     @property
-    def url(self):
+    def url(self) -> Any:
+        """Otomatik eklendi."""
         return f"http://localhost:{self.port}/webhook"
 
 
@@ -76,7 +82,7 @@ class MockWebhookServer:
 # =====================================================
 
 
-async def test_lock_auto_release_expired():
+async def test_lock_auto_release_expired() -> Any:
     """Süresi dolmuş kilit otomatik temizlenmeli."""
     issues = []
 
@@ -108,7 +114,7 @@ async def test_lock_auto_release_expired():
     return "Lock Auto-Release Expired", len(issues) == 0, issues
 
 
-async def test_lock_auto_release_audit_details():
+async def test_lock_auto_release_audit_details() -> Any:
     """Lock recovery audit kaydetmeli."""
     issues = []
 
@@ -133,7 +139,7 @@ async def test_lock_auto_release_audit_details():
     return "Lock Recovery Audit", len(issues) == 0, issues
 
 
-async def test_lock_not_released_if_active():
+async def test_lock_not_released_if_active() -> Any:
     """Aktif kilit otomatik temizlenmemeli."""
     issues = []
 
@@ -154,7 +160,7 @@ async def test_lock_not_released_if_active():
 # =====================================================
 
 
-async def test_parallel_edits_version_conflict():
+async def test_parallel_edits_version_conflict() -> Any:
     """Paralel düzenlemeler version conflict üretmeli."""
     issues = []
 
@@ -182,7 +188,7 @@ async def test_parallel_edits_version_conflict():
     return "Parallel Edits Version Conflict", len(issues) == 0, issues
 
 
-async def test_parallel_edits_with_lock():
+async def test_parallel_edits_with_lock() -> Any:
     """Lock ile paralel düzenleme engellenmeli."""
     issues = []
 
@@ -204,7 +210,7 @@ async def test_parallel_edits_with_lock():
     return "Parallel Edits With Lock", len(issues) == 0, issues
 
 
-async def test_parallel_edits_after_lock_release():
+async def test_parallel_edits_after_lock_release() -> Any:
     """Lock bırakıldıktan sonra düzenleme yapılabilmeli."""
     issues = []
 
@@ -224,7 +230,7 @@ async def test_parallel_edits_after_lock_release():
 # =====================================================
 
 
-async def test_three_way_diff_no_conflict():
+async def test_three_way_diff_no_conflict() -> Any:
     """Üçlü diff: farklı alanlarda değişiklik conflict olmamalı."""
     issues = []
 
@@ -263,7 +269,7 @@ async def test_three_way_diff_no_conflict():
     return "Three-Way Diff No Conflict", len(issues) == 0, issues
 
 
-async def test_three_way_diff_with_conflict():
+async def test_three_way_diff_with_conflict() -> Any:
     """Üçlü diff: conflict varsa tespit etmeli."""
     issues = []
 
@@ -297,7 +303,7 @@ async def test_three_way_diff_with_conflict():
     return "Three-Way Diff With Conflict", len(issues) == 0, issues
 
 
-async def test_three_way_diff_version_not_found():
+async def test_three_way_diff_version_not_found() -> Any:
     """Olmayan versiyon hata döndürmeli."""
     issues = []
 
@@ -311,7 +317,7 @@ async def test_three_way_diff_version_not_found():
     return "Three-Way Diff Version Not Found", len(issues) == 0, issues
 
 
-async def test_three_way_diff_identical_changes():
+async def test_three_way_diff_identical_changes() -> Any:
     """Her iki versiyonda aynı değişiklik conflict olmamalı."""
     issues = []
 
@@ -336,7 +342,7 @@ async def test_three_way_diff_identical_changes():
 # =====================================================
 
 
-async def test_webhook_success():
+async def test_webhook_success() -> Any:
     """Başarlı webhook gönderimi."""
     issues = []
 
@@ -360,7 +366,7 @@ async def test_webhook_success():
     return "Webhook Success", len(issues) == 0, issues
 
 
-async def test_webhook_failure_retry():
+async def test_webhook_failure_retry() -> Any:
     """Başarısız webhook retry yapmalı."""
     issues = []
 
@@ -387,7 +393,7 @@ async def test_webhook_failure_retry():
     return "Webhook Failure Retry", len(issues) == 0, issues
 
 
-async def test_webhook_failure_audit():
+async def test_webhook_failure_audit() -> Any:
     """Başarısız webhook audit log'a yazılmalı."""
     issues = []
 
@@ -411,7 +417,7 @@ async def test_webhook_failure_audit():
 # =====================================================
 
 
-async def test_batch_within_limit():
+async def test_batch_within_limit() -> Any:
     """Limit dahilinde batch başarılı olmalı."""
     issues = []
 
@@ -426,7 +432,7 @@ async def test_batch_within_limit():
     return "Batch Within Limit", len(issues) == 0, issues
 
 
-async def test_batch_exceeds_limit():
+async def test_batch_exceeds_limit() -> Any:
     """Limit aşan batch hata döndürmeli."""
     issues = []
 
@@ -443,7 +449,7 @@ async def test_batch_exceeds_limit():
     return "Batch Exceeds Limit", len(issues) == 0, issues
 
 
-async def test_batch_exactly_at_limit():
+async def test_batch_exactly_at_limit() -> Any:
     """Tam limitte batch başarılı olmalı."""
     issues = []
 
@@ -458,19 +464,23 @@ async def test_batch_exactly_at_limit():
     return "Batch Exactly At Limit", len(issues) == 0, issues
 
 
-async def test_batch_transaction_rollback():
+async def test_batch_transaction_rollback() -> Any:
     """DB hatası transaction rollback yapmalı."""
     issues = []
 
     # Hatalı DB (commit çalışmasın)
     class BrokenDB:
-        def execute(self, *args):
+        """Otomatik eklendi."""
+        def execute(self, *args) -> Any:
+            """Otomatik eklendi."""
             pass
 
-        def commit(self):
+        def commit(self) -> Any:
+            """Otomatik eklendi."""
             raise duckdb.OperationalError("disk full")
 
-        def rollback(self):
+        def rollback(self) -> Any:
+            """Otomatik eklendi."""
             pass
 
     policy = AlertPolicy()
@@ -498,10 +508,11 @@ async def test_batch_transaction_rollback():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("POLICY RESILIENCE TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("POLICY RESILIENCE TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Lock auto-release
@@ -541,27 +552,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

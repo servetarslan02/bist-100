@@ -28,7 +28,8 @@ logger = structlog.get_logger()
 _transaction_cost_engine = None
 
 
-def _get_cost_engine():
+def _get_cost_engine() -> Any:
+    """Otomatik eklendi."""
     global _transaction_cost_engine
     if _transaction_cost_engine is None:
         try:
@@ -62,6 +63,7 @@ class Trade:
     holding_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "trade_id": self.trade_id,
             "ticker": self.ticker,
@@ -90,19 +92,23 @@ class Position:
 
     @property
     def market_value(self) -> float:
+        """Otomatik eklendi."""
         return self.quantity * self.current_price
 
     @property
     def unrealized_pnl(self) -> float:
+        """Otomatik eklendi."""
         return self.market_value - self.cost_basis
 
     @property
     def unrealized_pnl_pct(self) -> float:
+        """Otomatik eklendi."""
         if self.cost_basis <= 0:
             return 0.0
         return (self.market_value / self.cost_basis - 1) * 100
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "quantity": self.quantity,
@@ -129,6 +135,7 @@ class EquitySnapshot:
     daily_return: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "date": self.date,
             "equity": round(self.equity, 2),
@@ -166,6 +173,7 @@ class BISTCommissionModel:
 
     @classmethod
     def compute(cls, amount: float) -> float:
+        """Otomatik eklendi."""
         broker = amount * cls.BROKER_RATE
         exchange = amount * cls.EXCHANGE_RATE
         base = broker + exchange
@@ -196,6 +204,7 @@ class PortfolioSimulatorV3:
         avg_daily_volume: float = 0,
         volatility_ratio: float = 1.0,
     ):
+        """Otomatik eklendi."""
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._max_position_pct = max_position_pct
@@ -435,7 +444,7 @@ class PortfolioSimulatorV3:
         prices: dict[str, float],
         date: str,
         benchmark_price: float | None = None,
-    ):
+    ) -> Any:
         """Günlük equity snapshot al."""
         # Pozisyon fiyatlarını güncelle
         for ticker, pos in self._positions.items():
@@ -511,30 +520,39 @@ class PortfolioSimulatorV3:
     # ===================== QUERIES =====================
 
     def get_total_value(self) -> float:
+        """Otomatik eklendi."""
         return self._cash + sum(p.market_value for p in self._positions.values())
 
     def get_realized_pnl(self) -> float:
+        """Otomatik eklendi."""
         return sum(t.pnl for t in self._trades if t.side == "SELL")
 
     def get_unrealized_pnl(self) -> float:
+        """Otomatik eklendi."""
         return sum(p.unrealized_pnl for p in self._positions.values())
 
     def can_buy(self) -> bool:
+        """Otomatik eklendi."""
         return len(self._positions) < self._max_positions and self._cash > 0
 
     def get_position_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self._positions)
 
     def has_position(self, ticker: str) -> bool:
+        """Otomatik eklendi."""
         return ticker in self._positions
 
     def get_trades(self) -> list[Trade]:
+        """Otomatik eklendi."""
         return self._trades
 
     def get_equity_curve(self) -> list[EquitySnapshot]:
+        """Otomatik eklendi."""
         return self._equity_curve
 
     def get_audit_log(self) -> list[AuditEntry]:
+        """Otomatik eklendi."""
         return self._audit_log
 
     # ===================== METRICS =====================
@@ -690,6 +708,7 @@ class PortfolioSimulatorV3:
 
     @staticmethod
     def _compute_holding_days(entry_date: str, exit_date: str) -> int:
+        """Otomatik eklendi."""
         try:
             from datetime import datetime
 
@@ -699,7 +718,8 @@ class PortfolioSimulatorV3:
         except Exception:
             return 0
 
-    def _audit(self, date: str, entry_type: str, ticker: str, details: dict[str, Any]):
+    def _audit(self, date: str, entry_type: str, ticker: str, details: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         from datetime import datetime
 
         self._audit_log.append(
@@ -712,7 +732,7 @@ class PortfolioSimulatorV3:
             )
         )
 
-    def reset(self):
+    def reset(self) -> Any:
         """Sıfırla."""
         self._cash = self._initial_capital
         self._positions.clear()

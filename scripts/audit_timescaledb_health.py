@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """ALPHA BIST — TimescaleDB Health & Data Quality Auditor
 
 TimescaleDB hypertable'ları, compression, retention ve veri kalitesini kontrol eder.
@@ -21,7 +24,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import asyncpg
 
 from services.core.config import settings
-
 
 # =====================================================
 # CONFIGURATION
@@ -82,7 +84,8 @@ DATA_QUALITY_RULES = {
 }
 
 
-async def get_connection():
+async def get_connection() -> Any:
+    """Otomatik eklendi."""
     return await asyncpg.connect(
         host=settings.postgres_host,
         port=settings.postgres_port,
@@ -92,14 +95,14 @@ async def get_connection():
     )
 
 
-async def check_hypertables(conn):
+async def check_hypertables(conn) -> Any:
     """Hypertable durumlarını kontrol et."""
     results = []
     for table in HYPERTABLES:
         try:
             info = await conn.fetchrow(
                 """
-                SELECT 
+                SELECT
                     hypertable_name,
                     num_chunks,
                     compression_state,
@@ -113,7 +116,7 @@ async def check_hypertables(conn):
                 # Chunk bilgisi
                 chunks = await conn.fetch(
                     """
-                    SELECT 
+                    SELECT
                         chunk_name,
                         range_start,
                         range_end,
@@ -150,12 +153,12 @@ async def check_hypertables(conn):
     return results
 
 
-async def check_compression_policies(conn):
+async def check_compression_policies(conn) -> Any:
     """Compression policy'leri kontrol et."""
     try:
         rows = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 hypertable_name,
                 config,
                 schedule_interval,
@@ -180,12 +183,12 @@ async def check_compression_policies(conn):
         return [{"error": str(e)}]
 
 
-async def check_retention_policies(conn):
+async def check_retention_policies(conn) -> Any:
     """Retention policy'leri kontrol et."""
     try:
         rows = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 hypertable_name,
                 config,
                 schedule_interval,
@@ -208,12 +211,12 @@ async def check_retention_policies(conn):
         return [{"error": str(e)}]
 
 
-async def check_continuous_aggregates(conn):
+async def check_continuous_aggregates(conn) -> Any:
     """Continuous aggregate'leri kontrol et."""
     try:
         rows = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 view_name,
                 compression_state,
                 materialization_hypertable_name
@@ -233,30 +236,24 @@ async def check_continuous_aggregates(conn):
         return [{"error": str(e)}]
 
 
-async def check_data_quality(conn, table: str, rules: dict):
+async def check_data_quality(conn, table: str, rules: dict) -> Any:
     """Veri kalitesi kontrolü."""
     issues = []
 
     # Null checks
     for col in rules.get("null_checks", []):
         try:
-            count = await conn.fetchval(
-                f"SELECT COUNT(*) FROM {table} WHERE {col} IS NULL"
-            )
+            count = await conn.fetchval(f"SELECT COUNT(*) FROM {table} WHERE {col} IS NULL")
             if count > 0:
-                issues.append(
-                    {"type": "null", "column": col, "count": count, "severity": "high"}
-                )
+                issues.append({"type": "null", "column": col, "count": count, "severity": "high"})
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     # Range checks
     for col, bounds in rules.get("range_checks", {}).items():
         try:
             if "min" in bounds:
-                count = await conn.fetchval(
-                    f"SELECT COUNT(*) FROM {table} WHERE {col} < $1", bounds["min"]
-                )
+                count = await conn.fetchval(f"SELECT COUNT(*) FROM {table} WHERE {col} < $1", bounds["min"])
                 if count > 0:
                     issues.append(
                         {
@@ -268,9 +265,7 @@ async def check_data_quality(conn, table: str, rules: dict):
                         }
                     )
             if "max" in bounds:
-                count = await conn.fetchval(
-                    f"SELECT COUNT(*) FROM {table} WHERE {col} > $1", bounds["max"]
-                )
+                count = await conn.fetchval(f"SELECT COUNT(*) FROM {table} WHERE {col} > $1", bounds["max"])
                 if count > 0:
                     issues.append(
                         {
@@ -282,7 +277,7 @@ async def check_data_quality(conn, table: str, rules: dict):
                         }
                     )
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     # Duplicate checks
     for cols in rules.get("duplicate_checks", []):
@@ -292,9 +287,9 @@ async def check_data_quality(conn, table: str, rules: dict):
                 count = await conn.fetchval(
                     f"""
                     SELECT COUNT(*) FROM (
-                        SELECT {col_str}, COUNT(*) as cnt 
-                        FROM {table} 
-                        GROUP BY {col_str} 
+                        SELECT {col_str}, COUNT(*) as cnt
+                        FROM {table}
+                        GROUP BY {col_str}
                         HAVING COUNT(*) > 1
                     ) t
                     """
@@ -309,15 +304,13 @@ async def check_data_quality(conn, table: str, rules: dict):
                         }
                     )
             except Exception:
-                pass
+                logger.error("Exception caught", exc_info=True)
 
     # Enum checks
     for col, allowed in rules.get("enum_checks", {}).items():
         try:
             allowed_str = ", ".join(f"'{v}'" for v in allowed)
-            count = await conn.fetchval(
-                f"SELECT COUNT(*) FROM {table} WHERE {col} NOT IN ({allowed_str})"
-            )
+            count = await conn.fetchval(f"SELECT COUNT(*) FROM {table} WHERE {col} NOT IN ({allowed_str})")
             if count > 0:
                 issues.append(
                     {
@@ -329,7 +322,7 @@ async def check_data_quality(conn, table: str, rules: dict):
                     }
                 )
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     # Future timestamp check
     try:
@@ -342,9 +335,7 @@ async def check_data_quality(conn, table: str, rules: dict):
         }
         if table in time_cols:
             col = time_cols[table]
-            count = await conn.fetchval(
-                f"SELECT COUNT(*) FROM {table} WHERE {col} > NOW() + INTERVAL '1 day'"
-            )
+            count = await conn.fetchval(f"SELECT COUNT(*) FROM {table} WHERE {col} > NOW() + INTERVAL '1 day'")
             if count > 0:
                 issues.append(
                     {
@@ -355,18 +346,18 @@ async def check_data_quality(conn, table: str, rules: dict):
                     }
                 )
     except Exception:
-        pass
+        logger.error("Exception caught", exc_info=True)
 
     return issues
 
 
-async def check_chunk_health(conn):
+async def check_chunk_health(conn) -> Any:
     """Chunk sağlık kontrolü."""
     try:
         # Compressed olmayan eski chunk'lar
         uncompressed_old = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 hypertable_name,
                 chunk_name,
                 range_start,
@@ -385,7 +376,7 @@ async def check_chunk_health(conn):
         # Chunk sayısı yüksek hypertable'lar
         chunk_counts = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 hypertable_name,
                 COUNT(*) as chunk_count
             FROM timescaledb_information.chunks
@@ -406,10 +397,7 @@ async def check_chunk_health(conn):
                 }
                 for r in uncompressed_old
             ],
-            "high_chunk_count": [
-                {"table": r["hypertable_name"], "count": r["chunk_count"]}
-                for r in chunk_counts
-            ],
+            "high_chunk_count": [{"table": r["hypertable_name"], "count": r["chunk_count"]} for r in chunk_counts],
         }
     except Exception as e:
         return {"error": str(e)}
@@ -422,13 +410,13 @@ def generate_report(
     continuous_aggregates,
     data_quality_results,
     chunk_health,
-):
+) -> Any:
     """Markdown rapor oluştur."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     report = f"""# 🏥 TimescaleDB Health & Data Quality Raporu
 
-> **Oluşturulma:** {now}  
+> **Oluşturulma:** {now}
 > **Kapsam:** {len(HYPERTABLES)} hypertable, compression, retention, data quality
 
 ---
@@ -484,9 +472,7 @@ def generate_report(
             report += "| Sorun | Detay | Adet | Önem |\n"
             report += "|---|---|---|---|\n"
             for issue in issues:
-                severity_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡"}.get(
-                    issue["severity"], "⚪"
-                )
+                severity_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡"}.get(issue["severity"], "⚪")
                 detail = ""
                 if issue["type"] == "null":
                     detail = f"`{issue['column']}` NULL"
@@ -530,7 +516,7 @@ def generate_report(
     report += "\n---\n\n## 📌 Öneriler\n\n"
     recommendations = []
 
-    uncompressed = [h for h in hypertables if h.get("is_compressed") == False]
+    uncompressed = [h for h in hypertables if not h.get("is_compressed")]
     if uncompressed:
         recommendations.append(f"🔴 {len(uncompressed)} hypertable sıkıştırılmamış")
 
@@ -547,9 +533,7 @@ def generate_report(
         recommendations.append(f"🔴 {total_issues} veri kalitesi sorunu tespit edildi")
 
     if chunk_health.get("uncompressed_old"):
-        recommendations.append(
-            f"🟠 {len(chunk_health['uncompressed_old'])} eski uncompressed chunk"
-        )
+        recommendations.append(f"🟠 {len(chunk_health['uncompressed_old'])} eski uncompressed chunk")
 
     if recommendations:
         for r in recommendations:
@@ -560,7 +544,8 @@ def generate_report(
     return report
 
 
-async def main():
+async def main() -> Any:
+    """Otomatik eklendi."""
     parser = argparse.ArgumentParser(description="TimescaleDB Health Auditor")
     parser.add_argument(
         "--output",
@@ -575,7 +560,7 @@ async def main():
     )
     args = parser.parse_args()
 
-    print("🏥 TimescaleDB Health Audit başlıyor...")
+    logger.info("🏥 TimescaleDB Health Audit başlıyor...")
 
     conn = await get_connection()
     try:
@@ -618,15 +603,15 @@ async def main():
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(output, encoding="utf-8")
-        print(f"✅ Rapor kaydedildi: {output_path}")
+        logger.info(f"✅ Rapor kaydedildi: {output_path}")
 
         # Konsola özet
-        print(f"\n📊 ÖZET:")
-        print(f"   Hypertable: {len([h for h in hypertables if h['status'] == 'ok'])}/{len(HYPERTABLES)}")
-        print(f"   Compression policy: {len(compression_policies)}")
-        print(f"   Retention policy: {len(retention_policies)}")
-        print(f"   Continuous aggregate: {len(continuous_aggregates)}")
-        print(f"   Veri kalitesi sorunu: {sum(len(v) for v in data_quality_results.values())}")
+        logger.info("\n📊 ÖZET:")
+        logger.info(f"   Hypertable: {len([h for h in hypertables if h['status'] == 'ok'])}/{len(HYPERTABLES)}")
+        logger.info(f"   Compression policy: {len(compression_policies)}")
+        logger.info(f"   Retention policy: {len(retention_policies)}")
+        logger.info(f"   Continuous aggregate: {len(continuous_aggregates)}")
+        logger.info(f"   Veri kalitesi sorunu: {sum(len(v) for v in data_quality_results.values())}")
 
     finally:
         await conn.close()

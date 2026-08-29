@@ -103,7 +103,6 @@ class LedoitWolfCovariance:
         return shrinkage
 
 
-
 class VolatilityTargeter:
     """Volatility targeting — portföy volatilitesini hedefle.
 
@@ -209,6 +208,7 @@ class RebalanceEngine:
     """Portföy rebalance motoru."""
 
     def __init__(self, turnover_limit: float = 0.3, threshold_pct: float = 5.0):
+        """Otomatik eklendi."""
         self.turnover_limit = turnover_limit  # Maksimum turnover (0-1)
         self.threshold_pct = threshold_pct  # Sapma eşiği (%)
 

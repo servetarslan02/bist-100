@@ -31,6 +31,7 @@ class ModelResult:
     calibration_score: float = 0.0  # Brier score (düşük = iyi)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "name": self.name,
             "accuracy": round(self.accuracy, 4),

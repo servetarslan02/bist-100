@@ -9,30 +9,37 @@ ALPHA BIST — Halt Monitor
 - SPK geçici işlem yasağı
 """
 
+import functools
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.halt_monitor")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class HaltStatus:
+    """Otomatik eklendi."""
     halted: bool
     reason: str = ""
     halt_type: str = ""  # KAP, CORPORATE, SPK, CIRCUIT_BREAKER
@@ -41,6 +48,7 @@ class HaltStatus:
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "halted": self.halted,
             "reason": self.reason,
@@ -54,6 +62,7 @@ class HaltMonitor:
     """Şirket bazlı durdurma takibi — DuckDB (state_store) persistence ile."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._halted_tickers: dict[str, HaltStatus] = {}
         self._restore_state()
 
@@ -64,7 +73,7 @@ class HaltMonitor:
         reason: str,
         halt_type: str = "KAP",
         expected_resume: str | None = None,
-    ):
+    ) -> Any:
         """Hisse durdurma ekle."""
         self._halted_tickers[ticker] = HaltStatus(
             halted=True,
@@ -77,7 +86,7 @@ class HaltMonitor:
         logger.info("Halt added", ticker=ticker, reason=reason, type=halt_type)
 
     @otel_trace("halt_monitor.remove_halt")
-    def remove_halt(self, ticker: str):
+    def remove_halt(self, ticker: str) -> Any:
         """Hisse durdurma kaldır."""
         if ticker in self._halted_tickers:
             del self._halted_tickers[ticker]
@@ -100,7 +109,7 @@ class HaltMonitor:
         """Hisse durdurulmuş mu?"""
         return ticker in self._halted_tickers
 
-    def _persist_state(self, ticker: str):
+    def _persist_state(self, ticker: str) -> Any:
         """Halt durumunu SQLite'a kaydet."""
         try:
             from .state_store import state_store
@@ -122,7 +131,7 @@ class HaltMonitor:
         except Exception as e:
             logger.debug("Halt persist skipped", ticker=ticker, error=str(e))
 
-    def _remove_persisted(self, ticker: str):
+    def _remove_persisted(self, ticker: str) -> Any:
         """Halt durumunu SQLite'dan sil."""
         try:
             from .state_store import state_store
@@ -132,7 +141,7 @@ class HaltMonitor:
         except Exception as e:
             logger.debug("Halt remove persist skipped", ticker=ticker, error=str(e))
 
-    def _restore_state(self):
+    def _restore_state(self) -> Any:
         """Halt durumunu SQLite'dan geri yükle."""
         try:
             from .state_store import state_store

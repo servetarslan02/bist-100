@@ -42,6 +42,7 @@ class BistEnsembleTrainer:
     """Alpha BIST için LightGBM + XGBoost + CatBoost Ensemble Eğitici."""
 
     def __init__(self, train_df: pl.DataFrame, oos_df: pl.DataFrame):
+        """Otomatik eklendi."""
         self.train_df = train_df
         self.oos_df = oos_df
         self.feature_cols = [

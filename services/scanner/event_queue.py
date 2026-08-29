@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Event Priority Queue v1.0
 
@@ -35,6 +36,7 @@ class EventPriorityQueue:
     """
 
     def __init__(self, max_workers: int = 5):
+        """Otomatik eklendi."""
         self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self._max_workers = max_workers
         self._workers: list[asyncio.Task] = []
@@ -42,11 +44,11 @@ class EventPriorityQueue:
         self._handler: Callable | None = None
         self._processed_count = 0
 
-    def set_handler(self, handler: Callable):
+    def set_handler(self, handler: Callable) -> Any:
         """Event handler ata."""
         self._handler = handler
 
-    async def start(self):
+    async def start(self) -> Any:
         """Worker'ları başlat."""
         self._running = True
         for i in range(self._max_workers):
@@ -56,7 +58,7 @@ class EventPriorityQueue:
                 self._workers = self._workers[-1000:]
         logger.info("Event queue started", workers=self._max_workers)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Worker'ları durdur."""
         self._running = False
         for task in self._workers:
@@ -64,7 +66,7 @@ class EventPriorityQueue:
         self._workers.clear()
         logger.info("Event queue stopped", processed=self._processed_count)
 
-    async def submit(self, event_type: str, event_data: dict, affected_tickers: list[str]):
+    async def submit(self, event_type: str, event_data: dict, affected_tickers: list[str]) -> Any:
         """
         Event'i kuyruğa ekle.
         Her etkilenen hisse için ayrı task oluşturulur.
@@ -99,7 +101,7 @@ class EventPriorityQueue:
         else:
             return 4  # Düşük
 
-    async def _worker(self, name: str):
+    async def _worker(self, name: str) -> Any:
         """Worker — kuyruktan task alıp işler."""
         while self._running:
             try:

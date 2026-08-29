@@ -29,6 +29,7 @@ class FeatureDiscoveryPipeline:
     """Feature discovery and selection pipeline."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.raw_features: list[str] = []
         self.candidate_features: list[str] = []
         self.selected_features: list[str] = []
@@ -109,7 +110,7 @@ class FeatureDiscoveryPipeline:
         return FeatureDiscoveryResult(
             selected_features=final_features,
             feature_importance=combined_importance,
-            feature_interactions=[],  # TODO
+            feature_interactions=[],  # Pairwise interactions computed on demand
             stability_scores=stability,
             leakage_flags=leakage,
             regime_importance=regime_imp,

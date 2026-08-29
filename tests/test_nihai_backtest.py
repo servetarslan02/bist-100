@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """
 ALPHA BIST — Nihai Backtest Sistemi Test Paketi
 
@@ -12,12 +15,11 @@ Tüm yeni modüller için kapsamlı testler:
 8. Scanner Parity
 """
 
-from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -78,10 +80,11 @@ from services.backtest.transaction_costs import (
 class TestLookAheadBiasDetector:
     """Look-ahead bias detection testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.detector = LookAheadBiasDetector()
 
-    def test_validate_feature_timestamps_no_leakage(self):
+    def test_validate_feature_timestamps_no_leakage(self) -> Any:
         """Feature'larda gelecek veri yoksa temiz rapor dönmeli."""
         df = pl.DataFrame(
             {
@@ -94,7 +97,7 @@ class TestLookAheadBiasDetector:
         assert report.critical_count == 0
         assert report.is_clean
 
-    def test_validate_feature_timestamps_with_leakage(self):
+    def test_validate_feature_timestamps_with_leakage(self) -> Any:
         """Feature'larda gelecek veri varsa critical ihlal bulmalı."""
         df = pl.DataFrame(
             {
@@ -107,21 +110,21 @@ class TestLookAheadBiasDetector:
         assert report.critical_count > 0
         assert not report.is_clean
 
-    def test_validate_label_feature_alignment_ok(self):
+    def test_validate_label_feature_alignment_ok(self) -> Any:
         """Purge yeterliyse temiz rapor dönmeli."""
         report = self.detector.validate_label_feature_alignment(
             label_horizon_days=5, feature_window_days=20, purge_days=5
         )
         assert report.critical_count == 0
 
-    def test_validate_label_feature_alignment_insufficient_purge(self):
+    def test_validate_label_feature_alignment_insufficient_purge(self) -> Any:
         """Purge yetersizse critical ihlal bulmalı."""
         report = self.detector.validate_label_feature_alignment(
             label_horizon_days=5, feature_window_days=20, purge_days=2
         )
         assert report.critical_count > 0
 
-    def test_validate_fold_boundaries_ok(self):
+    def test_validate_fold_boundaries_ok(self) -> Any:
         """Geçerli fold sınırlarında temiz rapor dönmeli."""
         train_end = datetime(2024, 6, 1)
         test_start = datetime(2024, 6, 10)  # 9 gün gap
@@ -130,7 +133,7 @@ class TestLookAheadBiasDetector:
         )
         assert report.critical_count == 0
 
-    def test_validate_fold_boundaries_overlap(self):
+    def test_validate_fold_boundaries_overlap(self) -> Any:
         """Train ve test çakışması critical ihlal oluşturmalı."""
         train_end = datetime(2024, 6, 10)
         test_start = datetime(2024, 6, 5)  # Test train'den önce başlıyor!
@@ -143,12 +146,12 @@ class TestLookAheadBiasDetector:
 class TestBiasDetectorMiddleware:
     """Middleware testleri."""
 
-    def test_enabled_mode(self):
+    def test_enabled_mode(self) -> Any:
         """Middleware enabled modunda çalışmalı."""
         middleware = BiasDetectorMiddleware(strict_mode=True)
         assert middleware.enabled
 
-    def test_disabled_mode(self):
+    def test_disabled_mode(self) -> Any:
         """Middleware disabled modunda her zaman safe dönmeli."""
         middleware = BiasDetectorMiddleware(strict_mode=True)
         middleware.enabled = False
@@ -162,10 +165,11 @@ class TestBiasDetectorMiddleware:
 class TestSurvivorshipBiasHandler:
     """Survivorship bias testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.handler = SurvivorshipBiasHandler()
 
-    def test_get_universe_before_delisting(self):
+    def test_get_universe_before_delisting(self) -> Any:
         """Delisting öncesi evren tüm hisseleri içermeli."""
         self.handler.register_delisting(
             DelistingEvent(
@@ -179,7 +183,7 @@ class TestSurvivorshipBiasHandler:
         assert "HISSE1" in universe
         assert len(universe) == 3
 
-    def test_get_universe_after_delisting(self):
+    def test_get_universe_after_delisting(self) -> Any:
         """Delisting sonrası evren o hisseyi içermemeli."""
         self.handler.register_delisting(
             DelistingEvent(
@@ -193,7 +197,7 @@ class TestSurvivorshipBiasHandler:
         assert "HISSE1" not in universe
         assert len(universe) == 2
 
-    def test_survivorship_bias_magnitude(self):
+    def test_survivorship_bias_magnitude(self) -> Any:
         """Bias büyüklüğü doğru hesaplanmalı."""
         full_returns = pl.DataFrame({"return": [0.01, -0.02, 0.03, -0.01, 0.02]})
         survivor_returns = pl.DataFrame({"return": [0.01, 0.03, 0.02, 0.01, 0.03]})
@@ -207,10 +211,11 @@ class TestSurvivorshipBiasHandler:
 class TestPointInTimeValidator:
     """PIT validation testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.validator = PointInTimeValidator()
 
-    def test_get_available_data_at(self):
+    def test_get_available_data_at(self) -> Any:
         """Karar anında sadece yayınlanmış veriler dönmeli."""
         self.validator.register_fundamental_data(
             ticker="THYAO",
@@ -226,7 +231,7 @@ class TestPointInTimeValidator:
         available = self.validator.get_available_data_at("THYAO", datetime(2024, 5, 1))
         assert len(available) == 1
 
-    def test_validate_fundamental_access_future_data(self):
+    def test_validate_fundamental_access_future_data(self) -> Any:
         """Gelecekteki veri erişimi reddedilmeli."""
         self.validator.register_fundamental_data(
             ticker="THYAO",
@@ -244,7 +249,7 @@ class TestPointInTimeValidator:
         assert violation is not None
         assert violation.violation_type == "future_data"
 
-    def test_validate_label_generation_too_early(self):
+    def test_validate_label_generation_too_early(self) -> Any:
         """Erken label üretimi reddedilmeli."""
         is_valid, violation = self.validator.validate_label_generation(
             feature_timestamp=datetime(2024, 1, 1),
@@ -263,10 +268,11 @@ class TestPointInTimeValidator:
 class TestTransactionCostEngine:
     """Transaction cost testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.engine = TransactionCostEngine()
 
-    def test_calculate_total_cost_buy(self):
+    def test_calculate_total_cost_buy(self) -> Any:
         """ALIŞ maliyeti pozitif olmalı."""
         result = self.engine.calculate_total_cost(
             side="BUY",
@@ -282,7 +288,7 @@ class TestTransactionCostEngine:
         assert "slippage" in result["costs"]
         assert "market_impact" in result["costs"]
 
-    def test_calculate_total_cost_sell(self):
+    def test_calculate_total_cost_sell(self) -> Any:
         """SATIŞ maliyeti de pozitif olmalı."""
         result = self.engine.calculate_total_cost(
             side="SELL",
@@ -293,13 +299,13 @@ class TestTransactionCostEngine:
         )
         assert result["total_cost"] > 0
 
-    def test_low_liquidity_higher_cost(self):
+    def test_low_liquidity_higher_cost(self) -> Any:
         """Düşük likidite daha yüksek maliyet üretmeli."""
         high_liq = self.engine.calculate_total_cost("BUY", 100.0, 1000, "HISSE", avg_daily_volume=1_000_000_000)
         low_liq = self.engine.calculate_total_cost("BUY", 100.0, 1000, "HISSE", avg_daily_volume=10_000_000)
         assert low_liq["total_cost_pct"] > high_liq["total_cost_pct"]
 
-    def test_round_trip_cost(self):
+    def test_round_trip_cost(self) -> Any:
         """Round-trip maliyeti iki tek yönün toplamı olmalı."""
         rt = self.engine.estimate_round_trip_cost(
             ticker="THYAO",
@@ -311,7 +317,7 @@ class TestTransactionCostEngine:
         assert rt["round_trip_cost_pct"] > 0
         assert rt["break_even_return_pct"] > 0
 
-    def test_liquidity_classification(self):
+    def test_liquidity_classification(self) -> Any:
         """Likidite sınıflandırması doğru olmalı."""
         assert self.engine.classify_liquidity(1_000_000_000) == LiquidityTier.TIER_1
         assert self.engine.classify_liquidity(200_000_000) == LiquidityTier.TIER_2
@@ -322,14 +328,14 @@ class TestTransactionCostEngine:
 class TestSpreadModel:
     """Spread model testleri."""
 
-    def test_higher_volatility_wider_spread(self):
+    def test_higher_volatility_wider_spread(self) -> Any:
         """Yüksek volatilite daha geniş spread üretmeli."""
         model = SpreadModel()
         low_vol_spread = model.estimate_spread(LiquidityTier.TIER_1, volatility_ratio=0.5)
         high_vol_spread = model.estimate_spread(LiquidityTier.TIER_1, volatility_ratio=2.0)
         assert high_vol_spread > low_vol_spread
 
-    def test_tier_1_narrowest_spread(self):
+    def test_tier_1_narrowest_spread(self) -> Any:
         """Tier 1 en dar spread'e sahip olmalı."""
         model = SpreadModel()
         t1 = model.estimate_spread(LiquidityTier.TIER_1)
@@ -345,7 +351,7 @@ class TestSpreadModel:
 class TestMultiAssetBacktestEngine:
     """Multi-asset backtest testleri."""
 
-    def test_basic_run(self):
+    def test_basic_run(self) -> Any:
         """Temel çalıştırma testi."""
         # Create sample data
         dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 1) + timedelta(days=100), timedelta(days=1), eager=True)
@@ -401,10 +407,11 @@ class TestMultiAssetBacktestEngine:
 class TestEnhancedReplayEngine:
     """Event replay testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.engine = EnhancedReplayEngine()
 
-    def test_audit_trail_integrity(self):
+    def test_audit_trail_integrity(self) -> Any:
         """Audit trail bütünlüğü korunmalı."""
         self.engine._record_event(
             timestamp=datetime.now(),
@@ -418,7 +425,7 @@ class TestEnhancedReplayEngine:
         )
         assert self.engine.verify_audit_integrity()
 
-    def test_create_restore_snapshot(self):
+    def test_create_restore_snapshot(self) -> Any:
         """Snapshot oluşturup geri yükleyebilmeli."""
         state = self.engine.create_snapshot(
             timestamp=datetime.now(),
@@ -429,7 +436,7 @@ class TestEnhancedReplayEngine:
         assert restored["cash"] == 100_000.0
         assert "HISSE1" in restored["positions"]
 
-    def test_compare_decisions_deterministic(self):
+    def test_compare_decisions_deterministic(self) -> Any:
         """Aynı kararlar deterministik olmalı."""
         decisions = [
             ReplayDecision(
@@ -450,10 +457,11 @@ class TestEnhancedReplayEngine:
 class TestDeterministicRecovery:
     """Deterministic recovery testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.recovery = DeterministicRecovery()
 
-    def test_create_restore_checkpoint(self):
+    def test_create_restore_checkpoint(self) -> Any:
         """Checkpoint oluşturup geri yükleyebilmeli."""
         config = {"param1": 1, "param2": "test"}
         portfolio = {"cash": 100_000, "positions": {}}
@@ -464,22 +472,24 @@ class TestDeterministicRecovery:
         assert restored_config == config
         assert restored_portfolio == portfolio
 
-    def test_determinism_validation(self):
+    def test_determinism_validation(self) -> Any:
         """Determinizm doğrulanmalı."""
 
-        def deterministic_func(x):
+        def deterministic_func(x) -> Any:
+            """Otomatik eklendi."""
             np.random.seed(42)
             return np.random.randn(x)
 
         is_det, result = self.recovery.validate_determinism(deterministic_func, (10,), deterministic_func(10))
         assert is_det
 
-    def test_idempotency_guard(self):
+    def test_idempotency_guard(self) -> Any:
         """Aynı işlem iki kez çalıştırılmamalı."""
         guard = IdempotencyGuard()
         call_count = 0
 
-        def expensive_func():
+        def expensive_func() -> Any:
+            """Otomatik eklendi."""
             nonlocal call_count
             call_count += 1
             return 42
@@ -500,7 +510,7 @@ class TestDeterministicRecovery:
 class TestDeflatedSharpe:
     """Deflated Sharpe testleri."""
 
-    def test_deflated_sharpe_single_strategy(self):
+    def test_deflated_sharpe_single_strategy(self) -> Any:
         """Tek strateji için deflated sharpe ≈ observed sharpe."""
         result = DeflatedSharpeCalculator.compute_deflated_sharpe(
             observed_sharpe=1.5,
@@ -511,7 +521,7 @@ class TestDeflatedSharpe:
         # Tek strateji için expected max sharpe ≈ 0
         assert abs(result.deflated_sharpe) > 0
 
-    def test_deflated_sharpe_multiple_strategies(self):
+    def test_deflated_sharpe_multiple_strategies(self) -> Any:
         """Çoklu strateji ile deflated sharpe farklı olmalı."""
         single = DeflatedSharpeCalculator.compute_deflated_sharpe(
             observed_sharpe=2.0,
@@ -529,7 +539,7 @@ class TestDeflatedSharpe:
         # 100 strateji test edildiğinde expected_max_sharpe artmalı
         assert multiple.expected_max_sharpe > single.expected_max_sharpe
 
-    def test_from_returns(self):
+    def test_from_returns(self) -> Any:
         """Getiri serisinden hesaplama çalışmalı."""
         returns = np.random.randn(252) * 0.01 + 0.0005  # ~%12 yıllık getiri
         result = DeflatedSharpeCalculator.from_returns(returns, num_strategies=10)
@@ -540,7 +550,7 @@ class TestDeflatedSharpe:
 class TestProbabilisticSharpeRatio:
     """PSR testleri."""
 
-    def test_psr_positive_sharpe(self):
+    def test_psr_positive_sharpe(self) -> Any:
         """Pozitif sharpe için PSR > 0.5 olmalı."""
         psr = ProbabilisticSharpeRatio.compute(
             observed_sharpe=1.5,
@@ -549,7 +559,7 @@ class TestProbabilisticSharpeRatio:
         )
         assert psr > 0.5
 
-    def test_psr_from_returns(self):
+    def test_psr_from_returns(self) -> Any:
         """Getiri serisinden PSR hesaplanmalı."""
         returns = np.random.randn(252) * 0.01 + 0.001
         result = ProbabilisticSharpeRatio.from_returns(returns)
@@ -560,7 +570,7 @@ class TestProbabilisticSharpeRatio:
 class TestBenchmarkComparator:
     """Benchmark karşılaştırma testleri."""
 
-    def test_compare_identical_returns(self):
+    def test_compare_identical_returns(self) -> Any:
         """Aynı getiriler için beta ≈ 1, alpha ≈ 0 olmalı."""
         returns = np.random.randn(252) * 0.01
         result = BenchmarkComparator.compare(returns, returns, "TEST")
@@ -568,7 +578,7 @@ class TestBenchmarkComparator:
         assert abs(result.alpha_pct) < 1.0
         assert result.correlation > 0.99
 
-    def test_compare_uncorrelated(self):
+    def test_compare_uncorrelated(self) -> Any:
         """Korelesiz getiriler için düşük korelasyon olmalı."""
         np.random.seed(42)
         sr = np.random.randn(252) * 0.01
@@ -576,7 +586,7 @@ class TestBenchmarkComparator:
         result = BenchmarkComparator.compare(sr, br, "TEST")
         assert abs(result.correlation) < 0.3
 
-    def test_generate_report(self):
+    def test_generate_report(self) -> Any:
         """Rapor oluşturulmalı."""
         comp1 = BenchmarkComparison(
             benchmark_name="BIST100",
@@ -606,13 +616,15 @@ class TestBenchmarkComparator:
 class TestBacktestScannerParity:
     """Scanner parity testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.parity = BacktestScannerParity()
 
-    def test_feature_parity_same_data(self):
+    def test_feature_parity_same_data(self) -> Any:
         """Aynı veriyle feature parity sağlanmalı."""
 
-        def mock_feature_engine(data, ticker, timestamp):
+        def mock_feature_engine(data, ticker, timestamp) -> Any:
+            """Otomatik eklendi."""
             return {"feature_1": 0.5, "feature_2": 1.2}
 
         self.parity.register_engines(
@@ -624,13 +636,15 @@ class TestBacktestScannerParity:
         result = self.parity.verify_feature_parity(data, "TEST", datetime.now())
         assert result.is_parity
 
-    def test_full_parity_check(self):
+    def test_full_parity_check(self) -> Any:
         """Tam parity kontrolü çalışmalı."""
 
-        def mock_feature_engine(data, ticker, timestamp):
+        def mock_feature_engine(data, ticker, timestamp) -> Any:
+            """Otomatik eklendi."""
             return {"f1": 0.5}
 
-        def mock_signal_engine(features, ticker):
+        def mock_signal_engine(features, ticker) -> Any:
+            """Otomatik eklendi."""
             return 70.0
 
         self.parity.register_engines(
@@ -652,10 +666,11 @@ class TestBacktestScannerParity:
 class TestFeatureVersionLock:
     """Feature version lock testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.lock = FeatureVersionLock()
 
-    def test_register_and_get_version(self):
+    def test_register_and_get_version(self) -> Any:
         """Versiyon kaydedilip alınabilmeli."""
         self.lock.register_version(
             "v1.0",
@@ -666,7 +681,7 @@ class TestFeatureVersionLock:
         assert "feature_names" in config
         assert len(config["feature_names"]) == 2
 
-    def test_validate_version_match(self):
+    def test_validate_version_match(self) -> Any:
         """Versiyon eşleşmesi doğrulanmalı."""
         self.lock.register_version("v1.0", ["f1"], {})
         assert self.lock.validate_version_match("v1.0")
@@ -681,7 +696,7 @@ class TestFeatureVersionLock:
 class TestIntegration:
     """Entegrasyon testleri."""
 
-    def test_full_pipeline_flow(self):
+    def test_full_pipeline_flow(self) -> Any:
         """Tam pipeline akışı testi."""
         # 1. Bias check
         detector = LookAheadBiasDetector()
@@ -703,7 +718,7 @@ class TestIntegration:
         comp = BenchmarkComparator.compare(returns, benchmark_returns, "BIST100")
         assert comp.num_observations == 252
 
-    def test_transaction_cost_impacts_returns(self):
+    def test_transaction_cost_impacts_returns(self) -> Any:
         """Transaction cost getiriyi düşürmeli."""
         # Without costs
         config_no_cost = MultiAssetConfig(use_realistic_costs=False)

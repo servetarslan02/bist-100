@@ -70,6 +70,7 @@ class KAPLLMExtractor:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._knowledge_graph: dict[str, dict] = defaultdict(lambda: {"relations": [], "events": []})
         self._sector_impact_cache: dict[str, dict] = {}
         logger.info("KAPLLMExtractor v3.0 initialized")

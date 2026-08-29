@@ -22,6 +22,7 @@ Kullanım:
 """
 
 import asyncio
+import functools
 import hashlib
 import time
 from collections.abc import Callable
@@ -32,21 +33,26 @@ from typing import Any
 
 import duckdb
 import orjson
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.offline_queue")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -63,6 +69,7 @@ class OfflineQueue:
         max_entries: int = 10000,
         default_ttl_hours: int = 48,
     ):
+        """Otomatik eklendi."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
@@ -78,7 +85,7 @@ class OfflineQueue:
 
         logger.info("OfflineQueue initialized", db_path=str(self.db_path))
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """SQLite tablolarını oluştur."""
         with self._connect() as conn:
             conn.execute("""
@@ -101,7 +108,8 @@ class OfflineQueue:
             conn.commit()
 
     @contextmanager
-    def _connect(self):
+    def _connect(self) -> Any:
+        """Otomatik eklendi."""
         conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
@@ -109,7 +117,7 @@ class OfflineQueue:
             conn.close()
 
     @otel_trace("offline_queue.register_publish_handler")
-    def register_publish_handler(self, event_type: str, handler: Callable):
+    def register_publish_handler(self, event_type: str, handler: Callable) -> Any:
         """Event type için publish handler kaydet."""
         self._publish_handlers[event_type] = handler
 
@@ -226,7 +234,7 @@ class OfflineQueue:
 
         return flushed
 
-    def _cleanup_expired(self):
+    def _cleanup_expired(self) -> Any:
         """Süresi dolmuş kayıtları temizle."""
         now = datetime.now(UTC).isoformat()
         with self._connect() as conn:

@@ -61,6 +61,7 @@ class NewsDuplicationEngine:
     """Haber tekrarı tespiti."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._seen_hashes: dict[str, deque] = {}  # hash → deque of sources
 
     def is_duplicate(self, title: str, source: str) -> bool:
@@ -86,9 +87,10 @@ class EventTimelineEngine:
     """Olay zaman çizelgesi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._timelines: dict[str, deque] = {}  # ticker → deque of events
 
-    def add_event(self, ticker: str, event_type: str, data: dict, timestamp: str):
+    def add_event(self, ticker: str, event_type: str, data: dict, timestamp: str) -> Any:
         """Olay ekle."""
         if ticker not in self._timelines:
             self._timelines[ticker] = deque(maxlen=100)

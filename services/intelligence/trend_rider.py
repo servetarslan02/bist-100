@@ -22,6 +22,7 @@ class TrendRiderEngine:
     """Tamamen dinamik volatiliteye (ATR) ve trende dayalı kurumsal çıkış algoritması."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         # ATR tabanlı çıkış parametreleri
         self.atr_period = 14  # ATR periyodu
         self.atr_multiplier_entry = 2.0  # Giriş ATR çarpanı

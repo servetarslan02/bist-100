@@ -81,10 +81,11 @@ class EnsembleForecaster:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._models: dict[str, Callable] = {}
         self._performance: dict[str, dict] = {}  # model → {accuracy, sharpe, ic}
 
-    def register_model(self, name: str, predict_fn: Callable):
+    def register_model(self, name: str, predict_fn: Callable) -> Any:
         """Model kaydet."""
         self._models[name] = predict_fn
         logger.info("Forecast model registered", name=name)
@@ -205,7 +206,7 @@ class EnsembleForecaster:
 
         return max(0.0, min(1.0, calibrated))
 
-    def update_performance(self, model_name: str, accuracy: float, sharpe: float = 0):
+    def update_performance(self, model_name: str, accuracy: float, sharpe: float = 0) -> Any:
         """Model performansını güncelle."""
         self._performance[model_name] = {
             "accuracy": accuracy,

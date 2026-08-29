@@ -23,6 +23,7 @@ class DatasetBuilder30Y:
     """30 yıllık BIST verisinden ML feature matrisi üreten motor."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 

@@ -36,6 +36,7 @@ class MacroHistoricalStore:
     """Tarihsel makro veri deposu."""
 
     def __init__(self, storage_path: str = "data/macro_historical.json"):
+        """Otomatik eklendi."""
         self._storage_path = storage_path
         self._data: dict[str, dict[str, list[dict]]] = {}  # indicator → {date → [values]}
         self._load()
@@ -46,7 +47,7 @@ class MacroHistoricalStore:
         indicator: str,
         value: float,
         source: str = "unknown",
-    ):
+    ) -> Any:
         """Makro veri kaydet.
 
         Args:
@@ -164,7 +165,7 @@ class MacroHistoricalStore:
         self,
         indicator: str,
         data: list[dict[str, Any]],
-    ):
+    ) -> Any:
         """Toplu veri yükleme (backfill).
 
         Args:
@@ -216,7 +217,7 @@ class MacroHistoricalStore:
 
     # ===================== PERSISTENCE =====================
 
-    def _load(self):
+    def _load(self) -> Any:
         """Veriyi dosyadan yükle."""
         if os.path.exists(self._storage_path):
             try:
@@ -227,7 +228,7 @@ class MacroHistoricalStore:
                 logger.error("Failed to load historical store", error=str(e))
                 self._data = {}
 
-    def _save(self):
+    def _save(self) -> Any:
         """Veriyi dosyaya kaydet."""
         try:
             os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)

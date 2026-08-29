@@ -36,23 +36,29 @@ try:
 except ImportError:
     asyncpg = None
 
-from .config import settings
-
-import structlog
 import functools
+
 from opentelemetry import trace
+
+from .config import settings
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.sharding")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -67,6 +73,7 @@ class ShardRouter:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._pools: dict[int, Any] = {}
         self._enabled = False
 
@@ -101,7 +108,7 @@ class ShardRouter:
             "range": self.SHARDS[shard_id]["range"],
         }
 
-    async def init(self):
+    async def init(self) -> Any:
         """Shard pool'larını başlat. Sharding devre dışıysa primary'ye düş."""
         if not getattr(settings, "sharding_enabled", False):
             logger.info("Sharding disabled, using single database")
@@ -131,7 +138,7 @@ class ShardRouter:
             self._enabled = True
             logger.info("Sharding enabled", shards=len(self._pools))
 
-    async def close(self):
+    async def close(self) -> Any:
         """Tüm shard pool'larını kapat."""
         for _shard_id, pool in self._pools.items():
             try:
@@ -142,7 +149,7 @@ class ShardRouter:
         self._enabled = False
         logger.info("Shard pools closed")
 
-    async def get_pool(self, ticker: str):
+    async def get_pool(self, ticker: str) -> Any:
         """Ticker için doğru pool'u döndür."""
         if not self._enabled:
             from .database import get_pg_pool
@@ -172,7 +179,7 @@ class ShardRouter:
             return await conn.fetch(query, *args)
 
     @otel_trace("sharding.fetchrow")
-    async def fetchrow(self, ticker: str, query: str, *args):
+    async def fetchrow(self, ticker: str, query: str, *args) -> Any:
         """Ticker'ın shard'ından tek satır çek."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
@@ -248,11 +255,11 @@ class ShardRouter:
 shard_router = ShardRouter()
 
 
-async def init_sharding():
+async def init_sharding() -> Any:
     """Sharding'i başlat."""
     await shard_router.init()
 
 
-async def close_sharding():
+async def close_sharding() -> Any:
     """Sharding'i kapat."""
     await shard_router.close()

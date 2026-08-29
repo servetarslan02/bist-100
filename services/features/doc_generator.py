@@ -41,6 +41,7 @@ class FeatureDocGenerator:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         pass
 
     def generate_catalog(
@@ -59,6 +60,7 @@ class FeatureDocGenerator:
         """
         if contracts is None:
             from .contract import feature_registry
+
             contracts = feature_registry.list_all()
 
         lines: list[str] = [
@@ -86,8 +88,8 @@ class FeatureDocGenerator:
                 pit_icon = "✅" if c.pit_safe else "⚠️"
                 lines.append(f"### `{c.name}`")
                 lines.append("")
-                lines.append(f"| Alan | Değer |")
-                lines.append(f"|------|-------|")
+                lines.append("| Alan | Değer |")
+                lines.append("|------|-------|")
                 lines.append(f"| **Açıklama** | {c.description} |")
                 lines.append(f"| **Kaynak** | {c.source} |")
                 lines.append(f"| **Formül** | `{c.formula}` |")
@@ -131,6 +133,7 @@ class FeatureDocGenerator:
         """
         if contracts is None:
             from .contract import feature_registry
+
             contracts = feature_registry.list_all()
 
         lines: list[str] = ["graph TD"]
@@ -141,13 +144,13 @@ class FeatureDocGenerator:
 
             if safe_name not in seen_nodes:
                 icon = self._get_category_icon(c.category)
-                lines.append(f"    {safe_name}[\"{icon} {c.name}\"]")
+                lines.append(f'    {safe_name}["{icon} {c.name}"]')
                 seen_nodes.add(safe_name)
 
             for dep in c.dependencies:
                 safe_dep = dep.replace(".", "_").replace("-", "_")
                 if safe_dep not in seen_nodes:
-                    lines.append(f"    {safe_dep}[\"📦 {dep}\"]")
+                    lines.append(f'    {safe_dep}["📦 {dep}"]')
                     seen_nodes.add(safe_dep)
                 lines.append(f"    {safe_dep} --> {safe_name}")
 
@@ -167,6 +170,7 @@ class FeatureDocGenerator:
         """
         if contracts is None:
             from .contract import feature_registry
+
             contracts = feature_registry.list_all()
 
         total = len(contracts)
@@ -201,11 +205,11 @@ class FeatureDocGenerator:
             "",
             "## Genel İstatistikler",
             "",
-            f"| Metrik | Değer |",
-            f"|--------|-------|",
+            "| Metrik | Değer |",
+            "|--------|-------|",
             f"| Toplam Feature | {total} |",
-            f"| PIT-Safe | {pit_safe} ({pit_safe/max(total,1)*100:.0f}%) |",
-            f"| PIT-Unsafe | {pit_unsafe} ({pit_unsafe/max(total,1)*100:.0f}%) |",
+            f"| PIT-Safe | {pit_safe} ({pit_safe / max(total, 1) * 100:.0f}%) |",
+            f"| PIT-Unsafe | {pit_unsafe} ({pit_unsafe / max(total, 1) * 100:.0f}%) |",
             f"| Ortalama Lookback | {avg_lookback:.1f} gün |",
             f"| Maksimum Lookback | {max_lookback} gün |",
             "",
@@ -220,38 +224,44 @@ class FeatureDocGenerator:
             ratio = count / total * 100
             lines.append(f"| {cat} | {count} | {ratio:.0f}% |")
 
-        lines.extend([
-            "",
-            "## Owner Dağılımı",
-            "",
-            "| Owner | Sayı | Oran |",
-            "|-------|------|------|",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Owner Dağılımı",
+                "",
+                "| Owner | Sayı | Oran |",
+                "|-------|------|------|",
+            ]
+        )
 
         for owner in sorted(by_owner.keys(), key=lambda x: by_owner[x], reverse=True):
             count = by_owner[owner]
             ratio = count / total * 100
             lines.append(f"| {owner} | {count} | {ratio:.0f}% |")
 
-        lines.extend([
-            "",
-            "## Frekans Dağılımı",
-            "",
-            "| Frekans | Sayı | Oran |",
-            "|---------|------|------|",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Frekans Dağılımı",
+                "",
+                "| Frekans | Sayı | Oran |",
+                "|---------|------|------|",
+            ]
+        )
 
         for freq in sorted(by_frequency.keys(), key=lambda x: by_frequency[x], reverse=True):
             count = by_frequency[freq]
             ratio = count / total * 100
             lines.append(f"| {freq} | {count} | {ratio:.0f}% |")
 
-        lines.extend([
-            "",
-            "---",
-            "",
-            f"*Bu rapor FeatureDocGenerator tarafından otomatik oluşturulmuştur.*",
-        ])
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "*Bu rapor FeatureDocGenerator tarafından otomatik oluşturulmuştur.*",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -288,12 +298,12 @@ class FeatureDocGenerator:
             lines.append(f"- **Değer Aralığı:** [{contract.value_range[0]}, {contract.value_range[1]}]")
 
         if contract.validation_rules:
-            lines.append(f"- **Validasyon Kuralları:**")
+            lines.append("- **Validasyon Kuralları:**")
             for k, v in contract.validation_rules.items():
                 lines.append(f"  - {k}: {v}")
 
         if contract.dependencies:
-            lines.append(f"- **Bağımlılıklar:**")
+            lines.append("- **Bağımlılıklar:**")
             for dep in contract.dependencies:
                 lines.append(f"  - `{dep}`")
 

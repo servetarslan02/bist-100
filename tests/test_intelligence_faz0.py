@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Intelligence Module Tests
 
@@ -23,13 +24,13 @@ from services.intelligence.hmm_regime import HMMRegimeDetector
 class TestHMMRegimeDetector:
     """HMM rejim tespit testleri."""
 
-    def test_initial_state(self):
+    def test_initial_state(self) -> Any:
         """Başlangıç durumu."""
         detector = HMMRegimeDetector(n_regimes=4)
         assert detector.is_fitted is False
         assert detector.current_regime is None
 
-    def test_rule_based_fallback(self):
+    def test_rule_based_fallback(self) -> Any:
         """Rule-based fallback çalışır."""
         detector = HMMRegimeDetector()
         returns = np.array([0.001] * 30)
@@ -38,7 +39,7 @@ class TestHMMRegimeDetector:
         assert result.regime in ["BULL", "BEAR", "HIGH_VOL", "LOW_VOL"]
         assert 0 <= result.confidence <= 1
 
-    def test_fallback_bull(self):
+    def test_fallback_bull(self) -> Any:
         """Pozitif getiri → BULL."""
         detector = HMMRegimeDetector()
         returns = np.array([0.005] * 30)  # Pozitif
@@ -46,7 +47,7 @@ class TestHMMRegimeDetector:
         result = detector.predict_regime(returns, vol)
         assert result.regime == "BULL"
 
-    def test_fallback_bear(self):
+    def test_fallback_bear(self) -> Any:
         """Negatif getiri → BEAR."""
         detector = HMMRegimeDetector()
         returns = np.array([-0.005] * 30)  # Negatif
@@ -54,7 +55,7 @@ class TestHMMRegimeDetector:
         result = detector.predict_regime(returns, vol)
         assert result.regime == "BEAR"
 
-    def test_fallback_high_vol(self):
+    def test_fallback_high_vol(self) -> Any:
         """Yüksek volatilite → HIGH_VOL."""
         detector = HMMRegimeDetector()
         returns = np.array([0.0] * 30)
@@ -62,12 +63,12 @@ class TestHMMRegimeDetector:
         result = detector.predict_regime(returns, vol)
         assert result.regime == "HIGH_VOL"
 
-    def test_transition_matrix_none_before_fit(self):
+    def test_transition_matrix_none_before_fit(self) -> Any:
         """Fit öncesi transition matrix yok."""
         detector = HMMRegimeDetector()
         assert detector.get_transition_matrix() is None
 
-    def test_history_tracking(self):
+    def test_history_tracking(self) -> Any:
         """Geçmiş takibi çalışır."""
         detector = HMMRegimeDetector()
         returns = np.array([0.001] * 30)
@@ -80,7 +81,7 @@ class TestHMMRegimeDetector:
         assert len(history) == 3
         assert "regime" in history[0]
 
-    def test_regime_duration_stats(self):
+    def test_regime_duration_stats(self) -> Any:
         """Rejim süre istatistikleri."""
         detector = HMMRegimeDetector()
         returns = np.array([0.001] * 30)
@@ -92,7 +93,7 @@ class TestHMMRegimeDetector:
         stats = detector.get_regime_duration_stats()
         assert isinstance(stats, dict)
 
-    def test_hmm_fit_with_sufficient_data(self):
+    def test_hmm_fit_with_sufficient_data(self) -> Any:
         """Yeterli veri ile HMM eğitimi."""
         detector = HMMRegimeDetector(n_regimes=2, rolling_window=50)
 
@@ -116,13 +117,13 @@ class TestHMMRegimeDetector:
 class TestEnsembleForecaster:
     """Ensemble forecast testleri."""
 
-    def test_register_model(self):
+    def test_register_model(self) -> Any:
         """Model kayıt."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: (1.0, 0.8))
         assert "test" in engine._models
 
-    def test_forecast_basic(self):
+    def test_forecast_basic(self) -> Any:
         """Temel forecast."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: (2.0, 0.7))
@@ -131,7 +132,7 @@ class TestEnsembleForecaster:
         assert result.horizon_days == 5
         assert result.regime == "BULL"
 
-    def test_forecast_multiple_models(self):
+    def test_forecast_multiple_models(self) -> Any:
         """Çoklu model forecast."""
         engine = EnsembleForecaster()
         engine.register_model("a", lambda f, h: (2.0, 0.7))
@@ -139,7 +140,7 @@ class TestEnsembleForecaster:
         result = engine.forecast({}, horizon=5)
         assert len(result.model_predictions) == 2
 
-    def test_forecast_agreement(self):
+    def test_forecast_agreement(self) -> Any:
         """Model agreement hesaplanır."""
         engine = EnsembleForecaster()
         engine.register_model("a", lambda f, h: (2.0, 0.7))
@@ -147,7 +148,7 @@ class TestEnsembleForecaster:
         result = engine.forecast({}, horizon=5)
         assert result.model_agreement > 0.9  # Yüksek agreement
 
-    def test_forecast_disagreement(self):
+    def test_forecast_disagreement(self) -> Any:
         """Model disagreement."""
         engine = EnsembleForecaster()
         engine.register_model("a", lambda f, h: (5.0, 0.7))
@@ -155,21 +156,21 @@ class TestEnsembleForecaster:
         result = engine.forecast({}, horizon=5)
         assert result.model_agreement < 0.5  # Düşük agreement
 
-    def test_forecast_with_dict_return(self):
+    def test_forecast_with_dict_return(self) -> Any:
         """Dict dönen model."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: {"prediction": 2.5, "confidence": 0.8})
         result = engine.forecast({}, horizon=5)
         assert result.ensemble_prediction == 2.5
 
-    def test_builtin_models(self):
+    def test_builtin_models(self) -> Any:
         """Dahili modeller çalışır."""
         engine = EnsembleForecaster()
         features = {"momentum_20d": 3, "rsi_14": 55, "momentum_5d": 2, "bb_position": 0.6}
         result = engine.forecast(features, horizon=5)
         assert result.ensemble_prediction is not None
 
-    def test_regime_based_weights(self):
+    def test_regime_based_weights(self) -> Any:
         """Rejime göre ağırlıklar farklı."""
         engine = EnsembleForecaster()
         engine.register_model("heuristic", lambda f, h: (2.0, 0.7))
@@ -184,7 +185,7 @@ class TestEnsembleForecaster:
         # Farklı rejimler → farklı ağırlıklar
         assert bull.weights_used != crisis.weights_used
 
-    def test_calibrated_confidence(self):
+    def test_calibrated_confidence(self) -> Any:
         """Kalibre edilmiş confidence."""
         engine = EnsembleForecaster()
         engine.register_model("a", lambda f, h: (2.0, 0.95))
@@ -192,7 +193,7 @@ class TestEnsembleForecaster:
         # Overconfidence cezası
         assert result.calibrated_confidence <= 0.95
 
-    def test_model_performance(self):
+    def test_model_performance(self) -> Any:
         """Model performans güncelleme."""
         engine = EnsembleForecaster()
         engine.update_performance("test", accuracy=0.65, sharpe=1.2)
@@ -208,20 +209,20 @@ class TestEnsembleForecaster:
 class TestConfidenceCalibrator:
     """Confidence calibrator testleri."""
 
-    def test_add_observation(self):
+    def test_add_observation(self) -> Any:
         """Gözlem ekleme."""
         cal = ConfidenceCalibrator(min_samples=5)
         cal.add_observation(0.8, True)
         cal.add_observation(0.3, False)
         assert len(cal._observations) == 2
 
-    def test_add_batch(self):
+    def test_add_batch(self) -> Any:
         """Toplu gözlem ekleme."""
         cal = ConfidenceCalibrator(min_samples=5)
         cal.add_batch([0.8, 0.3, 0.9], [True, False, True])
         assert len(cal._observations) == 3
 
-    def test_calibrate_insufficient_data(self):
+    def test_calibrate_insufficient_data(self) -> Any:
         """Yetersiz veri."""
         cal = ConfidenceCalibrator(min_samples=30)
         cal.add_observation(0.8, True)
@@ -229,7 +230,7 @@ class TestConfidenceCalibrator:
         assert report.n_samples == 1
         assert report.recommended_adjustment == 1.0
 
-    def test_calibrate_perfect_calibration(self):
+    def test_calibrate_perfect_calibration(self) -> Any:
         """Mükemmel kalibrasyon."""
         cal = ConfidenceCalibrator(min_samples=10, n_bins=5)
         # %80 güven → %80 gerçekleşti
@@ -240,7 +241,7 @@ class TestConfidenceCalibrator:
         report = cal.calibrate()
         assert report.brier_score < 0.3
 
-    def test_calibrate_overconfident(self):
+    def test_calibrate_overconfident(self) -> Any:
         """Overconfidence tespiti."""
         cal = ConfidenceCalibrator(min_samples=10, n_bins=5)
         # %90 güven ama sadece %50 gerçekleşti
@@ -251,7 +252,7 @@ class TestConfidenceCalibrator:
         report = cal.calibrate()
         assert report.overconfident is True
 
-    def test_adjust_confidence(self):
+    def test_adjust_confidence(self) -> Any:
         """Confidence ayarlama."""
         cal = ConfidenceCalibrator(min_samples=10)
         for _ in range(50):
@@ -261,7 +262,7 @@ class TestConfidenceCalibrator:
         adjusted = cal.adjust_confidence(0.9)
         assert adjusted < 0.9
 
-    def test_hit_rate(self):
+    def test_hit_rate(self) -> Any:
         """Hit rate hesaplama."""
         cal = ConfidenceCalibrator(min_samples=5)
         cal.add_observation(0.8, True)
@@ -272,7 +273,7 @@ class TestConfidenceCalibrator:
         hit_rate = cal.get_hit_rate(threshold=0.5)
         assert 0 <= hit_rate <= 1
 
-    def test_regime_calibration(self):
+    def test_regime_calibration(self) -> Any:
         """Rejim bazlı kalibrasyon."""
         cal = ConfidenceCalibrator(min_samples=5)
         for _ in range(20):
@@ -282,14 +283,14 @@ class TestConfidenceCalibrator:
         regime_cal = cal.get_regime_calibration()
         assert "BULL" in regime_cal or "BEAR" in regime_cal
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
         """İstatistikler."""
         cal = ConfidenceCalibrator(min_samples=5)
         cal.add_observation(0.8, True, regime="BULL")
         stats = cal.get_stats()
         assert stats["total_observations"] == 1
 
-    def test_reset(self):
+    def test_reset(self) -> Any:
         """Sıfırlama."""
         cal = ConfidenceCalibrator()
         cal.add_observation(0.8, True)
@@ -305,7 +306,7 @@ class TestConfidenceCalibrator:
 class TestAdvancedMonteCarlo:
     """Gelişmiş Monte Carlo testleri."""
 
-    def test_gbm_basic(self):
+    def test_gbm_basic(self) -> Any:
         """GBM temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=1000, seed=42)
@@ -313,13 +314,13 @@ class TestAdvancedMonteCarlo:
         assert result.model_type == "gbm"
         assert result.p50 > 0
 
-    def test_gbm_percentiles_ordered(self):
+    def test_gbm_percentiles_ordered(self) -> Any:
         """GBM percentile'lar sıralı."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
         assert result.p10 <= result.p25 <= result.p50 <= result.p75 <= result.p90
 
-    def test_gbm_probabilities(self):
+    def test_gbm_probabilities(self) -> Any:
         """GBM olasılıklar 0-1 arası."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
@@ -327,7 +328,7 @@ class TestAdvancedMonteCarlo:
         assert 0 <= result.prob_plus_5pct <= 1
         assert 0 <= result.prob_minus_5pct <= 1
 
-    def test_jump_diffusion_basic(self):
+    def test_jump_diffusion_basic(self) -> Any:
         """Jump-diffusion temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.jump_diffusion_sim(
@@ -345,7 +346,7 @@ class TestAdvancedMonteCarlo:
         assert result.model_type == "jump_diffusion"
         assert result.jump_intensity == 0.1
 
-    def test_jump_diffusion_fatter_tails(self):
+    def test_jump_diffusion_fatter_tails(self) -> Any:
         """Jump-diffusion daha kalın kuyruk."""
         mc = AdvancedMonteCarloEngine()
         gbm = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
@@ -364,14 +365,14 @@ class TestAdvancedMonteCarlo:
         # Jump-diffusion daha yüksek kurtosis (daha kalın kuyruk)
         assert abs(jump.kurtosis) >= abs(gbm.kurtosis) * 0.5
 
-    def test_student_t_basic(self):
+    def test_student_t_basic(self) -> Any:
         """Student-t temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.student_t_sim("TEST", 100, 0.15, 0.25, degrees_of_freedom=5, horizon_days=20, n_sims=1000, seed=42)
         assert result.model_type == "student_t"
         assert result.p50 > 0
 
-    def test_student_t_fatter_tails(self):
+    def test_student_t_fatter_tails(self) -> Any:
         """Student-t daha kalın kuyruk (düşük df)."""
         mc = AdvancedMonteCarloEngine()
         normal = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
@@ -379,7 +380,7 @@ class TestAdvancedMonteCarlo:
         # Student-t daha yüksek kurtosis
         assert abs(student.kurtosis) > abs(normal.kurtosis) * 0.5
 
-    def test_heston_basic(self):
+    def test_heston_basic(self) -> Any:
         """Heston-lite temel test."""
         mc = AdvancedMonteCarloEngine()
         result = mc.heston_lite_sim(
@@ -396,7 +397,7 @@ class TestAdvancedMonteCarlo:
         assert result.model_type == "heston"
         assert result.p50 > 0
 
-    def test_heston_stochastic_vol(self):
+    def test_heston_stochastic_vol(self) -> Any:
         """Heston stochastic vol — sonuç GBM'den farklı."""
         mc = AdvancedMonteCarloEngine()
         gbm = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=60, n_sims=5000, seed=42)
@@ -414,20 +415,20 @@ class TestAdvancedMonteCarlo:
         # Farklı volatilite
         assert abs(gbm.volatility - heston.volatility) > 0.01
 
-    def test_var_cvar(self):
+    def test_var_cvar(self) -> Any:
         """VaR ve CVaR hesaplanır."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=5000, seed=42)
         assert result.var_95 < 0  # Negatif (kayıp)
         assert result.cvar_95 <= result.var_95  # CVaR <= VaR
 
-    def test_max_drawdown(self):
+    def test_max_drawdown(self) -> Any:
         """Max drawdown pozitif."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=60, n_sims=5000, seed=42)
         assert result.max_drawdown_sim > 0
 
-    def test_sample_paths(self):
+    def test_sample_paths(self) -> Any:
         """Sample paths mevcut."""
         mc = AdvancedMonteCarloEngine()
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=500, seed=42)
@@ -435,7 +436,7 @@ class TestAdvancedMonteCarlo:
         assert result.sample_paths.shape[0] <= 200
         assert result.sample_paths.shape[1] == 21  # t=0 + 20 günlük hareket
 
-    def test_jump_diffusion_horizon_has_requested_daily_moves(self):
+    def test_jump_diffusion_horizon_has_requested_daily_moves(self) -> Any:
         """20 günlük ufuk, başlangıçtan sonra tam 20 günlük adım içermeli."""
         mc = AdvancedMonteCarloEngine()
         result = mc.jump_diffusion_sim(

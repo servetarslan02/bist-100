@@ -29,6 +29,7 @@ class YFinanceProvider:
     _FETCH_TIMEOUT = 15  # saniye
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, Any] = {}
 
     @staticmethod
@@ -51,7 +52,7 @@ class YFinanceProvider:
         return period  # 1y+ zaten yeterli
 
     @staticmethod
-    def _run_with_timeout(fn, *args, timeout: int = 15, **kwargs):
+    def _run_with_timeout(fn, *args, timeout: int = 15, **kwargs) -> Any:
         """Blocking fonksiyonu timeout ile çalıştır."""
         import concurrent.futures
 

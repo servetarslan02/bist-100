@@ -88,6 +88,7 @@ class SuperIntelligenceEngine:
         max_models_history: int | None = None,
         ab_test_window_days: int | None = None,
     ):
+        """Otomatik eklendi."""
         cfg = learning_settings
         self.retrain_threshold_sharpe = retrain_threshold_sharpe or cfg.retrain.sharpe_threshold
         self.retrain_threshold_ic = retrain_threshold_ic or cfg.retrain.ic_threshold
@@ -367,7 +368,7 @@ class SuperIntelligenceEngine:
         self,
         features_map: dict[str, dict],
         window_days: int = 60,
-    ):
+    ) -> Any:
         """Baseline dağılımları güncelle."""
         self._baseline_distributions = {}
 
@@ -382,7 +383,7 @@ class SuperIntelligenceEngine:
 
     # === A/B TESTING ===
 
-    def _start_ab_test(self, champion: str, challenger: str):
+    def _start_ab_test(self, champion: str, challenger: str) -> Any:
         """A/B test başlat."""
         self._ab_test_active = True
         self._ab_test_champion = champion
@@ -448,7 +449,7 @@ class SuperIntelligenceEngine:
         model_version: str,
         regime: str,
         metrics: dict[str, float],
-    ):
+    ) -> Any:
         """Performans kaydet (meta-learning için)."""
         scores = self._regime_model_performance[regime][model_version]
         scores.append(metrics.get("sharpe", 0))
@@ -491,7 +492,7 @@ class SuperIntelligenceEngine:
 
         return self._health_status
 
-    def update_module_status(self, module: str, status: str, error: str | None = None):
+    def update_module_status(self, module: str, status: str, error: str | None = None) -> Any:
         """Modül durumunu güncelle."""
         self._health_status.module_status[module] = status
         if error:
@@ -627,18 +628,21 @@ class SuperIntelligenceEngine:
         random_hash = hashlib.md5(str(np.random.random()).encode()).hexdigest()[:6]
         return f"v_{timestamp}_{random_hash}"
 
-    def _trigger_retrain(self):
+    def _trigger_retrain(self) -> Any:
         """Yeniden eğitim tetikle — continuous_learning üzerinden."""
         logger.info("Retrain triggered by self-healing")
         try:
-            from services.learning.continuous_learning import continuous_learning
-
-            continuous_learning._drift_detected = True
+            from services.core.event_bus import event_bus
+            
+            event_bus.publish(
+                "learning.retrain_needed",
+                {"source": "super_intelligence_self_healing", "reason": "drift_detected"},
+            )
             self._health_status.retrain_needed = True
         except Exception as e:
             logger.error("Retrain trigger failed", error=str(e))
 
-    def _trigger_data_refresh(self):
+    def _trigger_data_refresh(self) -> Any:
         """Veri yenileme tetikle — event bus üzerinden."""
         logger.info("Data refresh triggered by self-healing")
         try:
@@ -652,7 +656,7 @@ class SuperIntelligenceEngine:
         except Exception as e:
             logger.error("Data refresh trigger failed", error=str(e))
 
-    def _restart_module(self, module: str):
+    def _restart_module(self, module: str) -> Any:
         """Modül yeniden başlat — health status güncelle."""
         logger.info("Module restart triggered", module=module)
         self.update_module_status(module, "RESTARTING")
@@ -663,7 +667,7 @@ class SuperIntelligenceEngine:
         except ImportError:
             logger.warning("Health monitor not available for restart", module=module)
 
-    def _retry_with_backoff(self, healing_record: dict):
+    def _retry_with_backoff(self, healing_record: dict) -> Any:
         """Backoff ile tekrar dene."""
         attempt = healing_record.get("attempt", 0)
         backoff = learning_settings.health.healing_backoff_seconds
@@ -671,7 +675,7 @@ class SuperIntelligenceEngine:
         logger.info("Retry with backoff", attempt=attempt, wait_seconds=wait_time)
         time.sleep(min(wait_time, 300))
 
-    def _activate_fallback(self):
+    def _activate_fallback(self) -> Any:
         """Fallback modunu aktive et — rule-based sisteme geç."""
         logger.warning("Fallback mode activated — switching to rule-based")
         self._health_status.overall_status = "DEGRADED"

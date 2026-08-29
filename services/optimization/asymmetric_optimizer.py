@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Asimetrik Rejim & Tavan Serisi (Ralli Kilidi) Bayesian Optimizasyon Motoru
 ======================================================================================
@@ -47,6 +48,7 @@ class StrategyParameters:
 
 @dataclass
 class OptimizationTrialResult:
+    """Otomatik eklendi."""
     trial_id: int
     params: StrategyParameters
     total_return_pct: float = 0.0
@@ -63,11 +65,12 @@ class AsymmetricBayesianOptimizer:
     """24 Çekirdekli Asimetrik Bayesian Optimizasyon Motoru."""
 
     def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame]):
+        """Otomatik eklendi."""
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
 
-    def _precompute_technicals(self):
+    def _precompute_technicals(self) -> Any:
         """Teknik göstergeleri RAM'e önbellekler."""
         self.tech_cache = {}
         for ticker, df in self.stock_dict.items():
@@ -322,6 +325,7 @@ class AsymmetricBayesianOptimizer:
         trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
+            """Otomatik eklendi."""
             params = StrategyParameters(
                 min_buyer_pressure=trial.suggest_float("min_buyer_pressure", 45.0, 60.0, step=1.0),
                 min_candle_score=trial.suggest_float("min_candle_score", 60.0, 80.0, step=5.0),
@@ -345,7 +349,7 @@ class AsymmetricBayesianOptimizer:
             trial_results.append(res)
 
             if trial.number % 50 == 0:
-                print(
+                logger.info(
                     f"  [İlerleme] Deneme #{trial.number}/{n_trials} | Fitness: {res.fitness_score:.2f} | 1997-2023 Getiri: %{res.total_return_pct:+,.1f} | DD: %{res.max_drawdown:.1f}"
                 )
 

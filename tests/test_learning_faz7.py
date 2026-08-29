@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 7 Test Suite (Meta Learner)
 
@@ -15,25 +18,25 @@ import sys
 import numpy as np
 
 
-def test_init():
+def test_init() -> Any:
     """Meta learner init."""
     from services.learning.meta_learner import MetaLearner
 
     m = MetaLearner()
     assert len(m._model_history) == 0
     assert len(m._regime_performance) == 0
-    print("✅ Init")
+    logger.info("✅ Init")
 
 
-def test_singleton():
+def test_singleton() -> Any:
     """Singleton doğru mu?"""
     from services.learning.meta_learner import meta_learner
 
     assert meta_learner is not None
-    print("✅ Singleton")
+    logger.info("✅ Singleton")
 
 
-def test_record_performance():
+def test_record_performance() -> Any:
     """Performans kayıt."""
     from services.learning.meta_learner import MetaLearner
 
@@ -43,10 +46,10 @@ def test_record_performance():
     assert len(m._model_history) == 1
     assert m._model_history[0].model_id == "m1"
     assert m._model_history[0].sharpe == 1.5
-    print("✅ Record performance")
+    logger.info("✅ Record performance")
 
 
-def test_record_multiple():
+def test_record_multiple() -> Any:
     """Birden fazla performans kayıt."""
     from services.learning.meta_learner import MetaLearner
 
@@ -55,10 +58,10 @@ def test_record_multiple():
         m.record_performance(f"m{i}", "BULL", {"sharpe": float(i), "win_rate": 0.5, "ic": 0.01})
 
     assert len(m._model_history) == 10
-    print("✅ Record multiple")
+    logger.info("✅ Record multiple")
 
 
-def test_record_regime_tracking():
+def test_record_regime_tracking() -> Any:
     """Rejim bazlı performans takibi."""
     from services.learning.meta_learner import MetaLearner
 
@@ -70,10 +73,10 @@ def test_record_regime_tracking():
     assert "BEAR" in m._regime_performance
     assert "m1" in m._regime_performance["BULL"]
     assert "m1" in m._regime_performance["BEAR"]
-    print("✅ Record regime tracking")
+    logger.info("✅ Record regime tracking")
 
 
-def test_select_best_model():
+def test_select_best_model() -> Any:
     """En iyi model seçimi."""
     from services.learning.meta_learner import MetaLearner
 
@@ -84,20 +87,20 @@ def test_select_best_model():
 
     best = m.select_best_model("BULL")
     assert best == "m3"
-    print(f"✅ Select best model: {best}")
+    logger.info(f"✅ Select best model: {best}")
 
 
-def test_select_best_model_empty():
+def test_select_best_model_empty() -> Any:
     """Olmayan rejim için None döndürmeli."""
     from services.learning.meta_learner import MetaLearner
 
     m = MetaLearner()
     best = m.select_best_model("UNKNOWN")
     assert best is None
-    print("✅ Select best model empty")
+    logger.info("✅ Select best model empty")
 
 
-def test_select_best_model_regime_specific():
+def test_select_best_model_regime_specific() -> Any:
     """Farklı rejimler farklı model seçmeli."""
     from services.learning.meta_learner import MetaLearner
 
@@ -112,10 +115,10 @@ def test_select_best_model_regime_specific():
 
     assert m.select_best_model("BULL") == "m1"
     assert m.select_best_model("BEAR") == "m2"
-    print("✅ Select best model regime specific")
+    logger.info("✅ Select best model regime specific")
 
 
-def test_ensemble_weights():
+def test_ensemble_weights() -> Any:
     """Ensemble weights doğru mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -127,10 +130,10 @@ def test_ensemble_weights():
 
     assert weights["m1"] > weights["m2"]
     assert abs(sum(weights.values()) - 1.0) < 0.01
-    print(f"✅ Ensemble weights: {weights}")
+    logger.info(f"✅ Ensemble weights: {weights}")
 
 
-def test_ensemble_weights_equal():
+def test_ensemble_weights_equal() -> Any:
     """Veri olmayan modeller eşit ağırlık almalı."""
     from services.learning.meta_learner import MetaLearner
 
@@ -140,10 +143,10 @@ def test_ensemble_weights_equal():
     # Eşit ağırlık
     for w in weights.values():
         assert abs(w - 1 / 3) < 0.01
-    print(f"✅ Ensemble weights equal: {weights}")
+    logger.info(f"✅ Ensemble weights equal: {weights}")
 
 
-def test_ensemble_weights_normalize():
+def test_ensemble_weights_normalize() -> Any:
     """Weights toplamı 1 olmalı."""
     from services.learning.meta_learner import MetaLearner
 
@@ -154,10 +157,10 @@ def test_ensemble_weights_normalize():
     weights = m.calculate_ensemble_weights([f"m{i}" for i in range(5)], "BULL")
     total = sum(weights.values())
     assert abs(total - 1.0) < 0.01
-    print(f"✅ Ensemble weights normalize: sum={total:.4f}")
+    logger.info(f"✅ Ensemble weights normalize: sum={total:.4f}")
 
 
-def test_decay_prediction_no_data():
+def test_decay_prediction_no_data() -> Any:
     """Yetersiz veri ile decay prediction."""
     from services.learning.meta_learner import MetaLearner
 
@@ -167,10 +170,10 @@ def test_decay_prediction_no_data():
     result = m.predict_decay("m1")
     assert result["decay_predicted"] is False
     assert "Insufficient" in result["reason"]
-    print("✅ Decay prediction no data")
+    logger.info("✅ Decay prediction no data")
 
 
-def test_decay_prediction_declining():
+def test_decay_prediction_declining() -> Any:
     """Azalan performans decay prediction."""
     from services.learning.meta_learner import MetaLearner
 
@@ -189,10 +192,10 @@ def test_decay_prediction_declining():
     result = m.predict_decay("m1")
     assert result["decay_predicted"] is True
     assert result["trend"] < 0
-    print(f"✅ Decay prediction declining: trend={result['trend']}, days={result['estimated_days_to_retrain']}")
+    logger.info(f"✅ Decay prediction declining: trend={result['trend']}, days={result['estimated_days_to_retrain']}")
 
 
-def test_decay_prediction_stable():
+def test_decay_prediction_stable() -> Any:
     """Stabil performans decay prediction."""
     from services.learning.meta_learner import MetaLearner
 
@@ -210,10 +213,10 @@ def test_decay_prediction_stable():
 
     result = m.predict_decay("m1")
     assert result["decay_predicted"] is False
-    print(f"✅ Decay prediction stable: trend={result['trend']}")
+    logger.info(f"✅ Decay prediction stable: trend={result['trend']}")
 
 
-def test_regime_summary():
+def test_regime_summary() -> Any:
     """Rejim özeti doğru mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -228,20 +231,20 @@ def test_regime_summary():
     assert "m1" in summary["BULL"]
     assert "m1" in summary["BEAR"]
     assert "m2" in summary["BULL"]
-    print(f"✅ Regime summary: {list(summary.keys())}")
+    logger.info(f"✅ Regime summary: {list(summary.keys())}")
 
 
-def test_regime_summary_empty():
+def test_regime_summary_empty() -> Any:
     """Boş regime summary."""
     from services.learning.meta_learner import MetaLearner
 
     m = MetaLearner()
     summary = m.get_regime_summary()
     assert len(summary) == 0
-    print("✅ Regime summary empty")
+    logger.info("✅ Regime summary empty")
 
 
-def test_report():
+def test_report() -> Any:
     """Rapor doğru mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -253,10 +256,10 @@ def test_report():
     assert report["total_records"] == 2
     assert report["regime_count"] == 2
     assert "regime_summary" in report
-    print(f"✅ Report: {report['total_records']} records, {report['regime_count']} regimes")
+    logger.info(f"✅ Report: {report['total_records']} records, {report['regime_count']} regimes")
 
 
-def test_report_empty():
+def test_report_empty() -> Any:
     """Boş rapor."""
     from services.learning.meta_learner import MetaLearner
 
@@ -264,10 +267,10 @@ def test_report_empty():
     report = m.get_report()
     assert report["total_records"] == 0
     assert report["regime_count"] == 0
-    print("✅ Report empty")
+    logger.info("✅ Report empty")
 
 
-def test_current_regime():
+def test_current_regime() -> Any:
     """Current regime takip ediliyor mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -277,13 +280,14 @@ def test_current_regime():
 
     m.record_performance("m1", "BEAR", {"sharpe": 0.3, "win_rate": 0.45, "ic": 0.01})
     assert m._current_regime == "BEAR"
-    print("✅ Current regime tracking")
+    logger.info("✅ Current regime tracking")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_init,
         test_singleton,
@@ -317,19 +321,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 7 TEST SONUÇLARI (Meta Learner)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 7 TEST SONUÇLARI (Meta Learner)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

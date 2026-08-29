@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Tax Calculator (Güncel Vergi Oranları)
 
 BIST vergi oranları (2025-2026):
@@ -9,24 +10,31 @@ BIST vergi oranları (2025-2026):
 Kaynak: GVK, SPK mevzuatı
 """
 
+import functools
 from dataclasses import dataclass
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.tax")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 # BIST vergi oranları (2025-2026)
 # Hisse senedi kâr vergisi: Gelir vergisi dilimine göre değişir
@@ -67,6 +75,7 @@ def _get_income_tax_rate(annual_income: float) -> float:
 
 @dataclass
 class TaxResult:
+    """Otomatik eklendi."""
     profit: float
     tax_rate: float
     tax: float

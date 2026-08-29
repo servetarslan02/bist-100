@@ -105,10 +105,11 @@ class SocialProvider:
     """Sosyal medya veri sağlayıcısı (async)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._client = get_client("social", timeout=15.0, max_retries=2)
         self._x_api_key: str | None = None
 
-    def set_x_api_key(self, key: str):
+    def set_x_api_key(self, key: str) -> Any:
         """X API key ayarla."""
         self._x_api_key = key
 

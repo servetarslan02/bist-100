@@ -94,7 +94,7 @@ def run_frozen_strategy(
     initial_capital=10_000_000.0,
     verbose=False,
     label="Frozen Strategy",
-):
+) -> Any:
     """
     Tamamen dondurulmuş C_Max_Sustainable_Alpha stratejisini çalıştırır.
     Final Holdout veya Train/Validation fark etmeksizin aynı parametrelerle çalışır.
@@ -414,7 +414,8 @@ def run_frozen_strategy(
     }
 
 
-def print_full_report(m: dict[str, Any]):
+def print_full_report(m: dict[str, Any]) -> Any:
+    """Otomatik eklendi."""
     logger.info(f"\n{'=' * 65}")
     logger.info(f"🏆 {m['label']} — SONUÇ RAPORU")
     logger.info(f"{'=' * 65}")

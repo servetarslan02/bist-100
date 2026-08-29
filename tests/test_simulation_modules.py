@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Simulation Modules Test Suite v1.0
 
@@ -20,12 +21,14 @@ import pytest
 class TestSquareRootMarketImpact:
     """Square root market impact testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.enhanced_execution import SquareRootMarketImpact
 
         self.model = SquareRootMarketImpact(eta=0.3)
 
-    def test_small_order_low_impact(self):
+    def test_small_order_low_impact(self) -> Any:
+        """Otomatik eklendi."""
         impact = self.model.calculate(
             order_value=10000,
             adv_value=100000000,
@@ -33,7 +36,8 @@ class TestSquareRootMarketImpact:
         )
         assert impact < 0.001  # Küçük emir → düşük impact
 
-    def test_large_order_higher_impact(self):
+    def test_large_order_higher_impact(self) -> Any:
+        """Otomatik eklendi."""
         impact = self.model.calculate(
             order_value=10000000,
             adv_value=100000000,
@@ -41,12 +45,14 @@ class TestSquareRootMarketImpact:
         )
         assert impact > 0.001  # Büyük emir → yüksek impact
 
-    def test_higher_volatility_higher_impact(self):
+    def test_higher_volatility_higher_impact(self) -> Any:
+        """Otomatik eklendi."""
         low_vol = self.model.calculate(1000000, 100000000, 0.01)
         high_vol = self.model.calculate(1000000, 100000000, 0.05)
         assert high_vol > low_vol
 
-    def test_max_impact_capped(self):
+    def test_max_impact_capped(self) -> Any:
+        """Otomatik eklendi."""
         impact = self.model.calculate(
             order_value=50000000,
             adv_value=100000000,
@@ -54,7 +60,8 @@ class TestSquareRootMarketImpact:
         )
         assert impact <= 0.05  # Max %5
 
-    def test_zero_adv_returns_default(self):
+    def test_zero_adv_returns_default(self) -> Any:
+        """Otomatik eklendi."""
         impact = self.model.calculate(1000000, 0, 0.02)
         assert impact == 0.001
 
@@ -62,27 +69,32 @@ class TestSquareRootMarketImpact:
 class TestRegimeAwareSlippage:
     """Regime-aware slippage testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.enhanced_execution import RegimeAwareSlippage
 
         self.model = RegimeAwareSlippage()
 
-    def test_bull_lower_slippage(self):
+    def test_bull_lower_slippage(self) -> Any:
+        """Otomatik eklendi."""
         base = 0.01
         bull = self.model.adjust_slippage(base, "BULL")
         assert bull < base
 
-    def test_panic_higher_slippage(self):
+    def test_panic_higher_slippage(self) -> Any:
+        """Otomatik eklendi."""
         base = 0.01
         panic = self.model.adjust_slippage(base, "PANIC")
         assert panic > base * 1.5
 
-    def test_crisis_highest_slippage(self):
+    def test_crisis_highest_slippage(self) -> Any:
+        """Otomatik eklendi."""
         base = 0.01
         crisis = self.model.adjust_slippage(base, "CRISIS")
         assert crisis > base * 2
 
-    def test_unknown_regime_returns_base(self):
+    def test_unknown_regime_returns_base(self) -> Any:
+        """Otomatik eklendi."""
         base = 0.01
         result = self.model.adjust_slippage(base, "UNKNOWN")
         assert result == base
@@ -91,7 +103,8 @@ class TestRegimeAwareSlippage:
 class TestEnhancedExecutionSimulator:
     """Enhanced execution simulator testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.execution_simulator import Order, OrderSide, OrderType
 
@@ -101,7 +114,8 @@ class TestEnhancedExecutionSimulator:
         self.OrderSide = OrderSide
         self.OrderType = OrderType
 
-    def test_buy_order_slippage(self):
+    def test_buy_order_slippage(self) -> Any:
+        """Otomatik eklendi."""
         order = self.Order(
             order_id="test_1",
             portfolio_id=1,
@@ -125,7 +139,8 @@ class TestEnhancedExecutionSimulator:
         assert result["fill_price"] > 250.0  # BUY → fiyat yukarı
         assert result["slippage_pct"] > 0
 
-    def test_sell_order_slippage(self):
+    def test_sell_order_slippage(self) -> Any:
+        """Otomatik eklendi."""
         order = self.Order(
             order_id="test_2",
             portfolio_id=1,
@@ -148,7 +163,8 @@ class TestEnhancedExecutionSimulator:
         )
         assert result["fill_price"] < 250.0  # SELL → fiyat aşağı
 
-    def test_regime_impact(self):
+    def test_regime_impact(self) -> Any:
+        """Otomatik eklendi."""
         order = self.Order(
             order_id="test_3",
             portfolio_id=1,
@@ -165,7 +181,8 @@ class TestEnhancedExecutionSimulator:
 
         assert panic["slippage_pct"] > normal["slippage_pct"]
 
-    def test_partial_fill(self):
+    def test_partial_fill(self) -> Any:
+        """Otomatik eklendi."""
         order = self.Order(
             order_id="test_4",
             portfolio_id=1,
@@ -180,7 +197,8 @@ class TestEnhancedExecutionSimulator:
         assert result["partial_fill"] is True
         assert result["fill_quantity"] == 100000  # Max %10
 
-    def test_compare_slippage_models(self):
+    def test_compare_slippage_models(self) -> Any:
+        """Otomatik eklendi."""
         comparison = self.sim.compare_slippage_models(
             order_value=5000000,
             adv_value=100000000,
@@ -199,12 +217,14 @@ class TestEnhancedExecutionSimulator:
 class TestJumpDiffusionMonteCarlo:
     """Jump-diffusion Monte Carlo testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.monte_carlo_enhanced import JumpDiffusionMonteCarlo
 
         self.mc = JumpDiffusionMonteCarlo()
 
-    def test_simulate(self):
+    def test_simulate(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(
             current_price=100.0,
             daily_return=0.0004,
@@ -217,30 +237,34 @@ class TestJumpDiffusionMonteCarlo:
         assert result.horizon_days == 20
         assert result.current_price == 100.0
 
-    def test_percentiles_exist(self):
+    def test_percentiles_exist(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(100.0, 0.0004, 0.02, 1000, 20, seed=42)
         assert 5 in result.percentiles
         assert 50 in result.percentiles
         assert 95 in result.percentiles
 
-    def test_var_cvar(self):
+    def test_var_cvar(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(100.0, 0.0004, 0.02, 5000, 20, seed=42)
         assert result.var_95 < 0  # VaR negatif olmalı
         assert result.cvar_95 < result.var_95  # CVaR daha kötü
 
-    def test_probabilities(self):
+    def test_probabilities(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(100.0, 0.0004, 0.02, 5000, 20, seed=42)
         assert 0 <= result.prob_positive <= 100
         assert 0 <= result.prob_down_5pct <= 100
 
-    def test_jump_increases_volatility(self):
+    def test_jump_increases_volatility(self) -> Any:
+        """Otomatik eklendi."""
         # Yüksek jump intensity ile volatilite artmalı
         # Daha fazla simülasyon ile istatistiksel güvenilirlik
         no_jump = self.mc.simulate(100.0, 0.0004, 0.02, 50000, 20, jump_intensity=0, seed=42)
         with_jump = self.mc.simulate(100.0, 0.0004, 0.02, 50000, 20, jump_intensity=0.10, seed=42)
         assert with_jump.std_return_pct > no_jump.std_return_pct
 
-    def test_daily_drift_is_accumulated_over_horizon(self):
+    def test_daily_drift_is_accumulated_over_horizon(self) -> Any:
         """daily_return günlük parametredir; yıllık gibi tekrar ölçeklenmemeli."""
         result = self.mc.simulate(
             100.0,
@@ -263,12 +287,14 @@ class TestJumpDiffusionMonteCarlo:
 class TestCorrelatedMonteCarlo:
     """Correlated Monte Carlo testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.monte_carlo_enhanced import CorrelatedMonteCarlo
 
         self.mc = CorrelatedMonteCarlo()
 
-    def test_portfolio_simulation(self):
+    def test_portfolio_simulation(self) -> Any:
+        """Otomatik eklendi."""
         tickers = ["THYAO", "GARAN", "ASELS"]
         prices = np.array([250.0, 100.0, 50.0])
         returns = np.random.normal(0.0004, 0.02, (252, 3))
@@ -287,7 +313,8 @@ class TestCorrelatedMonteCarlo:
         assert "assets" in result
         assert "correlation_matrix" in result
 
-    def test_portfolio_var(self):
+    def test_portfolio_var(self) -> Any:
+        """Otomatik eklendi."""
         tickers = ["A", "B"]
         prices = np.array([100.0, 50.0])
         returns = np.random.normal(0.0004, 0.02, (100, 2))
@@ -296,7 +323,8 @@ class TestCorrelatedMonteCarlo:
         result = self.mc.simulate_portfolio(tickers, prices, returns, weights, 1000, 20, seed=42)
         assert result["portfolio"]["var_95"] < 0
 
-    def test_correlation_matrix_shape(self):
+    def test_correlation_matrix_shape(self) -> Any:
+        """Otomatik eklendi."""
         tickers = ["A", "B", "C"]
         prices = np.array([100, 50, 25])
         returns = np.random.normal(0, 0.02, (100, 3))
@@ -315,20 +343,24 @@ class TestCorrelatedMonteCarlo:
 class TestRegimeConditionedMonteCarlo:
     """Regime-conditioned MC testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
 
         self.mc = RegimeConditionedMonteCarlo()
 
-    def test_bull_regime(self):
+    def test_bull_regime(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42)
         assert "BULL" in result.model
 
-    def test_panic_regime(self):
+    def test_panic_regime(self) -> Any:
+        """Otomatik eklendi."""
         result = self.mc.simulate(100.0, 0.0004, 0.02, "PANIC", 1000, 20, seed=42)
         assert "PANIC" in result.model
 
-    def test_regime_affects_results(self):
+    def test_regime_affects_results(self) -> Any:
+        """Otomatik eklendi."""
         bull = self.mc.simulate(100.0, 0.0004, 0.02, "BULL", 2000, 20, seed=42)
         panic = self.mc.simulate(100.0, 0.0004, 0.02, "PANIC", 2000, 20, seed=42)
         # Panic'te volatilite daha yüksek olmalı
@@ -343,7 +375,8 @@ class TestRegimeConditionedMonteCarlo:
 class TestEnhancedStressTest:
     """Enhanced stress test testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
 
         self.engine = EnhancedStressTestEngine()
@@ -358,7 +391,8 @@ class TestEnhancedStressTest:
             ],
         }
 
-    def test_run_all_scenarios(self):
+    def test_run_all_scenarios(self) -> Any:
+        """Otomatik eklendi."""
         results = self.engine.run_stress_test(
             self.portfolio["total_value"],
             self.portfolio["positions"],
@@ -366,7 +400,8 @@ class TestEnhancedStressTest:
         assert len(results) >= 8
         assert all(r.portfolio_impact_pct != 0 for r in results)
 
-    def test_worst_scenario(self):
+    def test_worst_scenario(self) -> Any:
+        """Otomatik eklendi."""
         results = self.engine.run_stress_test(
             self.portfolio["total_value"],
             self.portfolio["positions"],
@@ -374,7 +409,8 @@ class TestEnhancedStressTest:
         summary = self.engine.get_scenario_summary(results)
         assert summary["worst_impact_pct"] < -5
 
-    def test_breaking_point(self):
+    def test_breaking_point(self) -> Any:
+        """Otomatik eklendi."""
         result = self.engine.find_breaking_point(
             self.portfolio["total_value"],
             self.portfolio["positions"],
@@ -383,7 +419,8 @@ class TestEnhancedStressTest:
         assert "is_robust" in result
         assert "breaking_scenarios" in result
 
-    def test_custom_scenario(self):
+    def test_custom_scenario(self) -> Any:
+        """Otomatik eklendi."""
         self.engine.add_custom_scenario(
             name="Custom Test",
             market_shock=-0.10,
@@ -395,7 +432,8 @@ class TestEnhancedStressTest:
         )
         assert any(r.scenario == "Custom Test" for r in results)
 
-    def test_sector_impacts_differ(self):
+    def test_sector_impacts_differ(self) -> Any:
+        """Otomatik eklendi."""
         results = self.engine.run_stress_test(
             self.portfolio["total_value"],
             self.portfolio["positions"],
@@ -404,7 +442,8 @@ class TestEnhancedStressTest:
         impacts = [r.portfolio_impact_pct for r in results]
         assert len(set(impacts)) > 1
 
-    def test_get_scenario_summary(self):
+    def test_get_scenario_summary(self) -> Any:
+        """Otomatik eklendi."""
         results = self.engine.run_stress_test(
             self.portfolio["total_value"],
             self.portfolio["positions"],
@@ -422,7 +461,7 @@ class TestEnhancedStressTest:
 class TestSimulationIntegration:
     """Entegrasyon testleri."""
 
-    def test_execution_with_stress(self):
+    def test_execution_with_stress(self) -> Any:
         """Execution + stress test entegrasyonu."""
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
@@ -454,7 +493,7 @@ class TestSimulationIntegration:
         result = exec_sim.execute_order(order, 250.0, liquidity, "PANIC", 0.05)
         assert result["slippage_pct"] > 0  # Stres altında slippage artmalı
 
-    def test_monte_carlo_with_stress(self):
+    def test_monte_carlo_with_stress(self) -> Any:
         """Monte Carlo + stress test entegrasyonu."""
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
         from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
@@ -480,12 +519,14 @@ class TestSimulationIntegration:
 class TestOrderBook:
     """Order book simülasyon testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.simulation.order_book import OrderBookSimulator
 
         self.sim = OrderBookSimulator()
 
-    def test_generate_book(self):
+    def test_generate_book(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         assert len(book.bids) == 5
         assert len(book.asks) == 5
@@ -493,58 +534,68 @@ class TestOrderBook:
         assert book.best_ask > 0
         assert book.best_ask > book.best_bid
 
-    def test_spread_positive(self):
+    def test_spread_positive(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         assert book.spread > 0
         assert book.spread_pct > 0
 
-    def test_panic_wider_spread(self):
+    def test_panic_wider_spread(self) -> Any:
+        """Otomatik eklendi."""
         normal = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         panic = self.sim.generate_book(100.0, 1000000, 0.02, "PANIC")
         assert panic.spread_pct > normal.spread_pct
 
-    def test_depth_positive(self):
+    def test_depth_positive(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         assert book.bid_depth > 0
         assert book.ask_depth > 0
 
-    def test_imbalance_range(self):
+    def test_imbalance_range(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         assert -1 <= book.imbalance <= 1
 
-    def test_market_buy_order(self):
+    def test_market_buy_order(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         result = self.sim.simulate_market_order(book, "BUY", 500)
         assert result["fill_quantity"] > 0
         assert result["avg_price"] > 0
         assert result["slippage_pct"] >= 0
 
-    def test_market_sell_order(self):
+    def test_market_sell_order(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         result = self.sim.simulate_market_order(book, "SELL", 500)
         assert result["fill_quantity"] > 0
         assert result["avg_price"] > 0
 
-    def test_large_order_partial_fill(self):
+    def test_large_order_partial_fill(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 100000, 0.02, "RANGE")
         result = self.sim.simulate_market_order(book, "BUY", 100000)
         # Book'da yeterli likidite olmayabilir
         assert result["fill_quantity"] > 0
 
-    def test_buy_walks_asks(self):
+    def test_buy_walks_asks(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         result = self.sim.simulate_market_order(book, "BUY", 500)
         # BUY emri ask'lerden fill olmalı
         assert result["avg_price"] >= book.best_ask
 
-    def test_liquidity_score(self):
+    def test_liquidity_score(self) -> Any:
+        """Otomatik eklendi."""
         book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
         score = self.sim.calculate_liquidity_score(book)
         assert 0 <= score["liquidity_score"] <= 100
         assert "spread_score" in score
         assert "depth_score" in score
 
-    def test_spread_estimate(self):
+    def test_spread_estimate(self) -> Any:
+        """Otomatik eklendi."""
         spread = self.sim.estimate_spread_from_volume(1000000, 0.02)
         assert 0.01 <= spread <= 2.0
 
@@ -557,7 +608,7 @@ class TestOrderBook:
 class TestSimulationIntegrationUpdated:
     """Entegrasyon testleri."""
 
-    def test_execution_with_stress(self):
+    def test_execution_with_stress(self) -> Any:
         """Execution + stress test entegrasyonu."""
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
@@ -585,7 +636,7 @@ class TestSimulationIntegrationUpdated:
         result = exec_sim.execute_order(order, 250.0, liquidity, "PANIC", 0.05)
         assert result["slippage_pct"] > 0
 
-    def test_monte_carlo_with_stress(self):
+    def test_monte_carlo_with_stress(self) -> Any:
         """Monte Carlo + stress test entegrasyonu."""
         from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
 
@@ -594,7 +645,7 @@ class TestSimulationIntegrationUpdated:
         crisis = mc.simulate(100.0, 0.0004, 0.02, "CRISIS", 1000, 20, seed=42)
         assert crisis.var_95 < normal.var_95
 
-    def test_order_book_with_execution(self):
+    def test_order_book_with_execution(self) -> Any:
         """Order book + execution entegrasyonu."""
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.execution_simulator import Order, OrderSide, OrderType
@@ -632,7 +683,7 @@ class TestSimulationIntegrationUpdated:
         assert result["fill_price"] > 0
         assert result["slippage_pct"] > 0
 
-    def test_order_book_large_order(self):
+    def test_order_book_large_order(self) -> Any:
         """Büyük emir order book'da daha fazla slippage yapmalı."""
         from services.simulation.order_book import OrderBookSimulator
 

@@ -57,10 +57,11 @@ class LLMSentimentAnalyzer:
     """LLM tabanlı Türkçe sentiment analizi."""
 
     def __init__(self, llm_client=None):
+        """Otomatik eklendi."""
         self._llm_client = llm_client
         self._cache: dict[str, tuple] = {}  # key → (result, cached_at)
 
-    def set_llm_client(self, client):
+    def set_llm_client(self, client) -> Any:
         """LLM client ayarla."""
         self._llm_client = client
 

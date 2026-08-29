@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 3-9 Test Suite
 
@@ -16,17 +19,17 @@ from datetime import UTC
 # ===================== FAZ 3: RETRAIN ENGINE =====================
 
 
-def test_retrain_engine_init():
+def test_retrain_engine_init() -> Any:
     """Retrain engine başlatılıyor mu?"""
     from services.learning.retrain_engine import retrain_engine
 
     assert retrain_engine is not None
     report = retrain_engine.get_retrain_report()
     assert report["status"] == "No retrain data"
-    print("✅ Retrain engine init")
+    logger.info("✅ Retrain engine init")
 
 
-def test_retrain_engine_version_id():
+def test_retrain_engine_version_id() -> Any:
     """Version ID üretiliyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -34,23 +37,23 @@ def test_retrain_engine_version_id():
     vid = engine._generate_version_id()
     assert vid.startswith("retrain_")
     assert len(vid) > 10
-    print(f"✅ Version ID: {vid}")
+    logger.info(f"✅ Version ID: {vid}")
 
 
 # ===================== FAZ 4: FEATURE TRACKER =====================
 
 
-def test_feature_tracker_init():
+def test_feature_tracker_init() -> Any:
     """Feature tracker başlatılıyor mu?"""
     from services.learning.feature_tracker import feature_importance_tracker
 
     assert feature_importance_tracker is not None
     report = feature_importance_tracker.get_report()
     assert report["status"] == "OK"
-    print("✅ Feature tracker init")
+    logger.info("✅ Feature tracker init")
 
 
-def test_feature_tracker_trends():
+def test_feature_tracker_trends() -> Any:
     """Feature trends çalışıyor mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -76,10 +79,10 @@ def test_feature_tracker_trends():
 
     trends = tracker.get_trends(top_n=5)
     assert isinstance(trends, dict)
-    print(f"✅ Feature trends: {len(trends)} features")
+    logger.info(f"✅ Feature trends: {len(trends)} features")
 
 
-def test_feature_tracker_report():
+def test_feature_tracker_report() -> Any:
     """Feature tracker raporu doğru mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -87,23 +90,23 @@ def test_feature_tracker_report():
     report = tracker.get_report()
     assert report["status"] == "OK"
     assert "total_records" in report
-    print("✅ Feature tracker report")
+    logger.info("✅ Feature tracker report")
 
 
 # ===================== FAZ 5: SHADOW MODE =====================
 
 
-def test_shadow_manager_init():
+def test_shadow_manager_init() -> Any:
     """Shadow manager başlatılıyor mu?"""
     from services.learning.shadow_manager import shadow_manager
 
     assert shadow_manager is not None
     status = shadow_manager.get_status()
     assert status["active"] is False
-    print("✅ Shadow manager init")
+    logger.info("✅ Shadow manager init")
 
 
-def test_shadow_start_stop():
+def test_shadow_start_stop() -> Any:
     """Shadow mode başlat/durdur."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -114,10 +117,10 @@ def test_shadow_start_stop():
 
     manager.stop_shadow()
     assert manager._shadow_active is False
-    print("✅ Shadow start/stop")
+    logger.info("✅ Shadow start/stop")
 
 
-def test_shadow_record_prediction():
+def test_shadow_record_prediction() -> Any:
     """Shadow prediction kayıt."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -130,10 +133,10 @@ def test_shadow_record_prediction():
         {"direction": "LONG", "confidence": 0.85},
     )
     assert len(manager._predictions) == 1
-    print("✅ Shadow record prediction")
+    logger.info("✅ Shadow record prediction")
 
 
-def test_shadow_evaluate_insufficient():
+def test_shadow_evaluate_insufficient() -> Any:
     """Shadow evaluation yetersiz veri."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -142,20 +145,20 @@ def test_shadow_evaluate_insufficient():
 
     result = manager.evaluate()
     assert result is None  # Yeterli veri yok
-    print("✅ Shadow evaluate insufficient")
+    logger.info("✅ Shadow evaluate insufficient")
 
 
-def test_champion_challenger_init():
+def test_champion_challenger_init() -> Any:
     """Champion-challenger başlatılıyor mu?"""
     from services.learning.champion_challenger import champion_challenger
 
     assert champion_challenger is not None
     report = champion_challenger.get_report()
     assert report["current_champion"] is None
-    print("✅ Champion-challenger init")
+    logger.info("✅ Champion-challenger init")
 
 
-def test_champion_challenger_promote():
+def test_champion_challenger_promote() -> Any:
     """Champion promote çalışıyor mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -165,10 +168,10 @@ def test_champion_challenger_promote():
     champion = engine.get_champion()
     assert champion is not None
     assert champion.model_id == "model_v2"
-    print("✅ Champion promote")
+    logger.info("✅ Champion promote")
 
 
-def test_champion_challenger_reject():
+def test_champion_challenger_reject() -> Any:
     """Champion reject çalışıyor mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -176,10 +179,10 @@ def test_champion_challenger_reject():
     engine.reject("model_v3", "Low performance", {"sharpe": 0.1})
 
     assert len(engine._rejected_challengers) == 1
-    print("✅ Champion reject")
+    logger.info("✅ Champion reject")
 
 
-def test_champion_challenger_rollback():
+def test_champion_challenger_rollback() -> Any:
     """Champion rollback çalışıyor mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -191,23 +194,23 @@ def test_champion_challenger_rollback():
     result = engine.rollback("v1")
     assert result is True
     assert engine.get_champion().version == "v1"
-    print("✅ Champion rollback")
+    logger.info("✅ Champion rollback")
 
 
 # ===================== FAZ 6: MODEL REGISTRY =====================
 
 
-def test_model_registry_init():
+def test_model_registry_init() -> Any:
     """Model registry başlatılıyor mu?"""
     from services.learning.model_registry import model_registry
 
     assert model_registry is not None
     report = model_registry.get_report()
     assert report["total_versions"] == 0
-    print("✅ Model registry init")
+    logger.info("✅ Model registry init")
 
 
-def test_model_registry_register():
+def test_model_registry_register() -> Any:
     """Model kayıt çalışıyor mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -224,10 +227,10 @@ def test_model_registry_register():
 
     assert record.model_id == "lgbm_v1"
     assert record.status == "CANDIDATE"
-    print("✅ Model register")
+    logger.info("✅ Model register")
 
 
-def test_model_registry_promote():
+def test_model_registry_promote() -> Any:
     """Model promote çalışıyor mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -238,10 +241,10 @@ def test_model_registry_promote():
     champion = registry.get_champion()
     assert champion is not None
     assert champion.status == "CHAMPION"
-    print("✅ Model registry promote")
+    logger.info("✅ Model registry promote")
 
 
-def test_model_registry_rollback():
+def test_model_registry_rollback() -> Any:
     """Model rollback çalışıyor mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -254,10 +257,10 @@ def test_model_registry_rollback():
     # Rollback
     result = registry.rollback("v1")
     assert result is True
-    print("✅ Model registry rollback")
+    logger.info("✅ Model registry rollback")
 
 
-def test_model_registry_versions():
+def test_model_registry_versions() -> Any:
     """Model versions listesi doğru mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -267,23 +270,23 @@ def test_model_registry_versions():
 
     versions = registry.get_all_versions()
     assert len(versions) == 2
-    print("✅ Model registry versions")
+    logger.info("✅ Model registry versions")
 
 
 # ===================== FAZ 7: META LEARNER =====================
 
 
-def test_meta_learner_init():
+def test_meta_learner_init() -> Any:
     """Meta learner başlatılıyor mu?"""
     from services.learning.meta_learner import meta_learner
 
     assert meta_learner is not None
     report = meta_learner.get_report()
     assert report["total_records"] == 0
-    print("✅ Meta learner init")
+    logger.info("✅ Meta learner init")
 
 
-def test_meta_learner_record():
+def test_meta_learner_record() -> Any:
     """Meta learner performans kayıt."""
     from services.learning.meta_learner import MetaLearner
 
@@ -292,10 +295,10 @@ def test_meta_learner_record():
     learner.record_performance("model_v1", "BULL", {"sharpe": 1.3, "win_rate": 0.58, "ic": 0.04})
 
     assert len(learner._model_history) == 2
-    print("✅ Meta learner record")
+    logger.info("✅ Meta learner record")
 
 
-def test_meta_learner_select_best():
+def test_meta_learner_select_best() -> Any:
     """Meta learner en iyi model seçimi."""
     from services.learning.meta_learner import MetaLearner
 
@@ -305,10 +308,10 @@ def test_meta_learner_select_best():
 
     best = learner.select_best_model("BULL")
     assert best == "model_v1"
-    print(f"✅ Meta learner select best: {best}")
+    logger.info(f"✅ Meta learner select best: {best}")
 
 
-def test_meta_learner_ensemble_weights():
+def test_meta_learner_ensemble_weights() -> Any:
     """Meta learner ensemble weights doğru mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -319,10 +322,10 @@ def test_meta_learner_ensemble_weights():
     weights = learner.calculate_ensemble_weights(["m1", "m2"], "BULL")
     assert weights["m1"] > weights["m2"]
     assert abs(sum(weights.values()) - 1.0) < 0.01
-    print(f"✅ Ensemble weights: {weights}")
+    logger.info(f"✅ Ensemble weights: {weights}")
 
 
-def test_meta_learner_decay_prediction():
+def test_meta_learner_decay_prediction() -> Any:
     """Meta learner decay prediction."""
     from services.learning.meta_learner import MetaLearner
 
@@ -332,10 +335,10 @@ def test_meta_learner_decay_prediction():
         learner.record_performance("model_v1", "BULL", {"sharpe": 1.5 - i * 0.03, "win_rate": 0.6, "ic": 0.05})
 
     result = learner.predict_decay("model_v1")
-    print(f"✅ Decay prediction: {result}")
+    logger.info(f"✅ Decay prediction: {result}")
 
 
-def test_meta_learner_regime_summary():
+def test_meta_learner_regime_summary() -> Any:
     """Meta learner regime summary doğru mu?"""
     from services.learning.meta_learner import MetaLearner
 
@@ -346,23 +349,23 @@ def test_meta_learner_regime_summary():
     summary = learner.get_regime_summary()
     assert "BULL" in summary
     assert "BEAR" in summary
-    print(f"✅ Regime summary: {list(summary.keys())}")
+    logger.info(f"✅ Regime summary: {list(summary.keys())}")
 
 
 # ===================== FAZ 8: HEALTH MONITOR =====================
 
 
-def test_health_monitor_init():
+def test_health_monitor_init() -> Any:
     """Health monitor başlatılıyor mu?"""
     from services.learning.health_monitor import learning_health_monitor
 
     assert learning_health_monitor is not None
     report = learning_health_monitor.get_report()
     assert report["status"] == "OK"
-    print("✅ Health monitor init")
+    logger.info("✅ Health monitor init")
 
 
-def test_health_check():
+def test_health_check() -> Any:
     """Health check çalışıyor mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -370,10 +373,10 @@ def test_health_check():
     report = monitor.check_health()
     assert report.overall_status in ["HEALTHY", "WARNING", "CRITICAL"]
     assert len(report.modules) > 0
-    print(f"✅ Health check: {report.overall_status}, modules: {len(report.modules)}")
+    logger.info(f"✅ Health check: {report.overall_status}, modules: {len(report.modules)}")
 
 
-def test_health_restart_request():
+def test_health_restart_request() -> Any:
     """Restart request çalışıyor mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -386,10 +389,10 @@ def test_health_restart_request():
     # İkinci çağrıda temizlenmiş olmalı
     requests2 = monitor.get_restart_requests()
     assert len(requests2) == 0
-    print("✅ Health restart request")
+    logger.info("✅ Health restart request")
 
 
-def test_health_error_recording():
+def test_health_error_recording() -> Any:
     """Hata kaydetme çalışıyor mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -398,13 +401,13 @@ def test_health_error_recording():
 
     assert len(monitor._error_history) == 1
     assert monitor._error_history[0]["module"] == "test_module"
-    print("✅ Health error recording")
+    logger.info("✅ Health error recording")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
     """Tüm testleri çalıştır."""
     tests = [
         # Faz 3
@@ -454,19 +457,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 3-9 TEST SONUÇLARI")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 3-9 TEST SONUÇLARI")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Portfolio Service v2.0 — Async DB-backed Testleri
 """
@@ -10,7 +13,7 @@ from services.core.database_dev import dev_db
 from services.portfolio.main import PortfolioService
 
 
-async def reset_test_db():
+async def reset_test_db() -> Any:
     """Test DB'sini sıfırla."""
     if dev_db._db is None:
         await dev_db.init()
@@ -19,7 +22,7 @@ async def reset_test_db():
     await safe_cleanup_tables(dev_db)
 
 
-async def seed_test_instruments():
+async def seed_test_instruments() -> Any:
     """Test için şirket ve enstrüman oluştur."""
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('AVIATION', 'H') ON CONFLICT (code) DO NOTHING")
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('BANK', 'B') ON CONFLICT (code) DO NOTHING")
@@ -38,6 +41,7 @@ async def seed_test_instruments():
 
 
 async def get_instrument_id(symbol: str) -> int:
+    """Otomatik eklendi."""
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = ?", symbol)
     return row["id"] if row else 0
 
@@ -56,7 +60,8 @@ async def make_service(capital: float = 100000) -> PortfolioService:
 # ============================================================
 
 
-async def test_service_lifecycle():
+async def test_service_lifecycle() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -72,7 +77,8 @@ async def test_service_lifecycle():
     return "Service Lifecycle", len(issues) == 0, issues
 
 
-async def test_execute_buy():
+async def test_execute_buy() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -102,7 +108,8 @@ async def test_execute_buy():
     return "Execute Buy", len(issues) == 0, issues
 
 
-async def test_execute_sell():
+async def test_execute_sell() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -131,7 +138,8 @@ async def test_execute_sell():
     return "Execute Sell", len(issues) == 0, issues
 
 
-async def test_equity_invariant():
+async def test_equity_invariant() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -150,7 +158,8 @@ async def test_equity_invariant():
     return "Equity Invariant", len(issues) == 0, issues
 
 
-async def test_cash_ledger_db():
+async def test_cash_ledger_db() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -174,7 +183,8 @@ async def test_cash_ledger_db():
     return "Cash Ledger DB", len(issues) == 0, issues
 
 
-async def test_position_history_db():
+async def test_position_history_db() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -198,7 +208,8 @@ async def test_position_history_db():
     return "Position History DB", len(issues) == 0, issues
 
 
-async def test_equity_snapshots_db():
+async def test_equity_snapshots_db() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -214,7 +225,8 @@ async def test_equity_snapshots_db():
     return "Equity Snapshots DB", len(issues) == 0, issues
 
 
-async def test_weighted_avg_cost_db():
+async def test_weighted_avg_cost_db() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -242,7 +254,8 @@ async def test_weighted_avg_cost_db():
     return "Weighted Avg Cost DB", len(issues) == 0, issues
 
 
-async def test_commission_accounting():
+async def test_commission_accounting() -> Any:
+    """Otomatik eklendi."""
     svc = await make_service()
     issues = []
 
@@ -268,10 +281,11 @@ async def test_commission_accounting():
 # ============================================================
 
 
-async def run_all_tests():
-    print("=" * 60)
-    print("PORTFOLIO SERVICE v2.0 — ASYNC DB TESTLERİ")
-    print("=" * 60)
+async def run_all_tests() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("PORTFOLIO SERVICE v2.0 — ASYNC DB TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_service_lifecycle,
@@ -298,28 +312,29 @@ async def run_all_tests():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if passed else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if passed:
             total_pass += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             total_fail += 1
             for issue in issues:
-                print(f"   ❌ {issue}")
+                logger.info(f"   ❌ {issue}")
                 all_issues.append(f"{name}: {issue}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
 
     return total_fail == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     success = asyncio.run(run_all_tests())
     sys.exit(0 if success else 1)
 

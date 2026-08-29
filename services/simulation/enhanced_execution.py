@@ -57,6 +57,7 @@ class SquareRootMarketImpact:
     """
 
     def __init__(self, eta: float = 0.3):
+        """Otomatik eklendi."""
         self.eta = eta  # Impact coefficient
 
     def calculate(
@@ -140,6 +141,7 @@ class EnhancedExecutionSimulator:
     MIN_COMMISSION = 1.0  # Minimum 1 TL
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._impact_model = SquareRootMarketImpact(eta=0.3)
         self._regime_slippage = RegimeAwareSlippage()
 

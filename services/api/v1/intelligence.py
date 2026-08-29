@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.get("/regime")
-async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Piyasa rejimi ve oynaklık durumu (Bull, Bear, Sideways, Volatile)."""
     try:
         from ...intelligence.regime import regime_detector
@@ -58,7 +58,7 @@ async def get_decisions(
     limit: int = Query(20, ge=1, le=100),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Yapay zeka çoklu model füzyonu ile üretilen güncel kararlar."""
     try:
         from ...scanner.alpha_engine import alpha_engine
@@ -80,7 +80,7 @@ async def simulation(
     n_sims: int = Query(5000, ge=100, le=20000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Monte Carlo simülasyonu — Advanced Monte Carlo Engine."""
     try:
         from ...intelligence.advanced_monte_carlo import AdvancedMonteCarloEngine
@@ -121,7 +121,7 @@ async def simulation(
 
 
 @router.get("/analysis/{ticker}")
-async def analysis(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def analysis(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tam hisse kantitatif analizi."""
     return {
         "ticker": ticker,
@@ -139,7 +139,7 @@ async def ask_gemini_endpoint(
     body: dict[str, Any],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Google Gemini 3.7 Flash canlı araştırma ve analiz endpoint'i."""
     prompt = body.get("prompt", "Borsa İstanbul piyasa durumu hakkında özet ver.")
     try:
@@ -164,7 +164,7 @@ async def gemini_report(
     resistance: float | None = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Belirli bir hisse için canlı Gemini 3.7 araştırma raporu."""
     try:
         from ...intelligence.gemini_service import analyze_company_gemini

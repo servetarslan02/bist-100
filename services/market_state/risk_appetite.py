@@ -46,6 +46,7 @@ class RiskAppetiteEngine:
         sentiment_weight: float = 0.10,
         macro_weight: float = 0.10,
     ):
+        """Otomatik eklendi."""
         self._weights = {
             "breadth": breadth_weight,
             "momentum": momentum_weight,
@@ -190,7 +191,7 @@ class RiskAppetiteEngine:
             return "MODERATE_RISK_OFF"
         return "RISK_OFF"
 
-    def update_weights(self, weights: dict[str, float]):
+    def update_weights(self, weights: dict[str, float]) -> Any:
         """Ağırlıkları güncelle (backtest optimizasyonu sonrası)."""
         for factor, weight in weights.items():
             if factor in self._weights:

@@ -30,13 +30,14 @@ class ScoreCalibrator:
     """Ranking score -> win_probability kalibrasyonu."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.params = CalibrationParams()
         self._trade_history: list[dict] = []  # Historical OOS trades
         self._fitted = False
         self._brier_scores: list[float] = []  # Brier score geçmişi
         self._calibration_curve: dict[str, list] = {"predicted": [], "actual": []}
 
-    def fit_from_trades(self, trades: list[dict]):
+    def fit_from_trades(self, trades: list[dict]) -> Any:
         """Historical OOS trades'ten calibration fit et.
 
         trades: [{score, return_pct, ticker, date}, ...]
@@ -91,7 +92,7 @@ class ScoreCalibrator:
         p = 1.0 / (1.0 + np.exp(-log_odds))
         return float(np.clip(p, 0.05, 0.95))
 
-    def add_trade(self, score: float, return_pct: float, ticker: str, date: str):
+    def add_trade(self, score: float, return_pct: float, ticker: str, date: str) -> Any:
         """Yeni trade ekle (online learning)."""
         self._trade_history.append(
             {

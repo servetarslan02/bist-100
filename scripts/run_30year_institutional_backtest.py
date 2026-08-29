@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — 30-YILLIK KURUMSAL GERÇEK PİYASA BACKTEST MOTORU (1997 - 2026)
 ===========================================================================
@@ -62,16 +63,16 @@ BIST_30Y_CORE_TICKERS = [
 BENCHMARK_TICKER = "XU100.IS"
 
 
-def download_30y_data():
+def download_30y_data() -> Any:
     """30 yıllık gerçek günlük mumları indirir ve hazırlar."""
-    print("=" * 80)
-    print("1. 30 YILLIK GERÇEK BIST PİYASA VERİLERİ İNDİRİLİYOR (1997 - 2026)")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("1. 30 YILLIK GERÇEK BIST PİYASA VERİLERİ İNDİRİLİYOR (1997 - 2026)")
+    logger.info("=" * 80)
 
     start_date = "1997-01-01"
     end_date = "2026-08-23"
 
-    print(f"  • BIST-100 Endeksi ({BENCHMARK_TICKER}) indiriliyor...")
+    logger.info(f"  • BIST-100 Endeksi ({BENCHMARK_TICKER}) indiriliyor...")
     bm_df = yf.download(BENCHMARK_TICKER, start=start_date, end=end_date, progress=False)
     if bm_df.empty:
         raise ValueError("XU100 verisi indirilemedi!")
@@ -79,11 +80,11 @@ def download_30y_data():
     if isinstance(bm_df.columns, list):
         bm_df.columns = [c[0] for c in bm_df.columns]
 
-    print(
+    logger.info(
         f"    ✓ BIST-100: {len(bm_df)} işlem günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})"
     )
 
-    print(f"  • {len(BIST_30Y_CORE_TICKERS)} Öncü BIST Hissesi indiriliyor...")
+    logger.info(f"  • {len(BIST_30Y_CORE_TICKERS)} Öncü BIST Hissesi indiriliyor...")
     stocks_raw = yf.download(BIST_30Y_CORE_TICKERS, start=start_date, end=end_date, progress=False, group_by="ticker")
 
     stock_dict = {}
@@ -98,24 +99,25 @@ def download_30y_data():
         except Exception:
             logger.warning("Caught Exception in download_30y_data", exc_info=True)
 
-    print(f"    ✓ {len(stock_dict)} hissenin 30 yıllık geçmişi başarıyla hazırlandı.\n")
+    logger.info(f"    ✓ {len(stock_dict)} hissenin 30 yıllık geçmişi başarıyla hazırlandı.\n")
 
     return bm_df, stock_dict
 
 
-def run_30year_backtest():
+def run_30year_backtest() -> Any:
+    """Otomatik eklendi."""
     bm_df, stock_dict = download_30y_data()
 
-    print("=" * 80)
-    print("2. 30 YILLIK GERÇEKÇİ KURUMSAL SİMÜLASYON BAŞLATILIYOR")
-    print("=" * 80)
-    print("  • Başlangıç Sermayesi       : 100.000 ₺")
-    print("  • Komisyon Oranı            : %0.15 (BIST Standardı)")
-    print("  • Fiyat Kayması (Slippage)  : %0.10")
-    print("  • Toplam İşlem Maliyeti     : %0.25 Alışta + %0.25 Satışta (%0.50 Round-Trip)")
-    print("  • Portföy Dağılım Kuralı    : Fractional Kelly (Hisse Başına Max %15)")
-    print("  • Rejim Koruması            : Ayı Piyasasında Nakde Geçiş (%60+ Nakit Rezervi)")
-    print("-" * 80)
+    logger.info("=" * 80)
+    logger.info("2. 30 YILLIK GERÇEKÇİ KURUMSAL SİMÜLASYON BAŞLATILIYOR")
+    logger.info("=" * 80)
+    logger.info("  • Başlangıç Sermayesi       : 100.000 ₺")
+    logger.info("  • Komisyon Oranı            : %0.15 (BIST Standardı)")
+    logger.info("  • Fiyat Kayması (Slippage)  : %0.10")
+    logger.info("  • Toplam İşlem Maliyeti     : %0.25 Alışta + %0.25 Satışta (%0.50 Round-Trip)")
+    logger.info("  • Portföy Dağılım Kuralı    : Fractional Kelly (Hisse Başına Max %15)")
+    logger.info("  • Rejim Koruması            : Ayı Piyasasında Nakde Geçiş (%60+ Nakit Rezervi)")
+    logger.info("-" * 80)
 
     COMMISSION_RATE = 0.0015
     SLIPPAGE_RATE = 0.0010
@@ -360,31 +362,31 @@ def run_30year_backtest():
     gross_losses = abs(df_trades[df_trades["pnl"] < 0]["pnl"].sum()) if total_trades > 0 else 1
     profit_factor = round(gross_wins / max(gross_losses, 1e-9), 2)
 
-    print("\n" + "=" * 80)
-    print("🏆 30 YILLIK (1997 - 2026) KURUMSAL PERFORMANS KARŞILAŞTIRMASI")
-    print("=" * 80)
-    print(f"{'METRİK':<36} | {'BIST-100 (Buy & Hold)':<20} | {'ALPHA BIST MOTORU (10/10)':<20}")
-    print("-" * 80)
-    print(f"{'Başlangıç Sermayesi':<36} | {'100.000 ₺':<20} | {'100.000 ₺':<20}")
-    print(f"{'Nihai Portföy Değeri':<36} | {f'{final_bm_equity:,.0f} ₺':<20} | {f'{final_equity:,.0f} ₺':<20}")
-    print(f"{'Kümülatif Toplam Getiri':<36} | %{total_bm_return:<19,.1f} | %{total_engine_return:<19,.1f}")
-    print(
+    logger.info("\n" + "=" * 80)
+    logger.info("🏆 30 YILLIK (1997 - 2026) KURUMSAL PERFORMANS KARŞILAŞTIRMASI")
+    logger.info("=" * 80)
+    logger.info(f"{'METRİK':<36} | {'BIST-100 (Buy & Hold)':<20} | {'ALPHA BIST MOTORU (10/10)':<20}")
+    logger.info("-" * 80)
+    logger.info(f"{'Başlangıç Sermayesi':<36} | {'100.000 ₺':<20} | {'100.000 ₺':<20}")
+    logger.info(f"{'Nihai Portföy Değeri':<36} | {f'{final_bm_equity:,.0f} ₺':<20} | {f'{final_equity:,.0f} ₺':<20}")
+    logger.info(f"{'Kümülatif Toplam Getiri':<36} | %{total_bm_return:<19,.1f} | %{total_engine_return:<19,.1f}")
+    logger.info(
         f"{'Bileşik Yıllık Getiri (CAGR)':<36} | %{cagr_bm:<19.2f} | %{cagr_engine:<19.2f} (Net +%{cagr_engine - cagr_bm:.2f}/yıl)"
     )
-    print(f"{'Sharpe Oranı (Risk Ayarlı)':<36} | {sharpe_bm:<20.2f} | {sharpe_engine:<20.2f}")
-    print(f"{'Maksimum Düşüş (Max Drawdown)':<36} | %{max_dd_bm:<19.2f} | %{max_dd_engine:<19.2f} (Kriz Korumalı)")
-    print(f"{'Toplam İşlem Sayısı':<36} | {'1 İşlem':<20} | {f'{total_trades} İşlem':<20}")
-    print(f"{'Kazanma Oranı (Win Rate)':<36} | {'—':<20} | %{win_rate:<19.1f}")
-    print(f"{'Kar / Zarar Çarpanı (Profit Factor)':<36} | {'—':<20} | {profit_factor:<20}")
-    print("-" * 80)
+    logger.info(f"{'Sharpe Oranı (Risk Ayarlı)':<36} | {sharpe_bm:<20.2f} | {sharpe_engine:<20.2f}")
+    logger.info(f"{'Maksimum Düşüş (Max Drawdown)':<36} | %{max_dd_bm:<19.2f} | %{max_dd_engine:<19.2f} (Kriz Korumalı)")
+    logger.info(f"{'Toplam İşlem Sayısı':<36} | {'1 İşlem':<20} | {f'{total_trades} İşlem':<20}")
+    logger.info(f"{'Kazanma Oranı (Win Rate)':<36} | {'—':<20} | %{win_rate:<19.1f}")
+    logger.info(f"{'Kar / Zarar Çarpanı (Profit Factor)':<36} | {'—':<20} | {profit_factor:<20}")
+    logger.info("-" * 80)
 
-    print("\n" + "=" * 80)
-    print("📅 YILLARA GÖRE DETAYLI PERFORMANS & KRİZ DÖNEMLERİ ANALİZİ")
-    print("=" * 80)
-    print(
+    logger.info("\n" + "=" * 80)
+    logger.info("📅 YILLARA GÖRE DETAYLI PERFORMANS & KRİZ DÖNEMLERİ ANALİZİ")
+    logger.info("=" * 80)
+    logger.info(
         f"{'YIL':<6} | {'MOTOR GETİRİSİ':<16} | {'BIST-100 GETİRİSİ':<18} | {'NET ALFA (Üstünlük)':<20} | {'DÖNEM NOTU'}"
     )
-    print("-" * 80)
+    logger.info("-" * 80)
 
     for y, data in sorted(yearly_stats.items()):
         eng_ret = data["engine_ret"]
@@ -407,11 +409,11 @@ def run_30year_backtest():
         elif y in (2025, 2026):
             note = "📊 Güncel Piyasa Sezonu"
 
-        print(f"{y:<6} | %{eng_ret:>+13.1f} | %{b_ret:>+15.1f} | %{alpha:>+17.1f} | {note}")
+        logger.info(f"{y:<6} | %{eng_ret:>+13.1f} | %{b_ret:>+15.1f} | %{alpha:>+17.1f} | {note}")
 
-    print("=" * 80)
-    print("✅ 30 YILLIK GERÇEK VERİ TESTİ TAMAMLANDI VE MOTORUN ÜSTÜNLÜĞÜ İSPATLANDI!")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info("✅ 30 YILLIK GERÇEK VERİ TESTİ TAMAMLANDI VE MOTORUN ÜSTÜNLÜĞÜ İSPATLANDI!")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":

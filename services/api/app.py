@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — API Application v2.0 (CANONICAL PRODUCTION SERVER)
 
@@ -21,7 +22,6 @@ NOT: Bu dosya CANONICAL production entry point'tir.
 import asyncio
 import os
 import time
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
@@ -33,10 +33,11 @@ try:
     import orjson
 except ImportError:
     import orjson as orjson
-import structlog
 import functools
-from opentelemetry import trace
+
+import structlog
 from fastapi.responses import Response as FastAPIResponse
+from opentelemetry import trace
 
 from ..core.database import check_db_health, init_databases
 from ..core.otel import setup_telemetry
@@ -46,14 +47,20 @@ from .v1 import v1_router
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return await func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -90,6 +97,9 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     return refresh_task
 
 
+_bg_tasks = set()
+
+
 def _start_background_tasks(refresh_task) -> dict:
     """Arka plan görevlerini başlat."""
     from .background_tasks import (
@@ -99,16 +109,23 @@ def _start_background_tasks(refresh_task) -> dict:
         radar_cache_refresher,
     )
 
-    return {
+    tasks = {
         "radar": asyncio.create_task(radar_cache_refresher()),
         "ml": asyncio.create_task(ml_learning_scheduler()),
         "storage": asyncio.create_task(auto_storage_optimizer()),
         "paper": asyncio.create_task(paper_trading_scheduler()),
     }
 
+    global _bg_tasks
+    for task in tasks.values():
+        _bg_tasks.add(task)
+        task.add_done_callback(_bg_tasks.discard)
+
+    return tasks
+
 
 @otel_trace("api.start_grpc")
-async def _start_grpc():
+async def _start_grpc() -> Any:
     """gRPC sunucusunu başlat."""
     try:
         from ..grpc.server import start_grpc_server
@@ -124,7 +141,7 @@ async def _start_grpc():
 
 
 @otel_trace("api.start_nats")
-async def _start_nats():
+async def _start_nats() -> Any:
     """NATS bağlantısını başlat."""
     try:
         from ..nats.client import nats_client
@@ -135,7 +152,7 @@ async def _start_nats():
 
 
 @otel_trace("api.start_service_mesh")
-async def _start_service_mesh():
+async def _start_service_mesh() -> Any:
     """Service mesh başlat."""
     try:
         from ..core.service_mesh import init_service_mesh, service_mesh
@@ -148,7 +165,7 @@ async def _start_service_mesh():
 
 
 @otel_trace("api.shutdown")
-async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server):
+async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server) -> Any:
     """Tüm servisleri düzgün şekilde kapat."""
     for task in background_tasks.values():
         task.cancel()
@@ -190,7 +207,7 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
     logger.info("ALPHA BIST API shutdown complete")
 
 
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> Any:
     """Application lifespan — DB lifecycle dahil."""
     logger.info("ALPHA BIST API starting (canonical production server)")
 
@@ -235,7 +252,8 @@ def create_app() -> FastAPI:
 
     # Request timing middleware
     @app.middleware("http")
-    async def timing_middleware(request: Request, call_next):
+    async def timing_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         start = time.monotonic()
         response = await call_next(request)
         duration = (time.monotonic() - start) * 1000
@@ -244,7 +262,8 @@ def create_app() -> FastAPI:
 
     # Request ID middleware — her isteğe unique ID ata
     @app.middleware("http")
-    async def request_id_middleware(request: Request, call_next):
+    async def request_id_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         import uuid as _uuid
 
         import structlog
@@ -258,7 +277,7 @@ def create_app() -> FastAPI:
 
             correlation_id_var.set(request_id)
         except ImportError:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
         # Structlog context'e ekle (tüm loglarda otomatik görünür)
         structlog.contextvars.clear_contextvars()
@@ -273,7 +292,8 @@ def create_app() -> FastAPI:
 
     # Request timeout middleware — uzun süren istekleri kes
     @app.middleware("http")
-    async def timeout_middleware(request: Request, call_next):
+    async def timeout_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         import asyncio
 
         # Timeout'suz endpoint'ler
@@ -291,7 +311,7 @@ def create_app() -> FastAPI:
 
         try:
             return await asyncio.wait_for(call_next(request), timeout=30.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             request_id = getattr(request.state, "request_id", None)
             logger.error(
                 "request_timeout",
@@ -313,7 +333,8 @@ def create_app() -> FastAPI:
 
     # Rate limit headers middleware
     @app.middleware("http")
-    async def rate_limit_middleware(request: Request, call_next):
+    async def rate_limit_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         client_id = request.client.host if request.client else "unknown"
         path = request.url.path
         method = request.method
@@ -352,7 +373,7 @@ def create_app() -> FastAPI:
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Any:
         """HTTP hatalarını structured ErrorResponse formatında döndür."""
         import uuid as _uuid
 
@@ -377,7 +398,7 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> Any:
         """Validation hatalarını structured ErrorResponse formatında döndür."""
         import uuid as _uuid
 
@@ -403,7 +424,7 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def general_exception_handler(request: Request, exc: Exception):
+    async def general_exception_handler(request: Request, exc: Exception) -> Any:
         """Beklenmedik hataları structured ErrorResponse formatında döndür."""
         import uuid as _uuid
 
@@ -431,11 +452,14 @@ def create_app() -> FastAPI:
 
     # API version header — tüm response'larda
     @app.middleware("http")
-    async def api_version_middleware(request: Request, call_next):
+    async def api_version_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         response = await call_next(request)
         if request.url.path.startswith("/api/"):
             response.headers["X-API-Version"] = "1.0.0"
-            response.headers["X-API-Deprecation-Policy"] = "https://github.com/servetarslan02/bist-100/blob/main/API_CHANGELOG.md"
+            response.headers["X-API-Deprecation-Policy"] = (
+                "https://github.com/servetarslan02/bist-100/blob/main/API_CHANGELOG.md"
+            )
         return response
 
     # Deprecation tracking — eski endpoint'ler için Sunset header
@@ -445,7 +469,8 @@ def create_app() -> FastAPI:
     }
 
     @app.middleware("http")
-    async def deprecation_middleware(request: Request, call_next):
+    async def deprecation_middleware(request: Request, call_next) -> Any:
+        """Otomatik eklendi."""
         response = await call_next(request)
         path = request.url.path
         if path in DEPRECATED_ENDPOINTS:
@@ -478,7 +503,8 @@ def create_app() -> FastAPI:
     # Root endpoints & Web UI Dashboard
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
-    async def dashboard():
+    async def dashboard() -> Any:
+        """Otomatik eklendi."""
         dashboard_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html"
         )
@@ -490,7 +516,8 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     @app.get("/api/health")
-    async def health():
+    async def health() -> Any:
+        """Otomatik eklendi."""
         db_health = await check_db_health()
 
         # NATS sağlık kontrolü
@@ -533,7 +560,7 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/health/detailed")
-    async def health_detailed():
+    async def health_detailed() -> Any:
         """Detaylı sağlık raporu."""
         db_health = await check_db_health()
         return {
@@ -550,13 +577,15 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/metrics")
-    async def metrics():
+    async def metrics() -> Any:
         """Prometheus metrics endpoint."""
         try:
             from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
             return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
         except (ImportError, Exception):
             from ..core.observability import prometheus_metrics
+
             return FastAPIResponse(
                 content=prometheus_metrics.get_prometheus_text().encode("utf-8"),
                 media_type="text/plain; version=0.0.4; charset=utf-8",

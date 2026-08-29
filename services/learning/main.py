@@ -31,10 +31,11 @@ class LearningService:
     """Automated ML training, validation, and model lifecycle management."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._consumer: EventConsumer = None
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the learning service."""
         setup_logging()
         logger.info("Starting Learning Service")
@@ -50,13 +51,13 @@ class LearningService:
             self._outcome_tracking_loop(),
         )
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the learning service."""
         self._running = False
         await close_databases()
         logger.info("Learning Service stopped")
 
-    async def _training_loop(self):
+    async def _training_loop(self) -> Any:
         """Periodic model training loop."""
         while self._running:
             try:
@@ -78,7 +79,7 @@ class LearningService:
                 logger.error("Training loop error", error=str(e))
                 await asyncio.sleep(3600)
 
-    async def _outcome_tracking_loop(self):
+    async def _outcome_tracking_loop(self) -> Any:
         """Track prediction outcomes."""
         while self._running:
             try:
@@ -88,7 +89,7 @@ class LearningService:
                 logger.error("Outcome tracking error", error=str(e))
                 await asyncio.sleep(3600)
 
-    async def _train_all_models(self):
+    async def _train_all_models(self) -> Any:
         """Train all ML models."""
         try:
             from ml.models import MODEL_CONFIGS, LightGBMModel
@@ -197,7 +198,7 @@ class LearningService:
             logger.error("Training data preparation failed", error=str(e))
             return None
 
-    async def _track_outcomes(self):
+    async def _track_outcomes(self) -> Any:
         """Track prediction outcomes."""
         try:
             # Get unresolved predictions
@@ -276,7 +277,7 @@ class LearningService:
         """)
         return row["last_training"] if row else None
 
-    async def _register_model(self, name: str, config, metrics: dict):
+    async def _register_model(self, name: str, config, metrics: dict) -> Any:
         """Register model in database."""
         await pg_execute(
             """
@@ -312,11 +313,12 @@ class LearningService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "learning"})
 
     app = web.Application()
@@ -333,7 +335,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the learning service."""
     await _health_server()
     service = LearningService()

@@ -30,6 +30,7 @@ class PerformanceTracker:
     """Paper trading performans motoru — incremental."""
 
     def __init__(self, state_store=None):
+        """Otomatik eklendi."""
         self._state_store = state_store
         self._daily_perf_cache: list[dict[str, Any]] = []
 
@@ -226,17 +227,20 @@ class PerformanceTracker:
     # ===================== INTERNAL =====================
 
     def _sharpe(self, returns: np.ndarray) -> float:
+        """Otomatik eklendi."""
         if len(returns) < 2 or np.std(returns) == 0:
             return 0.0
         return float(np.mean(returns) / np.std(returns) * np.sqrt(252))
 
     def _sortino(self, returns: np.ndarray) -> float:
+        """Otomatik eklendi."""
         downside = returns[returns < 0]
         if len(downside) < 1 or np.std(downside) == 0:
             return 0.0
         return float(np.mean(returns) / np.std(downside) * np.sqrt(252))
 
     def _max_drawdown(self, equities: list[float]) -> float:
+        """Otomatik eklendi."""
         peak = equities[0]
         max_dd = 0.0
         for e in equities:
@@ -265,6 +269,7 @@ class PerformanceTracker:
         return max_dd
 
     def _compute_daily_turnover(self, orders: list[dict[str, Any]], portfolio_value: float) -> float:
+        """Otomatik eklendi."""
         if portfolio_value <= 0:
             return 0.0
         total_value = sum(
@@ -273,6 +278,7 @@ class PerformanceTracker:
         return (total_value / portfolio_value) * 100
 
     def _alpha_beta(self, returns: np.ndarray, benchmark: np.ndarray) -> tuple:
+        """Otomatik eklendi."""
         if len(returns) < 2 or len(returns) != len(benchmark):
             return 0, 0, 0
         cov = np.cov(returns, benchmark)[0, 1]
@@ -283,6 +289,7 @@ class PerformanceTracker:
         return alpha, beta, corr if not np.isnan(corr) else 0
 
     def load_history(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         if self._state_store:
             return self._state_store.load_daily_performance()
         return []

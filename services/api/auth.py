@@ -18,7 +18,7 @@ import hmac
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import orjson
 import structlog
@@ -26,20 +26,21 @@ import structlog
 # Optional PyJWT dependency
 try:
     import jwt
+
     HAS_JWT = True
 except ImportError:
     jwt = None
     HAS_JWT = False
 
-from services.core.security import Role
 from services.core.otel import get_tracer
+from services.core.security import Role
 
 logger = structlog.get_logger(__name__)
 tracer = get_tracer(__name__)
 
 
 # Role → izin verilen HTTP method'ları
-ROLE_PERMISSIONS: Dict[Role, List[str]] = {
+ROLE_PERMISSIONS: dict[Role, list[str]] = {
     Role.VIEWER: ["GET"],
     Role.ANALYST: ["GET", "POST"],
     Role.OPERATOR: ["GET", "POST", "PUT"],
@@ -54,6 +55,7 @@ class AuthConfig:
     Configuration model for authentication.
     Supports Dependency Injection by uncoupling from direct environment variable access.
     """
+
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expires_hours: int = 24
@@ -64,10 +66,11 @@ class User:
     """
     Represents an authenticated user in the system.
     """
+
     user_id: str
     username: str
     role: Role
-    permissions: List[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     is_active: bool = True
 
 
@@ -76,12 +79,13 @@ class TokenPayload:
     """
     Represents the parsed payload from a valid JWT token.
     """
-    sub: str          # user_id
+
+    sub: str  # user_id
     username: str
     role: str
-    permissions: List[str]
-    exp: float        # expiration timestamp
-    iat: float        # issued at
+    permissions: list[str]
+    exp: float  # expiration timestamp
+    iat: float  # issued at
 
 
 class JWTHandler:
@@ -90,22 +94,40 @@ class JWTHandler:
     Uses Dependency Injection for configuration to adhere to SOLID principles.
     """
 
-    def __init__(self, config: AuthConfig) -> None:
+    def __init__(
+        self,
+        config: AuthConfig | None = None,
+        secret_key: str | None = None,
+        algorithm: str = "HS256",
+        expires_hours: int = 24,
+    ) -> None:
         """
         Initializes the JWT Handler.
-
-        Args:
-            config (AuthConfig): Injected authentication configuration.
+        Supports dependency injection or direct secret_key configuration.
         """
-        if not config.jwt_secret:
+        if config is not None:
+            self.config = config
+        else:
+            secret = secret_key or os.getenv("JWT_SECRET_KEY", "alpha-secret-key-prod-change-in-env-2026")
+            self.config = AuthConfig(
+                jwt_secret=secret,
+                jwt_algorithm=algorithm,
+                jwt_expires_hours=expires_hours,
+            )
+        if not self.config.jwt_secret:
             raise ValueError("JWT secret key must be provided in AuthConfig.")
-        self.config = config
+
+    @property
+    def algorithm(self) -> str:
+        """Returns the JWT algorithm configured."""
+        return self.config.jwt_algorithm
 
     def create_token(
         self,
         user_id: str,
         username: str,
         role: Role,
+        expires_hours: int | None = None,
     ) -> str:
         """
         Creates a JWT token for the specified user and role.
@@ -114,6 +136,7 @@ class JWTHandler:
             user_id (str): Unique user identifier.
             username (str): Username.
             role (Role): Assigned user role.
+            expires_hours (int | None): Optional expiration in hours.
 
         Returns:
             str: Encoded JWT string.
@@ -124,12 +147,13 @@ class JWTHandler:
             span.set_attribute("user.id", user_id)
             span.set_attribute("user.role", role_value)
 
+            exp_hours = expires_hours if expires_hours is not None else self.config.jwt_expires_hours
             payload = {
                 "sub": user_id,
                 "username": username,
                 "role": role_value,
                 "permissions": ROLE_PERMISSIONS.get(role, []),
-                "exp": now + (self.config.jwt_expires_hours * 3600),
+                "exp": now + (exp_hours * 3600),
                 "iat": now,
             }
 
@@ -138,21 +162,23 @@ class JWTHandler:
 
             return self._create_fallback_token(payload)
 
-    def _create_fallback_token(self, payload: Dict[str, Any]) -> str:
+    def _create_fallback_token(self, payload: dict[str, Any]) -> str:
         """
         Creates a token using HMAC and standard libraries when PyJWT is not available.
         """
         header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
         body = base64.urlsafe_b64encode(orjson.dumps(payload)).decode().rstrip("=")
         to_sign = f"{header}.{body}".encode()
-        
-        sig = base64.urlsafe_b64encode(
-            hmac.new(self.config.jwt_secret.encode(), to_sign, hashlib.sha256).digest()
-        ).decode().rstrip("=")
-        
+
+        sig = (
+            base64.urlsafe_b64encode(hmac.new(self.config.jwt_secret.encode(), to_sign, hashlib.sha256).digest())
+            .decode()
+            .rstrip("=")
+        )
+
         return f"{header}.{body}.{sig}"
 
-    def verify_token(self, token: str) -> Optional[TokenPayload]:
+    def verify_token(self, token: str) -> TokenPayload | None:
         """
         Verifies and parses a JWT token.
 
@@ -162,7 +188,7 @@ class JWTHandler:
         Returns:
             Optional[TokenPayload]: Parsed payload if valid, None otherwise.
         """
-        with tracer.start_as_current_span("auth.verify_token") as span:
+        with tracer.start_as_current_span("auth.verify_token"):
             if not token or not isinstance(token, str):
                 logger.warning("Invalid token format provided.")
                 return None
@@ -180,7 +206,7 @@ class JWTHandler:
 
             return self._verify_fallback_token(token)
 
-    def _verify_fallback_token(self, token: str) -> Optional[TokenPayload]:
+    def _verify_fallback_token(self, token: str) -> TokenPayload | None:
         """
         Verifies an HMAC token when PyJWT is not available.
         Ensures strict, constant-time signature comparison.
@@ -189,14 +215,16 @@ class JWTHandler:
             parts = token.split(".")
             if len(parts) != 3:
                 return None
-            
+
             header, body, sig = parts
             to_sign = f"{header}.{body}".encode()
-            
-            expected_sig = base64.urlsafe_b64encode(
-                hmac.new(self.config.jwt_secret.encode(), to_sign, hashlib.sha256).digest()
-            ).decode().rstrip("=")
-            
+
+            expected_sig = (
+                base64.urlsafe_b64encode(hmac.new(self.config.jwt_secret.encode(), to_sign, hashlib.sha256).digest())
+                .decode()
+                .rstrip("=")
+            )
+
             if not hmac.compare_digest(sig, expected_sig):
                 logger.warning("JWT signature mismatch.")
                 return None
@@ -204,12 +232,12 @@ class JWTHandler:
             rem = len(body) % 4
             if rem > 0:
                 body += "=" * (4 - rem)
-                
+
             payload_data = orjson.loads(base64.urlsafe_b64decode(body.encode()))
             if payload_data.get("exp", 0) < time.time():
                 logger.warning("JWT token expired.")
                 return None
-                
+
             return TokenPayload(**payload_data)
         except Exception as e:
             logger.warning("Fallback JWT verification failed.", error=str(e))
@@ -223,9 +251,9 @@ class APIKeyManager:
 
     def __init__(self) -> None:
         """Initializes the API Key Manager with an empty store."""
-        self._keys: Dict[str, Dict[str, Any]] = {}
+        self._keys: dict[str, dict[str, Any]] = {}
 
-    def register_key(self, api_key: str, service: str, permissions: List[str]) -> None:
+    def register_key(self, api_key: str, service: str, permissions: list[str]) -> None:
         """
         Registers a new API key.
 
@@ -240,7 +268,7 @@ class APIKeyManager:
             "created_at": time.time(),
         }
 
-    def verify_key(self, api_key: str) -> Optional[Dict[str, Any]]:
+    def verify_key(self, api_key: str) -> dict[str, Any] | None:
         """
         Verifies if an API key exists and is valid.
 

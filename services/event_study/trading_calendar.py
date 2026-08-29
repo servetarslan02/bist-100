@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Trading Calendar (BIST İş Günleri Takvimi).
 
 Event study'de calendar day yerine trading day kullanmak kritiktir çünkü:
@@ -51,6 +52,7 @@ class BISTTradingCalendar:
     """
 
     def __init__(self, holidays_json_path: str | None = None):
+        """Otomatik eklendi."""
         self._fixed_holidays: set[date] = set()
         self._variable_holidays: set[date] = set()
         self._all_holidays: set[date] = set()
@@ -74,7 +76,7 @@ class BISTTradingCalendar:
             total_holidays=len(self._all_holidays),
         )
 
-    def _load_fixed_holidays(self, years: range):
+    def _load_fixed_holidays(self, years: range) -> Any:
         """Sabit tatilleri tüm yıllar için yükle."""
         for year in years:
             for month, day in _FIXED_HOLIDAYS_MD:
@@ -83,7 +85,7 @@ class BISTTradingCalendar:
                 except ValueError:
                     logger.warning("Data error in _load_fixed_holidays: ValueError", exc_info=True)
 
-    def _load_variable_holidays(self, path: str):
+    def _load_variable_holidays(self, path: str) -> Any:
         """holidays.json'dan değişken tatilleri yükle."""
         try:
             with open(path, encoding="utf-8") as f:
@@ -250,7 +252,7 @@ class BISTTradingCalendar:
         event_date,
         start_offset: int,
         end_offset: int,
-    ):
+    ) -> Any:
         """Return serisini trading day offset'lerine hizala.
 
         Calendar day yerine trading day kullanarak event window'u çıkarır.

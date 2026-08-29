@@ -40,14 +40,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.arrow_pipeline")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -55,6 +61,7 @@ class ArrowPipeline:
     """Apache Arrow tabanlı veri pipeline'ı."""
 
     def __init__(self, base_path: str = "data"):
+        """Otomatik eklendi."""
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +111,7 @@ class ArrowPipeline:
             raise
 
     @otel_trace("arrow_pipeline.read_parquet")
-    def read_parquet(self, path: str, columns: list[str] | None = None):
+    def read_parquet(self, path: str, columns: list[str] | None = None) -> Any:
         """Parquet dosyasından Arrow Table oku."""
         try:
             import pyarrow.parquet as pq
@@ -120,7 +127,7 @@ class ArrowPipeline:
             raise
 
     @otel_trace("arrow_pipeline.scan_parquet")
-    def scan_parquet(self, path: str):
+    def scan_parquet(self, path: str) -> Any:
         """Parquet dosyasını lazy olarak tara (büyük dosyalar için)."""
         try:
             import pyarrow.dataset as ds

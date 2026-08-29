@@ -32,10 +32,11 @@ class OutcomeTracker:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._pending: deque = deque(maxlen=5000)  # Sonuç bekleyen tahminler
         self._checked_today: set = set()
 
-    def add_prediction(self, prediction: dict):
+    def add_prediction(self, prediction: dict) -> Any:
         """Yeni tahmin ekle — outcome takibi başlat."""
         ticker = prediction.get("ticker", "")
         predicted_direction = prediction.get("predicted_direction", "")
@@ -88,7 +89,7 @@ class OutcomeTracker:
             if cached:
                 return float(cached)
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
         return None
 

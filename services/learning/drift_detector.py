@@ -71,6 +71,7 @@ class AdvancedDriftDetector:
     """Gelişmiş drift detection motoru — çoklu yöntem."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._baseline_distributions: dict[str, dict] = {}  # feature → {mean, std, data}
         self._drift_history: list[ComprehensiveDriftReport] = []
         self._performance_history: list[dict] = []  # concept drift için
@@ -80,7 +81,7 @@ class AdvancedDriftDetector:
         self,
         feature_data: dict[str, np.ndarray],
         performance_data: list[dict] | None = None,
-    ):
+    ) -> Any:
         """Baseline dağılımları ayarla.
 
         Args:

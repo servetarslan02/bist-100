@@ -109,6 +109,7 @@ class MacroSensitivityEngine:
     """Şirket bazlı makro hassasiyet hesaplama — dinamik güncelleme destekli."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._company_sensitivity: dict[str, dict[str, float]] = {}
         self._dynamic_sensitivity: dict[str, dict[str, float]] = {}  # sector → dynamic values
         self._sector_returns: dict[str, list[float]] = {}  # sector → returns history
@@ -119,7 +120,7 @@ class MacroSensitivityEngine:
         """Sektör bazlı makro hassasiyet."""
         return SECTOR_MACRO_SENSITIVITY.get(sector, SECTOR_MACRO_SENSITIVITY["OTHER"])
 
-    def set_company_sensitivity(self, ticker: str, sensitivity: dict[str, float]):
+    def set_company_sensitivity(self, ticker: str, sensitivity: dict[str, float]) -> Any:
         """Şirket bazlı hassasiyet kaydet (override)."""
         self._company_sensitivity[ticker] = sensitivity
 
@@ -212,7 +213,7 @@ class MacroSensitivityEngine:
         self,
         sector_returns: dict[str, float],
         macro_values: dict[str, float],
-    ):
+    ) -> Any:
         """Dinamik hassasiyet güncelleme — günlük çağrılır.
 
         Args:
@@ -234,7 +235,7 @@ class MacroSensitivityEngine:
         # Rolling korelasyon ile hassasiyet güncelle
         self._compute_dynamic_sensitivities()
 
-    def _compute_dynamic_sensitivities(self):
+    def _compute_dynamic_sensitivities(self) -> Any:
         """Rolling korelasyon ile dinamik hassasiyet hesapla."""
 
         for sector, returns in self._sector_returns.items():

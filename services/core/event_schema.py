@@ -20,13 +20,13 @@ Kullanım:
     binary_data = event.to_binary()
 """
 
+import functools
 import struct
 import time
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -34,14 +34,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.event_schema")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -104,6 +110,7 @@ class CanonicalEvent:
     event_id: str = ""
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.timestamp == 0:
             self.timestamp = int(time.time() * 1000)
         if not self.event_id:

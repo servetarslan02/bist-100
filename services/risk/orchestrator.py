@@ -9,7 +9,7 @@ BIST-100 Ekosisteminin Tüm Risk Katmanlarını Birleştiren Merkezi Orkestratö
 5. Gerçek Zamanlı Streaming Fiyat & Limit Yakınlık İzleme
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,12 +19,12 @@ import structlog
 from services.core.market_session_fsm import BISTMarketPhase
 from services.core.risk_gate import RiskDecision, RiskGate, risk_gate
 from services.paper_trading.pre_trade_risk import PreTradeRiskEngine, pre_trade_risk_engine
-from services.risk.covariance import CovarianceEstimator, covariance_estimator, ensure_positive_semi_definite
+from services.risk.covariance import CovarianceEstimator, covariance_estimator
 from services.risk.drawdown_response import DrawdownResponseSystem, drawdown_system
 from services.risk.dynamic_limits import DynamicRiskLimits, dynamic_limits
-from services.risk.enhanced_risk import ConcentrationRisk, concentration_risk
+from services.risk.enhanced_risk import concentration_risk
 from services.risk.liquidity_risk import LiquidityRiskEngine, liquidity_risk_engine
-from services.risk.monitoring import Alert, AlertSeverity, AlertType, RiskMonitor, risk_monitor
+from services.risk.monitoring import Alert, RiskMonitor, risk_monitor
 from services.risk.risk_parity import RiskParityOptimizer, risk_parity_optimizer
 from services.risk.stress_test import StressTestEngine, stress_test_engine
 from services.risk.tail_hedge import TailRiskHedger, tail_hedger
@@ -68,6 +68,7 @@ class RiskOrchestrator:
         parity: RiskParityOptimizer = risk_parity_optimizer,
         cov_est: CovarianceEstimator = covariance_estimator,
     ):
+        """Otomatik eklendi."""
         self.gate = gate
         self.pre_trade = pre_trade
         self.liquidity = liquidity
@@ -95,7 +96,7 @@ class RiskOrchestrator:
         regime: str = "SIDEWAYS",
     ) -> RiskDecision:
         """Tüm BIST kuralları, limitler, drawdown durumu ve likidite kısıtlarını tek adımda denetler."""
-        is_risk_reducing_sell = (order.side == "SELL")
+        is_risk_reducing_sell = order.side == "SELL"
 
         if (self._kill_switch_active or self.drawdown.is_system_halted()) and not is_risk_reducing_sell:
             reason = f"KILL SWITCH AKTİF / SİSTEM DURDURULDU: {self._kill_switch_reason or 'Drawdown Acil Durumu'}"
@@ -116,7 +117,6 @@ class RiskOrchestrator:
                 checks_failed=1,
                 details={"drawdown_action": dd_state.action.value},
             )
-
 
         portfolio_value = float(portfolio_state.get("total_value", portfolio_state.get("current_capital", 100000.0)))
         portfolio_cash = float(portfolio_state.get("cash", portfolio_value))
@@ -243,7 +243,6 @@ class RiskOrchestrator:
                 report["var_cvar"] = var_rep
             except Exception as e:
                 report["var_cvar"] = {"error": str(e)}
-
 
         # 2. Likidite Riski & L-VaR
         try:
@@ -416,9 +415,7 @@ class RiskOrchestrator:
     def is_trading_allowed(self) -> bool:
         """Sistemin işlem yapmaya uygun olup olmadığını kontrol eder."""
         return (
-            not self._kill_switch_active
-            and self.drawdown.is_trading_allowed()
-            and not self.drawdown.is_system_halted()
+            not self._kill_switch_active and self.drawdown.is_trading_allowed() and not self.drawdown.is_system_halted()
         )
 
     def get_summary(self) -> dict[str, Any]:

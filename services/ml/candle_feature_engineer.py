@@ -19,6 +19,7 @@ class CandleFeatureEngineer:
     """BIST hisselerinde mum formasyonlarının ampirik başarı analizini ve ML özelliklerini üretir."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.pattern_stats: dict[str, dict[str, float]] = {}
 
     def compute_empirical_edge_table(self, stock_dict: dict[str, pl.DataFrame], forward_days: int = 10) -> pl.DataFrame:

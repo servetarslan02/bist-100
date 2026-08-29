@@ -1,12 +1,16 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import urllib.request
 
 import orjson
 
 
-def verify_all():
-    print("=" * 75)
-    print("  ALPHA BIST — 17 SAYFA VE TÜM ARKA PLAN SERVİSLERİ DOĞRULAMA DENETİMİ")
-    print("=" * 75)
+def verify_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 75)
+    logger.info("  ALPHA BIST — 17 SAYFA VE TÜM ARKA PLAN SERVİSLERİ DOĞRULAMA DENETİMİ")
+    logger.info("=" * 75)
 
     # 1. FRONTEND SAYFALARI (17 Sayfa)
     pages = [
@@ -28,7 +32,7 @@ def verify_all():
         "/system",
     ]
 
-    print("\n[A] FRONTEND SAYFA ERİŞİM KONTROLLERİ (Next.js 15 Standalone)")
+    logger.info("\n[A] FRONTEND SAYFA ERİŞİM KONTROLLERİ (Next.js 15 Standalone)")
     all_pages_ok = True
     for p in pages:
         url = f"http://localhost:3000{p}"
@@ -37,10 +41,10 @@ def verify_all():
             with urllib.request.urlopen(req, timeout=5) as resp:
                 resp.getcode()
                 html = resp.read().decode("utf-8", errors="ignore")
-                print(f"  [OK 200] {p:<25} -> {len(html):,} bytes HTML")
+                logger.info(f"  [OK 200] {p:<25} -> {len(html):,} bytes HTML")
         except Exception as e:
             all_pages_ok = False
-            print(f"  [FAIL]   {p:<25} -> {e}")
+            logger.info(f"  [FAIL]   {p:<25} -> {e}")
 
     # 2. BACKEND DINAMIK UÇ NOKTALARI
     api_endpoints = [
@@ -55,7 +59,7 @@ def verify_all():
         ("/api/v1/event-study/events", "Canlı Haber & KAP Akışı"),
     ]
 
-    print("\n[B] BACKEND DİNAMİK API VE MOTOR TESTLERİ (FastAPI / 8000)")
+    logger.info("\n[B] BACKEND DİNAMİK API VE MOTOR TESTLERİ (FastAPI / 8000)")
     all_apis_ok = True
     for ep, desc in api_endpoints:
         url = f"http://localhost:8000{ep}"
@@ -66,17 +70,17 @@ def verify_all():
                 raw = resp.read().decode("utf-8")
                 data = orjson.loads(raw)
                 item_count = len(data) if isinstance(data, list) else len(data.keys())
-                print(f"  [OK 200] {ep:<40} | {desc:<32} | {item_count} alan/öğe")
+                logger.info(f"  [OK 200] {ep:<40} | {desc:<32} | {item_count} alan/öğe")
         except Exception as e:
             all_apis_ok = False
-            print(f"  [FAIL]   {ep:<40} | {desc:<32} | HATA: {e}")
+            logger.info(f"  [FAIL]   {ep:<40} | {desc:<32} | HATA: {e}")
 
-    print("\n" + "=" * 75)
+    logger.info("\n" + "=" * 75)
     if all_pages_ok and all_apis_ok:
-        print("  DENETİM SONUCU: TÜM SAYFALAR VE UÇ NOKTALAR %100 CANLI VE AKTİF!")
+        logger.info("  DENETİM SONUCU: TÜM SAYFALAR VE UÇ NOKTALAR %100 CANLI VE AKTİF!")
     else:
-        print("  DENETİM SONUCU: BAZI SERVİSLERDE EKSİKLER TESPİT EDİLDİ.")
-    print("=" * 75)
+        logger.info("  DENETİM SONUCU: BAZI SERVİSLERDE EKSİKLER TESPİT EDİLDİ.")
+    logger.info("=" * 75)
 
 
 if __name__ == "__main__":

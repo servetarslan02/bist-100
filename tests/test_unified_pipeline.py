@@ -1,3 +1,4 @@
+from typing import Any
 """
 UNIFIED BIST PIPELINE INTEGRATION TESTS
 =======================================
@@ -17,7 +18,9 @@ from services.paper_trading.state_store import PaperStateStore
 
 
 class TestUnifiedPipeline(unittest.TestCase):
-    def setUp(self):
+    """Otomatik eklendi."""
+    def setUp(self) -> Any:
+        """Otomatik eklendi."""
         self.tmp_dir = tempfile.mkdtemp()
         self.db_path = os.path.join(self.tmp_dir, "test_unified.db")
         self.store = PaperStateStore(db_path=self.db_path)
@@ -28,7 +31,8 @@ class TestUnifiedPipeline(unittest.TestCase):
             state_store=self.store,
         )
 
-    def _make_mock_history(self, tickers, dates):
+    def _make_mock_history(self, tickers, dates) -> Any:
+        """Otomatik eklendi."""
         market_data = {}
         for t in tickers:
             prices = 100.0 + np.cumsum(np.random.randn(len(dates)) * 1.5)
@@ -44,7 +48,7 @@ class TestUnifiedPipeline(unittest.TestCase):
             market_data[t] = df
         return market_data
 
-    def test_eod_signal_queuing_does_not_execute_immediately(self):
+    def test_eod_signal_queuing_does_not_execute_immediately(self) -> Any:
         """18:15 EOD anında sinyal üretildiğinde hemen kapanıştan işlem yapılmaz, beklemeye alınır."""
         signals = [
             {
@@ -82,7 +86,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.assertEqual(len(pending), 2)
         self.assertEqual(pending[0]["ticker"], "THYAO")
 
-    def test_morning_execution_with_microstructure_and_t2_settlement(self):
+    def test_morning_execution_with_microstructure_and_t2_settlement(self) -> Any:
         """09:55 Sabah açılışında bekleyen emirler T+1 açılış fiyatları ve mikro-yapı ile yürütülür."""
         dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 15), timedelta(days=1), eager=True).head(5)
         market_data = self._make_mock_history(["THYAO", "GARAN"], dates)
@@ -129,7 +133,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.assertEqual(summary["num_positions"], 2)
         self.assertLess(summary["cash"], 1_000_000.0)
 
-    def test_blocking_pre_trade_risk_gate_blocks_excessive_order(self):
+    def test_blocking_pre_trade_risk_gate_blocks_excessive_order(self) -> Any:
         """Risk kapısı shadow modda değildir; kural ihlalinde emri derhal engeller."""
         signals = [
             {
@@ -160,7 +164,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         # Yetersiz bakiye nedeniyle emir açılmamalıdır (Risk kapısı bloklar)
         self.assertEqual(report["num_orders"], 0)
 
-    def test_friday_eod_to_monday_morning_open_execution(self):
+    def test_friday_eod_to_monday_morning_open_execution(self) -> Any:
         """Cuma akşamı üretilen sinyal Pazartesi sabahı Pazartesi açılış fiyatıyla yürütülmelidir."""
         # Cuma (2024-01-05) ve Pazartesi (2024-01-08)
         dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 20), timedelta(days=1), eager=True).head(10)
@@ -202,7 +206,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.assertAlmostEqual(pos["avg_cost"], 285.50, delta=5.0)
         self.assertLess(pos["avg_cost"], 290.0)
 
-    def test_pending_signals_retained_on_failed_morning_run(self):
+    def test_pending_signals_retained_on_failed_morning_run(self) -> Any:
         """Sabah yürütmesi veri kalitesi / kesinti nedeniyle başarısız olursa bekleyen sinyaller silinmez."""
         signals = [
             {

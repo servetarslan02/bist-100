@@ -77,7 +77,9 @@ DEFAULT_BEAT_SCHEDULE = {
     },
     "intraday-risk-stress-test": {
         "task": "tasks.risk_stress_test",
-        "schedule": "11,14,16:00 Mon-Fri" if not HAS_CELERY else crontab(hour="11,14,16", minute=0, day_of_week="mon-fri"),
+        "schedule": "11,14,16:00 Mon-Fri"
+        if not HAS_CELERY
+        else crontab(hour="11,14,16", minute=0, day_of_week="mon-fri"),
         "kwargs": {"portfolio_value": 10_000_000.0},
     },
 }
@@ -91,7 +93,7 @@ class BaseTaskWithDLQ(Task):
 
     abstract = True
 
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
+    def on_failure(self, exc, task_id, args, kwargs, einfo) -> Any:
         """Görev tükendiğinde veya kalıcı hata aldığında DLQ'ya yaz."""
         logger.error(
             "celery_task_failed_permanently",
@@ -101,6 +103,7 @@ class BaseTaskWithDLQ(Task):
         )
         try:
             import asyncio
+
             from services.core.dead_letter_queue import dead_letter_queue
 
             payload = {
@@ -143,9 +146,12 @@ class BaseTaskWithDLQ(Task):
 # Celery App Initialization or Standalone Mock
 # =====================================================
 
+
 class _MockConf(dict):
     """Celery yüklü olmadığında konfigürasyonu simüle eden nesne."""
+
     def __init__(self):
+        """Otomatik eklendi."""
         super().__init__()
         self.task_acks_late = True
         self.worker_prefetch_multiplier = 1
@@ -153,7 +159,8 @@ class _MockConf(dict):
         self.task_routes = DEFAULT_TASK_ROUTES
         self.beat_schedule = DEFAULT_BEAT_SCHEDULE
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> Any:
+        """Otomatik eklendi."""
         super().update(*args, **kwargs)
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -161,17 +168,24 @@ class _MockConf(dict):
 
 class _MockCeleryApp:
     """Celery kütüphanesi yokken kullanılan hafif yedek sınıf."""
+
     def __init__(self):
+        """Otomatik eklendi."""
         self.conf = _MockConf()
 
-    def task(self, *args, **kwargs):
-        def decorator(fn):
+    def task(self, *args, **kwargs) -> Any:
+        """Otomatik eklendi."""
+        def decorator(fn) -> Any:
+            """Otomatik eklendi."""
             class TaskWrapper:
+                """Otomatik eklendi."""
                 def __init__(self, func):
+                    """Otomatik eklendi."""
                     self.func = func
                     self.name = kwargs.get("name", func.__name__)
 
-                def delay(self, *a, **kw):
+                def delay(self, *a, **kw) -> Any:
+                    """Otomatik eklendi."""
                     sig = _generate_task_signature(self.name, a, kw)
                     mock_id = f"task-{sig}"
                     try:
@@ -180,21 +194,27 @@ class _MockCeleryApp:
                     except Exception as e:
                         return _MockAsyncResult(mock_id, status="FAILURE", result=e)
 
-                def __call__(self, *a, **kw):
+                def __call__(self, *a, **kw) -> Any:
+                    """Otomatik eklendi."""
                     return self.func(self, *a, **kw)
 
-                def update_state(self, state=None, meta=None):
+                def update_state(self, state=None, meta=None) -> Any:
+                    """Otomatik eklendi."""
                     pass
 
             return TaskWrapper(fn)
+
         return decorator
 
-    def AsyncResult(self, task_id: str):
+    def AsyncResult(self, task_id: str) -> Any:
+        """Otomatik eklendi."""
         return _MockAsyncResult(task_id, status="SUCCESS", result={"message": "Executed successfully"})
 
 
 class _MockAsyncResult:
+    """Otomatik eklendi."""
     def __init__(self, task_id: str, status: str = "SUCCESS", result: Any = None):
+        """Otomatik eklendi."""
         self.id = task_id
         self.status = status
         self.result = result
@@ -202,9 +222,11 @@ class _MockAsyncResult:
         self.info = None
 
     def ready(self) -> bool:
+        """Otomatik eklendi."""
         return True
 
     def successful(self) -> bool:
+        """Otomatik eklendi."""
         return self.status == "SUCCESS"
 
 
@@ -239,6 +261,7 @@ else:
 # =====================================================
 # Görev Tanımları (Task Definitions)
 # =====================================================
+
 
 @celery_app.task(
     bind=True,

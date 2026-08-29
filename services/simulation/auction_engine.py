@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class AuctionOrder:
+    """Otomatik eklendi."""
     order_id: str
     ticker: str
     side: str  # "BUY" | "SELL"
@@ -32,6 +33,7 @@ class AuctionOrder:
 
 @dataclass
 class AuctionResult:
+    """Otomatik eklendi."""
     equilibrium_price: float
     matched_volume: int
     matched_trades: list[dict[str, Any]]

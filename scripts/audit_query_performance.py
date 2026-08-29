@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """ALPHA BIST — PostgreSQL Query Performance Auditor
 
 Ağır sorguları tespit eder, EXPLAIN ANALYZE ile analiz eder.
@@ -13,7 +16,6 @@ Kullanım:
 import argparse
 import asyncio
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import asyncpg
 
 from services.core.config import settings
-
 
 # =====================================================
 # CONFIGURATION
@@ -48,7 +49,7 @@ CRITICAL_TABLES = {
 }
 
 
-async def get_connection():
+async def get_connection() -> Any:
     """PostgreSQL bağlantısı."""
     return await asyncpg.connect(
         host=settings.postgres_host,
@@ -59,24 +60,22 @@ async def get_connection():
     )
 
 
-async def check_pg_stat_statements(conn):
+async def check_pg_stat_statements(conn) -> Any:
     """pg_stat_statements extension kontrolü."""
-    ext = await conn.fetchval(
-        "SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'"
-    )
+    ext = await conn.fetchval("SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'")
     if not ext:
-        print("⚠️  pg_stat_statements extension aktif değil!")
-        print("   Aktif etmek için: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;")
+        logger.info("⚠️  pg_stat_statements extension aktif değil!")
+        logger.info("   Aktif etmek için: CREATE EXTENSION IF NOT EXISTS pg_stat_statements;")
         return False
     return True
 
 
-async def get_slow_queries(conn, threshold_ms: int):
+async def get_slow_queries(conn, threshold_ms: int) -> Any:
     """Yavaş sorguları pg_stat_statements'den çek."""
     try:
         rows = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 queryid,
                 query,
                 calls,
@@ -86,8 +85,8 @@ async def get_slow_queries(conn, threshold_ms: int):
                 rows / NULLIF(calls, 0) as avg_rows,
                 shared_blks_hit,
                 shared_blks_read,
-                CASE 
-                    WHEN shared_blks_hit + shared_blks_read > 0 
+                CASE
+                    WHEN shared_blks_hit + shared_blks_read > 0
                     THEN round(shared_blks_hit::numeric / (shared_blks_hit + shared_blks_read) * 100, 2)
                     ELSE 100
                 END as cache_hit_ratio
@@ -102,21 +101,21 @@ async def get_slow_queries(conn, threshold_ms: int):
         )
         return rows
     except Exception as e:
-        print(f"⚠️  pg_stat_statements sorgulanamadı: {e}")
+        logger.info(f"⚠️  pg_stat_statements sorgulanamadı: {e}")
         return []
 
 
-async def get_table_stats(conn):
+async def get_table_stats(conn) -> Any:
     """Tablo istatistikleri."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             schemaname,
             relname as table_name,
             n_live_tup as row_count,
             n_dead_tup as dead_rows,
-            CASE 
-                WHEN n_live_tup > 0 
+            CASE
+                WHEN n_live_tup > 0
                 THEN round(n_dead_tup::numeric / n_live_tup * 100, 2)
                 ELSE 0
             END as dead_ratio,
@@ -132,11 +131,11 @@ async def get_table_stats(conn):
     return rows
 
 
-async def get_index_usage(conn):
+async def get_index_usage(conn) -> Any:
     """Index kullanım istatistikleri."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             schemaname,
             relname as table_name,
             indexrelname as index_name,
@@ -152,18 +151,18 @@ async def get_index_usage(conn):
     return rows
 
 
-async def get_missing_indexes(conn):
+async def get_missing_indexes(conn) -> Any:
     """Eksik index tespiti — sequential scan yapan büyük tablolar."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             relname as table_name,
             seq_scan,
             seq_tup_read,
             idx_scan,
             n_live_tup as row_count,
-            CASE 
-                WHEN seq_scan + idx_scan > 0 
+            CASE
+                WHEN seq_scan + idx_scan > 0
                 THEN round(seq_scan::numeric / (seq_scan + idx_scan) * 100, 2)
                 ELSE 0
             END as seq_scan_ratio
@@ -177,11 +176,11 @@ async def get_missing_indexes(conn):
     return rows
 
 
-async def get_index_bloat(conn):
+async def get_index_bloat(conn) -> Any:
     """Index şişmesi kontrolü."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             schemaname,
             tablename,
             indexname,
@@ -196,11 +195,11 @@ async def get_index_bloat(conn):
     return rows
 
 
-async def get_locks(conn):
+async def get_locks(conn) -> Any:
     """Aktif lock'lar."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             pid,
             wait_event_type,
             wait_event,
@@ -217,12 +216,12 @@ async def get_locks(conn):
     return rows
 
 
-async def get_replication_lag(conn):
+async def get_replication_lag(conn) -> Any:
     """Replikasyon lag kontrolü."""
     try:
         rows = await conn.fetch(
             """
-            SELECT 
+            SELECT
                 client_addr,
                 state,
                 sent_lsn,
@@ -238,7 +237,7 @@ async def get_replication_lag(conn):
         return []
 
 
-async def explain_analyze(conn, query: str, params=None):
+async def explain_analyze(conn, query: str, params=None) -> Any:
     """EXPLAIN ANALYZE çalıştır."""
     try:
         explain_query = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {query}"
@@ -251,11 +250,11 @@ async def explain_analyze(conn, query: str, params=None):
         return {"error": str(e)}
 
 
-async def check_table_indexes(conn, table_name: str):
+async def check_table_indexes(conn, table_name: str) -> Any:
     """Belirli bir tablonun index'lerini kontrol et."""
     rows = await conn.fetch(
         """
-        SELECT 
+        SELECT
             indexname,
             indexdef
         FROM pg_indexes
@@ -268,7 +267,7 @@ async def check_table_indexes(conn, table_name: str):
     return rows
 
 
-async def check_composite_indexes(conn):
+async def check_composite_indexes(conn) -> Any:
     """Composite index ihtiyacı analizi."""
     findings = []
 
@@ -306,14 +305,14 @@ def generate_report(
     replication_lag,
     composite_findings,
     threshold_ms,
-):
+) -> Any:
     """Markdown rapor oluştur."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     report = f"""# 🔍 PostgreSQL Query Performance Raporu
 
-> **Oluşturulma:** {now}  
-> **Eşik:** {threshold_ms}ms  
+> **Oluşturulma:** {now}
+> **Eşik:** {threshold_ms}ms
 > **Kapsam:** pg_stat_statements, tablo istatistikleri, index analizi
 
 ---
@@ -368,7 +367,9 @@ def generate_report(
         for f in composite_findings:
             report += f"### {f['table']}\n"
             report += f"- **Eksik index'lenmiş sütunlar:** {', '.join(f['missing_indexed_columns'])}\n"
-            report += f"- **Mevcut index'ler:** {', '.join(f['existing_indexes']) if f['existing_indexes'] else 'Yok'}\n\n"
+            report += (
+                f"- **Mevcut index'ler:** {', '.join(f['existing_indexes']) if f['existing_indexes'] else 'Yok'}\n\n"
+            )
     else:
         report += "✅ Kritik tablolar için index stratejisi yeterli.\n"
 
@@ -421,7 +422,8 @@ def generate_report(
     return report
 
 
-async def main():
+async def main() -> Any:
+    """Otomatik eklendi."""
     parser = argparse.ArgumentParser(description="PostgreSQL Query Performance Auditor")
     parser.add_argument(
         "--threshold",
@@ -442,7 +444,7 @@ async def main():
     )
     args = parser.parse_args()
 
-    print(f"🔍 PostgreSQL Query Performance Audit başlıyor... (eşik: {args.threshold}ms)")
+    logger.info(f"🔍 PostgreSQL Query Performance Audit başlıyor... (eşik: {args.threshold}ms)")
 
     conn = await get_connection()
     try:
@@ -487,16 +489,16 @@ async def main():
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(output, encoding="utf-8")
-        print(f"✅ Rapor kaydedildi: {output_path}")
+        logger.info(f"✅ Rapor kaydedildi: {output_path}")
 
         # Konsola özet yaz
-        print(f"\n📊 ÖZET:")
-        print(f"   Yavaş sorgu: {len(slow_queries)}")
-        print(f"   Tablo: {len(table_stats)}")
-        print(f"   Kullanılmayan index: {len([i for i in index_usage if i['index_scans'] == 0])}")
-        print(f"   Seq scan yüksek tablo: {len(missing_indexes)}")
-        print(f"   Eksik composite index: {len(composite_findings)}")
-        print(f"   Aktif lock: {len(locks)}")
+        logger.info("\n📊 ÖZET:")
+        logger.info(f"   Yavaş sorgu: {len(slow_queries)}")
+        logger.info(f"   Tablo: {len(table_stats)}")
+        logger.info(f"   Kullanılmayan index: {len([i for i in index_usage if i['index_scans'] == 0])}")
+        logger.info(f"   Seq scan yüksek tablo: {len(missing_indexes)}")
+        logger.info(f"   Eksik composite index: {len(composite_findings)}")
+        logger.info(f"   Aktif lock: {len(locks)}")
 
     finally:
         await conn.close()

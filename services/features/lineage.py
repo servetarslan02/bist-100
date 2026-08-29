@@ -92,6 +92,7 @@ class FeatureLineageTracker:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._records: dict[str, FeatureLineageRecord] = {}
         self._raw_sources: set[str] = set()
         self._history: list[dict[str, Any]] = []
@@ -212,29 +213,35 @@ class FeatureLineageTracker:
         # Feature düğümleri ve kenarları
         for name, record in self._records.items():
             if name not in seen_nodes:
-                nodes.append(LineageNode(
-                    name=name,
-                    node_type="feature",
-                    description=record.description,
-                    version=record.version,
-                ))
+                nodes.append(
+                    LineageNode(
+                        name=name,
+                        node_type="feature",
+                        description=record.description,
+                        version=record.version,
+                    )
+                )
                 seen_nodes.add(name)
 
             # Raw source kenarları
             for raw in record.raw_sources:
-                edges.append(LineageEdge(
-                    source=raw,
-                    target=name,
-                    transformation=record.transformations[0] if record.transformations else "",
-                ))
+                edges.append(
+                    LineageEdge(
+                        source=raw,
+                        target=name,
+                        transformation=record.transformations[0] if record.transformations else "",
+                    )
+                )
 
             # Intermediate feature kenarları
             for intermediate in record.intermediate_features:
-                edges.append(LineageEdge(
-                    source=intermediate,
-                    target=name,
-                    transformation="composition",
-                ))
+                edges.append(
+                    LineageEdge(
+                        source=intermediate,
+                        target=name,
+                        transformation="composition",
+                    )
+                )
 
         # Mermaid formatı
         mermaid = self._generate_mermaid(nodes, edges)
@@ -318,13 +325,13 @@ class FeatureLineageTracker:
         for node in nodes:
             safe_name = node.name.replace(".", "_").replace("-", "_")
             if node.node_type == "raw":
-                lines.append(f"    {safe_name}[\"📦 {node.name}\"]")
+                lines.append(f'    {safe_name}["📦 {node.name}"]')
             elif node.node_type == "feature":
-                lines.append(f"    {safe_name}[\"🔧 {node.name}\"]")
+                lines.append(f'    {safe_name}["🔧 {node.name}"]')
             elif node.node_type == "model":
-                lines.append(f"    {safe_name}[\"🤖 {node.name}\"]")
+                lines.append(f'    {safe_name}["🤖 {node.name}"]')
             else:
-                lines.append(f"    {safe_name}[\"📊 {node.name}\"]")
+                lines.append(f'    {safe_name}["📊 {node.name}"]')
 
         # Kenar tanımları
         for edge in edges:

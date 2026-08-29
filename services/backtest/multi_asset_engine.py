@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -44,6 +45,7 @@ class SectorExposure:
     current_weight_pct: float = 0.0
 
     def is_within_limit(self, additional_weight: float = 0) -> bool:
+        """Otomatik eklendi."""
         return (self.current_weight_pct + additional_weight) <= self.max_weight_pct
 
 
@@ -124,6 +126,7 @@ class MultiAssetResult:
     daily_metrics: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -162,6 +165,7 @@ class MultiAssetBacktestEngine:
         config: MultiAssetConfig | None = None,
         cost_engine: TransactionCostEngine | None = None,
     ):
+        """Otomatik eklendi."""
         self.config = config or MultiAssetConfig()
         self.cost_engine = cost_engine or bist_transaction_cost
         self.bias_detector = LookAheadBiasDetector()

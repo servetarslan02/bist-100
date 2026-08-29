@@ -36,6 +36,7 @@ class KAPProvider:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._client = get_client(
             "kap",
             timeout=3.0,
@@ -432,7 +433,8 @@ class KAPProvider:
             logger.info("Automated KAP market restrictions synced", count=registered_count, date=current_date)
         return registered_count
 
-    async def close(self):
+    async def close(self) -> Any:
+        """Otomatik eklendi."""
         await self._client.close()
 
 

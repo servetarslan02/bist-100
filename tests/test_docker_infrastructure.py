@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Docker & Container Infrastructure Test Suite
 Doğrulanan Özellikler:
@@ -8,17 +9,18 @@ Doğrulanan Özellikler:
 5. Dockerfile Güvenliği: Non-root user (USER alpha) ve sağlık denetimi
 """
 
-import os
 from pathlib import Path
+
 import pytest
 import yaml
 
 
 @pytest.fixture(scope="module")
-def compose_config():
+def compose_config() -> Any:
+    """Otomatik eklendi."""
     compose_path = Path("docker-compose.yml")
     assert compose_path.exists(), "docker-compose.yml bulunamadı"
-    with open(compose_path, "r", encoding="utf-8") as f:
+    with open(compose_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return data
 
@@ -26,13 +28,15 @@ def compose_config():
 class TestDockerComposeArchitecture:
     """docker-compose.yml mimari ve yapılandırma testleri."""
 
-    def test_top_level_structure(self, compose_config):
+    def test_top_level_structure(self, compose_config) -> Any:
+        """Otomatik eklendi."""
         assert "services" in compose_config, "services tanımı eksik"
         assert "networks" in compose_config or "x-common" in compose_config
         services = compose_config["services"]
         assert len(services) >= 10, f"Beklenen mikroservis sayısı yetersiz: {len(services)}"
 
-    def test_core_services_presence(self, compose_config):
+    def test_core_services_presence(self, compose_config) -> Any:
+        """Otomatik eklendi."""
         services = compose_config["services"]
         required_services = [
             "postgres",
@@ -51,28 +55,34 @@ class TestDockerComposeArchitecture:
         for s in required_services:
             assert s in services, f"Kritik servis eksik: {s}"
 
-
-    def test_resource_limits_and_logging(self, compose_config):
+    def test_resource_limits_and_logging(self, compose_config) -> Any:
+        """Otomatik eklendi."""
         services = compose_config["services"]
         for name, spec in services.items():
             if not isinstance(spec, dict):
                 continue
             # Resource limit kontrolü
-            assert "mem_limit" in spec or "deploy" in spec or "x-common" in spec, f"Servis için memory limiti eksik: {name}"
+            assert "mem_limit" in spec or "deploy" in spec or "x-common" in spec, (
+                f"Servis için memory limiti eksik: {name}"
+            )
 
-    def test_read_only_config_mounts(self, compose_config):
+    def test_read_only_config_mounts(self, compose_config) -> Any:
+        """Otomatik eklendi."""
         services = compose_config["services"]
         for name, spec in services.items():
             volumes = spec.get("volumes", [])
             for vol in volumes:
                 if isinstance(vol, str) and ("/etc/" in vol or "initdb" in vol or "traefik.yml" in vol):
-                    assert vol.endswith(":ro") or ":ro" in vol, f"Konfigürasyon volume'ü read-only (:ro) olmalı: {name} -> {vol}"
+                    assert vol.endswith(":ro") or ":ro" in vol, (
+                        f"Konfigürasyon volume'ü read-only (:ro) olmalı: {name} -> {vol}"
+                    )
 
 
 class TestDockerfileSecurity:
     """Dockerfile güvenlik ve standart kontrolleri."""
 
-    def test_dockerfile_api_security(self):
+    def test_dockerfile_api_security(self) -> Any:
+        """Otomatik eklendi."""
         dockerfile_path = Path("infrastructure/Dockerfile.api")
         assert dockerfile_path.exists(), "Dockerfile.api bulunamadı"
         content = dockerfile_path.read_text(encoding="utf-8")

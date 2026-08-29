@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Testi
 ==========================================================================
@@ -56,10 +59,11 @@ BIST_CORE_STOCKS = [
 BENCHMARK_TICKER = "XU100.IS"
 
 
-def main():
-    print("=" * 85)
-    print("1. BIST-100 GEÇMİŞ VERİLERİ İNDİRİLİYOR (1997 - 2026)")
-    print("=" * 85)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 85)
+    logger.info("1. BIST-100 GEÇMİŞ VERİLERİ İNDİRİLİYOR (1997 - 2026)")
+    logger.info("=" * 85)
 
     bm_df = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
     if isinstance(bm_df.columns, list):
@@ -75,15 +79,15 @@ def main():
             if len(df_t) > 50:
                 stock_dict[ticker] = df_t
 
-    print(f"✓ {len(stock_dict)} hissenin 30 yıllık günlük mumları başarıyla yüklendi.\n")
+    logger.info(f"✓ {len(stock_dict)} hissenin 30 yıllık günlük mumları başarıyla yüklendi.\n")
 
     # -------------------------------------------------------------
     # 2. Mum Formasyonları BIST Ampirik Başarı Karnesi
     # -------------------------------------------------------------
-    print("=" * 85)
-    print("2. JAPON MUM FORMASYONLARI BIST GERÇEK KAZANÇ / KAYIP KARNESİ")
-    print("=" * 85)
-    print("BIST-100 hisselerinin tüm tarihsel seansları taranarak 10 günlük ileri getiri hesaplandı:\n")
+    logger.info("=" * 85)
+    logger.info("2. JAPON MUM FORMASYONLARI BIST GERÇEK KAZANÇ / KAYIP KARNESİ")
+    logger.info("=" * 85)
+    logger.info("BIST-100 hisselerinin tüm tarihsel seansları taranarak 10 günlük ileri getiri hesaplandı:\n")
 
     edge_table = candle_feature_engineer.compute_empirical_edge_table(stock_dict, forward_days=10)
 
@@ -97,15 +101,15 @@ def main():
             "Beklenen Değer (Expectancy %)",
             "Model Öneri Derecesi",
         ]
-        print(edge_table[cols_to_print].to_string(index=False))
-    print("-" * 85)
+        logger.info(edge_table[cols_to_print].to_string(index=False))
+    logger.info("-" * 85)
 
     # -------------------------------------------------------------
     # 3. Yapay Zeka (LightGBM) Modelinin Mum Özellikleriyle Eğitimi
     # -------------------------------------------------------------
-    print("\n" + "=" * 85)
-    print("3. YAPAY ZEKA (LIGHTGBM) MODELİNİN MUM VE PRICE ACTION ZEKASIYLA EĞİTİLMESİ")
-    print("=" * 85)
+    logger.info("\n" + "=" * 85)
+    logger.info("3. YAPAY ZEKA (LIGHTGBM) MODELİNİN MUM VE PRICE ACTION ZEKASIYLA EĞİTİLMESİ")
+    logger.info("=" * 85)
 
     X_list, y_list = [], []
     feature_names = [
@@ -152,22 +156,22 @@ def main():
     df_imp = pl.DataFrame({"Özellik (Mum/Price Action)": feature_names, "Öğrenilen Model Ağırlığı (Gain)": imp})
     df_imp = df_imp.sort(by="Öğrenilen Model Ağırlığı (Gain)", reverse=True)
 
-    print("🧠 Model Tarafından Öğrenilen Mum Özellik Ağırlıkları (Feature Importance):")
-    print(df_imp.to_string(index=False))
-    print("✓ Model eğitimi başarıyla tamamlandı!\n")
+    logger.info("🧠 Model Tarafından Öğrenilen Mum Özellik Ağırlıkları (Feature Importance):")
+    logger.info(df_imp.to_string(index=False))
+    logger.info("✓ Model eğitimi başarıyla tamamlandı!\n")
 
     # -------------------------------------------------------------
     # 4. 30 Yıllık Saf Hisse Trend Rider Simülasyonu (Sıfır Faiz)
     # -------------------------------------------------------------
-    print("=" * 85)
-    print("4. TREND RIDER & SAF HİSSE 30 YILLIK KURUMSAL BACKTEST (SIFIR YAPAY FAİZ)")
-    print("=" * 85)
-    print("  • Başlangıç Sermayesi       : 100.000 ₺")
-    print("  • İşlem Maliyeti (Komisyon) : %0.15 Alış + %0.15 Satış")
-    print("  • Fiyat Kayması (Slippage)  : %0.10 Alış + %0.10 Satış (Toplam %0.50 Round-Trip)")
-    print("  • Tavan & Mega Trend Kuralı : Erken kâr kesilmez, 9-EMA ve tepe dönüş mumuna kadar sürülür.")
-    print("  • Nakit Geliri              : %0.0 (Sıfır Faiz/Repo — Saf Hisse Alfasını Ölçmek İçin)")
-    print("-" * 85)
+    logger.info("=" * 85)
+    logger.info("4. TREND RIDER & SAF HİSSE 30 YILLIK KURUMSAL BACKTEST (SIFIR YAPAY FAİZ)")
+    logger.info("=" * 85)
+    logger.info("  • Başlangıç Sermayesi       : 100.000 ₺")
+    logger.info("  • İşlem Maliyeti (Komisyon) : %0.15 Alış + %0.15 Satış")
+    logger.info("  • Fiyat Kayması (Slippage)  : %0.10 Alış + %0.10 Satış (Toplam %0.50 Round-Trip)")
+    logger.info("  • Tavan & Mega Trend Kuralı : Erken kâr kesilmez, 9-EMA ve tepe dönüş mumuna kadar sürülür.")
+    logger.info("  • Nakit Geliri              : %0.0 (Sıfır Faiz/Repo — Saf Hisse Alfasını Ölçmek İçin)")
+    logger.info("-" * 85)
 
     COMMISSION_RATE = 0.0015
     SLIPPAGE_RATE = 0.0010
@@ -340,24 +344,24 @@ def main():
     mega_winners = df_trades[df_trades["ret_pct"] >= 50]
     best_trade = df_trades.sort(by="ret_pct", reverse=True).iloc[0] if total_trades > 0 else None
 
-    print("\n" + "=" * 85)
-    print("🏆 30 YILLIK SAF HİSSE & TREND RIDER KURUMSAL PERFORMANSI")
-    print("=" * 85)
-    print(f"{'METRİK':<38} | {'BIST-100 (Al ve Unut)':<20} | {'TREND RIDER MOTORU':<20}")
-    print("-" * 85)
-    print(f"{'Başlangıç Sermayesi':<38} | {'100.000 ₺':<20} | {'100.000 ₺':<20}")
-    print(f"{'Nihai Portföy Değeri (Net)':<38} | {f'{final_bm:,.0f} ₺':<20} | {f'{final_equity:,.0f} ₺':<20}")
-    print(f"{'Kümülatif Toplam Getiri':<38} | %{total_bm_ret:<19,.1f} | %{total_engine_ret:<19,.1f}")
-    print(f"{'Maksimum Çöküş / Düşüş (Max DD)':<38} | %{max_dd_bm:<19.2f} | %{max_dd_engine:<19.2f} (Kriz Zırhı)")
-    print(f"{'Toplam İşlem Sayısı':<38} | {'1 İşlem':<20} | {f'{total_trades} İşlem':<20}")
-    print(f"{'Kazanma Oranı (Win Rate)':<38} | {'—':<20} | %{win_rate:<19.1f}")
-    print(f"{'Kar / Zarar Çarpanı (Profit Factor)':<38} | {'—':<20} | {pf:<20}")
-    print(f"{'+%50 Üzeri Mega Trend İşlemleri':<38} | {'—':<20} | {len(mega_winners)} Adet Mega Trend")
+    logger.info("\n" + "=" * 85)
+    logger.info("🏆 30 YILLIK SAF HİSSE & TREND RIDER KURUMSAL PERFORMANSI")
+    logger.info("=" * 85)
+    logger.info(f"{'METRİK':<38} | {'BIST-100 (Al ve Unut)':<20} | {'TREND RIDER MOTORU':<20}")
+    logger.info("-" * 85)
+    logger.info(f"{'Başlangıç Sermayesi':<38} | {'100.000 ₺':<20} | {'100.000 ₺':<20}")
+    logger.info(f"{'Nihai Portföy Değeri (Net)':<38} | {f'{final_bm:,.0f} ₺':<20} | {f'{final_equity:,.0f} ₺':<20}")
+    logger.info(f"{'Kümülatif Toplam Getiri':<38} | %{total_bm_ret:<19,.1f} | %{total_engine_ret:<19,.1f}")
+    logger.info(f"{'Maksimum Çöküş / Düşüş (Max DD)':<38} | %{max_dd_bm:<19.2f} | %{max_dd_engine:<19.2f} (Kriz Zırhı)")
+    logger.info(f"{'Toplam İşlem Sayısı':<38} | {'1 İşlem':<20} | {f'{total_trades} İşlem':<20}")
+    logger.info(f"{'Kazanma Oranı (Win Rate)':<38} | {'—':<20} | %{win_rate:<19.1f}")
+    logger.info(f"{'Kar / Zarar Çarpanı (Profit Factor)':<38} | {'—':<20} | {pf:<20}")
+    logger.info(f"{'+%50 Üzeri Mega Trend İşlemleri':<38} | {'—':<20} | {len(mega_winners)} Adet Mega Trend")
     if best_trade is not None:
-        print(
+        logger.info(
             f"{'En Yüksek Tekil İşlem Kârı':<38} | {'—':<20} | {best_trade['ticker']} (+%{best_trade['ret_pct']:.1f})"
         )
-    print("=" * 85)
+    logger.info("=" * 85)
 
 
 if __name__ == "__main__":

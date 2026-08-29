@@ -19,14 +19,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.circuit_breaker_metrics")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -48,6 +54,7 @@ class CircuitBreakerSnapshot:
     uptime_percentage: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "name": self.name,
             "state": self.state,
@@ -72,17 +79,18 @@ class CircuitBreakerMetricsCollector:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._tracked_breakers: dict[str, Any] = {}  # name → CircuitBreaker
         self._history: list[dict[str, Any]] = []
         self._max_history = 1000
 
     @otel_trace("circuit_breaker_metrics.track")
-    def track(self, breaker: Any):
+    def track(self, breaker: Any) -> Any:
         """Circuit breaker'ı izleme altına al."""
         self._tracked_breakers[breaker.name] = breaker
         logger.debug("Circuit breaker tracked", name=breaker.name)
 
-    def untrack(self, name: str):
+    def untrack(self, name: str) -> Any:
         """İzlemeyi kaldır."""
         self._tracked_breakers.pop(name, None)
 
@@ -184,7 +192,7 @@ class CircuitBreakerMetricsCollector:
         }
 
     @otel_trace("circuit_breaker_metrics.record_state_change")
-    def record_state_change(self, name: str, old_state: str, new_state: str):
+    def record_state_change(self, name: str, old_state: str, new_state: str) -> Any:
         """State change kaydet."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),

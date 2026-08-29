@@ -373,7 +373,7 @@ class EnhancedStressTestEngine:
         rate_shock: float = 0,
         vol_spike: float = 2.0,
         probability: float = 0.05,
-    ):
+    ) -> Any:
         """Özel stres senaryosu ekle.
 
         Args:

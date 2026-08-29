@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 
 
 class VaRMethod(StrEnum):
+    """Otomatik eklendi."""
     PARAMETRIC = "parametric"
     HISTORICAL = "historical"
     MONTE_CARLO = "monte_carlo"
@@ -84,6 +85,7 @@ class VaRCalculator:
     """
 
     def __init__(self, trading_days_per_year: int = 252):
+        """Otomatik eklendi."""
         self.trading_days_per_year = trading_days_per_year
 
     @staticmethod

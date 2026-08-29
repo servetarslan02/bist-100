@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 2 Test Suite (Drift Detection)
 
@@ -18,7 +21,7 @@ import sys
 import numpy as np
 
 
-def test_no_drift():
+def test_no_drift() -> Any:
     """Aynı dağılımlar için drift tespit edilmemeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -34,10 +37,10 @@ def test_no_drift():
     assert report.overall_drift is False
     assert report.severity in ["LOW", "NONE"]
     assert report.recommendation in ["OK", "MONITOR"]
-    print(f"✅ No drift: type={report.drift_type}, severity={report.severity}")
+    logger.info(f"✅ No drift: type={report.drift_type}, severity={report.severity}")
 
 
-def test_psi_drift():
+def test_psi_drift() -> Any:
     """PSI yüksek olan feature için drift tespit edilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -53,10 +56,10 @@ def test_psi_drift():
 
     assert report.overall_drift is True
     assert "feat_a" in report.affected_features
-    print(f"✅ PSI drift: type={report.drift_type}, severity={report.severity}")
+    logger.info(f"✅ PSI drift: type={report.drift_type}, severity={report.severity}")
 
 
-def test_gradual_drift():
+def test_gradual_drift() -> Any:
     """Kademeli drift Page-Hinkley ile tespit edilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -72,10 +75,10 @@ def test_gradual_drift():
 
     # Drift tespit edilmeli (en az 2 yöntem)
     feat_result = report.feature_results["feat_a"]
-    print(f"✅ Gradual drift: type={feat_result.drift_type}, methods_agreed={feat_result.methods_agreed}")
+    logger.info(f"✅ Gradual drift: type={feat_result.drift_type}, methods_agreed={feat_result.methods_agreed}")
 
 
-def test_sudden_shift():
+def test_sudden_shift() -> Any:
     """Ani değişim ADWIN ile tespit edilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -92,10 +95,10 @@ def test_sudden_shift():
     feat_result = report.feature_results["feat_a"]
     assert feat_result.drift_detected is True
     assert "adwin" in feat_result.details or "psi" in feat_result.details
-    print(f"✅ Sudden shift: type={feat_result.drift_type}, methods_agreed={feat_result.methods_agreed}")
+    logger.info(f"✅ Sudden shift: type={feat_result.drift_type}, methods_agreed={feat_result.methods_agreed}")
 
 
-def test_concept_drift():
+def test_concept_drift() -> Any:
     """Performans düşünce concept drift tespit edilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -114,10 +117,10 @@ def test_concept_drift():
     report = detector.detect_all_drift(current, current_performance=current_perf)
 
     assert report.concept_drift["concept_drift"] is True
-    print(f"✅ Concept drift: sharpe_drop={report.concept_drift['sharpe_drop']}")
+    logger.info(f"✅ Concept drift: sharpe_drop={report.concept_drift['sharpe_drop']}")
 
 
-def test_multiple_features():
+def test_multiple_features() -> Any:
     """Birden fazla feature için drift tespit."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -139,13 +142,13 @@ def test_multiple_features():
     assert "feat_drifted" in report.affected_features
     assert report.feature_results["feat_normal"].drift_detected is False
     assert report.feature_results["feat_drifted"].drift_detected is True
-    print(
+    logger.info(
         f"✅ Multiple features: normal={report.feature_results['feat_normal'].drift_detected}, "
         f"drifted={report.feature_results['feat_drifted'].drift_detected}"
     )
 
 
-def test_drift_type_classification():
+def test_drift_type_classification() -> Any:
     """Drift type sınıflandırması doğru mu?"""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -161,10 +164,10 @@ def test_drift_type_classification():
 
     feat_result = report.feature_results["feat"]
     assert feat_result.drift_type != "STABLE"
-    print(f"✅ Drift type: {feat_result.drift_type}")
+    logger.info(f"✅ Drift type: {feat_result.drift_type}")
 
 
-def test_severity_levels():
+def test_severity_levels() -> Any:
     """Severity seviyeleri doğru mu?"""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -180,17 +183,17 @@ def test_severity_levels():
 
     # Hafif drift → LOW veya MEDIUM severity
     feat_result = report.feature_results["feat"]
-    print(f"✅ Severity (hafif): {feat_result.severity}")
+    logger.info(f"✅ Severity (hafif): {feat_result.severity}")
 
     # Şiddetli drift
     current2 = {"feat": np.random.normal(10, 5, 200)}
     report2 = detector.detect_all_drift(current2)
 
     feat_result2 = report2.feature_results["feat"]
-    print(f"✅ Severity (şiddetli): {feat_result2.severity}")
+    logger.info(f"✅ Severity (şiddetli): {feat_result2.severity}")
 
 
-def test_recommendation():
+def test_recommendation() -> Any:
     """Öneriler doğru mu?"""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -204,16 +207,16 @@ def test_recommendation():
     current = {"feat": np.random.normal(0, 1, 200)}
     report = detector.detect_all_drift(current)
     assert report.recommendation in ["OK", "MONITOR"]
-    print(f"✅ Recommendation (stabil): {report.recommendation}")
+    logger.info(f"✅ Recommendation (stabil): {report.recommendation}")
 
     # Major drift
     current2 = {"feat": np.random.normal(10, 5, 200)}
     report2 = detector.detect_all_drift(current2)
     assert report2.recommendation in ["RETRAIN_IMMEDIATE", "RETRAIN_SCHEDULED", "INVESTIGATE"]
-    print(f"✅ Recommendation (drift): {report2.recommendation}")
+    logger.info(f"✅ Recommendation (drift): {report2.recommendation}")
 
 
-def test_drift_report():
+def test_drift_report() -> Any:
     """Drift raporu doğru mu?"""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -231,20 +234,20 @@ def test_drift_report():
     assert "overall_drift" in report
     assert "drift_type" in report
     assert "recommendation" in report
-    print(f"✅ Drift report: {report['drift_type']}, {report['recommendation']}")
+    logger.info(f"✅ Drift report: {report['drift_type']}, {report['recommendation']}")
 
 
-def test_empty_drift_report():
+def test_empty_drift_report() -> Any:
     """Boş drift raporu doğru mu?"""
     from services.learning.drift_detector import AdvancedDriftDetector
 
     detector = AdvancedDriftDetector()
     report = detector.get_drift_report()
     assert report["status"] == "No drift data"
-    print("✅ Empty drift report")
+    logger.info("✅ Empty drift report")
 
 
-def test_baseline_update():
+def test_baseline_update() -> Any:
     """Baseline güncellenebilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -262,10 +265,10 @@ def test_baseline_update():
 
     # Mean değişmeli
     assert abs(detector._baseline_distributions["feat"]["mean"] - 5) < 1
-    print("✅ Baseline update")
+    logger.info("✅ Baseline update")
 
 
-def test_insufficient_data():
+def test_insufficient_data() -> Any:
     """Yetersiz veri ile başa çıkmalı."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -282,10 +285,10 @@ def test_insufficient_data():
     # Drift tespit edilmemeli (yetersiz veri)
     feat_result = report.feature_results["feat"]
     assert feat_result.drift_detected is False
-    print(f"✅ Insufficient data: type={feat_result.drift_type}")
+    logger.info(f"✅ Insufficient data: type={feat_result.drift_type}")
 
 
-def test_history_tracking():
+def test_history_tracking() -> Any:
     """Drift geçmişi takip edilmeli."""
     from services.learning.drift_detector import AdvancedDriftDetector
 
@@ -301,10 +304,10 @@ def test_history_tracking():
         detector.detect_all_drift(current)
 
     assert len(detector._drift_history) == 3
-    print(f"✅ History tracking: {len(detector._drift_history)} reports")
+    logger.info(f"✅ History tracking: {len(detector._drift_history)} reports")
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
     """Tüm testleri çalıştır."""
     tests = [
         test_no_drift,
@@ -334,19 +337,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 2 TEST SONUÇLARI (Drift Detection)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 2 TEST SONUÇLARI (Drift Detection)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

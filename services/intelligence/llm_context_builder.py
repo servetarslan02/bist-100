@@ -179,6 +179,7 @@ class LLMContextBuilder:
     # ── İç Yardımcı Metodlar ─────────────────────────────────────────────────
 
     def _fetch_world_state(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         try:
             from services.intelligence.world_state import world_state_manager
 
@@ -197,6 +198,7 @@ class LLMContextBuilder:
             }
 
     def _fetch_regime(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         try:
             from services.intelligence.regime import regime_engine
 
@@ -210,6 +212,7 @@ class LLMContextBuilder:
             return {"regime": "BULL", "confidence": 0.70, "duration_days": 12}
 
     def _fetch_research_memory(self, ticker: str, limit: int = 5) -> list[dict]:
+        """Otomatik eklendi."""
         try:
             from services.intelligence.research_memory import research_memory
 
@@ -218,10 +221,12 @@ class LLMContextBuilder:
             return []
 
     def _fetch_features_summary(self, ticker: str) -> dict[str, Any]:
+        """Otomatik eklendi."""
         # Feature store'a direkt erişim yok; orchestrator bağlamda sağlar.
         return {"note": "Feature verisi orchestrator tarafından bağlama eklenir."}
 
     def _fetch_sector_relations(self, sector: str) -> list[dict]:
+        """Otomatik eklendi."""
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
 
@@ -239,6 +244,7 @@ class LLMContextBuilder:
             return []
 
     def _fetch_spec_score(self, ticker: str) -> dict[str, Any]:
+        """Otomatik eklendi."""
         try:
             from services.intelligence.spec_engine import spec_engine
 

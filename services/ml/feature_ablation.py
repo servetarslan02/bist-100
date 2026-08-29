@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import polars as pl
 
 from services.backtest.engine import BacktestEngine
@@ -7,7 +10,9 @@ from services.core.risk_manager import RiskManager
 
 
 class FeatureAblator:
+    """Otomatik eklendi."""
     def __init__(self, base_features: list[str]):
+        """Otomatik eklendi."""
         self.base_features = base_features
         self.engine = AlphaEngine()
         self.rm = RiskManager()
@@ -102,21 +107,22 @@ class FeatureAblator:
         )
         return report.metrics
 
-    def run_full_ablation(self):
-        print("📥 Ablasyon icin 3 yillik hizli veri seti indiriliyor (2021-2024)...")
+    def run_full_ablation(self) -> Any:
+        """Otomatik eklendi."""
+        logger.info("📥 Ablasyon icin 3 yillik hizli veri seti indiriliyor (2021-2024)...")
         market_data, bm_df, sector_map = self.engine.fetch_data("2021-01-01", "2024-11-03")
         common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
 
-        print("▶ Baseline (Tum featurelar) OOS hesaplaniyor...")
+        logger.info("▶ Baseline (Tum featurelar) OOS hesaplaniyor...")
         base_metrics = self._run_ablation_test(self.base_features, market_data, bm_df, sector_map, common_dates)
-        print(
+        logger.info(
             f"🌟 Baseline -> CAGR: %{base_metrics.cagr_pct:.2f}, MaxDD: -%{base_metrics.max_drawdown_pct:.2f}, Sharpe: {base_metrics.sharpe_ratio:.2f}"
         )
 
         ablation_results = []
 
         for i, feature in enumerate(self.base_features, 1):
-            print(f"[{i}/{len(self.base_features)}] Ablasyon Testi: '{feature}' kaldiriliyor...")
+            logger.info(f"[{i}/{len(self.base_features)}] Ablasyon Testi: '{feature}' kaldiriliyor...")
             self.engine.exclude_features = [feature]
 
             test_features = [f for f in self.base_features if f != feature]
@@ -124,15 +130,15 @@ class FeatureAblator:
 
             diff = m.sharpe_ratio - base_metrics.sharpe_ratio
             if diff > 0.05:
-                print(
+                logger.info(
                     f"  🔴 KESIN ZARARLI! '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f} ({(diff):.2f} artis)"
                 )
             elif diff > 0.0:
-                print(
+                logger.info(
                     f"  🟠 MUHTEMEL GURULTU. '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f} ({(diff):.2f} artis)"
                 )
             else:
-                print(
+                logger.info(
                     f"  🟢 FAYDALI. '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f}"
                 )
 
@@ -146,8 +152,8 @@ class FeatureAblator:
                 }
             )
 
-        print("\n=== ABLASYON OZETI (EN ZARARLI FEATURELAR) ===")
+        logger.info("\n=== ABLASYON OZETI (EN ZARARLI FEATURELAR) ===")
         ablation_results.sort(key=lambda x: x["diff"], reverse=True)
         for res in ablation_results:
             if res["diff"] > 0:
-                print(f"DROP: {res['dropped_feature']} -> Yeni Sharpe: {res['sharpe']:.2f} (Artis: +{res['diff']:.2f})")
+                logger.info(f"DROP: {res['dropped_feature']} -> Yeni Sharpe: {res['sharpe']:.2f} (Artis: +{res['diff']:.2f})")

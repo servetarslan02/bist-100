@@ -16,8 +16,8 @@ Kullanım:
     watcher.stop()
 """
 
-import functools
 import asyncio
+import functools
 import os
 import time
 from collections.abc import Callable
@@ -32,19 +32,26 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.config_watcher")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class ConfigAuditEntry:
+    """Otomatik eklendi."""
     timestamp: float
     action: str  # reload, reload_failed, validation_failed, rollback
     config_path: str
@@ -53,6 +60,7 @@ class ConfigAuditEntry:
     error: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp,
             "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
@@ -75,6 +83,7 @@ class ConfigWatcher:
         watch_interval_s: float = 5.0,
         on_change: Callable | None = None,
     ):
+        """Otomatik eklendi."""
         self._config_path = config_path
         self._reload_fn = reload_fn
         self._validate_fn = validate_fn
@@ -89,7 +98,7 @@ class ConfigWatcher:
         self._error_count = 0
 
     @otel_trace("config_watcher.start")
-    def start(self):
+    def start(self) -> Any:
         """Watcher'ı başlat."""
         if self._running:
             return
@@ -101,7 +110,7 @@ class ConfigWatcher:
         logger.info("Config watcher started", path=self._config_path)
 
     @otel_trace("config_watcher.stop")
-    def stop(self):
+    def stop(self) -> Any:
         """Watcher'ı durdur."""
         self._running = False
         if self._task and not self._task.done():
@@ -111,7 +120,7 @@ class ConfigWatcher:
             "Config watcher stopped", path=self._config_path, reloads=self._reload_count, errors=self._error_count
         )
 
-    async def _watch_loop(self):
+    async def _watch_loop(self) -> Any:
         """Periyodik dosya değişiklik kontrolü."""
         # İlk yükleme
         if os.path.exists(self._config_path):
@@ -127,7 +136,7 @@ class ConfigWatcher:
                 logger.warning("Config watcher error", error=str(e))
 
     @otel_trace("config_watcher._check_and_reload")
-    async def _check_and_reload(self):
+    async def _check_and_reload(self) -> Any:
         """Dosya değişikliği kontrolü ve reload."""
         if not os.path.exists(self._config_path):
             return

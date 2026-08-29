@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Direction(StrEnum):
+    """Otomatik eklendi."""
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
@@ -19,13 +20,14 @@ class Direction(StrEnum):
 
 
 class RiskLevel(StrEnum):
+    """Otomatik eklendi."""
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
 
-def _normalize_confidence(v):
+def _normalize_confidence(v) -> Any:
     """Confidence değerini 0-1 aralığına normalize et."""
     if isinstance(v, (int, float)) and v > 1:
         return v / 100
@@ -45,7 +47,8 @@ class AgentOutputSchema(BaseModel):
 
     @field_validator("confidence", mode="before")
     @classmethod
-    def validate_confidence(cls, v):
+    def validate_confidence(cls, v) -> Any:
+        """Otomatik eklendi."""
         return _normalize_confidence(v)
 
 
@@ -99,7 +102,8 @@ class DebateArgumentSchema(BaseModel):
 
     @field_validator("confidence", mode="before")
     @classmethod
-    def validate_confidence(cls, v):
+    def validate_confidence(cls, v) -> Any:
+        """Otomatik eklendi."""
         return _normalize_confidence(v)
 
 
@@ -133,7 +137,8 @@ class SynthesisResultSchema(BaseModel):
 
     @field_validator("final_confidence", mode="before")
     @classmethod
-    def validate_confidence(cls, v):
+    def validate_confidence(cls, v) -> Any:
+        """Otomatik eklendi."""
         return _normalize_confidence(v)
 
 

@@ -12,6 +12,7 @@ from .backtest import router as backtest_router
 from .decisions import router as decisions_router
 from .event_study import router as event_study_router
 from .factors import router as factors_router
+from .holidays import router as holidays_router
 from .intelligence import router as intelligence_router
 from .learning import router as learning_router
 from .macro import router as macro_router
@@ -23,7 +24,6 @@ from .scanner import router as scanner_router
 from .sse import router as sse_router
 from .system import router as system_router
 from .viop import router as viop_router
-from .holidays import router as holidays_router
 from .ws import router as ws_router
 
 v1_router = APIRouter(prefix="/api/v1")

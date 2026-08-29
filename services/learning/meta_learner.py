@@ -39,6 +39,7 @@ class MetaLearner:
     """Rejim-specific model selection ve ensemble optimization."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._regime_performance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
         self._model_history: deque = deque(maxlen=5000)
         self._current_regime: str = "UNKNOWN"
@@ -48,7 +49,7 @@ class MetaLearner:
         model_id: str,
         regime: str,
         metrics: dict[str, float],
-    ):
+    ) -> Any:
         """Rejim bazlı performans kaydet."""
         scores = self._regime_performance[regime][model_id]
         scores.append(metrics.get("sharpe", 0))

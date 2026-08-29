@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -41,6 +42,7 @@ class BiasViolation:
     data_point: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -60,7 +62,8 @@ class BiasReport:
     warning_count: int = 0
     is_clean: bool = True
 
-    def add_violation(self, violation: BiasViolation):
+    def add_violation(self, violation: BiasViolation) -> Any:
+        """Otomatik eklendi."""
         self.violations.append(violation)
         if violation.severity == "critical":
             self.critical_count += 1
@@ -69,6 +72,7 @@ class BiasReport:
             self.warning_count += 1
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_checks": self.total_checks,
             "violations": [v.to_dict() for v in self.violations],
@@ -90,6 +94,7 @@ class LookAheadBiasDetector:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.violations: list[BiasViolation] = []
 
     def validate_feature_timestamps(

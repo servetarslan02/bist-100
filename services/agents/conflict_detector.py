@@ -32,14 +32,17 @@ class ConflictReport:
 
     @property
     def long_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self.long_agents)
 
     @property
     def short_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self.short_agents)
 
     @property
     def total_agents(self) -> int:
+        """Otomatik eklendi."""
         return self.long_count + self.short_count + len(self.neutral_agents)
 
     @property
@@ -52,6 +55,7 @@ class ConflictReport:
         return None
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "has_conflict": self.has_conflict,
             "is_unanimous": self.is_unanimous,

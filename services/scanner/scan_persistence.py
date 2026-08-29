@@ -37,6 +37,7 @@ class ScanResultRecord:
     timestamp: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return asdict(self)
 
 
@@ -60,10 +61,11 @@ class ScanPersistence:
     """
 
     def __init__(self, db_path: str = "data/scan_results.db"):
+        """Otomatik eklendi."""
         self._db_path = db_path
         self._initialized = False
 
-    def _ensure_table(self):
+    def _ensure_table(self) -> Any:
         """Tabloyu oluştur (yoksa)."""
         if self._initialized:
             return
@@ -121,7 +123,7 @@ class ScanPersistence:
         except Exception as e:
             logger.error("Failed to initialize scan persistence", error=str(e))
 
-    def save_scan_result(self, record: ScanResultRecord):
+    def save_scan_result(self, record: ScanResultRecord) -> Any:
         """Tek tarama sonucu kaydet.
 
         Args:
@@ -170,7 +172,7 @@ class ScanPersistence:
         scan_type: str,
         results: list[dict[str, Any]],
         regime: str = "RANGE",
-    ):
+    ) -> Any:
         """Toplu tarama sonuçları kaydet.
 
         Args:
@@ -241,7 +243,7 @@ class ScanPersistence:
             columns = [desc[0] for desc in cursor.description] if cursor.description else []
             conn.close()
 
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("Failed to get scan history", ticker=ticker, error=str(e))
@@ -449,7 +451,7 @@ class ScanPersistence:
             logger.error("Failed to get top scanned tickers", error=str(e))
             return []
 
-    def cleanup_old_records(self, days: int = 90):
+    def cleanup_old_records(self, days: int = 90) -> Any:
         """Eski kayıtları temizle.
 
         Args:

@@ -1,7 +1,8 @@
+from typing import Any
 from datetime import UTC
 
 
-def run_alpha_engine_sync():
+def run_alpha_engine_sync() -> Any:
     """Arka planda (veya scheduler ile) AlphaEngine'i calistirip DB'ye yazar."""
     import asyncio
     from datetime import datetime
@@ -54,7 +55,8 @@ def run_alpha_engine_sync():
     tickers_json = orjson.dumps(top_picks).decode()
 
     # DB'ye kaydet
-    async def save_to_db():
+    async def save_to_db() -> Any:
+        """Otomatik eklendi."""
         from services.core.database import pg_execute
 
         query = """

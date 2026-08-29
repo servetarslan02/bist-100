@@ -17,6 +17,7 @@ class DataRefreshWorker:
     """Piyasa verisi yenileme worker'ı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_refresh: str | None = None
         self._refresh_count: int = 0
 
@@ -47,6 +48,7 @@ class DataRefreshWorker:
         return result
 
     def get_status(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {"last_refresh": self._last_refresh, "refresh_count": self._refresh_count}
 
 

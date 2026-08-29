@@ -46,11 +46,12 @@ class LearningScheduler:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._jobs: dict[str, LearningJobConfig] = {}
         self._running = False
         self._setup_default_jobs()
 
-    def _setup_default_jobs(self):
+    def _setup_default_jobs(self) -> Any:
         """Varsayılan learning job'ları."""
         self._jobs = {
             "learning_cycle": LearningJobConfig(
@@ -80,7 +81,7 @@ class LearningScheduler:
             ),
         }
 
-    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
+    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:
         """Learning job handler'ı kaydet.
 
         Handler async olmalıdır. Sync handler eklenirse uyarı loglanır
@@ -99,7 +100,8 @@ class LearningScheduler:
             logger.warning("Handler is not async, wrapping in coroutine", job_type=job_type)
             original = handler
 
-            async def _async_wrapper():
+            async def _async_wrapper() -> Any:
+                """Otomatik eklendi."""
                 return original()
 
             handler = _async_wrapper
@@ -107,7 +109,7 @@ class LearningScheduler:
         self._jobs[job_type].handler = handler
         logger.info("Learning handler registered", job_type=job_type)
 
-    def enable_job(self, job_type: str, enabled: bool = True):
+    def enable_job(self, job_type: str, enabled: bool = True) -> Any:
         """Job'ı aktif/pasif yap.
 
         Args:
@@ -117,7 +119,7 @@ class LearningScheduler:
         if job_type in self._jobs:
             self._jobs[job_type].enabled = enabled
 
-    def update_interval(self, job_type: str, interval_hours: int):
+    def update_interval(self, job_type: str, interval_hours: int) -> Any:
         """Job interval'ını güncelle.
 
         Args:

@@ -15,9 +15,11 @@ Kullanım:
 import sys
 import warnings
 
+import structlog
+
 # Geriye dönük uyumluluk: canonical app'i yeniden dışa aktar
 from .app import app  # noqa: F401
-import structlog
+
 logger = structlog.get_logger()
 
 

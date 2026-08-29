@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Autonomous Operations Testleri
 
@@ -39,7 +42,7 @@ from services.core.monitoring_security import (
 # =====================================================
 
 
-async def test_alert_lifecycle_states():
+async def test_alert_lifecycle_states() -> Any:
     """Alert lifecycle doğru geçişleri yapmalı."""
     issues = []
 
@@ -78,7 +81,7 @@ async def test_alert_lifecycle_states():
     assert len(issues) == 0, f"Alert Lifecycle States: {issues}"
 
 
-async def test_alert_serialization():
+async def test_alert_serialization() -> Any:
     """Alert serialization doğru olmalı."""
     issues = []
 
@@ -110,7 +113,7 @@ async def test_alert_serialization():
     assert len(issues) == 0, f"Alert Serialization: {issues}"
 
 
-async def test_escalation_timeout():
+async def test_escalation_timeout() -> Any:
     """Escalation timeout doğru çalışmalı."""
     issues = []
 
@@ -145,7 +148,7 @@ async def test_escalation_timeout():
     assert len(issues) == 0, f"Escalation Timeout: {issues}"
 
 
-async def test_acknowledge_stops_escalation():
+async def test_acknowledge_stops_escalation() -> Any:
     """Acknowledged alert escalate edilmemeli."""
     issues = []
 
@@ -186,7 +189,7 @@ async def test_acknowledge_stops_escalation():
 # =====================================================
 
 
-async def test_alert_db_persistence():
+async def test_alert_db_persistence() -> Any:
     """Alert DB'ye persist edilmeli."""
     import duckdb
 
@@ -213,7 +216,7 @@ async def test_alert_db_persistence():
     assert len(issues) == 0, f"Alert DB Persistence: {issues}"
 
 
-async def test_alert_restart_recovery():
+async def test_alert_restart_recovery() -> Any:
     """Restart sonrası alert'ler geri yüklenmeli."""
     import duckdb
 
@@ -245,7 +248,7 @@ async def test_alert_restart_recovery():
 # =====================================================
 
 
-async def test_notification_routing():
+async def test_notification_routing() -> Any:
     """Notification routing severity'ye göre doğru provider seçmeli."""
     issues = []
 
@@ -272,7 +275,7 @@ async def test_notification_routing():
     assert len(issues) == 0, f"Notification Routing: {issues}"
 
 
-async def test_slack_payload_format():
+async def test_slack_payload_format() -> Any:
     """Slack payload doğru formatta olmalı."""
     issues = []
 
@@ -291,7 +294,7 @@ async def test_slack_payload_format():
     assert len(issues) == 0, f"Slack Payload Format: {issues}"
 
 
-async def test_discord_payload_format():
+async def test_discord_payload_format() -> Any:
     """Discord payload doğru formatta olmalı."""
     issues = []
 
@@ -308,7 +311,7 @@ async def test_discord_payload_format():
     assert len(issues) == 0, f"Discord Payload Format: {issues}"
 
 
-async def test_pagerduty_payload_format():
+async def test_pagerduty_payload_format() -> Any:
     """PagerDuty payload doğru formatta olmalı."""
     issues = []
 
@@ -325,7 +328,7 @@ async def test_pagerduty_payload_format():
     assert len(issues) == 0, f"PagerDuty Payload Format: {issues}"
 
 
-async def test_log_provider_notification():
+async def test_log_provider_notification() -> Any:
     """Log provider her zaman başarılı olmalı."""
     issues = []
 
@@ -347,7 +350,7 @@ async def test_log_provider_notification():
 # =====================================================
 
 
-async def test_jwt_validation():
+async def test_jwt_validation() -> Any:
     """JWT token doğrulama doğru çalışmalı."""
     issues = []
 
@@ -400,7 +403,7 @@ async def test_jwt_validation():
     assert len(issues) == 0, f"JWT Validation: {issues}"
 
 
-async def test_jwt_role_extraction():
+async def test_jwt_role_extraction() -> Any:
     """JWT'den roller doğru çıkarılmalı."""
     issues = []
 
@@ -437,7 +440,7 @@ async def test_jwt_role_extraction():
 # =====================================================
 
 
-async def test_role_permissions():
+async def test_role_permissions() -> Any:
     """Role permission mapping doğru olmalı."""
     issues = []
 
@@ -454,7 +457,7 @@ async def test_role_permissions():
     assert len(issues) == 0, f"Role Permissions: {issues}"
 
 
-async def test_rbac_admin_access():
+async def test_rbac_admin_access() -> Any:
     """Admin tüm izinlere sahip olmalı."""
     issues = []
 
@@ -469,7 +472,7 @@ async def test_rbac_admin_access():
     assert len(issues) == 0, f"RBAC Admin Access: {issues}"
 
 
-async def test_rbac_viewer_restrictions():
+async def test_rbac_viewer_restrictions() -> Any:
     """Viewer sadece read ve metrics iznine sahip olmalı."""
     issues = []
 
@@ -491,7 +494,7 @@ async def test_rbac_viewer_restrictions():
     assert len(issues) == 0, f"RBAC Viewer Restrictions: {issues}"
 
 
-async def test_rbac_operator_permissions():
+async def test_rbac_operator_permissions() -> Any:
     """Operator read, write, metrics, alerts, portfolio iznine sahip olmalı."""
     issues = []
 
@@ -511,7 +514,7 @@ async def test_rbac_operator_permissions():
     assert len(issues) == 0, f"RBAC Operator Permissions: {issues}"
 
 
-async def test_oauth_provider_without_secret():
+async def test_oauth_provider_without_secret() -> Any:
     """Secret yoksa OAuthProvider authenticate etmemeli."""
     issues = []
 
@@ -523,7 +526,7 @@ async def test_oauth_provider_without_secret():
     assert len(issues) == 0, f"OAuth Without Secret: {issues}"
 
 
-async def test_auth_manager_multi_provider():
+async def test_auth_manager_multi_provider() -> Any:
     """Auth manager tüm provider'ları denemeli."""
     issues = []
 
@@ -550,10 +553,11 @@ async def test_auth_manager_multi_provider():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("AUTONOMOUS OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("AUTONOMOUS OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Lifecycle
@@ -591,36 +595,37 @@ async def run_all():
             await test_func()
             name = test_func.__name__
             passed += 1
-            print(f"\n✅ {name}")
-            print("   PASSED")
+            logger.info(f"\n✅ {name}")
+            logger.info("   PASSED")
         except AssertionError as e:
             name = test_func.__name__
             failed += 1
             issues = [str(e)]
-            print(f"\n❌ {name}")
+            logger.info(f"\n❌ {name}")
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
         except Exception as e:
             name = test_func.__name__
             failed += 1
             issues = [f"Exception: {e}"]
-            print(f"\n❌ {name}")
+            logger.info(f"\n❌ {name}")
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

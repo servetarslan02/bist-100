@@ -73,9 +73,11 @@ class HistoricalDataWarehouse:
     """30 yıllık BIST tarihsel verisini yerel DuckDB diskte tutan ve anında sunan depo."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         os.makedirs(DATA_DIR, exist_ok=True)
 
     def is_cached(self) -> bool:
+        """Otomatik eklendi."""
         if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) < 10000:
             return False
         try:
@@ -88,6 +90,7 @@ class HistoricalDataWarehouse:
             return False
 
     def download_and_save_warehouse(self, force_refresh: bool = False) -> tuple[int, int]:
+        """Otomatik eklendi."""
         if self.is_cached() and not force_refresh:
             logger.info("30 yıllık yerel veri deposu zaten mevcut.")
             return len(BIST_ALL_KEY_TICKERS), 7277
@@ -96,6 +99,7 @@ class HistoricalDataWarehouse:
 
         # 1. BIST-100 Endeksi
         from datetime import date
+
         end_date = date.today().isoformat()
         bm_raw = yf.download(BENCHMARK_TICKER, start="1997-01-01", end=end_date, progress=False)
         bm_df = _yf_to_polars(bm_raw)

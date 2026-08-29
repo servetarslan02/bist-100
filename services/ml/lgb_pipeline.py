@@ -12,7 +12,9 @@ logger = structlog.get_logger()
 
 
 class LightGBMPipeline:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.model = None
         self.features = []
         self.params = {
@@ -37,7 +39,8 @@ class LightGBMPipeline:
         train_end: pl.Series,
         snapshot_offsets: list[int] = None,
         forward_days: int = 20,
-    ):
+    ) -> Any:
+        """Otomatik eklendi."""
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
         rows = []
@@ -108,7 +111,8 @@ class LightGBMPipeline:
         sector_map: dict[str, str],
         train_start: pl.Series,
         train_end: pl.Series,
-    ):
+    ) -> Any:
+        """Otomatik eklendi."""
         X, y, feature_names = self.generate_samples(market_data, bm_df, sector_map, train_start, train_end)
 
         if len(X) == 0:
@@ -127,6 +131,7 @@ class LightGBMPipeline:
         sector_map: dict[str, str],
         target_date: pl.Series,
     ) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         if not self.model:
             return []
 

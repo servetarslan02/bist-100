@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import gc
 
 import polars as pl
@@ -8,15 +11,16 @@ from services.core.alpha_engine import AlphaEngine
 from services.core.risk_manager import RiskManager
 
 
-def run_final():
-    print("\n" + "=" * 70)
-    print("🚀 ALPHA BIST - CORE QUANT ENGINE (Ablation + Optuna + EW)")
-    print("=" * 70)
+def run_final() -> Any:
+    """Otomatik eklendi."""
+    logger.info("\n" + "=" * 70)
+    logger.info("🚀 ALPHA BIST - CORE QUANT ENGINE (Ablation + Optuna + EW)")
+    logger.info("=" * 70)
 
     # Kötü göstergeler (bad_features) artık AlphaEngine içinde varsayılan olarak siliniyor.
     engine = AlphaEngine()
 
-    print("?? Fetching 10-year data...")
+    logger.info("?? Fetching 10-year data...")
     market_data, bm_df, sector_map = engine.fetch_data("2015-01-01", "2024-11-03")
     common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
 
@@ -28,17 +32,17 @@ def run_final():
     folds = wf.create_folds(common_dates)
 
     for i, fold in enumerate(folds, 1):
-        print(
+        logger.info(
             f"\n? FOLD {i}/{len(folds)} | Train: {fold['train_start']} -> {fold['train_end']} | Test: {fold['test_start']} -> {fold['test_end']}"
         )
-        print("  - Optuna & Egitiliyor...")
+        logger.info("  - Optuna & Egitiliyor...")
 
         success = engine.train(market_data, bm_df, sector_map, fold["train_start"], fold["train_end"], optimize=True)
 
         if not success:
             continue
 
-        print(f"  - Tahmin Uretiliyor (Test_Start: {fold['test_start']})...")
+        logger.info(f"  - Tahmin Uretiliyor (Test_Start: {fold['test_start']})...")
         try:
             preds = engine.predict(market_data, bm_df, sector_map, fold["test_start"])
             top_picks = preds[:10]
@@ -75,13 +79,13 @@ def run_final():
                                 "weight": adj_weight,
                             }
                         )
-                print("  ? Sinyaller eklendi.")
+                logger.info("  ? Sinyaller eklendi.")
         except Exception as e:
-            print(f"  ? Hata: {e}")
+            logger.info(f"  ? Hata: {e}")
 
         gc.collect()
 
-    print("\n? Sinyal Uretimi Tamamlandi.")
+    logger.info("\n? Sinyal Uretimi Tamamlandi.")
 
     price_data_formatted = {}
     for ticker, df_t in market_data.items():
@@ -114,17 +118,17 @@ def run_final():
 
     metrics = report.metrics
 
-    print("\n" + "=" * 70)
-    print("?? ALPHA BIST PHASE 18 - THE HOLY GRAIL (ABLATED + OPTUNA)")
-    print("=" * 70)
-    print(f"CAGR                : %{metrics.cagr_pct:.2f}")
-    print(f"Max Drawdown        : -%{metrics.max_drawdown_pct:.2f}")
-    print(f"Sharpe Ratio        : {metrics.sharpe_ratio:.2f}")
-    print(f"Sortino Ratio       : {metrics.sortino_ratio:.2f}")
-    print(f"Win Rate            : %{metrics.win_rate * 100:.1f}")
-    print(f"Trade Count         : {metrics.total_trades}")
-    print(f"Profit Factor       : {metrics.profit_factor:.2f}")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("?? ALPHA BIST PHASE 18 - THE HOLY GRAIL (ABLATED + OPTUNA)")
+    logger.info("=" * 70)
+    logger.info(f"CAGR                : %{metrics.cagr_pct:.2f}")
+    logger.info(f"Max Drawdown        : -%{metrics.max_drawdown_pct:.2f}")
+    logger.info(f"Sharpe Ratio        : {metrics.sharpe_ratio:.2f}")
+    logger.info(f"Sortino Ratio       : {metrics.sortino_ratio:.2f}")
+    logger.info(f"Win Rate            : %{metrics.win_rate * 100:.1f}")
+    logger.info(f"Trade Count         : {metrics.total_trades}")
+    logger.info(f"Profit Factor       : {metrics.profit_factor:.2f}")
+    logger.info("=" * 70)
 
 
 if __name__ == "__main__":

@@ -21,10 +21,10 @@ tracer = trace.get_tracer("alpha-bist.algo_notification")
 
 def generate_algo_notification(strategy: dict[str, Any]) -> dict[str, Any]:
     """SPK algoritmik trading bildirimi oluştur.
-    
+
     Args:
         strategy: Algoritma strateji bilgileri (isim, tip vb.)
-        
+
     Returns:
         SPK standartlarına uygun bildirim sözlüğü.
     """
@@ -32,7 +32,7 @@ def generate_algo_notification(strategy: dict[str, Any]) -> dict[str, Any]:
         strategy_name = strategy.get("name", "UNKNOWN")
         span.set_attribute("strategy.name", strategy_name)
         span.set_attribute("strategy.type", strategy.get("type", "UNKNOWN"))
-        
+
         notification = {
             "notification_type": "ALGO_TRADING",
             "strategy_name": strategy_name,

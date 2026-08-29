@@ -62,6 +62,7 @@ class IntegratedLearningSystem:
     """Entegre öğrenme sistemi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._predictions: deque = deque(maxlen=5000)
         self._outcomes: deque = deque(maxlen=5000)
         self._regime_accuracy: dict[str, dict] = defaultdict(lambda: {"correct": 0, "total": 0})
@@ -280,7 +281,7 @@ class IntegratedLearningSystem:
         prediction_id: str,
         feedback: str,
         actual_outcome: str,
-    ):
+    ) -> Any:
         """Manuel feedback kaydet."""
         self._feedback_buffer.append(
             {
@@ -392,7 +393,7 @@ class IntegratedLearningSystem:
         drift = self.check_model_drift()
         return drift.get("drift_detected", False)
 
-    def save(self, path: str = "data/integrated_learning.json"):
+    def save(self, path: str = "data/integrated_learning.json") -> Any:
         """Learning state'i dosyaya kaydet."""
         data = {
             "predictions": [
@@ -429,7 +430,7 @@ class IntegratedLearningSystem:
             "Integrated learning saved", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes)
         )
 
-    def load(self, path: str = "data/integrated_learning.json"):
+    def load(self, path: str = "data/integrated_learning.json") -> Any:
         """Learning state'i dosyadan yükle."""
         if not Path(path).exists():
             return

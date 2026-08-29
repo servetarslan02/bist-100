@@ -31,6 +31,7 @@ class RealtimeDataProvider:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._handlers: list[Callable] = []
         self._last_prices: dict[str, float] = {}
@@ -38,13 +39,13 @@ class RealtimeDataProvider:
         self._poll_interval = 300  # 5 dakika (yfinance delayed)
         self._provider = "yfinance"  # Default
 
-    def on_tick(self, handler: Callable):
+    def on_tick(self, handler: Callable) -> Any:
         """Tick handler kaydet."""
         self._handlers.append(handler)
         if len(self._handlers) > 100:
             self._handlers = self._handlers[-100:]
 
-    async def start(self, tickers: list[str], provider: str = "yfinance"):
+    async def start(self, tickers: list[str], provider: str = "yfinance") -> Any:
         """Veri akışını başlat."""
         self._running = True
         self._provider = provider
@@ -58,7 +59,7 @@ class RealtimeDataProvider:
         else:
             logger.error("Unknown provider", provider=provider)
 
-    async def _yfinance_polling(self, tickers: list[str]):
+    async def _yfinance_polling(self, tickers: list[str]) -> Any:
         """yfinance ile polling (5 dakika aralıkla)."""
 
         while self._running:
@@ -116,7 +117,7 @@ class RealtimeDataProvider:
                 logger.error("yfinance polling error", error=str(e))
                 await asyncio.sleep(60)
 
-    async def _matriks_streaming(self, tickers: list[str]):
+    async def _matriks_streaming(self, tickers: list[str]) -> Any:
         """Matriks streaming (WebSocket)."""
         # Matriks API entegrasyonu
         logger.info("Matriks streaming not yet implemented, falling back to yfinance")
@@ -145,7 +146,7 @@ class RealtimeDataProvider:
             },
         }
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Veri akışını durdur."""
         self._running = False
         logger.info("Realtime data provider stopped")

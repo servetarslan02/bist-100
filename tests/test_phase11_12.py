@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 11-12 Test Suite
 
@@ -7,7 +10,7 @@ Position Sizing, Reconciliation, Backtest Engine, Walk-Forward testleri.
 import sys
 
 
-def test_position_sizing():
+def test_position_sizing() -> Any:
     """Position Sizing testleri."""
     from services.risk.position_sizing import position_sizer
 
@@ -31,7 +34,7 @@ def test_position_sizing():
     assert result.risk_pct <= 2.0
     assert result.method == "RISK_BUDGET"
     passed += 1
-    print(f"  ✓ Basic: {result.shares} shares, {result.position_pct:.1f}% portfolio, {result.risk_pct:.1f}% risk")
+    logger.info(f"  ✓ Basic: {result.shares} shares, {result.position_pct:.1f}% portfolio, {result.risk_pct:.1f}% risk")
 
     # 2. Max position limit
     result2 = position_sizer.calculate(
@@ -46,7 +49,7 @@ def test_position_sizing():
     )
     assert result2.position_pct <= 5.0
     passed += 1
-    print(f"  ✓ Max position limit: {result2.position_pct:.1f}% (limit 5%)")
+    logger.info(f"  ✓ Max position limit: {result2.position_pct:.1f}% (limit 5%)")
 
     # 3. Zero stop distance
     result3 = position_sizer.calculate(
@@ -58,7 +61,7 @@ def test_position_sizing():
     assert result3.shares == 0
     assert result3.method == "INVALID"
     passed += 1
-    print(f"  ✓ Zero stop: {result3.method}")
+    logger.info(f"  ✓ Zero stop: {result3.method}")
 
     # 4. High correlation adjustment
     result4 = position_sizer.calculate(
@@ -77,12 +80,12 @@ def test_position_sizing():
     )
     assert result4.shares <= result4b.shares
     passed += 1
-    print(f"  ✓ Correlation adjustment: high={result4.shares}, low={result4b.shares}")
+    logger.info(f"  ✓ Correlation adjustment: high={result4.shares}, low={result4b.shares}")
 
     return passed, failed
 
 
-def test_reconciliation():
+def test_reconciliation() -> Any:
     """Reconciliation Engine testleri."""
     from services.risk.reconciliation import reconciliation_engine
 
@@ -102,7 +105,7 @@ def test_reconciliation():
     assert result.is_consistent
     assert len(result.errors) == 0
     passed += 1
-    print(f"  ✓ Consistent: {result.is_consistent}")
+    logger.info(f"  ✓ Consistent: {result.is_consistent}")
 
     # 2. Cash mismatch
     result2 = reconciliation_engine.reconcile(
@@ -117,7 +120,7 @@ def test_reconciliation():
     assert not result2.is_consistent
     assert any("Cash" in e for e in result2.errors)
     passed += 1
-    print(f"  ✓ Cash mismatch detected: {result2.cash_diff}")
+    logger.info(f"  ✓ Cash mismatch detected: {result2.cash_diff}")
 
     # 3. Equity equation mismatch
     result3 = reconciliation_engine.reconcile(
@@ -131,12 +134,12 @@ def test_reconciliation():
     )
     assert not result3.is_consistent
     passed += 1
-    print("  ✓ Equation mismatch detected")
+    logger.info("  ✓ Equation mismatch detected")
 
     return passed, failed
 
 
-def test_backtest_engine():
+def test_backtest_engine() -> Any:
     """Backtest Engine testleri."""
     from services.backtest.engine import backtest_engine
 
@@ -161,34 +164,34 @@ def test_backtest_engine():
     assert len(result.trades) == 2
     assert result.metrics.total_trades == 2
     passed += 1
-    print(f"  ✓ Basic backtest: {len(result.trades)} trades, return={result.metrics.total_return_pct:.2f}%")
+    logger.info(f"  ✓ Basic backtest: {len(result.trades)} trades, return={result.metrics.total_return_pct:.2f}%")
 
     # 2. Win rate
     assert result.metrics.win_rate > 0
     passed += 1
-    print(f"  ✓ Win rate: {result.metrics.win_rate:.2%}")
+    logger.info(f"  ✓ Win rate: {result.metrics.win_rate:.2%}")
 
     # 3. Equity curve
     assert len(result.equity_curve) > 0
     assert result.equity_curve[0] == 100000
     passed += 1
-    print(f"  ✓ Equity curve: {len(result.equity_curve)} points")
+    logger.info(f"  ✓ Equity curve: {len(result.equity_curve)} points")
 
     # 4. Drawdown curve
     assert len(result.drawdown_curve) > 0
     assert max(result.drawdown_curve) >= 0
     passed += 1
-    print(f"  ✓ Max drawdown: {result.metrics.max_drawdown_pct:.2f}%")
+    logger.info(f"  ✓ Max drawdown: {result.metrics.max_drawdown_pct:.2f}%")
 
     # 5. Profit factor
     assert result.metrics.profit_factor > 0
     passed += 1
-    print(f"  ✓ Profit factor: {result.metrics.profit_factor:.2f}")
+    logger.info(f"  ✓ Profit factor: {result.metrics.profit_factor:.2f}")
 
     return passed, failed
 
 
-def test_walk_forward():
+def test_walk_forward() -> Any:
     """Walk-Forward Validation testleri."""
     from services.backtest.walk_forward import walk_forward_engine
 
@@ -218,23 +221,24 @@ def test_walk_forward():
     )
     assert result.total_folds > 0
     passed += 1
-    print(f"  ✓ Walk-forward: {result.total_folds} folds")
+    logger.info(f"  ✓ Walk-forward: {result.total_folds} folds")
 
     assert isinstance(result.avg_test_return, float)
     passed += 1
-    print(f"  ✓ Avg test return: {result.avg_test_return:.2f}%")
+    logger.info(f"  ✓ Avg test return: {result.avg_test_return:.2f}%")
 
     assert 0 <= result.stability_score <= 1
     passed += 1
-    print(f"  ✓ Stability: {result.stability_score:.2f}")
+    logger.info(f"  ✓ Stability: {result.stability_score:.2f}")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 11-12 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 11-12 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -247,21 +251,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Scheduler Modules Test Suite v2.0
 
@@ -24,34 +25,35 @@ import pytest
 class TestHolidayProvider:
     """Holiday provider testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.unified_scheduler import HolidayProvider
 
         self.provider = HolidayProvider()
 
-    def test_fallback_holidays_loaded(self):
+    def test_fallback_holidays_loaded(self) -> Any:
         """Fallback tatil günleri yüklenmeli."""
         holidays = self.provider.get_holidays()
         assert len(holidays) >= 14  # 2026 hardcoded
         assert date(2026, 1, 1) in holidays  # Yılbaşı
 
-    def test_is_holiday_new_year(self):
+    def test_is_holiday_new_year(self) -> Any:
         """Yılbaşı tatil olmalı."""
         dt = datetime(2026, 1, 1, 14, 0, tzinfo=timezone(timedelta(hours=3)))
         assert self.provider.is_holiday(dt) is True
 
-    def test_is_holiday_normal_day(self):
+    def test_is_holiday_normal_day(self) -> Any:
         """Normal gün tatil olmamalı."""
         dt = datetime(2026, 6, 15, 14, 0, tzinfo=timezone(timedelta(hours=3)))
         assert self.provider.is_holiday(dt) is False
 
-    def test_add_holiday(self):
+    def test_add_holiday(self) -> Any:
         """Runtime tatil eklenebilmeli."""
         self.provider.add_holiday(date(2026, 12, 31))
         dt = datetime(2026, 12, 31, 14, 0, tzinfo=timezone(timedelta(hours=3)))
         assert self.provider.is_holiday(dt) is True
 
-    def test_remove_holiday(self):
+    def test_remove_holiday(self) -> Any:
         """Runtime tatil kaldırılabilmeli."""
         self.provider.add_holiday(date(2026, 12, 31))
         self.provider.remove_holiday(date(2026, 12, 31))
@@ -67,12 +69,14 @@ class TestHolidayProvider:
 class TestMarketSessionManager:
     """Market session testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.unified_scheduler import MarketSessionManager
 
         self.market = MarketSessionManager()
 
-    def test_current_phase(self):
+    def test_current_phase(self) -> Any:
+        """Otomatik eklendi."""
         phase = self.market.current_phase()
         assert phase.value in [
             "CLOSED",
@@ -86,23 +90,28 @@ class TestMarketSessionManager:
             "NIGHT",
         ]
 
-    def test_is_trading_hours(self):
+    def test_is_trading_hours(self) -> Any:
+        """Otomatik eklendi."""
         result = self.market.is_trading_hours()
         assert isinstance(result, bool)
 
-    def test_is_market_open(self):
+    def test_is_market_open(self) -> Any:
+        """Otomatik eklendi."""
         result = self.market.is_market_open()
         assert isinstance(result, bool)
 
-    def test_should_run_trading_job(self):
+    def test_should_run_trading_job(self) -> Any:
+        """Otomatik eklendi."""
         result = self.market.should_run_trading_job()
         assert isinstance(result, bool)
 
-    def test_seconds_until_next_phase(self):
+    def test_seconds_until_next_phase(self) -> Any:
+        """Otomatik eklendi."""
         seconds = self.market.seconds_until_next_phase()
         assert seconds >= 0
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.market.get_status()
         assert "phase" in status
         assert "is_trading" in status
@@ -110,13 +119,13 @@ class TestMarketSessionManager:
         assert "is_holiday" in status
         assert "is_trading_day" in status
 
-    def test_phase_times_ordered(self):
+    def test_phase_times_ordered(self) -> Any:
         """Faz zamanları sıralı olmalı."""
         times = [t for t, _ in self.market.PHASE_TIMES]
         for i in range(len(times) - 1):
             assert times[i] < times[i + 1]
 
-    def test_holiday_provider_integration(self):
+    def test_holiday_provider_integration(self) -> Any:
         """Holiday provider entegre olmalı."""
         provider = self.market.get_holiday_provider()
         assert provider is not None
@@ -131,34 +140,40 @@ class TestMarketSessionManager:
 class TestUnifiedScheduler:
     """Unified scheduler testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.unified_scheduler import UnifiedScheduler
 
         self.scheduler = UnifiedScheduler()
 
-    def test_register_handler(self):
-        async def dummy_handler():
+    def test_register_handler(self) -> Any:
+        """Otomatik eklendi."""
+        async def dummy_handler() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.scheduler.register_handler("test_job", dummy_handler)
         assert "test_job" in self.scheduler._handlers
 
-    def test_update_interval(self):
+    def test_update_interval(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_interval("health_check", 120)
         assert self.scheduler._configs["health_check"].interval_seconds == 120
 
-    def test_enable_disable_job(self):
+    def test_enable_disable_job(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.enable_job("health_check", False)
         assert self.scheduler._configs["health_check"].enabled is False
 
         self.scheduler.enable_job("health_check", True)
         assert self.scheduler._configs["health_check"].enabled is True
 
-    def test_update_priority(self):
+    def test_update_priority(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_priority("health_check", 1)
         assert self.scheduler._configs["health_check"].priority == 1
 
-    def test_update_priority_clamped(self):
+    def test_update_priority_clamped(self) -> Any:
         """Priority 1-10 aralığında olmalı."""
         self.scheduler.update_priority("health_check", 0)
         assert self.scheduler._configs["health_check"].priority == 1
@@ -166,7 +181,8 @@ class TestUnifiedScheduler:
         self.scheduler.update_priority("health_check", 15)
         assert self.scheduler._configs["health_check"].priority == 10
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.scheduler.get_status()
         assert "running" in status
         assert "market" in status
@@ -174,18 +190,21 @@ class TestUnifiedScheduler:
         assert "enabled_configs" in status
         assert "trigger_queue_size" in status
 
-    def test_get_job_stats(self):
+    def test_get_job_stats(self) -> Any:
+        """Otomatik eklendi."""
         stats = self.scheduler.get_job_stats()
         assert "total_jobs" in stats
 
-    def test_default_configs_loaded(self):
+    def test_default_configs_loaded(self) -> Any:
+        """Otomatik eklendi."""
         assert len(self.scheduler._configs) > 0
         assert "market_data_update" in self.scheduler._configs
         assert "batch_scan" in self.scheduler._configs
         assert "learning_cycle" in self.scheduler._configs
         assert "backup" in self.scheduler._configs
 
-    def test_job_config_fields(self):
+    def test_job_config_fields(self) -> Any:
+        """Otomatik eklendi."""
         config = self.scheduler._configs["batch_scan"]
         assert config.interval_seconds > 0
         assert config.priority > 0
@@ -193,7 +212,7 @@ class TestUnifiedScheduler:
         assert config.timeout_seconds > 0
         assert config.description != ""
 
-    def test_priority_ordering(self):
+    def test_priority_ordering(self) -> Any:
         """Job'lar priority'ye göre sıralanabilmeli."""
         configs = self.scheduler._configs
         sorted_jobs = sorted(configs.items(), key=lambda x: x[1].priority)
@@ -201,20 +220,22 @@ class TestUnifiedScheduler:
         # İlk job en yüksek önceliğe sahip olmalı
         assert sorted_jobs[0][1].priority <= sorted_jobs[-1][1].priority
 
-    def test_get_job_configs(self):
+    def test_get_job_configs(self) -> Any:
+        """Otomatik eklendi."""
         configs = self.scheduler.get_job_configs()
         assert "health_check" in configs
         assert "priority" in configs["health_check"]
 
-    def test_trigger_job_no_handler(self):
+    def test_trigger_job_no_handler(self) -> Any:
         """Handler yoksa hata dönmeli."""
         result = asyncio.run(self.scheduler.trigger_job("nonexistent"))
         assert result["status"] == "ERROR"
 
-    def test_trigger_job_with_handler(self):
+    def test_trigger_job_with_handler(self) -> Any:
         """Handler varsa queue'ya eklenmeli."""
 
-        async def dummy():
+        async def dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.scheduler.register_handler("test_trigger", dummy)
@@ -235,12 +256,13 @@ class TestUnifiedScheduler:
 class TestDBJobTracker:
     """DB job tracker testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.unified_scheduler import DBJobTracker
 
         self.tracker = DBJobTracker()
 
-    def test_record_job_memory_fallback(self):
+    def test_record_job_memory_fallback(self) -> Any:
         """DB yoksa memory'ye yazmalı."""
         from services.scheduler.unified_scheduler import JobResult
 
@@ -251,7 +273,7 @@ class TestDBJobTracker:
         assert success is True
         assert len(self.tracker._memory_history) == 1
 
-    def test_get_job_history_memory(self):
+    def test_get_job_history_memory(self) -> Any:
         """Memory'den job geçmişi alabilmeli."""
         from services.scheduler.unified_scheduler import JobResult
 
@@ -264,7 +286,7 @@ class TestDBJobTracker:
         history = asyncio.run(self.tracker.get_job_history(limit=3))
         assert len(history) == 3
 
-    def test_get_failure_stats_memory(self):
+    def test_get_failure_stats_memory(self) -> Any:
         """Memory'den failure stats alabilmeli."""
         from services.scheduler.unified_scheduler import JobResult
 
@@ -300,23 +322,27 @@ class TestDBJobTracker:
 class TestJobMonitor:
     """Job monitor testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.job_monitor import JobMonitor
 
         self.monitor = JobMonitor()
 
-    def test_record_success(self):
+    def test_record_success(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("batch_scan", "SUCCESS", 1500.0)
         stats = self.monitor.get_stats()
         assert stats["total_jobs"] == 1
         assert stats["success"] == 1
 
-    def test_record_failure(self):
+    def test_record_failure(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("batch_scan", "FAILED", 500.0, error="timeout")
         stats = self.monitor.get_stats()
         assert stats["failed"] == 1
 
-    def test_failure_rate(self):
+    def test_failure_rate(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("test", "SUCCESS", 100.0)
         self.monitor.record_job("test", "SUCCESS", 100.0)
         self.monitor.record_job("test", "FAILED", 100.0)
@@ -324,7 +350,8 @@ class TestJobMonitor:
         rate = self.monitor.get_failure_rate("test")
         assert rate == pytest.approx(1 / 3, abs=0.01)
 
-    def test_consecutive_failures_alert(self):
+    def test_consecutive_failures_alert(self) -> Any:
+        """Otomatik eklendi."""
         callback_called = []
         self.monitor.register_callback(lambda a: callback_called.append(a))
 
@@ -335,14 +362,15 @@ class TestJobMonitor:
         assert len(callback_called) > 0
         assert callback_called[0].alert_type == "CONSECUTIVE_FAILURE"
 
-    def test_consecutive_failure_reset(self):
+    def test_consecutive_failure_reset(self) -> Any:
         """Başarılı job consecutive failure'ı sıfırlamalı."""
         self.monitor.record_job("test", "FAILED", 100.0)
         self.monitor.record_job("test", "FAILED", 100.0)
         self.monitor.record_job("test", "SUCCESS", 100.0)
         assert self.monitor._consecutive_failures.get("test", 0) == 0
 
-    def test_slow_job_alert(self):
+    def test_slow_job_alert(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.job_monitor import JobMonitor
 
         monitor = JobMonitor(slow_threshold_ms=1000)
@@ -354,12 +382,14 @@ class TestJobMonitor:
         assert len(callback_called) > 0
         assert callback_called[0].alert_type == "SLOW_JOB"
 
-    def test_get_slow_jobs(self):
+    def test_get_slow_jobs(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("test", "SUCCESS", 50000.0)  # 50sn
         slow = self.monitor.get_slow_jobs(threshold_ms=10000)
         assert len(slow) > 0
 
-    def test_per_job_stats(self):
+    def test_per_job_stats(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("job_a", "SUCCESS", 100.0)
         self.monitor.record_job("job_b", "FAILED", 200.0)
 
@@ -367,7 +397,7 @@ class TestJobMonitor:
         assert stats_a["total_jobs"] == 1
         assert stats_a["success"] == 1
 
-    def test_percentiles(self):
+    def test_percentiles(self) -> Any:
         """Percentile hesaplaması doğru olmalı."""
         for i in range(100):
             self.monitor.record_job("test", "SUCCESS", float(i * 10))
@@ -377,18 +407,20 @@ class TestJobMonitor:
         assert stats["p99_duration_ms"] > 0
         assert stats["median_duration_ms"] > 0
 
-    def test_triggered_by_tracking(self):
+    def test_triggered_by_tracking(self) -> Any:
         """Triggered_by bilgisi kaydedilmeli."""
         self.monitor.record_job("test", "SUCCESS", 100.0, triggered_by="manual")
         assert self.monitor._records[-1].triggered_by == "manual"
 
-    def test_get_summary(self):
+    def test_get_summary(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("test", "SUCCESS", 100.0)
         summary = self.monitor.get_summary()
         assert "total_records" in summary
         assert "per_job_stats" in summary
 
-    def test_clear(self):
+    def test_clear(self) -> Any:
+        """Otomatik eklendi."""
         self.monitor.record_job("test", "SUCCESS", 100.0)
         self.monitor.clear()
         assert self.monitor.get_stats()["total_jobs"] == 0
@@ -402,45 +434,54 @@ class TestJobMonitor:
 class TestDailyWorkflow:
     """Daily workflow testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.daily_workflow import DailyWorkflow
 
         self.workflow = DailyWorkflow()
 
-    def test_phases_defined(self):
+    def test_phases_defined(self) -> Any:
+        """Otomatik eklendi."""
         assert len(self.workflow.PHASES) == 8
         assert "pre_market" in self.workflow.PHASES
         assert "post_market" in self.workflow.PHASES
         assert "night" in self.workflow.PHASES
 
-    def test_register_handler(self):
-        async def dummy():
+    def test_register_handler(self) -> Any:
+        """Otomatik eklendi."""
+        async def dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.workflow.register_handler("test_job", dummy)
         assert "test_job" in self.workflow._handlers
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.workflow.get_status()
         assert hasattr(status, "current_phase")
         assert hasattr(status, "jobs_run_today")
         assert hasattr(status, "jobs_failed_today")
 
-    def test_get_phases(self):
+    def test_get_phases(self) -> Any:
+        """Otomatik eklendi."""
         phases = self.workflow.get_phases()
         assert "pre_market" in phases
         assert phases["pre_market"]["name"] == "PRE_MARKET"
         assert "market_data_update" in phases["pre_market"]["jobs"]
 
-    def test_reset_daily_counters(self):
+    def test_reset_daily_counters(self) -> Any:
+        """Otomatik eklendi."""
         self.workflow._jobs_run_today = 10
         self.workflow._jobs_failed_today = 2
         self.workflow.reset_daily_counters()
         assert self.workflow._jobs_run_today == 0
         assert self.workflow._jobs_failed_today == 0
 
-    def test_execute_phase(self):
-        async def dummy_job():
+    def test_execute_phase(self) -> Any:
+        """Otomatik eklendi."""
+        async def dummy_job() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.workflow.register_handler("market_data_update", dummy_job)
@@ -450,11 +491,12 @@ class TestDailyWorkflow:
         assert "market_data_update" in results
         assert results["market_data_update"]["status"] == "SUCCESS"
 
-    def test_execute_unknown_phase(self):
+    def test_execute_unknown_phase(self) -> Any:
+        """Otomatik eklendi."""
         result = asyncio.run(self.workflow.execute_phase("unknown"))
         assert "error" in result
 
-    def test_phase_map_complete(self):
+    def test_phase_map_complete(self) -> Any:
         """Tüm market phase'leri workflow phase'e map'lenmeli."""
         from services.scheduler.unified_scheduler import MarketPhase
 
@@ -470,74 +512,87 @@ class TestDailyWorkflow:
 class TestLearningScheduler:
     """Learning scheduler testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.learning_scheduler import LearningScheduler
 
         self.scheduler = LearningScheduler()
 
-    def test_default_jobs(self):
+    def test_default_jobs(self) -> Any:
+        """Otomatik eklendi."""
         assert "learning_cycle" in self.scheduler._jobs
         assert "model_retrain" in self.scheduler._jobs
         assert "calibration_update" in self.scheduler._jobs
 
-    def test_register_handler(self):
-        async def dummy():
+    def test_register_handler(self) -> Any:
+        """Otomatik eklendi."""
+        async def dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.scheduler.register_handler("learning_cycle", dummy)
         assert self.scheduler._jobs["learning_cycle"].handler is not None
 
-    def test_register_sync_handler_wrapped(self):
+    def test_register_sync_handler_wrapped(self) -> Any:
         """Sync handler async'e wrap'lenmeli."""
 
-        def sync_dummy():
+        def sync_dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.scheduler.register_handler("learning_cycle", sync_dummy)
         handler = self.scheduler._jobs["learning_cycle"].handler
         assert asyncio.iscoroutinefunction(handler)
 
-    def test_register_unknown_job_type(self):
+    def test_register_unknown_job_type(self) -> Any:
         """Bilinmeyen job type uyarı loglamalı."""
 
-        async def dummy():
+        async def dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         # Hata fırlatmamalı
         self.scheduler.register_handler("unknown_job", dummy)
 
-    def test_enable_disable(self):
+    def test_enable_disable(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.enable_job("learning_cycle", False)
         assert self.scheduler._jobs["learning_cycle"].enabled is False
 
-    def test_update_interval(self):
+    def test_update_interval(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_interval("learning_cycle", 48)
         assert self.scheduler._jobs["learning_cycle"].interval_hours == 48
 
-    def test_update_interval_min_1(self):
+    def test_update_interval_min_1(self) -> Any:
         """Interval minimum 1 olmalı."""
         self.scheduler.update_interval("learning_cycle", 0)
         assert self.scheduler._jobs["learning_cycle"].interval_hours == 1
 
-    def test_should_run_first_time(self):
+    def test_should_run_first_time(self) -> Any:
+        """Otomatik eklendi."""
         config = self.scheduler._jobs["learning_cycle"]
         config.last_run = None
         assert self.scheduler._should_run(config) is True
 
-    def test_should_run_not_yet(self):
+    def test_should_run_not_yet(self) -> Any:
+        """Otomatik eklendi."""
         config = self.scheduler._jobs["learning_cycle"]
         config.last_run = datetime.now(UTC).isoformat()
         assert self.scheduler._should_run(config) is False
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.scheduler.get_status()
         assert "total_jobs" in status
         assert "enabled_jobs" in status
         assert "jobs_with_handlers" in status
         assert "jobs" in status
 
-    def test_get_pending_jobs(self):
-        async def dummy():
+    def test_get_pending_jobs(self) -> Any:
+        """Otomatik eklendi."""
+        async def dummy() -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         self.scheduler.register_handler("learning_cycle", dummy)
@@ -553,62 +608,75 @@ class TestLearningScheduler:
 class TestSchedulerAPI:
     """Scheduler API testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.scheduler_api import SchedulerAPI
 
         self.api = SchedulerAPI()
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.api.get_status()
         assert "timestamp" in status
         assert "scheduler" in status
 
-    def test_get_jobs(self):
+    def test_get_jobs(self) -> Any:
+        """Otomatik eklendi."""
         jobs = self.api.get_jobs()
         assert "total_jobs" in jobs
         assert jobs["total_jobs"] > 0
 
-    def test_get_monitor(self):
+    def test_get_monitor(self) -> Any:
+        """Otomatik eklendi."""
         monitor = self.api.get_monitor()
         assert "stats" in monitor
 
-    def test_get_workflow(self):
+    def test_get_workflow(self) -> Any:
+        """Otomatik eklendi."""
         workflow = self.api.get_workflow()
         assert "status" in workflow
         assert "phases" in workflow
 
-    def test_get_learning(self):
+    def test_get_learning(self) -> Any:
+        """Otomatik eklendi."""
         learning = self.api.get_learning()
         assert "status" in learning
 
-    def test_get_market_session(self):
+    def test_get_market_session(self) -> Any:
+        """Otomatik eklendi."""
         market = self.api.get_market_session()
         assert "market" in market
 
-    def test_trigger_job(self):
+    def test_trigger_job(self) -> Any:
+        """Otomatik eklendi."""
         result = asyncio.run(self.api.trigger_job("nonexistent"))
         assert result["status"] == "ERROR"
 
-    def test_update_interval(self):
+    def test_update_interval(self) -> Any:
+        """Otomatik eklendi."""
         result = self.api.update_interval("health_check", 120)
         assert result["status"] == "OK"
         assert result["new_interval"] == 120
 
-    def test_update_interval_unknown(self):
+    def test_update_interval_unknown(self) -> Any:
+        """Otomatik eklendi."""
         result = self.api.update_interval("unknown", 120)
         assert result["status"] == "ERROR"
 
-    def test_enable_job(self):
+    def test_enable_job(self) -> Any:
+        """Otomatik eklendi."""
         result = self.api.enable_job("health_check", False)
         assert result["status"] == "OK"
         assert result["enabled"] is False
 
-    def test_update_priority(self):
+    def test_update_priority(self) -> Any:
+        """Otomatik eklendi."""
         result = self.api.update_priority("health_check", 1)
         assert result["status"] == "OK"
         assert result["new_priority"] == 1
 
-    def test_get_full_dashboard(self):
+    def test_get_full_dashboard(self) -> Any:
+        """Otomatik eklendi."""
         dashboard = asyncio.run(self.api.get_full_dashboard())
         assert "status" in dashboard
         assert "jobs" in dashboard
@@ -624,14 +692,16 @@ class TestSchedulerAPI:
 class TestSchedulerRateLimiter:
     """Rate limiter testleri."""
 
-    def test_rate_limiter_allows_normal(self):
+    def test_rate_limiter_allows_normal(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.scheduler_api import _RateLimiter
 
         limiter = _RateLimiter(max_tokens=5, refill_rate=5 / 60)
         for _ in range(5):
             assert limiter.allow() is True
 
-    def test_rate_limiter_blocks_excess(self):
+    def test_rate_limiter_blocks_excess(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.scheduler_api import _RateLimiter
 
         limiter = _RateLimiter(max_tokens=3, refill_rate=0)
@@ -639,7 +709,8 @@ class TestSchedulerRateLimiter:
             limiter.allow()
         assert limiter.allow() is False
 
-    def test_rate_limiter_remaining(self):
+    def test_rate_limiter_remaining(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.scheduler_api import _RateLimiter
 
         limiter = _RateLimiter(max_tokens=5, refill_rate=5 / 60)
@@ -647,7 +718,8 @@ class TestSchedulerRateLimiter:
         limiter.allow()
         assert limiter.remaining == 3
 
-    def test_trigger_rate_limited(self):
+    def test_trigger_rate_limited(self) -> Any:
+        """Otomatik eklendi."""
         from services.scheduler.scheduler_api import SchedulerAPI
 
         api = SchedulerAPI()
@@ -666,7 +738,7 @@ class TestSchedulerRateLimiter:
 class TestSchedulerIntegration:
     """Entegrasyon testleri."""
 
-    def test_scheduler_with_monitor(self):
+    def test_scheduler_with_monitor(self) -> Any:
         """Scheduler + monitor entegrasyonu."""
         from services.scheduler.job_monitor import JobMonitor
         from services.scheduler.unified_scheduler import UnifiedScheduler
@@ -681,7 +753,7 @@ class TestSchedulerIntegration:
         stats = monitor.get_stats("batch_scan")
         assert stats["total_jobs"] == 2
 
-    def test_workflow_with_scheduler(self):
+    def test_workflow_with_scheduler(self) -> Any:
         """Workflow + scheduler entegrasyonu."""
         from services.scheduler.daily_workflow import DailyWorkflow
         from services.scheduler.unified_scheduler import MarketSessionManager
@@ -693,7 +765,7 @@ class TestSchedulerIntegration:
         status = workflow.get_status()
         assert status.current_phase is not None
 
-    def test_learning_with_monitor(self):
+    def test_learning_with_monitor(self) -> Any:
         """Learning + monitor entegrasyonu."""
         from services.scheduler.job_monitor import JobMonitor
         from services.scheduler.learning_scheduler import LearningScheduler
@@ -701,14 +773,15 @@ class TestSchedulerIntegration:
         learning = LearningScheduler()
         monitor = JobMonitor()
 
-        async def dummy_learning():
+        async def dummy_learning() -> Any:
+            """Otomatik eklendi."""
             monitor.record_job("learning_cycle", "SUCCESS", 2000.0)
             return "learned"
 
         learning.register_handler("learning_cycle", dummy_learning)
         assert learning._jobs["learning_cycle"].handler is not None
 
-    def test_api_with_all_modules(self):
+    def test_api_with_all_modules(self) -> Any:
         """API tüm modüllerle entegre olmalı."""
         from services.scheduler.scheduler_api import SchedulerAPI
 
@@ -724,7 +797,7 @@ class TestSchedulerIntegration:
         jobs = api.get_jobs()
         assert jobs["total_jobs"] > 0
 
-    def test_priority_based_execution_order(self):
+    def test_priority_based_execution_order(self) -> Any:
         """Priority'ye göre job sıralaması doğru olmalı."""
         from services.scheduler.unified_scheduler import UnifiedScheduler
 
@@ -740,7 +813,7 @@ class TestSchedulerIntegration:
         # backup (priority=10) en son gelmeli
         assert sorted_jobs[-1][1].priority == 10
 
-    def test_holiday_blocks_trading(self):
+    def test_holiday_blocks_trading(self) -> Any:
         """Tatil gününde trading job'ları çalışmamalı."""
         from services.scheduler.unified_scheduler import HolidayProvider, MarketPhase, MarketSessionManager
 

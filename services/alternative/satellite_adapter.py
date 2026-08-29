@@ -112,6 +112,7 @@ class SatelliteAdapter(BaseAdapter):
     PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
 
     def __init__(self):
+        """Otomatik eklendi."""
         super().__init__()
         self._token: str | None = None
         self._token_expiry: float = 0

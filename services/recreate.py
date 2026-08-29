@@ -1,7 +1,13 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import asyncio
+
 from services.core.database import init_databases, pg_execute
 
-async def run():
+
+async def run() -> Any:
+    """Otomatik eklendi."""
     await init_databases()
     await pg_execute("DROP TABLE IF EXISTS paper_trade_portfolio")
     await pg_execute("""CREATE TABLE IF NOT EXISTS paper_trade_portfolio (
@@ -12,7 +18,8 @@ async def run():
         is_cash_regime BOOLEAN DEFAULT FALSE,
         is_rebalance BOOLEAN DEFAULT FALSE
     );""")
-    print("Recreated table!")
+    logger.info("Recreated table!")
+
 
 if __name__ == "__main__":
     asyncio.run(run())

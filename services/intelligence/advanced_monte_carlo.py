@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Advanced Monte Carlo Engine v1.0
 
@@ -18,8 +19,10 @@ try:
     from numba import jit
 except ImportError:
 
-    def jit(*args, **kwargs):
-        def decorator(func):
+    def jit(*args, **kwargs) -> Any:
+        """Otomatik eklendi."""
+        def decorator(func) -> Any:
+            """Otomatik eklendi."""
             return func
 
         return decorator
@@ -45,6 +48,7 @@ def _run_jump_diffusion(
     n_sims: int,
     dt: float,
 ) -> np.ndarray:
+    """Otomatik eklendi."""
     drift = (mu - 0.5 * sigma**2 - compensator) * dt
     diffusion = sigma * np.sqrt(dt)
 
@@ -82,6 +86,7 @@ def _run_heston_lite(
     horizon_days: int,
     n_sims: int,
 ) -> np.ndarray:
+    """Otomatik eklendi."""
     prices = np.zeros((n_sims, horizon_days + 1))
     vols = np.zeros((n_sims, horizon_days + 1))
     for i in range(n_sims):
@@ -193,6 +198,7 @@ class AdvancedMonteCarloEngine:
         n_sims: int = 10000,
         seed: int | None = None,
     ) -> AdvancedMCResult:
+        """Otomatik eklendi."""
         if seed is not None:
             np.random.seed(seed)
 
@@ -269,6 +275,7 @@ class AdvancedMonteCarloEngine:
         n_sims: int = 10000,
         seed: int | None = None,
     ) -> AdvancedMCResult:
+        """Otomatik eklendi."""
         if seed is not None:
             np.random.seed(seed)
 

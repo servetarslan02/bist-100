@@ -35,6 +35,7 @@ class PortfolioService:
     """
 
     def __init__(self, initial_capital: float = 10000000.0):
+        """Otomatik eklendi."""
         self._running = False
         self._portfolio_id: int | None = None
         self._pm = PortfolioManager(initial_capital=initial_capital)
@@ -50,7 +51,7 @@ class PortfolioService:
     # LIFECYCLE
     # =====================================================
 
-    async def start(self):
+    async def start(self) -> Any:
         """Servisi başlat (state lock ile)."""
         logger.info("Starting Portfolio Service v2.0")
 
@@ -81,7 +82,7 @@ class PortfolioService:
 
         logger.info("Portfolio Service v2.0 started", portfolio_id=self._portfolio_id)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Servisi durdur."""
         self._running = False
         if self._config_watcher:
@@ -93,7 +94,7 @@ class PortfolioService:
                 logger.warning("Equity snapshot save failed during stop", error=str(e))
         logger.info("Portfolio Service v2.0 stopped")
 
-    def _on_config_change(self, new_config: dict[str, Any]):
+    def _on_config_change(self, new_config: dict[str, Any]) -> Any:
         """Config değişikliğinde çağrılır."""
         try:
             # Risk limitlerini güncelle
@@ -129,7 +130,7 @@ class PortfolioService:
         except (ValueError, TypeError):
             return datetime.now(UTC)
 
-    async def _load_state(self):
+    async def _load_state(self) -> Any:
         """DB'den portföy durumunu eksiksiz yükle.
 
         Restore edilen alanlar:
@@ -307,7 +308,7 @@ class PortfolioService:
         except Exception:
             return []
 
-    async def _update_daily_pnl(self, realized_pnl: float, commission: float):
+    async def _update_daily_pnl(self, realized_pnl: float, commission: float) -> Any:
         """İşlem sonrası daily_pnl tablosunu güncelle.
 
         Aynı gün için INSERT OR UPDATE yapar (UPSERT mantığı).
@@ -357,7 +358,7 @@ class PortfolioService:
     # TRADE EXECUTION — v2.0 Muhasebe
     # =====================================================
 
-    def _verify_invariant(self, context: str):
+    def _verify_invariant(self, context: str) -> Any:
         """EQUITY = CASH + MARKET_VALUE invariant doğrula."""
         acc = self._pm.get_accounting_summary()
         if not acc["invariant_check"]:
@@ -424,7 +425,7 @@ class PortfolioService:
         except RuntimeError as e:
             return {"success": False, "error": str(e)}
 
-    async def update_prices(self, prices: dict[str, float]):
+    async def update_prices(self, prices: dict[str, float]) -> Any:
         """Fiyat güncelle + equity snapshot."""
         self._pm.update_prices(prices)
 
@@ -579,7 +580,7 @@ class PortfolioService:
             "locks": lock_health,
         }
 
-    async def _persist_buy(self, ticker: str, quantity: int, price: float, commission: float, instrument_id: int):
+    async def _persist_buy(self, ticker: str, quantity: int, price: float, commission: float, instrument_id: int) -> Any:
         """Alımı DB'ye kaydet."""
         cost = quantity * price
 
@@ -664,7 +665,7 @@ class PortfolioService:
 
     async def _persist_sell(
         self, ticker: str, quantity: int, price: float, commission: float, result: dict, instrument_id: int = 0
-    ):
+    ) -> Any:
         """Satışı DB'ye kaydet."""
         realized_pnl = result.get("realized_pnl", 0)
 
@@ -732,7 +733,7 @@ class PortfolioService:
             self._portfolio_id,
         )
 
-    async def _update_portfolio_totals(self):
+    async def _update_portfolio_totals(self) -> Any:
         """Portfolio toplamlarını DB'ye yaz."""
         if not self._portfolio_id:
             return
@@ -748,7 +749,7 @@ class PortfolioService:
             self._portfolio_id,
         )
 
-    async def _save_equity_snapshot(self):
+    async def _save_equity_snapshot(self) -> Any:
         """Günlük equity snapshot + daily_pnl DB'ye kaydet."""
         if not self._portfolio_id:
             return
@@ -835,7 +836,9 @@ class PortfolioService:
     async def get_equity_snapshots(self, limit: int = 252) -> list[dict]:
         """DB'den equity snapshot'ları."""
         rows = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id DESC LIMIT $2", self._portfolio_id, limit
+            "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id DESC LIMIT $2",
+            self._portfolio_id,
+            limit,
         )
         return rows
 
@@ -883,7 +886,8 @@ def get_portfolio_enhancements() -> dict[str, Any]:
     return result
 
 
-async def main():
+async def main() -> Any:
+    """Otomatik eklendi."""
     try:
         await portfolio_service.start()
         while portfolio_service._running:

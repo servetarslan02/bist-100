@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Event-Driven Scanner v1.0
 
@@ -21,6 +22,7 @@ class EventScanner:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._pending_rescans: dict[str, dict] = {}  # ticker -> event data
         self._last_rescan: dict[str, datetime] = {}
 
@@ -102,12 +104,12 @@ class EventScanner:
         """Bekleyen yeniden tarama isteklerini döndür."""
         return self._pending_rescans.copy()
 
-    def clear_rescan(self, ticker: str):
+    def clear_rescan(self, ticker: str) -> Any:
         """Yeniden tarama tamamlandı."""
         self._pending_rescans.pop(ticker, None)
         self._last_rescan[ticker] = datetime.now(UTC)
 
-    def clear_all(self):
+    def clear_all(self) -> Any:
         """Tüm bekleyen taramaları temizle."""
         self._pending_rescans.clear()
 
@@ -201,7 +203,7 @@ class EventScanner:
 
         return max(0, min(100, base_score))
 
-    def set_event_direction(self, ticker: str, direction: int):
+    def set_event_direction(self, ticker: str, direction: int) -> Any:
         """Event yönünü belirle: +1 pozitif, -1 negatif, 0 nötr."""
         if ticker in self._pending_rescans:
             self._pending_rescans[ticker]["direction"] = direction

@@ -16,6 +16,7 @@ Referanslar:
 """
 
 import base64
+import functools
 import hmac
 import os
 import secrets
@@ -25,7 +26,6 @@ from datetime import timedelta
 from enum import StrEnum
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -33,18 +33,25 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.jwt_manager")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class TokenType(StrEnum):
+    """Otomatik eklendi."""
     ACCESS = "access"
     REFRESH = "refresh"
     API_KEY = "api_key"
@@ -63,6 +70,7 @@ class JWTClaims:
     jti: str = field(default_factory=lambda: secrets.token_hex(8))
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "sub": self.sub,
             "role": self.role,
@@ -75,6 +83,7 @@ class JWTClaims:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "JWTClaims":
+        """Otomatik eklendi."""
         return cls(
             sub=data.get("sub", ""),
             role=data.get("role", ""),
@@ -87,6 +96,7 @@ class JWTClaims:
 
     @property
     def is_expired(self) -> bool:
+        """Otomatik eklendi."""
         return time.time() > self.expires_at
 
 
@@ -113,6 +123,7 @@ class JWTManager:
         refresh_token_ttl_days: int = 7,
         algorithm: str = "HS256",
     ):
+        """Otomatik eklendi."""
         self._secret = secret_key or os.environ.get("JWT_SECRET", "")
         self._access_ttl = timedelta(hours=access_token_ttl_hours)
         self._refresh_ttl = timedelta(days=refresh_token_ttl_days)
@@ -305,7 +316,7 @@ class JWTManager:
         return api_key
 
     @otel_trace("jwt_manager.rotate_secret")
-    def rotate_secret(self, new_secret: str):
+    def rotate_secret(self, new_secret: str) -> Any:
         """
         Secret key'i deÄŸiÅŸtir.
 
@@ -338,4 +349,3 @@ class JWTManager:
 
 # Singleton
 jwt_manager = JWTManager()
-

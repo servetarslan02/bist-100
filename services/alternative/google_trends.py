@@ -57,10 +57,11 @@ class GoogleTrendsAdapter(BaseAdapter):
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         super().__init__()
         self._pytrends = None
 
-    def _get_pytrends(self):
+    def _get_pytrends(self) -> Any:
         """pytrends instance'ı al (lazy init)."""
         if self._pytrends is None:
             try:

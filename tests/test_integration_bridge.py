@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """ALPHA BIST — Integration Bridge v2.0 Tests
 
 Kapsamlı test suite:
@@ -11,10 +14,8 @@ Kapsamlı test suite:
 - Correlation ID tracking
 """
 
-from __future__ import annotations
 
 import time
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -28,7 +29,6 @@ from services.core.integration_bridge import (
     ModuleMetrics,
     PipelineEnhancementReport,
 )
-
 
 # =====================================================
 # FIXTURES
@@ -97,21 +97,21 @@ def sample_decision() -> dict[str, Any]:
 class TestCircuitBreaker:
     """Circuit breaker testleri."""
 
-    def test_initial_state_closed(self):
+    def test_initial_state_closed(self) -> Any:
         """Başlangıç durumu kapalı olmalı."""
         cb = CircuitBreaker(name="test")
         assert cb.state == CircuitState.CLOSED
         assert cb.can_execute() is True
         assert cb.failure_count == 0
 
-    def test_failure_increments_count(self):
+    def test_failure_increments_count(self) -> Any:
         """Hata sayacı artmalı."""
         cb = CircuitBreaker(name="test", failure_threshold=5)
         cb.record_failure()
         assert cb.failure_count == 1
         assert cb.state == CircuitState.CLOSED
 
-    def test_opens_after_threshold(self):
+    def test_opens_after_threshold(self) -> Any:
         """Eşik aşıldığında devre açılmalı."""
         cb = CircuitBreaker(name="test", failure_threshold=3)
         cb.record_failure()
@@ -121,7 +121,7 @@ class TestCircuitBreaker:
         assert cb.state == CircuitState.OPEN
         assert cb.can_execute() is False
 
-    def test_half_open_after_timeout(self):
+    def test_half_open_after_timeout(self) -> Any:
         """Timeout sonrası yarı açık mod."""
         cb = CircuitBreaker(name="test", failure_threshold=2, recovery_timeout_seconds=0.1)
         cb.record_failure()
@@ -132,7 +132,7 @@ class TestCircuitBreaker:
         assert cb.can_execute() is True
         assert cb.state == CircuitState.HALF_OPEN
 
-    def test_half_open_success_closes(self):
+    def test_half_open_success_closes(self) -> Any:
         """Yarı açık modda başarı devreyi kapatmalı."""
         cb = CircuitBreaker(name="test", failure_threshold=2, recovery_timeout_seconds=0.1)
         cb.record_failure()
@@ -143,7 +143,7 @@ class TestCircuitBreaker:
         assert cb.state == CircuitState.CLOSED
         assert cb.failure_count == 0
 
-    def test_half_open_failure_reopens(self):
+    def test_half_open_failure_reopens(self) -> Any:
         """Yarı açık modda hata devreyi tekrar açmalı."""
         cb = CircuitBreaker(name="test", failure_threshold=2, recovery_timeout_seconds=0.1)
         cb.record_failure()
@@ -153,7 +153,7 @@ class TestCircuitBreaker:
         cb.record_failure()
         assert cb.state == CircuitState.OPEN
 
-    def test_success_decrements_failure(self):
+    def test_success_decrements_failure(self) -> Any:
         """Başarı hata sayacını azaltmalı."""
         cb = CircuitBreaker(name="test", failure_threshold=5)
         cb.record_failure()
@@ -162,7 +162,7 @@ class TestCircuitBreaker:
         cb.record_success()
         assert cb.failure_count == 1
 
-    def test_reset(self):
+    def test_reset(self) -> Any:
         """Reset tüm durumu sıfırlamalı."""
         cb = CircuitBreaker(name="test", failure_threshold=2)
         cb.record_failure()
@@ -181,7 +181,7 @@ class TestCircuitBreaker:
 class TestModuleMetrics:
     """Module metrics testleri."""
 
-    def test_initial_state(self):
+    def test_initial_state(self) -> Any:
         """Başlangıç durumu sıfır olmalı."""
         m = ModuleMetrics(name="test")
         assert m.total_calls == 0
@@ -190,7 +190,7 @@ class TestModuleMetrics:
         assert m.success_rate == 0.0
         assert m.avg_latency_ms == 0.0
 
-    def test_success_rate_calculation(self):
+    def test_success_rate_calculation(self) -> Any:
         """Başarı oranı doğru hesaplanmalı."""
         m = ModuleMetrics(name="test")
         m.total_calls = 10
@@ -198,14 +198,14 @@ class TestModuleMetrics:
         m.failed_calls = 3
         assert m.success_rate == pytest.approx(0.7)
 
-    def test_avg_latency(self):
+    def test_avg_latency(self) -> Any:
         """Ortalama latency doğru hesaplanmalı."""
         m = ModuleMetrics(name="test")
         m.successful_calls = 4
         m.total_latency_ms = 200.0
         assert m.avg_latency_ms == pytest.approx(50.0)
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> Any:
         """Dict dönüşümü doğru olmalı."""
         m = ModuleMetrics(name="test", total_calls=5, successful_calls=4, failed_calls=1)
         d = m.to_dict()
@@ -222,20 +222,20 @@ class TestModuleMetrics:
 class TestEnhancementResult:
     """Enhancement result testleri."""
 
-    def test_success_result(self):
+    def test_success_result(self) -> Any:
         """Başarılı sonuç doğru oluşturulmalı."""
         r = EnhancementResult(module="test", success=True, data={"key": "value"}, latency_ms=10.5)
         assert r.success is True
         assert r.data == {"key": "value"}
         assert r.skipped is False
 
-    def test_failure_result(self):
+    def test_failure_result(self) -> Any:
         """Başarısız sonuç doğru oluşturulmalı."""
         r = EnhancementResult(module="test", success=False, error="Something failed")
         assert r.success is False
         assert r.error == "Something failed"
 
-    def test_skipped_result(self):
+    def test_skipped_result(self) -> Any:
         """Atlanan sonuç doğru oluşturulmalı."""
         r = EnhancementResult(module="test", success=False, skipped=True, error="Circuit open")
         assert r.skipped is True
@@ -249,7 +249,7 @@ class TestEnhancementResult:
 class TestPipelineEnhancementReport:
     """Pipeline enhancement report testleri."""
 
-    def test_healthy_report(self):
+    def test_healthy_report(self) -> Any:
         """Sağlıklı rapor doğru oluşturulmalı."""
         report = PipelineEnhancementReport(
             ticker="THYAO",
@@ -265,7 +265,7 @@ class TestPipelineEnhancementReport:
         )
         assert report.is_healthy is True
 
-    def test_unhealthy_report(self):
+    def test_unhealthy_report(self) -> Any:
         """Sağlıksız rapor doğru oluşturulmalı."""
         report = PipelineEnhancementReport(
             ticker="THYAO",
@@ -281,7 +281,7 @@ class TestPipelineEnhancementReport:
         )
         assert report.is_healthy is False
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> Any:
         """Dict dönüşümü doğru olmalı."""
         report = PipelineEnhancementReport(
             ticker="THYAO",
@@ -305,25 +305,25 @@ class TestPipelineEnhancementReport:
 class TestBridgeInitialization:
     """Bridge initialization testleri."""
 
-    def test_default_config(self):
+    def test_default_config(self) -> Any:
         """Varsayılan konfigürasyon doğru olmalı."""
         bridge = IntegrationBridge()
         assert bridge.config.enable_feature_stability is True
         assert bridge.config.circuit_failure_threshold == 5
 
-    def test_custom_config(self, config):
+    def test_custom_config(self, config) -> Any:
         """Özel konfigürasyon uygulanmalı."""
         bridge = IntegrationBridge(config=config)
         assert bridge.config.circuit_failure_threshold == 3
         assert bridge.config.circuit_recovery_timeout == 1.0
 
-    def test_circuit_breakers_initialized(self, bridge):
+    def test_circuit_breakers_initialized(self, bridge) -> Any:
         """Circuit breaker'lar başlatılmalı."""
         assert len(bridge._circuits) == 10
         assert "feature_stability" in bridge._circuits
         assert "regime_limits" in bridge._circuits
 
-    def test_metrics_initialized(self, bridge):
+    def test_metrics_initialized(self, bridge) -> Any:
         """Metrikler başlatılmalı."""
         assert len(bridge._metrics) == 10
         assert bridge._metrics["feature_stability"].total_calls == 0
@@ -337,43 +337,43 @@ class TestBridgeInitialization:
 class TestInputValidation:
     """Input validation testleri."""
 
-    def test_valid_ticker(self, bridge):
+    def test_valid_ticker(self, bridge) -> Any:
         """Geçerli ticker kabul edilmeli."""
         assert bridge._validate_ticker("THYAO") is True
         assert bridge._validate_ticker("GARAN") is True
 
-    def test_invalid_ticker(self, bridge):
+    def test_invalid_ticker(self, bridge) -> Any:
         """Geçersiz ticker reddedilmeli."""
         assert bridge._validate_ticker("") is False
         assert bridge._validate_ticker(None) is False
         assert bridge._validate_ticker("A" * 25) is False
 
-    def test_valid_features(self, bridge, sample_features):
+    def test_valid_features(self, bridge, sample_features) -> Any:
         """Geçerli feature seti kabul edilmeli."""
         assert bridge._validate_features(sample_features) is True
 
-    def test_invalid_features(self, bridge):
+    def test_invalid_features(self, bridge) -> Any:
         """Geçersiz feature seti reddedilmeli."""
         assert bridge._validate_features({}) is False
         assert bridge._validate_features(None) is False
 
-    def test_valid_confidence(self, bridge):
+    def test_valid_confidence(self, bridge) -> Any:
         """Geçerli confidence kabul edilmeli."""
         assert bridge._validate_confidence(0.5) is True
         assert bridge._validate_confidence(0.0) is True
         assert bridge._validate_confidence(1.0) is True
 
-    def test_invalid_confidence(self, bridge):
+    def test_invalid_confidence(self, bridge) -> Any:
         """Geçersiz confidence reddedilmeli."""
         assert bridge._validate_confidence(-0.1) is False
         assert bridge._validate_confidence(1.1) is False
 
-    def test_valid_prices(self, bridge):
+    def test_valid_prices(self, bridge) -> Any:
         """Geçerli fiyat serisi kabul edilmeli."""
         prices = np.array([100.0, 101.0, 102.0])
         assert bridge._validate_prices(prices) is True
 
-    def test_invalid_prices(self, bridge):
+    def test_invalid_prices(self, bridge) -> Any:
         """Geçersiz fiyat serisi reddedilmeli."""
         assert bridge._validate_prices(np.array([])) is False
         assert bridge._validate_prices(None) is False
@@ -388,30 +388,30 @@ class TestInputValidation:
 class TestPipelineEnhancement:
     """Pipeline enhancement testleri."""
 
-    def test_invalid_ticker_returns_error(self, bridge, sample_features):
+    def test_invalid_ticker_returns_error(self, bridge, sample_features) -> Any:
         """Geçersiz ticker hata döndürmeli."""
         result = bridge.enhance_pipeline_result("", {}, sample_features, "BULL")
         assert "_bridge_error" in result
 
-    def test_invalid_features_returns_error(self, bridge):
+    def test_invalid_features_returns_error(self, bridge) -> Any:
         """Geçersiz feature seti hata döndürmeli."""
         result = bridge.enhance_pipeline_result("THYAO", {}, {}, "BULL")
         assert "_bridge_error" in result
 
-    def test_bridge_metadata_added(self, bridge, sample_features):
+    def test_bridge_metadata_added(self, bridge, sample_features) -> Any:
         """Bridge metadata eklenmeli."""
         result = bridge.enhance_pipeline_result("THYAO", {}, sample_features, "BULL")
         assert "_bridge" in result
         assert "correlation_id" in result["_bridge"]
         assert "latency_ms" in result["_bridge"]
 
-    def test_correlation_id_unique(self, bridge, sample_features):
+    def test_correlation_id_unique(self, bridge, sample_features) -> Any:
         """Her çağrıda benzersiz correlation ID oluşmalı."""
         r1 = bridge.enhance_pipeline_result("THYAO", {}, sample_features, "BULL")
         r2 = bridge.enhance_pipeline_result("THYAO", {}, sample_features, "BULL")
         assert r1["_bridge"]["correlation_id"] != r2["_bridge"]["correlation_id"]
 
-    def test_disabled_modules_skipped(self, config, sample_features):
+    def test_disabled_modules_skipped(self, config, sample_features) -> Any:
         """Devre dışı modüller atlanmalı."""
         config.enable_feature_stability = False
         config.enable_regime_limits = False
@@ -430,20 +430,20 @@ class TestPipelineEnhancement:
 class TestTradePlanEnhancement:
     """Trade plan enhancement testleri."""
 
-    def test_invalid_ticker_returns_error(self, bridge, sample_decision):
+    def test_invalid_ticker_returns_error(self, bridge, sample_decision) -> Any:
         """Geçersiz ticker hata döndürmeli."""
         prices = np.array([100.0, 101.0])
         result = bridge.enhance_trade_plan("", sample_decision, prices, "BULL", 0.7)
         assert "_bridge_error" in result
 
-    def test_confidence_clamped(self, bridge, sample_decision):
+    def test_confidence_clamped(self, bridge, sample_decision) -> Any:
         """Confidence sınırlandırılmalı."""
         prices = np.array([100.0, 101.0])
         # Geçersiz confidence — clamp edilmeli, hata vermemeli
         result = bridge.enhance_trade_plan("THYAO", sample_decision, prices, "BULL", 1.5)
         assert "_bridge" in result
 
-    def test_bridge_metadata_added(self, bridge, sample_decision):
+    def test_bridge_metadata_added(self, bridge, sample_decision) -> Any:
         """Bridge metadata eklenmeli."""
         prices = np.array([100.0, 101.0])
         result = bridge.enhance_trade_plan("THYAO", sample_decision, prices, "BULL", 0.7)
@@ -458,13 +458,13 @@ class TestTradePlanEnhancement:
 class TestLearningCycleEnhancement:
     """Learning cycle enhancement testleri."""
 
-    def test_bridge_metadata_added(self, bridge):
+    def test_bridge_metadata_added(self, bridge) -> Any:
         """Bridge metadata eklenmeli."""
         learning_result = {"model": "lgbm", "accuracy": 0.65}
         result = bridge.enhance_learning_cycle(learning_result)
         assert "_bridge" in result
 
-    def test_with_model_predictions(self, bridge):
+    def test_with_model_predictions(self, bridge) -> Any:
         """Model predictions ile diversity analizi yapılmalı."""
         predictions = {
             "lgbm": np.array([0.7, 0.3, 0.8]),
@@ -483,7 +483,7 @@ class TestLearningCycleEnhancement:
 class TestEventEnhancement:
     """Event enhancement testleri."""
 
-    def test_disabled_returns_original(self, config):
+    def test_disabled_returns_original(self, config) -> Any:
         """Devre dışı event enhancement orijinal payload döndürmeli."""
         config.enable_event_enhancements = False
         bridge = IntegrationBridge(config=config)
@@ -500,7 +500,7 @@ class TestEventEnhancement:
 class TestPortfolioEnhancement:
     """Portfolio enhancement testleri."""
 
-    def test_disabled_returns_original(self, config):
+    def test_disabled_returns_original(self, config) -> Any:
         """Devre dışı portfolio enhancement orijinal ağırlıkları döndürmeli."""
         config.enable_portfolio_enhancements = False
         bridge = IntegrationBridge(config=config)
@@ -517,21 +517,21 @@ class TestPortfolioEnhancement:
 class TestHealthCheck:
     """Health check testleri."""
 
-    def test_health_check_returns_structure(self, bridge):
+    def test_health_check_returns_structure(self, bridge) -> Any:
         """Health check doğru yapı döndürmeli."""
         health = bridge.health_check()
         assert "all_healthy" in health
         assert "modules" in health
         assert "timestamp" in health
 
-    def test_health_check_modules(self, bridge):
+    def test_health_check_modules(self, bridge) -> Any:
         """Tüm modüller sağlık raporunda olmalı."""
         health = bridge.health_check()
         assert "feature_stability" in health["modules"]
         assert "regime_limits" in health["modules"]
         assert "calibration_enhanced" in health["modules"]
 
-    def test_health_check_module_structure(self, bridge):
+    def test_health_check_module_structure(self, bridge) -> Any:
         """Her modülün sağlık yapısı doğru olmalı."""
         health = bridge.health_check()
         module = health["modules"]["feature_stability"]
@@ -549,14 +549,14 @@ class TestHealthCheck:
 class TestMetrics:
     """Metrics testleri."""
 
-    def test_initial_metrics_zero(self, bridge):
+    def test_initial_metrics_zero(self, bridge) -> Any:
         """Başlangıç metrikleri sıfır olmalı."""
         metrics = bridge.get_metrics()
         assert metrics["total_calls"] == 0
         assert metrics["total_successful"] == 0
         assert metrics["total_failed"] == 0
 
-    def test_metrics_after_call(self, bridge, sample_features):
+    def test_metrics_after_call(self, bridge, sample_features) -> Any:
         """Çağrı sonrası metrikler güncellenmeli."""
         bridge.enhance_pipeline_result("THYAO", {}, sample_features, "BULL")
         metrics = bridge.get_metrics()
@@ -567,14 +567,14 @@ class TestMetrics:
         assert "total_failed" in metrics
         assert metrics["total_calls"] >= 0
 
-    def test_reset_metrics(self, bridge, sample_features):
+    def test_reset_metrics(self, bridge, sample_features) -> Any:
         """Metrik sıfırlama çalışmalı."""
         bridge.enhance_pipeline_result("THYAO", {}, sample_features, "BULL")
         bridge.reset_metrics()
         metrics = bridge.get_metrics()
         assert metrics["total_calls"] == 0
 
-    def test_reset_circuit_breakers(self, bridge):
+    def test_reset_circuit_breakers(self, bridge) -> Any:
         """Circuit breaker sıfırlama çalışmalı."""
         cb = bridge._circuits["feature_stability"]
         cb.record_failure()
@@ -591,23 +591,23 @@ class TestMetrics:
 class TestConfiguration:
     """Configuration testleri."""
 
-    def test_disable_module(self, bridge):
+    def test_disable_module(self, bridge) -> Any:
         """Modül devre dışı bırakılabilmeli."""
         bridge.disable_module("feature_stability")
         assert bridge.config.enable_feature_stability is False
 
-    def test_enable_module(self, bridge):
+    def test_enable_module(self, bridge) -> Any:
         """Modül etkinleştirilebilmeli."""
         bridge.disable_module("feature_stability")
         bridge.enable_module("feature_stability")
         assert bridge.config.enable_feature_stability is True
 
-    def test_update_config(self, bridge):
+    def test_update_config(self, bridge) -> Any:
         """Konfigürasyon güncellenebilmeli."""
         bridge.update_config(circuit_failure_threshold=10)
         assert bridge.config.circuit_failure_threshold == 10
 
-    def test_update_config_unknown_key(self, bridge):
+    def test_update_config_unknown_key(self, bridge) -> Any:
         """Bilinmeyen anahtar uyarı vermemeli (sessiz geç)."""
         bridge.update_config(unknown_key="value")  # Should not raise
 
@@ -620,14 +620,14 @@ class TestConfiguration:
 class TestCircuitBreakerIntegration:
     """Circuit breaker entegrasyon testleri."""
 
-    def test_circuit_breaker_opens_on_failures(self, bridge):
+    def test_circuit_breaker_opens_on_failures(self, bridge) -> Any:
         """Sürekli hatalar circuit breaker'ı açmalı."""
         cb = bridge._circuits["feature_stability"]
         for _ in range(bridge.config.circuit_failure_threshold):
             cb.record_failure()
         assert cb.state == CircuitState.OPEN
 
-    def test_open_circuit_skips_calls(self, bridge, sample_features):
+    def test_open_circuit_skips_calls(self, bridge, sample_features) -> Any:
         """Açık circuit breaker çağrıları atlamalı."""
         cb = bridge._circuits["feature_stability"]
         for _ in range(bridge.config.circuit_failure_threshold):
@@ -647,25 +647,25 @@ class TestCircuitBreakerIntegration:
 class TestEdgeCases:
     """Edge case testleri."""
 
-    def test_empty_regime(self, bridge, sample_features):
+    def test_empty_regime(self, bridge, sample_features) -> Any:
         """Boş regime ile çalışmalı."""
         result = bridge.enhance_pipeline_result("THYAO", {}, sample_features, "")
         assert "_bridge" in result
 
-    def test_none_features_values(self, bridge):
+    def test_none_features_values(self, bridge) -> Any:
         """None değerli feature'lar filtrelenmeli."""
         features = {"rsi_14": None, "macd": 0.5, "volume_ratio": float("nan")}
         # None ve NaN filtrelenmeli, macd kalmalı
         result = bridge.enhance_pipeline_result("THYAO", {}, features, "BULL")
         assert "_bridge" in result
 
-    def test_large_feature_set(self, bridge):
+    def test_large_feature_set(self, bridge) -> Any:
         """Büyük feature seti ile çalışmalı."""
         features = {f"feature_{i}": float(i) for i in range(1000)}
         result = bridge.enhance_pipeline_result("THYAO", {}, features, "BULL")
         assert "_bridge" in result
 
-    def test_special_float_values(self, bridge):
+    def test_special_float_values(self, bridge) -> Any:
         """Özel float değerler (inf, -inf) filtrelenmeli."""
         features = {
             "normal": 1.5,

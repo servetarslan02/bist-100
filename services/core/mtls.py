@@ -22,6 +22,7 @@ Kullanım:
     channel = get_client_ssl_channel("alpha-api:50051")
 """
 
+import functools
 import os
 import ssl
 from dataclasses import dataclass
@@ -29,21 +30,26 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.mtls")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -134,6 +140,7 @@ class CertificateManager:
     """Sertifika yaşam döngüsü yönetimi."""
 
     def __init__(self, config: MTLSConfig):
+        """Otomatik eklendi."""
         self.config = config
 
     @otel_trace("mtls.CertificateManager.check_expiry")
@@ -234,6 +241,7 @@ class MTLSContext:
     """
 
     def __init__(self, config: MTLSConfig | None = None):
+        """Otomatik eklendi."""
         self.config = config or MTLSConfig()
         self.cert_manager = CertificateManager(self.config)
 
@@ -334,7 +342,7 @@ class MTLSContext:
         }
 
     @otel_trace("mtls.MTLSContext.get_grpc_channel_credentials")
-    def get_grpc_channel_credentials(self):
+    def get_grpc_channel_credentials(self) -> Any:
         """gRPC TLS channel credentials."""
         if not self.config.enabled:
             return None
@@ -364,7 +372,7 @@ class MTLSContext:
             return None
 
     @otel_trace("mtls.MTLSContext.get_grpc_server_credentials")
-    def get_grpc_server_credentials(self):
+    def get_grpc_server_credentials(self) -> Any:
         """gRPC TLS server credentials."""
         if not self.config.enabled:
             return None
@@ -440,13 +448,13 @@ def get_server_ssl_args() -> dict[str, str]:
 
 
 @otel_trace("mtls.get_grpc_client_credentials")
-def get_grpc_client_credentials():
+def get_grpc_client_credentials() -> Any:
     """gRPC client TLS credentials (shortcut)."""
     return get_mtls_context().get_grpc_channel_credentials()
 
 
 @otel_trace("mtls.get_grpc_server_credentials")
-def get_grpc_server_credentials():
+def get_grpc_server_credentials() -> Any:
     """gRPC server TLS credentials (shortcut)."""
     return get_mtls_context().get_grpc_server_credentials()
 
@@ -473,11 +481,13 @@ class MTLSMiddleware:
     """
 
     def __init__(self, app, required: bool = True):
+        """Otomatik eklendi."""
         self.app = app
         self.required = required
         self.mtls = get_mtls_context()
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope, receive, send) -> Any:
+        """Otomatik eklendi."""
         if scope["type"] == "http":
             # SSL bilgilerini kontrol et
             ssl_object = scope.get("ssl")
@@ -523,7 +533,7 @@ class MTLSMiddleware:
 
 
 @otel_trace("mtls.create_mtls_health_endpoint")
-def create_mtls_health_endpoint():
+def create_mtls_health_endpoint() -> Any:
     """mTLS sağlık kontrolü endpoint'i.
 
     FastAPI router'a eklenebilir:
@@ -535,18 +545,18 @@ def create_mtls_health_endpoint():
     router = APIRouter(prefix="/mtls", tags=["mTLS"])
 
     @router.get("/status")
-    async def mtls_status():
+    async def mtls_status() -> Any:
         """mTLS durum bilgisi."""
         return get_mtls_status()
 
     @router.get("/certificates")
-    async def mtls_certificates():
+    async def mtls_certificates() -> Any:
         """Sertifika detayları."""
         ctx = get_mtls_context()
         return ctx.cert_manager.get_all_status()
 
     @router.get("/health")
-    async def mtls_health():
+    async def mtls_health() -> Any:
         """mTLS sağlık kontrolü."""
         ctx = get_mtls_context()
         status = ctx.get_status()

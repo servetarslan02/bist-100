@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Likidite Kısıtı ve Gap Risk Testleri
 
@@ -20,7 +21,7 @@ from services.backtest.multi_asset_engine import (
 )
 
 
-def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1"):
+def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1") -> Any:
     """D günü sinyal üretilir (score=80 → BUY), D+1 günü execution olur."""
     dates = pl.Series(["2024-01-01", "2024-01-02"])
     market_data = pl.DataFrame(
@@ -58,7 +59,7 @@ def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1"):
 class TestLiquidityConstraint:
     """Likidite kısıtı testleri."""
 
-    def test_large_order_capped_by_daily_volume(self):
+    def test_large_order_capped_by_daily_volume(self) -> Any:
         """Doğal pozisyon büyüklüğü hacmin %10'unu aşıyorsa, emir kısılmalı."""
         market_data, signal_data, sector_map = _make_two_day_data(
             d0_close=100.0,
@@ -84,7 +85,7 @@ class TestLiquidityConstraint:
         )
         assert buys[0]["quantity"] > 0
 
-    def test_zero_volume_skips_trade_entirely(self):
+    def test_zero_volume_skips_trade_entirely(self) -> Any:
         """Hacim verisi 0/yoksa emir hiç gerçekleşmemeli (güvenli taraf)."""
         market_data, signal_data, sector_map = _make_two_day_data(
             d0_close=100.0,
@@ -104,7 +105,7 @@ class TestLiquidityConstraint:
         buys = [t for t in result.trade_log if t["side"] == "BUY"]
         assert len(buys) == 0, "Hacim verisi olmayan bir günde işlem yapılmamalı"
 
-    def test_participation_limit_disabled_when_zero(self):
+    def test_participation_limit_disabled_when_zero(self) -> Any:
         """max_volume_participation_pct=0 kısıtı tamamen kapatmalı (geriye dönük uyumluluk)."""
         market_data, signal_data, sector_map = _make_two_day_data(
             d0_close=100.0,
@@ -131,7 +132,7 @@ class TestLiquidityConstraint:
 class TestGapRisk:
     """Gap risk (tavan/taban kilidi) testleri."""
 
-    def test_large_gap_blocks_trade(self):
+    def test_large_gap_blocks_trade(self) -> Any:
         """Açılış, önceki kapanışa göre %10'u aşan bir sıçrama yapıyorsa
         emir gerçekleşmemeli (limit kilidi varsayımı)."""
         market_data, signal_data, sector_map = _make_two_day_data(
@@ -152,7 +153,7 @@ class TestGapRisk:
         buys = [t for t in result.trade_log if t["side"] == "BUY"]
         assert len(buys) == 0, "Bandı aşan gap'te işlem gerçekleşmemeli"
 
-    def test_small_gap_allows_trade(self):
+    def test_small_gap_allows_trade(self) -> Any:
         """Bandın içindeki normal bir açılış farkında işlem gerçekleşmeli."""
         market_data, signal_data, sector_map = _make_two_day_data(
             d0_close=100.0,
@@ -173,7 +174,7 @@ class TestGapRisk:
         assert len(buys) == 1
         assert buys[0]["price"] > 0
 
-    def test_gap_check_disabled_when_zero(self):
+    def test_gap_check_disabled_when_zero(self) -> Any:
         """gap_limit_pct=0 kontrolü tamamen kapatmalı."""
         market_data, signal_data, sector_map = _make_two_day_data(
             d0_close=100.0,

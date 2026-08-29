@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Expected Return (Multi-Factor Model).
 
 Market Model (OLS) ve Fama-French 3/5-Factor modeli destekler.
@@ -268,7 +269,8 @@ def _newey_west_se(X: np.ndarray, residuals: np.ndarray, lags: int) -> dict[str,
     e = residuals
 
     # Bartlett kernel ağırlıkları
-    def w(j):
+    def w(j) -> Any:
+        """Otomatik eklendi."""
         return 1 - j / (lags + 1)
 
     # S_hat hesapla (k × k sandwich matrix)

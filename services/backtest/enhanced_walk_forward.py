@@ -87,6 +87,7 @@ class PurgeEmbargoWalkForward:
         purge_days: int = 5,
         embargo_days: int = 5,
     ):
+        """Otomatik eklendi."""
         self.train_days = train_days
         self.test_days = test_days
         self.step_days = step_days
@@ -391,6 +392,7 @@ class PurgeEmbargoWalkForward:
 
 # Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
 import warnings
+
 warnings.warn(
     "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
     DeprecationWarning,

@@ -1,3 +1,4 @@
+from typing import Any
 import asyncio
 import time
 from collections import defaultdict
@@ -15,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/state")
-async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Piyasa durumu — 0-Gecikmeli radar ve rejim motorundan anında döner."""
     try:
         from ...core.redis_helper import get_cached
@@ -84,7 +85,7 @@ _INSTRUMENTS_CACHE = None
 
 
 @router.get("/instruments")
-async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tüm hisseler."""
     global _INSTRUMENTS_CACHE
     if _INSTRUMENTS_CACHE:
@@ -104,7 +105,7 @@ async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 
 @router.get("/instruments/{ticker}")
-async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Hisşe detay."""
     try:
         await get_service_orchestrator()
@@ -118,7 +119,7 @@ async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depen
 @router.get("/instruments/{ticker}/ohlcv")
 async def ohlcv(
     ticker: str, period: str = "6mo", interval: str = "1d", user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """OHLCV verisi."""
     try:
         from ...data.data_source import data_source
@@ -278,7 +279,7 @@ async def live_intel_analysis(
     interval: str = Query("1d", description="Bar interval: 1d, 1wk, 1mo"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Gerçek zamanlı piyasa verisi, hesaplanmış teknik indikatörler ve mum grafiği."""
     sym = ticker.upper().replace(".IS", "").strip()
     yf_ticker = f"{sym}.IS"
@@ -297,13 +298,15 @@ async def live_intel_analysis(
     try:
         import pandas as pd
         import polars as pl
+
         from ...data.data_source import data_source
 
         # Fetch timeframe chart data (daily, weekly, months)
         raw_chart = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
         raw_daily = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
 
-        def _to_pandas_df(d):
+        def _to_pandas_df(d) -> Any:
+            """Otomatik eklendi."""
             if d is None:
                 return None
             if isinstance(d, pl.DataFrame):
@@ -324,6 +327,7 @@ async def live_intel_analysis(
         # Fallback: Eger canli veri cekilemediyse gercekci piyasa gecmisi olustur
         if df is None or df.empty or len(df) < 2:
             import numpy as np
+
             dates = pd.date_range(end=pd.Timestamp.now(), periods=120, freq="B")
             base_p = float(meta.get("pe", 10.0) * 12.5) if meta.get("pe") else 125.0
             np.random.seed(abs(hash(sym)) % 100000)
@@ -333,13 +337,9 @@ async def live_intel_analysis(
             highs = np.maximum(prices, opens) * (1 + np.random.uniform(0.002, 0.015, 120))
             lows = np.minimum(prices, opens) * (1 - np.random.uniform(0.002, 0.015, 120))
             volumes = np.random.randint(500_000, 15_000_000, 120)
-            df = pd.DataFrame({
-                "Open": opens,
-                "High": highs,
-                "Low": lows,
-                "Close": prices,
-                "Volume": volumes
-            }, index=dates)
+            df = pd.DataFrame(
+                {"Open": opens, "High": highs, "Low": lows, "Close": prices, "Volume": volumes}, index=dates
+            )
             df_chart = df
 
         # Ensure clean non-null close prices
@@ -468,7 +468,7 @@ async def live_intel_analysis(
 
 
 @router.get("/instruments/{ticker}/features")
-async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Feature'lar — factor_engine servisi."""
     try:
         from ...intelligence.factor_engine import FactorEngine
@@ -481,19 +481,19 @@ async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_
 
 
 @router.get("/sectors")
-async def sectors(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def sectors(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Sektörler."""
     return {"sectors": ["BANKA", "SANAYI", "TEKNOLOJI", "PERAKENDE", "ENERJI", "ULAŞTIRMA"]}
 
 
 @router.get("/calendar")
-async def calendar(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def calendar(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """İşlem takvimi."""
     return {"market_open": "09:40", "market_close": "18:00", "timezone": "Europe/Istanbul"}
 
 
 @router.get("/events")
-async def events(limit: int = Query(20, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def events(limit: int = Query(20, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Piyasa olayları — event_scanner servisi."""
     try:
         from ...scanner.event_scanner import EventScanner
@@ -506,7 +506,7 @@ async def events(limit: int = Query(20, le=100), user=Depends(get_current_user),
 
 
 @router.get("/radar")
-async def market_radar(limit: int = Query(1000, le=1000), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def market_radar(limit: int = Query(1000, le=1000), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Piyasa radarı — Redis cache'den anında döner (<50ms). Cache 2dk'da bir yenilenir."""
     from ...core.redis_helper import get_cached
 
@@ -529,11 +529,9 @@ async def market_radar(limit: int = Query(1000, le=1000), user=Depends(get_curre
     return await _fetch_radar_fresh(limit)
 
 
-async def _fetch_radar_fresh(limit: int = 1000):
+async def _fetch_radar_fresh(limit: int = 1000) -> Any:
     """0-Gecikmeli Canlı TradingView & Kamu Veri Beslemesi ile TÜM BIST hisselerini çek."""
     from concurrent.futures import ThreadPoolExecutor
-
-    import requests
 
     from ...ingestion.bist_universe import bist_universe
 
@@ -541,7 +539,7 @@ async def _fetch_radar_fresh(limit: int = 1000):
     all_tickers = bist_universe.BIST_ALL_TICKERS
     tickers_to_fetch = all_tickers[:limit] if limit else all_tickers
 
-    def _fetch_tradingview_live():
+    def _fetch_tradingview_live() -> Any:
         """TradingView Turkey Scanner API üzerinden 648 hisseyi 0.2 saniyede CANLI ve 0 Gecikmeyle çek."""
         url = "https://scanner.tradingview.com/turkey/scan"
         payload = {
@@ -568,7 +566,9 @@ async def _fetch_radar_fresh(limit: int = 1000):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         try:
-            resp = requests.post(url, json=payload, headers=headers, timeout=2.0)
+            import httpx
+            with httpx.Client(timeout=2.0) as client:
+                resp = client.post(url, json=payload, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 rows = data.get("data", [])
@@ -623,7 +623,8 @@ async def _fetch_radar_fresh(limit: int = 1000):
             logger.warning(f"tradingview_scan_error: {e}, falling back to yfinance")
         return None
 
-    def _calc_rsi(closes, period=14):
+    def _calc_rsi(closes, period=14) -> Any:
+        """Otomatik eklendi."""
         if len(closes) < period + 1:
             return 50.0
         arr = np.array(closes)
@@ -640,7 +641,8 @@ async def _fetch_radar_fresh(limit: int = 1000):
         rs = avg_gain / (avg_loss + 1e-9)
         return round(100 - 100 / (1 + rs), 1)
 
-    def _batch_fetch():
+    def _batch_fetch() -> Any:
+        """Otomatik eklendi."""
         # Önce 0 gecikmeli TradingView canlı beslemesini dene
         tv_results = _fetch_tradingview_live()
         if tv_results:
@@ -754,7 +756,7 @@ async def _fetch_radar_fresh(limit: int = 1000):
 
 
 @router.get("/regime")
-async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Piyasa rejimi."""
     try:
         from ...intelligence.regime import regime_engine
@@ -770,7 +772,7 @@ _HEATMAP_TIME = 0.0
 
 
 @router.get("/heatmap")
-async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """BIST 100% dinamik canlı sektör ısı haritası — yeni hisseler ve halka arzlar otomatik dahil edilir."""
     global _HEATMAP_CACHE, _HEATMAP_TIME
     now = time.time()

@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Forensic Live Cross-Verification & Stress Test
 ===========================================================
@@ -23,10 +26,11 @@ from services.paper_trading.state_store import PaperStateStore
 from services.paper_trading.synthetic_liquidity import LiquidityScenario
 
 
-def run_forensic_proof():
-    print("=" * 90)
-    print("🔬 ALPHA BIST ÇEKİRDEK MOTORU DERİNLEMESİNE ADLİ (FORENSIC) ÇAPRAZ DENETİMİ")
-    print("=" * 90)
+def run_forensic_proof() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 90)
+    logger.info("🔬 ALPHA BIST ÇEKİRDEK MOTORU DERİNLEMESİNE ADLİ (FORENSIC) ÇAPRAZ DENETİMİ")
+    logger.info("=" * 90)
 
     # Geçici izole test DB
     test_db = "data/forensic_test.db"
@@ -77,7 +81,7 @@ def run_forensic_proof():
     # -------------------------------------------------------------
     # ADIM 1: CUMA AKŞAMI (2024-01-05 18:15) - Sinyal Kuyruklama
     # -------------------------------------------------------------
-    print(f"\n[1] 📅 CUMA AKŞAMI ({date_strs[0]} 18:15) — EOD Sinyal Üretimi")
+    logger.info(f"\n[1] 📅 CUMA AKŞAMI ({date_strs[0]} 18:15) — EOD Sinyal Üretimi")
     cuma_signals = [
         {
             "ticker": t,
@@ -97,34 +101,34 @@ def run_forensic_proof():
     assert summary["total_value"] == 1_000_000.0, "Cuma akşamı değer bozulmamalı!"
     assert summary["num_positions"] == 0, "Cuma akşamı pozisyon açılmamalı!"
     assert summary["total_cash"] == 1_000_000.0, "Nakit eksilmemeli!"
-    print(
+    logger.info(
         f"  ✓ Sinyaller başarıyla kuyruğa alındı. Açık Pozisyon: {summary['num_positions']}, Toplam Değer: {summary['total_value']:,.2f} ₺"
     )
 
     # -------------------------------------------------------------
     # ADIM 2: PAZARTESİ SABAHI (2024-01-08 09:55) - T+1 Açılış Yürütmesi
     # -------------------------------------------------------------
-    print(f"\n[2] 📅 PAZARTESİ SABAHI ({date_strs[1]} 09:55) — Açılış Fiyatı & 10 Kademeli Walk-the-Book")
+    logger.info(f"\n[2] 📅 PAZARTESİ SABAHI ({date_strs[1]} 09:55) — Açılış Fiyatı & 10 Kademeli Walk-the-Book")
     rep_pazartesi = orch.execute_pending_signals(date_strs[1], market_data, sector_map)
 
     assert rep_pazartesi["status"] == "COMPLETED"
     assert rep_pazartesi["num_orders"] == 10
 
     p_summary = orch.portfolio.get_summary()
-    print(f"  ✓ 10 emir Walk-the-Book ile eşleşti. Açık Pozisyon: {p_summary['num_positions']}")
-    print(f"  ✓ Pazartesi Açılış Sonrası Portföy Değeri: {p_summary['total_value']:,.2f} ₺")
-    print(
+    logger.info(f"  ✓ 10 emir Walk-the-Book ile eşleşti. Açık Pozisyon: {p_summary['num_positions']}")
+    logger.info(f"  ✓ Pazartesi Açılış Sonrası Portföy Değeri: {p_summary['total_value']:,.2f} ₺")
+    logger.info(
         f"  ✓ Kalan Serbest Nakit: {p_summary['total_cash']:,.2f} ₺, Yatırılan Tutar: {p_summary['invested_value']:,.2f} ₺"
     )
 
     # Muhasebe Invariant Kontrolü: total_value == total_cash + invested_value
     assert abs(p_summary["total_value"] - (p_summary["total_cash"] + p_summary["invested_value"])) < 1e-4
-    print("  ✓ [İNVARİANT DOĞRULANDI]: Total Value == Total Cash + Invested Value")
+    logger.info("  ✓ [İNVARİANT DOĞRULANDI]: Total Value == Total Cash + Invested Value")
 
     # -------------------------------------------------------------
     # ADIM 3: SALI GÜNÜ (2024-01-09) - KAP VBTS Brüt Takas & Satış Engeli
     # -------------------------------------------------------------
-    print(f"\n[3] 📅 SALI GÜNÜ ({date_strs[2]}) — KAP VBTS Brüt Takas Kısıtı Testi")
+    logger.info(f"\n[3] 📅 SALI GÜNÜ ({date_strs[2]}) — KAP VBTS Brüt Takas Kısıtı Testi")
     # THYAO için KAP'tan Brüt Takas tescil edilsin
     kap_restriction_registry.register_restriction(
         ticker="THYAO",
@@ -148,12 +152,12 @@ def run_forensic_proof():
     assert res_sell.get("error") == "GROSS_SETTLEMENT_BLOCKED", (
         "Brüt takastaki hissenin aynı gün satışı engellenmeliydi!"
     )
-    print("  ✓ [KAP KISITI DOĞRULANDI]: Brüt takastaki hissenin gün içi satışı başarıyla BLOKLANDI!")
+    logger.info("  ✓ [KAP KISITI DOĞRULANDI]: Brüt takastaki hissenin gün içi satışı başarıyla BLOKLANDI!")
 
     # -------------------------------------------------------------
     # ADIM 4: ÇARŞAMBA SABAHI (2024-01-10) - Rebalance & Takasbank Mahsubu
     # -------------------------------------------------------------
-    print(f"\n[4] 📅 ÇARŞAMBA SABAHI ({date_strs[3]}) — Rebalance & Takasbank T+2 Mahsup Doğrulaması")
+    logger.info(f"\n[4] 📅 ÇARŞAMBA SABAHI ({date_strs[3]}) — Rebalance & Takasbank T+2 Mahsup Doğrulaması")
     # THYAO ve AKBNK çıksın, yerine KCHOL ve ASELS lotları artsın
     rebalance_signals = [
         {
@@ -189,15 +193,15 @@ def run_forensic_proof():
     assert rep_reb["status"] == "COMPLETED"
 
     reb_summary = orch.portfolio.get_summary()
-    print("  ✓ Rebalance başarıyla tamamlandı. THYAO ve AKBNK satıldı, satış geliri ile yeni emirler alındı.")
-    print(f"  ✓ Alım Gücü (Purchasing Power): {reb_summary['purchasing_power']:,.2f} ₺")
-    print(f"  ✓ Valörlü Takas Bekleyen Nakit (T+2): {reb_summary['unsettled_cash_t2']:,.2f} ₺")
-    print(f"  ✓ Bankaya Çekilebilir Bakiye (Settled): {reb_summary['withdrawable_cash']:,.2f} ₺")
+    logger.info("  ✓ Rebalance başarıyla tamamlandı. THYAO ve AKBNK satıldı, satış geliri ile yeni emirler alındı.")
+    logger.info(f"  ✓ Alım Gücü (Purchasing Power): {reb_summary['purchasing_power']:,.2f} ₺")
+    logger.info(f"  ✓ Valörlü Takas Bekleyen Nakit (T+2): {reb_summary['unsettled_cash_t2']:,.2f} ₺")
+    logger.info(f"  ✓ Bankaya Çekilebilir Bakiye (Settled): {reb_summary['withdrawable_cash']:,.2f} ₺")
 
     # -------------------------------------------------------------
     # ADIM 5: PERŞEMBE (2024-01-11) - Piyasa Çöküşü & Risk Kapısı Kill-Switch
     # -------------------------------------------------------------
-    print(f"\n[5] 📅 PERŞEMBE ({date_strs[4]}) — Stres Senaryosu & Risk Kapısı Kill-Switch Testi")
+    logger.info(f"\n[5] 📅 PERŞEMBE ({date_strs[4]}) — Stres Senaryosu & Risk Kapısı Kill-Switch Testi")
     # Portföyde yapay %30 drawdown oluşturalım
     orch.portfolio._max_equity = 1_500_000.0  # Zirve
     # Risk kapısı kill-switch kontrolü
@@ -219,11 +223,11 @@ def run_forensic_proof():
     rep_crash = orch.execute_pending_signals(date_strs[4], market_data, sector_map)
 
     # Drawdown kill switch nedeniyle emir doldurulmamalı
-    print(f"  ✓ Risk Kapısı Kill-Switch Tetiklendi. Gerçekleşen Emir: {rep_crash['num_orders']} (Sermaye Korundu!)")
+    logger.info(f"  ✓ Risk Kapısı Kill-Switch Tetiklendi. Gerçekleşen Emir: {rep_crash['num_orders']} (Sermaye Korundu!)")
 
-    print("\n" + "=" * 90)
-    print("✅ TÜM ADLİ ÇAPRAZ KONTROLLER %100 BAŞARIYLA GEÇTİ — SIFIR HATA, SIFIR SIZINTI!")
-    print("=" * 90)
+    logger.info("\n" + "=" * 90)
+    logger.info("✅ TÜM ADLİ ÇAPRAZ KONTROLLER %100 BAŞARIYLA GEÇTİ — SIFIR HATA, SIFIR SIZINTI!")
+    logger.info("=" * 90)
 
     # Temizlik
     if os.path.exists(test_db):

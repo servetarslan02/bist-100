@@ -157,6 +157,7 @@ class KAPExtractor:
         )
 
     def _build_empty(self, ticker: str, kap_id: str) -> KAPExtractedEvent:
+        """Otomatik eklendi."""
         return KAPExtractedEvent(
             ticker=ticker,
             kap_id=kap_id,

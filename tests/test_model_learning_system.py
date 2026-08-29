@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Comprehensive Model Training & Performance Learning Test Suite
 
 Test edilen alanlar:
@@ -24,14 +25,15 @@ from services.learning.model_trust_engine import ModelTrustEngine, ModelTrustSco
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Any:
+    """Otomatik eklendi."""
     temp_dir = tempfile.mkdtemp()
     db_path = os.path.join(temp_dir, "test_memory.db")
     yield db_path
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def test_prediction_to_outcome_matching(temp_db):
+def test_prediction_to_outcome_matching(temp_db) -> Any:
     """Prediction -> Outcome eşleşmesi ve net PnL hesaplaması."""
     store = ModelMemoryStore(db_path=temp_db)
 
@@ -59,7 +61,7 @@ def test_prediction_to_outcome_matching(temp_db):
     assert outcome_res["net_pnl"] == pytest.approx(492.6, abs=0.5)
 
 
-def test_performance_metrics_and_transaction_costs():
+def test_performance_metrics_and_transaction_costs() -> Any:
     """BIST işlem maliyetli metrikler, Sharpe, Brier ve Rank IC testi."""
     mock_data = [
         {
@@ -112,7 +114,7 @@ def test_performance_metrics_and_transaction_costs():
     assert "BULL" in metrics.regime_breakdown
 
 
-def test_dynamic_trust_score_and_shrinkage():
+def test_dynamic_trust_score_and_shrinkage() -> Any:
     """Örneklem yetersizliğinde prior shrinkage ve yüksek örneklemde güvenilirlik artışı."""
     engine = ModelTrustEngine(min_samples_threshold=30, prior_trust=0.50)
 
@@ -171,7 +173,7 @@ def test_dynamic_trust_score_and_shrinkage():
     assert high_trust.reliability_score > 0.70  # Gerçek yüksek güven skoru
 
 
-def test_signal_fusion_adaptive_weights_and_bounds():
+def test_signal_fusion_adaptive_weights_and_bounds() -> Any:
     """Signal fusion adaptif ağırlık dağılımı ve min/max sınırları (%5 - %35)."""
     fusion = SignalFusionEngine()
     trust_engine = ModelTrustEngine(weight_min=0.05, weight_max=0.35)
@@ -200,7 +202,7 @@ def test_signal_fusion_adaptive_weights_and_bounds():
     assert sum(active_w.values()) == pytest.approx(1.0, abs=0.01)
 
 
-def test_full_learning_pipeline_end_to_end(temp_db):
+def test_full_learning_pipeline_end_to_end(temp_db) -> Any:
     """Uçtan uca döngü: Predict -> Outcome -> Performance -> Trust -> Fusion -> Report."""
     store = ModelMemoryStore(db_path=temp_db)
     pipeline = LearningPipeline(memory_store=store)

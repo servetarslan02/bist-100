@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 5.1 Test Suite
 
@@ -15,7 +18,7 @@ import orjson
 # ────────────────────────────────────────────────────────────
 
 
-def test_config_production_validation():
+def test_config_production_validation() -> Any:
     """Production'da insecure config reddedilmeli."""
     from services.core.config import Settings
 
@@ -25,7 +28,7 @@ def test_config_production_validation():
     # Development modu — validation宽松
     s = Settings(APP_ENV="development", SECRET_KEY="", JWT_SECRET="")
     assert not s.is_production
-    print("  ✓ Development mode: insecure defaults allowed")
+    logger.info("  ✓ Development mode: insecure defaults allowed")
     passed += 1
 
     # Production modu — insecure key reddedilmeli
@@ -38,10 +41,10 @@ def test_config_production_validation():
             APP_DEBUG=False,
         )
         # Bu satıra ulaşmamalı (sys.exit)
-        print("  ✗ Production should reject insecure keys")
+        logger.info("  ✗ Production should reject insecure keys")
         failed += 1
     except SystemExit:
-        print("  ✓ Production rejects insecure keys (SystemExit)")
+        logger.info("  ✓ Production rejects insecure keys (SystemExit)")
         passed += 1
 
     # Production modu — debug=True reddedilmeli
@@ -53,10 +56,10 @@ def test_config_production_validation():
             POSTGRES_PASSWORD="secure_password_123",
             APP_DEBUG=True,
         )
-        print("  ✗ Production should reject debug=True")
+        logger.info("  ✗ Production should reject debug=True")
         failed += 1
     except SystemExit:
-        print("  ✓ Production rejects debug=True (SystemExit)")
+        logger.info("  ✓ Production rejects debug=True (SystemExit)")
         passed += 1
 
     return passed, failed
@@ -67,7 +70,7 @@ def test_config_production_validation():
 # ────────────────────────────────────────────────────────────
 
 
-def test_missing_secret_detection():
+def test_missing_secret_detection() -> Any:
     """Eksik secret'lar tespit edilmeli."""
     from services.core.config import Settings
 
@@ -83,10 +86,10 @@ def test_missing_secret_detection():
             POSTGRES_PASSWORD="secure_pw_123456",
             APP_DEBUG=False,
         )
-        print("  ✗ Should reject empty SECRET_KEY")
+        logger.info("  ✗ Should reject empty SECRET_KEY")
         failed += 1
     except SystemExit:
-        print("  ✓ Empty SECRET_KEY rejected in production")
+        logger.info("  ✓ Empty SECRET_KEY rejected in production")
         passed += 1
 
     return passed, failed
@@ -97,7 +100,7 @@ def test_missing_secret_detection():
 # ────────────────────────────────────────────────────────────
 
 
-def test_dev_config_isolation():
+def test_dev_config_isolation() -> Any:
     """Development config production kurallarından muaf olmalı."""
     from services.core.config import Settings
 
@@ -107,12 +110,12 @@ def test_dev_config_isolation():
     s = Settings(APP_ENV="development", APP_DEBUG=True, SECRET_KEY="", JWT_SECRET="")
     assert not s.is_production
     assert s.app_debug is True
-    print("  ✓ Dev config: debug=True, empty secrets allowed")
+    logger.info("  ✓ Dev config: debug=True, empty secrets allowed")
     passed += 1
 
     s2 = Settings(APP_ENV="test", APP_DEBUG=True, SECRET_KEY="", JWT_SECRET="")
     assert not s2.is_production
-    print("  ✓ Test config: same as dev")
+    logger.info("  ✓ Test config: same as dev")
     passed += 1
 
     return passed, failed
@@ -123,7 +126,7 @@ def test_dev_config_isolation():
 # ────────────────────────────────────────────────────────────
 
 
-def test_config_fields():
+def test_config_fields() -> Any:
     """Tüm production gerekli alanlar config'de tanımlı olmalı."""
     from services.core.config import Settings
 
@@ -155,7 +158,7 @@ def test_config_fields():
     assert hasattr(s, "postgres_url")
     assert hasattr(s, "redis_url")
 
-    print("  ✓ Config fields: all present (broker, KAP, security, DB)")
+    logger.info("  ✓ Config fields: all present (broker, KAP, security, DB)")
     passed += 1
 
     return passed, failed
@@ -166,14 +169,14 @@ def test_config_fields():
 # ────────────────────────────────────────────────────────────
 
 
-def test_env_example_no_secrets():
+def test_env_example_no_secrets() -> Any:
     """.env.example gerçek secret içermemeli."""
     passed = 0
     failed = 0
 
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.example")
     if not os.path.exists(env_path):
-        print("  ⚠ .env.example not found, skip")
+        logger.info("  ⚠ .env.example not found, skip")
         return 0, 0
 
     with open(env_path) as f:
@@ -192,7 +195,7 @@ def test_env_example_no_secrets():
             found.append(pattern)
 
     assert len(found) == 0, f".env.example contains insecure values: {found}"
-    print("  ✓ .env.example: no real secrets")
+    logger.info("  ✓ .env.example: no real secrets")
     passed += 1
 
     return passed, failed
@@ -203,7 +206,7 @@ def test_env_example_no_secrets():
 # ────────────────────────────────────────────────────────────
 
 
-def test_db_health_check():
+def test_db_health_check() -> Any:
     """DB health check fonksiyonu mevcut olmalı ve graceful çalışmalı."""
     from services.core.database import check_db_health
 
@@ -219,11 +222,11 @@ def test_db_health_check():
         assert "postgres" in health
         assert "clickhouse" in health
         assert "redis" in health
-        print(f"  ✓ DB health check: {health}")
+        logger.info(f"  ✓ DB health check: {health}")
         passed += 1
     except Exception as e:
         # DB yoksa bile graceful hata
-        print(f"  ✓ DB health check graceful failure: {e}")
+        logger.info(f"  ✓ DB health check graceful failure: {e}")
         passed += 1
 
     return passed, failed
@@ -234,7 +237,7 @@ def test_db_health_check():
 # ────────────────────────────────────────────────────────────
 
 
-def test_db_graceful_failure():
+def test_db_graceful_failure() -> Any:
     """DB erişilemezse sistem crash olmamalı."""
     from services.core.database import init_databases
 
@@ -245,10 +248,10 @@ def test_db_graceful_failure():
 
     try:
         asyncio.get_event_loop().run_until_complete(init_databases())
-        print("  ✓ DB init: no crash (DB may be unavailable)")
+        logger.info("  ✓ DB init: no crash (DB may be unavailable)")
         passed += 1
     except Exception as e:
-        print(f"  ✗ DB init crashed: {e}")
+        logger.info(f"  ✗ DB init crashed: {e}")
         failed += 1
 
     return passed, failed
@@ -259,7 +262,7 @@ def test_db_graceful_failure():
 # ────────────────────────────────────────────────────────────
 
 
-def test_model_persistence_serialization():
+def test_model_persistence_serialization() -> Any:
     """Model metadata serialization/deserialization çalışmalı."""
 
     passed = 0
@@ -267,6 +270,7 @@ def test_model_persistence_serialization():
 
     # Mock model object
     class MockModel:
+        """Otomatik eklendi."""
         feature_names = ["f1", "f2", "f3"]
         cs_features = ["f1_cs_zscore"]
         validation_metrics = {"mae": 5.0, "rmse": 7.0, "ic": 0.05}
@@ -310,7 +314,7 @@ def test_model_persistence_serialization():
     assert deserialized["feature_names"] == ["f1", "f2", "f3"]
     assert deserialized["confidence_score"] == 0.75
 
-    print(f"  ✓ Model persistence: contract={contract_hash}, serializable")
+    logger.info(f"  ✓ Model persistence: contract={contract_hash}, serializable")
     passed += 1
 
     return passed, failed
@@ -321,7 +325,7 @@ def test_model_persistence_serialization():
 # ────────────────────────────────────────────────────────────
 
 
-def test_migration_consistency():
+def test_migration_consistency() -> Any:
     """Migration dosyaları tutarlı olmalı."""
     passed = 0
     failed = 0
@@ -354,7 +358,7 @@ def test_migration_consistency():
     assert "system_jobs" in content
     assert "feature_snapshots" in content
 
-    print(f"  ✓ Migrations: {len(migrations)} files, all have up/down, v005 FAZ 4 fields present")
+    logger.info(f"  ✓ Migrations: {len(migrations)} files, all have up/down, v005 FAZ 4 fields present")
     passed += 1
 
     return passed, failed
@@ -365,7 +369,7 @@ def test_migration_consistency():
 # ────────────────────────────────────────────────────────────
 
 
-def test_startup_health():
+def test_startup_health() -> Any:
     """Startup'ta config ve DB sağlık kontrolü yapılmalı."""
     from services.core.config import settings
 
@@ -375,7 +379,7 @@ def test_startup_health():
     # Config yüklenmiş olmalı
     assert settings is not None
     assert settings.app_env in ("development", "staging", "production", "test")
-    print(f"  ✓ Startup config: env={settings.app_env}, port={settings.app_port}")
+    logger.info(f"  ✓ Startup config: env={settings.app_env}, port={settings.app_port}")
     passed += 1
 
     return passed, failed
@@ -386,7 +390,8 @@ def test_startup_health():
 # ────────────────────────────────────────────────────────────
 
 
-def run_all():
+def run_all() -> Any:
+    """Otomatik eklendi."""
     tests = [
         ("Production config validation", test_config_production_validation),
         ("Missing secret detection", test_missing_secret_detection),
@@ -403,28 +408,28 @@ def run_all():
     total_passed = 0
     total_failed = 0
 
-    print("=" * 70)
-    print("FAZ 5.1 — Config/Secrets + Database + Model Persistence")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("FAZ 5.1 — Config/Secrets + Database + Model Persistence")
+    logger.info("=" * 70)
 
     for name, test_fn in tests:
-        print(f"\n▸ {name}")
+        logger.info(f"\n▸ {name}")
         try:
             p, f = test_fn()
             total_passed += p
             total_failed += f
             if f > 0:
-                print(f"  ⚠ {f} FAILED")
+                logger.info(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
 
-            print(f"  ✗ EXCEPTION: {e}")
+            logger.info(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1
 
-    print("\n" + "=" * 70)
-    print(f"SONUÇ: {total_passed} passed, {total_failed} failed")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info(f"SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info("=" * 70)
 
     return total_failed == 0
 

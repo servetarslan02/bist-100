@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Synthetic Microstructure & Multi-Scenario Liquidity Tests
 """
@@ -21,12 +22,14 @@ from services.paper_trading.synthetic_liquidity import (
 
 
 class TestSyntheticMicrostructure(unittest.TestCase):
-    def setUp(self):
+    """Otomatik eklendi."""
+    def setUp(self) -> Any:
+        """Otomatik eklendi."""
         self.estimator = SyntheticLiquidityEstimator()
         self.builder = SyntheticOrderBookBuilder()
         self.kap_reg = KAPMarketRestrictionRegistry()
 
-    def test_corwin_schultz_spread_and_bist_floor(self):
+    def test_corwin_schultz_spread_and_bist_floor(self) -> Any:
         """Corwin-Schultz spread tahmini ve BIST kuruş adımı tabanı testi."""
         price = 100.0
         tick = get_bist_tick_size(price)  # 0.10 TL (%0.10)
@@ -52,7 +55,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         )
         self.assertAlmostEqual(spread_flat, (tick / price) * 100.0, places=2)
 
-    def test_synthetic_order_book_generation_deterministic(self):
+    def test_synthetic_order_book_generation_deterministic(self) -> Any:
         """10 kademeli deterministik defter üretimi testi."""
         book1 = self.builder.build_synthetic_book(
             ticker="THYAO",
@@ -80,7 +83,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertEqual(book1.asks[0].price, book2.asks[0].price)
         self.assertEqual(book1.bids[0].quantity, book2.bids[0].quantity)
 
-    def test_walk_the_book_and_participation_cap(self):
+    def test_walk_the_book_and_participation_cap(self) -> Any:
         """Kademe tüketme (Walk-the-Book) ve katılım tavanı testi."""
         adv = 1_000_000
         book = self.builder.build_synthetic_book(
@@ -109,7 +112,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertGreater(res["levels_consumed"], 0)
         self.assertGreaterEqual(res["vwap_price"], book.best_ask)
 
-    def test_multi_scenario_spread_and_depth_scaling(self):
+    def test_multi_scenario_spread_and_depth_scaling(self) -> Any:
         """Kötümser / Normal / İyimser senaryo çarpanları testi."""
         adv = 1_000_000
         pess_book = self.builder.build_synthetic_book(
@@ -145,7 +148,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertLess(pess_book.bids[0].quantity, norm_book.bids[0].quantity)
         self.assertLess(norm_book.bids[0].quantity, opt_book.bids[0].quantity)
 
-    def test_kap_restriction_registry_timestamp_and_gating(self):
+    def test_kap_restriction_registry_timestamp_and_gating(self) -> Any:
         """KAP tedbirlerinde yayın tarihi vs yürürlük tarihi ve kısıt kapısı testi."""
         # Akşam 18:30'da yayımlanan tedbir, 2024-01-02'de yürürlüğe girer
         self.kap_reg.register_restriction(
@@ -171,7 +174,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertFalse(ok_data)
         self.assertIn("DATA_QUALITY_UNVERIFIED", reason_data)
 
-    def test_scenario_manager_success_gate(self):
+    def test_scenario_manager_success_gate(self) -> Any:
         """3 Senaryolu Başarı Kapısı: Normal > BIST & Stres Drawdown Bounded."""
         pessimistic = ScenarioResult(
             scenario=LiquidityScenario.PESSIMISTIC,
@@ -250,7 +253,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertEqual(eval_fail["decision"], "INVALID_STRATEGY")
         self.assertTrue(any("OPTIMISTIC_ONLY_BIAS" in r for r in eval_fail["rejection_reasons"]))
 
-    def test_missing_bars_and_date_mismatch_failsafe(self):
+    def test_missing_bars_and_date_mismatch_failsafe(self) -> Any:
         """Eksik bar veya tarih uyuşmazlığında sıfır sentetik varsayım ve kesin NO_TRADE testi."""
         import polars as pl
 
@@ -295,7 +298,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         )
         self.assertEqual(res_date_mismatch["num_orders"], 0)
 
-    def test_exclusive_kap_registry_gross_settlement(self):
+    def test_exclusive_kap_registry_gross_settlement(self) -> Any:
         """Brüt takasın yalnızca KAP kısıt sicilinden teyit edilmesi testi."""
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
 

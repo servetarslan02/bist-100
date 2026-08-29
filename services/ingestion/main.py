@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST - Data Ingestion Service (Main Entry Point)"""
 
 import asyncio
@@ -38,10 +39,11 @@ class IngestionService:
     """Main data ingestion service for ALPHA BIST."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._instrument_map: dict[str, int] = {}  # ticker -> instrument_id
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the ingestion service."""
         setup_logging()
         logger.info("Starting ALPHA BIST Ingestion Service")
@@ -66,19 +68,18 @@ class IngestionService:
         await questdb_tick_consumer.start()
 
         # Start loops in the background
-        self._tasks = [
-            asyncio.create_task(self._market_data_loop()),
-            asyncio.create_task(self._kap_loop()),
-            asyncio.create_task(self._macro_loop()),
-            asyncio.create_task(self._news_loop()),
-            asyncio.create_task(self._social_loop()),
-        ]
+        t_market = asyncio.create_task(self._market_data_loop())
+        t_kap = asyncio.create_task(self._kap_loop())
+        t_macro = asyncio.create_task(self._macro_loop())
+        t_news = asyncio.create_task(self._news_loop())
+        t_social = asyncio.create_task(self._social_loop())
+        self._tasks = [t_market, t_kap, t_macro, t_news, t_social]
 
         # Keep the service running
         while self._running:
             await asyncio.sleep(1)
 
-    async def _refresh_universe(self):
+    async def _refresh_universe(self) -> Any:
         """Hisse evrenini otomatik yenile."""
         global BIST_STOCKS, BIST_ALL
         try:
@@ -90,7 +91,7 @@ class IngestionService:
         except Exception as e:
             logger.warning("Universe refresh failed, using cached/static", error=str(e))
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the ingestion service."""
         self._running = False
         await questdb_tick_consumer.stop()
@@ -99,7 +100,7 @@ class IngestionService:
         await close_databases()
         logger.info("Ingestion Service stopped")
 
-    async def _load_instrument_map(self):
+    async def _load_instrument_map(self) -> Any:
         """Load instrument ticker -> id mapping from PostgreSQL."""
         from ..core.database import pg_fetch
 
@@ -122,7 +123,7 @@ class IngestionService:
             """)
             self._instrument_map = {row["symbol"]: row["id"] for row in rows}
 
-    async def _seed_instruments(self):
+    async def _seed_instruments(self) -> Any:
         """Seed initial instrument data into PostgreSQL."""
         from ..core.database import pg_execute
 
@@ -183,7 +184,7 @@ class IngestionService:
     # Market Data Loop
     # =====================================================
 
-    async def _market_data_loop(self):
+    async def _market_data_loop(self) -> Any:
         """Periodically fetch market data from yfinance."""
         while self._running:
             try:
@@ -280,7 +281,7 @@ class IngestionService:
     # KAP Loop
     # =====================================================
 
-    async def _kap_loop(self):
+    async def _kap_loop(self) -> Any:
         """Periodically fetch KAP disclosures."""
         while self._running:
             try:
@@ -337,7 +338,7 @@ class IngestionService:
     # Macro Loop
     # =====================================================
 
-    async def _macro_loop(self):
+    async def _macro_loop(self) -> Any:
         """Periodically fetch macro data."""
         while self._running:
             try:
@@ -384,7 +385,7 @@ class IngestionService:
     # News Loop
     # =====================================================
 
-    async def _news_loop(self):
+    async def _news_loop(self) -> Any:
         """Periodically fetch news."""
         while self._running:
             try:
@@ -433,7 +434,7 @@ class IngestionService:
     # Social Media Loop
     # =====================================================
 
-    async def _social_loop(self):
+    async def _social_loop(self) -> Any:
         """Periodically fetch social media data."""
         while self._running:
             try:
@@ -477,11 +478,12 @@ class IngestionService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "ingestion"})
 
     app = web.Application()
@@ -498,7 +500,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the ingestion service."""
     # Start health server
     await _health_server()

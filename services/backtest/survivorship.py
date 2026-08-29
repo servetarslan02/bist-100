@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Any
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -44,6 +45,7 @@ class DelistingEvent:
     recovery_rate: float | None = None  # İflas durumunda geri kazanım oranı
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "delisting_date": self.delisting_date.isoformat(),
@@ -65,6 +67,7 @@ class UniverseSnapshot:
     delisted_count: int
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "date": self.date.isoformat(),
             "active_count": self.active_count,
@@ -82,11 +85,12 @@ class SurvivorshipBiasHandler:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._delisting_events: list[DelistingEvent] = []
         self._delisted_tickers: dict[str, datetime] = {}  # ticker → delist date
         self._active_tickers: set[str] = set()
 
-    def register_delisting(self, event: DelistingEvent):
+    def register_delisting(self, event: DelistingEvent) -> Any:
         """Delisting olayı kaydet."""
         self._delisting_events.append(event)
         if len(self._delisting_events) > 500:
@@ -96,12 +100,12 @@ class SurvivorshipBiasHandler:
             "Delisting registered", ticker=event.ticker, date=event.delisting_date.isoformat(), reason=event.reason
         )
 
-    def register_delistings_batch(self, events: list[DelistingEvent]):
+    def register_delistings_batch(self, events: list[DelistingEvent]) -> Any:
         """Toplu delisting kaydı."""
         for event in events:
             self.register_delisting(event)
 
-    def set_active_universe(self, tickers: set[str]):
+    def set_active_universe(self, tickers: set[str]) -> Any:
         """Aktif evreni tanımla (bugünkü hisseler)."""
         self._active_tickers = tickers
 

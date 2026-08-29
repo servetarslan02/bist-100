@@ -46,6 +46,7 @@ class QlibBIST:
     """
 
     def __init__(self, config: QlibConfig | None = None):
+        """Otomatik eklendi."""
         self.config = config or QlibConfig()
         self._data_cache: dict[str, pl.DataFrame] = {}
         self._feature_store: dict[str, np.ndarray] = {}
@@ -170,7 +171,7 @@ class QlibBIST:
         """Feature store döndür."""
         return self._feature_store
 
-    def add_to_feature_store(self, name: str, features: np.ndarray):
+    def add_to_feature_store(self, name: str, features: np.ndarray) -> Any:
         """Feature store'a ekle."""
         self._feature_store[name] = features
 
@@ -178,7 +179,7 @@ class QlibBIST:
         """Cache'den veri döndür."""
         return self._data_cache.get(ticker)
 
-    def clear_cache(self):
+    def clear_cache(self) -> Any:
         """Cache'i temizle."""
         self._data_cache.clear()
 

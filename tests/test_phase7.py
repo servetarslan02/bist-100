@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 7 Test Suite
 
@@ -8,7 +11,7 @@ import asyncio
 import sys
 
 
-def test_agent_system():
+def test_agent_system() -> Any:
     """AI Agent System testleri."""
     from services.agents.agent_system import (
         AgentOrchestrator,
@@ -29,7 +32,7 @@ def test_agent_system():
     assert not AgentToolRegistry.can_access(AgentRole.NEWS, "calculate_risk")  # News risk hesaplayamaz
     assert not AgentToolRegistry.can_access(AgentRole.TECHNICAL, "read_portfolio")
     passed += 1
-    print("  ✓ Tool registry (access control)")
+    logger.info("  ✓ Tool registry (access control)")
 
     # 2. AI Output Validation - valid
     output = '{"direction": "LONG", "confidence": 75, "reasoning": "Strong momentum"}'
@@ -38,21 +41,21 @@ def test_agent_system():
     assert result["parsed"]["direction"] == "LONG"
     assert result["parsed"]["confidence"] == 0.75  # 75 → 0.75 normalize
     passed += 1
-    print("  ✓ AI output validation (valid)")
+    logger.info("  ✓ AI output validation (valid)")
 
     # 3. AI Output Validation - invalid direction
     output = '{"direction": "BUY", "confidence": 50}'
     result = AIOutputValidator.validate(output)
     assert not result["valid"] or "BUY" in str(result.get("errors", []))
     passed += 1
-    print("  ✓ AI output validation (invalid direction)")
+    logger.info("  ✓ AI output validation (invalid direction)")
 
     # 4. AI Output Validation - negative price
     output = '{"direction": "LONG", "confidence": 50, "price_target": -100}'
     result = AIOutputValidator.validate(output)
     assert any("Negative" in e for e in result["errors"])
     passed += 1
-    print("  ✓ AI output validation (negative price)")
+    logger.info("  ✓ AI output validation (negative price)")
 
     # 5. AI Output Validation - confidence range
     output = '{"direction": "LONG", "confidence": 150}'
@@ -60,7 +63,7 @@ def test_agent_system():
     # 150 → normalize edilmeli ama hata vermemeli
     assert result["parsed"]["confidence"] == 1.5  # Normalize edilmez ama kabul edilir
     passed += 1
-    print("  ✓ AI output validation (confidence range)")
+    logger.info("  ✓ AI output validation (confidence range)")
 
     # 6. Rule-based fallback
     features = {"roc_5d": 5.0, "volume_zscore": 3.0, "rsi_14": 55, "trend_slope_20d": 1.0}
@@ -70,10 +73,11 @@ def test_agent_system():
     assert len(fallback["reasons"]) > 0
     assert fallback["source"] == "rule_based_fallback"
     passed += 1
-    print(f"  ✓ Rule-based fallback (direction={fallback['direction']}, confidence={fallback['confidence']:.2f})")
+    logger.info(f"  ✓ Rule-based fallback (direction={fallback['direction']}, confidence={fallback['confidence']:.2f})")
 
     # 7. Base agent execution (async)
-    async def run_agent():
+    async def run_agent() -> Any:
+        """Otomatik eklendi."""
         agent = BaseAgent(AgentRole.TECHNICAL)
         task = AgentTask(
             task_id="test-001",
@@ -90,10 +94,11 @@ def test_agent_system():
     assert result.duration_ms > 0
     assert len(result.input_hash) == 16
     passed += 1
-    print(f"  ✓ Base agent execution (confidence={result.confidence:.2f}, {result.duration_ms:.1f}ms)")
+    logger.info(f"  ✓ Base agent execution (confidence={result.confidence:.2f}, {result.duration_ms:.1f}ms)")
 
     # 8. Agent orchestrator
-    async def run_orchestrator():
+    async def run_orchestrator() -> Any:
+        """Otomatik eklendi."""
         orch = AgentOrchestrator()
         return await orch.run_research_pipeline(
             "THYAO",
@@ -107,7 +112,7 @@ def test_agent_system():
     assert "SYNTHESIS" in orch_result["results"]
     assert orch_result["overall_direction"] in ["LONG", "SHORT", "NEUTRAL"]
     passed += 1
-    print(
+    logger.info(
         f"  ✓ Agent orchestrator (direction={orch_result['overall_direction']}, confidence={orch_result['overall_confidence']:.2f})"
     )
 
@@ -116,34 +121,35 @@ def test_agent_system():
     assert agent.model_version == "gemma4:12b"
     assert agent.prompt_version == "v1.2"
     passed += 1
-    print("  ✓ Prompt versioning")
+    logger.info("  ✓ Prompt versioning")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 7 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 7 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
 
-    print("\n--- AI Agent System ---")
+    logger.info("\n--- AI Agent System ---")
     try:
         p, f = test_agent_system()
         total_passed += p
         total_failed += f
     except Exception as e:
-        print(f"  ✗ Test crashed: {e}")
+        logger.info(f"  ✗ Test crashed: {e}")
         import traceback
 
         traceback.print_exc()
         total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class EventImpactAssessment:
+    """Otomatik eklendi."""
     materiality: str
     revenue_relevance: str
     cashflow_relevance: str
@@ -18,6 +19,7 @@ class EventImpactAssessment:
 
 
 class EventImpactEngine:
+    """Otomatik eklendi."""
     def assess(
         self,
         *,
@@ -28,6 +30,7 @@ class EventImpactEngine:
         uncertainty: str,
         horizon: str,
     ) -> EventImpactAssessment:
+        """Otomatik eklendi."""
         return EventImpactAssessment(
             materiality=materiality,
             revenue_relevance=revenue_relevance,

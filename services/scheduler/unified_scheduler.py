@@ -158,6 +158,7 @@ class HolidayProvider:
     )
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._dynamic_holidays: set | None = None
         self._last_fetch: float = 0
         self._fetch_interval: float = 3600  # 1 saatte bir yenile
@@ -185,7 +186,7 @@ class HolidayProvider:
         all_holidays = self.get_holidays()
         return d in all_holidays
 
-    def add_holiday(self, d: date):
+    def add_holiday(self, d: date) -> Any:
         """Tatil günü ekle (runtime)."""
         if self._dynamic_holidays is None:
             self._dynamic_holidays = set()
@@ -194,12 +195,12 @@ class HolidayProvider:
         # Bunun yerine _last_fetch'i güncelle ki refresh tetiklenmesin
         self._last_fetch = time.time()
 
-    def remove_holiday(self, d: date):
+    def remove_holiday(self, d: date) -> Any:
         """Tatil günü kaldır (runtime)."""
         if self._dynamic_holidays is not None:
             self._dynamic_holidays.discard(d)
 
-    def _refresh_sync(self):
+    def _refresh_sync(self) -> Any:
         """Dinamik tatil günlerini yenile (Senkron, başlangıç için)."""
         holidays = set()
 
@@ -221,7 +222,7 @@ class HolidayProvider:
         self._dynamic_holidays = holidays
         self._last_fetch = time.time()
 
-    async def _refresh_async(self):
+    async def _refresh_async(self) -> Any:
         """Dinamik tatil günlerini yenile (Asenkron). Loop'u bloklamaz."""
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._refresh_sync)
@@ -254,6 +255,7 @@ class MarketSessionManager:
     ]
 
     def __init__(self, holiday_provider: HolidayProvider | None = None):
+        """Otomatik eklendi."""
         self._holiday_provider = holiday_provider or HolidayProvider()
         self._current_phase: MarketPhase | None = None
         self._phase_callbacks: dict[MarketPhase, list[Callable]] = {}
@@ -338,7 +340,7 @@ class MarketSessionManager:
         """Tatil sağlayıcısını al."""
         return self._holiday_provider
 
-    def _on_phase_change(self, old: MarketPhase | None, new: MarketPhase):
+    def _on_phase_change(self, old: MarketPhase | None, new: MarketPhase) -> Any:
         """Faz değişikliği callback."""
         logger.info("Market phase changed", old=old.value if old else None, new=new.value)
 
@@ -346,13 +348,13 @@ class MarketSessionManager:
         for cb in callbacks:
             try:
                 if asyncio.iscoroutinefunction(cb):
-                    asyncio.create_task(cb(old, new))
+                    _cb_task = asyncio.create_task(cb(old, new))
                 else:
                     cb(old, new)
             except Exception as e:
                 logger.error("Phase callback error", error=str(e))
 
-    def on_phase(self, phase: MarketPhase, callback: Callable):
+    def on_phase(self, phase: MarketPhase, callback: Callable) -> Any:
         """Faz değişikliği callback'i kaydet."""
         if phase not in self._phase_callbacks:
             self._phase_callbacks[phase] = []
@@ -585,6 +587,7 @@ class DBJobTracker:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._db_available: bool | None = None
         self._memory_history: list[dict[str, Any]] = []
         self._max_memory = 1000
@@ -749,6 +752,7 @@ class UnifiedScheduler:
     """
 
     def __init__(self, job_configs: dict[str, JobConfig] | None = None):
+        """Otomatik eklendi."""
         self._market = MarketSessionManager()
         self._configs = {**DEFAULT_JOB_CONFIGS, **(job_configs or {})}
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
@@ -777,29 +781,29 @@ class UnifiedScheduler:
         # Tatil senkronizasyon handler'ı — otomatik kaydet
         self.register_handler(JobType.HOLIDAY_SYNC, self._holiday_sync_handler)
 
-    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
+    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:
         """Job handler kaydet."""
         self._handlers[job_type] = handler
         logger.info("Handler registered", job_type=job_type)
 
-    def register_phase_callback(self, phase: str, callback: Callable):
+    def register_phase_callback(self, phase: str, callback: Callable) -> Any:
         """Faz değişikliği callback'i kaydet."""
         if phase not in self._phase_callbacks:
             self._phase_callbacks[phase] = []
         self._phase_callbacks[phase].append(callback)
 
-    def update_interval(self, job_type: str, interval_seconds: int):
+    def update_interval(self, job_type: str, interval_seconds: int) -> Any:
         """Job interval'ını runtime'da güncelle."""
         if job_type in self._configs:
             self._configs[job_type].interval_seconds = interval_seconds
             logger.info("Interval updated", job_type=job_type, interval=interval_seconds)
 
-    def enable_job(self, job_type: str, enabled: bool = True):
+    def enable_job(self, job_type: str, enabled: bool = True) -> Any:
         """Job'ı aktif/pasif yap."""
         if job_type in self._configs:
             self._configs[job_type].enabled = enabled
 
-    def update_priority(self, job_type: str, priority: int):
+    def update_priority(self, job_type: str, priority: int) -> Any:
         """Job önceliğini güncelle."""
         if job_type in self._configs:
             self._configs[job_type].priority = max(1, min(10, priority))
@@ -832,7 +836,7 @@ class UnifiedScheduler:
             "message": "Job queued for immediate execution",
         }
 
-    async def start(self):
+    async def start(self) -> Any:
         """Scheduler'ı başlat."""
         self._running = True
 
@@ -857,13 +861,13 @@ class UnifiedScheduler:
 
         logger.info("=== UNIFIED SCHEDULER STOPPED ===")
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Scheduler'ı durdur."""
         self._running = False
         self._shutdown_event.set()
         logger.info("Scheduler stop requested")
 
-    def _signal_handler(self, sig):
+    def _signal_handler(self, sig) -> Any:
         """SIGTERM/SIGINT callback."""
         logger.info(f"Signal {sig} received, shutting down")
         self._running = False
@@ -871,8 +875,9 @@ class UnifiedScheduler:
 
     async def _holiday_sync_handler(self) -> dict[str, Any]:
         """Takvim senkronizasyonu — BIST resmi + dini bayram hesaplama."""
-        from ..core.holiday_manager import holiday_manager
         from datetime import date
+
+        from ..core.holiday_manager import holiday_manager
 
         today = date.today()
         result = {"year": today.year}
@@ -896,9 +901,10 @@ class UnifiedScheduler:
         if holiday_manager.is_trading_day(today):
             result["is_trading_day"] = True
             # Market data handler'ın son veri zamanını kontrol et
-            last_data = getattr(self, '_last_market_data_time', None)
+            last_data = getattr(self, "_last_market_data_time", None)
             if last_data:
                 from datetime import UTC, datetime
+
                 diff_minutes = (datetime.now(UTC) - last_data).total_seconds() / 60
                 if diff_minutes > 30:  # 30 dakikadır veri gelmiyor
                     detected = holiday_manager.report_no_data(today)
@@ -915,7 +921,7 @@ class UnifiedScheduler:
         logger.info("Holiday sync completed", **result)
         return result
 
-    async def _startup_sequence(self):
+    async def _startup_sequence(self) -> Any:
         """Startup kontrolleri."""
         logger.info("Running startup sequence...")
 
@@ -925,8 +931,9 @@ class UnifiedScheduler:
 
         # Tatil takvimi — otomatik senkronizasyon
         try:
-            from ..core.holiday_manager import holiday_manager
             from datetime import date
+
+            from ..core.holiday_manager import holiday_manager
 
             # Bu yılın tatillerini hesapla
             today = date.today()
@@ -955,7 +962,7 @@ class UnifiedScheduler:
 
         logger.info("Startup sequence complete")
 
-    async def _main_loop(self):
+    async def _main_loop(self) -> Any:
         """Ana scheduler döngüsü."""
         while self._running:
             try:
@@ -966,7 +973,7 @@ class UnifiedScheduler:
                 logger.error("Scheduler tick error", error=str(e))
                 await asyncio.sleep(10)
 
-    async def _trigger_consumer(self):
+    async def _trigger_consumer(self) -> Any:
         """Manuel tetikleme queue'sunu tüket."""
         while self._running:
             try:
@@ -979,7 +986,7 @@ class UnifiedScheduler:
             except Exception as e:
                 logger.error("Trigger consumer error", error=str(e))
 
-    async def _tick(self):
+    async def _tick(self) -> Any:
         """Tek scheduler döngüsü.
 
         Market fazına göre hangi job grubunun çalıştırılacağına karar verir.
@@ -1014,7 +1021,7 @@ class UnifiedScheduler:
             await self._run_jobs_for_phase("after_hours")
             await asyncio.sleep(120)
 
-    async def _run_jobs_for_phase(self, phase_name: str):
+    async def _run_jobs_for_phase(self, phase_name: str) -> Any:
         """Belirli bir faz için job'ları priority sırasıyla çalıştır.
 
         Priority sıralaması: p=1 (en yüksek) → p=10 (en düşük).
@@ -1036,7 +1043,7 @@ class UnifiedScheduler:
         for job_type, config in eligible_jobs:
             await self._maybe_run_job(job_type, config)
 
-    async def _maybe_run_job(self, job_type: str, config: JobConfig):
+    async def _maybe_run_job(self, job_type: str, config: JobConfig) -> Any:
         """Job çalıştırılmalı mı? Interval kontrolü."""
         now = time.time()
         last = self._last_run.get(job_type, 0)
@@ -1059,7 +1066,7 @@ class UnifiedScheduler:
         handler: Callable,
         config: JobConfig,
         triggered_by: str = "scheduler",
-    ):
+    ) -> Any:
         """Retry ile job çalıştır.
 
         Exponential backoff: 1s → 2s → 4s (attempt 0 → 1 → 2).
@@ -1127,7 +1134,7 @@ class UnifiedScheduler:
 
         logger.error("Job failed after all retries", job_type=job_type, error=last_error)
 
-    async def _record_job(self, result: JobResult):
+    async def _record_job(self, result: JobResult) -> Any:
         """Job sonucunu kaydet (DB + memory)."""
         # DB'ye persist et
         await self._db_tracker.record_job(result)
@@ -1212,7 +1219,7 @@ class UnifiedScheduler:
         """DB job tracker'ı al."""
         return self._db_tracker
 
-    def _init_state_db(self):
+    def _init_state_db(self) -> Any:
         """Scheduler state SQLite tablosunu oluştur."""
         from pathlib import Path
 
@@ -1237,7 +1244,7 @@ class UnifiedScheduler:
         conn.commit()
         conn.close()
 
-    def save_state(self):
+    def save_state(self) -> Any:
         """Scheduler durumunu SQLite'a kaydet."""
         import duckdb
 
@@ -1274,7 +1281,7 @@ class UnifiedScheduler:
         except Exception as e:
             logger.warning("Failed to save scheduler state", error=str(e))
 
-    def _load_state(self):
+    def _load_state(self) -> Any:
         """Scheduler durumunu SQLite'dan yükle."""
         from pathlib import Path
 

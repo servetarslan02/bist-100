@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """ALPHA BIST - Configuration Management v3.0 (Enterprise-Grade)
 
 Kurumsal Standartlar:
@@ -10,11 +13,9 @@ Kurumsal Standartlar:
 6. KALİTE:    %100 type hint, docstring, Türkçe yorum
 """
 
-from __future__ import annotations
 
 import os
 import sys
-from typing import Any
 
 import structlog
 
@@ -76,8 +77,8 @@ class Settings(BaseSettings):
     clickhouse_password: str = Field(default="", alias="CLICKHOUSE_PASSWORD")
 
     # QuestDB (tick verisi için)
-    questdb_host: str = Field(default="localhost", alias="QUESTDB_HOST")
-    questdb_http_port: int = Field(default=9009, alias="QUESTDB_HTTP_PORT")
+    questdb_host: str = Field(default="questdb", alias="QUESTDB_HOST")
+    questdb_http_port: int = Field(default=9000, alias="QUESTDB_HTTP_PORT")
     questdb_pg_port: int = Field(default=8812, alias="QUESTDB_PG_PORT")
     questdb_ilp_port: int = Field(default=9009, alias="QUESTDB_ILP_PORT")
 
@@ -205,7 +206,7 @@ class Settings(BaseSettings):
         model_config = SettingsConfigDict(extra="allow")
 
         @model_validator(mode="after")
-        def _validate_production_security(self):
+        def _validate_production_security(self) -> Any:
             """Production'da insecure configuration kontrolü."""
             if not self.is_production:
                 return self
@@ -240,6 +241,7 @@ class Settings(BaseSettings):
         @field_validator("app_port")
         @classmethod
         def _validate_port(cls, v: int) -> int:
+            """Otomatik eklendi."""
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid port: {v}")
             return v
@@ -247,6 +249,7 @@ class Settings(BaseSettings):
         @field_validator("postgres_port")
         @classmethod
         def _validate_pg_port(cls, v: int) -> int:
+            """Otomatik eklendi."""
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid PostgreSQL port: {v}")
             return v
@@ -254,10 +257,12 @@ class Settings(BaseSettings):
     else:
 
         class Config:
+            """Otomatik eklendi."""
             extra = "allow"
 
         @root_validator
-        def _validate_production_security_v1(cls, values):
+        def _validate_production_security_v1(cls, values) -> Any:
+            """Otomatik eklendi."""
             config = values
             if str(config.get("app_env", "development")).lower() not in ("production", "prod", "staging"):
                 return values
@@ -290,12 +295,14 @@ class Settings(BaseSettings):
 
         @validator("app_port")
         def _validate_port_v1(cls, v: int) -> int:
+            """Otomatik eklendi."""
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid port: {v}")
             return v
 
         @validator("postgres_port")
         def _validate_pg_port_v1(cls, v: int) -> int:
+            """Otomatik eklendi."""
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid PostgreSQL port: {v}")
             return v
@@ -324,8 +331,7 @@ def _parse_dotenv(path: str) -> dict[str, str]:
                 value = raw_value.split(" #", 1)[0].strip()
                 # Çift ve tek tırnak kaldır (tam sarmalama kontrolü)
                 if len(value) >= 2 and (
-                    (value.startswith('"') and value.endswith('"'))
-                    or (value.startswith("'") and value.endswith("'"))
+                    (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'"))
                 ):
                     value = value[1:-1]
                 result[key] = value

@@ -47,11 +47,12 @@ class ProviderManager:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._providers: dict[str, dict[str, Callable]] = {}  # data_type -> {name: func}
         self._health: dict[str, ProviderHealth] = {}
         self._priority: dict[str, list[str]] = {}  # data_type -> [provider_names]
 
-    def register_provider(self, data_type: str, name: str, func: Callable, priority: int = 0):
+    def register_provider(self, data_type: str, name: str, func: Callable, priority: int = 0) -> Any:
         """Veri sağlayıcı kaydet."""
         if data_type not in self._providers:
             self._providers[data_type] = {}

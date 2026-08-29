@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — June 2026 V-Dip Audit Script (Read-Only Deep Inspection)
 
 Bu script 2026 Mayıs ve Haziran aylarındaki:
@@ -9,32 +10,24 @@ gün gün dökerek inceler.
 """
 
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
+import structlog
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
     extract_point_in_time_features,
-    ModelTrainer,
+    load_all_market_data,
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
-import structlog
+
 logger = structlog.get_logger()
 
 
-
-def audit_june_2026():
+def audit_june_2026() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — JUNE 2026 V-DIP AUDIT (READ-ONLY INSPECTION)")
     logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
-    feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
-    ]
 
     features_by_ticker = {}
     for tk, df in stock_data.items():
@@ -43,15 +36,15 @@ def audit_june_2026():
             features_by_ticker[tk] = fdf
 
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
-    
+
     # 2026 Mayıs ve Haziran Tarihleri
-    target_dates = [d for d in common_dates if d.strftime('%Y-%m') in ['2026-05', '2026-06']]
+    target_dates = [d for d in common_dates if d.strftime("%Y-%m") in ["2026-05", "2026-06"]]
 
     logger.info(f"Audit Edilen Gün Sayısı: {len(target_dates)} gün (2026-05-01 ile 2026-06-30 arası)")
 
     # 1. Hisselerin Haziran 2026 Getirileri
-    june_start = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06'][0]
-    june_end = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06'][-1]
+    june_start = [d for d in target_dates if d.strftime("%Y-%m") == "2026-06"][0]
+    june_end = [d for d in target_dates if d.strftime("%Y-%m") == "2026-06"][-1]
 
     xu_june_ret = (float(xu100_close.loc[june_end]) / float(xu100_close.loc[june_start]) - 1.0) * 100.0
     logger.info(f"\n📈 XU100 Haziran 2026 Getirisi: +%{xu_june_ret:.2f}")
@@ -71,8 +64,8 @@ def audit_june_2026():
     logger.info("\n📅 GÜNLÜK AKIŞ VE SİNYAL DENETİMİ (HAZİRAN 2026):")
     logger.info("| Tarih | XU100 Kapanış | Günlük Değ. (%) | Rejim | 5G Ret (%) | 20G Vol (%) | Yorum |")
     logger.info("|---|---|---|---|---|---|---|")
-    
-    june_dates = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06']
+
+    june_dates = [d for d in target_dates if d.strftime("%Y-%m") == "2026-06"]
     valid_xu_dates = [d for d in target_dates if d in xu100_close.index]
     for d in june_dates:
         if d not in xu100_close.index:
@@ -96,7 +89,9 @@ def audit_june_2026():
         elif daily_chg < -4.0:
             comment = "🔴 Sert Satış"
 
-        logger.info(f"| {d.strftime('%Y-%m-%d')} | {cur_p:,.1f} | %{daily_chg:+.2f} | {reg} | %{ret_5d:+.1f} | %{vol_20d:.1f} | {comment} |")
+        logger.info(
+            f"| {d.strftime('%Y-%m-%d')} | {cur_p:,.1f} | %{daily_chg:+.2f} | {reg} | %{ret_5d:+.1f} | %{vol_20d:.1f} | {comment} |"
+        )
 
 
 if __name__ == "__main__":

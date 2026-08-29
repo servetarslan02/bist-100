@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Production-Grade Historical Data Ingestion Tests
 
@@ -10,7 +13,7 @@ import sys
 import tempfile
 
 
-def _make_temp_repo():
+def _make_temp_repo() -> Any:
     """Geçici SQLite repository oluştur."""
     from services.data.persistent_repository import PersistentHistoricalRepository
 
@@ -19,7 +22,7 @@ def _make_temp_repo():
     return PersistentHistoricalRepository(db_path=path), path
 
 
-def _make_test_snapshots():
+def _make_test_snapshots() -> Any:
     """Test snapshot'ları oluştur."""
     from services.data.historical_contracts import (
         CatalystSnapshot,
@@ -107,7 +110,7 @@ def _make_test_snapshots():
 # =====================================================
 
 
-def test_future_fundamental_no_score_effect():
+def test_future_fundamental_no_score_effect() -> Any:
     """Gelecekteki fundamental veri skoru etkilememeli."""
     import os
     import tempfile
@@ -164,7 +167,7 @@ def test_future_fundamental_no_score_effect():
 # =====================================================
 
 
-def test_future_kap_no_score_effect():
+def test_future_kap_no_score_effect() -> Any:
     """Gelecekteki KAP event skoru etkilememeli."""
     import os
     import tempfile
@@ -208,7 +211,7 @@ def test_future_kap_no_score_effect():
 # =====================================================
 
 
-def test_future_news_no_score_effect():
+def test_future_news_no_score_effect() -> Any:
     """Gelecekteki news event skoru etkilememeli."""
     import os
     import tempfile
@@ -251,7 +254,7 @@ def test_future_news_no_score_effect():
 # =====================================================
 
 
-def test_future_catalyst_no_score_effect():
+def test_future_catalyst_no_score_effect() -> Any:
     """Gelecekteki catalyst skoru etkilememeli."""
     import os
     import tempfile
@@ -295,7 +298,7 @@ def test_future_catalyst_no_score_effect():
 # =====================================================
 
 
-def test_publication_vs_period_end():
+def test_publication_vs_period_end() -> Any:
     """publication_date ve period_end karışmamalı."""
     import os
     import tempfile
@@ -344,7 +347,7 @@ def test_publication_vs_period_end():
 # =====================================================
 
 
-def test_duplicate_ingestion_idempotent():
+def test_duplicate_ingestion_idempotent() -> Any:
     """Aynı veri tekrar tekrar_ingest edilebilmeli (idempotent)."""
     import os
     import tempfile
@@ -387,7 +390,7 @@ def test_duplicate_ingestion_idempotent():
 # =====================================================
 
 
-def test_same_event_two_sources():
+def test_same_event_two_sources() -> Any:
     """Aynı event farklı kaynaklardan gelirse tek event olmalı."""
     import os
     import tempfile
@@ -439,7 +442,7 @@ def test_same_event_two_sources():
 # =====================================================
 
 
-def test_missing_publication_timestamp():
+def test_missing_publication_timestamp() -> Any:
     """Publication timestamp yoksa UNKNOWN olarak işaretlenmeli."""
     import os
     import tempfile
@@ -482,7 +485,7 @@ def test_missing_publication_timestamp():
 # =====================================================
 
 
-def test_stale_fundamental():
+def test_stale_fundamental() -> Any:
     """Eski fundamental veri STALE olarak işaretlenmeli."""
     import os
     import tempfile
@@ -524,7 +527,7 @@ def test_stale_fundamental():
 # =====================================================
 
 
-def test_restated_fundamental():
+def test_restated_fundamental() -> Any:
     """Restate edilmiş fundamental veri en güncel olanı kullanılmalı."""
     import os
     import tempfile
@@ -580,7 +583,7 @@ def test_restated_fundamental():
 # =====================================================
 
 
-def test_partial_ingestion_recovery():
+def test_partial_ingestion_recovery() -> Any:
     """Partial ingestion'dan sonra mevcut veri bozulmamalı."""
     import os
     import tempfile
@@ -624,7 +627,7 @@ def test_partial_ingestion_recovery():
 # =====================================================
 
 
-def test_provider_timeout_recovery():
+def test_provider_timeout_recovery() -> Any:
     """Provider timeout olursa mevcut veri bozulmamalı."""
     import os
     import tempfile
@@ -667,7 +670,7 @@ def test_provider_timeout_recovery():
 # =====================================================
 
 
-def test_deterministic_historical_replay():
+def test_deterministic_historical_replay() -> Any:
     """Aynı historical veri → aynı sonuç (deterministic)."""
     import os
     import tempfile
@@ -716,7 +719,7 @@ def test_deterministic_historical_replay():
 # =====================================================
 
 
-def test_future_data_mutation_invariance():
+def test_future_data_mutation_invariance() -> Any:
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
     import os
     import tempfile
@@ -783,7 +786,7 @@ def test_future_data_mutation_invariance():
 # =====================================================
 
 
-def test_historical_snapshot_reproducibility():
+def test_historical_snapshot_reproducibility() -> Any:
     """Aynı snapshot farklı session'larda aynı sonucu vermeli."""
     import os
     import tempfile
@@ -831,7 +834,7 @@ def test_historical_snapshot_reproducibility():
 # =====================================================
 
 
-def test_persistent_repo_basic():
+def test_persistent_repo_basic() -> Any:
     """Persistent repository temel operasyonları çalışıyor mu?"""
     import os
     import tempfile
@@ -871,7 +874,7 @@ def test_persistent_repo_basic():
     return "Persistent repo basic", len(issues) == 0, issues
 
 
-def test_ingestion_pipeline_import():
+def test_ingestion_pipeline_import() -> Any:
     """Ingestion pipeline import edilebiliyor mu?"""
     from services.data.ingestion_pipeline import HistoricalIngestionPipeline
 
@@ -883,7 +886,7 @@ def test_ingestion_pipeline_import():
     return "Ingestion pipeline import", len(issues) == 0, issues
 
 
-def test_historical_adapter_with_persistent_repo():
+def test_historical_adapter_with_persistent_repo() -> Any:
     """Historical adapter persistent repo ile çalışıyor mu?"""
     import os
     import tempfile
@@ -973,7 +976,7 @@ def test_historical_adapter_with_persistent_repo():
     return "Adapter with persistent repo", len(issues) == 0, issues
 
 
-def test_canonical_scoring_with_all_historical():
+def test_canonical_scoring_with_all_historical() -> Any:
     """Tüm historical verilerle canonical scoring çalışıyor mu?"""
     import os
     import tempfile
@@ -1080,7 +1083,7 @@ def test_canonical_scoring_with_all_historical():
     return "Canonical scoring with all historical", len(issues) == 0, issues
 
 
-def test_news_ingestion():
+def test_news_ingestion() -> Any:
     """RSS feed'lerden haber ingestion çalışıyor mu?"""
     import os
     import tempfile
@@ -1114,10 +1117,11 @@ def test_news_ingestion():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("  Production-Grade Historical Data Ingestion Tests")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  Production-Grade Historical Data Ingestion Tests")
+    logger.info("=" * 60)
 
     tests = [
         # PIT tests
@@ -1175,19 +1179,19 @@ def run_all():
             icon = "❌"
             failed += 1
 
-        print(f"{icon} {name}")
+        logger.info(f"{icon} {name}")
         for i in issues:
-            print(f"   {'⏭️' if ok is None else '❌'} {i}")
+            logger.info(f"   {'⏭️' if ok is None else '❌'} {i}")
             if ok is not None:
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {passed} geçti, {failed} başarısız, {skipped} atlandı")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {passed} geçti, {failed} başarısız, {skipped} atlandı")
     if all_issues:
-        print("\n  HATALAR:")
+        logger.info("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"    {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"    {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

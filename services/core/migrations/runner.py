@@ -50,6 +50,7 @@ class MigrationFile:
 
     @staticmethod
     def parse(filepath: Path) -> "MigrationFile":
+        """Otomatik eklendi."""
         match = re.match(r"v(\d+)_(.+)\.sql", filepath.name)
         if not match:
             raise ValueError(f"Geçersiz migration dosyası: {filepath.name}")
@@ -79,6 +80,7 @@ class MigrationFile:
 
 @dataclass
 class MigrationStatus:
+    """Otomatik eklendi."""
     current_version: int
     pending_count: int
     applied: list[dict[str, Any]]
@@ -93,6 +95,7 @@ class MigrationRunner:
     """Production-grade migration runner with distributed locking."""
 
     def __init__(self, db, dialect: str = "postgresql"):
+        """Otomatik eklendi."""
         self._db = db
         self._dialect = dialect
         self._lock_id: str | None = None
@@ -102,7 +105,7 @@ class MigrationRunner:
     # LOCK TABLE
     # =====================================================
 
-    async def _init_lock_table(self):
+    async def _init_lock_table(self) -> Any:
         """Lock tablosunu oluştur."""
         await self._execute(f"""
             CREATE TABLE IF NOT EXISTS {LOCK_TABLE} (
@@ -169,7 +172,7 @@ class MigrationRunner:
                     return False
             return False
 
-    async def _release_lock(self):
+    async def _release_lock(self) -> Any:
         """Lock'u serbest bırak."""
         self._stop_heartbeat()
         if self._lock_id:
@@ -182,7 +185,7 @@ class MigrationRunner:
                 logger.debug("Handled exception", error=str(e), context="runner.py:174")
             self._lock_id = None
 
-    async def _refresh_lock(self):
+    async def _refresh_lock(self) -> Any:
         """Lock süresini uzat."""
         if self._lock_id:
             try:
@@ -196,12 +199,13 @@ class MigrationRunner:
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="runner.py:187")
 
-    def _start_heartbeat(self):
+    def _start_heartbeat(self) -> Any:
         """Arka planda lock süresini otomatik yenile."""
         if self._heartbeat_task is not None:
             return
 
-        async def _heartbeat_loop():
+        async def _heartbeat_loop() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     await asyncio.sleep(LOCK_TIMEOUT_SECONDS // 3)
@@ -216,7 +220,7 @@ class MigrationRunner:
         except RuntimeError:
             logger.warning("Runtime error in _heartbeat_loop", exc_info=True)
 
-    def _stop_heartbeat(self):
+    def _stop_heartbeat(self) -> Any:
         """Heartbeat durdur."""
         if self._heartbeat_task and not self._heartbeat_task.done():
             self._heartbeat_task.cancel()
@@ -226,7 +230,8 @@ class MigrationRunner:
     # INIT
     # =====================================================
 
-    async def init_schema_migrations(self):
+    async def init_schema_migrations(self) -> Any:
+        """Otomatik eklendi."""
         ts_type = "TIMESTAMP" if self._dialect == "sqlite" else "TIMESTAMPTZ"
         default_ts = "CURRENT_TIMESTAMP" if self._dialect == "sqlite" else "NOW()"
         await self._execute(f"""
@@ -243,6 +248,7 @@ class MigrationRunner:
     # =====================================================
 
     def discover_migrations(self) -> list[MigrationFile]:
+        """Otomatik eklendi."""
         migrations = []
         for f in sorted(MIGRATIONS_DIR.glob("v*.sql")):
             try:
@@ -252,6 +258,7 @@ class MigrationRunner:
         return migrations
 
     async def get_applied(self) -> dict[int, dict[str, Any]]:
+        """Otomatik eklendi."""
         try:
             rows = await self._fetchall(
                 "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version"
@@ -261,6 +268,7 @@ class MigrationRunner:
             return {}
 
     async def get_current_version(self) -> int:
+        """Otomatik eklendi."""
         applied = await self.get_applied()
         return max(applied.keys()) if applied else 0
 
@@ -268,7 +276,7 @@ class MigrationRunner:
     # DEPENDENCY VALIDATION
     # =====================================================
 
-    def _validate_dependencies(self, migrations: list[MigrationFile], applied: dict[int, dict]):
+    def _validate_dependencies(self, migrations: list[MigrationFile], applied: dict[int, dict]) -> Any:
         """Migration bağımlılıklarını doğrula.
 
         Kural: Uygulanmış migration'lar arasında boşluk olmamalı.
@@ -305,6 +313,7 @@ class MigrationRunner:
     # =====================================================
 
     async def status(self) -> MigrationStatus:
+        """Otomatik eklendi."""
         await self.init_schema_migrations()
         applied_map = await self.get_applied()
         all_migrations = self.discover_migrations()
@@ -380,7 +389,7 @@ class MigrationRunner:
         finally:
             await self._release_lock()
 
-    async def _apply_up(self, m: MigrationFile):
+    async def _apply_up(self, m: MigrationFile) -> Any:
         """Tek bir up migration uygula."""
         statements = self._split_statements(m.up_sql)
 
@@ -446,7 +455,8 @@ class MigrationRunner:
         finally:
             await self._release_lock()
 
-    async def _apply_down(self, m: MigrationFile):
+    async def _apply_down(self, m: MigrationFile) -> Any:
+        """Otomatik eklendi."""
         statements = self._split_statements(m.down_sql)
         await self._begin_transaction()
         try:
@@ -464,19 +474,22 @@ class MigrationRunner:
     # TRANSACTION MANAGEMENT
     # =====================================================
 
-    async def _begin_transaction(self):
+    async def _begin_transaction(self) -> Any:
+        """Otomatik eklendi."""
         if self._dialect == "sqlite":
             pass  # DuckDB auto-transaction
         else:
             await self._db.execute("BEGIN")
 
-    async def _commit(self):
+    async def _commit(self) -> Any:
+        """Otomatik eklendi."""
         if self._dialect == "sqlite":
             self._db.commit()
         else:
             await self._db.execute("COMMIT")
 
-    async def _rollback(self):
+    async def _rollback(self) -> Any:
+        """Otomatik eklendi."""
         try:
             if self._dialect == "sqlite":
                 self._db.rollback()
@@ -491,6 +504,7 @@ class MigrationRunner:
     # =====================================================
 
     def _prepare_statement(self, stmt: str) -> str | None:
+        """Otomatik eklendi."""
         stmt = stmt.strip()
         if not stmt:
             return None
@@ -508,6 +522,7 @@ class MigrationRunner:
         return stmt
 
     def _split_statements(self, sql: str) -> list[str]:
+        """Otomatik eklendi."""
         if "-- migrate:split" in sql:
             parts = sql.split("-- migrate:split")
             return [p.strip() for p in parts if p.strip()]
@@ -538,6 +553,7 @@ class MigrationRunner:
         return statements
 
     def _pg_to_sqlite(self, stmt: str) -> str:
+        """Otomatik eklendi."""
         s = stmt
         s = s.replace("TIMESTAMPTZ", "TIMESTAMP")
         s = re.sub(r"\bBOOLEAN\b", "INTEGER", s, flags=re.IGNORECASE)
@@ -581,7 +597,8 @@ class MigrationRunner:
     # SAFE EXECUTION
     # =====================================================
 
-    async def _execute_safe(self, sql: str):
+    async def _execute_safe(self, sql: str) -> Any:
+        """Otomatik eklendi."""
         try:
             await self._execute(sql)
         except Exception as e:
@@ -594,7 +611,8 @@ class MigrationRunner:
                 return
             raise
 
-    async def _execute(self, sql: str, *args):
+    async def _execute(self, sql: str, *args) -> Any:
+        """Otomatik eklendi."""
         if self._dialect == "sqlite":
             if args:
                 # Parametreli sorgular tek statement olmalı
@@ -612,6 +630,7 @@ class MigrationRunner:
             return await self._db.execute(sql, *args)
 
     async def _fetchall(self, sql: str, *args) -> list[dict]:
+        """Otomatik eklendi."""
         if self._dialect == "sqlite":
             cursor = self._db.execute(sql, args)
             return [dict(r) for r in cursor.fetchall()]
@@ -619,6 +638,7 @@ class MigrationRunner:
             return [dict(r) for r in await self._db.fetch(sql, *args)]
 
     async def _fetchone(self, sql: str, *args) -> dict | None:
+        """Otomatik eklendi."""
         if self._dialect == "sqlite":
             cursor = self._db.execute(sql, args)
             row = cursor.fetchone()

@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Market State API Endpoints v2.0
 
 REST API endpoint'leri:
@@ -17,7 +18,7 @@ import structlog
 logger = structlog.get_logger()
 
 
-def register_market_state_routes(app, market_state_service):
+def register_market_state_routes(app, market_state_service) -> Any:
     """FastAPI app'e market state route'larını ekle.
 
     Args:
@@ -26,7 +27,7 @@ def register_market_state_routes(app, market_state_service):
     """
 
     @app.get("/api/market/state")
-    async def get_market_state():
+    async def get_market_state() -> Any:
         """Tam market state — tüm bileşenler birleşik."""
         try:
             state = market_state_service.get_current_state()
@@ -38,7 +39,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/breadth")
-    async def get_breadth():
+    async def get_breadth() -> Any:
         """Market breadth detayları — 7 gösterge."""
         try:
             breadth = market_state_service.get_breadth()
@@ -50,7 +51,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/regime")
-    async def get_regime():
+    async def get_regime() -> Any:
         """Ensemble regime — 3 yöntem, probabilities, consensus."""
         try:
             regime = market_state_service.get_ensemble_regime()
@@ -62,7 +63,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/transition")
-    async def get_transition():
+    async def get_transition() -> Any:
         """Transition history + stats — geçiş matrisi, kararlılık."""
         try:
             tracker = market_state_service.get_transition_tracker()
@@ -83,7 +84,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/multi-tf")
-    async def get_multi_timeframe():
+    async def get_multi_timeframe() -> Any:
         """Multi-timeframe states — intraday, daily, weekly, monthly."""
         try:
             multi_tf = market_state_service.get_multi_timeframe()
@@ -95,7 +96,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/alerts")
-    async def get_alerts():
+    async def get_alerts() -> Any:
         """Aktif alert'ler — rejim değişimi, kararlılık, breadth aşırı."""
         try:
             alerts = []
@@ -128,7 +129,7 @@ def register_market_state_routes(app, market_state_service):
             return {"error": str(e)}
 
     @app.get("/api/market/health")
-    async def get_health():
+    async def get_health() -> Any:
         """Market state sağlık durumu."""
         try:
             state = market_state_service.get_current_state()

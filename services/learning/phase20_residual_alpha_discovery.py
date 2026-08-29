@@ -1,31 +1,34 @@
-"""FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY
-"""
+from typing import Any
+"""FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY"""
+
+import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, pearsonr
-import warnings
-warnings.filterwarnings('ignore')
+from scipy.stats import pearsonr, spearmanr
+
+warnings.filterwarnings("ignore")
 
 import structlog
+
 logger = structlog.get_logger()
 
-from services.learning.institutional_walkforward_engine import (
-    load_all_market_data, detect_market_regime
-)
+from services.learning.institutional_walkforward_engine import detect_market_regime, load_all_market_data
 
-def extract_forensic_features(df):
+
+def extract_forensic_features(df) -> Any:
+    """Otomatik eklendi."""
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
-    high = df["High"]
-    low = df["Low"]
-    volume = df["Volume"]
+    df["High"]
+    df["Low"]
+    df["Volume"]
 
     feats["roc_5d"] = (close / close.shift(5) - 1.0) * 100.0
     feats["roc_20d"] = (close / close.shift(20) - 1.0) * 100.0
-    
-    sma20 = close.rolling(20).mean()
-    sma50 = close.rolling(50).mean()
+
+    close.rolling(20).mean()
+    close.rolling(50).mean()
     sma200 = close.rolling(200).mean()
     feats["price_vs_sma200"] = ((close / sma200 - 1.0) * 100.0).fillna(0)
 
@@ -34,20 +37,25 @@ def extract_forensic_features(df):
     feats["target_5d_ret"] = (close.shift(-5) / close - 1.0) * 100.0
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 
-def get_resid(y, x):
-    if len(x) < 2 or np.std(x) == 0: return y
+
+def get_resid(y, x) -> Any:
+    """Otomatik eklendi."""
+    if len(x) < 2 or np.std(x) == 0:
+        return y
     b = np.cov(x, y)[0, 1] / np.var(x)
     return y - b * x
 
-def run_residual_discovery():
+
+def run_residual_discovery() -> Any:
+    """Otomatik eklendi."""
     logger.info("🚀 FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY")
     logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
-    
+
     stock_data, xu100_close = load_all_market_data()
     features_by_ticker = {tk: extract_forensic_features(df) for tk, df in stock_data.items() if len(df) >= 120}
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
-    
+
     # REGIME TRACKING
     regimes = {}
     last_regime = None
@@ -59,72 +67,84 @@ def run_residual_discovery():
         else:
             days_in_regime = 1
             last_regime = r
-            
+
         fine_regime = r
         if r == "BULL_TREND":
             fine_regime = "EARLY_BULL" if days_in_regime <= 20 else "LATE_BULL"
         regimes[d] = fine_regime
 
     records = []
-    
+
     for d in val_dates:
         tickers = list(features_by_ticker.keys())
         day_data = []
         for tk in tickers:
             day_data.append(features_by_ticker[tk].loc[d])
         df_d = pd.DataFrame(day_data, index=tickers)
-        
+
         if df_d["target_5d_ret"].isnull().all() or len(df_d) < 5:
             continue
-            
+
         df_d["ex_5d"] = df_d["target_5d_ret"] - df_d["target_5d_ret"].mean()
-        
+
         # Residualization
         df_d["excess_roc_20d"] = df_d["roc_20d"] - df_d["roc_20d"].mean()
         df_d["resid_roc_20d_vs_vol"] = get_resid(df_d["roc_20d"].values, df_d["volatility_20d"].values)
-        
+
         d_rec = {"date": d, "regime": regimes[d]}
-        
+
         # Interactions Vol x Mom
         vol_med = df_d["volatility_20d"].median()
         mom_med = df_d["roc_20d"].median()
-        
-        d_rec["low_vol_low_mom"] = df_d[(df_d["volatility_20d"] <= vol_med) & (df_d["roc_20d"] <= mom_med)]["ex_5d"].mean()
-        d_rec["low_vol_high_mom"] = df_d[(df_d["volatility_20d"] <= vol_med) & (df_d["roc_20d"] > mom_med)]["ex_5d"].mean()
-        d_rec["high_vol_low_mom"] = df_d[(df_d["volatility_20d"] > vol_med) & (df_d["roc_20d"] <= mom_med)]["ex_5d"].mean()
-        d_rec["high_vol_high_mom"] = df_d[(df_d["volatility_20d"] > vol_med) & (df_d["roc_20d"] > mom_med)]["ex_5d"].mean()
-        
+
+        d_rec["low_vol_low_mom"] = df_d[(df_d["volatility_20d"] <= vol_med) & (df_d["roc_20d"] <= mom_med)][
+            "ex_5d"
+        ].mean()
+        d_rec["low_vol_high_mom"] = df_d[(df_d["volatility_20d"] <= vol_med) & (df_d["roc_20d"] > mom_med)][
+            "ex_5d"
+        ].mean()
+        d_rec["high_vol_low_mom"] = df_d[(df_d["volatility_20d"] > vol_med) & (df_d["roc_20d"] <= mom_med)][
+            "ex_5d"
+        ].mean()
+        d_rec["high_vol_high_mom"] = df_d[(df_d["volatility_20d"] > vol_med) & (df_d["roc_20d"] > mom_med)][
+            "ex_5d"
+        ].mean()
+
         # Base ICs & Partials
         rank_vol = df_d["volatility_20d"].rank()
         rank_mom = df_d["roc_20d"].rank()
         rank_resid_mom = df_d["resid_roc_20d_vs_vol"].rank()
         rank_y = df_d["ex_5d"].rank()
-        
+
         d_rec["ic_vol"] = spearmanr(rank_vol, rank_y)[0]
         d_rec["ic_raw_mom"] = spearmanr(rank_mom, rank_y)[0]
         d_rec["ic_resid_mom"] = spearmanr(rank_resid_mom, rank_y)[0]
-        
+
         rank_sma = df_d["price_vs_sma200"].rank()
         d_rec["ic_sma200"] = spearmanr(rank_sma, rank_y)[0]
         res_sma_vol = get_resid(rank_sma, rank_vol)
         res_y_vol = get_resid(rank_y, rank_vol)
         d_rec["partial_ic_sma200_vs_vol"] = pearsonr(res_sma_vol, res_y_vol)[0]
-        
+
         # Quantiles & Shuffle for Resid Mom
         f_name = "resid_roc_20d_vs_vol"
         f_vals = df_d[f_name].values
-        q_cols = pd.qcut(f_vals, 5, labels=False, duplicates='drop') if len(np.unique(f_vals)) > 5 else pd.Series(0, index=df_d.index)
+        q_cols = (
+            pd.qcut(f_vals, 5, labels=False, duplicates="drop")
+            if len(np.unique(f_vals)) > 5
+            else pd.Series(0, index=df_d.index)
+        )
         for q in range(5):
-            d_rec[f"resid_mom_Q{q+1}_5d"] = df_d.iloc[q_cols == q]["ex_5d"].mean()
+            d_rec[f"resid_mom_Q{q + 1}_5d"] = df_d.iloc[q_cols == q]["ex_5d"].mean()
         d_rec["resid_mom_spread"] = d_rec.get("resid_mom_Q1_5d", 0) - d_rec.get("resid_mom_Q5_5d", 0)
-        
+
         # Null test
         shuf_f = f_vals.copy()
         np.random.shuffle(shuf_f)
         d_rec["null_ic_resid_mom"] = spearmanr(shuf_f, df_d["ex_5d"].values)[0]
-        
+
         records.append(d_rec)
-        
+
     df_res = pd.DataFrame(records).fillna(0)
 
     logger.info("\n==================================================")
@@ -132,7 +152,9 @@ def run_residual_discovery():
     logger.info("==================================================")
     logger.info(f"Mean IC (Raw roc_20d)                  : {df_res['ic_raw_mom'].mean():.4f}")
     logger.info(f"Mean IC (Residual roc_20d vs Volatility): {df_res['ic_resid_mom'].mean():.4f}")
-    logger.info("-> Teşhis: Momentum'un Volatilite'den arındırılmış (residual) hali bile IC kazanamamıştır. Çöküş doğrudan volatilite ile açıklanamaz, momentumun kendi doğasındaki mean-reversion etkilidir.")
+    logger.info(
+        "-> Teşhis: Momentum'un Volatilite'den arındırılmış (residual) hali bile IC kazanamamıştır. Çöküş doğrudan volatilite ile açıklanamaz, momentumun kendi doğasındaki mean-reversion etkilidir."
+    )
 
     logger.info("\n==================================================")
     logger.info("D) NON-LINEARITY (Residual Momentum Q1-Q5)")
@@ -151,7 +173,9 @@ def run_residual_discovery():
     logger.info(f"LOW-Vol  + HIGH-Mom : %{df_res['low_vol_high_mom'].mean():.3f} (<- Güvenli Liman Momentum)")
     logger.info(f"HIGH-Vol + LOW-Mom  : %{df_res['high_vol_low_mom'].mean():.3f}")
     logger.info(f"HIGH-Vol + HIGH-Mom : %{df_res['high_vol_high_mom'].mean():.3f} (<- Toksik Kesişim - Çöküş Alanı)")
-    logger.info("-> Teşhis: Düşük Volatilite ile desteklenen Momentum para kazandırıyor. Ancak Yüksek Volatiliteli (Aşırı spekülatif) Momentum hisseleri portföyü havaya uçuruyor. Çözüm, momentumu tek başına değil conditional (Volatilite Filtreli) kullanmaktır.")
+    logger.info(
+        "-> Teşhis: Düşük Volatilite ile desteklenen Momentum para kazandırıyor. Ancak Yüksek Volatiliteli (Aşırı spekülatif) Momentum hisseleri portföyü havaya uçuruyor. Çözüm, momentumu tek başına değil conditional (Volatilite Filtreli) kullanmaktır."
+    )
 
     logger.info("\n==================================================")
     logger.info("F) PRICE_VS_SMA200 FORENSICS")
@@ -160,7 +184,7 @@ def run_residual_discovery():
     logger.info(f"Partial IC (vs Vol) : {df_res['partial_ic_sma200_vs_vol'].mean():.4f}")
     for r in ["EARLY_BULL", "LATE_BULL", "SIDEWAYS_RANGE", "BEAR_MARKET"]:
         sub = df_res[df_res["regime"] == r]
-        ic = sub['ic_sma200'].mean() if len(sub)>0 else 0
+        ic = sub["ic_sma200"].mean() if len(sub) > 0 else 0
         logger.info(f"{r:15} | Raw IC: {ic:.4f}")
 
     logger.info("\n==================================================")
@@ -168,7 +192,7 @@ def run_residual_discovery():
     logger.info("==================================================")
     blocks = [df_res.iloc[idx] for idx in np.array_split(range(len(df_res)), 5)]
     for i, b in enumerate(blocks):
-        logger.info(f"Block {i+1} | Resid Mom Mean IC: {b['ic_resid_mom'].mean():.4f}")
+        logger.info(f"Block {i + 1} | Resid Mom Mean IC: {b['ic_resid_mom'].mean():.4f}")
     logger.info(f"\nResid Mom Null IC: {df_res['null_ic_resid_mom'].mean():.4f}")
 
     logger.info("\n==================================================")
@@ -179,11 +203,14 @@ def run_residual_discovery():
     logger.info("CORE (Kesin Kullanılacaklar):")
     logger.info("  - volatility_20d (Güçlü Low-Vol Alpha)")
     logger.info("OPTIONAL / CONDITIONAL (Sadece Filtre ile veya Interaction ile):")
-    logger.info("  - roc_5d, roc_20d (SADECE volatility_20d DÜŞÜK ise çalışır. Lineer modelde kullanılamazlar. Ağaç modellerinde volatilite ile etkileşime girecekleri garanti edilmelidir).")
+    logger.info(
+        "  - roc_5d, roc_20d (SADECE volatility_20d DÜŞÜK ise çalışır. Lineer modelde kullanılamazlar. Ağaç modellerinde volatilite ile etkileşime girecekleri garanti edilmelidir)."
+    )
     logger.info("REMOVE / DO NOT USE (Redundant veya Toksik):")
     logger.info("  - momentum_20d (Tam kopya)")
     logger.info("  - atr_pct (Volatilitenin gölgesinde kalıyor)")
     logger.info("  - price_vs_sma200 (Çok uzun vade, istikrarsız, mean-reversiona maruz)")
+
 
 if __name__ == "__main__":
     run_residual_discovery()

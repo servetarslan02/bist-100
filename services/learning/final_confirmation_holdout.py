@@ -8,30 +8,25 @@ Bu modül:
 5. 6 Rejim (Bull, Bear, Sideways, High Vol, Low Vol, V-Dip Recovery) bazında PnL ve kazanma oranlarını raporlar.
 """
 
-import os
-import orjson
-import numpy as np
+from datetime import timedelta
+from typing import Any
 
+import numpy as np
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Tuple
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-import xgboost as xgb
+import structlog
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
-    extract_point_in_time_features,
     ModelTrainer,
+    extract_point_in_time_features,
+    load_all_market_data,
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
-import structlog
+
 logger = structlog.get_logger()
 
 
-
-def run_final_confirmation():
+def run_final_confirmation() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — FINAL CONFIRMATION HOLDOUT TEST")
     logger.info("=================================================================")
@@ -40,9 +35,16 @@ def run_final_confirmation():
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
 
     features_by_ticker = {}
@@ -59,10 +61,19 @@ def run_final_confirmation():
     split_train_idx = 140
     holdout_dates = common_dates[split_train_idx:-5]
 
-    logger.info(f"🎯 CONFIRMATION HOLDOUT ARALIĞI: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} işlem günü)")
+    logger.info(
+        f"🎯 CONFIRMATION HOLDOUT ARALIĞI: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} işlem günü)"
+    )
     logger.info(f"🏢 Portföy Kapsamı: {len(features_by_ticker)} BIST Hissesi\n")
 
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "XGBoost_Model",
+        "Cross_Sectional_Momentum",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+    ]
 
     INITIAL_CAPITAL = 10_000_000.0
     TRANSACTION_FEE_PCT = 0.00074
@@ -88,15 +99,15 @@ def run_final_confirmation():
 
     trainer = ModelTrainer(feature_cols)
     portfolio_cash = INITIAL_CAPITAL
-    positions: Dict[str, Dict[str, Any]] = {}
+    positions: dict[str, dict[str, Any]] = {}
     equity_curve = []
     daily_rets = []
     holding_periods = []
     daily_exposures = []
     daily_cash_pct = []
-    monthly_perf: Dict[str, Dict[str, float]] = {}
-    
-    regime_pnl: Dict[str, Dict[str, float]] = {
+    monthly_perf: dict[str, dict[str, float]] = {}
+
+    regime_pnl: dict[str, dict[str, float]] = {
         "BULL_TREND": {"pnl": 0.0, "trades": 0, "wins": 0},
         "BEAR_MARKET": {"pnl": 0.0, "trades": 0, "wins": 0},
         "SIDEWAYS_RANGE": {"pnl": 0.0, "trades": 0, "wins": 0},
@@ -111,12 +122,16 @@ def run_final_confirmation():
     losses_count = 0
     gross_win_pnl = 0.0
     gross_loss_pnl = 0.0
-    smoothed_scores: Dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
-    pending_evals: List[Dict[str, Any]] = []
+    smoothed_scores: dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
+    pending_evals: list[dict[str, Any]] = []
     completed_wins = {m: 0 for m in models}
     completed_totals = {m: 0 for m in models}
 
-    start_xu100 = float(xu100_close.loc[holdout_dates[0]]) if holdout_dates[0] in xu100_close.index else float(xu100_close.iloc[0])
+    start_xu100 = (
+        float(xu100_close.loc[holdout_dates[0]])
+        if holdout_dates[0] in xu100_close.index
+        else float(xu100_close.iloc[0])
+    )
     equity_xu100 = []
     equity_ew = []
     daily_rets_xu100 = []
@@ -127,7 +142,7 @@ def run_final_confirmation():
     logger.info("🚀 Confirmation Out-Of-Sample Koşusu Başlatıldı...", flush=True)
 
     for step_i, current_date in enumerate(holdout_dates):
-        date_str = current_date.strftime("%Y-%m-%d")
+        current_date.strftime("%Y-%m-%d")
         month_key = current_date.strftime("%Y-%m")
 
         # 0. Kapanan tahmin havuzlarını güncelle
@@ -144,17 +159,17 @@ def run_final_confirmation():
         # 1. PERİYODİK MODEL RETRAINING (Genişleyen Pencere, 5 Gün Embargo)
         if step_i % retrain_freq == 0:
             current_fold += 1
-            train_rows = [fdf.loc[:current_date - timedelta(days=7)] for fdf in features_by_ticker.values()]
+            train_rows = [fdf.loc[: current_date - timedelta(days=7)] for fdf in features_by_ticker.values()]
             comb_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(comb_train)
 
         # 2. PİYASA REJİMİ
         current_regime = detect_market_regime_v2(xu100_close, current_date)
-        
+
         # V-Dip Recovery ayrımı (Analiz için)
         hist_xu = xu100_close.loc[:current_date]
         ret_5d_xu = (hist_xu.iloc[-1] / hist_xu.iloc[-5] - 1.0) * 100.0 if len(hist_xu) >= 5 else 0.0
-        is_v_dip = (current_regime == "BULL_TREND" and ret_5d_xu > 3.5)
+        is_v_dip = current_regime == "BULL_TREND" and ret_5d_xu > 3.5
         regime_tag = "V_DIP_RECOVERY" if is_v_dip else current_regime
 
         max_pos = regime_max_positions.get(current_regime, 3)
@@ -191,15 +206,23 @@ def run_final_confirmation():
             alpha_ema = 0.75 if delta_s > 0.20 else 0.40
             smoothed_scores[tk] = alpha_ema * raw_c + (1.0 - alpha_ema) * smoothed_scores[tk]
 
-            cand.append({
-                "ticker": tk, "score": smoothed_scores[tk], "close": cur_p,
-                "future": fwd_p, "ret_5d": ret_5d, "atr_pct": atr_p
-            })
+            cand.append(
+                {
+                    "ticker": tk,
+                    "score": smoothed_scores[tk],
+                    "close": cur_p,
+                    "future": fwd_p,
+                    "ret_5d": ret_5d,
+                    "atr_pct": atr_p,
+                }
+            )
 
             for m in models:
                 p_val = 1 if batch_sigs[tk][m] > 0 else -1
                 act_sign = 1 if ret_5d > 0 else -1
-                pending_evals.append({"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_val == act_sign)})
+                pending_evals.append(
+                    {"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_val == act_sign)}
+                )
 
         # 5. POZİSYON ÇIKIŞLARI (ATR Trailing Stop)
         closed_tickers = []
@@ -212,15 +235,15 @@ def run_final_confirmation():
             atr_buffer = max(4.5, pos.get("atr_pct", 3.0) * 1.5)
 
             should_exit = False
-            if pnl_pct <= -6.0:
-                should_exit = True
-            elif pos["highest_price"] > pos["entry_price"] * 1.05 and cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0):
-                should_exit = True
-            elif pnl_pct >= 35.0:
-                should_exit = True
-            elif pos["days_held"] >= 10 and smoothed_scores[tk] < -0.15:
-                should_exit = True
-            elif pos["days_held"] >= 65:
+            if (
+                pnl_pct <= -6.0
+                or pos["highest_price"] > pos["entry_price"] * 1.05
+                and cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)
+                or pnl_pct >= 35.0
+                or pos["days_held"] >= 10
+                and smoothed_scores[tk] < -0.15
+                or pos["days_held"] >= 65
+            ):
                 should_exit = True
 
             if should_exit:
@@ -254,7 +277,9 @@ def run_final_confirmation():
         slots = max_pos - len(positions)
 
         if slots > 0 and len(top_cand) > 0 and portfolio_cash > 200_000:
-            tot_val = portfolio_cash + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items())
+            tot_val = portfolio_cash + sum(
+                p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items()
+            )
             for rank_idx, c in enumerate(top_cand[:slots]):
                 max_alloc_pct = 0.25 if (rank_idx == 0 and c["score"] > 0.25) else 0.20
                 alloc_slot = min(portfolio_cash / (slots - rank_idx), tot_val * max_alloc_pct)
@@ -262,19 +287,27 @@ def run_final_confirmation():
                 if shares > 0:
                     cost = shares * c["close"]
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash -= (cost + friction)
+                    portfolio_cash -= cost + friction
                     total_costs += friction
                     positions[c["ticker"]] = {
-                        "shares": shares, "entry_price": c["close"], "days_held": 0,
-                        "highest_price": c["close"], "atr_pct": c["atr_pct"],
-                        "regime": current_regime, "regime_tag": regime_tag
+                        "shares": shares,
+                        "entry_price": c["close"],
+                        "days_held": 0,
+                        "highest_price": c["close"],
+                        "atr_pct": c["atr_pct"],
+                        "regime": current_regime,
+                        "regime_tag": regime_tag,
                     }
 
         # 7. GÜNLÜK DEĞERLER VE BENCHMARK
-        cur_eq = portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items())
+        cur_eq = portfolio_cash + sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items()
+        )
         equity_curve.append(cur_eq)
 
-        invested = sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items())
+        invested = sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items()
+        )
         exp_pct = (invested / cur_eq) * 100.0 if cur_eq > 0 else 0.0
         daily_exposures.append(exp_pct)
         daily_cash_pct.append(100.0 - exp_pct)
@@ -285,7 +318,12 @@ def run_final_confirmation():
         equity_xu100.append(eq_xu)
 
         # Equal-Weight
-        ew_val = INITIAL_CAPITAL * np.mean([float(fdf.loc[current_date]["close"]) / float(fdf.loc[holdout_dates[0]]["close"]) for fdf in features_by_ticker.values()])
+        ew_val = INITIAL_CAPITAL * np.mean(
+            [
+                float(fdf.loc[current_date]["close"]) / float(fdf.loc[holdout_dates[0]]["close"])
+                for fdf in features_by_ticker.values()
+            ]
+        )
         equity_ew.append(ew_val)
 
         if len(equity_curve) > 1:
@@ -295,7 +333,12 @@ def run_final_confirmation():
             daily_rets_xu100.append(d_x)
 
             if month_key not in monthly_perf:
-                monthly_perf[month_key] = {"strat_start": equity_curve[-2], "xu_start": equity_xu100[-2], "strat_end": cur_eq, "xu_end": eq_xu}
+                monthly_perf[month_key] = {
+                    "strat_start": equity_curve[-2],
+                    "xu_start": equity_xu100[-2],
+                    "strat_end": cur_eq,
+                    "xu_end": eq_xu,
+                }
             else:
                 monthly_perf[month_key]["strat_end"] = cur_eq
                 monthly_perf[month_key]["xu_end"] = eq_xu
@@ -340,12 +383,16 @@ def run_final_confirmation():
     # Upside & Downside Capture
     up_idx = xu_series > 0
     down_idx = xu_series < 0
-    upside_capture = (d_series[up_idx].mean() / xu_series[up_idx].mean()) * 100.0 if xu_series[up_idx].mean() > 0 else 0.0
-    downside_capture = (d_series[down_idx].mean() / xu_series[down_idx].mean()) * 100.0 if xu_series[down_idx].mean() < 0 else 0.0
+    upside_capture = (
+        (d_series[up_idx].mean() / xu_series[up_idx].mean()) * 100.0 if xu_series[up_idx].mean() > 0 else 0.0
+    )
+    downside_capture = (
+        (d_series[down_idx].mean() / xu_series[down_idx].mean()) * 100.0 if xu_series[down_idx].mean() < 0 else 0.0
+    )
 
     cov_mat = np.cov(d_series, xu_series)
     beta = cov_mat[0, 1] / cov_mat[1, 1] if cov_mat[1, 1] > 0 else 1.0
-    alpha_annual = (cagr - (40.0 + beta * (cagr_xu - 40.0)))
+    alpha_annual = cagr - (40.0 + beta * (cagr_xu - 40.0))
 
     avg_holding = np.mean(holding_periods) if holding_periods else 0.0
     avg_exp = np.mean(daily_exposures)
@@ -354,15 +401,21 @@ def run_final_confirmation():
     logger.info("\n=================================================================")
     logger.info("🏆 FINAL CONFIRMATION HOLDOUT KARŞILAŞTIRMA RAPORU")
     logger.info("=================================================================")
-    logger.info(f"| Metrik | ALPHA BIST (Frozen Upside-Aware) | XU100 Buy & Hold | Equal-Weight BIST (20 Hisse) |")
-    logger.info(f"|---|---|---|---|")
-    logger.info(f"| **Bitiş Sermayesi** | **₺{eq_series.iloc[-1]:,.2f}** | ₺{equity_xu100[-1]:,.2f} | ₺{equity_ew[-1]:,.2f} |")
+    logger.info("| Metrik | ALPHA BIST (Frozen Upside-Aware) | XU100 Buy & Hold | Equal-Weight BIST (20 Hisse) |")
+    logger.info("|---|---|---|---|")
+    logger.info(
+        f"| **Bitiş Sermayesi** | **₺{eq_series.iloc[-1]:,.2f}** | ₺{equity_xu100[-1]:,.2f} | ₺{equity_ew[-1]:,.2f} |"
+    )
     logger.info(f"| **Toplam Net Getiri** | **%{tot_ret:+.2f}** | %{tot_ret_xu:+.2f} | %{tot_ret_ew:+.2f} |")
     logger.info(f"| **CAGR (Yıllık Getiri)** | **%{cagr:+.2f}** | %{cagr_xu:+.2f} | %{cagr_ew:+.2f} |")
     logger.info(f"| **Maksimum Drawdown (Max DD)** | **%{max_dd:.2f}** | %{max_dd_xu:.2f} | %18.42 |")
-    logger.info(f"| **Sharpe Oranı (Rf=%40)** | **{sharpe:.2f}** | {np.sqrt(252)*(xu_series-rf_daily).mean()/xu_series.std():.2f} | -0.15 |")
-    logger.info(f"| **Sortino Oranı** | **{sortino:.2f}** | {(cagr_xu-40.0)/(xu_series[xu_series<0].std()*np.sqrt(252)):.2f} | -0.22 |")
-    logger.info(f"| **Calmar Oranı** | **{calmar:.2f}** | {cagr_xu/max_dd_xu:.2f} | {cagr_ew/18.42:.2f} |")
+    logger.info(
+        f"| **Sharpe Oranı (Rf=%40)** | **{sharpe:.2f}** | {np.sqrt(252) * (xu_series - rf_daily).mean() / xu_series.std():.2f} | -0.15 |"
+    )
+    logger.info(
+        f"| **Sortino Oranı** | **{sortino:.2f}** | {(cagr_xu - 40.0) / (xu_series[xu_series < 0].std() * np.sqrt(252)):.2f} | -0.22 |"
+    )
+    logger.info(f"| **Calmar Oranı** | **{calmar:.2f}** | {cagr_xu / max_dd_xu:.2f} | {cagr_ew / 18.42:.2f} |")
     logger.info(f"| **Kâr Faktörü (Profit Factor)** | **{profit_factor:.2f}** | - | - |")
     logger.info(f"| **Kazanma Oranı (Win Rate)** | **%{win_rate:.1f}** ({wins_count}/{trades_count}) | - | - |")
     logger.info(f"| **Upside Capture Ratio** | **%{upside_capture:.1f}** | %100.0 | %105.2 |")

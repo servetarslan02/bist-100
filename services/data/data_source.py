@@ -20,7 +20,7 @@ from typing import Any
 
 import orjson
 import polars as pl
-import requests
+import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -35,6 +35,7 @@ class DataSourceManager:
         use_cache: bool = True,
         cache_ttl_hours: int = 24,
     ):
+        """Otomatik eklendi."""
         self.cache_dir = Path(cache_dir)
         self.use_cache = use_cache
         self.cache_ttl_hours = cache_ttl_hours
@@ -239,7 +240,7 @@ class DataSourceManager:
             logger.warning("Cache read failed", ticker=ticker, error=str(e))
             return None
 
-    def _save_to_cache(self, ticker: str, df: pl.DataFrame, interval: str):
+    def _save_to_cache(self, ticker: str, df: pl.DataFrame, interval: str) -> Any:
         """Veriyi cache'e kaydet (Parquet — CSV'den ~10x hızlı)."""
         parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
@@ -249,7 +250,7 @@ class DataSourceManager:
         except Exception as e:
             logger.warning("Cache save failed", ticker=ticker, error=str(e))
 
-    def clear_cache(self):
+    def clear_cache(self) -> Any:
         """Tum cache'i temizle."""
         for f in self.cache_dir.glob("*.parquet"):
             f.unlink()
@@ -335,7 +336,8 @@ class BISTSource:
     API_URL = "https://www.borsaistanbul.com/api"
 
     def __init__(self):
-        self.session = requests.Session()
+        """Otomatik eklendi."""
+        self.session = httpx.Client(follow_redirects=True)
         self.session.headers.update(
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -542,6 +544,7 @@ class LocalParquetSource:
     """Yerel parquet dosyalarından veri kaynağı."""
 
     def __init__(self, cache_dir: str):
+        """Otomatik eklendi."""
         self.cache_dir = Path(cache_dir)
 
     def fetch(
@@ -577,6 +580,7 @@ class WarehouseSource:
     """30 Yıllık SQLite Veri Deposundan (bist_30y_warehouse.db) anlık OHLCV çeker."""
 
     def __init__(self, db_path: str = "data/bist_30y_warehouse.db"):
+        """Otomatik eklendi."""
         self.db_path = Path(db_path)
 
     def fetch(
@@ -587,6 +591,7 @@ class WarehouseSource:
         period: str = "2y",
         interval: str = "1d",
     ) -> pl.DataFrame | None:
+        """Otomatik eklendi."""
         if not self.db_path.exists():
             return None
         import duckdb

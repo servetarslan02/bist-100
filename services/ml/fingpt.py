@@ -56,6 +56,7 @@ class FinGPTSentiment:
     """
 
     def __init__(self, model_name: str = "FinBERT"):
+        """Otomatik eklendi."""
         self.model_name = model_name
         self._model = None
         self._tokenizer = None
@@ -129,7 +130,8 @@ class FinGPTSentiment:
         # Son N saat
         now = datetime.now(UTC)
 
-        def _parse_ts(ts_str):
+        def _parse_ts(ts_str) -> Any:
+            """Otomatik eklendi."""
             try:
                 dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                 return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)

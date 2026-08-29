@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
+from typing import Any
 """
 Monitoring & Observability Testleri (Pytest Uyumlu)
 
@@ -12,7 +15,6 @@ Kapsam:
 - Invariant failure tracking
 """
 
-from __future__ import annotations
 
 import pytest
 
@@ -22,19 +24,20 @@ from services.core.db_lock import (
 )
 from services.core.monitoring import PortfolioMonitor
 from services.core.observability import prometheus_metrics
-from services.paper_trading.paper_orchestrator import paper_orchestrator
 
 
 class MockPortfolioService:
     """Offline resilient mock portfolio service."""
 
     def __init__(self, initial_capital: float = 100000.0):
+        """Otomatik eklendi."""
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._positions = {}
         self._invariant_ok = True
 
     def get_health_status(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "status": "HEALTHY" if self._invariant_ok else "UNHEALTHY",
             "portfolio": {
@@ -45,7 +48,7 @@ class MockPortfolioService:
 
 
 @pytest.mark.asyncio
-async def test_monitor_health_report():
+async def test_monitor_health_report() -> Any:
     """Portfolio monitor health report doğru bilgi vermeli."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -62,7 +65,7 @@ async def test_monitor_health_report():
 
 
 @pytest.mark.asyncio
-async def test_prometheus_format():
+async def test_prometheus_format() -> Any:
     """Prometheus text format doğru olmalı."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -78,7 +81,7 @@ async def test_prometheus_format():
 
 
 @pytest.mark.asyncio
-async def test_lock_metrics_api():
+async def test_lock_metrics_api() -> Any:
     """Lock metrics API doğru bilgi vermeli."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -92,7 +95,7 @@ async def test_lock_metrics_api():
 
 
 @pytest.mark.asyncio
-async def test_portfolio_api():
+async def test_portfolio_api() -> Any:
     """Portfolio API doğru bilgi vermeli."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -107,7 +110,7 @@ async def test_portfolio_api():
 
 
 @pytest.mark.asyncio
-async def test_health_status_change():
+async def test_health_status_change() -> Any:
     """Health status duruma göre değişmeli."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -123,7 +126,7 @@ async def test_health_status_change():
 
 
 @pytest.mark.asyncio
-async def test_metrics_sync():
+async def test_metrics_sync() -> Any:
     """Metrics sync doğru değerler üretmeli."""
     svc = MockPortfolioService()
     monitor = PortfolioMonitor()
@@ -142,7 +145,7 @@ async def test_metrics_sync():
 
 
 @pytest.mark.asyncio
-async def test_monitor_without_service():
+async def test_monitor_without_service() -> Any:
     """Service bağlanmadan monitor çağırmak hata vermemeli."""
     monitor = PortfolioMonitor()
 
@@ -157,7 +160,7 @@ async def test_monitor_without_service():
 
 
 @pytest.mark.asyncio
-async def test_lock_health_degraded():
+async def test_lock_health_degraded() -> Any:
     """Lock timeout sonrası DEGRADED status."""
     metrics = get_lock_metrics("test_degraded")
     metrics.record_timeout()

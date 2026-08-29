@@ -455,7 +455,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-ingestion
     command: python -m services.ingestion.main
     volumes:
@@ -496,7 +496,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-feature-engine
     command: python -m services.features.main
     volumes:
@@ -547,7 +547,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-market-state
     command: python -m services.market_state.main
     volumes:
@@ -587,7 +587,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-intelligence
     command: python -m services.intelligence.main
     volumes:
@@ -639,7 +639,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-simulation
     command: python -m services.simulation.main
     volumes:
@@ -690,7 +690,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-risk
     command: python -m services.risk.main
     volumes:
@@ -728,7 +728,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-portfolio
     command: python -m services.portfolio.main
     volumes:
@@ -767,7 +767,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-learning
     command: python -m services.learning.main
     volumes:
@@ -818,7 +818,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-celery-worker
     command: celery -A services.tasks.queue worker --loglevel=info --concurrency=2
     volumes:

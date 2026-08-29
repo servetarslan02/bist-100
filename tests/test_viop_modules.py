@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — VIOP Test Suite v3.0
 
@@ -18,21 +19,21 @@ import pytest
 class TestBlackScholes:
     """Black-Scholes fiyat doğruluğunu test et."""
 
-    def test_call_atm(self):
+    def test_call_atm(self) -> Any:
         """ATM call fiyatı pozitif ve makul olmalı."""
         from services.viop.enhanced_options import black_scholes
 
         price = black_scholes(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert 2.0 < price < 8.0, f"ATM call price {price} beklenen aralık dışında"
 
-    def test_put_atm(self):
+    def test_put_atm(self) -> Any:
         """ATM put fiyatı pozitif ve makul olmalı."""
         from services.viop.enhanced_options import black_scholes
 
         price = black_scholes(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="put")
         assert 1.0 < price < 7.0, f"ATM put price {price} beklenen aralık dışında"
 
-    def test_put_call_parity(self):
+    def test_put_call_parity(self) -> Any:
         """Put-Call Parity: C - P = S - K*e^(-rT)"""
         from services.viop.enhanced_options import black_scholes
 
@@ -43,21 +44,21 @@ class TestBlackScholes:
         rhs = S - K * np.exp(-r * T)
         assert abs(lhs - rhs) < 0.001, f"Put-Call Parity ihlali: {lhs} != {rhs}"
 
-    def test_call_deep_itm(self):
+    def test_call_deep_itm(self) -> Any:
         """Deep ITM call → intrinsic value'a yakın."""
         from services.viop.enhanced_options import black_scholes
 
         price = black_scholes(S=150, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert price > 49, f"Deep ITM call {price} < 49 olmamalı"
 
-    def test_call_deep_otm(self):
+    def test_call_deep_otm(self) -> Any:
         """Deep OTM call → sıfıra yakın."""
         from services.viop.enhanced_options import black_scholes
 
         price = black_scholes(S=50, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert price < 0.01, f"Deep OTM call {price} ≈ 0 olmalı"
 
-    def test_put_deep_itm(self):
+    def test_put_deep_itm(self) -> Any:
         """Deep ITM put → intrinsic value'a yakın."""
         from services.viop.enhanced_options import black_scholes
 
@@ -65,7 +66,7 @@ class TestBlackScholes:
         # Deep ITM put: intrinsic = 50, ama faiz nedeniyle put < intrinsic olabilir
         assert price > 45, f"Deep ITM put {price} > 45 olmalı"
 
-    def test_zero_vol(self):
+    def test_zero_vol(self) -> Any:
         """Sıfır vol limitinde kullanım fiyatı vadeye iskonto edilir."""
         from services.viop.enhanced_options import black_scholes
 
@@ -73,14 +74,14 @@ class TestBlackScholes:
         expected = 100 - 90 * np.exp(-0.15 * 0.25)
         assert abs(price - expected) < 0.01, f"Zero vol call {price} != {expected}"
 
-    def test_zero_T(self):
+    def test_zero_T(self) -> Any:
         """Sıfır vade → intrinsic value."""
         from services.viop.enhanced_options import black_scholes
 
         price = black_scholes(S=100, K=90, T=0, r=0.15, sigma=0.25, option_type="call")
         assert abs(price - 10) < 0.01, f"Zero T call intrinsic {price} != 10"
 
-    def test_higher_vol_higher_price(self):
+    def test_higher_vol_higher_price(self) -> Any:
         """Yüksek volatilite → yüksek fiyat."""
         from services.viop.enhanced_options import black_scholes
 
@@ -88,7 +89,7 @@ class TestBlackScholes:
         high = black_scholes(S=100, K=100, T=0.25, r=0.15, sigma=0.40, option_type="call")
         assert high > low, f"Yüksek vol {high} > düşük vol {low} olmalı"
 
-    def test_longer_T_higher_price(self):
+    def test_longer_T_higher_price(self) -> Any:
         """Uzun vade → yüksek fiyat (call)."""
         from services.viop.enhanced_options import black_scholes
 
@@ -105,56 +106,56 @@ class TestBlackScholes:
 class TestGreeks:
     """Greeks doğruluğunu test et."""
 
-    def test_call_delta_range(self):
+    def test_call_delta_range(self) -> Any:
         """Call delta 0 ile 1 arasında olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert 0 < g["delta"] < 1, f"Call delta {g['delta']} aralık dışında"
 
-    def test_put_delta_range(self):
+    def test_put_delta_range(self) -> Any:
         """Put delta -1 ile 0 arasında olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="put")
         assert -1 < g["delta"] < 0, f"Put delta {g['delta']} aralık dışında"
 
-    def test_gamma_positive(self):
+    def test_gamma_positive(self) -> Any:
         """Gamma her zaman pozitif olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert g["gamma"] > 0, f"Gamma {g['gamma']} > 0 olmalı"
 
-    def test_theta_negative(self):
+    def test_theta_negative(self) -> Any:
         """Theta genellikle negatif olmalı (zaman aşımı)."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert g["theta"] < 0, f"Theta {g['theta']} < 0 olmalı"
 
-    def test_vega_positive(self):
+    def test_vega_positive(self) -> Any:
         """Vega pozitif olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert g["vega"] > 0, f"Vega {g['vega']} > 0 olmalı"
 
-    def test_atm_delta_near_half(self):
+    def test_atm_delta_near_half(self) -> Any:
         """ATM call delta ≈ 0.5 olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=100, K=100, T=0.25, r=0.05, sigma=0.25, option_type="call")
         assert 0.45 < g["delta"] < 0.60, f"ATM delta {g['delta']} ≈ 0.5 olmalı"
 
-    def test_deep_itm_call_delta_near_one(self):
+    def test_deep_itm_call_delta_near_one(self) -> Any:
         """Deep ITM call delta ≈ 1 olmalı."""
         from services.viop.enhanced_options import calculate_greeks
 
         g = calculate_greeks(S=200, K=100, T=0.25, r=0.15, sigma=0.25, option_type="call")
         assert g["delta"] > 0.95, f"Deep ITM delta {g['delta']} ≈ 1 olmalı"
 
-    def test_zero_T_returns_intrinsic(self):
+    def test_zero_T_returns_intrinsic(self) -> Any:
         """Sıfır vade → intrinsic Greeks."""
         from services.viop.enhanced_options import calculate_greeks
 
@@ -172,7 +173,7 @@ class TestGreeks:
 class TestImpliedVolatility:
     """IV hesaplama doğruluğunu test et."""
 
-    def test_roundtrip_call(self):
+    def test_roundtrip_call(self) -> Any:
         """BS fiyat → IV → tekrar BS fiyat = aynı olmalı."""
         from services.viop.enhanced_options import black_scholes, implied_volatility
 
@@ -182,7 +183,7 @@ class TestImpliedVolatility:
         iv = implied_volatility.calculate(price, S, K, T, r, "call")
         assert abs(iv - true_sigma) < 0.001, f"IV roundtrip {iv} != {true_sigma}"
 
-    def test_roundtrip_put(self):
+    def test_roundtrip_put(self) -> Any:
         """Put için IV roundtrip."""
         from services.viop.enhanced_options import black_scholes, implied_volatility
 
@@ -192,7 +193,7 @@ class TestImpliedVolatility:
         iv = implied_volatility.calculate(price, S, K, T, r, "put")
         assert abs(iv - true_sigma) < 0.001, f"Put IV roundtrip {iv} != {true_sigma}"
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
         """Toplu IV hesaplama."""
         from services.viop.enhanced_options import implied_volatility
 
@@ -204,7 +205,7 @@ class TestImpliedVolatility:
         assert len(results) == 2
         assert all(r["implied_vol"] > 0 for r in results)
 
-    def test_higher_price_higher_iv(self):
+    def test_higher_price_higher_iv(self) -> Any:
         """Yüksek fiyat → yüksek IV."""
         from services.viop.enhanced_options import implied_volatility
 
@@ -212,7 +213,7 @@ class TestImpliedVolatility:
         iv_high = implied_volatility.calculate(8.0, 100, 100, 0.25, 0.15, "call")
         assert iv_high > iv_low, f"Yüksek fiyat IV {iv_high} > düşük fiyat IV {iv_low} olmalı"
 
-    def test_bisection_fallback(self):
+    def test_bisection_fallback(self) -> Any:
         """Newton-Raphson başarısız olsa bile bisection çalışmalı."""
         from services.viop.enhanced_options import implied_volatility
 
@@ -229,7 +230,7 @@ class TestImpliedVolatility:
 class TestPortfolioGreeks:
     """Portfolio Greeks aggregation testleri."""
 
-    def test_single_long_call(self):
+    def test_single_long_call(self) -> Any:
         """Tek long call pozitif delta."""
         from services.viop.enhanced_options import PortfolioGreeks
 
@@ -251,7 +252,7 @@ class TestPortfolioGreeks:
         assert result.total_delta > 0
         assert result.n_positions == 1
 
-    def test_short_negates_long(self):
+    def test_short_negates_long(self) -> Any:
         """Short pozisyon long pozisyonun deltasını azaltmalı."""
         from services.viop.enhanced_options import PortfolioGreeks
 
@@ -282,7 +283,7 @@ class TestPortfolioGreeks:
         )
         assert abs(result.total_delta) < 0.01, f"Long+Short delta {result.total_delta} ≈ 0 olmalı"
 
-    def test_delta_neutral_flag(self):
+    def test_delta_neutral_flag(self) -> Any:
         """Delta neutral flag çalışmalı."""
         from services.viop.enhanced_options import PortfolioGreeks
 
@@ -314,7 +315,7 @@ class TestPortfolioGreeks:
         )
         assert result.delta_neutral
 
-    def test_put_call_portfolio(self):
+    def test_put_call_portfolio(self) -> Any:
         """Long call + long put → gamma pozitif, delta küçük."""
         from services.viop.enhanced_options import PortfolioGreeks
 
@@ -354,7 +355,7 @@ class TestPortfolioGreeks:
 class TestOptionsChain:
     """Options Chain veri modeli testleri."""
 
-    def test_add_and_get_quote(self):
+    def test_add_and_get_quote(self) -> Any:
         """Kotasyon ekle ve getir."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -366,21 +367,21 @@ class TestOptionsChain:
         assert got.bid == 100
         assert got.ask == 105
 
-    def test_mid_price(self):
+    def test_mid_price(self) -> Any:
         """Mid price = (bid + ask) / 2."""
         from services.viop.enhanced_options import OptionQuote
 
         q = OptionQuote(strike=100, expiry=date.today(), option_type="call", bid=10, ask=14)
         assert q.mid == 12.0
 
-    def test_spread(self):
+    def test_spread(self) -> Any:
         """Spread = ask - bid."""
         from services.viop.enhanced_options import OptionQuote
 
         q = OptionQuote(strike=100, expiry=date.today(), option_type="call", bid=10, ask=14)
         assert q.spread == 4.0
 
-    def test_get_strikes(self):
+    def test_get_strikes(self) -> Any:
         """Strike listesi sıralı olmalı."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -392,7 +393,7 @@ class TestOptionsChain:
         strikes = chain.get_strikes(exp)
         assert strikes == [9500, 10000, 10500]
 
-    def test_get_expiries(self):
+    def test_get_expiries(self) -> Any:
         """Vade listesi sıralı olmalı."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -402,7 +403,7 @@ class TestOptionsChain:
         expiries = chain.get_expiries()
         assert expiries == [date(2026, 9, 26), date(2026, 12, 26)]
 
-    def test_find_atm(self):
+    def test_find_atm(self) -> Any:
         """ATM bulma çalışmalı."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -415,7 +416,7 @@ class TestOptionsChain:
         assert atm is not None
         assert atm.strike == 10000
 
-    def test_get_chain(self):
+    def test_get_chain(self) -> Any:
         """Chain calls/puts ayrımı."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -427,7 +428,7 @@ class TestOptionsChain:
         assert len(result["calls"]) == 1
         assert len(result["puts"]) == 1
 
-    def test_calculate_all_greeks(self):
+    def test_calculate_all_greeks(self) -> Any:
         """Tüm chain için Greeks hesaplama."""
         from services.viop.enhanced_options import OptionQuote, OptionsChain
 
@@ -451,7 +452,7 @@ class TestOptionsChain:
 class TestStrategies:
     """Opsiyon strateji testleri — her strateji için matematik doğrulama."""
 
-    def test_covered_call_math(self):
+    def test_covered_call_math(self) -> Any:
         """Covered Call: max_profit ve max_loss doğruluğu."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -464,7 +465,7 @@ class TestStrategies:
         # Breakeven = 100 - 3 = 97
         assert result.breakeven == [97], f"Breakeven {result.breakeven} != [97]"
 
-    def test_protective_put_math(self):
+    def test_protective_put_math(self) -> Any:
         """Protective Put: max_loss doğruluğu."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -477,7 +478,7 @@ class TestStrategies:
         # Max profit = unlimited
         assert result.max_profit == float("inf")
 
-    def test_collar_math(self):
+    def test_collar_math(self) -> Any:
         """Collar: sınırlı risk, sınırlı ödül."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -489,7 +490,7 @@ class TestStrategies:
         # Max loss = -(100 - 95 + 1) * 100 = -600
         assert result.max_loss == -600, f"Max loss {result.max_loss} != -600"
 
-    def test_iron_condor_math(self):
+    def test_iron_condor_math(self) -> Any:
         """Iron Condor: net credit = max profit."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -511,7 +512,7 @@ class TestStrategies:
         assert result.max_loss == -300, f"Max loss {result.max_loss} != -300"
         assert len(result.breakeven) == 2
 
-    def test_straddle_math(self):
+    def test_straddle_math(self) -> Any:
         """Straddle: max_loss = toplam premium."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -523,7 +524,7 @@ class TestStrategies:
         assert result.breakeven == [94, 106], f"Breakeven {result.breakeven} != [94, 106]"
         assert result.max_profit == float("inf")
 
-    def test_strangle_math(self):
+    def test_strangle_math(self) -> Any:
         """Strangle: breakeven doğruluğu."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -532,7 +533,7 @@ class TestStrategies:
         # Breakeven: down = 95 - 4 = 91, up = 105 + 4 = 109
         assert result.breakeven == [91, 109], f"Breakeven {result.breakeven} != [91, 109]"
 
-    def test_bull_call_spread_math(self):
+    def test_bull_call_spread_math(self) -> Any:
         """Bull Call Spread: max_profit = spread - net debit."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -545,7 +546,7 @@ class TestStrategies:
         # Breakeven = 100 + 3 = 103
         assert result.breakeven == [103], f"Breakeven {result.breakeven} != [103]"
 
-    def test_bear_put_spread_math(self):
+    def test_bear_put_spread_math(self) -> Any:
         """Bear Put Spread: matematik doğruluğu."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -558,7 +559,7 @@ class TestStrategies:
         # Breakeven = 110 - 3 = 107
         assert result.breakeven == [107]
 
-    def test_butterfly_math(self):
+    def test_butterfly_math(self) -> Any:
         """Butterfly: max_profit = width - net debit."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -576,7 +577,7 @@ class TestStrategies:
         assert result.max_profit == 400, f"Max profit {result.max_profit} != 400"
         assert result.max_loss == -100
 
-    def test_all_strategies_return_to_dict(self):
+    def test_all_strategies_return_to_dict(self) -> Any:
         """Tüm stratejiler to_dict() döndürmeli."""
         from services.viop.enhanced_options import OptionsStrategies
 
@@ -608,7 +609,7 @@ class TestStrategies:
 class TestDeltaHedging:
     """Delta hedging testleri."""
 
-    def test_positive_delta_needs_short(self):
+    def test_positive_delta_needs_short(self) -> Any:
         """Pozitif delta → short futures."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -617,7 +618,7 @@ class TestDeltaHedging:
         assert result.contracts_needed < 0, f"Pozitif delta → short {result.contracts_needed}"
         assert result.action == "SELL"
 
-    def test_negative_delta_needs_long(self):
+    def test_negative_delta_needs_long(self) -> Any:
         """Negatif delta → long futures."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -626,7 +627,7 @@ class TestDeltaHedging:
         assert result.contracts_needed > 0, f"Negatif delta → long {result.contracts_needed}"
         assert result.action == "BUY"
 
-    def test_zero_delta_none(self):
+    def test_zero_delta_none(self) -> Any:
         """Sıfır delta → işlem yok."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -635,7 +636,7 @@ class TestDeltaHedging:
         assert result.contracts_needed == 0
         assert result.action == "NONE"
 
-    def test_custom_multiplier(self):
+    def test_custom_multiplier(self) -> Any:
         """Özel sözleşme çarpanı ile hedge."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -644,7 +645,7 @@ class TestDeltaHedging:
         result = h.hedge(portfolio_delta=5000, spot_price=10000, contract_multiplier=10000)
         assert result.contracts_needed == 0  # 5000 / 10000 = 0.5 → round = 0 veya 1
 
-    def test_gamma_scalp_positive(self):
+    def test_gamma_scalp_positive(self) -> Any:
         """Long gamma + fiyat hareketi → pozitif P&L."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -652,7 +653,7 @@ class TestDeltaHedging:
         result = h.gamma_scalp(portfolio_gamma=0.05, spot_price=100, price_move_pct=3.0)
         assert result["gamma_pnl"] > 0, f"Gamma scalp P&L {result['gamma_pnl']} > 0 olmalı"
 
-    def test_gamma_scalp_zero_move(self):
+    def test_gamma_scalp_zero_move(self) -> Any:
         """Sıfır hareket → sıfır P&L."""
         from services.viop.enhanced_options import DeltaHedger
 
@@ -669,7 +670,7 @@ class TestDeltaHedging:
 class TestSPANMargin:
     """SPAN margin testleri."""
 
-    def test_long_futures_margin(self):
+    def test_long_futures_margin(self) -> Any:
         """Long futures pozitif margin üretmeli."""
         from services.viop.enhanced_options import SPANMarginCalculator
 
@@ -689,7 +690,7 @@ class TestSPANMargin:
         assert result["total_margin"] > 0
         assert result["scenarios_tested"] == 16
 
-    def test_options_have_gamma_vega(self):
+    def test_options_have_gamma_vega(self) -> Any:
         """Opsiyon pozisyonu gamma ve vega etkisi içermeli."""
         from services.viop.enhanced_options import SPANMarginCalculator
 
@@ -711,7 +712,7 @@ class TestSPANMargin:
         pnls = result["position_margins"][0]["scenario_pnls"]
         assert len(set(pnls)) > 1, "Farklı senaryolar farklı PnL üretmeli"
 
-    def test_multiple_positions(self):
+    def test_multiple_positions(self) -> Any:
         """Çoklu pozisyon toplamı."""
         from services.viop.enhanced_options import SPANMarginCalculator
 
@@ -734,7 +735,7 @@ class TestSPANMargin:
 class TestArbitrage:
     """Arbitrage testleri."""
 
-    def test_fair_price_no_arbitrage(self):
+    def test_fair_price_no_arbitrage(self) -> Any:
         """Teorik fiyat → arbitraj yok."""
         from services.viop.enhanced_options import FuturesSpotArbitrage
 
@@ -745,7 +746,7 @@ class TestArbitrage:
         assert not result.arbitrage_opportunity
         assert result.strategy == "NO_ARBITRAGE"
 
-    def test_overpriced_futures(self):
+    def test_overpriced_futures(self) -> Any:
         """Pahalı futures → SELL_FUTURES_BUY_SPOT."""
         from services.viop.enhanced_options import FuturesSpotArbitrage
 
@@ -757,7 +758,7 @@ class TestArbitrage:
         assert result.strategy == "SELL_FUTURES_BUY_SPOT"
         assert result.estimated_profit > 0
 
-    def test_underpriced_futures(self):
+    def test_underpriced_futures(self) -> Any:
         """Ucuz futures → BUY_FUTURES_SELL_SPOT."""
         from services.viop.enhanced_options import FuturesSpotArbitrage
 
@@ -768,7 +769,7 @@ class TestArbitrage:
         assert result.arbitrage_opportunity
         assert result.strategy == "BUY_FUTURES_SELL_SPOT"
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> Any:
         """to_dict çalışmalı."""
         from services.viop.enhanced_options import FuturesSpotArbitrage
 
@@ -787,7 +788,7 @@ class TestArbitrage:
 class TestParity:
     """Put-Call Parity testleri."""
 
-    def test_parity_holds(self):
+    def test_parity_holds(self) -> Any:
         """BS ile üretilen fiyatlar parity sağlamalı."""
         from services.viop.enhanced_options import black_scholes, check_put_call_parity
 
@@ -798,7 +799,7 @@ class TestParity:
         assert result["parity_holds"]
         assert abs(result["deviation"]) < 0.01
 
-    def test_arbitrage_detected(self):
+    def test_arbitrage_detected(self) -> Any:
         """Büyük sapma → arbitraj fırsatı."""
         from services.viop.enhanced_options import check_put_call_parity
 
@@ -815,7 +816,7 @@ class TestParity:
 class TestRiskIntegration:
     """VIOP risk entegrasyonu testleri."""
 
-    def test_portfolio_risk_basic(self):
+    def test_portfolio_risk_basic(self) -> Any:
         """Temel portföy risk hesabı."""
         from services.viop.enhanced_options import VIOPRiskCalculator
 
@@ -839,7 +840,7 @@ class TestRiskIntegration:
         assert result["total_pnl"] > 0  # Long 10100 > 10000 → kar
         assert result["n_positions"] == 1
 
-    def test_risk_flags_high_delta(self):
+    def test_risk_flags_high_delta(self) -> Any:
         """Yüksek delta exposure → flag üretilmeli."""
         from services.viop.enhanced_options import VIOPRiskCalculator
 
@@ -861,7 +862,7 @@ class TestRiskIntegration:
         result = calc.calculate_portfolio_viop_risk(positions, 100000)
         assert len(result["risk_flags"]) > 0
 
-    def test_margin_requirement(self):
+    def test_margin_requirement(self) -> Any:
         """Teminat hesabı çalışmalı."""
         from services.viop.enhanced_options import VIOPRiskCalculator
 
@@ -883,7 +884,7 @@ class TestRiskIntegration:
         result = calc.calculate_margin_requirement(positions)
         assert result["total_margin"] > 0
 
-    def test_short_pnl(self):
+    def test_short_pnl(self) -> Any:
         """Short pozisyon: fiyat yükselirse zarar."""
         from services.viop.enhanced_options import VIOPRiskCalculator
 
@@ -914,7 +915,7 @@ class TestRiskIntegration:
 class TestBacktest:
     """Backtest motoru testleri."""
 
-    def test_covered_call_backtest(self):
+    def test_covered_call_backtest(self) -> Any:
         """Covered call backtest çalışmalı."""
         from datetime import date
 
@@ -928,7 +929,7 @@ class TestBacktest:
         assert result.win_rate >= 0
         assert result.profit_factor >= 0
 
-    def test_iron_condor_backtest(self):
+    def test_iron_condor_backtest(self) -> Any:
         """Iron condor backtest çalışmalı."""
         from datetime import date
 
@@ -942,7 +943,7 @@ class TestBacktest:
         result = engine.backtest_iron_condor(prices, width_pct=0.05, premium_pct=0.015, holding_days=30)
         assert result.total_trades > 0
 
-    def test_empty_series(self):
+    def test_empty_series(self) -> Any:
         """Boş fiyat serisi → sıfır işlem."""
         from services.viop.enhanced_options import OptionsBacktestEngine
 
@@ -951,7 +952,7 @@ class TestBacktest:
         assert result.total_trades == 0
         assert result.total_pnl == 0
 
-    def test_result_to_dict(self):
+    def test_result_to_dict(self) -> Any:
         """BacktestResult to_dict çalışmalı."""
         from datetime import date
 
@@ -974,7 +975,8 @@ class TestBacktest:
 class TestContractCatalog:
     """VIOP sözleşme kataloğu testleri."""
 
-    def test_get_contract(self):
+    def test_get_contract(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         c = viop_catalog.get_contract("XU030")
@@ -982,7 +984,8 @@ class TestContractCatalog:
         assert c.symbol == "XU030"
         assert c.contract_size == 10
 
-    def test_get_all_contracts(self):
+    def test_get_all_contracts(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         contracts = viop_catalog.get_all_contracts()
@@ -991,7 +994,8 @@ class TestContractCatalog:
         assert "DOL" in contracts
         assert "GAU" in contracts
 
-    def test_get_by_category(self):
+    def test_get_by_category(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         endeks = viop_catalog.get_contracts_by_category("endeks")
@@ -999,37 +1003,43 @@ class TestContractCatalog:
         döviz = viop_catalog.get_contracts_by_category("döviz")
         assert len(döviz) >= 2
 
-    def test_get_expiry_dates(self):
+    def test_get_expiry_dates(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         dates = viop_catalog.get_expiry_dates("XU030", 2026)
         assert len(dates) == 4  # Mart, Haziran, Eylül, Aralık
 
-    def test_get_next_expiry(self):
+    def test_get_next_expiry(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         next_exp = viop_catalog.get_next_expiry("XU030")
         assert next_exp is not None
         assert next_exp > date.today()
 
-    def test_calculate_margin(self):
+    def test_calculate_margin(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         margin = viop_catalog.calculate_margin("XU030", 10, 10000)
         assert margin == 10 * 10000 * 10 * 0.15  # qty * price * size * rate
 
-    def test_calculate_pnl(self):
+    def test_calculate_pnl(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         pnl = viop_catalog.calculate_pnl("XU030", 10, 10000, 10100)
         assert pnl == 10 * 100 * 10  # qty * diff * size
 
-    def test_unknown_contract(self):
+    def test_unknown_contract(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         assert viop_catalog.get_contract("UNKNOWN") is None
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> Any:
+        """Otomatik eklendi."""
         from services.viop.contract_catalog import viop_catalog
 
         d = viop_catalog.to_dict("DOL")
@@ -1046,28 +1056,32 @@ class TestContractCatalog:
 class TestVIOPMonitor:
     """VIOP monitor testleri."""
 
-    def test_margin_ok(self):
+    def test_margin_ok(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.viop_monitor import viop_monitor
 
         status = viop_monitor.check_viop_margin(100000, 20000)
         assert not status.margin_call
         assert status.action == "OK"
 
-    def test_margin_call(self):
+    def test_margin_call(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.viop_monitor import viop_monitor
 
         status = viop_monitor.check_viop_margin(100000, 10000)  # %10 < %13
         assert status.margin_call
         assert status.action == "MARGIN_CALL"
 
-    def test_custom_rate(self):
+    def test_custom_rate(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.viop_monitor import viop_monitor
 
         viop_monitor.set_margin_rate("CUSTOM", 0.20)
         status = viop_monitor.check_viop_margin(100000, 15000, "CUSTOM")
         assert status.margin_call  # 15000 < 100000 * 0.20 = 20000
 
-    def test_zero_position(self):
+    def test_zero_position(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.viop_monitor import viop_monitor
 
         status = viop_monitor.check_viop_margin(0, 20000)
@@ -1083,7 +1097,7 @@ class TestVIOPMonitor:
 class TestIntegration:
     """Tam entegrasyon testleri."""
 
-    def test_catalog_then_margin(self):
+    def test_catalog_then_margin(self) -> Any:
         """Catalog → Margin entegrasyonu."""
         from services.viop.contract_catalog import viop_catalog
         from services.viop.enhanced_options import SPANMarginCalculator
@@ -1104,7 +1118,7 @@ class TestIntegration:
         )
         assert result["total_margin"] > 0
 
-    def test_chain_then_greeks_then_hedge(self):
+    def test_chain_then_greeks_then_hedge(self) -> Any:
         """Chain → Greeks → Hedge tam pipeline."""
         from services.viop.enhanced_options import DeltaHedger, OptionQuote, OptionsChain, PortfolioGreeks
 
@@ -1134,7 +1148,7 @@ class TestIntegration:
         hedge = hedger.hedge(greeks.total_delta, spot_price=10000, contract_multiplier=100)
         assert hedge.action in ("BUY", "SELL", "NONE")
 
-    def test_strategy_then_risk(self):
+    def test_strategy_then_risk(self) -> Any:
         """Strateji → Risk entegrasyonu."""
         from services.viop.enhanced_options import OptionsStrategies, VIOPRiskCalculator
 
@@ -1159,7 +1173,7 @@ class TestIntegration:
         risk_result = risk.calculate_portfolio_viop_risk(positions, 100000)
         assert "total_delta_exposure" in risk_result
 
-    def test_backtest_then_summary(self):
+    def test_backtest_then_summary(self) -> Any:
         """Backtest → Özet."""
         from datetime import date
 

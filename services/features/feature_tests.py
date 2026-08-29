@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 import polars as pl
@@ -80,6 +80,7 @@ class FeatureTestSuite:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._test_data_generators: dict[str, Callable] = {
             "normal": self._generate_normal_data,
             "empty": self._generate_empty_data,
@@ -127,11 +128,13 @@ class FeatureTestSuite:
                 case_data = generator()
                 results.append(self._test_edge_case(feature_name, compute_fn, case_name, case_data))
             except Exception as e:
-                results.append(TestResult(
-                    test_name=f"edge_case_{case_name}",
-                    passed=False,
-                    message=f"Test setup failed: {e}",
-                ))
+                results.append(
+                    TestResult(
+                        test_name=f"edge_case_{case_name}",
+                        passed=False,
+                        message=f"Test setup failed: {e}",
+                    )
+                )
 
         # 3. Determinism testi
         results.append(self._test_determinism(feature_name, compute_fn, test_data))
@@ -187,14 +190,16 @@ class FeatureTestSuite:
                 feature_results.append(result)
             except Exception as e:
                 logger.error("feature_test_failed", feature=name, error=str(e))
-                feature_results.append(FeatureTestResult(
-                    feature_name=name,
-                    total_tests=0,
-                    passed=0,
-                    failed=1,
-                    skipped=0,
-                    overall_passed=False,
-                ))
+                feature_results.append(
+                    FeatureTestResult(
+                        feature_name=name,
+                        total_tests=0,
+                        passed=0,
+                        failed=1,
+                        skipped=0,
+                        overall_passed=False,
+                    )
+                )
 
         duration = (time.time() - start) * 1000
 
@@ -264,7 +269,7 @@ class FeatureTestSuite:
     ) -> TestResult:
         """Edge case testi."""
         try:
-            result = compute_fn(data)
+            compute_fn(data)
             # Edge case'de NaN/None dönebilir — bu kabul edilebilir
             # Önemli olan crash olmaması
             return TestResult(test_name=f"edge_{case_name}", passed=True, message="No crash")
@@ -320,7 +325,9 @@ class FeatureTestSuite:
             if min_val <= value <= max_val:
                 return TestResult(test_name="range", passed=True, message=f"In range: {value}")
 
-            return TestResult(test_name="range", passed=False, message=f"Out of range: {value} not in [{min_val}, {max_val}]")
+            return TestResult(
+                test_name="range", passed=False, message=f"Out of range: {value} not in [{min_val}, {max_val}]"
+            )
         except Exception as e:
             return TestResult(test_name="range", passed=False, message=f"Exception: {e}")
 
@@ -399,88 +406,100 @@ class FeatureTestSuite:
         low = close - np.abs(np.random.randn(n) * 0.3)
         volume = np.random.randint(1000, 100000, n).astype(float)
 
-        return pl.DataFrame({
-            "Date": pl.date_range(
-                start=pl.date(2025, 1, 1),
-                end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
-                eager=True,
-            ),
-            "Close": close,
-            "High": high,
-            "Low": low,
-            "Open": close + np.random.randn(n) * 0.1,
-            "Volume": volume,
-        })
+        return pl.DataFrame(
+            {
+                "Date": pl.date_range(
+                    start=pl.date(2025, 1, 1),
+                    end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
+                    eager=True,
+                ),
+                "Close": close,
+                "High": high,
+                "Low": low,
+                "Open": close + np.random.randn(n) * 0.1,
+                "Volume": volume,
+            }
+        )
 
     def _generate_empty_data(self) -> pl.DataFrame:
         """Boş DataFrame."""
-        return pl.DataFrame({
-            "Date": pl.Series("Date", [], dtype=pl.Date),
-            "Close": pl.Series("Close", [], dtype=pl.Float64),
-            "High": pl.Series("High", [], dtype=pl.Float64),
-            "Low": pl.Series("Low", [], dtype=pl.Float64),
-            "Open": pl.Series("Open", [], dtype=pl.Float64),
-            "Volume": pl.Series("Volume", [], dtype=pl.Float64),
-        })
+        return pl.DataFrame(
+            {
+                "Date": pl.Series("Date", [], dtype=pl.Date),
+                "Close": pl.Series("Close", [], dtype=pl.Float64),
+                "High": pl.Series("High", [], dtype=pl.Float64),
+                "Low": pl.Series("Low", [], dtype=pl.Float64),
+                "Open": pl.Series("Open", [], dtype=pl.Float64),
+                "Volume": pl.Series("Volume", [], dtype=pl.Float64),
+            }
+        )
 
     def _generate_single_data(self) -> pl.DataFrame:
         """Tek satır veri."""
-        return pl.DataFrame({
-            "Date": [pl.date(2025, 1, 1)],
-            "Close": [100.0],
-            "High": [101.0],
-            "Low": [99.0],
-            "Open": [100.5],
-            "Volume": [50000.0],
-        })
+        return pl.DataFrame(
+            {
+                "Date": [pl.date(2025, 1, 1)],
+                "Close": [100.0],
+                "High": [101.0],
+                "Low": [99.0],
+                "Open": [100.5],
+                "Volume": [50000.0],
+            }
+        )
 
     def _generate_all_nan_data(self) -> pl.DataFrame:
         """Tüm değerler NaN."""
         n = 50
-        return pl.DataFrame({
-            "Date": pl.date_range(
-                start=pl.date(2025, 1, 1),
-                end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
-                eager=True,
-            ),
-            "Close": [float("nan")] * n,
-            "High": [float("nan")] * n,
-            "Low": [float("nan")] * n,
-            "Open": [float("nan")] * n,
-            "Volume": [float("nan")] * n,
-        })
+        return pl.DataFrame(
+            {
+                "Date": pl.date_range(
+                    start=pl.date(2025, 1, 1),
+                    end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
+                    eager=True,
+                ),
+                "Close": [float("nan")] * n,
+                "High": [float("nan")] * n,
+                "Low": [float("nan")] * n,
+                "Open": [float("nan")] * n,
+                "Volume": [float("nan")] * n,
+            }
+        )
 
     def _generate_constant_data(self) -> pl.DataFrame:
         """Sabit değerler."""
         n = 50
-        return pl.DataFrame({
-            "Date": pl.date_range(
-                start=pl.date(2025, 1, 1),
-                end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
-                eager=True,
-            ),
-            "Close": [100.0] * n,
-            "High": [100.0] * n,
-            "Low": [100.0] * n,
-            "Open": [100.0] * n,
-            "Volume": [50000.0] * n,
-        })
+        return pl.DataFrame(
+            {
+                "Date": pl.date_range(
+                    start=pl.date(2025, 1, 1),
+                    end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
+                    eager=True,
+                ),
+                "Close": [100.0] * n,
+                "High": [100.0] * n,
+                "Low": [100.0] * n,
+                "Open": [100.0] * n,
+                "Volume": [50000.0] * n,
+            }
+        )
 
     def _generate_extreme_data(self) -> pl.DataFrame:
         """Aşırı değerler."""
         n = 50
-        return pl.DataFrame({
-            "Date": pl.date_range(
-                start=pl.date(2025, 1, 1),
-                end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
-                eager=True,
-            ),
-            "Close": [1e-10] * 25 + [1e10] * 25,
-            "High": [1e-10] * 25 + [1e10] * 25,
-            "Low": [1e-10] * 25 + [1e10] * 25,
-            "Open": [1e-10] * 25 + [1e10] * 25,
-            "Volume": [0.0] * 25 + [1e15] * 25,
-        })
+        return pl.DataFrame(
+            {
+                "Date": pl.date_range(
+                    start=pl.date(2025, 1, 1),
+                    end=pl.date(2025, 1, 1) + pl.duration(days=n - 1),
+                    eager=True,
+                ),
+                "Close": [1e-10] * 25 + [1e10] * 25,
+                "High": [1e-10] * 25 + [1e10] * 25,
+                "Low": [1e-10] * 25 + [1e10] * 25,
+                "Open": [1e-10] * 25 + [1e10] * 25,
+                "Volume": [0.0] * 25 + [1e15] * 25,
+            }
+        )
 
 
 # Singleton

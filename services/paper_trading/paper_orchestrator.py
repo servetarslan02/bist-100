@@ -38,6 +38,7 @@ class PaperTradingOrchestrator:
         strict_t2: bool = True,
         scenario: str = "NORMAL",
     ):
+        """Otomatik eklendi."""
         self._champion_version = champion_version
         self.initial_capital = initial_capital
         self.require_next_open = require_next_open
@@ -302,7 +303,8 @@ class PaperTradingOrchestrator:
                 if hasattr(df, "loc"):
                     try:
 
-                        def _get_val(r, *keys, default=0.0):
+                        def _get_val(r, *keys, default=0.0) -> Any:
+                            """Otomatik eklendi."""
                             for k in keys:
                                 if k in r:
                                     return r[k]
@@ -495,6 +497,7 @@ class PaperTradingOrchestrator:
         return self.get_full_report()
 
     def get_full_report(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         equity_curve = self.portfolio.get_equity_curve()
         trades = self.portfolio.get_trades()
         metrics = self.performance.compute_full_metrics(equity_curve, trades)
@@ -518,6 +521,7 @@ class PaperTradingOrchestrator:
         data_quality_ok: bool = True,
         next_open_prices: dict[str, float] | None = None,
     ) -> dict[str, Any]:
+        """Otomatik eklendi."""
         ticker = signal.get("ticker", "")
         direction = signal.get("direction", "")
         price = prices.get(ticker, 0.0)
@@ -676,7 +680,8 @@ class PaperTradingOrchestrator:
 
     # ===================== AUDIT HELPERS =====================
 
-    def _audit_signal(self, date: str, signal: dict[str, Any]):
+    def _audit_signal(self, date: str, signal: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -690,7 +695,8 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_order(self, date: str, order: dict[str, Any]):
+    def _audit_order(self, date: str, order: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -702,7 +708,8 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_performance(self, date: str, perf: dict[str, Any]):
+    def _audit_performance(self, date: str, perf: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -711,7 +718,8 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_no_trade(self, date: str, reason: str, ticker: str | None = None):
+    def _audit_no_trade(self, date: str, reason: str, ticker: str | None = None) -> Any:
+        """Otomatik eklendi."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
@@ -721,7 +729,8 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_error(self, date: str, error_type: str, message: str, ticker: str | None = None):
+    def _audit_error(self, date: str, error_type: str, message: str, ticker: str | None = None) -> Any:
+        """Otomatik eklendi."""
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "date": date,

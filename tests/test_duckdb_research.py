@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — DuckDB Research Engine Tests
 
 Gerçek fonksiyonel testler:
@@ -18,14 +19,13 @@ import pytest
 
 from services.core.duckdb_research import DuckDBResearchEngine
 
-
 # =====================================================
 # FIXTURES
 # =====================================================
 
 
 @pytest.fixture
-def research_engine():
+def research_engine() -> Any:
     """Test için DuckDB research engine."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = str(Path(tmpdir) / "test_research.duckdb")
@@ -35,7 +35,7 @@ def research_engine():
 
 
 @pytest.fixture
-def sample_parquet(tmp_path):
+def sample_parquet(tmp_path) -> Any:
     """Test Parquet dosyası oluştur."""
     df = pl.DataFrame(
         {
@@ -58,13 +58,13 @@ def sample_parquet(tmp_path):
 class TestParquetOperations:
     """Parquet okuma/yazma testleri."""
 
-    def test_query_parquet_returns_polars(self, research_engine, sample_parquet):
+    def test_query_parquet_returns_polars(self, research_engine, sample_parquet) -> Any:
         """Parquet sorgusu Polars DataFrame döndürmeli."""
         result = research_engine.query_parquet(sample_parquet)
         assert isinstance(result, pl.DataFrame)
         assert len(result) == 5
 
-    def test_query_parquet_with_filter(self, research_engine, sample_parquet):
+    def test_query_parquet_with_filter(self, research_engine, sample_parquet) -> Any:
         """Parquet sorgusu filtre çalışmalı."""
         result = research_engine.query_parquet(
             sample_parquet,
@@ -73,7 +73,7 @@ class TestParquetOperations:
         assert len(result) == 2
         assert all(result["ticker"] == "THYAO")
 
-    def test_query_parquet_with_aggregation(self, research_engine, sample_parquet):
+    def test_query_parquet_with_aggregation(self, research_engine, sample_parquet) -> Any:
         """Parquet sorgusu aggregation çalışmalı."""
         result = research_engine.query_parquet(
             sample_parquet,
@@ -82,18 +82,18 @@ class TestParquetOperations:
         assert len(result) == 3  # THYAO, GARAN, AKBNK
         assert "avg_price" in result.columns
 
-    def test_register_parquet_view(self, research_engine, sample_parquet):
+    def test_register_parquet_view(self, research_engine, sample_parquet) -> Any:
         """Parquet view olarak kaydedilmeli."""
         research_engine.register_parquet("market_data", sample_parquet)
         assert "market_data" in research_engine.list_parquet_views()
 
-    def test_query_registered_view(self, research_engine, sample_parquet):
+    def test_query_registered_view(self, research_engine, sample_parquet) -> Any:
         """Kayıtlı view sorgulanabilmeli."""
         research_engine.register_parquet("market_data", sample_parquet)
         result = research_engine.query_research("SELECT * FROM market_data")
         assert len(result) == 5
 
-    def test_parquet_write_and_read(self, research_engine, tmp_path):
+    def test_parquet_write_and_read(self, research_engine, tmp_path) -> Any:
         """Parquet yazma ve okuma döngüsü çalışmalı."""
         # Parquet yaz
         df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
@@ -115,7 +115,7 @@ class TestParquetOperations:
 class TestResearchDB:
     """Research DB işlemleri testleri."""
 
-    def test_create_table(self, research_engine):
+    def test_create_table(self, research_engine) -> Any:
         """Research tablosu oluşturulabilmeli."""
         research_engine.create_research_table(
             "test_table",
@@ -126,22 +126,20 @@ class TestResearchDB:
         stats = research_engine.get_stats()
         assert "test_table" in stats["tables"]
 
-    def test_insert_and_query(self, research_engine):
+    def test_insert_and_query(self, research_engine) -> Any:
         """Veri yazma ve okuma çalışmalı."""
         research_engine.create_research_table(
             "test_data",
             {"ticker": "VARCHAR", "price": "DOUBLE"},
         )
 
-        research_engine.execute_research(
-            "INSERT INTO test_data VALUES ('THYAO', 100.0), ('GARAN', 50.0)"
-        )
+        research_engine.execute_research("INSERT INTO test_data VALUES ('THYAO', 100.0), ('GARAN', 50.0)")
 
         result = research_engine.query_research("SELECT * FROM test_data ORDER BY ticker")
         assert len(result) == 2
         assert result["ticker"].to_list() == ["GARAN", "THYAO"]
 
-    def test_insert_from_parquet(self, research_engine, sample_parquet):
+    def test_insert_from_parquet(self, research_engine, sample_parquet) -> Any:
         """Parquet'ten research tablosuna veri aktarılabilmeli."""
         research_engine.create_research_table(
             "market_data",
@@ -153,7 +151,7 @@ class TestResearchDB:
         result = research_engine.query_research("SELECT COUNT(*) as cnt FROM market_data")
         assert result["cnt"].to_list()[0] == 5
 
-    def test_get_stats(self, research_engine):
+    def test_get_stats(self, research_engine) -> Any:
         """İstatistikler doğru döndürülmeli."""
         research_engine.create_research_table("t1", {"id": "INTEGER"})
         research_engine.create_research_table("t2", {"id": "INTEGER"})
@@ -174,13 +172,13 @@ class TestResearchDB:
 class TestPolarsIntegration:
     """Polars DataFrame entegrasyonu testleri."""
 
-    def test_query_returns_polars(self, research_engine, sample_parquet):
+    def test_query_returns_polars(self, research_engine, sample_parquet) -> Any:
         """Sorgular Polars DataFrame döndürmeli."""
         research_engine.register_parquet("data", sample_parquet)
         result = research_engine.query_research("SELECT * FROM data")
         assert isinstance(result, pl.DataFrame)
 
-    def test_polars_operations(self, research_engine, sample_parquet):
+    def test_polars_operations(self, research_engine, sample_parquet) -> Any:
         """Polars işlemleri çalışmalı."""
         research_engine.register_parquet("data", sample_parquet)
         df = research_engine.query_research("SELECT * FROM data")
@@ -193,18 +191,13 @@ class TestPolarsIntegration:
         thyao = df.filter(pl.col("ticker") == "THYAO")
         assert len(thyao) == 2
 
-    def test_lazy_query(self, research_engine, sample_parquet):
+    def test_lazy_query(self, research_engine, sample_parquet) -> Any:
         """Lazy sorgu çalışmalı."""
         research_engine.register_parquet("data", sample_parquet)
         df = research_engine.query_research("SELECT * FROM data")
 
         # Polars lazy operations
-        result = (
-            df.lazy()
-            .filter(pl.col("price") > 50)
-            .select(["ticker", "price"])
-            .collect()
-        )
+        result = df.lazy().filter(pl.col("price") > 50).select(["ticker", "price"]).collect()
         assert len(result) == 3  # THYAO x2, GARAN x1
 
 
@@ -216,18 +209,18 @@ class TestPolarsIntegration:
 class TestErrorHandling:
     """Hata yönetimi testleri."""
 
-    def test_invalid_parquet_path(self, research_engine):
+    def test_invalid_parquet_path(self, research_engine) -> Any:
         """Geçersiz Parquet yolu hata vermeli."""
         with pytest.raises(Exception):
             research_engine.query_parquet("/nonexistent/path.parquet")
 
-    def test_invalid_sql(self, research_engine, sample_parquet):
+    def test_invalid_sql(self, research_engine, sample_parquet) -> Any:
         """Geçersiz SQL hata vermeli."""
         research_engine.register_parquet("data", sample_parquet)
         with pytest.raises(Exception):
             research_engine.query_research("INVALID SQL QUERY")
 
-    def test_close_and_reopen(self, sample_parquet):
+    def test_close_and_reopen(self, sample_parquet) -> Any:
         """Kapatıp yeniden açma çalışmalı."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "test.duckdb")

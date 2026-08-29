@@ -53,6 +53,7 @@ class PipelineResult:
     total_duration_ms: float
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp,
@@ -71,10 +72,12 @@ class PipelineResult:
 
     @property
     def direction(self) -> str:
+        """Otomatik eklendi."""
         return self.synthesis.final_direction
 
     @property
     def confidence(self) -> float:
+        """Otomatik eklendi."""
         return self.synthesis.final_confidence
 
 
@@ -95,6 +98,7 @@ class AgentPipelineOrchestrator:
         enable_self_eval: bool = True,
         memory_path: str | None = None,  # F-028: None yerine varsayılan yol kullan
     ):
+        """Otomatik eklendi."""
         self.llm_client = llm_client
         self.max_concurrent = max_concurrent
         self.agent_timeout = agent_timeout
@@ -212,6 +216,7 @@ class AgentPipelineOrchestrator:
         except Exception as e:
             logger.error("Risk assessment failed, using conservative default", error=str(e))
             from .risk_assessor import RiskAssessment
+
             risk_assessment = RiskAssessment(
                 approved=False,
                 risk_level="HIGH",
@@ -291,6 +296,7 @@ class AgentPipelineOrchestrator:
             if template:
                 try:
                     from .prompts import PromptFactory
+
                     _, user_prompt = PromptFactory.get_prompts(
                         template_name=template,
                         ticker=ticker,
@@ -316,7 +322,7 @@ class AgentPipelineOrchestrator:
         ticker: str,
         results: dict[AgentRole, Any],
         synthesis: SynthesisResult,
-    ):
+    ) -> Any:
         """Memory'leri güncelle — task + outcome."""
         for role, result in results.items():
             role_name = role.value

@@ -11,35 +11,43 @@ BIST açığa satış kuralları:
 Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
+import functools
 from dataclasses import dataclass
 from datetime import UTC
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.short_selling")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class ShortSellingDecision:
+    """Otomatik eklendi."""
     allowed: bool
     reason: str = ""
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
@@ -51,6 +59,7 @@ class ShortSellingMonitor:
     UPTICK_RULE_THRESHOLD_PCT = 2.0  # BIST-100 %2 düşünce uptick rule aktif
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._bist50_cache: list[str] | None = None
         self._gross_settlement_tickers: set = set()
         self._spk_banned_tickers: set = set()
@@ -72,7 +81,7 @@ class ShortSellingMonitor:
         return self._bist50_cache
 
     @otel_trace("short_selling.refresh_bist50_cache")
-    def refresh_bist50_cache(self):
+    def refresh_bist50_cache(self) -> Any:
         """BIST-50 listesini yenile (çeyrek dönemlerde güncellenir).
 
         BIST-50 listesi her yıl Mart, Haziran, Eylül, Aralık aylarında güncellenir.
@@ -88,20 +97,20 @@ class ShortSellingMonitor:
 
         return datetime.now(UTC).month in {3, 6, 9, 12}
 
-    def auto_refresh_if_needed(self):
+    def auto_refresh_if_needed(self) -> Any:
         """Çeyrek dönemlerde otomatik yenile."""
         if self.is_quarterly_rebalance_month():
             self.refresh_bist50_cache()
 
-    def set_gross_settlement(self, tickers: list[str]):
+    def set_gross_settlement(self, tickers: list[str]) -> Any:
         """Brüt takaslı hisseleri güncelle."""
         self._gross_settlement_tickers = set(tickers)
 
-    def set_spk_banned(self, tickers: list[str]):
+    def set_spk_banned(self, tickers: list[str]) -> Any:
         """SPK geçici yasaklı hisseleri güncelle."""
         self._spk_banned_tickers = set(tickers)
 
-    def set_uptick_rule_active(self, active: bool):
+    def set_uptick_rule_active(self, active: bool) -> Any:
         """Uptick rule durumunu güncelle.
 
         BIST-100 endeksi %2 veya daha fazla düşerse seans sonuna kadar aktif.
@@ -110,7 +119,7 @@ class ShortSellingMonitor:
         if active:
             logger.warning("BIST Uptick Rule AKTİF — BIST-100 %2+ düştü")
 
-    def check_uptick_rule(self, bist100_change_pct: float):
+    def check_uptick_rule(self, bist100_change_pct: float) -> Any:
         """BIST-100 değişim oranına göre uptick rule kontrolü.
 
         Args:
@@ -120,7 +129,7 @@ class ShortSellingMonitor:
             self.set_uptick_rule_active(True)
         # Not: Seans sonunda otomatik sıfırlanmalı (scheduler tarafından)
 
-    def reset_uptick_rule(self):
+    def reset_uptick_rule(self) -> Any:
         """Seans sonunda uptick rule sıfırla."""
         self._uptick_rule_active = False
 

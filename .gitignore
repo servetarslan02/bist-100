@@ -64,3 +64,6 @@ data/ledgers/
 
 # mTLS certificates (NEVER commit private keys)
 infrastructure/mtls/certs/
+
+# Audit run json reports
+audit/*.json

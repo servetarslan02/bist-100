@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Alternative Data Test Suite v1.0
 
@@ -50,7 +51,8 @@ logger = structlog.get_logger(__name__)
 # =====================================================
 
 
-def create_mock_social_data():
+def create_mock_social_data() -> Any:
+    """Otomatik eklendi."""
     return {
         "sentiment": 0.65,
         "volume": 1500,
@@ -67,7 +69,8 @@ def create_mock_social_data():
     }
 
 
-def create_mock_job_data():
+def create_mock_job_data() -> Any:
+    """Otomatik eklendi."""
     return {
         "posting_growth": 0.25,
         "tech_hiring_pct": 0.35,
@@ -78,7 +81,8 @@ def create_mock_job_data():
     }
 
 
-def create_mock_cc_data():
+def create_mock_cc_data() -> Any:
+    """Otomatik eklendi."""
     return {
         "spend_growth": 0.15,
         "vs_sector": 0.05,
@@ -88,7 +92,8 @@ def create_mock_cc_data():
     }
 
 
-def create_mock_satellite_data():
+def create_mock_satellite_data() -> Any:
+    """Otomatik eklendi."""
     return {
         "factory_traffic": 0.10,
         "store_traffic": 0.05,
@@ -98,7 +103,8 @@ def create_mock_satellite_data():
     }
 
 
-def create_mock_web_data():
+def create_mock_web_data() -> Any:
+    """Otomatik eklendi."""
     return {
         "web_traffic_change": 0.15,
         "app_ranking_change": -5,
@@ -109,7 +115,8 @@ def create_mock_web_data():
     }
 
 
-def run_async(coro):
+def run_async(coro) -> Any:
+    """Otomatik eklendi."""
     return asyncio.get_event_loop().run_until_complete(coro)
 
 
@@ -122,13 +129,15 @@ class TestFaz0_RateLimiter:
     """Rate limiter test'leri."""
 
     @pytest.mark.asyncio
-    async def test_acquire_basic(self):
+    async def test_acquire_basic(self) -> Any:
+        """Otomatik eklendi."""
         limiter = RateLimiter(max_requests=10, window_seconds=60)
         await limiter.acquire()  # Should not block
         assert limiter._tokens < 10
 
     @pytest.mark.asyncio
-    async def test_acquire_respects_limit(self):
+    async def test_acquire_respects_limit(self) -> Any:
+        """Otomatik eklendi."""
         limiter = RateLimiter(max_requests=2, window_seconds=60)
         await limiter.acquire()
         await limiter.acquire()
@@ -142,19 +151,22 @@ class TestFaz0_RateLimiter:
 class TestFaz0_CircuitBreaker:
     """Circuit breaker test'leri."""
 
-    def test_initial_state_closed(self):
+    def test_initial_state_closed(self) -> Any:
+        """Otomatik eklendi."""
         cb = CircuitBreaker(failure_threshold=3)
         assert cb.state == CircuitState.CLOSED
         assert cb.allow_request()
 
-    def test_opens_after_threshold(self):
+    def test_opens_after_threshold(self) -> Any:
+        """Otomatik eklendi."""
         cb = CircuitBreaker(failure_threshold=3)
         for _ in range(3):
             cb.record_failure()
         assert cb.state == CircuitState.OPEN
         assert not cb.allow_request()
 
-    def test_half_open_after_timeout(self):
+    def test_half_open_after_timeout(self) -> Any:
+        """Otomatik eklendi."""
         cb = CircuitBreaker(failure_threshold=2, recovery_timeout_seconds=0)
         cb.record_failure()
         cb.record_failure()
@@ -163,7 +175,8 @@ class TestFaz0_CircuitBreaker:
         assert state == CircuitState.HALF_OPEN
         assert cb.allow_request()
 
-    def test_closes_after_success(self):
+    def test_closes_after_success(self) -> Any:
+        """Otomatik eklendi."""
         cb = CircuitBreaker(failure_threshold=2, recovery_timeout_seconds=0)
         cb.record_failure()
         cb.record_failure()
@@ -177,41 +190,47 @@ class TestFaz0_CircuitBreaker:
 class TestFaz0_DataQuality:
     """Data quality validator test'leri."""
 
-    def test_valid_data(self):
+    def test_valid_data(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         data = {"sentiment": 0.5, "volume": 1000}
         report = validator.validate(data, source="test")
         assert report.is_valid
         assert report.score > 0.5
 
-    def test_none_data(self):
+    def test_none_data(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         report = validator.validate(None, source="test")
         assert not report.is_valid
         assert report.score == 0
 
-    def test_empty_dict(self):
+    def test_empty_dict(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         report = validator.validate({}, source="test")
         # Boş dict: null check + type check + empty check → 1 failed
         # score = 3/4 = 0.75, is_valid = True (score >= 0.5 ve failed <= 2)
         assert report.checks_failed >= 1
 
-    def test_all_zeros(self):
+    def test_all_zeros(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         data = {"a": 0, "b": 0, "c": 0}
         report = validator.validate(data, source="test")
         # All zeros: 1 failed, score = 3/4 = 0.75
         assert report.checks_failed >= 1
 
-    def test_expected_fields(self):
+    def test_expected_fields(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         data = {"sentiment": 0.5}
         report = validator.validate(data, source="test", expected_fields=["sentiment", "volume"])
         # Missing field: 1 failed, score = 4/5 = 0.8
         assert report.checks_failed >= 1
 
-    def test_range_check(self):
+    def test_range_check(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataQualityValidator()
         data = {"confidence": 2.0}  # 0-1 arası olmalı
         report = validator.validate(data, source="test")
@@ -221,20 +240,23 @@ class TestFaz0_DataQuality:
 class TestFaz0_AdapterRegistry:
     """Adapter registry test'leri."""
 
-    def test_register_and_list(self):
+    def test_register_and_list(self) -> Any:
+        """Otomatik eklendi."""
         registry = AdapterRegistry()
         adapter = BKMAdapter()
         registry.register(adapter)
         assert "bkm" in registry.list_adapters()
 
-    def test_get_adapter(self):
+    def test_get_adapter(self) -> Any:
+        """Otomatik eklendi."""
         registry = AdapterRegistry()
         adapter = BKMAdapter()
         registry.register(adapter)
         assert registry.get("bkm") is adapter
         assert registry.get("nonexistent") is None
 
-    def test_get_all_status(self):
+    def test_get_all_status(self) -> Any:
+        """Otomatik eklendi."""
         registry = AdapterRegistry()
         registry.register(BKMAdapter())
         status = registry.get_all_status()
@@ -249,7 +271,8 @@ class TestFaz0_AdapterRegistry:
 class TestFaz1_LegacyFeatures:
     """Legacy feature fonksiyonları test'leri."""
 
-    def test_social_features(self):
+    def test_social_features(self) -> Any:
+        """Otomatik eklendi."""
         data = create_mock_social_data()
         features = compute_social_features(data, "THYAO")
         assert "social_sentiment" in features
@@ -258,32 +281,37 @@ class TestFaz1_LegacyFeatures:
         assert "social_viral" in features
         assert "social_twitter_sentiment" in features
 
-    def test_job_features(self):
+    def test_job_features(self) -> Any:
+        """Otomatik eklendi."""
         data = create_mock_job_data()
         features = compute_job_features(data, "THYAO")
         assert "job_posting_growth" in features
         assert features["job_posting_growth"] == 0.25
         assert features["tech_hiring_pct"] == 0.35
 
-    def test_cc_features(self):
+    def test_cc_features(self) -> Any:
+        """Otomatik eklendi."""
         data = create_mock_cc_data()
         features = compute_cc_features(data, "THYAO")
         assert "cc_spend_growth" in features
         assert features["cc_spend_growth"] == 0.15
 
-    def test_satellite_features(self):
+    def test_satellite_features(self) -> Any:
+        """Otomatik eklendi."""
         data = create_mock_satellite_data()
         features = compute_satellite_features(data, "THYAO")
         assert "factory_traffic_change" in features
         assert features["factory_traffic_change"] == 0.10
 
-    def test_web_features(self):
+    def test_web_features(self) -> Any:
+        """Otomatik eklendi."""
         data = create_mock_web_data()
         features = compute_web_features(data, "THYAO")
         assert "web_traffic_change" in features
         assert features["web_traffic_change"] == 0.15
 
-    def test_empty_data(self):
+    def test_empty_data(self) -> Any:
+        """Otomatik eklendi."""
         assert compute_social_features({}, "THYAO") == {}
         assert compute_social_features(None, "THYAO") == {}
 
@@ -296,19 +324,23 @@ class TestFaz1_LegacyFeatures:
 class TestFaz2_BKMAdapter:
     """BKM adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert bkm_adapter.source_name == "bkm"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = bkm_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_placeholder(self):
+    def test_compute_features_placeholder(self) -> Any:
+        """Otomatik eklendi."""
         data = {"data_source": "placeholder", "total_spend": 0}
         features = bkm_adapter.compute_features(data, "THYAO")
-        assert features == {}  # Placeholder veri → feature üretme
+        assert features == {}  # Mock veri → feature üretme
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "total_spend": 1000000,
             "transaction_count": 50000,
@@ -329,14 +361,17 @@ class TestFaz2_BKMAdapter:
 class TestFaz2_GoogleTrendsAdapter:
     """Google Trends adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert google_trends_adapter.source_name == "google_trends"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = google_trends_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "score": 75,
             "avg_30d": 60,
@@ -355,14 +390,17 @@ class TestFaz2_GoogleTrendsAdapter:
 class TestFaz2_KariyerNetAdapter:
     """Kariyer.net adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert kariyer_net_adapter.source_name == "kariyer_net"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = kariyer_net_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "postings": [
                 {"is_tech": True, "is_management": False, "is_remote": True, "department": "IT"},
@@ -381,14 +419,17 @@ class TestFaz2_KariyerNetAdapter:
 class TestFaz2_EksiSozlukAdapter:
     """Ekşi Sözlük adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert eksi_sozluk_adapter.source_name == "eksi_sozluk"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = eksi_sozluk_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "entries": [
                 {"text": "thyao çok güzel hisse, yükseliş devam edecek", "favorites": 15},
@@ -401,7 +442,8 @@ class TestFaz2_EksiSozlukAdapter:
         assert "eksi_volume" in features
         assert features["eksi_volume"] == 3
 
-    def test_basic_sentiment(self):
+    def test_basic_sentiment(self) -> Any:
+        """Otomatik eklendi."""
         assert eksi_sozluk_adapter._basic_sentiment("güzel harika başarılı") > 0
         assert eksi_sozluk_adapter._basic_sentiment("kötü batık zarar") < 0
         # "güzel" pozitif kelimeler listesinde olduğu için nötr metin bile pozitif çıkabilir
@@ -417,29 +459,34 @@ class TestFaz2_EksiSozlukAdapter:
 class TestFaz3_LLMSentiment:
     """LLM sentiment test'leri."""
 
-    def test_keyword_analyze_positive(self):
+    def test_keyword_analyze_positive(self) -> Any:
+        """Otomatik eklendi."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Şirket rekor kâr açıkladı, büyüme devam ediyor")
         assert result["sentiment_score"] > 0
         assert result["source"] == "keyword_fallback"
 
-    def test_keyword_analyze_negative(self):
+    def test_keyword_analyze_negative(self) -> Any:
+        """Otomatik eklendi."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Şirket zarar açıkladı, iflas riski var")
         assert result["sentiment_score"] < 0
 
-    def test_keyword_analyze_neutral(self):
+    def test_keyword_analyze_neutral(self) -> Any:
+        """Otomatik eklendi."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._keyword_analyze("Bugün hava çok güzel")
         assert result["sentiment_score"] == 0
 
-    def test_neutral_result(self):
+    def test_neutral_result(self) -> Any:
+        """Otomatik eklendi."""
         analyzer = LLMSentimentAnalyzer()
         result = analyzer._neutral_result()
         assert result["sentiment_score"] == 0
         assert result["category"] == "NEUTRAL"
 
-    def test_cache_stats(self):
+    def test_cache_stats(self) -> Any:
+        """Otomatik eklendi."""
         analyzer = LLMSentimentAnalyzer()
         stats = analyzer.get_cache_stats()
         assert "cache_size" in stats
@@ -454,7 +501,8 @@ class TestFaz3_LLMSentiment:
 class TestFaz4_FeatureEngine:
     """Feature engine test'leri."""
 
-    def test_get_feature_names(self):
+    def test_get_feature_names(self) -> Any:
+        """Otomatik eklendi."""
         engine = AlternativeFeatureEngine()
         names = engine.get_feature_names()
         assert len(names) > 40
@@ -463,7 +511,8 @@ class TestFaz4_FeatureEngine:
         assert "eksi_sentiment" in names
         assert "alt_sentiment_avg" in names
 
-    def test_composite_features(self):
+    def test_composite_features(self) -> Any:
+        """Otomatik eklendi."""
         engine = AlternativeFeatureEngine()
         features = {
             "google_trends_zscore": 1.5,
@@ -476,7 +525,8 @@ class TestFaz4_FeatureEngine:
         assert "alt_growth_avg" in composite
         assert "alt_data_coverage" in composite
 
-    def test_status(self):
+    def test_status(self) -> Any:
+        """Otomatik eklendi."""
         engine = AlternativeFeatureEngine()
         status = engine.get_status()
         assert "initialized" in status
@@ -491,14 +541,17 @@ class TestFaz4_FeatureEngine:
 class TestFaz5_InvestingAdapter:
     """Investing.com adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert investing_adapter.source_name == "investing"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = investing_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "comments": [
                 {"text": "yükseliş devam edecek, al"},
@@ -511,7 +564,8 @@ class TestFaz5_InvestingAdapter:
         assert "investing_volume" in features
         assert features["investing_volume"] == 3
 
-    def test_basic_sentiment(self):
+    def test_basic_sentiment(self) -> Any:
+        """Otomatik eklendi."""
         assert investing_adapter._basic_sentiment("yükseliş güçlü al") > 0
         assert investing_adapter._basic_sentiment("düşüş riski sat") < 0
 
@@ -519,14 +573,17 @@ class TestFaz5_InvestingAdapter:
 class TestFaz5_SatelliteAdapter:
     """Sentinel-2 satellite adapter test'leri."""
 
-    def test_source_name(self):
+    def test_source_name(self) -> Any:
+        """Otomatik eklendi."""
         assert satellite_adapter.source_name == "satellite"
 
-    def test_compute_features_empty(self):
+    def test_compute_features_empty(self) -> Any:
+        """Otomatik eklendi."""
         features = satellite_adapter.compute_features({}, "THYAO")
         assert features == {}
 
-    def test_compute_features_valid(self):
+    def test_compute_features_valid(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "locations": {
                 "IST Airport": {
@@ -542,7 +599,8 @@ class TestFaz5_SatelliteAdapter:
         assert "sat_airport_activity" in features
         assert abs(features["sat_activity_index"] - 0.20) < 0.01
 
-    def test_compute_features_factory(self):
+    def test_compute_features_factory(self) -> Any:
+        """Otomatik eklendi."""
         data = {
             "locations": {
                 "Erdemir": {
@@ -556,7 +614,7 @@ class TestFaz5_SatelliteAdapter:
         assert "sat_factory_activity" in features
         assert features["sat_factory_activity"] < 0  # ndbi > ndvi = negative
 
-    def test_company_locations(self):
+    def test_company_locations(self) -> Any:
         """Önemli şirketlerin lokasyon tanımları olmalı."""
         from services.alternative.satellite_adapter import COMPANY_LOCATIONS
 
@@ -568,12 +626,14 @@ class TestFaz5_SatelliteAdapter:
 class TestFaz5_Reconciliation:
     """Cross-source reconciliation test'leri."""
 
-    def test_reconcile_no_data(self):
+    def test_reconcile_no_data(self) -> Any:
+        """Otomatik eklendi."""
         r = reconciler.reconcile("THYAO", {})
         assert r.consensus_direction == "NEUTRAL"
         assert r.source_count == 0
 
-    def test_reconcile_consistent(self):
+    def test_reconcile_consistent(self) -> Any:
+        """Otomatik eklendi."""
         features = {
             "google_trends_zscore": 1.5,
             "eksi_sentiment": 0.6,
@@ -584,7 +644,8 @@ class TestFaz5_Reconciliation:
         assert r.source_count == 3
         assert r.reliability_score > 0
 
-    def test_reconcile_discrepant(self):
+    def test_reconcile_discrepant(self) -> Any:
+        """Otomatik eklendi."""
         features = {
             "google_trends_zscore": 0.8,
             "eksi_sentiment": -0.7,
@@ -592,7 +653,8 @@ class TestFaz5_Reconciliation:
         r = reconciler.reconcile("THYAO", features)
         assert len(r.discrepancies) > 0 or len(r.warnings) > 0
 
-    def test_reconcile_to_dict(self):
+    def test_reconcile_to_dict(self) -> Any:
+        """Otomatik eklendi."""
         r = reconciler.reconcile("THYAO", {"eksi_sentiment": 0.5})
         d = r.to_dict()
         assert "ticker" in d
@@ -602,26 +664,30 @@ class TestFaz5_Reconciliation:
 class TestFaz5_FeatureStore:
     """Feature store test'leri."""
 
-    def test_put_and_get(self):
+    def test_put_and_get(self) -> Any:
+        """Otomatik eklendi."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.5, "volume": 100})
         features = store.get("THYAO", "2026-01-01")
         assert features["sentiment"] == 0.5
 
-    def test_get_latest(self):
+    def test_get_latest(self) -> Any:
+        """Otomatik eklendi."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.3})
         store.put("THYAO", "2026-01-15", {"sentiment": 0.7})
         features = store.get_latest("THYAO", "2026-01-20")
         assert features["sentiment"] == 0.7
 
-    def test_get_latest_before_any_date(self):
+    def test_get_latest_before_any_date(self) -> Any:
+        """Otomatik eklendi."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"sentiment": 0.5})
         features = store.get_latest("THYAO", "2025-12-01")
         assert features == {}
 
-    def test_register_feature(self):
+    def test_register_feature(self) -> Any:
+        """Otomatik eklendi."""
         store = FeatureStore()
         store.register_feature(
             FeatureManifest(
@@ -636,7 +702,8 @@ class TestFaz5_FeatureStore:
         )
         assert "test_feature" in store.list_features()
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
+        """Otomatik eklendi."""
         store = FeatureStore()
         store.put("THYAO", "2026-01-01", {"a": 1, "b": 2})
         stats = store.get_stats()
@@ -647,7 +714,7 @@ class TestFaz5_FeatureStore:
 class TestFaz5_Integration:
     """Entegrasyon test'leri."""
 
-    def test_all_imports(self):
+    def test_all_imports(self) -> Any:
         """Tüm modüllerin import edilebilir olduğunu doğrula."""
         from services.alternative import (
             AdapterRegistry,
@@ -687,11 +754,11 @@ class TestFaz5_Integration:
         assert callable(compute_satellite_features)
         assert callable(compute_web_features)
 
-    def test_adapter_registry_singleton(self):
+    def test_adapter_registry_singleton(self) -> Any:
         """Singleton registry'nin doğru çalıştığını doğrula."""
         assert isinstance(adapter_registry, AdapterRegistry)
 
-    def test_legacy_functions_compatible(self):
+    def test_legacy_functions_compatible(self) -> Any:
         """Legacy fonksiyonların geriye uyumlu olduğunu doğrula."""
         data = {"sentiment": 0.5, "volume": 100}
         features = compute_social_features(data, "TEST")
@@ -702,7 +769,7 @@ class TestFaz5_Integration:
 class TestBugFixes:
     """Düzeltilen bug'lar için test'ler."""
 
-    def test_clamp_none_handling(self):
+    def test_clamp_none_handling(self) -> Any:
         """_clamp(None) crash yapmamalı."""
         from services.alternative.social import _clamp
 
@@ -711,7 +778,7 @@ class TestBugFixes:
         assert _clamp(2.0, -1, 1) == 1.0
         assert _clamp(-2.0, -1, 1) == -1.0
 
-    def test_google_trends_float_types(self):
+    def test_google_trends_float_types(self) -> Any:
         """Google Trends feature'ları float olmalı."""
         data = {
             "score": 75,
@@ -726,7 +793,7 @@ class TestBugFixes:
         for k, v in features.items():
             assert isinstance(v, float), f"{k} should be float, got {type(v).__name__}"
 
-    def test_compute_features_contract(self):
+    def test_compute_features_contract(self) -> Any:
         """Tüm adapter'lar Dict[str, float} döndürmeli."""
         adapters = [
             (bkm_adapter, {}),
@@ -742,7 +809,7 @@ class TestBugFixes:
                 assert isinstance(v, (int, float)), f"{adapter.source_name}.{k} should be numeric"
 
     @pytest.mark.asyncio
-    async def test_feature_engine_compute(self):
+    async def test_feature_engine_compute(self) -> Any:
         """Feature engine çalışmalı (boş veri ile)."""
         engine = AlternativeFeatureEngine()
         engine.initialize()

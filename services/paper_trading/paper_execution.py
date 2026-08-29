@@ -36,6 +36,7 @@ class PaperExecutionEngine:
         slippage_max_pct: float = 0.5,  # %0.5 max
         microstructure: MarketMicrostructureEngine | None = None,
     ):
+        """Otomatik eklendi."""
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
         self.bsmv_rate = bsmv_rate
@@ -289,6 +290,7 @@ class PaperExecutionEngine:
         return min(total_slippage, max_slippage)
 
     def _round_to_tick(self, price: float, side: str) -> float:
+        """Otomatik eklendi."""
         return round_to_bist_tick(price, side=side)
 
     def _compute_commission(self, amount: float) -> float:
@@ -304,7 +306,7 @@ class PaperExecutionEngine:
         """Gunluk turnover degeri."""
         return self._daily_turnover_value
 
-    def reset_daily_turnover(self):
+    def reset_daily_turnover(self) -> Any:
         """Gunluk turnover'u sifirla."""
         self._daily_turnover_value = 0.0
 

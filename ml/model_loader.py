@@ -23,6 +23,7 @@ class MLModelLoader:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._models: dict[str, Any] = {}
         self._model_configs: dict[str, dict] = {}
         self._loaded = False

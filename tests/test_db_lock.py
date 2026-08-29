@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Database Lock Abstraction Testleri
 
@@ -14,9 +17,8 @@ Kapsam:
 """
 
 import asyncio
-import sys
-
 import sqlite3
+import sys
 
 import duckdb
 
@@ -31,19 +33,19 @@ from services.core.db_lock import (
 from services.portfolio.main import PortfolioService
 
 
-def fresh_db():
+def fresh_db() -> Any:
     """Test için SQLite in-memory DB (SQLite dialect testleri için)."""
     db = sqlite3.connect(":memory:")
     return db
 
 
-def fresh_duckdb():
+def fresh_duckdb() -> Any:
     """Test için DuckDB in-memory DB (PostgreSQL dialect testleri için)."""
     db = duckdb.connect(":memory:")
     return db
 
 
-async def test_sqlite_lock_basic():
+async def test_sqlite_lock_basic() -> Any:
     """Temel SQLite lock alma/bırakma."""
     db = fresh_db()
     lock = DatabaseLock(db, dialect="sqlite", key="test_basic")
@@ -62,7 +64,7 @@ async def test_sqlite_lock_basic():
     return "SQLite Lock Basic", len(issues) == 0, issues
 
 
-async def test_sqlite_lock_contention():
+async def test_sqlite_lock_contention() -> Any:
     """İki lock aynı anda yazı kilidi alamaz."""
     db = fresh_db()
     lock1 = DatabaseLock(db, dialect="sqlite", key="test_contention")
@@ -81,7 +83,7 @@ async def test_sqlite_lock_contention():
     return "SQLite Lock Contention", len(issues) == 0, issues
 
 
-async def test_lock_context_manager():
+async def test_lock_context_manager() -> Any:
     """Context manager doğru çalışmalı."""
     db = fresh_db()
     issues = []
@@ -98,7 +100,7 @@ async def test_lock_context_manager():
     return "Lock Context Manager", len(issues) == 0, issues
 
 
-async def test_lock_rollback():
+async def test_lock_rollback() -> Any:
     """Exception durumunda rollback çalışmalı."""
     db = fresh_db()
     issues = []
@@ -124,7 +126,7 @@ async def test_lock_rollback():
     return "Lock Rollback", len(issues) == 0, issues
 
 
-async def test_coordinated_lock():
+async def test_coordinated_lock() -> Any:
     """CoordinatedLock hem asyncio hem DB lock almalı."""
     db = fresh_db()
     issues = []
@@ -147,7 +149,7 @@ async def test_coordinated_lock():
     return "Coordinated Lock", len(issues) == 0, issues
 
 
-async def test_lock_metrics():
+async def test_lock_metrics() -> Any:
     """Lock metrikleri doğru toplanmalı."""
     db = fresh_db()
     key = "test_metrics"
@@ -175,7 +177,7 @@ async def test_lock_metrics():
     return "Lock Metrics", len(issues) == 0, issues
 
 
-async def test_lock_ordering():
+async def test_lock_ordering() -> Any:
     """Lock sıralaması tanımlı olmalı."""
     issues = []
 
@@ -191,7 +193,7 @@ async def test_lock_ordering():
     return "Lock Ordering", len(issues) == 0, issues
 
 
-async def test_pg_mock_lock():
+async def test_pg_mock_lock() -> Any:
     """PostgreSQL lock davranışı mock test."""
     issues = []
 
@@ -214,7 +216,7 @@ async def test_pg_mock_lock():
     return "PG Mock Lock", len(issues) == 0, issues
 
 
-async def test_portfolio_with_coordinated_lock():
+async def test_portfolio_with_coordinated_lock() -> Any:
     """PortfolioService CoordinatedLock ile çalışmalı."""
     dev_db._db = None
     await dev_db.init()
@@ -260,7 +262,7 @@ async def test_portfolio_with_coordinated_lock():
     return "Portfolio Coordinated Lock", len(issues) == 0, issues
 
 
-async def test_parallel_with_metrics():
+async def test_parallel_with_metrics() -> Any:
     """Paralel işlemler sonrası metrikler doğru olmalı."""
     dev_db._db = None
     await dev_db.init()
@@ -284,7 +286,8 @@ async def test_parallel_with_metrics():
     await svc.start()
 
     # Paralel alımlar
-    async def buy(i):
+    async def buy(i) -> Any:
+        """Otomatik eklendi."""
         return await svc.execute_buy("X", 10, 100.0, instrument_id=xid)
 
     results = await asyncio.gather(*[buy(i) for i in range(5)])
@@ -312,10 +315,11 @@ async def test_parallel_with_metrics():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("DATABASE LOCK ABSTRACTION TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("DATABASE LOCK ABSTRACTION TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_sqlite_lock_basic,
@@ -343,27 +347,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

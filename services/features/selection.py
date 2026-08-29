@@ -72,6 +72,7 @@ class FeatureSelector:
         variance_threshold: float = 0.001,
         default_top_k: int = 50,
     ):
+        """Otomatik eklendi."""
         self.correlation_threshold = correlation_threshold
         self.variance_threshold = variance_threshold
         self.default_top_k = default_top_k
@@ -285,14 +286,14 @@ class FeatureSelector:
         importances = self._compute_shap_importance(X, y, feature_names, model)
 
         result = []
-        for rank, (name, imp) in enumerate(
-            sorted(importances.items(), key=lambda x: x[1], reverse=True), start=1
-        ):
-            result.append(FeatureImportance(
-                feature_name=name,
-                importance=round(imp, 6),
-                rank=rank,
-            ))
+        for rank, (name, imp) in enumerate(sorted(importances.items(), key=lambda x: x[1], reverse=True), start=1):
+            result.append(
+                FeatureImportance(
+                    feature_name=name,
+                    importance=round(imp, 6),
+                    rank=rank,
+                )
+            )
 
         return result
 
@@ -440,10 +441,11 @@ class FeatureSelector:
         importances: dict[str, float] = {}
 
         try:
-            import shap
-
             # Modeli eğit
             import copy
+
+            import shap
+
             fitted_model = copy.deepcopy(model)
             fitted_model.fit(X, y)
 

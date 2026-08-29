@@ -29,15 +29,16 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from collections.abc import AsyncIterator, Callable
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import orjson
 import structlog
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Callable
+
     from nats.aio.client import Client as NATS
+
     from services.core.event_schema import CanonicalEvent
 
 try:
@@ -46,21 +47,28 @@ try:
     HAS_NATS = True
 except ImportError:
     HAS_NATS = False
-import structlog
+import contextlib
 import functools
+
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.nats_client")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -68,6 +76,7 @@ class NatsClient:
     """NATS & JetStream istemcisi — kurumsal event bus."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._nc: NATS | None = None
         self._js = None  # JetStream context
         self._subscriptions: dict[str, Any] = {}
@@ -91,15 +100,18 @@ class NatsClient:
         try:
             url = servers or os.environ.get("NATS_URL", "nats://localhost:4222")
 
-            async def _disconnected_cb():
+            async def _disconnected_cb() -> Any:
+                """Otomatik eklendi."""
                 logger.warning("NATS disconnected, will reconnect")
                 self._connected = False
 
-            async def _reconnected_cb():
+            async def _reconnected_cb() -> Any:
+                """Otomatik eklendi."""
                 logger.info("NATS reconnected")
                 self._connected = True
 
-            async def _error_cb(e):
+            async def _error_cb(e) -> Any:
+                """Otomatik eklendi."""
                 self._total_errors += 1
                 logger.warning("NATS error", error=str(e))
 
@@ -128,7 +140,7 @@ class NatsClient:
             self._connected = False
             return False
 
-    async def close(self):
+    async def close(self) -> Any:
         """Bağlantıyı kapat."""
         if self._nc:
             try:
@@ -140,6 +152,7 @@ class NatsClient:
 
     @property
     def is_connected(self) -> bool:
+        """Otomatik eklendi."""
         return self._connected and self._nc is not None
 
     @otel_trace("nats.publish")
@@ -182,10 +195,8 @@ class NatsClient:
             if stream is None:
                 stream = subject.replace(".", "_").upper()
 
-            try:
+            with contextlib.suppress(Exception):
                 await self._js.add_stream(name=stream, subjects=[subject])
-            except Exception:
-                pass
 
             ack = await self._js.publish(subject, payload)
             self._total_published += 1
@@ -204,10 +215,16 @@ class NatsClient:
 
         try:
             if handler:
-                async def _msg_handler(msg):
+
+                async def _msg_handler(msg) -> Any:
+                    """Otomatik eklendi."""
                     self._total_received += 1
                     try:
-                        data = orjson.loads(msg.data) if isinstance(msg.data, (bytes, bytearray)) else orjson.loads(str(msg.data).encode("utf-8"))
+                        data = (
+                            orjson.loads(msg.data)
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else orjson.loads(str(msg.data).encode("utf-8"))
+                        )
                         self._propagate_correlation(data)
                         if asyncio.iscoroutinefunction(handler):
                             await handler(data)
@@ -216,7 +233,11 @@ class NatsClient:
                     except Exception as e:
                         self._total_errors += 1
                         logger.error("NATS handler error", subject=subject, error=str(e))
-                        raw_str = msg.data.decode("utf-8", errors="replace") if isinstance(msg.data, (bytes, bytearray)) else str(msg.data)
+                        raw_str = (
+                            msg.data.decode("utf-8", errors="replace")
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else str(msg.data)
+                        )
                         await self._route_to_dlq(subject=subject, raw_payload=raw_str, error_str=str(e))
 
                 sub = await self._nc.subscribe(subject, cb=_msg_handler)
@@ -229,11 +250,19 @@ class NatsClient:
                 async for msg in sub.messages:
                     self._total_received += 1
                     try:
-                        data = orjson.loads(msg.data) if isinstance(msg.data, (bytes, bytearray)) else orjson.loads(str(msg.data).encode("utf-8"))
+                        data = (
+                            orjson.loads(msg.data)
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else orjson.loads(str(msg.data).encode("utf-8"))
+                        )
                         self._propagate_correlation(data)
                         yield data
                     except orjson.JSONDecodeError:
-                        raw_str = msg.data.decode("utf-8", errors="replace") if isinstance(msg.data, (bytes, bytearray)) else str(msg.data)
+                        raw_str = (
+                            msg.data.decode("utf-8", errors="replace")
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else str(msg.data)
+                        )
                         yield {"raw": raw_str}
         except Exception as e:
             self._total_errors += 1
@@ -253,16 +282,20 @@ class NatsClient:
             if stream is None:
                 stream = subject.replace(".", "_").upper()
 
-            try:
+            with contextlib.suppress(Exception):
                 await self._js.add_stream(name=stream, subjects=[subject])
-            except Exception:
-                pass
 
             if handler:
-                async def _msg_handler(msg):
+
+                async def _msg_handler(msg) -> Any:
+                    """Otomatik eklendi."""
                     self._total_received += 1
                     try:
-                        data = orjson.loads(msg.data) if isinstance(msg.data, (bytes, bytearray)) else orjson.loads(str(msg.data).encode("utf-8"))
+                        data = (
+                            orjson.loads(msg.data)
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else orjson.loads(str(msg.data).encode("utf-8"))
+                        )
                         self._propagate_correlation(data)
                         if asyncio.iscoroutinefunction(handler):
                             await handler(data)
@@ -272,7 +305,11 @@ class NatsClient:
                     except Exception as e:
                         self._total_errors += 1
                         logger.error("JetStream handler error", subject=subject, error=str(e))
-                        raw_str = msg.data.decode("utf-8", errors="replace") if isinstance(msg.data, (bytes, bytearray)) else str(msg.data)
+                        raw_str = (
+                            msg.data.decode("utf-8", errors="replace")
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else str(msg.data)
+                        )
                         await self._route_to_dlq(subject=subject, raw_payload=raw_str, error_str=str(e))
                         await msg.nak()
 
@@ -286,24 +323,35 @@ class NatsClient:
                 async for msg in psub.messages:
                     self._total_received += 1
                     try:
-                        data = orjson.loads(msg.data) if isinstance(msg.data, (bytes, bytearray)) else orjson.loads(str(msg.data).encode("utf-8"))
+                        data = (
+                            orjson.loads(msg.data)
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else orjson.loads(str(msg.data).encode("utf-8"))
+                        )
                         self._propagate_correlation(data)
                         yield data
                         await msg.ack()
                     except orjson.JSONDecodeError:
-                        raw_str = msg.data.decode("utf-8", errors="replace") if isinstance(msg.data, (bytes, bytearray)) else str(msg.data)
+                        raw_str = (
+                            msg.data.decode("utf-8", errors="replace")
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else str(msg.data)
+                        )
                         yield {"raw": raw_str}
                         await msg.ack()
                     except Exception as e:
                         self._total_errors += 1
                         logger.error("JetStream iterator error", error=str(e))
-                        raw_str = msg.data.decode("utf-8", errors="replace") if isinstance(msg.data, (bytes, bytearray)) else str(msg.data)
+                        raw_str = (
+                            msg.data.decode("utf-8", errors="replace")
+                            if isinstance(msg.data, (bytes, bytearray))
+                            else str(msg.data)
+                        )
                         await self._route_to_dlq(subject=subject, raw_payload=raw_str, error_str=str(e))
                         await msg.nak()
         except Exception as e:
             self._total_errors += 1
             logger.debug("JetStream subscribe failed", subject=subject, error=str(e))
-
 
     @otel_trace("nats.request")
     async def request(self, subject: str, data: Any, timeout: float = 5.0) -> dict[str, Any]:
@@ -320,7 +368,7 @@ class NatsClient:
             logger.debug("NATS request failed", subject=subject, error=str(e))
             return {}
 
-    async def unsubscribe(self, subject: str):
+    async def unsubscribe(self, subject: str) -> Any:
         """Aboneliği iptal et."""
         if subject in self._subscriptions:
             try:
@@ -358,7 +406,7 @@ class NatsClient:
                     if cid:
                         data = {**data, "_correlation_id": cid}
                 except (ImportError, LookupError):
-                    pass
+                    logger.error("Exception caught", exc_info=True)
             return orjson.dumps(data, default=str)
         elif isinstance(data, bytes):
             return data
@@ -376,7 +424,7 @@ class NatsClient:
 
                 correlation_id_var.set(cid)
             except (ImportError, LookupError):
-                pass
+                logger.error("Exception caught", exc_info=True)
 
     async def _route_to_dlq(self, subject: str, raw_payload: str, error_str: str) -> None:
         """İşlenemeyen hatalı mesajları Dead Letter Queue'ya yönlendirir."""

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Monitoring Operations Testleri
 
@@ -33,7 +36,7 @@ from services.core.observability import DEFAULT_BUCKETS, PrometheusMetrics
 # =====================================================
 
 
-async def test_metrics_token_auth():
+async def test_metrics_token_auth() -> Any:
     """Metrics endpoint token doğrulama."""
     auth = MonitoringAuth(
         AuthConfig(
@@ -58,7 +61,7 @@ async def test_metrics_token_auth():
     return "Metrics Token Auth", len(issues) == 0, issues
 
 
-async def test_admin_token_auth():
+async def test_admin_token_auth() -> Any:
     """Admin endpoint token doğrulama."""
     auth = MonitoringAuth(
         AuthConfig(
@@ -81,7 +84,7 @@ async def test_admin_token_auth():
     return "Admin Token Auth", len(issues) == 0, issues
 
 
-async def test_bearer_token_extraction():
+async def test_bearer_token_extraction() -> Any:
     """Bearer token extraction."""
     issues = []
 
@@ -108,7 +111,7 @@ async def test_bearer_token_extraction():
     return "Bearer Token Extraction", len(issues) == 0, issues
 
 
-async def test_api_key_extraction():
+async def test_api_key_extraction() -> Any:
     """API key extraction."""
     issues = []
 
@@ -127,7 +130,7 @@ async def test_api_key_extraction():
     return "API Key Extraction", len(issues) == 0, issues
 
 
-async def test_rate_limiting():
+async def test_rate_limiting() -> Any:
     """Rate limiting çalışmalı."""
     auth = MonitoringAuth(AuthConfig(rate_limit_per_minute=5))
     issues = []
@@ -146,7 +149,7 @@ async def test_rate_limiting():
     return "Rate Limiting", len(issues) == 0, issues
 
 
-async def test_auth_disabled():
+async def test_auth_disabled() -> Any:
     """Auth devre dışıyken tüm token'lar geçerli."""
     auth = MonitoringAuth(AuthConfig(enabled=False))
     issues = []
@@ -159,7 +162,7 @@ async def test_auth_disabled():
     return "Auth Disabled", len(issues) == 0, issues
 
 
-async def test_failed_attempt_tracking():
+async def test_failed_attempt_tracking() -> Any:
     """Başarısız girişim takibi."""
     auth = MonitoringAuth()
     issues = []
@@ -180,7 +183,7 @@ async def test_failed_attempt_tracking():
 # =====================================================
 
 
-async def test_histogram_buckets():
+async def test_histogram_buckets() -> Any:
     """Histogram bucket desteği doğru çalışmalı."""
     metrics = PrometheusMetrics()
     issues = []
@@ -211,7 +214,7 @@ async def test_histogram_buckets():
     return "Histogram Buckets", len(issues) == 0, issues
 
 
-async def test_histogram_prometheus_format():
+async def test_histogram_prometheus_format() -> Any:
     """Histogram Prometheus text format doğru olmalı."""
     metrics = PrometheusMetrics()
     issues = []
@@ -234,13 +237,13 @@ async def test_histogram_prometheus_format():
     return "Histogram Prometheus Format", len(issues) == 0, issues
 
 
-async def test_timed_context_manager():
+async def test_timed_context_manager() -> Any:
     """timed() context manager süre ölçmeli."""
     metrics = PrometheusMetrics()
     issues = []
 
     with metrics.timed("test_timer"):
-        time.sleep(0.05)
+        await asyncio.sleep(0.05)
 
     m = metrics.get_metrics()
     hist = m["histograms"].get("test_timer", {})
@@ -260,7 +263,7 @@ async def test_timed_context_manager():
 # =====================================================
 
 
-async def test_health_change_alert():
+async def test_health_change_alert() -> Any:
     """Health değişikliği alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -289,7 +292,7 @@ async def test_health_change_alert():
     return "Health Change Alert", len(issues) == 0, issues
 
 
-async def test_invariant_failure_alert():
+async def test_invariant_failure_alert() -> Any:
     """Invariant failure alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -307,7 +310,7 @@ async def test_invariant_failure_alert():
     return "Invariant Failure Alert", len(issues) == 0, issues
 
 
-async def test_lock_deadlock_alert():
+async def test_lock_deadlock_alert() -> Any:
     """Lock deadlock alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -323,7 +326,7 @@ async def test_lock_deadlock_alert():
     return "Lock Deadlock Alert", len(issues) == 0, issues
 
 
-async def test_lock_timeout_spike_alert():
+async def test_lock_timeout_spike_alert() -> Any:
     """Lock timeout spike alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -343,7 +346,7 @@ async def test_lock_timeout_spike_alert():
     return "Lock Timeout Spike Alert", len(issues) == 0, issues
 
 
-async def test_negative_cash_alert():
+async def test_negative_cash_alert() -> Any:
     """Negatif cash alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -361,7 +364,7 @@ async def test_negative_cash_alert():
     return "Negative Cash Alert", len(issues) == 0, issues
 
 
-async def test_drawdown_breach_alert():
+async def test_drawdown_breach_alert() -> Any:
     """Drawdown breach alert üretmeli."""
     alerting = AlertingSystem()
     issues = []
@@ -377,7 +380,7 @@ async def test_drawdown_breach_alert():
     return "Drawdown Breach Alert", len(issues) == 0, issues
 
 
-async def test_alert_summary():
+async def test_alert_summary() -> Any:
     """Alert özeti doğru bilgi vermeli."""
     alerting = AlertingSystem()
     issues = []
@@ -397,7 +400,7 @@ async def test_alert_summary():
     return "Alert Summary", len(issues) == 0, issues
 
 
-async def test_alert_resolve():
+async def test_alert_resolve() -> Any:
     """Alert resolve mekanizması."""
     alerting = AlertingSystem()
     issues = []
@@ -419,7 +422,7 @@ async def test_alert_resolve():
 # =====================================================
 
 
-async def test_dashboard_json():
+async def test_dashboard_json() -> Any:
     """Grafana dashboard JSON geçerli olmalı."""
     issues = []
 
@@ -461,10 +464,11 @@ async def test_dashboard_json():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("MONITORING OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("MONITORING OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Auth
@@ -505,27 +509,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

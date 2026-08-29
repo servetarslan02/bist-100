@@ -54,6 +54,7 @@ class XGBoostAdjustedLoss:
     """
 
     def __init__(self, penalty: float = 11.0):
+        """Otomatik eklendi."""
         self.penalty = penalty
 
     def __call__(self, preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
@@ -96,6 +97,7 @@ class XGBoostModel:
     """
 
     def __init__(self, config: XGBoostConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or XGBoostConfig()
         self._models: dict[int, Any] = {}  # horizon → model
         self._feature_names = None
@@ -344,7 +346,7 @@ class XGBoostModel:
             logger.warning("shap_calculation_failed", error=str(e))
             return None
 
-    def _create_model(self, xgb_module, is_classifier: bool):
+    def _create_model(self, xgb_module, is_classifier: bool) -> Any:
         """XGBoost sklearn API model oluştur."""
         if is_classifier:
             return xgb_module.XGBClassifier(
@@ -433,7 +435,7 @@ class XGBoostModel:
 
         return metrics
 
-    def _compute_shap(self, X: np.ndarray, feature_names: list[str] | None):
+    def _compute_shap(self, X: np.ndarray, feature_names: list[str] | None) -> Any:
         """SHAP values hesapla ve cache'le."""
         model = self._models.get(5)
         if model is None:
@@ -461,7 +463,7 @@ class XGBoostModel:
         except Exception as e:
             logger.debug("xgboost_shap_failed", error=str(e))
 
-    def _cache_feature_importance(self, horizon: int, feature_names: list[str] | None):
+    def _cache_feature_importance(self, horizon: int, feature_names: list[str] | None) -> Any:
         """Feature importance cache'le (gain, cover, weight)."""
         model = self._models.get(horizon)
         if model is None:
@@ -475,7 +477,7 @@ class XGBoostModel:
             except Exception as e:
                 logger.warning("xgboost_handled_exception", error=str(e), context="feature_importance_cache")
 
-    def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
+    def _check_overfitting(self, metrics: dict[str, Any], horizon: int) -> Any:
         """Overfitting kontrolü."""
         if "val_ic" in metrics:
             ic = metrics["val_ic"]
@@ -531,14 +533,17 @@ class XGBoostModel:
 
     @property
     def is_trained(self) -> bool:
+        """Otomatik eklendi."""
         return len(self._models) > 0
 
     @property
     def trained_horizons(self) -> list[int]:
+        """Otomatik eklendi."""
         return sorted(self._models.keys())
 
     @property
     def metrics(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return self._training_metrics
 
 
@@ -564,8 +569,7 @@ def compare_xgboost_vs_lightgbm(
     Returns:
         Kararlılık raporu dict
     """
-    from .lightgbm_trainer import LightGBMTrainer, MLModelConfig
-    from .model_comparator import ModelComparator
+    from .lightgbm_trainer import LightGBMTrainer
 
     # Veriyi hazırla
     trainer = LightGBMTrainer()
@@ -597,7 +601,7 @@ def compare_xgboost_vs_lightgbm(
     try:
         lgb_model = trainer.train(features_map, returns, date_groups, feature_names)
         if lgb_model:
-            lgb_pred = lgb_model.predict_batch([dict(zip(feature_names, row)) for row in X_val_s])
+            lgb_pred = lgb_model.predict_batch([dict(zip(feature_names, row, strict=False)) for row in X_val_s])
             lgb_pred = np.array(lgb_pred)
             results["lightgbm"] = {
                 "val_ic": round(float(np.corrcoef(lgb_pred, y_val)[0, 1]), 4) if len(np.unique(lgb_pred)) > 1 else 0.0,
@@ -612,10 +616,14 @@ def compare_xgboost_vs_lightgbm(
     try:
         xgb_model = XGBoostModel(config)
         xgb_metrics = xgb_model.train(
-            X_train_s, y_train, X_val_s, y_val,
-            feature_names=feature_names, horizon=5,
+            X_train_s,
+            y_train,
+            X_val_s,
+            y_val,
+            feature_names=feature_names,
+            horizon=5,
         )
-        xgb_pred = xgb_model.predict(X_val_s, horizon=5)
+        xgb_model.predict(X_val_s, horizon=5)
         results["xgboost"] = {
             "val_ic": xgb_metrics.get("val_ic", 0.0),
             "val_directional_accuracy": xgb_metrics.get("val_directional_accuracy", 0.0),

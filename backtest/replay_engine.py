@@ -71,10 +71,11 @@ class ReplayEngine:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._handlers: dict[str, Callable] = {}
         self._state: dict[str, Any] = {}
 
-    def on(self, event_type: str, handler: Callable):
+    def on(self, event_type: str, handler: Callable) -> Any:
         """Event handler kaydet."""
         self._handlers[event_type] = handler
         return self
@@ -323,6 +324,7 @@ class WalkForwardValidator:
     """
 
     def __init__(self, train_months: int = 12, test_months: int = 1, purge_days: int = 5, embargo_days: int = 5):
+        """Otomatik eklendi."""
         self.train_months = train_months
         self.test_months = test_months
         self.purge_days = purge_days

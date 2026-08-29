@@ -217,7 +217,7 @@ class PointInTimeValidator:
         config = self.DATA_DELAYS.get(data_type)
         return config.delay if config else None
 
-    def set_custom_delay(self, data_type: str, delay: timedelta, description: str = ""):
+    def set_custom_delay(self, data_type: str, delay: timedelta, description: str = "") -> Any:
         """Özel gecikme süresi tanımla."""
         self.DATA_DELAYS[data_type] = PITConfig(
             data_type=data_type,

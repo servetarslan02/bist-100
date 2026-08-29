@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — BIST Market Data Stream v1.0
 
@@ -41,19 +42,20 @@ class BISTStreamProvider:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._handlers: list[Callable] = []
         self._running = False
         self._source = "yfinance"  # Varsayılan
         self._tick_count = 0
 
-    def on_tick(self, handler: Callable):
+    def on_tick(self, handler: Callable) -> Any:
         """Tick handler ata."""
         self._handlers.append(handler)
         if len(self._handlers) > 100:
             self._handlers = self._handlers[-100:]
         return self
 
-    async def start(self, source: str = "yfinance"):
+    async def start(self, source: str = "yfinance") -> Any:
         """Stream'i başlat."""
         self._source = source
         self._running = True
@@ -67,11 +69,11 @@ class BISTStreamProvider:
         else:
             logger.error("Unknown stream source", source=source)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stream'i durdur."""
         self._running = False
 
-    async def _stream_yfinance(self):
+    async def _stream_yfinance(self) -> Any:
         """
         yfinance ile aggressive polling.
         Ücretsiz, 15dk gecikmeli, ama sürekli.
@@ -133,7 +135,7 @@ class BISTStreamProvider:
                 logger.error("yfinance stream error", error=str(e))
                 await asyncio.sleep(30)
 
-    async def _stream_investing(self):
+    async def _stream_investing(self) -> Any:
         """
         Investing.com WebSocket stream.
         Ücretsiz, gecikmeli, ama sürekli.
@@ -193,7 +195,7 @@ class BISTStreamProvider:
             logger.error("Investing stream failed", error=str(e))
             await self._stream_yfinance()
 
-    async def _stream_websocket(self):
+    async def _stream_websocket(self) -> Any:
         """
         Generic WebSocket stream.
         BISTECH veya özel feed bağlanabilir.

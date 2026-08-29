@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Risk Orchestrator & Multi-Layer Risk Engine Test Suite
 
@@ -21,9 +22,8 @@ from services.risk.covariance import (
 )
 from services.risk.liquidity_risk import (
     LiquidityRiskEngine,
-    liquidity_risk_engine,
 )
-from services.risk.monitoring import AlertSeverity, AlertType, RiskMonitor
+from services.risk.monitoring import AlertType, RiskMonitor
 from services.risk.orchestrator import (
     PreTradeOrderRequest,
     RiskOrchestrator,
@@ -36,7 +36,8 @@ from services.risk.orchestrator import (
 class TestCovariancePSD:
     """Pozitif Yarı-Tanımlılık (PSD) ve özdeğer taban testleri."""
 
-    def test_ensure_positive_semi_definite_on_indefinite_matrix(self):
+    def test_ensure_positive_semi_definite_on_indefinite_matrix(self) -> Any:
+        """Otomatik eklendi."""
         # Matris with negative eigenvalue
         bad_matrix = np.array(
             [
@@ -51,7 +52,8 @@ class TestCovariancePSD:
         eigvals = np.linalg.eigvalsh(psd_matrix)
         assert np.all(eigvals >= 1e-5)
 
-    def test_covariance_estimator_singular_collinear_assets(self):
+    def test_covariance_estimator_singular_collinear_assets(self) -> Any:
+        """Otomatik eklendi."""
         # Exactly collinear assets (rank deficient)
         np.random.seed(42)
         r1 = np.random.normal(0, 0.02, 100)
@@ -67,7 +69,8 @@ class TestCovariancePSD:
         assert res["is_psd"] is True
         assert is_positive_semi_definite(cov)
 
-    def test_covariance_estimator_single_asset_and_nans(self):
+    def test_covariance_estimator_single_asset_and_nans(self) -> Any:
+        """Otomatik eklendi."""
         # Single asset
         r_single = np.array([[0.01], [0.02], [-0.01], [0.03]])
         estimator = CovarianceEstimator()
@@ -90,10 +93,12 @@ class TestCovariancePSD:
 class TestLiquidityRiskEngine:
     """Likidite riski ve piyasa etkisi testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.engine = LiquidityRiskEngine(max_adv_participation_pct=5.0)
 
-    def test_evaluate_order_liquidity_liquid_stock(self):
+    def test_evaluate_order_liquidity_liquid_stock(self) -> Any:
+        """Otomatik eklendi."""
         # THYAO (High ADV, low spread)
         metrics = self.engine.evaluate_order_liquidity(
             ticker="THYAO",
@@ -108,7 +113,8 @@ class TestLiquidityRiskEngine:
         assert metrics.participation_rate_pct < 0.01
         assert metrics.liquidation_days < 0.1
 
-    def test_evaluate_order_liquidity_illiquid_stock(self):
+    def test_evaluate_order_liquidity_illiquid_stock(self) -> Any:
+        """Otomatik eklendi."""
         # Illiquid small-cap (Low ADV, wide spread, gross settlement)
         metrics = self.engine.evaluate_order_liquidity(
             ticker="SMALL",
@@ -124,7 +130,8 @@ class TestLiquidityRiskEngine:
         assert metrics.liquidity_sizing_multiplier <= 0.50
         assert len(metrics.warnings) >= 2
 
-    def test_calculate_portfolio_liquidity_and_lvar(self):
+    def test_calculate_portfolio_liquidity_and_lvar(self) -> Any:
+        """Otomatik eklendi."""
         positions = [
             {"ticker": "THYAO", "value": 500_000.0, "adv_tl": 2_000_000_000.0, "spread_bps": 5.0},
             {"ticker": "GARAN", "value": 500_000.0, "adv_tl": 1_500_000_000.0, "spread_bps": 6.0},
@@ -148,10 +155,12 @@ class TestLiquidityRiskEngine:
 class TestRiskOrchestrator:
     """Merkezi RiskOrchestrator entegrasyon testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.orchestrator = RiskOrchestrator()
 
-    def test_evaluate_pre_trade_valid_order(self):
+    def test_evaluate_pre_trade_valid_order(self) -> Any:
+        """Otomatik eklendi."""
         req = PreTradeOrderRequest(
             ticker="THYAO",
             side="BUY",
@@ -172,7 +181,8 @@ class TestRiskOrchestrator:
         assert decision.checks_passed > 0
         assert decision.checks_failed == 0
 
-    def test_evaluate_pre_trade_blocks_on_insufficient_cash(self):
+    def test_evaluate_pre_trade_blocks_on_insufficient_cash(self) -> Any:
+        """Otomatik eklendi."""
         req = PreTradeOrderRequest(
             ticker="THYAO",
             side="BUY",
@@ -191,7 +201,8 @@ class TestRiskOrchestrator:
         assert decision.checks_failed >= 1
         assert "INSUFFICIENT_FUNDS" in decision.details.get("bist_rejection", "")
 
-    def test_evaluate_pre_trade_blocks_on_kill_switch(self):
+    def test_evaluate_pre_trade_blocks_on_kill_switch(self) -> Any:
+        """Otomatik eklendi."""
         self.orchestrator.trigger_emergency_kill_switch(reason="Test acil durum")
         assert self.orchestrator.is_trading_allowed() is False
 
@@ -210,7 +221,8 @@ class TestRiskOrchestrator:
         self.orchestrator.reset_kill_switch()
         assert self.orchestrator.is_trading_allowed() is True
 
-    def test_assess_portfolio_risk_full_report(self):
+    def test_assess_portfolio_risk_full_report(self) -> Any:
+        """Otomatik eklendi."""
         np.random.seed(42)
         returns = np.random.normal(0.0008, 0.015, 252)
         portfolio = {
@@ -242,7 +254,8 @@ class TestRiskOrchestrator:
 class TestStreamingRiskMonitoring:
     """Canlı fiyat tick'leri ve limit yakınlık uyarı testleri."""
 
-    def test_limit_proximity_alerts(self):
+    def test_limit_proximity_alerts(self) -> Any:
+        """Otomatik eklendi."""
         monitor = RiskMonitor()
 
         # Fiyat tavana çok yakın (Ref: 100, Tavan: 110, Fiyat: 109.5)
@@ -266,7 +279,8 @@ class TestStreamingRiskMonitoring:
         assert len(alerts_down) >= 1
         assert alerts_down[0].title == "Taban Fiyat Yakınlığı Uyarısı"
 
-    def test_spread_blowout_alert(self):
+    def test_spread_blowout_alert(self) -> Any:
+        """Otomatik eklendi."""
         monitor = RiskMonitor()
         # Spread 200 bps (%2.0)
         alerts = monitor.ingest_price_tick(
@@ -286,14 +300,16 @@ class TestStreamingRiskMonitoring:
 class TestEdgeCases:
     """Uç durum ve sıfır bölme koruma testleri."""
 
-    def test_zero_portfolio_value_safety(self):
+    def test_zero_portfolio_value_safety(self) -> Any:
+        """Otomatik eklendi."""
         orchestrator = RiskOrchestrator()
         empty_portfolio = {"total_value": 0.0, "weights": {}, "positions": []}
         report = orchestrator.assess_portfolio_risk(empty_portfolio)
         assert report["portfolio_value"] == 0.0
         assert report["composite_risk_score"] >= 0.0
 
-    def test_negative_price_order_rejection(self):
+    def test_negative_price_order_rejection(self) -> Any:
+        """Otomatik eklendi."""
         orchestrator = RiskOrchestrator()
         req = PreTradeOrderRequest(
             ticker="THYAO",

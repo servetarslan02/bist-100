@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Market State Engine v2.0 Test Suite
 
 Tüm modüller için testler:
@@ -30,7 +31,7 @@ from services.market_state.transition_tracker import RegimeTransitionTracker
 
 
 @pytest.fixture
-def sample_instrument_states():
+def sample_instrument_states() -> Any:
     """Örnek hisse state'leri — 10 hisse."""
     return [
         {
@@ -147,51 +148,58 @@ def sample_instrument_states():
 
 
 @pytest.fixture
-def sample_returns():
+def sample_returns() -> Any:
     """Örnek getiri serisi — 100 gün."""
     np.random.seed(42)
     return np.random.normal(0.0005, 0.015, 100)
 
 
 @pytest.fixture
-def sample_volatility():
+def sample_volatility() -> Any:
     """Örnek volatilite serisi — 100 gün."""
     np.random.seed(42)
     return np.abs(np.random.normal(0.02, 0.005, 100))
 
 
 @pytest.fixture
-def breadth_engine():
+def breadth_engine() -> Any:
+    """Otomatik eklendi."""
     return MarketBreadthEngine()
 
 
 @pytest.fixture
-def component_engine():
+def component_engine() -> Any:
+    """Otomatik eklendi."""
     return ComponentStateEngine()
 
 
 @pytest.fixture
-def ensemble_detector():
+def ensemble_detector() -> Any:
+    """Otomatik eklendi."""
     return EnsembleRegimeDetector()
 
 
 @pytest.fixture
-def transition_tracker():
+def transition_tracker() -> Any:
+    """Otomatik eklendi."""
     return RegimeTransitionTracker()
 
 
 @pytest.fixture
-def risk_engine():
+def risk_engine() -> Any:
+    """Otomatik eklendi."""
     return RiskAppetiteEngine()
 
 
 @pytest.fixture
-def multi_tf_engine():
+def multi_tf_engine() -> Any:
+    """Otomatik eklendi."""
     return MultiTimeframeEngine()
 
 
 @pytest.fixture
-def formatter():
+def formatter() -> Any:
+    """Otomatik eklendi."""
     return MarketStateFormatter()
 
 
@@ -203,7 +211,7 @@ def formatter():
 class TestBreadthEngine:
     """Market Breadth Engine testleri."""
 
-    def test_compute_basic(self, breadth_engine, sample_instrument_states):
+    def test_compute_basic(self, breadth_engine, sample_instrument_states) -> Any:
         """Temel breadth hesaplama."""
         result = breadth_engine.compute(sample_instrument_states)
 
@@ -214,18 +222,18 @@ class TestBreadthEngine:
         assert result.pct_advancing == 60.0
         assert result.ad_ratio > 1.0  # More advancing than declining
 
-    def test_compute_mcclellan(self, breadth_engine, sample_instrument_states):
+    def test_compute_mcclellan(self, breadth_engine, sample_instrument_states) -> Any:
         """McClellan Oscillator hesaplama."""
         result = breadth_engine.compute(sample_instrument_states)
         assert isinstance(result.mcclellan_osc, float)
 
-    def test_compute_trin(self, breadth_engine, sample_instrument_states):
+    def test_compute_trin(self, breadth_engine, sample_instrument_states) -> Any:
         """TRIN hesaplama."""
         result = breadth_engine.compute(sample_instrument_states)
         assert isinstance(result.trin, float)
         assert result.trin > 0
 
-    def test_breadth_state_broad(self, breadth_engine):
+    def test_breadth_state_broad(self, breadth_engine) -> Any:
         """Breadth state = BROAD (yüksek katılımlı yükseliş)."""
         states = [{"ticker": f"H{i}", "change_pct": 2.0, "volume": 50000} for i in range(80)] + [
             {"ticker": f"H{i}", "change_pct": -1.0, "volume": 50000} for i in range(80, 100)
@@ -234,7 +242,7 @@ class TestBreadthEngine:
         assert result.breadth_state == "BROAD"
         assert result.pct_advancing == 80.0
 
-    def test_breadth_state_narrow(self, breadth_engine):
+    def test_breadth_state_narrow(self, breadth_engine) -> Any:
         """Breadth state = NARROW (düşük katılımlı)."""
         states = [{"ticker": f"H{i}", "change_pct": -3.0, "volume": 50000} for i in range(75)] + [
             {"ticker": f"H{i}", "change_pct": 0.5, "volume": 50000} for i in range(75, 100)
@@ -242,7 +250,7 @@ class TestBreadthEngine:
         result = breadth_engine.compute(states)
         assert result.breadth_state == "NARROW"
 
-    def test_alert_critical(self, breadth_engine):
+    def test_alert_critical(self, breadth_engine) -> Any:
         """Alert = CRITICAL (crash sinyali — pct < 15 ve trin > 2.0)."""
         # Düşen hacmi yüksek, yükselen hacmi düşük → trin > 2
         states = [{"ticker": f"H{i}", "change_pct": -3.0, "volume": 100000} for i in range(92)] + [
@@ -251,7 +259,7 @@ class TestBreadthEngine:
         result = breadth_engine.compute(states)
         assert result.alert_level == "CRITICAL"
 
-    def test_sector_breadth(self, breadth_engine, sample_instrument_states):
+    def test_sector_breadth(self, breadth_engine, sample_instrument_states) -> Any:
         """Sektörel breadth hesaplama."""
         sector_map = {
             "THYAO": "HAVACILIK",
@@ -269,7 +277,7 @@ class TestBreadthEngine:
         assert "HAVACILIK" in result.sector_breadth
         assert "BANKACILIK" in result.sector_breadth
 
-    def test_low_volume_filter(self, breadth_engine):
+    def test_low_volume_filter(self, breadth_engine) -> Any:
         """Düşük hacimli hisseler filtrelenmeli."""
         states = [
             {"ticker": "HIGH", "change_pct": 2.0, "volume": 100000},
@@ -278,13 +286,13 @@ class TestBreadthEngine:
         result = breadth_engine.compute(states)
         assert result.total == 1  # Sadece HIGH
 
-    def test_reset(self, breadth_engine, sample_instrument_states):
+    def test_reset(self, breadth_engine, sample_instrument_states) -> Any:
         """Reset sonrası cumulative state sıfırlanmalı."""
         breadth_engine.compute(sample_instrument_states)
         breadth_engine.reset()
         assert breadth_engine._ad_line_cumulative == 0
 
-    def test_to_dict(self, breadth_engine, sample_instrument_states):
+    def test_to_dict(self, breadth_engine, sample_instrument_states) -> Any:
         """to_dict() tüm alanları içermeli."""
         result = breadth_engine.compute(sample_instrument_states)
         d = result.to_dict()
@@ -302,7 +310,7 @@ class TestBreadthEngine:
 class TestComponentStates:
     """Component States Engine testleri."""
 
-    def test_compute_all(self, component_engine, sample_instrument_states):
+    def test_compute_all(self, component_engine, sample_instrument_states) -> Any:
         """Tüm bileşenler hesaplanmalı."""
         result = component_engine.compute_all(sample_instrument_states)
 
@@ -314,7 +322,7 @@ class TestComponentStates:
         assert result.liquidity_state in ("TIGHT", "NORMAL", "LOOSE")
         assert result.sentiment_state in ("NEGATIVE", "NEUTRAL", "POSITIVE", "EUPHORIA")
 
-    def test_momentum_state_positive(self, component_engine):
+    def test_momentum_state_positive(self, component_engine) -> Any:
         """Pozitif momentum ağırlıklı → POSITIVE."""
         states = [
             {"momentum": 3.0},
@@ -331,7 +339,7 @@ class TestComponentStates:
         result = component_engine.compute_all(states)
         assert result.momentum_state == "POSITIVE"
 
-    def test_momentum_state_negative(self, component_engine):
+    def test_momentum_state_negative(self, component_engine) -> Any:
         """Negatif momentum ağırlıklı → NEGATIVE."""
         states = [
             {"momentum": -3.0},
@@ -348,13 +356,13 @@ class TestComponentStates:
         result = component_engine.compute_all(states)
         assert result.momentum_state == "NEGATIVE"
 
-    def test_volatility_state_with_vix(self, component_engine):
+    def test_volatility_state_with_vix(self, component_engine) -> Any:
         """VIX ile volatility state."""
         states = [{"volatility": 0.02}]
         result = component_engine.compute_all(states, vix_level=45)
         assert result.volatility_state == "EXTREME"
 
-    def test_rsi_state_oversold(self, component_engine):
+    def test_rsi_state_oversold(self, component_engine) -> Any:
         """RSI < 30 yaygın → OVERSOLD (>30% hisse RSI < 30)."""
         states = [
             {"rsi": 25},
@@ -371,13 +379,13 @@ class TestComponentStates:
         result = component_engine.compute_all(states)
         assert result.rsi_state == "OVERSOLD"
 
-    def test_sentiment_state_euphoria(self, component_engine):
+    def test_sentiment_state_euphoria(self, component_engine) -> Any:
         """Yüksek sentiment → EUPHORIA."""
         states = [{"rsi": 50}]
         result = component_engine.compute_all(states, news_sentiment=0.8)
         assert result.sentiment_state == "EUPHORIA"
 
-    def test_anomaly_state(self, component_engine):
+    def test_anomaly_state(self, component_engine) -> Any:
         """Anomaly tespit."""
         states = [
             {"anomaly_score": 0.9},
@@ -389,7 +397,7 @@ class TestComponentStates:
         assert result.anomaly_count == 3
         assert result.anomaly_severity == "HIGH"
 
-    def test_macro_state(self, component_engine):
+    def test_macro_state(self, component_engine) -> Any:
         """Macro state world_state'den."""
         states = [{"rsi": 50}]
         world_state = {
@@ -400,7 +408,7 @@ class TestComponentStates:
         result = component_engine.compute_all(states, world_state=world_state)
         assert result.macro_state == "EXPANSION"
 
-    def test_to_dict(self, component_engine, sample_instrument_states):
+    def test_to_dict(self, component_engine, sample_instrument_states) -> Any:
         """to_dict() tüm alanları içermeli."""
         result = component_engine.compute_all(sample_instrument_states)
         d = result.to_dict()
@@ -417,7 +425,7 @@ class TestComponentStates:
 class TestEnsembleRegime:
     """Ensemble Regime Detection testleri."""
 
-    def test_detect_score_only(self, ensemble_detector, sample_returns, sample_volatility):
+    def test_detect_score_only(self, ensemble_detector, sample_returns, sample_volatility) -> Any:
         """Skor bazlı tespit (HMM/GMM olmadan)."""
         features = {
             "breadth_pct": 65.0,
@@ -435,7 +443,7 @@ class TestEnsembleRegime:
         assert result.regime != "UNKNOWN"
         assert 0 <= result.confidence <= 1
 
-    def test_detect_with_returns(self, ensemble_detector, sample_returns, sample_volatility):
+    def test_detect_with_returns(self, ensemble_detector, sample_returns, sample_volatility) -> Any:
         """Returns ile birlikte tespit."""
         features = {
             "breadth_pct": 55.0,
@@ -447,7 +455,7 @@ class TestEnsembleRegime:
 
         assert result.method_count >= 1
 
-    def test_consensus(self, ensemble_detector):
+    def test_consensus(self, ensemble_detector) -> Any:
         """Consensus tespit."""
         # Tüm yöntemler aynı sonucu vermeli (eğer çalışırlarsa)
         features = {
@@ -460,13 +468,13 @@ class TestEnsembleRegime:
         # Consensus bool olmalı
         assert isinstance(result.consensus, bool)
 
-    def test_update_weights(self, ensemble_detector):
+    def test_update_weights(self, ensemble_detector) -> Any:
         """Ağırlık güncelleme."""
         ensemble_detector.update_weights(score_weight=0.6, hmm_weight=0.3, gmm_weight=0.1)
         # Ağırlıklar normalize edilmeli
         assert abs(ensemble_detector._score_weight - 0.6) < 0.01
 
-    def test_to_dict(self, ensemble_detector):
+    def test_to_dict(self, ensemble_detector) -> Any:
         """to_dict() tüm alanları içermeli."""
         features = {"breadth_pct": 50, "momentum_avg": 0, "volatility_avg": 20, "rsi_avg": 50}
         result = ensemble_detector.detect(features)
@@ -484,7 +492,7 @@ class TestEnsembleRegime:
 class TestTransitionTracker:
     """Regime Transition Tracker testleri."""
 
-    def test_record_initial(self, transition_tracker):
+    def test_record_initial(self, transition_tracker) -> Any:
         """İlk kayıt."""
         transition_tracker.record("BULL", 0.8)
         stats = transition_tracker.get_stats()
@@ -492,7 +500,7 @@ class TestTransitionTracker:
         assert stats.total_observations == 1
         assert stats.total_transitions == 0
 
-    def test_record_transition(self, transition_tracker):
+    def test_record_transition(self, transition_tracker) -> Any:
         """Rejim değişimi tespit."""
         transition_tracker.record("BULL", 0.8)
         transition_tracker.record("BEAR", 0.7)
@@ -500,7 +508,7 @@ class TestTransitionTracker:
         assert stats.total_transitions == 1
         assert stats.current_regime == "BEAR"
 
-    def test_stability_score(self, transition_tracker):
+    def test_stability_score(self, transition_tracker) -> Any:
         """Kararlılık skoru."""
         # Sabit rejim → yüksek kararlılık
         for _ in range(20):
@@ -508,7 +516,7 @@ class TestTransitionTracker:
         stats = transition_tracker.get_stats()
         assert stats.stability_score > 0.9
 
-    def test_stability_score_unstable(self, transition_tracker):
+    def test_stability_score_unstable(self, transition_tracker) -> Any:
         """Kararsız rejim → düşük kararlılık."""
         regimes = ["BULL", "BEAR", "BULL", "BEAR", "BULL", "BEAR"]
         for r in regimes:
@@ -516,7 +524,7 @@ class TestTransitionTracker:
         stats = transition_tracker.get_stats()
         assert stats.stability_score < 0.8
 
-    def test_transition_probability(self, transition_tracker):
+    def test_transition_probability(self, transition_tracker) -> Any:
         """Geçiş olasılığı."""
         transition_tracker.record("BULL", 0.8)
         transition_tracker.record("BEAR", 0.7)
@@ -526,14 +534,14 @@ class TestTransitionTracker:
         prob = transition_tracker.get_transition_probability("BULL", "BEAR")
         assert prob > 0.9  # BULL hep BEAR'a geçmiş
 
-    def test_confidence_trend(self, transition_tracker):
+    def test_confidence_trend(self, transition_tracker) -> Any:
         """Confidence trend."""
         for conf in [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]:
             transition_tracker.record("BULL", conf)
         stats = transition_tracker.get_stats()
         assert stats.confidence_trend == "INCREASING"
 
-    def test_recent_transitions(self, transition_tracker):
+    def test_recent_transitions(self, transition_tracker) -> Any:
         """Son geçişler."""
         transition_tracker.record("BULL", 0.8)
         transition_tracker.record("BEAR", 0.7)
@@ -544,7 +552,7 @@ class TestTransitionTracker:
         assert recent[0]["from"] == "BULL"
         assert recent[0]["to"] == "BEAR"
 
-    def test_reset(self, transition_tracker):
+    def test_reset(self, transition_tracker) -> Any:
         """Reset sonrası sıfırlanmalı."""
         transition_tracker.record("BULL", 0.8)
         transition_tracker.record("BEAR", 0.7)
@@ -561,7 +569,7 @@ class TestTransitionTracker:
 class TestRiskAppetite:
     """Risk Appetite Engine testleri."""
 
-    def test_compute_basic(self, risk_engine):
+    def test_compute_basic(self, risk_engine) -> Any:
         """Temel hesaplama."""
         score = risk_engine.compute(
             breadth_pct=65.0,
@@ -574,7 +582,7 @@ class TestRiskAppetite:
         assert 0 <= score <= 1
         assert score > 0.5  # Pozitif koşullar → risk-on
 
-    def test_compute_risk_off(self, risk_engine):
+    def test_compute_risk_off(self, risk_engine) -> Any:
         """Risk-off koşulları."""
         score = risk_engine.compute(
             breadth_pct=25.0,
@@ -586,7 +594,7 @@ class TestRiskAppetite:
         )
         assert score < 0.4  # Negatif koşullar → risk-off
 
-    def test_compute_detailed(self, risk_engine):
+    def test_compute_detailed(self, risk_engine) -> Any:
         """Detaylı hesaplama."""
         result = risk_engine.compute_detailed(
             breadth_pct=60.0,
@@ -599,7 +607,7 @@ class TestRiskAppetite:
         assert "state" in result
         assert len(result["contributions"]) == 6
 
-    def test_risk_appetite_state(self, risk_engine):
+    def test_risk_appetite_state(self, risk_engine) -> Any:
         """State belirleme."""
         result = risk_engine.compute_detailed(
             breadth_pct=80.0,
@@ -611,7 +619,7 @@ class TestRiskAppetite:
         )
         assert result["state"] in ("RISK_ON", "MODERATE_RISK_ON")
 
-    def test_update_weights(self, risk_engine):
+    def test_update_weights(self, risk_engine) -> Any:
         """Ağırlık güncelleme."""
         risk_engine.update_weights({"breadth": 0.4, "momentum": 0.3})
         # Ağırlıklar normalize edilmeli
@@ -626,7 +634,7 @@ class TestRiskAppetite:
 class TestMultiTimeframe:
     """Multi-Timeframe Engine testleri."""
 
-    def test_compute_all_timeframes(self, multi_tf_engine):
+    def test_compute_all_timeframes(self, multi_tf_engine) -> Any:
         """Tüm timeframe'ler hesaplanmalı."""
         data = {
             "daily": {
@@ -641,7 +649,7 @@ class TestMultiTimeframe:
         assert "daily" in result.states
         assert result.states["daily"].regime != "UNKNOWN"
 
-    def test_alignment_score(self, multi_tf_engine):
+    def test_alignment_score(self, multi_tf_engine) -> Any:
         """Alignment score hesaplama."""
         data = {
             "daily": {
@@ -658,7 +666,7 @@ class TestMultiTimeframe:
         result = multi_tf_engine.compute_all_timeframes(data)
         assert 0 <= result.alignment_score <= 1
 
-    def test_divergence_detection(self, multi_tf_engine):
+    def test_divergence_detection(self, multi_tf_engine) -> Any:
         """Divergence tespit."""
         # Günlük BULL, haftalık BEAR
         data = {
@@ -677,7 +685,7 @@ class TestMultiTimeframe:
         # Divergence olabilir (veri çok az ama)
         assert isinstance(result.divergences, list)
 
-    def test_dominant_timeframe(self, multi_tf_engine):
+    def test_dominant_timeframe(self, multi_tf_engine) -> Any:
         """Dominant timeframe seçimi."""
         data = {
             "daily": {
@@ -698,13 +706,13 @@ class TestMultiTimeframe:
 class TestOutputFormatter:
     """Market State Output Formatter testleri."""
 
-    def test_format_empty(self, formatter):
+    def test_format_empty(self, formatter) -> Any:
         """Boş input ile format."""
         output = formatter.format()
         assert isinstance(output, MarketStateOutput)
         assert output.regime == "UNKNOWN"
 
-    def test_format_full(self, formatter, sample_instrument_states):
+    def test_format_full(self, formatter, sample_instrument_states) -> Any:
         """Tam input ile format."""
         breadth = MarketBreadthEngine().compute(sample_instrument_states)
         components = ComponentStateEngine().compute_all(sample_instrument_states)
@@ -734,7 +742,7 @@ class TestOutputFormatter:
         # Note: momentum_state depends on input data
         # assert output.momentum_state != "NEUTRAL"  # Enable with specific test data
 
-    def test_to_dict(self, formatter):
+    def test_to_dict(self, formatter) -> Any:
         """to_dict() tüm alanları içermeli."""
         output = formatter.format()
         d = output.to_dict()
@@ -752,7 +760,7 @@ class TestOutputFormatter:
 class TestIntegration:
     """Entegrasyon testleri — tüm modüller birlikte."""
 
-    def test_full_pipeline(self, sample_instrument_states):
+    def test_full_pipeline(self, sample_instrument_states) -> Any:
         """Tam pipeline: breadth → components → ensemble → transition → risk → output."""
         # 1. Breadth
         breadth_engine = MarketBreadthEngine()
@@ -802,7 +810,7 @@ class TestIntegration:
         assert output.breadth != {}
         assert output.regime_stability >= 0
 
-    def test_regime_consistency(self, sample_instrument_states):
+    def test_regime_consistency(self, sample_instrument_states) -> Any:
         """Aynı input ile aynı regime üretilmeli."""
         engine = EnsembleRegimeDetector()
         features = {

@@ -38,6 +38,7 @@ class AttentionLayer:
     """Attention mechanism — LSTM çıktılarına ağırlık verir."""
 
     def __init__(self, hidden_size: int):
+        """Otomatik eklendi."""
         try:
             import torch.nn as nn
 
@@ -46,7 +47,8 @@ class AttentionLayer:
         except ImportError:
             self.attention = None
 
-    def __call__(self, lstm_output):
+    def __call__(self, lstm_output) -> Any:
+        """Otomatik eklendi."""
         if self.attention is None:
             return lstm_output[:, -1, :]
         import torch
@@ -75,6 +77,7 @@ class StockLSTM:
     """
 
     def __init__(self, config: LSTMConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or LSTMConfig()
         self._model = None
         self._scaler = None
@@ -254,11 +257,13 @@ class StockLSTM:
 
         return np.array(X_seq), np.array(y_seq)
 
-    def _build_model(self, torch, nn):
+    def _build_model(self, torch, nn) -> Any:
         """PyTorch LSTM model oluştur."""
 
         class LSTMModel(nn.Module):
+            """Otomatik eklendi."""
             def __init__(self_cfg, torch_mod, nn_mod):
+                """Otomatik eklendi."""
                 super().__init__()
                 self.lstm = nn_mod.LSTM(
                     input_size=self_cfg.input_size,
@@ -277,7 +282,8 @@ class StockLSTM:
                     nn_mod.Linear(64, self_cfg.output_size),
                 )
 
-            def forward(self, x):
+            def forward(self, x) -> Any:
+                """Otomatik eklendi."""
                 lstm_out, _ = self.lstm(x)
                 context = self.attention(lstm_out) if self.attention is not None else lstm_out[:, -1, :]
                 return self.fc(context)
@@ -324,4 +330,5 @@ class StockLSTM:
 
     @property
     def is_trained(self) -> bool:
+        """Otomatik eklendi."""
         return self._is_trained

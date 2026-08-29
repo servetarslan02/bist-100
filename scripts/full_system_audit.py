@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Any
 """
 ALPHA BIST — FULL SYSTEM FORENSIC AUDIT
 İnceleme-test dosyasına göre 23 modülün kapsamlı denetimi.
@@ -33,6 +34,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class AuditIssue:
+    """Otomatik eklendi."""
     module: str
     severity: str  # P0, P1, P2, P3
     category: str  # CRITICAL BUG, LOGIC BUG, FINANCIAL MATH BUG, DATA BUG, LEAKAGE RISK, etc.
@@ -44,6 +46,7 @@ class AuditIssue:
 
 @dataclass
 class ModuleResult:
+    """Otomatik eklendi."""
     name: str
     status: str  # PASS, FAIL, CONDITIONAL PASS
     issues: list[AuditIssue] = field(default_factory=list)
@@ -51,7 +54,9 @@ class ModuleResult:
 
 
 class AuditReport:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.modules: dict[str, ModuleResult] = {}
         self.system_status = "PASS"
         self.critical_bugs = []
@@ -63,7 +68,8 @@ class AuditReport:
         self.performance_issues = []
         self.missing_features = []
 
-    def add_module(self, name: str, status: str, issues: list[AuditIssue] = None, details: str = ""):
+    def add_module(self, name: str, status: str, issues: list[AuditIssue] = None, details: str = "") -> Any:
+        """Otomatik eklendi."""
         self.modules[name] = ModuleResult(name=name, status=status, issues=issues or [], details=details)
         if status == "FAIL":
             self.system_status = "FAIL"
@@ -88,20 +94,21 @@ class AuditReport:
             elif issue.category == "MISSING FEATURE":
                 self.missing_features.append(issue)
 
-    def print_report(self):
-        print("\n" + "=" * 70)
-        print("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT REPORT")
-        print(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 70)
-        print(f"\nSYSTEM STATUS: {self.system_status}")
-        print("\nMODULE AUDIT:")
-        print("-" * 70)
+    def print_report(self) -> Any:
+        """Otomatik eklendi."""
+        logger.info("\n" + "=" * 70)
+        logger.info("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT REPORT")
+        logger.info(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("=" * 70)
+        logger.info(f"\nSYSTEM STATUS: {self.system_status}")
+        logger.info("\nMODULE AUDIT:")
+        logger.info("-" * 70)
         for name, result in self.modules.items():
             status_icon = "✅" if result.status == "PASS" else "❌" if result.status == "FAIL" else "⚠️"
-            print(f"  {status_icon} {name:<30} {result.status}")
+            logger.info(f"  {status_icon} {name:<30} {result.status}")
             if result.details:
                 for line in result.details.split("\n")[:3]:
-                    print(f"      {line}")
+                    logger.info(f"      {line}")
 
         # Issue categories
         for label, issues in [
@@ -115,19 +122,19 @@ class AuditReport:
             ("MISSING FEATURES", self.missing_features),
         ]:
             if issues:
-                print(f"\n{'=' * 70}")
-                print(f"{label} ({len(issues)})")
-                print("=" * 70)
+                logger.info(f"\n{'=' * 70}")
+                logger.info(f"{label} ({len(issues)})")
+                logger.info("=" * 70)
                 for i, issue in enumerate(issues, 1):
-                    print(f"\n  [{i}] {issue.module} — {issue.severity}")
-                    print(f"      Root Cause: {issue.root_cause}")
-                    print(f"      Evidence: {issue.evidence}")
-                    print(f"      Fix: {issue.recommended_fix}")
+                    logger.info(f"\n  [{i}] {issue.module} — {issue.severity}")
+                    logger.info(f"      Root Cause: {issue.root_cause}")
+                    logger.info(f"      Evidence: {issue.evidence}")
+                    logger.info(f"      Fix: {issue.recommended_fix}")
 
         # Summary
-        print(f"\n{'=' * 70}")
-        print("SUMMARY")
-        print("=" * 70)
+        logger.info(f"\n{'=' * 70}")
+        logger.info("SUMMARY")
+        logger.info("=" * 70)
         total_issues = sum(
             len(v)
             for v in [
@@ -141,17 +148,17 @@ class AuditReport:
                 self.missing_features,
             ]
         )
-        print(f"  Toplam Bulgu: {total_issues}")
-        print(
+        logger.info(f"  Toplam Bulgu: {total_issues}")
+        logger.info(
             f"  P0 (Kritik): {sum(1 for v in [self.critical_bugs, self.security_bugs] for i in v if i.severity == 'P0')}"
         )
-        print(
+        logger.info(
             f"  P1 (Yüksek): {sum(1 for v in [self.logic_bugs, self.financial_math_bugs, self.leakage_risks] for i in v if i.severity == 'P1')}"
         )
-        print(
+        logger.info(
             f"  P2 (Orta): {sum(1 for v in [self.data_bugs, self.performance_issues] for i in v if i.severity == 'P2')}"
         )
-        print(f"  P3 (Düşük): {sum(1 for v in [self.missing_features] for i in v if i.severity == 'P3')}")
+        logger.info(f"  P3 (Düşük): {sum(1 for v in [self.missing_features] for i in v if i.severity == 'P3')}")
 
 
 # ============================================================
@@ -159,11 +166,11 @@ class AuditReport:
 # ============================================================
 
 
-def audit_live_data(report: AuditReport):
+def audit_live_data(report: AuditReport) -> Any:
     """Modül 1: Canlı Veri Testi"""
-    print("\n" + "=" * 70)
-    print("MODÜL 1: CANLI VERİ TESTİ")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 1: CANLI VERİ TESTİ")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -172,11 +179,11 @@ def audit_live_data(report: AuditReport):
         from services.ingestion.bist_universe import bist_universe
 
         bist_100 = bist_universe.BIST_100_TICKERS
-        print(f"  BIST 100 evren: {len(bist_100)} hisse")
+        logger.info(f"  BIST 100 evren: {len(bist_100)} hisse")
 
         # Canlı veri çek (son 6 ay)
         yf_tickers = [f"{t}.IS" for t in bist_100[:10] if t != "XU100"] + ["XU100.IS"]
-        print(f"  Test edilen: {len(yf_tickers)} hisse (ilk 10 + XU100)")
+        logger.info(f"  Test edilen: {len(yf_tickers)} hisse (ilk 10 + XU100)")
 
         market_data = data_source.get_multiple_stocks(yf_tickers, period="6mo", interval="1d")
         market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
@@ -346,7 +353,7 @@ def audit_live_data(report: AuditReport):
             )
 
         # Bozuk veri enjeksiyonu testi
-        print("  Bozuk veri enjeksiyonu testi...")
+        logger.info("  Bozuk veri enjeksiyonu testi...")
         from services.core.data_quality import data_quality
 
         mask_result = data_quality.check_tradability(
@@ -369,7 +376,7 @@ def audit_live_data(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Data", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -386,11 +393,11 @@ def audit_live_data(report: AuditReport):
         report.add_module("Data", "FAIL", issues, str(e))
 
 
-def audit_data_quality(report: AuditReport):
+def audit_data_quality(report: AuditReport) -> Any:
     """Modül 1 devamı: Data Quality Gate"""
-    print("\n" + "=" * 70)
-    print("MODÜL 1B: DATA QUALITY GATE")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 1B: DATA QUALITY GATE")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -458,7 +465,7 @@ def audit_data_quality(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Data Quality", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -475,11 +482,11 @@ def audit_data_quality(report: AuditReport):
         report.add_module("Data Quality", "FAIL", issues, str(e))
 
 
-def audit_tradability_mask(report: AuditReport):
+def audit_tradability_mask(report: AuditReport) -> Any:
     """Modül 3: Mask-First / Tradability"""
-    print("\n" + "=" * 70)
-    print("MODÜL 3: TRADABILITY MASK")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 3: TRADABILITY MASK")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -606,7 +613,7 @@ def audit_tradability_mask(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Tradability Mask", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -623,11 +630,11 @@ def audit_tradability_mask(report: AuditReport):
         report.add_module("Tradability Mask", "FAIL", issues, str(e))
 
 
-def audit_features(report: AuditReport):
+def audit_features(report: AuditReport) -> Any:
     """Modül 4: Feature Engineering Audit"""
-    print("\n" + "=" * 70)
-    print("MODÜL 4: FEATURE ENGINEERING AUDİT")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 4: FEATURE ENGINEERING AUDİT")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -777,7 +784,7 @@ def audit_features(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Features", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -794,11 +801,11 @@ def audit_features(report: AuditReport):
         report.add_module("Features", "FAIL", issues, str(e))
 
 
-def audit_cross_sectional(report: AuditReport):
+def audit_cross_sectional(report: AuditReport) -> Any:
     """Modül 5: Cross-Sectional Logic"""
-    print("\n" + "=" * 70)
-    print("MODÜL 5: CROSS-SECTIONAL LOGİC")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 5: CROSS-SECTIONAL LOGİC")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -892,7 +899,7 @@ def audit_cross_sectional(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Cross Sectional", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -909,11 +916,11 @@ def audit_cross_sectional(report: AuditReport):
         report.add_module("Cross Sectional", "FAIL", issues, str(e))
 
 
-def audit_regime(report: AuditReport):
+def audit_regime(report: AuditReport) -> Any:
     """Modül 6: Regime Detector"""
-    print("\n" + "=" * 70)
-    print("MODÜL 6: REGİME DETECTOR")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 6: REGİME DETECTOR")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1023,7 +1030,7 @@ def audit_regime(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Regime", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1040,11 +1047,11 @@ def audit_regime(report: AuditReport):
         report.add_module("Regime", "FAIL", issues, str(e))
 
 
-def audit_ranking(report: AuditReport):
+def audit_ranking(report: AuditReport) -> Any:
     """Modül 8: Ranking Model"""
-    print("\n" + "=" * 70)
-    print("MODÜL 8: RANKİNG MODEL")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 8: RANKİNG MODEL")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1109,7 +1116,7 @@ def audit_ranking(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Ranking", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1126,11 +1133,11 @@ def audit_ranking(report: AuditReport):
         report.add_module("Ranking", "FAIL", issues, str(e))
 
 
-def audit_calibration(report: AuditReport):
+def audit_calibration(report: AuditReport) -> Any:
     """Modül 10: Calibration"""
-    print("\n" + "=" * 70)
-    print("MODÜL 10: CALİBRATİON")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 10: CALİBRATİON")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1177,7 +1184,7 @@ def audit_calibration(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Calibration", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1194,11 +1201,11 @@ def audit_calibration(report: AuditReport):
         report.add_module("Calibration", "FAIL", issues, str(e))
 
 
-def audit_position_sizing(report: AuditReport):
+def audit_position_sizing(report: AuditReport) -> Any:
     """Modül 11: Position Sizing (Kelly)"""
-    print("\n" + "=" * 70)
-    print("MODÜL 11: POSİTİON SİZİNG (KELLY)")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 11: POSİTİON SİZİNG (KELLY)")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1307,7 +1314,7 @@ def audit_position_sizing(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Position Sizing", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1324,11 +1331,11 @@ def audit_position_sizing(report: AuditReport):
         report.add_module("Position Sizing", "FAIL", issues, str(e))
 
 
-def audit_risk_engine(report: AuditReport):
+def audit_risk_engine(report: AuditReport) -> Any:
     """Modül 12: Risk Engine"""
-    print("\n" + "=" * 70)
-    print("MODÜL 12: RİSK ENGİNE")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 12: RİSK ENGİNE")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1399,7 +1406,7 @@ def audit_risk_engine(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Risk Engine", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1416,11 +1423,11 @@ def audit_risk_engine(report: AuditReport):
         report.add_module("Risk Engine", "FAIL", issues, str(e))
 
 
-def audit_execution(report: AuditReport):
+def audit_execution(report: AuditReport) -> Any:
     """Modül 13: Paper Execution"""
-    print("\n" + "=" * 70)
-    print("MODÜL 13: PAPER EXECUTİON")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 13: PAPER EXECUTİON")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1454,7 +1461,7 @@ def audit_execution(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Execution", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1471,11 +1478,11 @@ def audit_execution(report: AuditReport):
         report.add_module("Execution", "FAIL", issues, str(e))
 
 
-def audit_portfolio(report: AuditReport):
+def audit_portfolio(report: AuditReport) -> Any:
     """Modül 14: Portfolio Accounting"""
-    print("\n" + "=" * 70)
-    print("MODÜL 14: PORTFOLİO ACCOUNTİNG")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 14: PORTFOLİO ACCOUNTİNG")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1534,7 +1541,7 @@ def audit_portfolio(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Portfolio", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1551,11 +1558,11 @@ def audit_portfolio(report: AuditReport):
         report.add_module("Portfolio", "FAIL", issues, str(e))
 
 
-def audit_performance(report: AuditReport):
+def audit_performance(report: AuditReport) -> Any:
     """Modül 15: Performance Metrics"""
-    print("\n" + "=" * 70)
-    print("MODÜL 15: PERFORMANCE METRİCS")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 15: PERFORMANCE METRİCS")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1634,7 +1641,7 @@ def audit_performance(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Performance", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1651,11 +1658,11 @@ def audit_performance(report: AuditReport):
         report.add_module("Performance", "FAIL", issues, str(e))
 
 
-def audit_benchmark(report: AuditReport):
+def audit_benchmark(report: AuditReport) -> Any:
     """Modül 16: Benchmark"""
-    print("\n" + "=" * 70)
-    print("MODÜL 16: BENCHMARK")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 16: BENCHMARK")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1709,7 +1716,7 @@ def audit_benchmark(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Benchmark", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1726,11 +1733,11 @@ def audit_benchmark(report: AuditReport):
         report.add_module("Benchmark", "FAIL", issues, str(e))
 
 
-def audit_walk_forward(report: AuditReport):
+def audit_walk_forward(report: AuditReport) -> Any:
     """Modül 9: Walk-Forward"""
-    print("\n" + "=" * 70)
-    print("MODÜL 9: WALK-FORWARD")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 9: WALK-FORWARD")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1788,7 +1795,7 @@ def audit_walk_forward(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Walk Forward", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1805,11 +1812,11 @@ def audit_walk_forward(report: AuditReport):
         report.add_module("Walk Forward", "FAIL", issues, str(e))
 
 
-def audit_quality_gate(report: AuditReport):
+def audit_quality_gate(report: AuditReport) -> Any:
     """Modül 18: Model Quality Gate"""
-    print("\n" + "=" * 70)
-    print("MODÜL 18: MODEL QUALİTY GATE")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 18: MODEL QUALİTY GATE")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1854,7 +1861,7 @@ def audit_quality_gate(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Quality Gate", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1871,11 +1878,11 @@ def audit_quality_gate(report: AuditReport):
         report.add_module("Quality Gate", "FAIL", issues, str(e))
 
 
-def audit_self_learning(report: AuditReport):
+def audit_self_learning(report: AuditReport) -> Any:
     """Modül 19: Self-Learning"""
-    print("\n" + "=" * 70)
-    print("MODÜL 19: SELF-LEARNİNG")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 19: SELF-LEARNİNG")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1912,7 +1919,7 @@ def audit_self_learning(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Self Learning", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -1929,11 +1936,11 @@ def audit_self_learning(report: AuditReport):
         report.add_module("Self Learning", "FAIL", issues, str(e))
 
 
-def audit_fail_safe(report: AuditReport):
+def audit_fail_safe(report: AuditReport) -> Any:
     """Modül 20: Failure / Chaos Test"""
-    print("\n" + "=" * 70)
-    print("MODÜL 20: FAİLURE / CHAOS TEST")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 20: FAİLURE / CHAOS TEST")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -1995,7 +2002,7 @@ def audit_fail_safe(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Fail Safe", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -2012,11 +2019,11 @@ def audit_fail_safe(report: AuditReport):
         report.add_module("Fail Safe", "FAIL", issues, str(e))
 
 
-def audit_survivorship(report: AuditReport):
+def audit_survivorship(report: AuditReport) -> Any:
     """Modül 17: Survivorship Bias"""
-    print("\n" + "=" * 70)
-    print("MODÜL 17: SURVİVORSHİP BİAS")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 17: SURVİVORSHİP BİAS")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -2067,7 +2074,7 @@ def audit_survivorship(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Survivorship", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -2084,11 +2091,11 @@ def audit_survivorship(report: AuditReport):
         report.add_module("Survivorship", "FAIL", issues, str(e))
 
 
-def audit_lookahead(report: AuditReport):
+def audit_lookahead(report: AuditReport) -> Any:
     """Modül 2: Time / Look-Ahead / Data Leakage"""
-    print("\n" + "=" * 70)
-    print("MODÜL 2: LOOK-AHEAD / DATA LEAKAGE")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL 2: LOOK-AHEAD / DATA LEAKAGE")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -2176,7 +2183,7 @@ def audit_lookahead(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Look-Ahead", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -2193,11 +2200,11 @@ def audit_lookahead(report: AuditReport):
         report.add_module("Look-Ahead", "FAIL", issues, str(e))
 
 
-def audit_security(report: AuditReport):
+def audit_security(report: AuditReport) -> Any:
     """Ek: Security / Audit"""
-    print("\n" + "=" * 70)
-    print("MODÜL: SECURİTY / AUDİT")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("MODÜL: SECURİTY / AUDİT")
+    logger.info("=" * 70)
     issues = []
     details_lines = []
 
@@ -2238,7 +2245,7 @@ def audit_security(report: AuditReport):
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Security/Audit", status, issues, "\n".join(details_lines))
-        print(f"  Sonuç: {status} ({len(issues)} bulgu)")
+        logger.info(f"  Sonuç: {status} ({len(issues)} bulgu)")
 
     except Exception as e:
         issues.append(
@@ -2260,11 +2267,12 @@ def audit_security(report: AuditReport):
 # ============================================================
 
 
-def main():
-    print("=" * 70)
-    print("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT")
-    print(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 70)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 70)
+    logger.info("ALPHA BIST — FULL SYSTEM FORENSIC AUDIT")
+    logger.info(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 70)
 
     report = AuditReport()
 
@@ -2297,7 +2305,7 @@ def main():
         try:
             audit_func(report)
         except Exception as e:
-            print(f"  ❌ {name} audit crashed: {e}")
+            logger.info(f"  ❌ {name} audit crashed: {e}")
             report.add_module(
                 name,
                 "FAIL",
@@ -2339,7 +2347,7 @@ def main():
     }
     with open("reports/full_audit_report.json", "w") as f:
         f.write(orjson.dumps(report_data, option=orjson.OPT_INDENT_2, default=str).decode())
-    print("\n📄 JSON rapor: reports/full_audit_report.json")
+    logger.info("\n📄 JSON rapor: reports/full_audit_report.json")
 
     return report
 

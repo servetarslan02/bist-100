@@ -27,6 +27,7 @@ Kullanım:
 """
 
 import asyncio
+import functools
 import os
 import ssl
 import time
@@ -35,24 +36,30 @@ from enum import Enum
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.service_mesh")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class ServiceStatus(Enum):
+    """Otomatik eklendi."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -73,10 +80,12 @@ class ServiceInfo:
 
     @property
     def address(self) -> str:
+        """Otomatik eklendi."""
         return f"{self.host}:{self.port}"
 
     @property
     def is_alive(self) -> bool:
+        """Otomatik eklendi."""
         if self.status == ServiceStatus.UNKNOWN:
             return True  # Henüz kontrol edilmedi
         return self.status in (ServiceStatus.HEALTHY, ServiceStatus.DEGRADED)
@@ -86,6 +95,7 @@ class ServiceDiscovery:
     """Service Discovery & Health Monitor — Docker Compose ile çalışır."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._services: dict[str, ServiceInfo] = {}
         self._health_check_interval = 15  # saniye
         self._failure_threshold = 3
@@ -99,7 +109,7 @@ class ServiceDiscovery:
     # =====================================================
 
     @otel_trace("service_mesh.register")
-    def register(self, name: str, host: str, port: int, metadata: dict = None):
+    def register(self, name: str, host: str, port: int, metadata: dict = None) -> Any:
         """Servisi kaydet."""
         self._services[name] = ServiceInfo(
             name=name,
@@ -111,7 +121,7 @@ class ServiceDiscovery:
         logger.info("Service registered", name=name, address=f"{host}:{port}")
 
     @otel_trace("service_mesh.unregister")
-    def unregister(self, name: str):
+    def unregister(self, name: str) -> Any:
         """Servis kaydını sil."""
         self._services.pop(name, None)
         self._health_history.pop(name, None)
@@ -168,7 +178,7 @@ class ServiceDiscovery:
 
         return service.status
 
-    def _record_health(self, name: str, healthy: bool):
+    def _record_health(self, name: str, healthy: bool) -> Any:
         """Sağlık durumunu geçmişe kaydet (son 100 kontrol)."""
         if name not in self._health_history:
             self._health_history[name] = []
@@ -213,7 +223,7 @@ class ServiceDiscovery:
     # =====================================================
 
     @otel_trace("service_mesh.start_monitoring")
-    async def start_monitoring(self):
+    async def start_monitoring(self) -> Any:
         """Arka planda servis sağlık takibi başlat."""
         self._running = True
         logger.info(
@@ -231,7 +241,7 @@ class ServiceDiscovery:
 
             await asyncio.sleep(self._health_check_interval)
 
-    def stop_monitoring(self):
+    def stop_monitoring(self) -> Any:
         """Sağlık takibini durdur."""
         self._running = False
 
@@ -239,7 +249,7 @@ class ServiceDiscovery:
     # SSL Context (Opsiyonel — geliştirme ortamı)
     # =====================================================
 
-    def generate_ca(self, cert_dir: str = "/tmp/alpha-certs"):
+    def generate_ca(self, cert_dir: str = "/tmp/alpha-certs") -> Any:
         """Self-signed CA oluştur (geliştirme ortamı için).
 
         Not: Production'da gerçek CA sertifikaları kullanılmalıdır.
@@ -344,7 +354,7 @@ class ServiceDiscovery:
 service_mesh = ServiceDiscovery()
 
 
-def init_service_mesh():
+def init_service_mesh() -> Any:
     """Service discovery'yi başlat — tüm servisleri kaydet."""
     services = {
         "api": ("alpha-api", 8000),

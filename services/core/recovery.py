@@ -9,25 +9,31 @@ ALPHA BIST — Recovery & Resilience v1.0
 """
 
 import asyncio
+import functools
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.recovery")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -35,10 +41,11 @@ class EventReplay:
     """Event replay motoru — belirli timestamp'ten itibaren eventleri yeniden oynat."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._event_log: list[dict] = []
 
     @otel_trace("recovery.log_event")
-    def log_event(self, event_type: str, data: dict, timestamp: str = None):
+    def log_event(self, event_type: str, data: dict, timestamp: str = None) -> Any:
         """Event kaydet (replay için)."""
         self._event_log.append(
             {
@@ -78,6 +85,7 @@ class EventReplay:
 
     @otel_trace("recovery.get_log_count")
     def get_log_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self._event_log)
 
 
@@ -85,18 +93,19 @@ class GracefulShutdown:
     """Graceful shutdown yönetimi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._shutdown_handlers: list[Callable] = []
         self._is_shutting_down = False
 
     @otel_trace("recovery.register_handler")
-    def register_handler(self, handler: Callable):
+    def register_handler(self, handler: Callable) -> Any:
         """Shutdown handler kaydet."""
         self._shutdown_handlers.append(handler)
         if len(self._shutdown_handlers) > 100:
             self._shutdown_handlers = self._shutdown_handlers[-100:]
 
     @otel_trace("recovery.shutdown")
-    async def shutdown(self, reason: str = "manual"):
+    async def shutdown(self, reason: str = "manual") -> Any:
         """Graceful shutdown başlat."""
         if self._is_shutting_down:
             return
@@ -147,6 +156,7 @@ class GracefulShutdown:
 
     @property
     def is_shutting_down(self) -> bool:
+        """Otomatik eklendi."""
         return self._is_shutting_down
 
 
@@ -154,6 +164,7 @@ class StartupRecovery:
     """Startup recovery — restart sonrası state'i geri yükle."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._recovery_steps: list[dict] = []
 
     @otel_trace("recovery.recover")
@@ -233,17 +244,18 @@ class FailureInjector:
     """Test amaçlı hata enjeksiyonu."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._active_failures: dict[str, bool] = {}
 
     @otel_trace("recovery.inject")
-    def inject(self, component: str, failure_type: str = "down"):
+    def inject(self, component: str, failure_type: str = "down") -> Any:
         """Hata enjekte et."""
         key = f"{component}:{failure_type}"
         self._active_failures[key] = True
         logger.warning("Failure injected", component=component, type=failure_type)
 
     @otel_trace("recovery.clear")
-    def clear(self, component: str, failure_type: str = "down"):
+    def clear(self, component: str, failure_type: str = "down") -> Any:
         """Hatayı kaldır."""
         key = f"{component}:{failure_type}"
         self._active_failures.pop(key, None)
@@ -255,7 +267,7 @@ class FailureInjector:
         return self._active_failures.get(f"{component}:{failure_type}", False)
 
     @otel_trace("recovery.clear_all")
-    def clear_all(self):
+    def clear_all(self) -> Any:
         """Tüm hataları kaldır."""
         self._active_failures.clear()
 

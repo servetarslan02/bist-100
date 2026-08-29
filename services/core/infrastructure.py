@@ -11,6 +11,8 @@ ALPHA BIST — Event Infrastructure v1.0
 - Job Queue
 """
 
+import asyncio
+import functools
 import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,26 +20,31 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-import asyncio
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.infrastructure")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class EventPriority(StrEnum):
+    """Otomatik eklendi."""
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
     NORMAL = "NORMAL"
@@ -62,18 +69,19 @@ class EventOrchestrator:
     """Event pipeline yönetimi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._handlers: dict[str, list[Callable]] = {}
         self._priority_queue: list[dict] = []
 
     @otel_trace("event_orchestrator.register")
-    def register(self, event_type: str, handler: Callable, priority: EventPriority = EventPriority.NORMAL):
+    def register(self, event_type: str, handler: Callable, priority: EventPriority = EventPriority.NORMAL) -> Any:
         """Handler kaydet."""
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append({"handler": handler, "priority": priority})
 
     @otel_trace("event_orchestrator.dispatch")
-    async def dispatch(self, event_type: str, data: dict, priority: EventPriority = EventPriority.NORMAL):
+    async def dispatch(self, event_type: str, data: dict, priority: EventPriority = EventPriority.NORMAL) -> Any:
         """Event'i dispatch et."""
         handlers = self._handlers.get(event_type, [])
         for h in sorted(handlers, key=lambda x: list(EventPriority).index(x["priority"])):
@@ -90,10 +98,11 @@ class CatalystEngine:
     """Yaklaşan olayları izle."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._catalysts: list[CatalystEvent] = []
 
     @otel_trace("catalyst_engine.add_catalyst")
-    def add_catalyst(self, catalyst: CatalystEvent):
+    def add_catalyst(self, catalyst: CatalystEvent) -> Any:
         """Yaklaşan olay ekle."""
         self._catalysts.append(catalyst)
         if len(self._catalysts) > 500:
@@ -133,10 +142,11 @@ class NotificationSystem:
     CATEGORIES = ["OPPORTUNITY", "RISK", "NEWS", "KAP", "REGIME", "PORTFOLIO", "MODEL", "SYSTEM", "SECURITY"]
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._notifications: list[dict] = []
 
     @otel_trace("notification_system.notify")
-    def notify(self, category: str, title: str, message: str, severity: str = "INFO", data: dict = None):
+    def notify(self, category: str, title: str, message: str, severity: str = "INFO", data: dict = None) -> Any:
         """Bildirim gönder."""
         notification = {
             "id": hashlib.sha256(f"{category}:{title}:{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12],
@@ -159,7 +169,7 @@ class NotificationSystem:
         return [n for n in self._notifications if not n["read"]][-limit:]
 
     @otel_trace("notification_system.mark_read")
-    def mark_read(self, notification_id: str):
+    def mark_read(self, notification_id: str) -> Any:
         """Bildirimi okundu olarak işaretle."""
         for n in self._notifications:
             if n["id"] == notification_id:
@@ -170,6 +180,7 @@ class AlertEngine:
     """Alert motoru."""
 
     def __init__(self, notification_system: NotificationSystem):
+        """Otomatik eklendi."""
         self._notifications = notification_system
         self._thresholds = {
             "max_drawdown_pct": 15.0,
@@ -179,7 +190,7 @@ class AlertEngine:
         }
 
     @otel_trace("alert_engine.check_drawdown")
-    def check_drawdown(self, current_drawdown: float):
+    def check_drawdown(self, current_drawdown: float) -> Any:
         """Drawdown kontrolü."""
         threshold = self._thresholds["max_drawdown_pct"]
         if current_drawdown > threshold:
@@ -191,7 +202,7 @@ class AlertEngine:
             )
 
     @otel_trace("alert_engine.check_daily_loss")
-    def check_daily_loss(self, daily_loss_pct: float):
+    def check_daily_loss(self, daily_loss_pct: float) -> Any:
         """Günlük zarar kontrolü."""
         threshold = self._thresholds["daily_loss_pct"]
         if abs(daily_loss_pct) > threshold:
@@ -203,7 +214,7 @@ class AlertEngine:
             )
 
     @otel_trace("alert_engine.check_position_limit")
-    def check_position_limit(self, ticker: str, position_pct: float):
+    def check_position_limit(self, ticker: str, position_pct: float) -> Any:
         """Pozisyon limiti kontrolü."""
         threshold = self._thresholds["position_limit_pct"]
         if position_pct > threshold:
@@ -219,10 +230,11 @@ class SnapshotSystem:
     """Periyodik snapshot sistemi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._snapshots: list[dict] = []
 
     @otel_trace("snapshot_system.take_snapshot")
-    def take_snapshot(self, state: dict[str, Any]):
+    def take_snapshot(self, state: dict[str, Any]) -> Any:
         """Snapshot al."""
         snapshot = {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -249,6 +261,7 @@ class CacheSystem:
     """Cache sistemi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, dict] = {}
 
     @otel_trace("cache_system.get")
@@ -263,7 +276,7 @@ class CacheSystem:
         return None
 
     @otel_trace("cache_system.set")
-    def set(self, key: str, value: Any, ttl_seconds: int = 3600):
+    def set(self, key: str, value: Any, ttl_seconds: int = 3600) -> Any:
         """Cache'e yaz."""
         self._cache[key] = {
             "value": value,
@@ -272,7 +285,7 @@ class CacheSystem:
         }
 
     @otel_trace("cache_system.invalidate")
-    def invalidate(self, key: str):
+    def invalidate(self, key: str) -> Any:
         """Cache'i temizle."""
         self._cache.pop(key, None)
 
@@ -286,12 +299,13 @@ class JobQueue:
     """İş kuyruğu."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._queue: list[dict] = []
         self._running: list[dict] = []
         self._completed: list[dict] = []
 
     @otel_trace("job_queue.enqueue")
-    def enqueue(self, job_type: str, payload: dict, priority: str = "NORMAL"):
+    def enqueue(self, job_type: str, payload: dict, priority: str = "NORMAL") -> Any:
         """İş ekle."""
         job = {
             "job_id": hashlib.sha256(f"{job_type}:{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12],
@@ -322,7 +336,7 @@ class JobQueue:
         return None
 
     @otel_trace("job_queue.complete")
-    def complete(self, job_id: str, result: Any = None):
+    def complete(self, job_id: str, result: Any = None) -> Any:
         """İşi tamamla."""
         for i, job in enumerate(self._running):
             if job["job_id"] == job_id:

@@ -37,10 +37,26 @@ def get_bist100_universe(self) -> List[str]:
     # TODO: Gerçek BIST 100 listesi
     # Şimdilik örnek liste
     return [
-        "THYAO.IS", "GARAN.IS", "ISCTR.IS", "AKBNK.IS", "YKBNK.IS",
-        "BIMAS.IS", "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS",
-        "ASELS.IS", "SISE.IS", "TOASO.IS", "ARCLK.IS", "KRDMD.IS",
-        "PETKM.IS", "PGSUS.IS", "TAVHL.IS", "TKFEN.IS", "VAKBN.IS",
+        "THYAO.IS",
+        "GARAN.IS",
+        "ISCTR.IS",
+        "AKBNK.IS",
+        "YKBNK.IS",
+        "BIMAS.IS",
+        "KCHOL.IS",
+        "SAHOL.IS",
+        "TUPRS.IS",
+        "EREGL.IS",
+        "ASELS.IS",
+        "SISE.IS",
+        "TOASO.IS",
+        "ARCLK.IS",
+        "KRDMD.IS",
+        "PETKM.IS",
+        "PGSUS.IS",
+        "TAVHL.IS",
+        "TKFEN.IS",
+        "VAKBN.IS",
     ]
 ```
 
@@ -371,12 +387,8 @@ negative = ["düşüş", "kayıp", "zarar", "azalma", "gerileme", "iptal", "risk
 **Satır:** ~15-35  
 **Kod:**
 ```python
-TURKISH_POSITIVE = [
-    "yükseliş", "artış", "kazanç", "rekor", ...
-]
-TURKISH_NEGATIVE = [
-    "düşüş", "kayıp", "zarar", "gerileme", ...
-]
+TURKISH_POSITIVE = ["yükseliş", "artış", "kazanç", "rekor", ...]
+TURKISH_NEGATIVE = ["düşüş", "kayıp", "zarar", "gerileme", ...]
 ```
 
 **Sorun:** Kelime listeleri iyi ama `_analyze_sentiment` basit keyword counting yapıyor. N-gram veya bağlam analizi yok.  
@@ -392,14 +404,21 @@ TURKISH_NEGATIVE = [
 **Kod:**
 ```python
 positive = [
-    "artış", "yükseliş", "büyüme", "kâr", "rekor", "başarı",
-    "arttı", "yükseldi", "güçlü", "olumlu", "destek", "teşvik",
-    ...
+    "artış",
+    "yükseliş",
+    "büyüme",
+    "kâr",
+    "rekor",
+    "başarı",
+    "arttı",
+    "yükseldi",
+    "güçlü",
+    "olumlu",
+    "destek",
+    "teşvik",
+    ...,
 ]
-negative = [
-    "düşüş", "kayıp", "zarar", "azalma", "gerileme", "kriz",
-    ...
-]
+negative = ["düşüş", "kayıp", "zarar", "azalma", "gerileme", "kriz", ...]
 ```
 
 **Sorun:** LLM yoksa keyword fallback kullanılıyor. Aynı negation sorunu.  
@@ -413,14 +432,8 @@ negative = [
 **Satır:** ~120-140  
 **Kod:**
 ```python
-positive_words = [
-    "güzel", "harika", "mükemmel", "başarılı", "iyi", "yükseliş",
-    ...
-]
-negative_words = [
-    "kötü", "berbat", "başarısız", "düşüş", "kayıp", "zarar",
-    ...
-]
+positive_words = ["güzel", "harika", "mükemmel", "başarılı", "iyi", "yükseliş", ...]
+negative_words = ["kötü", "berbat", "başarısız", "düşüş", "kayıp", "zarar", ...]
 ```
 
 **Sorun:** Aynı pattern. Ekşi Sözlük'te ironi/sarkasm çok yaygın — keyword-based sentiment yanıltıcı olabilir.  
@@ -453,6 +466,7 @@ def _basic_sentiment(self, text: str) -> float:
 def _load_rss_feeds(self) -> List[str]:
     try:
         from services.core.observability import config_manager
+
         feeds = config_manager.get("news.rss_feeds")
         if feeds:
             return feeds
@@ -568,7 +582,7 @@ def _check_fundamental_freshness(self, fetch_ts, as_of_date):
 ```python
 # Event date: published_at + 30 gün (tahmini)
 try:
-    pub_dt = datetime.fromisoformat(published_at.replace('Z', '+00:00'))
+    pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
     event_dt = pub_dt + timedelta(days=30)
     event_date = event_dt.strftime("%Y-%m-%d")
 except (ValueError, TypeError):
@@ -594,10 +608,12 @@ def _sma_masked(self, data, period):
     if len(valid) < period:
         return valid[-1] if len(valid) > 0 else 0  # ← 0 döndürüyor
 
+
 def _roc_masked(self, data, period):
     valid = data[~np.isnan(data)]
     if len(valid) <= period:
         return 0  # ← 0 döndürüyor
+
 
 def _volume_zscore_masked(self, volume):
     valid = volume[~np.isnan(volume)]
@@ -618,14 +634,16 @@ def _volume_zscore_masked(self, volume):
 **Kod:**
 ```python
 # fetch_ohlcv — Capitalized columns
-df = df.rename(columns={
-    "Date": "timestamp",
-    "Open": "Open",
-    "High": "High",
-    "Low": "Low",
-    "Close": "Close",
-    "Volume": "Volume",
-})
+df = df.rename(
+    columns={
+        "Date": "timestamp",
+        "Open": "Open",
+        "High": "High",
+        "Low": "Low",
+        "Close": "Close",
+        "Volume": "Volume",
+    }
+)
 
 # fetch_batch_ohlcv — Lowercase columns
 col_map = {}
@@ -706,8 +724,12 @@ async def fetch_fundamentals(self, ticker):
 **Kod:**
 ```python
 mask = self._tm.compute_mask(
-    ticker, df['Open'].values, df['High'].values,
-    df['Low'].values, df['Close'].values, df['Volume'].values,
+    ticker,
+    df["Open"].values,
+    df["High"].values,
+    df["Low"].values,
+    df["Close"].values,
+    df["Volume"].values,
 )
 ```
 
@@ -891,6 +913,7 @@ start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
 **Kod:**
 ```python
 from email.utils import parsedate_to_datetime
+
 dt = parsedate_to_datetime(raw_date)
 return dt.strftime("%Y-%m-%d")
 ```
@@ -1004,8 +1027,7 @@ if len(seen_urls) > 10000:
 **Kod:**
 ```python
 class DataValidator:
-    def validate_price(self, ticker, prices):
-        ...
+    def validate_price(self, ticker, prices): ...
 ```
 
 **Sorun:** Sadece fiyat doğrulaması var. Volume, OHLC tutarlılığı (High >= Low, Close aralığı), timestamp doğrulaması yok.  
@@ -1033,7 +1055,7 @@ def _validate_contract(self, features, ticker):
         if value != value:  # NaN
             invalid.append(name)
             continue
-        if value == float('inf') or value == float('-inf'):
+        if value == float("inf") or value == float("-inf"):
             invalid.append(name)
             continue
         if abs(value) > 1e12:
@@ -1129,7 +1151,7 @@ self._cache_ttl_seconds = 3600  # 1 saat cache
 **Satır:** ~20  
 **Kod:**
 ```python
-cache_ttl_hours: int = 24,
+cache_ttl_hours: int = (24,)
 ```
 
 **Sorun:** 24 saat cache. Intraday trading'de bu çok uzun.  
@@ -1297,15 +1319,17 @@ COMPANY_NAME_MAP = {
 ```python
 for name, value in features.items():
     if name not in self._manifests:
-        self.register_feature(FeatureManifest(
-            feature_name=name,
-            version="v1",
-            source=source,
-            description=f"Auto-registered from {source}",
-            dtype="float",
-            range_min=-100,
-            range_max=100,
-        ))
+        self.register_feature(
+            FeatureManifest(
+                feature_name=name,
+                version="v1",
+                source=source,
+                description=f"Auto-registered from {source}",
+                dtype="float",
+                range_min=-100,
+                range_max=100,
+            )
+        )
 ```
 
 **Sorun:** Feature'lar otomatik olarak `range_min=-100, range_max=100` ile kaydediliyor. Bu aralık birçok feature için yanlış (örn: `market_cap` milyarlarca olabilir).  

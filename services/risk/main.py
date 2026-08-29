@@ -27,12 +27,12 @@ from ..core.logging import setup_logging
 logger = structlog.get_logger()
 
 
-async def _db_fetchrow(query, *args):
+async def _db_fetchrow(query, *args) -> Any:
     """Fetch single row from PostgreSQL."""
     return await pg_fetchrow(query, *args)
 
 
-async def _db_fetchval(query, *args):
+async def _db_fetchval(query, *args) -> Any:
     """Fetch single value from PostgreSQL."""
     return await pg_fetchval(query, *args)
 
@@ -41,13 +41,14 @@ class RiskEngine:
     """Independent risk management engine. Operates ABOVE the AI layer."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._consumer: EventConsumer = None
         self._risk_limits: dict[str, float] = {}
         self._risk_limits_loaded: bool = False  # P0-6: Fail-closed flag
         self._portfolio_state: dict[str, Any] = {}
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the risk engine."""
         setup_logging()
         logger.info("Starting Risk Engine")
@@ -70,7 +71,7 @@ class RiskEngine:
         logger.info("Risk Engine started")
         await self._consumer.consume_loop()
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the risk engine."""
         self._running = False
         if self._consumer:
@@ -78,7 +79,7 @@ class RiskEngine:
         await close_databases()
         logger.info("Risk Engine stopped")
 
-    async def _load_risk_limits(self):
+    async def _load_risk_limits(self) -> Any:
         """Load risk limits from database with robust auto-creation and fallback."""
         default_limits = {
             "max_position_pct": 10.0,
@@ -163,7 +164,7 @@ class RiskEngine:
             self._risk_limits = default_limits.copy()
             self._risk_limits_loaded = True
 
-    async def _on_decision(self, event: CanonicalEvent):
+    async def _on_decision(self, event: CanonicalEvent) -> Any:
         """Evaluate a trading decision against risk limits.
 
         P0-6: Risk limits yüklenemezse tüm işlemler BLOCKED.
@@ -311,7 +312,7 @@ class RiskEngine:
             )
             publish_event(alert_event, key=event.data.get("ticker", "unknown"))
 
-    async def _on_signal(self, event: CanonicalEvent):
+    async def _on_signal(self, event: CanonicalEvent) -> Any:
         """Evaluate signal risk."""
         try:
             ticker = event.data.get("ticker")
@@ -545,11 +546,12 @@ class RiskEngine:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "risk"})
 
     app = web.Application()
@@ -566,7 +568,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the risk engine."""
     await _health_server()
     engine = RiskEngine()
@@ -621,7 +623,6 @@ def assess_portfolio_risk(
             "error": str(e),
             "composite_risk_score": 50.0,
         }
-
 
 
 def assess_viop_risk(

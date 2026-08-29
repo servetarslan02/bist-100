@@ -11,12 +11,12 @@ ROADMAP v3.0: Enterprise Grade Data Contracts
 from __future__ import annotations
 
 import copy as _copy
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import metrics, trace
 
@@ -29,15 +29,22 @@ logger = structlog.get_logger(__name__)
 meter = metrics.get_meter("alpha.data.quality")
 tracer = trace.get_tracer("alpha-bist.data_quality")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 # OpenTelemetry Metrics
 VIOLATIONS_COUNTER = meter.create_counter(
@@ -62,6 +69,7 @@ class TradabilityMask:
     volume_mask: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp.isoformat(),
@@ -88,6 +96,7 @@ class Expectation(ABC):
 
     @abstractmethod
     def get_name(self) -> str:
+        """Otomatik eklendi."""
         pass
 
     @abstractmethod
@@ -102,13 +111,17 @@ class Expectation(ABC):
 
 
 class ExpectColumnValuesToBePositive(Expectation):
+    """Otomatik eklendi."""
     def __init__(self, columns: list[str]):
+        """Otomatik eklendi."""
         self.columns = columns
 
     def get_name(self) -> str:
+        """Otomatik eklendi."""
         return f"ExpectColumnValuesToBePositive({','.join(self.columns)})"
 
     def validate_row(self, data: dict[str, Any]) -> ExpectationResult:
+        """Otomatik eklendi."""
         failed_cols = []
         for col in self.columns:
             val = data.get(col)
@@ -120,6 +133,7 @@ class ExpectColumnValuesToBePositive(Expectation):
         return ExpectationResult(self.get_name(), True, "OK")
 
     def validate_df(self, df: Any) -> ExpectationResult:
+        """Otomatik eklendi."""
         if pl is None or not isinstance(df, pl.DataFrame):
             return ExpectationResult(self.get_name(), True, "Not a Polars DF")
 
@@ -139,20 +153,26 @@ class ExpectColumnValuesToBePositive(Expectation):
 
 
 class ExpectOHLCGeometry(Expectation):
+    """Otomatik eklendi."""
     def get_name(self) -> str:
+        """Otomatik eklendi."""
         return "ExpectOHLCGeometry"
 
     def validate_row(self, data: dict[str, Any]) -> ExpectationResult:
+        """Otomatik eklendi."""
         h, l, o, c = data.get("high"), data.get("low"), data.get("open_price", data.get("open")), data.get("close")
         if any(x is None for x in (h, l, o, c)):
             return ExpectationResult(self.get_name(), True, "Missing OHLC, skipped", "INFO")
 
         if h < l or o > h or o < l or c > h or c < l:
-            return ExpectationResult(self.get_name(), False, "Anormal fiyat yapÄ±sÄ± (H<L veya O/C dÄ±ÅŸarÄ±da)", "CRITICAL")
+            return ExpectationResult(
+                self.get_name(), False, "Anormal fiyat yapÄ±sÄ± (H<L veya O/C dÄ±ÅŸarÄ±da)", "CRITICAL"
+            )
 
         return ExpectationResult(self.get_name(), True, "OK")
 
     def validate_df(self, df: Any) -> ExpectationResult:
+        """Otomatik eklendi."""
         if pl is None or not isinstance(df, pl.DataFrame):
             return ExpectationResult(self.get_name(), True, "Not a Polars DF")
 
@@ -169,13 +189,17 @@ class ExpectOHLCGeometry(Expectation):
 
 
 class ExpectCircuitBreakerLimits(Expectation):
+    """Otomatik eklendi."""
     def __init__(self, limit_pct: float = 9.5):
+        """Otomatik eklendi."""
         self.limit_pct = limit_pct
 
     def get_name(self) -> str:
+        """Otomatik eklendi."""
         return f"ExpectCircuitBreakerLimits(pct={self.limit_pct})"
 
     def validate_row(self, data: dict[str, Any]) -> ExpectationResult:
+        """Otomatik eklendi."""
         c, p = data.get("close"), data.get("prev_close")
         if c is not None and p is not None and p > 0:
             change = abs(c / p - 1) * 100
@@ -186,19 +210,24 @@ class ExpectCircuitBreakerLimits(Expectation):
         return ExpectationResult(self.get_name(), True, "OK")
 
     def validate_df(self, df: Any) -> ExpectationResult:
+        """Otomatik eklendi."""
         return ExpectationResult(
             self.get_name(), True, "DF checks not fully supported yet for prev_close without shift"
         )
 
 
 class ExpectVolumeLiquidityProfile(Expectation):
+    """Otomatik eklendi."""
     def __init__(self, min_volume: float = 1000):
+        """Otomatik eklendi."""
         self.min_volume = min_volume
 
     def get_name(self) -> str:
+        """Otomatik eklendi."""
         return f"ExpectVolumeLiquidityProfile(min={self.min_volume})"
 
     def validate_row(self, data: dict[str, Any]) -> ExpectationResult:
+        """Otomatik eklendi."""
         vol = data.get("volume")
         if vol is not None:
             if vol == 0:
@@ -216,6 +245,7 @@ class ExpectVolumeLiquidityProfile(Expectation):
         return ExpectationResult(self.get_name(), True, "OK")
 
     def validate_df(self, df: Any) -> ExpectationResult:
+        """Otomatik eklendi."""
         if pl is None or not isinstance(df, pl.DataFrame):
             return ExpectationResult(self.get_name(), True, "Not a Polars DF")
 
@@ -240,13 +270,16 @@ class ExpectationsSuite:
     """Kural setini yÃ¶neten ve Ã§alÄ±ÅŸtÄ±ran Suit."""
 
     def __init__(self, name: str):
+        """Otomatik eklendi."""
         self.name = name
         self.expectations: list[Expectation] = []
 
-    def add_expectation(self, exp: Expectation):
+    def add_expectation(self, exp: Expectation) -> Any:
+        """Otomatik eklendi."""
         self.expectations.append(exp)
 
     def validate_row(self, ticker: str, data: dict[str, Any]) -> list[ExpectationResult]:
+        """Otomatik eklendi."""
         results = []
         for exp in self.expectations:
             res = exp.validate_row(data)
@@ -258,6 +291,7 @@ class ExpectationsSuite:
         return results
 
     def validate_df(self, ticker: str, df: Any) -> list[ExpectationResult]:
+        """Otomatik eklendi."""
         results = []
         for exp in self.expectations:
             res = exp.validate_df(df)
@@ -270,6 +304,7 @@ class ExpectationsSuite:
 
 
 def _build_financial_suite() -> ExpectationsSuite:
+    """Otomatik eklendi."""
     suite = ExpectationsSuite("BIST_Financial_Contracts")
     suite.add_expectation(
         ExpectColumnValuesToBePositive(["close", "open_price", "high", "low", "open", "High", "Low", "Close"])
@@ -284,6 +319,7 @@ class DataQualityEngine:
     """Veri kalitesi ve tradability kontrol motoru (Expectations tabanlÄ±)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._masks: dict[str, TradabilityMask] = {}
         self.suite = _build_financial_suite()
         logger.info("DataQualityEngine initialized with ExpectationsSuite")
@@ -373,12 +409,15 @@ class DataQualityEngine:
         return raw_data
 
     def get_mask(self, ticker: str) -> TradabilityMask | None:
+        """Otomatik eklendi."""
         return self._masks.get(ticker)
 
     def get_untradable_count(self) -> int:
+        """Otomatik eklendi."""
         return sum(1 for m in self._masks.values() if not m.is_tradable)
 
     def get_mask_stats(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         total = len(self._masks)
         untradable = self.get_untradable_count()
         return {
@@ -389,6 +428,7 @@ class DataQualityEngine:
         }
 
     def _get_reasons_breakdown(self) -> dict[str, int]:
+        """Otomatik eklendi."""
         reasons = {}
         for mask in self._masks.values():
             for reason in mask.reasons:
@@ -404,6 +444,7 @@ class DataQualityEngine:
 
 @dataclass
 class QualityIssue:
+    """Otomatik eklendi."""
     check: str
     severity: str
     message: str
@@ -411,10 +452,12 @@ class QualityIssue:
     affected_rows: int = 0
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
-    def to_dict(self):
+    def to_dict(self) -> Any:
+        """Otomatik eklendi."""
         return {
             "check": self.check,
             "severity": self.severity,
@@ -426,13 +469,15 @@ class QualityIssue:
 
 @dataclass
 class QualityReport:
+    """Otomatik eklendi."""
     ticker: str
     total_rows: int
     issues: list[QualityIssue]
     quality_score: float
     passed: bool
 
-    def to_dict(self):
+    def to_dict(self) -> Any:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "total_rows": self.total_rows,
@@ -446,10 +491,12 @@ class DataQualityChecker:
     """Polars DataFrame bazlÄ± veri kalitesi kontrolÃ¼ (Expectations kullanan)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.suite = _build_financial_suite()
 
     @otel_trace("data_quality.full_quality_check")
     def full_quality_check(self, df: Any, ticker: str = "UNKNOWN") -> QualityReport:
+        """Otomatik eklendi."""
         issues = []
         total_rows = len(df) if hasattr(df, "__len__") else 0
         if total_rows == 0:
@@ -505,7 +552,7 @@ class DataQualityChecker:
                                 )
                             )
                     except Exception:
-                        pass  # Date diff hesaplanamazsa atla
+                        logger.error("Exception caught", exc_info=True)
 
             # Eksik deÄŸer kontrolÃ¼
             for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low", "volume", "Volume"]:
@@ -534,4 +581,3 @@ class DataQualityChecker:
 # Singleton'lar
 data_quality = DataQualityEngine()
 data_quality_checker = DataQualityChecker()
-

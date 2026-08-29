@@ -38,10 +38,12 @@ class ScenarioResult:
 
     @property
     def is_profitable(self) -> bool:
+        """Otomatik eklendi."""
         return self.total_return_pct > 0.0
 
     @property
     def beats_benchmark(self) -> bool:
+        """Otomatik eklendi."""
         return self.total_return_pct > self.benchmark_return_pct
 
 

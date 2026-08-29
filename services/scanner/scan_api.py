@@ -30,6 +30,7 @@ class ScanAPI:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Singleton referansları
         from .alpha_engine import alpha_engine
         from .custom_filters import custom_filter_engine

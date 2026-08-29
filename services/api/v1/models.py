@@ -1,3 +1,4 @@
+from typing import Any
 """Models API - 30-Yıllık BIST Makine Öğrenimi Ensemble Kayıt Defteri."""
 
 import os
@@ -85,7 +86,7 @@ PROD_MODELS = [
 @router.get("/status")
 @router.get("/list")
 @router.get("/registry")
-async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Model kayıt defteri — gerçek model registry'den okur, eksikse üretim modellerini döner."""
     try:
         from ...ml.model_registry import ModelRegistry
@@ -97,22 +98,24 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
             formatted = []
             for m in raw_models:
                 metrics = m.get("metrics", {})
-                formatted.append({
-                    "id": m.get("model_id", "model"),
-                    "name": m.get("description") or f"{m.get('model_id')} ({m.get('version', 'v1')})",
-                    "type": m.get("model_type", "Machine Learning"),
-                    "role": "Alpha & Tahmin Modeli",
-                    "version": m.get("version", "v1.0.0"),
-                    "status": m.get("status", "CHALLENGER"),
-                    "metrics": {
-                        "ic": float(metrics.get("ic", metrics.get("accuracy", 0.045))),
-                        "r2": float(metrics.get("r2", 0.12)),
-                        "sharpe": float(metrics.get("sharpe", 1.85)),
-                        "latency_ms": int(metrics.get("latency_ms", 15)),
-                    },
-                    "features_count": len(m.get("features", [])) or 36,
-                    "last_trained": m.get("created_at") or "2026-08-28T18:00:00Z",
-                })
+                formatted.append(
+                    {
+                        "id": m.get("model_id", "model"),
+                        "name": m.get("description") or f"{m.get('model_id')} ({m.get('version', 'v1')})",
+                        "type": m.get("model_type", "Machine Learning"),
+                        "role": "Alpha & Tahmin Modeli",
+                        "version": m.get("version", "v1.0.0"),
+                        "status": m.get("status", "CHALLENGER"),
+                        "metrics": {
+                            "ic": float(metrics.get("ic", metrics.get("accuracy", 0.045))),
+                            "r2": float(metrics.get("r2", 0.12)),
+                            "sharpe": float(metrics.get("sharpe", 1.85)),
+                            "latency_ms": int(metrics.get("latency_ms", 15)),
+                        },
+                        "features_count": len(m.get("features", [])) or 36,
+                        "last_trained": m.get("created_at") or "2026-08-28T18:00:00Z",
+                    }
+                )
             return {
                 "models": formatted,
                 "count": len(formatted),
@@ -133,7 +136,8 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 
 @router.get("/performance")
-async def model_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def model_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
+    """Otomatik eklendi."""
     return {
         "performance": {
             "bist30y_ensemble_v1": {"ic": 0.045, "r2": 0.128, "sharpe": 1.01, "cagr": 15.72, "max_dd": -22.83},
@@ -144,7 +148,7 @@ async def model_performance(user=Depends(get_current_user), _=Depends(check_rate
 
 
 @router.get("/champion")
-async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Aktif şampiyon modeli döner."""
     return {
         "champion_id": "LambdaRank_v3_LOCKED",
@@ -160,7 +164,8 @@ async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rat
 
 
 @router.post("/retrain")
-async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
+    """Otomatik eklendi."""
     return {
         "status": "started",
         "model": model_name,

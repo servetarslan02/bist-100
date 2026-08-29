@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Server-Sent Events (SSE) Router v2.0
 
@@ -142,7 +143,7 @@ async def sse_ticks(
     request: Request,
     tickers: str = Query("", description="Comma-separated ticker list"),
     interval: float = Query(1.0, ge=0.1, le=10.0, description="Update interval in seconds"),
-):
+) -> Any:
     """SSE: Anlık fiyat akışı.
 
     Kullanım:
@@ -171,7 +172,7 @@ async def sse_ticks(
 async def sse_signals(
     request: Request,
     interval: float = Query(2.0, ge=0.5, le=30.0),
-):
+) -> Any:
     """SSE: Sinyal akışı.
 
     Kullanım:
@@ -192,7 +193,7 @@ async def sse_signals(
 async def sse_portfolio(
     request: Request,
     interval: float = Query(5.0, ge=1.0, le=60.0),
-):
+) -> Any:
     """SSE: Portföy durumu akışı.
 
     Kullanım:
@@ -213,7 +214,7 @@ async def sse_portfolio(
 async def sse_alerts(
     request: Request,
     interval: float = Query(3.0, ge=1.0, le=30.0),
-):
+) -> Any:
     """SSE: Alarm akışı.
 
     Kullanım:
@@ -234,7 +235,7 @@ async def sse_alerts(
 async def sse_regime(
     request: Request,
     interval: float = Query(10.0, ge=5.0, le=60.0),
-):
+) -> Any:
     """SSE: Piyasa rejimi akışı.
 
     Kullanım:
@@ -255,7 +256,7 @@ async def sse_regime(
 async def sse_radar(
     request: Request,
     interval: float = Query(5.0, ge=1.0, le=30.0),
-):
+) -> Any:
     """SSE: Radar akışı.
 
     Kullanım:

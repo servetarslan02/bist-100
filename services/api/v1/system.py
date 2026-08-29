@@ -60,7 +60,7 @@ def _get_system_resources() -> dict[str, Any]:
 
 @router.get("/status")
 @router.get("/health")
-async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Sistem durumu — mikroservis saglik ve canlilik kontrolu."""
     services = {}
 
@@ -144,7 +144,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
 
 @router.get("/databases")
-async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Veri Merkezi — ClickHouse, PostgreSQL, Redis ve NATS GERÇEK disk ve bellek istatistikleri."""
     # 1. ClickHouse Gerçek Boyut
     ch_lat = 1.4
@@ -308,7 +308,7 @@ _ALERTS_CACHE_TIME = 0.0
 
 
 @router.get("/db-performance")
-async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Veritabanı Performans Metrikleri — Cache hit ratio, bağlantı istatistikleri, yavaş sorgular."""
     result = {
         "cache_hit_ratio": None,
@@ -375,7 +375,7 @@ _ALERTS_CACHE_TIME = 0.0
 
 
 @router.get("/alerts")
-async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları (Hızlı Önbellekli)."""
     global _ALERTS_CACHE, _ALERTS_CACHE_TIME
     now_ts = time.time()
@@ -468,7 +468,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
 
 
 @router.post("/optimize_storage")
-async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Dağıtık depolama ve veritabanı optimizasyonu (ClickHouse Part Merge & Redis Flush & Vacuum)."""
     try:
         reclaimed = "3.4 MB"

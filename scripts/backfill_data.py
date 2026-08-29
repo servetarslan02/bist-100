@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Any
 """ALPHA BIST — Historical Data Backfill
 
 DB'ye historical market data yükler.
@@ -22,7 +23,7 @@ import structlog
 logger = structlog.get_logger()
 
 
-async def backfill_ticker(ticker: str, start_date: str, end_date: str):
+async def backfill_ticker(ticker: str, start_date: str, end_date: str) -> Any:
     """Tek ticker için historical data yükle."""
     try:
         import yfinance as yf
@@ -60,7 +61,8 @@ async def backfill_ticker(ticker: str, start_date: str, end_date: str):
         return 0
 
 
-async def main():
+async def main() -> Any:
+    """Otomatik eklendi."""
     parser = argparse.ArgumentParser(description="Historical data backfill")
     parser.add_argument("--tickers", help="Comma-separated ticker list")
     parser.add_argument("--all-bist100", action="store_true", help="All BIST-100 tickers")
@@ -79,7 +81,7 @@ async def main():
     elif args.tickers:
         tickers = args.tickers.split(",")
     else:
-        print("Specify --tickers or --all-bist100")
+        logger.info("Specify --tickers or --all-bist100")
         return
 
     total = 0
@@ -87,7 +89,7 @@ async def main():
         count = await backfill_ticker(ticker, args.start, args.end)
         total += count
 
-    print(f"\nBackfill complete: {total} rows for {len(tickers)} tickers")
+    logger.info(f"\nBackfill complete: {total} rows for {len(tickers)} tickers")
 
 
 if __name__ == "__main__":

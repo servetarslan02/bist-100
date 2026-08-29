@@ -12,6 +12,7 @@ class MacroFeatureEngine:
     """Computes macro-economic features for market analysis."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, float] = {}
 
     def compute_features(

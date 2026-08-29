@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Drawdown Response System v1.0
 
@@ -19,6 +20,7 @@ logger = structlog.get_logger()
 
 
 class DrawdownAction(StrEnum):
+    """Otomatik eklendi."""
     NONE = "NONE"
     REDUCE_SIZE = "REDUCE_SIZE"  # Pozisyon boyutunu azalt
     STOP_NEW = "STOP_NEW"  # Yeni pozisyon durdur
@@ -27,6 +29,7 @@ class DrawdownAction(StrEnum):
 
 
 class DrawdownSeverity(StrEnum):
+    """Otomatik eklendi."""
     NORMAL = "NORMAL"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
@@ -110,6 +113,7 @@ class DrawdownResponseSystem:
     ]
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._peak_equity: float = 0.0
         self._current_equity: float = 0.0
         self._current_action: DrawdownAction = DrawdownAction.NONE
@@ -300,7 +304,7 @@ class DrawdownResponseSystem:
         """Son drawdown olaylarını al."""
         return self._events[-limit:]
 
-    def reset(self, *, force: bool = False, reason: str = ""):
+    def reset(self, *, force: bool = False, reason: str = "") -> Any:
         """Drawdown sistemini sıfırla.
 
         Args:

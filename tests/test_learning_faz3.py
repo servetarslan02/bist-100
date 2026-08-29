@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 3 Test Suite (Retrain Engine)
 
@@ -25,10 +28,12 @@ class MockModel:
     """Test için basit model — güçlü sinyal."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._coef = None
         self._bias = 0.0
 
-    def fit(self, X, y):
+    def fit(self, X, y) -> Any:
+        """Otomatik eklendi."""
         if len(X) > 0 and len(y) > 0:
             # Ridge regresyon (daha stabil)
             try:
@@ -38,17 +43,19 @@ class MockModel:
             except Exception:
                 self._coef = np.zeros(X.shape[1])
 
-    def predict(self, X):
+    def predict(self, X) -> Any:
+        """Otomatik eklendi."""
         if self._coef is not None:
             return X @ self._coef + self._bias
         return np.zeros(len(X))
 
 
-def mock_model_fn():
+def mock_model_fn() -> Any:
+    """Otomatik eklendi."""
     return MockModel()
 
 
-def generate_test_data(n_samples=800, n_features=5, seed=42):
+def generate_test_data(n_samples=800, n_features=5, seed=42) -> Any:
     """Test verisi oluştur — deterministik, mükemmel korelasyon."""
     np.random.seed(seed)
     X = np.random.randn(n_samples, n_features)
@@ -63,7 +70,7 @@ def generate_test_data(n_samples=800, n_features=5, seed=42):
 # ===================== VERSION ID =====================
 
 
-def test_version_id_unique():
+def test_version_id_unique() -> Any:
     """Her version ID benzersiz olmalı."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -74,10 +81,10 @@ def test_version_id_unique():
         assert vid.startswith("retrain_")
         assert vid not in ids, f"Duplicate version ID: {vid}"
         ids.add(vid)
-    print(f"✅ Version ID uniqueness: {len(ids)} unique IDs")
+    logger.info(f"✅ Version ID uniqueness: {len(ids)} unique IDs")
 
 
-def test_version_id_format():
+def test_version_id_format() -> Any:
     """Version ID format doğru mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -88,13 +95,13 @@ def test_version_id_format():
     assert parts[0] == "retrain"
     assert len(parts[1]) == 8  # YYYYMMDD
     assert len(parts[2]) == 6  # HHMMSS
-    print(f"✅ Version ID format: {vid}")
+    logger.info(f"✅ Version ID format: {vid}")
 
 
 # ===================== WALK-FORWARD SPLITS =====================
 
 
-def test_wf_splits_generation():
+def test_wf_splits_generation() -> Any:
     """Walk-forward split'ler doğru oluşuyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -113,10 +120,10 @@ def test_wf_splits_generation():
         assert s["train_end"] > s["train_start"]
         assert s["test_start"] >= s["train_end"]
         assert s["test_end"] > s["test_start"]
-    print(f"✅ WF splits: {len(splits)} splits from 600 days")
+    logger.info(f"✅ WF splits: {len(splits)} splits from 600 days")
 
 
-def test_wf_splits_insufficient_data():
+def test_wf_splits_insufficient_data() -> Any:
     """Yetersiz veri ile split oluşmamalı."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -130,10 +137,10 @@ def test_wf_splits_insufficient_data():
     splits = engine._generate_wf_splits(dates, cfg)
 
     assert len(splits) == 0, f"Split oluşmamalıydı ama {len(splits)} oluştu"
-    print("✅ WF splits insufficient data → 0 splits")
+    logger.info("✅ WF splits insufficient data → 0 splits")
 
 
-def test_wf_splits_purge_embargo():
+def test_wf_splits_purge_embargo() -> Any:
     """Purge ve embargo doğru uygulanıyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -149,10 +156,10 @@ def test_wf_splits_purge_embargo():
         # Purge gap: train_end ile test_start arasında boşluk olmalı
         purge_gap = s["test_start"] - s["train_end"]
         assert purge_gap >= 0, f"Purge gap negatif: {purge_gap}"
-    print(f"✅ WF purge/embargo: gap={splits[0]['test_start'] - splits[0]['train_end']}")
+    logger.info(f"✅ WF purge/embargo: gap={splits[0]['test_start'] - splits[0]['train_end']}")
 
 
-def test_wf_splits_step_size():
+def test_wf_splits_step_size() -> Any:
     """Step size doğru uygulanıyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -167,13 +174,13 @@ def test_wf_splits_step_size():
     if len(splits) >= 2:
         step = splits[1]["test_start"] - splits[0]["test_start"]
         assert step == cfg.wf_step_size, f"Step size yanlış: {step} != {cfg.wf_step_size}"
-    print(f"✅ WF step size: {cfg.wf_step_size}")
+    logger.info(f"✅ WF step size: {cfg.wf_step_size}")
 
 
 # ===================== FEATURE PREPARATION =====================
 
 
-def test_prepare_features_dict():
+def test_prepare_features_dict() -> Any:
     """Dict of arrays → matrix dönüşümü doğru mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -187,10 +194,10 @@ def test_prepare_features_dict():
     assert X.shape == (5, 2)
     assert X[0, 0] == 1.0
     assert X[0, 1] == 10.0
-    print(f"✅ Prepare features dict: shape={X.shape}")
+    logger.info(f"✅ Prepare features dict: shape={X.shape}")
 
 
-def test_prepare_features_unequal_lengths():
+def test_prepare_features_unequal_lengths() -> Any:
     """Farklı uzunluktaki feature'lar eşitlenmeli."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -203,27 +210,28 @@ def test_prepare_features_unequal_lengths():
     X = engine._prepare_features(features, None)
     assert X.shape[0] == 3  # Kısa olan kadar
     assert X.shape[1] == 2
-    print(f"✅ Prepare features unequal: shape={X.shape}")
+    logger.info(f"✅ Prepare features unequal: shape={X.shape}")
 
 
-def test_prepare_features_custom_fn():
+def test_prepare_features_custom_fn() -> Any:
     """Custom feature fonksiyonu çalışıyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
     engine = RetrainEngine()
     features = {"a": np.array([1.0, 2.0, 3.0])}
 
-    def custom_fn(fm):
+    def custom_fn(fm) -> Any:
+        """Otomatik eklendi."""
         return np.column_stack([fm["a"], fm["a"] ** 2])
 
     X = engine._prepare_features(features, custom_fn)
     assert X.shape == (3, 2)
     assert X[0, 1] == 1.0  # 1^2
     assert X[1, 1] == 4.0  # 2^2
-    print(f"✅ Prepare features custom fn: shape={X.shape}")
+    logger.info(f"✅ Prepare features custom fn: shape={X.shape}")
 
 
-def test_prepare_features_empty():
+def test_prepare_features_empty() -> Any:
     """Boş feature map hata vermeli."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -232,13 +240,13 @@ def test_prepare_features_empty():
         engine._prepare_features({}, None)
         raise AssertionError("Hata vermeliydi")
     except ValueError:
-        print("✅ Prepare features empty → ValueError")
+        logger.info("✅ Prepare features empty → ValueError")
 
 
 # ===================== WF METRIC EVALUATION =====================
 
 
-def test_evaluate_wf_metrics_pass():
+def test_evaluate_wf_metrics_pass() -> Any:
     """İyi metriklerle retrain kabul edilmeli."""
     from services.learning.config.learning_config import learning_settings
     from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
@@ -261,10 +269,10 @@ def test_evaluate_wf_metrics_pass():
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
     assert accepted is True
     assert reason == "Validation passed"
-    print(f"✅ WF metrics pass: {reason}")
+    logger.info(f"✅ WF metrics pass: {reason}")
 
 
-def test_evaluate_wf_metrics_low_correlation():
+def test_evaluate_wf_metrics_low_correlation() -> Any:
     """Düşük korelasyonla retrain reddedilmeli."""
     from services.learning.config.learning_config import learning_settings
     from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
@@ -287,10 +295,10 @@ def test_evaluate_wf_metrics_low_correlation():
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
     assert accepted is False
     assert "Correlation" in reason
-    print(f"✅ WF metrics low correlation → rejected: {reason}")
+    logger.info(f"✅ WF metrics low correlation → rejected: {reason}")
 
 
-def test_evaluate_wf_metrics_low_accuracy():
+def test_evaluate_wf_metrics_low_accuracy() -> Any:
     """Düşük doğrulukla retrain reddedilmeli."""
     from services.learning.config.learning_config import learning_settings
     from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
@@ -313,10 +321,10 @@ def test_evaluate_wf_metrics_low_accuracy():
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
     assert accepted is False
     assert "accuracy" in reason.lower()
-    print(f"✅ WF metrics low accuracy → rejected: {reason}")
+    logger.info(f"✅ WF metrics low accuracy → rejected: {reason}")
 
 
-def test_evaluate_wf_metrics_low_pass_rate():
+def test_evaluate_wf_metrics_low_pass_rate() -> Any:
     """Düşük pass rate ile retrain reddedilmeli."""
     from services.learning.config.learning_config import learning_settings
     from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
@@ -339,13 +347,13 @@ def test_evaluate_wf_metrics_low_pass_rate():
     accepted, reason = engine._evaluate_wf_metrics(metrics, cfg)
     assert accepted is False
     assert "Pass rate" in reason
-    print(f"✅ WF metrics low pass rate → rejected: {reason}")
+    logger.info(f"✅ WF metrics low pass rate → rejected: {reason}")
 
 
 # ===================== FULL RETRAIN =====================
 
 
-def test_full_retrain_success():
+def test_full_retrain_success() -> Any:
     """Tam retrain başarılı olmalı."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -365,14 +373,14 @@ def test_full_retrain_success():
     assert result.wf_metrics is not None
     assert result.training_samples > 0
     assert result.version_id.startswith("retrain_")
-    print(
+    logger.info(
         f"✅ Full retrain success: version={result.version_id}, "
         f"samples={result.training_samples}, "
         f"wf_corr={result.wf_metrics.avg_correlation}"
     )
 
 
-def test_full_retrain_insufficient_data():
+def test_full_retrain_insufficient_data() -> Any:
     """Yetersiz veri ile retrain başarısız olmalı."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -388,10 +396,10 @@ def test_full_retrain_insufficient_data():
 
     assert result.success is False
     assert "failed" in result.reason.lower() or "insufficient" in result.reason.lower()
-    print(f"✅ Full retrain insufficient → failed: {result.reason}")
+    logger.info(f"✅ Full retrain insufficient → failed: {result.reason}")
 
 
-def test_full_retrain_with_nan():
+def test_full_retrain_with_nan() -> Any:
     """NaN veri ile retrain başa çıkmalı."""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -411,10 +419,10 @@ def test_full_retrain_with_nan():
 
     # NaN temizlenip devam etmeli
     assert result.success is True or "Insufficient" in result.reason
-    print(f"✅ Full retrain with NaN: success={result.success}")
+    logger.info(f"✅ Full retrain with NaN: success={result.success}")
 
 
-def test_full_retrain_history():
+def test_full_retrain_history() -> Any:
     """Retrain history doğru tutuluyor mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -428,23 +436,23 @@ def test_full_retrain_history():
 
     assert len(engine._retrain_history) >= 1
     assert engine._retrain_count >= 1
-    print(f"✅ Retrain history: {len(engine._retrain_history)} records, {engine._retrain_count} retrains")
+    logger.info(f"✅ Retrain history: {len(engine._retrain_history)} records, {engine._retrain_count} retrains")
 
 
 # ===================== REPORT =====================
 
 
-def test_retrain_report_empty():
+def test_retrain_report_empty() -> Any:
     """Boş rapor doğru mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
     engine = RetrainEngine()
     report = engine.get_retrain_report()
     assert report["status"] == "No retrain data"
-    print("✅ Retrain report empty")
+    logger.info("✅ Retrain report empty")
 
 
-def test_retrain_report_after_retrain():
+def test_retrain_report_after_retrain() -> Any:
     """Retrain sonrası rapor doğru mu?"""
     from services.learning.retrain_engine import RetrainEngine
 
@@ -457,13 +465,13 @@ def test_retrain_report_after_retrain():
     assert "last_retrain" in report
     assert "wf_metrics" in report
     assert report["total_retrains"] >= 1
-    print(f"✅ Retrain report: {report['total_retrains']} retrains")
+    logger.info(f"✅ Retrain report: {report['total_retrains']} retrains")
 
 
 # ===================== CONFIG INTEGRATION =====================
 
 
-def test_config_wf_params():
+def test_config_wf_params() -> Any:
     """Walk-forward parametreleri config'den okunuyor mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -475,10 +483,10 @@ def test_config_wf_params():
     assert cfg.wf_step_size == 21
     assert cfg.wf_min_correlation == 0.05
     assert cfg.wf_min_direction_accuracy == 52.0
-    print(f"✅ Config WF params: train={cfg.wf_train_size}, test={cfg.wf_test_size}")
+    logger.info(f"✅ Config WF params: train={cfg.wf_train_size}, test={cfg.wf_test_size}")
 
 
-def test_config_retrain_thresholds():
+def test_config_retrain_thresholds() -> Any:
     """Retrain eşikleri config'den okunuyor mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -486,13 +494,14 @@ def test_config_retrain_thresholds():
     assert cfg.sharpe_threshold == 0.3
     assert cfg.winrate_threshold == 0.45
     assert cfg.min_samples == 500
-    print(f"✅ Config retrain thresholds: sharpe={cfg.sharpe_threshold}, wr={cfg.winrate_threshold}")
+    logger.info(f"✅ Config retrain thresholds: sharpe={cfg.sharpe_threshold}, wr={cfg.winrate_threshold}")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_version_id_unique,
         test_version_id_format,
@@ -529,19 +538,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 3 TEST SONUÇLARI (Retrain Engine)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 3 TEST SONUÇLARI (Retrain Engine)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

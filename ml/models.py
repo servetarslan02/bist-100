@@ -169,13 +169,14 @@ class AlphaModel:
     """Base model wrapper for ALPHA BIST ML models."""
 
     def __init__(self, config: ModelConfig):
+        """Otomatik eklendi."""
         self.config = config
         self.model = None
         self.is_trained = False
         self.feature_importance: dict[str, float] = {}
         self.metrics: dict[str, float] = {}
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
         """Train the model."""
         raise NotImplementedError
 
@@ -206,7 +207,7 @@ class AlphaModel:
 
         return {}
 
-    def save(self, path: str):
+    def save(self, path: str) -> Any:
         """Save model to disk."""
         model_path = Path(path)
         model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -237,7 +238,7 @@ class AlphaModel:
 
         logger.info("Model saved", path=path, name=self.config.name)
 
-    def load(self, path: str):
+    def load(self, path: str) -> Any:
         """Load model from disk."""
         # Hash doğrulama
         hash_path = path + ".sha256"
@@ -255,7 +256,7 @@ class AlphaModel:
         except SecurityError:
             raise
         except Exception:
-            pass  # Hash dosyası yoksa doğrulama atlanır
+            logger.error("Exception caught", exc_info=True)
 
         with open(path, "rb") as f:
             data = pickle.load(f)
@@ -273,9 +274,10 @@ class LightGBMModel(AlphaModel):
     """LightGBM model wrapper."""
 
     def __init__(self, config: ModelConfig):
+        """Otomatik eklendi."""
         super().__init__(config)
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
         """Train LightGBM model."""
         import lightgbm as lgb
 
@@ -310,9 +312,10 @@ class XGBoostModel(AlphaModel):
     """XGBoost model wrapper."""
 
     def __init__(self, config: ModelConfig):
+        """Otomatik eklendi."""
         super().__init__(config)
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None) -> Any:
         """Train XGBoost model."""
         import xgboost as xgb
 
@@ -344,9 +347,10 @@ class ModelEnsemble:
     """Ensemble of multiple models for consensus predictions."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.models: dict[str, AlphaModel] = {}
 
-    def add_model(self, model: AlphaModel):
+    def add_model(self, model: AlphaModel) -> Any:
         """Add a model to the ensemble."""
         self.models[model.config.name] = model
         logger.info("Model added to ensemble", name=model.config.name)

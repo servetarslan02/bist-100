@@ -46,6 +46,7 @@ class ComponentStates:
     macro_score: float = 0.5
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "momentum_state": self.momentum_state,

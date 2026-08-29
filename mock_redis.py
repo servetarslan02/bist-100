@@ -1,8 +1,11 @@
+import structlog
+logger = structlog.get_logger(__name__)
 import json
-import redis
 from datetime import datetime
 
-r = redis.Redis(host='redis', port=6379, db=0, password='alpha_secure_pass_123')
+import redis
+
+r = redis.Redis(host="redis", port=6379, db=0, password="alpha_secure_pass_123")
 
 base_stocks = [
     {"ticker": "THYAO", "score": 92.5},
@@ -19,18 +22,20 @@ base_stocks = [
     {"ticker": "EREGL", "score": 65.2},
     {"ticker": "ISCTR", "score": 63.8},
     {"ticker": "PGSUS", "score": 60.1},
-    {"ticker": "TOASO", "score": 58.7}
+    {"ticker": "TOASO", "score": 58.7},
 ]
 
 preds = []
 for idx, s in enumerate(base_stocks):
-    preds.append({
-        "ticker": s["ticker"],
-        "score": s["score"] / 100.0,
-        "direction": "BUY" if s["score"] > 60 else "SELL",
-        "expected_return": (s["score"] - 50) / 100.0
-    })
+    preds.append(
+        {
+            "ticker": s["ticker"],
+            "score": s["score"] / 100.0,
+            "direction": "BUY" if s["score"] > 60 else "SELL",
+            "expected_return": (s["score"] - 50) / 100.0,
+        }
+    )
 
 r.set("phase18:predictions", json.dumps(preds))
 r.set("phase18:last_trained", datetime.now().isoformat())
-print("Redis phase18:predictions mock basariyla yazildi!")
+logger.info("Redis phase18:predictions mock basariyla yazildi!")

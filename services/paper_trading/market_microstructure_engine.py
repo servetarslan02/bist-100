@@ -43,6 +43,7 @@ class MarketMicrostructureEngine:
         slippage_base_pct: float = 0.05,
         slippage_max_pct: float = 0.5,
     ):
+        """Otomatik eklendi."""
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
         self.bsmv_rate = bsmv_rate
@@ -58,6 +59,7 @@ class MarketMicrostructureEngine:
         self._daily_turnover: float = 0.0
 
     def get_or_create_book(self, ticker: str) -> OrderBook:
+        """Otomatik eklendi."""
         if ticker not in self._books:
             self._books[ticker] = OrderBook(ticker=ticker, tick_size=0.01)
         return self._books[ticker]
@@ -232,6 +234,7 @@ class MarketMicrostructureEngine:
         }
 
     def _compute_slippage(self, quantity: int, avg_volume: int, volatility: float, spread_pct: float) -> float:
+        """Otomatik eklendi."""
         base_slippage = (spread_pct / 100.0) / 2.0
         volume_impact = (quantity / avg_volume * volatility * 0.5) if avg_volume > 0 else 0.001
         vol_premium = volatility * 0.02
@@ -239,6 +242,7 @@ class MarketMicrostructureEngine:
         return min(total, self.slippage_max_pct / 100.0)
 
     def _compute_commission(self, amount: float) -> float:
+        """Otomatik eklendi."""
         broker = amount * self.commission_rate
         exchange = amount * self.exchange_fee_rate
         base = broker + exchange

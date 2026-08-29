@@ -18,6 +18,7 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 @dataclass
 class ReplayResult:
+    """Otomatik eklendi."""
     start_date: str
     end_date: str
     total_ticks: int = 0
@@ -31,6 +32,7 @@ class ReplayResult:
     equity_curve: list[float] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "period": f"{self.start_date} → {self.end_date}",
             "total_ticks": self.total_ticks,
@@ -48,9 +50,11 @@ class StrategyReplay:
     """Strateji replay motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._strategy = None
 
-    def load_strategy(self, strategy):
+    def load_strategy(self, strategy) -> Any:
+        """Otomatik eklendi."""
         self._strategy = strategy
 
     def run(

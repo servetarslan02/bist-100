@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — FastAPI Backend v3.0 (STANDALONE)
 
@@ -44,6 +45,7 @@ logger = structlog.get_logger()
 
 
 class OpportunityResponse(BaseModel):
+    """Otomatik eklendi."""
     ticker: str
     rank: int
     score: float
@@ -54,6 +56,7 @@ class OpportunityResponse(BaseModel):
 
 
 class PortfolioResponse(BaseModel):
+    """Otomatik eklendi."""
     date: str
     total_positions: int
     total_weight: float
@@ -62,6 +65,7 @@ class PortfolioResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
+    """Otomatik eklendi."""
     status: str
     timestamp: str
     uptime_hours: float
@@ -70,11 +74,13 @@ class HealthResponse(BaseModel):
 
 
 class PredictRequest(BaseModel):
+    """Otomatik eklendi."""
     ticker: str
     features: dict | None = None
 
 
 class PredictResponse(BaseModel):
+    """Otomatik eklendi."""
     ticker: str
     score: float
     rank: int
@@ -89,7 +95,7 @@ class PredictResponse(BaseModel):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> Any:
     """Uygulama yaşam döngüsü."""
     logger.info("ALPHA BIST API starting up")
     yield
@@ -119,7 +125,7 @@ app.add_middleware(
 
 
 @app.get("/", tags=["Root"])
-async def root():
+async def root() -> Any:
     """API bilgisi."""
     return {
         "name": "ALPHA BIST API",
@@ -131,7 +137,7 @@ async def root():
 
 
 @app.get("/health", tags=["System"])
-async def health_check():
+async def health_check() -> Any:
     """Sistem sağlık kontrolü — standart format."""
     try:
         from services.learning.super_intelligence import super_intelligence
@@ -155,7 +161,7 @@ async def health_check():
 
 
 @app.get("/regime", tags=["Market"])
-async def get_regime():
+async def get_regime() -> Any:
     """Mevcut piyasa rejimi."""
     raise HTTPException(
         status_code=301,
@@ -168,7 +174,7 @@ async def get_opportunities(
     limit: int = 20,
     regime: str | None = None,
     min_confidence: float = 0.0,
-):
+) -> Any:
     """En iyi fırsatları getir."""
     raise HTTPException(
         status_code=301,
@@ -177,7 +183,7 @@ async def get_opportunities(
 
 
 @app.get("/opportunities/{ticker}", tags=["Trading"])
-async def get_opportunity_detail(ticker: str):
+async def get_opportunity_detail(ticker: str) -> Any:
     """Belirli bir hissenin detaylı analizi."""
     raise HTTPException(
         status_code=501,
@@ -186,7 +192,7 @@ async def get_opportunity_detail(ticker: str):
 
 
 @app.get("/portfolio", response_model=PortfolioResponse, tags=["Trading"])
-async def get_portfolio_recommendation():
+async def get_portfolio_recommendation() -> Any:
     """Portföy önerisi."""
     raise HTTPException(
         status_code=301,
@@ -195,7 +201,7 @@ async def get_portfolio_recommendation():
 
 
 @app.get("/backtest", tags=["Analysis"])
-async def get_backtest_results():
+async def get_backtest_results() -> Any:
     """Backtest sonuçları."""
     from services.core.orchestrator import orchestrator
 
@@ -210,7 +216,7 @@ async def get_backtest_results():
 
 
 @app.get("/learning", tags=["System"])
-async def get_learning_status():
+async def get_learning_status() -> Any:
     """Sürekli öğrenme durumu."""
     raise HTTPException(
         status_code=301,
@@ -219,7 +225,7 @@ async def get_learning_status():
 
 
 @app.get("/features/{ticker}", tags=["Analysis"])
-async def get_features(ticker: str):
+async def get_features(ticker: str) -> Any:
     """Hissenin feature vektörü."""
     raise HTTPException(
         status_code=301,
@@ -228,7 +234,7 @@ async def get_features(ticker: str):
 
 
 @app.post("/predict", response_model=PredictResponse, tags=["Trading"])
-async def predict(request: PredictRequest):
+async def predict(request: PredictRequest) -> Any:
     """Prediction endpoint — not yet implemented."""
     raise HTTPException(
         status_code=501,
@@ -237,7 +243,7 @@ async def predict(request: PredictRequest):
 
 
 @app.get("/pipeline/stats", tags=["System"])
-async def get_pipeline_stats():
+async def get_pipeline_stats() -> Any:
     """Pipeline istatistikleri."""
     from services.core.orchestrator import orchestrator
 
@@ -245,7 +251,7 @@ async def get_pipeline_stats():
 
 
 @app.get("/reports/latest", tags=["System"])
-async def get_latest_report():
+async def get_latest_report() -> Any:
     """Son günlük rapor."""
     from services.core.orchestrator import orchestrator
 
@@ -275,18 +281,22 @@ class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.active_connections: list[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> Any:
+        """Otomatik eklendi."""
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info("WebSocket connected", connections=len(self.active_connections))
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket) -> Any:
+        """Otomatik eklendi."""
         self.active_connections.remove(websocket)
         logger.info("WebSocket disconnected", connections=len(self.active_connections))
 
-    async def broadcast(self, message: dict):
+    async def broadcast(self, message: dict) -> Any:
+        """Otomatik eklendi."""
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
@@ -298,7 +308,7 @@ manager = ConnectionManager()
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket) -> Any:
     """Real-time WebSocket bağlantısı — Authorization header ile token doğrulama."""
     # Token'ı header'dan al (URL'de taşınmaz — güvenlik)
     auth_header = websocket.headers.get("authorization", "")
@@ -371,7 +381,7 @@ async def websocket_endpoint(websocket: WebSocket):
 # =====================================================
 
 
-async def broadcast_updates():
+async def broadcast_updates() -> Any:
     """Periyodik güncellemeleri broadcast et."""
     while True:
         await asyncio.sleep(60)  # Her 60 saniye

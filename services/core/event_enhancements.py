@@ -22,6 +22,7 @@ Kullanım:
 
 from __future__ import annotations
 
+import functools
 import time
 import uuid
 from collections import defaultdict
@@ -29,21 +30,26 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.event_enhancements")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -86,6 +92,7 @@ class EventEnhancements:
         idempotency_window_hours: float = 24.0,
         retry_policy: RetryPolicy | None = None,
     ):
+        """Otomatik eklendi."""
         self.idempotency_window_hours = idempotency_window_hours
         self.retry_policy = retry_policy or RetryPolicy()
         self._processed_events: dict[str, float] = {}  # event_id → timestamp

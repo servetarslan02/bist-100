@@ -18,6 +18,7 @@ class DailyPipelineWorker:
     """Günlük trading pipeline worker'ı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_run_date: str | None = None
         self._last_run_status: str = "never"
         self._last_run_result: dict[str, Any] | None = None
@@ -65,6 +66,7 @@ class DailyPipelineWorker:
         return result
 
     def get_status(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "last_run_date": self._last_run_date,
             "last_run_status": self._last_run_status,

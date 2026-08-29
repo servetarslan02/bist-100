@@ -22,7 +22,7 @@ Kullanım:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -85,6 +85,7 @@ class CalibrationEnhanced:
         drift_threshold: float = 0.05,
         min_samples_for_retrain: int = 100,
     ):
+        """Otomatik eklendi."""
         self.retrain_interval_hours = retrain_interval_hours
         self.drift_threshold = drift_threshold
         self.min_samples_for_retrain = min_samples_for_retrain
@@ -115,9 +116,9 @@ class CalibrationEnhanced:
         Returns:
             OutOfFoldResult
         """
-        from sklearn.model_selection import TimeSeriesSplit
-
         import copy
+
+        from sklearn.model_selection import TimeSeriesSplit
 
         kf = TimeSeriesSplit(n_splits=cv)
         oof_predictions = np.zeros(len(y))
@@ -147,14 +148,14 @@ class CalibrationEnhanced:
                     if np.isfinite(ic):
                         fold_ics.append(ic)
                 except Exception:
-                    pass
+                    logger.error("Exception caught", exc_info=True)
 
                 # Brier
                 try:
                     brier = float(np.mean((preds - y_val) ** 2))
                     fold_briers.append(brier)
                 except Exception:
-                    pass
+                    logger.error("Exception caught", exc_info=True)
 
             except Exception as e:
                 logger.warning("oof_fold_failed", fold=fold_idx, error=str(e))
@@ -330,7 +331,8 @@ class CalibrationEnhanced:
             n_neg = np.sum(outcomes == 0)
             targets = np.where(outcomes == 1, (n_pos + 1) / (n_pos + 2), 1 / (n_neg + 2))
 
-            def platt_loss(params):
+            def platt_loss(params) -> Any:
+                """Otomatik eklendi."""
                 a, b = params
                 f = np.clip(a * confidences + b, -500, 500)
                 p = np.clip(1.0 / (1.0 + np.exp(f)), 1e-10, 1 - 1e-10)

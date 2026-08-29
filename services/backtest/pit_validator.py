@@ -49,6 +49,7 @@ class PITRecord:
         return (self.publish_date - self.report_date).days
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "data_id": self.data_id,
             "ticker": self.ticker,
@@ -72,6 +73,7 @@ class PITViolation:
     decision_time: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -90,7 +92,8 @@ class PITValidationReport:
     warning_count: int = 0
     is_valid: bool = True
 
-    def add_violation(self, violation: PITViolation):
+    def add_violation(self, violation: PITViolation) -> Any:
+        """Otomatik eklendi."""
         self.violations.append(violation)
         if violation.severity == "critical":
             self.critical_count += 1
@@ -99,6 +102,7 @@ class PITValidationReport:
             self.warning_count += 1
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_records": self.total_records,
             "violations": [v.to_dict() for v in self.violations],
@@ -116,10 +120,11 @@ class PointInTimeValidator:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._registry: dict[str, list[PITRecord]] = {}  # ticker → records
         self._corporate_actions: list[dict[str, Any]] = []
 
-    def register_record(self, record: PITRecord):
+    def register_record(self, record: PITRecord) -> Any:
         """PIT kaydı oluştur."""
         if record.ticker not in self._registry:
             self._registry[record.ticker] = []
@@ -131,7 +136,7 @@ class PointInTimeValidator:
         report_date: datetime,
         publish_date: datetime,
         revision_version: int = 1,
-    ):
+    ) -> Any:
         """Temel veri (bilanço) kaydı oluştur."""
         record = PITRecord(
             data_id=f"{ticker}_{report_date.strftime('%Y%m%d')}_v{revision_version}",
@@ -149,7 +154,7 @@ class PointInTimeValidator:
         ticker: str,
         event_time: datetime,
         system_entry_time: datetime,
-    ):
+    ) -> Any:
         """Haber/KAP olayı kaydı oluştur."""
         record = PITRecord(
             data_id=f"{ticker}_news_{event_time.strftime('%Y%m%d%H%M')}",
@@ -167,7 +172,7 @@ class PointInTimeValidator:
         ex_date: datetime,
         record_date: datetime,
         details: dict[str, Any],
-    ):
+    ) -> Any:
         """Kurumsal işlem (temettü, bölünme vb.) kaydı oluştur."""
         self._corporate_actions.append(
             {

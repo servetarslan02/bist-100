@@ -82,7 +82,7 @@ class WorldState:
             ]
         )
 
-    def from_vector(self, vec: np.ndarray):
+    def from_vector(self, vec: np.ndarray) -> Any:
         """Vektörden state güncelle."""
         self.global_risk_appetite = float(np.clip(vec[0], 0, 1))
         self.usd_strength = float(np.clip(vec[1], 0, 1))
@@ -111,7 +111,7 @@ class WorldState:
             "timestamp": self.timestamp.isoformat(),
         }
 
-    def apply_decay(self, hours_elapsed: float):
+    def apply_decay(self, hours_elapsed: float) -> Any:
         """Zaman geçtikçe etki azalır — factor bazlı decay."""
         factors = [
             "global_risk_appetite",
@@ -199,11 +199,13 @@ class WorldStateManager:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._current_state = WorldState(timestamp=datetime.now(UTC))
         self._last_update = datetime.now(UTC)
 
     @property
     def current_state(self) -> WorldState:
+        """Otomatik eklendi."""
         return self._current_state
 
     def update_from_event(self, event_type: str, event_data: dict[str, Any]) -> dict[str, float]:
@@ -251,7 +253,7 @@ class WorldStateManager:
 
         return delta
 
-    def update_from_macro(self, macro_data: dict[str, Any]):
+    def update_from_macro(self, macro_data: dict[str, Any]) -> Any:
         """Macro verilerden world state güncelle.
 
         P1 düzeltmesi: Hard-coded eşikler kaldırıldı.

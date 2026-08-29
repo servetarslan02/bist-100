@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 10-13 Test Suite
 
@@ -7,7 +10,7 @@ Execution Simulator, Portfolio Integration, Backtest Metrics, E2E testleri.
 import sys
 
 
-def test_execution_simulator():
+def test_execution_simulator() -> Any:
     """Execution Simulator testleri."""
     from services.simulation.execution_simulator import (
         Order,
@@ -45,7 +48,7 @@ def test_execution_simulator():
     assert result.commission > 0
     assert result.slippage >= 0
     passed += 1
-    print(f"  ✓ Market BUY: {result.filled_quantity} @ {result.avg_fill_price:.2f}, commission={result.commission:.2f}")
+    logger.info(f"  ✓ Market BUY: {result.filled_quantity} @ {result.avg_fill_price:.2f}, commission={result.commission:.2f}")
 
     # 2. Market sell order
     order2 = Order(
@@ -61,7 +64,7 @@ def test_execution_simulator():
     assert result2.status == OrderStatus.FILLED
     assert result2.avg_fill_price < 310.0  # Sell'de slippage fiyatı düşürür
     passed += 1
-    print(f"  ✓ Market SELL: {result2.filled_quantity} @ {result2.avg_fill_price:.2f}")
+    logger.info(f"  ✓ Market SELL: {result2.filled_quantity} @ {result2.avg_fill_price:.2f}")
 
     # 3. Large order → partial fill
     order3 = Order(
@@ -81,7 +84,7 @@ def test_execution_simulator():
     assert result3.status == OrderStatus.PARTIALLY_FILLED
     assert result3.filled_quantity == 100000  # %10 limit
     passed += 1
-    print(f"  ✓ Partial fill: {result3.filled_quantity}/{200000}")
+    logger.info(f"  ✓ Partial fill: {result3.filled_quantity}/{200000}")
 
     # 4. Commission model
     amount = 100 * 305.25
@@ -89,14 +92,14 @@ def test_execution_simulator():
     assert commission > 0
     assert commission < amount * 0.01  # %1'den az olmalı
     passed += 1
-    print(f"  ✓ Commission: {commission:.2f} TL on {amount:.0f} TL")
+    logger.info(f"  ✓ Commission: {commission:.2f} TL on {amount:.0f} TL")
 
     # 5. Slippage model
     slippage_small = execution_simulator._compute_slippage(100, 1000000, 0.25, 0.1, OrderSide.BUY)
     slippage_large = execution_simulator._compute_slippage(100000, 1000000, 0.25, 0.1, OrderSide.BUY)
     assert slippage_large > slippage_small
     passed += 1
-    print(f"  ✓ Slippage: small={slippage_small:.4%}, large={slippage_large:.4%}")
+    logger.info(f"  ✓ Slippage: small={slippage_small:.4%}, large={slippage_large:.4%}")
 
     # 6. Fill creation
     fill = execution_simulator.create_fill(result)
@@ -104,18 +107,18 @@ def test_execution_simulator():
     assert fill.quantity == 100
     assert fill.price > 0
     passed += 1
-    print(f"  ✓ Fill created: {fill.fill_id}")
+    logger.info(f"  ✓ Fill created: {fill.fill_id}")
 
     # 7. Order lifecycle
     assert result.status in [OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED]
     assert result.filled_at is not None
     passed += 1
-    print(f"  ✓ Order lifecycle: {result.status.value}")
+    logger.info(f"  ✓ Order lifecycle: {result.status.value}")
 
     return passed, failed
 
 
-def test_portfolio_metrics():
+def test_portfolio_metrics() -> Any:
     """Portfolio metrik testleri."""
     import numpy as np
 
@@ -129,7 +132,7 @@ def test_portfolio_metrics():
     sharpe = (mean_ret - 0) / std_ret * np.sqrt(252) if std_ret > 0 else 0
     assert isinstance(sharpe, float)
     passed += 1
-    print(f"  ✓ Sharpe ratio: {sharpe:.2f}")
+    logger.info(f"  ✓ Sharpe ratio: {sharpe:.2f}")
 
     # 2. Max drawdown
     equity = [100000, 102000, 99000, 97000, 101000, 103000, 98000, 105000]
@@ -144,7 +147,7 @@ def test_portfolio_metrics():
     assert max_dd > 0
     assert max_dd < 1
     passed += 1
-    print(f"  ✓ Max drawdown: {max_dd:.2%}")
+    logger.info(f"  ✓ Max drawdown: {max_dd:.2%}")
 
     # 3. Win rate
     trades = [100, -50, 200, -80, 150, -30, 180, -60]
@@ -152,7 +155,7 @@ def test_portfolio_metrics():
     win_rate = wins / len(trades)
     assert 0 < win_rate < 1
     passed += 1
-    print(f"  ✓ Win rate: {win_rate:.2%}")
+    logger.info(f"  ✓ Win rate: {win_rate:.2%}")
 
     # 4. Profit factor
     gross_profit = sum(t for t in trades if t > 0)
@@ -160,12 +163,12 @@ def test_portfolio_metrics():
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
     assert profit_factor > 0
     passed += 1
-    print(f"  ✓ Profit factor: {profit_factor:.2f}")
+    logger.info(f"  ✓ Profit factor: {profit_factor:.2f}")
 
     return passed, failed
 
 
-def test_e2e_pipeline():
+def test_e2e_pipeline() -> Any:
     """E2E: Tüm pipeline entegrasyon testi."""
     from services.core.decision_engine import DecisionEngine, DecisionInput
     from services.intelligence.signal_fusion import signal_fusion_engine
@@ -205,7 +208,7 @@ def test_e2e_pipeline():
     opp = opportunity_engine.compute_opportunity_score("THYAO", features, "BULL")
     assert opp.opportunity_score > 50
     passed += 1
-    print(f"  ✓ Step 1: Opportunity score = {opp.opportunity_score:.1f}")
+    logger.info(f"  ✓ Step 1: Opportunity score = {opp.opportunity_score:.1f}")
 
     # Signal fusion
     signals = {
@@ -221,7 +224,7 @@ def test_e2e_pipeline():
     fused = signal_fusion_engine.fuse_signals("THYAO", signals, "BULL")
     assert fused.fused_direction == "LONG"
     passed += 1
-    print(f"  ✓ Step 2: Fused direction = {fused.fused_direction} (confidence={fused.fused_confidence:.2f})")
+    logger.info(f"  ✓ Step 2: Fused direction = {fused.fused_direction} (confidence={fused.fused_confidence:.2f})")
 
     # Decision
     engine = DecisionEngine()
@@ -247,7 +250,7 @@ def test_e2e_pipeline():
     decision = engine.decide(inp)
     assert decision.action in ["BUY", "SELL", "HOLD"]
     passed += 1
-    print(f"  ✓ Step 3: Decision = {decision.action} ({decision.conviction})")
+    logger.info(f"  ✓ Step 3: Decision = {decision.action} ({decision.conviction})")
 
     # Execution (eğer BUY ise)
     if decision.action == "BUY":
@@ -264,18 +267,19 @@ def test_e2e_pipeline():
         assert result.filled_quantity > 0
         assert result.avg_fill_price > 0
         passed += 1
-        print(f"  ✓ Step 4: Execution = {result.filled_quantity} @ {result.avg_fill_price:.2f}")
+        logger.info(f"  ✓ Step 4: Execution = {result.filled_quantity} @ {result.avg_fill_price:.2f}")
     else:
         passed += 1
-        print(f"  ✓ Step 4: Skipped (decision={decision.action})")
+        logger.info(f"  ✓ Step 4: Skipped (decision={decision.action})")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 10-13 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 10-13 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -287,21 +291,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

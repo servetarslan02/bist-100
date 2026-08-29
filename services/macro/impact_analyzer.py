@@ -64,6 +64,7 @@ class MacroImpactAnalyzer:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._shock_history: list[ShockEvent] = []
 
     def record_shock(
@@ -71,7 +72,7 @@ class MacroImpactAnalyzer:
         shock_type: str,
         magnitude: float,
         indicator: str,
-    ):
+    ) -> Any:
         """Şok olayı kaydet."""
         cfg = macro_config.decay
         half_life = cfg.half_life_by_shock_type.get(shock_type, cfg.default_half_life_days)

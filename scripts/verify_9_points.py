@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 import urllib.request
 
 import orjson
@@ -53,11 +55,11 @@ tests = [
     ),
 ]
 
-print("=== 9 KRİTİK ENDPOINT DOĞRULAMA TESTİ ===")
+logger.info("=== 9 KRİTİK ENDPOINT DOĞRULAMA TESTİ ===")
 for name, url, fmt in tests:
     try:
         resp = urllib.request.urlopen(url, timeout=5)
         data = orjson.loads(resp.read().decode("utf-8"))
-        print(f"[BASARILI] {name:<35} -> {fmt(data)}")
+        logger.info(f"[BASARILI] {name:<35} -> {fmt(data)}")
     except Exception as e:
-        print(f"[HATA]     {name:<35} -> {e}")
+        logger.info(f"[HATA]     {name:<35} -> {e}")

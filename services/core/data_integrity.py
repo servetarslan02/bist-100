@@ -31,18 +31,26 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.data_integrity")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        async def async_wrapper(self, *args, **kwargs):
+        async def async_wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return await func(self, *args, **kwargs)
+
         @functools.wraps(func)
-        def sync_wrapper(self, *args, **kwargs):
+        def sync_wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+
     return decorator
 
 
@@ -53,6 +61,7 @@ class DataIntegrityValidator:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_validation: float | None = None
         self._validation_history: list[dict] = []
 
@@ -359,7 +368,7 @@ class DataIntegrityValidator:
         return result
 
     @otel_trace("data_integrity.auto_repair")
-    async def auto_repair(self, validation_results: dict[str, Any]):
+    async def auto_repair(self, validation_results: dict[str, Any]) -> Any:
         """Tespit edilen sorunları otomatik onar."""
         logger.info("Starting auto-repair based on validation results")
 

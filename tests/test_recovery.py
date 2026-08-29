@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Test: PC Kapalı Kalma Senaryoları — Recovery Mechanism
 
@@ -23,9 +26,9 @@ from services.paper_trading.state_store import PaperStateStore
 from services.paper_trading.virtual_portfolio import VirtualPortfolio
 
 
-def test_gap_detection():
+def test_gap_detection() -> Any:
     """Test 1: Gap detection doğru gün sayısını hesaplıyor mu?"""
-    print("\n=== TEST 1: Gap Detection ===")
+    logger.info("\n=== TEST 1: Gap Detection ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -43,15 +46,15 @@ def test_gap_detection():
 
         assert result["status"] == "RECOVERED", f"Expected RECOVERED, got {result['status']}"
         assert result["gap_days"] == 5, f"Expected 5 gap days, got {result['gap_days']}"
-        print(f"  ✅ Gap detection: {result['gap_days']} gün doğru tespit edildi")
+        logger.info(f"  ✅ Gap detection: {result['gap_days']} gün doğru tespit edildi")
 
     finally:
         os.unlink(db_path)
 
 
-def test_multi_day_t2_roll():
+def test_multi_day_t2_roll() -> Any:
     """Test 2: T+2 takas birden fazla gün için kaydırılıyor mu?"""
-    print("\n=== TEST 2: Multi-Day T+2 Settlement Roll ===")
+    logger.info("\n=== TEST 2: Multi-Day T+2 Settlement Roll ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -81,16 +84,16 @@ def test_multi_day_t2_roll():
         assert portfolio.unsettled_cash_t1 == 0.0, f"Expected t1=0, got {portfolio.unsettled_cash_t1}"
         assert portfolio.unsettled_cash_t2 == 0.0, f"Expected t2=0, got {portfolio.unsettled_cash_t2}"
 
-        print(f"  ✅ T+2 roll: 3 gün sonunda settled={portfolio.settled_cash:.0f}")
-        print(f"     Başlangıç: settled={initial_settled:.0f}, t1={initial_t1:.0f}, t2={initial_t2:.0f}")
+        logger.info(f"  ✅ T+2 roll: 3 gün sonunda settled={portfolio.settled_cash:.0f}")
+        logger.info(f"     Başlangıç: settled={initial_settled:.0f}, t1={initial_t1:.0f}, t2={initial_t2:.0f}")
 
     finally:
         os.unlink(db_path)
 
 
-def test_pending_signal_expiry():
+def test_pending_signal_expiry() -> Any:
     """Test 3: Süresi dolmuş sinyaller temizleniyor mu?"""
-    print("\n=== TEST 3: Pending Signal Expiry ===")
+    logger.info("\n=== TEST 3: Pending Signal Expiry ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -109,7 +112,7 @@ def test_pending_signal_expiry():
         # Hemen yükle → 3 sinyal olmalı
         loaded = store.load_pending_signals()
         assert len(loaded) == 3, f"Expected 3 signals, got {len(loaded)}"
-        print(f"  ✅ Taze sinyaller yüklendi: {len(loaded)} adet")
+        logger.info(f"  ✅ Taze sinyaller yüklendi: {len(loaded)} adet")
 
         # Süresi dolmuş sinyalleri temizle (max_age_days=0 → hepsini temizle)
         # Not: expires_at 1 gün sonra, bu yüzden 0 gün ile temizlemek için
@@ -120,20 +123,20 @@ def test_pending_signal_expiry():
 
         cleared = store.clear_stale_pending_signals(max_age_days=1)
         assert cleared == 3, f"Expected 3 cleared, got {cleared}"
-        print(f"  ✅ Süresi dolmuş sinyaller temizlendi: {cleared} adet")
+        logger.info(f"  ✅ Süresi dolmuş sinyaller temizlendi: {cleared} adet")
 
         # Yükle → 0 sinyal olmalı
         loaded_after = store.load_pending_signals()
         assert len(loaded_after) == 0, f"Expected 0 signals after clear, got {len(loaded_after)}"
-        print(f"  ✅ Temizlik sonrası sinyal sayısı: {len(loaded_after)}")
+        logger.info(f"  ✅ Temizlik sonrası sinyal sayısı: {len(loaded_after)}")
 
     finally:
         os.unlink(db_path)
 
 
-def test_kill_switch_auto_reset():
+def test_kill_switch_auto_reset() -> Any:
     """Test 4: Kill switch yeni günde otomatik resetleniyor mu?"""
-    print("\n=== TEST 4: Kill Switch Auto-Reset ===")
+    logger.info("\n=== TEST 4: Kill Switch Auto-Reset ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -158,16 +161,16 @@ def test_kill_switch_auto_reset():
 
         assert not orchestrator.risk_gate.is_kill_switch_active(), "Kill switch should be reset after recovery"
 
-        print("  ✅ Kill switch otomatik resetlendi")
-        print(f"     Gap gün sayısı: {result['gap_days']}")
+        logger.info("  ✅ Kill switch otomatik resetlendi")
+        logger.info(f"     Gap gün sayısı: {result['gap_days']}")
 
     finally:
         os.unlink(db_path)
 
 
-def test_equity_curve_gap_fill():
+def test_equity_curve_gap_fill() -> Any:
     """Test 5: Equity curve'deki boş günler dolduruluyor mu?"""
-    print("\n=== TEST 5: Equity Curve Gap Fill ===")
+    logger.info("\n=== TEST 5: Equity Curve Gap Fill ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -197,16 +200,16 @@ def test_equity_curve_gap_fill():
         for pt in curve:
             assert pt["equity"] == 1_050_000, f"Fill equity mismatch: {pt['equity']}"
 
-        print(f"  ✅ Equity curve gap fill: {len(curve)} kayıt")
-        print(f"     Tarihler: {[pt['date'] for pt in curve]}")
+        logger.info(f"  ✅ Equity curve gap fill: {len(curve)} kayıt")
+        logger.info(f"     Tarihler: {[pt['date'] for pt in curve]}")
 
     finally:
         os.unlink(db_path)
 
 
-def test_no_gap_scenario():
+def test_no_gap_scenario() -> Any:
     """Test 6: Gap yoksa recovery çalışmamalı."""
-    print("\n=== TEST 6: No Gap Scenario ===")
+    logger.info("\n=== TEST 6: No Gap Scenario ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -225,15 +228,15 @@ def test_no_gap_scenario():
         assert result["status"] == "NO_GAP", f"Expected NO_GAP, got {result['status']}"
         assert result["gap_days"] == 0
 
-        print("  ✅ Gap yok: Recovery çalışmadı (status=NO_GAP)")
+        logger.info("  ✅ Gap yok: Recovery çalışmadı (status=NO_GAP)")
 
     finally:
         os.unlink(db_path)
 
 
-def test_first_run_scenario():
+def test_first_run_scenario() -> Any:
     """Test 7: İlk çalıştırmada recovery atlanmalı."""
-    print("\n=== TEST 7: First Run Scenario ===")
+    logger.info("\n=== TEST 7: First Run Scenario ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -251,15 +254,15 @@ def test_first_run_scenario():
 
         assert result["status"] == "FIRST_RUN", f"Expected FIRST_RUN, got {result['status']}"
 
-        print("  ✅ İlk çalıştırma: Recovery atlandı (status=FIRST_RUN)")
+        logger.info("  ✅ İlk çalıştırma: Recovery atlandı (status=FIRST_RUN)")
 
     finally:
         os.unlink(db_path)
 
 
-def test_docker_restart_policy():
+def test_docker_restart_policy() -> Any:
     """Test 8: Docker restart policy 'always' olarak ayarlanmış mı?"""
-    print("\n=== TEST 8: Docker Restart Policy ===")
+    logger.info("\n=== TEST 8: Docker Restart Policy ===")
 
     compose_path = Path(__file__).parent.parent / "docker-compose.yml"
     content = compose_path.read_text()
@@ -267,12 +270,12 @@ def test_docker_restart_policy():
     assert "restart: always" in content, "restart: always not found in docker-compose.yml"
     assert "restart: unless-stopped" not in content, "Old restart policy still present"
 
-    print("  ✅ Docker restart policy: 'always'")
+    logger.info("  ✅ Docker restart policy: 'always'")
 
 
-def test_holiday_calendar_extended():
+def test_holiday_calendar_extended() -> Any:
     """Test 9: Holiday takvimi 2028+ yılları içeriyor mu?"""
-    print("\n=== TEST 9: Holiday Calendar Extended ===")
+    logger.info("\n=== TEST 9: Holiday Calendar Extended ===")
 
     from services.scheduler.unified_scheduler import HolidayProvider
 
@@ -288,15 +291,15 @@ def test_holiday_calendar_extended():
     assert has_2029, "2029 holidays missing"
     assert has_2030, "2030 holidays missing"
 
-    print(f"  ✅ Holiday takvimi: 2026-2030 arası {len(holidays)} tatil günü")
-    print(f"     2028: {sum(1 for d in holidays if d.year == 2028)} gün")
-    print(f"     2029: {sum(1 for d in holidays if d.year == 2029)} gün")
-    print(f"     2030: {sum(1 for d in holidays if d.year == 2030)} gün")
+    logger.info(f"  ✅ Holiday takvimi: 2026-2030 arası {len(holidays)} tatil günü")
+    logger.info(f"     2028: {sum(1 for d in holidays if d.year == 2028)} gün")
+    logger.info(f"     2029: {sum(1 for d in holidays if d.year == 2029)} gün")
+    logger.info(f"     2030: {sum(1 for d in holidays if d.year == 2030)} gün")
 
 
-def test_force_price_refresh():
+def test_force_price_refresh() -> Any:
     """Test 10: Force price refresh metodu çalışıyor mu?"""
-    print("\n=== TEST 10: Force Price Refresh ===")
+    logger.info("\n=== TEST 10: Force Price Refresh ===")
 
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
@@ -329,18 +332,18 @@ def test_force_price_refresh():
         updated = portfolio.force_refresh_prices("2026-08-25")
 
         # Redis yoksa güncelleme olmaz ama crash de olmaz
-        print(f"  ✅ Force price refresh: {len(updated)} fiyat güncellendi")
-        print(f"     Pozisyon sayısı: {len(portfolio._positions)}")
-        print("     Crash yok, graceful degradation")
+        logger.info(f"  ✅ Force price refresh: {len(updated)} fiyat güncellendi")
+        logger.info(f"     Pozisyon sayısı: {len(portfolio._positions)}")
+        logger.info("     Crash yok, graceful degradation")
 
     finally:
         os.unlink(db_path)
 
 
 if __name__ == "__main__":
-    print("╔══════════════════════════════════════════════════════════╗")
-    print("║   PC KAPALI KALMA SENARYOLARI — RECOVERY TEST SUITE    ║")
-    print("╚══════════════════════════════════════════════════════════╝")
+    logger.info("╔══════════════════════════════════════════════════════════╗")
+    logger.info("║   PC KAPALI KALMA SENARYOLARI — RECOVERY TEST SUITE    ║")
+    logger.info("╚══════════════════════════════════════════════════════════╝")
 
     tests = [
         test_gap_detection,
@@ -363,11 +366,11 @@ if __name__ == "__main__":
             test()
             passed += 1
         except Exception as e:
-            print(f"  ❌ FAILED: {e}")
+            logger.info(f"  ❌ FAILED: {e}")
             failed += 1
 
-    print("\n" + "=" * 60)
-    print(f"SONUÇ: {passed} passed, {failed} failed, {len(tests)} total")
-    print("=" * 60)
+    logger.info("\n" + "=" * 60)
+    logger.info(f"SONUÇ: {passed} passed, {failed} failed, {len(tests)} total")
+    logger.info("=" * 60)
 
     sys.exit(1 if failed > 0 else 0)

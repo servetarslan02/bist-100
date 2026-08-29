@@ -17,6 +17,7 @@ class ModelRetrainWorker:
     """ML model yeniden eğitim worker'ı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_train_date: str | None = None
         self._train_count: int = 0
 
@@ -59,6 +60,7 @@ class ModelRetrainWorker:
         return result
 
     def should_retrain(self) -> bool:
+        """Otomatik eklendi."""
         if self._last_train_date is None:
             return True
         try:
@@ -68,6 +70,7 @@ class ModelRetrainWorker:
             return True
 
     def get_status(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "last_train_date": self._last_train_date,
             "train_count": self._train_count,

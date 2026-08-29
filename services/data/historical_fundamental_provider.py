@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Historical Fundamental Provider
 
@@ -24,6 +25,7 @@ class HistoricalFundamentalProvider:
     """yfinance'dan PIT-safe historical fundamental veri çeker."""
 
     def __init__(self, cache_ttl_seconds: int = 3600):
+        """Otomatik eklendi."""
         self._cache: dict[str, list[FundamentalSnapshot]] = {}
         self._cache_ts: dict[str, float] = {}
         self._cache_ttl = cache_ttl_seconds
@@ -231,6 +233,7 @@ class HistoricalFundamentalProvider:
 
         return mapped
 
-    def clear_cache(self):
+    def clear_cache(self) -> Any:
+        """Otomatik eklendi."""
         self._cache.clear()
         self._cache_ts.clear()

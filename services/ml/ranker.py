@@ -22,6 +22,7 @@ class LearningToRankModel:
     """LightGBM Ranker ile hisse sıralama."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._model = None
         self._is_trained = False
         self._feature_names = [

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Migration System — Production Dayanıklılık Testleri
 
@@ -22,13 +25,13 @@ import duckdb
 from services.core.migrations.runner import MigrationFile, MigrationRunner
 
 
-def fresh_db():
+def fresh_db() -> Any:
     """Yeni bir in-memory SQLite DB oluştur."""
     db = duckdb.connect(":memory:")
     return db
 
 
-async def test_clean_migration():
+async def test_clean_migration() -> Any:
     """Temiz DB'de tüm migration'lar çalışmalı."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -80,7 +83,7 @@ async def test_clean_migration():
     return "Clean Migration", len(issues) == 0, issues
 
 
-async def test_idempotent():
+async def test_idempotent() -> Any:
     """Migration tekrar çalıştırılabilir olmalı, veri kaybı yok."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -116,7 +119,7 @@ async def test_idempotent():
     return "Idempotent", len(issues) == 0, issues
 
 
-async def test_checksum_verification():
+async def test_checksum_verification() -> Any:
     """Checksum değişirse hata vermeli."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -141,7 +144,7 @@ async def test_checksum_verification():
     return "Checksum Verification", len(issues) == 0, issues
 
 
-async def test_rollback():
+async def test_rollback() -> Any:
     """Rollback migration'ları çalıştırmalı."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -173,7 +176,7 @@ async def test_rollback():
     return "Rollback", len(issues) == 0, issues
 
 
-async def test_transaction_rollback():
+async def test_transaction_rollback() -> Any:
     """Başarısız migration transaction rollback yapmalı."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -203,7 +206,7 @@ async def test_transaction_rollback():
     return "Transaction Rollback", len(issues) == 0, issues
 
 
-async def test_pg_to_sqlite_translation():
+async def test_pg_to_sqlite_translation() -> Any:
     """PostgreSQL → SQLite syntax çevirisi doğru olmalı."""
     runner = MigrationRunner(None, dialect="sqlite")
     issues = []
@@ -224,7 +227,7 @@ async def test_pg_to_sqlite_translation():
     return "PG→SQLite Translation", len(issues) == 0, issues
 
 
-async def test_data_preservation():
+async def test_data_preservation() -> Any:
     """Schema değişikliğinde mevcut veri korunmalı."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -268,7 +271,7 @@ async def test_data_preservation():
     return "Data Preservation", len(issues) == 0, issues
 
 
-async def test_status_report():
+async def test_status_report() -> Any:
     """Status raporu doğru bilgi vermeli."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -287,7 +290,7 @@ async def test_status_report():
     return "Status Report", len(issues) == 0, issues
 
 
-async def test_migration_file_parse():
+async def test_migration_file_parse() -> Any:
     """Migration dosyası parse doğru çalışmalı."""
     issues = []
 
@@ -313,10 +316,11 @@ async def test_migration_file_parse():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("MIGRATION SYSTEM — PRODUCTION DAYANIKLILIK TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("MIGRATION SYSTEM — PRODUCTION DAYANIKLILIK TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_clean_migration,
@@ -343,27 +347,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

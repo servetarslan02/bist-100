@@ -39,6 +39,7 @@ class RiskParityOptimizer:
     """
 
     def __init__(self, tolerance: float = 1e-8, max_iterations: int = 1000):
+        """Otomatik eklendi."""
         self.tolerance = tolerance
         self.max_iterations = max_iterations
 
@@ -129,7 +130,8 @@ class RiskParityOptimizer:
         bounds = [(0.001, 1.0) for _ in range(n)]
 
         # Amaç fonksiyonu: risk katkılarının hedeften sapması
-        def objective(w):
+        def objective(w) -> Any:
+            """Otomatik eklendi."""
             rc = self._risk_contributions(w, cov_matrix)
             return np.sum((rc - target_rc) ** 2)
 

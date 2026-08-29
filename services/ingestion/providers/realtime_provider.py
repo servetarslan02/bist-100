@@ -42,6 +42,7 @@ class DataEvent:
     content_hash: str = ""
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if not self.content_hash:
             raw = orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS, default=str).decode()
             self.content_hash = hashlib.sha256(raw.encode()).hexdigest()
@@ -61,19 +62,20 @@ class RealTimeDataEngine:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._handlers: dict[str, list[Callable]] = {}
         self._seen_hashes: set[str] = set()  # Duplicate detection
         self._session: aiohttp.ClientSession | None = None
 
-    def on(self, source: str, handler: Callable):
+    def on(self, source: str, handler: Callable) -> Any:
         """Veri kaynağına handler ata."""
         if source not in self._handlers:
             self._handlers[source] = []
         self._handlers[source].append(handler)
         return self
 
-    async def start(self):
+    async def start(self) -> Any:
         """Tüm veri kaynaklarını başlat."""
         self._running = True
         if aiohttp:
@@ -90,7 +92,7 @@ class RealTimeDataEngine:
             return_exceptions=True,
         )
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Durdur."""
         self._running = False
         if self._session:
@@ -107,7 +109,7 @@ class RealTimeDataEngine:
             self._seen_hashes = set(list(self._seen_hashes)[-25000:])
         return True
 
-    async def _dispatch(self, event: DataEvent):
+    async def _dispatch(self, event: DataEvent) -> Any:
         """Event'i ilgili handler'lara dağıt."""
         if not self._is_new(event):
             return
@@ -126,7 +128,7 @@ class RealTimeDataEngine:
     # KAP Real-Time (RSS polling — çok sık)
     # =====================================================
 
-    async def _listen_kap_realtime(self):
+    async def _listen_kap_realtime(self) -> Any:
         """
         KAP bildirimlerini dinle.
         KAP WebSocket/SSE yok ama RSS/API çok sık poll edilebilir.
@@ -176,7 +178,7 @@ class RealTimeDataEngine:
     # News RSS Real-Time (SSE/RSS — sürekli)
     # =====================================================
 
-    async def _listen_news_rss(self):
+    async def _listen_news_rss(self) -> Any:
         """
         Haber RSS feed'lerini sürekli dinle.
         RSS feed'leri pubsub mantığıyla çalışır — yeni haber eklenir eklenmez görünür.
@@ -237,7 +239,7 @@ class RealTimeDataEngine:
     # Market Data Stream (aggressive polling)
     # =====================================================
 
-    async def _listen_market_stream(self):
+    async def _listen_market_stream(self) -> Any:
         """
         Piyasa verisini dinle.
         Ücretsiz kaynaklarla aggressive polling (her 60 saniye).
@@ -296,7 +298,7 @@ class RealTimeDataEngine:
     # Macro Events (düşük frekans — zaten nadir değişir)
     # =====================================================
 
-    async def _listen_macro_events(self):
+    async def _listen_macro_events(self) -> Any:
         """
         Makro verileri dinle.
         TCMB/TÜİK verileri zaten nadir değişir (günlük/aylık).

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Incremental Fetcher v1.0
 
@@ -54,6 +55,7 @@ class IncrementalFetcher:
     """
 
     def __init__(self, default_lookback_hours: int = 1):
+        """Otomatik eklendi."""
         self._states: dict[str, FetchState] = {}
         self._default_lookback_hours = default_lookback_hours
         self._stats = IncrementalStats()
@@ -91,7 +93,7 @@ class IncrementalFetcher:
         ticker: str,
         success: bool = True,
         error: str | None = None,
-    ):
+    ) -> Any:
         """Çekme zamanını güncelle."""
         now = time.time()
         state = self._states.get(ticker)
@@ -179,7 +181,7 @@ class IncrementalFetcher:
 
         return stale
 
-    def reset(self, ticker: str | None = None):
+    def reset(self, ticker: str | None = None) -> Any:
         """Sıfırla."""
         if ticker:
             self._states.pop(ticker, None)

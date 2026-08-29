@@ -60,6 +60,7 @@ class HTTPStatusError(Exception):
     """HTTP durum hatası."""
 
     def __init__(self, status_code: int, message: str = ""):
+        """Otomatik eklendi."""
         self.status_code = status_code
         self.message = message
         super().__init__(f"HTTP {status_code}: {message}")
@@ -69,6 +70,7 @@ class RetryExhaustedError(Exception):
     """Tüm denemeler tükendi."""
 
     def __init__(self, attempts: int, last_error: Exception):
+        """Otomatik eklendi."""
         self.attempts = attempts
         self.last_error = last_error
         super().__init__(f"Retry exhausted after {attempts} attempts: {last_error}")
@@ -99,6 +101,7 @@ class RetryPolicy:
         retryable_exceptions: set[type[Exception]] | None = None,
         non_retryable_exceptions: set[type[Exception]] | None = None,
     ):
+        """Otomatik eklendi."""
         self.config = RetryConfig(
             max_attempts=max_attempts,
             base_delay_s=base_delay_s,

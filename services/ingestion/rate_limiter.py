@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Rate Limiter v1.0
 
@@ -53,6 +54,7 @@ class RateLimiter:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._limits: dict[str, RateLimitConfig] = {}
         self._timestamps: dict[str, list[float]] = {}  # provider → [request_times]
         self._stats: dict[str, RateLimitStats] = {}
@@ -64,7 +66,7 @@ class RateLimiter:
         max_requests: int,
         window_seconds: float = 60.0,
         burst_size: int = 0,
-    ):
+    ) -> Any:
         """Rate limit ayarla."""
         self._limits[provider] = RateLimitConfig(
             max_requests=max_requests,
@@ -80,7 +82,7 @@ class RateLimiter:
 
         logger.info("Rate limit set", provider=provider, max_requests=max_requests, window_seconds=window_seconds)
 
-    def _cleanup_window(self, provider: str):
+    def _cleanup_window(self, provider: str) -> Any:
         """Eski istekleri pencereden çıkar."""
         config = self._limits.get(provider)
         if not config:
@@ -141,15 +143,18 @@ class RateLimiter:
         """async with limiter.acquire(provider): ... kullanımı için."""
 
         def __init__(self, limiter: "RateLimiter", provider: str):
+            """Otomatik eklendi."""
             self._limiter = limiter
             self._provider = provider
             self._wait_time = 0.0
 
-        async def __aenter__(self):
+        async def __aenter__(self) -> Any:
+            """Otomatik eklendi."""
             self._wait_time = await self._limiter.acquire(self._provider)
             return self
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb) -> Any:
+            """Otomatik eklendi."""
             return False
 
     def acquire_context(self, provider: str) -> "RateLimiter._AcquireContext":

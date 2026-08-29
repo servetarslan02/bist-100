@@ -14,15 +14,18 @@ Kurumsal Standartlar:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from opentelemetry import metrics, trace
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.connectivity")
@@ -40,6 +43,7 @@ _offline_duration_histogram = meter.create_histogram(
 
 
 class ConnectivityState(StrEnum):
+    """Otomatik eklendi."""
     ONLINE = "ONLINE"
     DEGRADED = "DEGRADED"  # Bazı endpoint'ler erişilebilir
     OFFLINE = "OFFLINE"
@@ -81,6 +85,7 @@ class ConnectivityMonitor:
         failure_threshold: int = 3,
         recovery_threshold: int = 1,
     ):
+        """Otomatik eklendi."""
         self._check_interval = check_interval_seconds
         self._timeout = timeout_seconds
         self._failure_threshold = failure_threshold
@@ -112,46 +117,52 @@ class ConnectivityMonitor:
 
     @property
     def is_online(self) -> bool:
+        """Otomatik eklendi."""
         return self._state == ConnectivityState.ONLINE
 
     @property
     def is_offline(self) -> bool:
+        """Otomatik eklendi."""
         return self._state == ConnectivityState.OFFLINE
 
     @property
     def state(self) -> ConnectivityState:
+        """Otomatik eklendi."""
         return self._state
 
     @property
     def offline_since(self) -> float | None:
+        """Otomatik eklendi."""
         return self._offline_since
 
     @property
     def offline_duration_seconds(self) -> float:
+        """Otomatik eklendi."""
         if self._offline_since:
             return time.time() - self._offline_since
         return 0.0
 
     @property
     def total_offline_seconds(self) -> float:
+        """Otomatik eklendi."""
         total = self._total_offline_seconds
         if self._offline_since:
             total += time.time() - self._offline_since
         return total
 
-    def on_offline(self, callback: Callable[[], Awaitable[None]]):
+    def on_offline(self, callback: Callable[[], Awaitable[None]]) -> Any:
         """Offline olduğunda çağrılacak callback kaydet."""
         self._on_offline.append(callback)
 
-    def on_online(self, callback: Callable[[float], Awaitable[None]]):
+    def on_online(self, callback: Callable[[float], Awaitable[None]]) -> Any:
         """Online olduğunda çağrılacak callback kaydet (arg: offline süresi)."""
         self._on_online.append(callback)
 
-    def on_degraded(self, callback: Callable[[], Awaitable[None]]):
+    def on_degraded(self, callback: Callable[[], Awaitable[None]]) -> Any:
         """Degraded durumda çağrılacak callback kaydet."""
         self._on_degraded.append(callback)
 
-    async def start(self):
+    async def start(self) -> Any:
         """Arka plan izleyiciyi başlat."""
         if self._running:
             return
@@ -168,10 +179,8 @@ class ConnectivityMonitor:
         self._running = False
         if self._monitor_task:
             self._monitor_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._monitor_task
-            except asyncio.CancelledError:
-                pass
         # Session kapat (bellek temizleme)
         if self._session and not self._session.closed:
             await self._session.close()
@@ -182,7 +191,7 @@ class ConnectivityMonitor:
         """Şu an bağlantı kontrolü yap (anlık)."""
         return await self._do_check()
 
-    async def wait_for_online(self, timeout: float = 300.0, poll_interval: float = 10.0):
+    async def wait_for_online(self, timeout: float = 300.0, poll_interval: float = 10.0) -> Any:
         """Online olana kadar bekle."""
         start = time.time()
         while time.time() - start < timeout:
@@ -191,7 +200,7 @@ class ConnectivityMonitor:
             await asyncio.sleep(poll_interval)
         return False
 
-    async def _monitor_loop(self):
+    async def _monitor_loop(self) -> Any:
         """Arka plan izleme döngüsü."""
         while self._running:
             try:
@@ -302,7 +311,7 @@ class ConnectivityMonitor:
         except Exception:
             return False
 
-    def _log_event(self, event_type: str, duration: float = 0.0, details: str = ""):
+    def _log_event(self, event_type: str, duration: float = 0.0, details: str = "") -> Any:
         """Olay kaydet."""
         event = ConnectivityEvent(
             timestamp=time.time(),
@@ -320,18 +329,14 @@ class ConnectivityMonitor:
             "state": self._state.value,
             "is_online": self.is_online,
             "offline_since": (
-                datetime.fromtimestamp(self._offline_since, tz=UTC).isoformat()
-                if self._offline_since
-                else None
+                datetime.fromtimestamp(self._offline_since, tz=UTC).isoformat() if self._offline_since else None
             ),
             "offline_duration_seconds": round(self.offline_duration_seconds, 1),
             "total_offline_seconds": round(self.total_offline_seconds, 1),
             "consecutive_failures": self._consecutive_failures,
             "consecutive_successes": self._consecutive_successes,
             "last_check": (
-                datetime.fromtimestamp(self._last_check_time, tz=UTC).isoformat()
-                if self._last_check_time
-                else None
+                datetime.fromtimestamp(self._last_check_time, tz=UTC).isoformat() if self._last_check_time else None
             ),
             "recent_events": [
                 {

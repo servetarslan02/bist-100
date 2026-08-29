@@ -31,10 +31,12 @@ try:
     _norm_pdf = norm.pdf
 except (ImportError, Exception):
 
-    def _norm_cdf(x):
+    def _norm_cdf(x) -> Any:
+        """Otomatik eklendi."""
         return 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
 
-    def _norm_pdf(x):
+    def _norm_pdf(x) -> Any:
+        """Otomatik eklendi."""
         return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * float(x) * float(x))
 
 
@@ -338,6 +340,7 @@ class OptionsChain:
     """
 
     def __init__(self, underlying: str, spot_price: float, risk_free_rate: float = 0.15):
+        """Otomatik eklendi."""
         self.underlying = underlying
         self.spot_price = spot_price
         self.risk_free_rate = risk_free_rate
@@ -453,6 +456,7 @@ class PortfolioGreeksResult:
     position_details: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_delta": self.total_delta,
             "total_gamma": self.total_gamma,
@@ -563,6 +567,7 @@ class StrategyResult:
     legs: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "strategy": self.strategy,
             "max_profit": self.max_profit,
@@ -916,6 +921,7 @@ class DeltaHedgeResult:
     contract_multiplier: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "current_delta": self.current_delta,
             "target_delta": self.target_delta,
@@ -1147,6 +1153,7 @@ class ArbitrageResult:
     estimated_profit: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "spot_price": self.spot_price,
             "futures_price": self.futures_price,
@@ -1459,6 +1466,7 @@ class BacktestResult:
     trades: list[BacktestTrade]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_trades": self.total_trades,
             "winning_trades": self.winning_trades,
@@ -1483,6 +1491,7 @@ class OptionsBacktestEngine:
     """
 
     def __init__(self, strategies: OptionsStrategies = None):
+        """Otomatik eklendi."""
         self.strategies = strategies or OptionsStrategies()
 
     def backtest_covered_call(

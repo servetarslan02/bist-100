@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Singleton Thread-Safety Verification Script
 
@@ -12,11 +15,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def analyze_class_safety(class_name, module_path):
+def analyze_class_safety(class_name, module_path) -> Any:
     """Bir sınıfın thread-safety profilini analiz et."""
-    print(f"\n{'=' * 60}")
-    print(f"📊 {class_name} Analizi")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"📊 {class_name} Analizi")
+    logger.info(f"{'=' * 60}")
 
     with open(module_path) as f:
         content = f.read()
@@ -26,7 +29,7 @@ def analyze_class_safety(class_name, module_path):
 
     class_match = re.search(rf"class {class_name}.*?(?=\nclass |\Z)", content, re.DOTALL)
     if not class_match:
-        print(f"❌ {class_name} bulunamadı")
+        logger.info(f"❌ {class_name} bulunamadı")
         return
 
     class_code = class_match.group(0)
@@ -43,33 +46,33 @@ def analyze_class_safety(class_name, module_path):
     methods = re.findall(r"    def (\w+)", class_code)
     async_methods = re.findall(r"    async def (\w+)", class_code)
 
-    print(f"  Toplam method: {len(methods)}")
-    print(f"  Async method: {len(async_methods)}")
-    print(f"  Sync method: {len(methods) - len(async_methods)}")
-    print(f"  self atamaları: {self_writes}")
+    logger.info(f"  Toplam method: {len(methods)}")
+    logger.info(f"  Async method: {len(async_methods)}")
+    logger.info(f"  Sync method: {len(methods) - len(async_methods)}")
+    logger.info(f"  self atamaları: {self_writes}")
 
     # Safety assessment
-    print("\n  🔍 Güvenlik Değerlendirmesi:")
+    logger.info("\n  🔍 Güvenlik Değerlendirmesi:")
 
     if has_async:
-        print("  ⚠️  Async methodlar var — await noktalarında yarış olabilir")
+        logger.info("  ⚠️  Async methodlar var — await noktalarında yarış olabilir")
     else:
-        print("  ✅ Tüm methodlar sync — atomik çalışır (GIL koruması)")
+        logger.info("  ✅ Tüm methodlar sync — atomik çalışır (GIL koruması)")
 
     if self_writes <= 1:  # Only __init__
-        print("  ✅ Stateless — paylaşımlı durum yok")
+        logger.info("  ✅ Stateless — paylaşımlı durum yok")
     else:
-        print(f"  ⚠️  Mutable state var ({self_writes} atama) — paylaşımlı durum mevcut")
-        print("     → Bu kasıtlı olabilir (cache, model, vs.)")
+        logger.info(f"  ⚠️  Mutable state var ({self_writes} atama) — paylaşımlı durum mevcut")
+        logger.info("     → Bu kasıtlı olabilir (cache, model, vs.)")
 
     # Check for locks
     has_locks = "Lock" in class_code or "lock" in class_code
     if has_locks:
-        print("  ✅ Lock mekanizması mevcut")
+        logger.info("  ✅ Lock mekanizması mevcut")
     elif self_writes > 1 and has_async:
-        print("  ❌ Lock mekanizması YOK — async ortamda riskli")
+        logger.info("  ❌ Lock mekanizması YOK — async ortamda riskli")
     elif self_writes > 1:
-        print("  ℹ️  Lock yok ama sync methodlar GIL tarafından korunur")
+        logger.info("  ℹ️  Lock yok ama sync methodlar GIL tarafından korunur")
 
     return {
         "class": class_name,
@@ -82,9 +85,10 @@ def analyze_class_safety(class_name, module_path):
     }
 
 
-def main():
-    print("🔒 Singleton Thread-Safety Verification")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("🔒 Singleton Thread-Safety Verification")
+    logger.info("=" * 60)
 
     classes = [
         ("FeatureCalculator", "services/features/calculator.py"),
@@ -100,23 +104,23 @@ def main():
             if result:
                 results.append(result)
         except Exception as e:
-            print(f"❌ {class_name} analiz hatası: {e}")
+            logger.info(f"❌ {class_name} analiz hatası: {e}")
 
     # Summary
-    print(f"\n{'=' * 60}")
-    print("📋 ÖZET")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📋 ÖZET")
+    logger.info(f"{'=' * 60}")
 
     for r in results:
         status = "✅" if r["is_stateless"] or r["is_safe_sync"] else "⚠️"
-        print(
+        logger.info(
             f"{status} {r['class']}: {r['self_writes']} atama, {r['async_methods']} async, lock={'var' if r['has_locks'] else 'yok'}"
         )
 
-    print(f"\n{'=' * 60}")
-    print("🎯 SONUÇ")
-    print(f"{'=' * 60}")
-    print("""
+    logger.info(f"\n{'=' * 60}")
+    logger.info("🎯 SONUÇ")
+    logger.info(f"{'=' * 60}")
+    logger.info("""
 FastAPI asyncio modelinde:
 - Sync methodlar atomik çalışır (GIL koruması)
 - Await noktaları arasında yarış olmaz

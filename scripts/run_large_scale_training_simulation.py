@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """ALPHA BIST — High-Performance Large Scale Model Training & Evaluation Simulator
 
 1,000+ Historical Predictions per Model (Total 6,000+ transactions) across 5 Market Regimes:
@@ -16,7 +19,8 @@ from services.learning.learning_pipeline import LearningPipeline
 from services.learning.model_memory_store import ModelMemoryStore
 
 
-def run_large_scale_simulation():
+def run_large_scale_simulation() -> Any:
+    """Otomatik eklendi."""
     store = ModelMemoryStore()
     pipeline = LearningPipeline(memory_store=store)
 
@@ -139,7 +143,7 @@ def run_large_scale_simulation():
     np.random.seed(42)
     start_date = datetime.now(UTC) - timedelta(days=500)
 
-    print(f"Generating {total_per_model} walk-forward samples per model ({total_per_model * 6} total records)...")
+    logger.info(f"Generating {total_per_model} walk-forward samples per model ({total_per_model * 6} total records)...")
     for m_id, prof in models_profile.items():
         for i in range(total_per_model):
             reg_probs = [r["weight"] for r in regimes]
@@ -180,13 +184,13 @@ def run_large_scale_simulation():
                 }
             )
 
-    print("Saving batch records atomically into DuckDB Model Memory Store...")
+    logger.info("Saving batch records atomically into DuckDB Model Memory Store...")
     store.save_batch_records(all_batch_records)
 
-    print("Running Master Learning Cycle over 6,000+ historical evaluations...")
+    logger.info("Running Master Learning Cycle over 6,000+ historical evaluations...")
     res = pipeline.run_learning_cycle(current_regime="BULL_TREND")
-    print("✅ Long-horizon evaluation successfully completed!")
-    print("\n" + res["markdown_report"])
+    logger.info("✅ Long-horizon evaluation successfully completed!")
+    logger.info("\n" + res["markdown_report"])
 
 
 if __name__ == "__main__":

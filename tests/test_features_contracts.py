@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """ALPHA BIST — Feature Contract Testleri
 
 Her feature için:
@@ -11,14 +14,8 @@ Kullanım:
     python -m pytest tests/test_features_contracts.py -v
 """
 
-from __future__ import annotations
 
-import math
-
-import numpy as np
-import pytest
-
-from services.features.contract import FeatureContract, FeatureRegistry, feature_registry
+from services.features.contract import FeatureContract, feature_registry
 
 
 class TestFeatureContracts:
@@ -28,14 +25,12 @@ class TestFeatureContracts:
     # PIT-SAFETY TESTS
     # =====================================================
 
-    def test_all_features_have_pit_safe_field(self):
+    def test_all_features_have_pit_safe_field(self) -> Any:
         """Tüm feature'lar pit_safe field'ına sahip olmalı."""
         for contract in feature_registry.list_all():
-            assert hasattr(contract, "pit_safe"), (
-                f"Feature '{contract.name}' pit_safe field'ına sahip değil"
-            )
+            assert hasattr(contract, "pit_safe"), f"Feature '{contract.name}' pit_safe field'ına sahip değil"
 
-    def test_pit_safe_features_use_only_past_data(self):
+    def test_pit_safe_features_use_only_past_data(self) -> Any:
         """PIT-safe feature'lar sadece geçmiş veri kullanmalı.
 
         Bu test, PIT-safe olarak işaretlenen feature'ların
@@ -51,7 +46,7 @@ class TestFeatureContracts:
                 # Bu bir uyarı, hata değil — bazı realtime feature'lar PIT-safe olabilir
                 pass
 
-    def test_pit_unsafe_features_are_marked(self):
+    def test_pit_unsafe_features_are_marked(self) -> Any:
         """PIT-unsafe feature'lar açıkça işaretlenmiş olmalı."""
         for contract in feature_registry.list_all():
             if not contract.pit_safe:
@@ -66,7 +61,7 @@ class TestFeatureContracts:
     # VALUE RANGE TESTS
     # =====================================================
 
-    def test_value_range_is_valid(self):
+    def test_value_range_is_valid(self) -> Any:
         """Value range tanımlıysa min < max olmalı."""
         for contract in feature_registry.list_all():
             if contract.value_range is not None:
@@ -75,7 +70,7 @@ class TestFeatureContracts:
                     f"Feature '{contract.name}' value_range'ında min ({min_val}) >= max ({max_val})"
                 )
 
-    def test_validate_value_within_range(self):
+    def test_validate_value_within_range(self) -> Any:
         """Değer aralık içindeyse geçmeli."""
         for contract in feature_registry.list_all():
             if contract.value_range is None:
@@ -88,7 +83,7 @@ class TestFeatureContracts:
                 f"Feature '{contract.name}' orta değer ({mid_val}) aralık içinde olmalı"
             )
 
-    def test_validate_value_outside_range(self):
+    def test_validate_value_outside_range(self) -> Any:
         """Değer aralık dışındaysa başarısız olmalı."""
         for contract in feature_registry.list_all():
             if contract.value_range is None:
@@ -112,31 +107,23 @@ class TestFeatureContracts:
     # EDGE CASE TESTS
     # =====================================================
 
-    def test_validate_value_none(self):
+    def test_validate_value_none(self) -> Any:
         """None değer geçerli olmalı (eksik veri)."""
         for contract in feature_registry.list_all():
-            assert contract.validate_value(None), (
-                f"Feature '{contract.name}' None değeri kabul etmeli (eksik veri)"
-            )
+            assert contract.validate_value(None), f"Feature '{contract.name}' None değeri kabul etmeli (eksik veri)"
 
-    def test_validate_value_nan(self):
+    def test_validate_value_nan(self) -> Any:
         """NaN değer geçersiz olmalı."""
         for contract in feature_registry.list_all():
-            assert not contract.validate_value(float("nan")), (
-                f"Feature '{contract.name}' NaN değeri reddetmeli"
-            )
+            assert not contract.validate_value(float("nan")), f"Feature '{contract.name}' NaN değeri reddetmeli"
 
-    def test_validate_value_inf(self):
+    def test_validate_value_inf(self) -> Any:
         """Inf değer geçersiz olmalı."""
         for contract in feature_registry.list_all():
-            assert not contract.validate_value(float("inf")), (
-                f"Feature '{contract.name}' +Inf değeri reddetmeli"
-            )
-            assert not contract.validate_value(float("-inf")), (
-                f"Feature '{contract.name}' -Inf değeri reddetmeli"
-            )
+            assert not contract.validate_value(float("inf")), f"Feature '{contract.name}' +Inf değeri reddetmeli"
+            assert not contract.validate_value(float("-inf")), f"Feature '{contract.name}' -Inf değeri reddetmeli"
 
-    def test_validate_value_zero(self):
+    def test_validate_value_zero(self) -> Any:
         """Sıfır değer — range'e bağlı olarak geçerli veya geçersiz."""
         for contract in feature_registry.list_all():
             result = contract.validate_value(0.0)
@@ -151,7 +138,7 @@ class TestFeatureContracts:
                         f"Feature '{contract.name}' sıfır değerini reddetmeli (range: {contract.value_range})"
                     )
 
-    def test_validate_value_negative(self):
+    def test_validate_value_negative(self) -> Any:
         """Negatif değer — range'e bağlı olarak geçerli veya geçersiz."""
         for contract in feature_registry.list_all():
             result = contract.validate_value(-1.0)
@@ -170,7 +157,7 @@ class TestFeatureContracts:
     # VALIDATION RULES TESTS
     # =====================================================
 
-    def test_validation_rules_min(self):
+    def test_validation_rules_min(self) -> Any:
         """Min kuralı çalışmalı."""
         contract = FeatureContract(
             name="test_min",
@@ -189,7 +176,7 @@ class TestFeatureContracts:
         assert contract.validate_value(10)
         assert not contract.validate_value(5)
 
-    def test_validation_rules_max(self):
+    def test_validation_rules_max(self) -> Any:
         """Max kuralı çalışmalı."""
         contract = FeatureContract(
             name="test_max",
@@ -208,7 +195,7 @@ class TestFeatureContracts:
         assert contract.validate_value(100)
         assert not contract.validate_value(150)
 
-    def test_validation_rules_min_and_max(self):
+    def test_validation_rules_min_and_max(self) -> Any:
         """Min + Max kuralı birlikte çalışmalı."""
         contract = FeatureContract(
             name="test_range",
@@ -233,33 +220,41 @@ class TestFeatureContracts:
     # CONTRACT COMPLETENESS TESTS
     # =====================================================
 
-    def test_all_contracts_have_required_fields(self):
+    def test_all_contracts_have_required_fields(self) -> Any:
         """Tüm contract'lar zorunlu field'lara sahip olmalı."""
         required_fields = [
-            "name", "source", "formula", "lookback",
-            "frequency", "available_at", "pit_safe",
-            "version", "owner",
+            "name",
+            "source",
+            "formula",
+            "lookback",
+            "frequency",
+            "available_at",
+            "pit_safe",
+            "version",
+            "owner",
         ]
 
         for contract in feature_registry.list_all():
             for field in required_fields:
                 value = getattr(contract, field, None)
-                assert value is not None, (
-                    f"Feature '{contract.name}' zorunlu field '{field}' eksik"
-                )
+                assert value is not None, f"Feature '{contract.name}' zorunlu field '{field}' eksik"
 
-    def test_all_contracts_have_description(self):
+    def test_all_contracts_have_description(self) -> Any:
         """Tüm contract'lar description'a sahip olmalı."""
         for contract in feature_registry.list_all():
-            assert contract.description, (
-                f"Feature '{contract.name}' description eksik"
-            )
+            assert contract.description, f"Feature '{contract.name}' description eksik"
 
-    def test_all_contracts_have_category(self):
+    def test_all_contracts_have_category(self) -> Any:
         """Tüm contract'lar category'ye sahip olmalı."""
         valid_categories = {
-            "technical", "fundamental", "sentiment",
-            "microstructure", "session", "risk", "market", "macro",
+            "technical",
+            "fundamental",
+            "sentiment",
+            "microstructure",
+            "session",
+            "risk",
+            "market",
+            "macro",
         }
 
         for contract in feature_registry.list_all():
@@ -268,48 +263,44 @@ class TestFeatureContracts:
                 f"Geçerli kategoriler: {valid_categories}"
             )
 
-    def test_lookback_is_non_negative(self):
+    def test_lookback_is_non_negative(self) -> Any:
         """Lookback negatif olmamalı."""
         for contract in feature_registry.list_all():
-            assert contract.lookback >= 0, (
-                f"Feature '{contract.name}' negatif lookback: {contract.lookback}"
-            )
+            assert contract.lookback >= 0, f"Feature '{contract.name}' negatif lookback: {contract.lookback}"
 
-    def test_version_is_positive(self):
+    def test_version_is_positive(self) -> Any:
         """Version pozitif olmalı."""
         for contract in feature_registry.list_all():
-            assert contract.version > 0, (
-                f"Feature '{contract.name}' geçersiz version: {contract.version}"
-            )
+            assert contract.version > 0, f"Feature '{contract.name}' geçersiz version: {contract.version}"
 
     # =====================================================
     # REGISTRY TESTS
     # =====================================================
 
-    def test_registry_has_features(self):
+    def test_registry_has_features(self) -> Any:
         """Registry boş olmamalı."""
         assert len(feature_registry.list_all()) > 0, "Feature registry boş"
 
-    def test_registry_no_duplicate_names(self):
+    def test_registry_no_duplicate_names(self) -> Any:
         """Tekrar eden feature isimleri olmamalı."""
         names = [c.name for c in feature_registry.list_all()]
         assert len(names) == len(set(names)), (
             f"Tekrar eden feature isimleri: {[n for n in names if names.count(n) > 1]}"
         )
 
-    def test_registry_list_by_category(self):
+    def test_registry_list_by_category(self) -> Any:
         """Kategoriye göre listeleme çalışmalı."""
         for category in ["technical", "fundamental", "sentiment", "session", "risk"]:
-            features = feature_registry.list_by_category(category)
+            feature_registry.list_by_category(category)
             # Her kategoride en az 0 feature olabilir (boş kategori geçerli)
 
-    def test_registry_list_pit_safe(self):
+    def test_registry_list_pit_safe(self) -> Any:
         """PIT-safe listeleme çalışmalı."""
         pit_safe = feature_registry.list_pit_safe()
         for c in pit_safe:
             assert c.pit_safe
 
-    def test_registry_get_summary(self):
+    def test_registry_get_summary(self) -> Any:
         """Özet istatistikler çalışmalı."""
         summary = feature_registry.get_summary()
 
@@ -321,7 +312,7 @@ class TestFeatureContracts:
         assert summary["total"] > 0
         assert summary["pit_safe"] + summary["pit_unsafe"] == summary["total"]
 
-    def test_registry_validate_known_feature(self):
+    def test_registry_validate_known_feature(self) -> Any:
         """Bilinen feature için validation çalışmalı."""
         rsi_contract = feature_registry.get("rsi_14")
         if rsi_contract:
@@ -329,7 +320,7 @@ class TestFeatureContracts:
             assert not feature_registry.validate("rsi_14", -10.0)
             assert not feature_registry.validate("rsi_14", 110.0)
 
-    def test_registry_validate_unknown_feature(self):
+    def test_registry_validate_unknown_feature(self) -> Any:
         """Bilinmeyen feature için validation False döndürmeli."""
         assert not feature_registry.validate("nonexistent_feature", 42.0)
 
@@ -337,7 +328,7 @@ class TestFeatureContracts:
     # TO_DICT TESTS
     # =====================================================
 
-    def test_contract_to_dict(self):
+    def test_contract_to_dict(self) -> Any:
         """to_dict() tüm field'ları içermeli."""
         for contract in feature_registry.list_all():
             d = contract.to_dict()
@@ -354,15 +345,13 @@ class TestFeatureContracts:
             assert "description" in d
             assert "category" in d
 
-    def test_contract_to_dict_value_range_serializable(self):
+    def test_contract_to_dict_value_range_serializable(self) -> Any:
         """to_dict() value_range serialize edilebilir olmalı."""
         for contract in feature_registry.list_all():
             d = contract.to_dict()
             vr = d.get("value_range")
 
             if vr is not None:
-                assert isinstance(vr, list), (
-                    f"Feature '{contract.name}' value_range list olmalı: {type(vr)}"
-                )
+                assert isinstance(vr, list), f"Feature '{contract.name}' value_range list olmalı: {type(vr)}"
                 assert len(vr) == 2
                 assert vr[0] < vr[1]

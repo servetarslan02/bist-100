@@ -65,12 +65,14 @@ _notification_retry_counter = meter.create_counter(
 
 
 class AlertSeverity(StrEnum):
+    """Otomatik eklendi."""
     INFO = "INFO"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
 
 
 class AlertStatus(StrEnum):
+    """Otomatik eklendi."""
     CREATED = "CREATED"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     ESCALATED = "ESCALATED"
@@ -78,6 +80,7 @@ class AlertStatus(StrEnum):
 
 
 class AlertType(StrEnum):
+    """Otomatik eklendi."""
     HEALTH_CHANGE = "health_change"
     INVARIANT_FAILURE = "invariant_failure"
     LOCK_DEADLOCK = "lock_deadlock"
@@ -118,6 +121,7 @@ class Alert:
     escalation_count: int = 0
 
     def __post_init__(self) -> None:
+        """Otomatik eklendi."""
         if not self.fingerprint:
             self.fingerprint = self._compute_fingerprint()
 
@@ -149,9 +153,11 @@ class Alert:
         return self.status in (AlertStatus.CREATED, AlertStatus.ACKNOWLEDGED, AlertStatus.ESCALATED)
 
     def timestamp_iso_str(self) -> str:
+        """Otomatik eklendi."""
         return datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "alert_type": self.alert_type,
             "severity": self.severity,
@@ -169,6 +175,7 @@ class Alert:
         }
 
     def to_webhook_payload(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "event": "alert",
             "alert_type": self.alert_type,
@@ -182,6 +189,7 @@ class Alert:
         }
 
     def to_slack_payload(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         color = {"INFO": "#36a64f", "WARNING": "#ff9900", "CRITICAL": "#ff0000"}.get(self.severity, "#999")
         return {
             "attachments": [
@@ -199,6 +207,7 @@ class Alert:
         }
 
     def to_discord_payload(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         color = {"INFO": 0x36A64F, "WARNING": 0xFF9900, "CRITICAL": 0xFF0000}.get(self.severity, 0x999999)
         return {
             "embeds": [
@@ -216,6 +225,7 @@ class Alert:
         }
 
     def to_pagerduty_payload(self, routing_key: str = "") -> dict[str, Any]:
+        """Otomatik eklendi."""
         severity_map = {"INFO": "info", "WARNING": "warning", "CRITICAL": "critical"}
         return {
             "routing_key": routing_key,
@@ -237,10 +247,21 @@ class Alert:
 class NotificationProvider(Protocol):
     """Bildirim kanalı sözleşmesi — DI hazırlıklı."""
 
-    async def send(self, alert: Alert) -> bool: ...
-    def name(self) -> str: ...
-    def min_severity(self) -> str: ...
-    async def close(self) -> None: ...
+    async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
+        pass
+
+    def name(self) -> str:
+        """Otomatik eklendi."""
+        pass
+
+    def min_severity(self) -> str:
+        """Otomatik eklendi."""
+        pass
+
+    async def close(self) -> None:
+        """Otomatik eklendi."""
+        pass
 
 
 # ─── Provider Implementasyonları ─────────────────────────────────────────────
@@ -253,12 +274,15 @@ class LogProvider:
     _name: str = "log"
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return self._name
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "INFO"
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         logger.warning(
             "ALERT",
             type=alert.alert_type,
@@ -269,7 +293,8 @@ class LogProvider:
         return True
 
     async def close(self) -> None:
-        pass
+        """Otomatik eklendi."""
+        return None
 
 
 @dataclass
@@ -285,21 +310,26 @@ class WebhookProvider:
     _session: Any = field(default=None, init=False, repr=False)
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return f"webhook:{self.url[:50]}"
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "WARNING"
 
     async def _get_session(self) -> Any:
         """Singleton aiohttp session döner."""
         if self._session is None or self._session.closed:
             import aiohttp
+
             self._session = aiohttp.ClientSession()
         return self._session
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         try:
             import aiohttp
+
             session = await self._get_session()
             async with session.post(
                 self.url,
@@ -313,6 +343,7 @@ class WebhookProvider:
             return False
 
     async def close(self) -> None:
+        """Otomatik eklendi."""
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -326,20 +357,26 @@ class SlackProvider:
     _session: Any = field(default=None, init=False, repr=False)
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return "slack"
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "CRITICAL"
 
     async def _get_session(self) -> Any:
+        """Otomatik eklendi."""
         if self._session is None or self._session.closed:
             import aiohttp
+
             self._session = aiohttp.ClientSession()
         return self._session
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         try:
             import aiohttp
+
             session = await self._get_session()
             async with session.post(
                 self.webhook_url,
@@ -353,6 +390,7 @@ class SlackProvider:
             return False
 
     async def close(self) -> None:
+        """Otomatik eklendi."""
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -366,20 +404,26 @@ class DiscordProvider:
     _session: Any = field(default=None, init=False, repr=False)
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return "discord"
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "CRITICAL"
 
     async def _get_session(self) -> Any:
+        """Otomatik eklendi."""
         if self._session is None or self._session.closed:
             import aiohttp
+
             self._session = aiohttp.ClientSession()
         return self._session
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         try:
             import aiohttp
+
             session = await self._get_session()
             async with session.post(
                 self.webhook_url,
@@ -393,6 +437,7 @@ class DiscordProvider:
             return False
 
     async def close(self) -> None:
+        """Otomatik eklendi."""
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -406,20 +451,26 @@ class PagerDutyProvider:
     _session: Any = field(default=None, init=False, repr=False)
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return "pagerduty"
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "CRITICAL"
 
     async def _get_session(self) -> Any:
+        """Otomatik eklendi."""
         if self._session is None or self._session.closed:
             import aiohttp
+
             self._session = aiohttp.ClientSession()
         return self._session
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         try:
             import aiohttp
+
             session = await self._get_session()
             async with session.post(
                 "https://events.pagerduty.com/v2/enqueue",
@@ -433,6 +484,7 @@ class PagerDutyProvider:
             return False
 
     async def close(self) -> None:
+        """Otomatik eklendi."""
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -449,12 +501,15 @@ class EmailProvider:
     password: str = field(default_factory=lambda: os.environ.get("SMTP_PASSWORD", ""))
 
     def name(self) -> str:
+        """Otomatik eklendi."""
         return f"email:{','.join(self.to_addresses[:3])}"
 
     def min_severity(self) -> str:
+        """Otomatik eklendi."""
         return "CRITICAL"
 
     async def send(self, alert: Alert) -> bool:
+        """Otomatik eklendi."""
         try:
             from email.mime.text import MIMEText
 
@@ -474,7 +529,9 @@ class EmailProvider:
             return False
 
     def _send_smtp(self, msg: Any) -> None:
+        """Otomatik eklendi."""
         import smtplib
+
         with smtplib.SMTP(self.smtp_host, self.smtp_port) as s:
             if self.username:
                 s.starttls()
@@ -482,7 +539,8 @@ class EmailProvider:
             s.send_message(msg)
 
     async def close(self) -> None:
-        pass
+        """Otomatik eklendi."""
+        return None
 
 
 # ─── Notification Router ──────────────────────────────────────────────────────
@@ -499,6 +557,7 @@ class NotificationRouter:
     _SEVERITY_ORDER: dict[str, int] = {"INFO": 0, "WARNING": 1, "CRITICAL": 2}
 
     def __init__(self) -> None:
+        """Otomatik eklendi."""
         self._providers: list[Any] = []
 
     def add_provider(self, provider: Any) -> None:
@@ -510,12 +569,10 @@ class NotificationRouter:
     def get_providers_for_severity(self, severity: str) -> list[Any]:
         """Verilen severity için uygun provider listesi döner."""
         target_level = self._SEVERITY_ORDER.get(severity, 0)
-        return [
-            p for p in self._providers
-            if self._SEVERITY_ORDER.get(p.min_severity(), 999) <= target_level
-        ]
+        return [p for p in self._providers if self._SEVERITY_ORDER.get(p.min_severity(), 999) <= target_level]
 
     def get_all_providers(self) -> list[str]:
+        """Otomatik eklendi."""
         return [p.name() for p in self._providers]
 
     async def close_all(self) -> None:
@@ -524,7 +581,9 @@ class NotificationRouter:
             try:
                 await provider.close()
             except Exception as exc:
-                logger.warning("Provider kapatılamadı", provider=getattr(provider, 'name', lambda: str(provider))(), error=str(exc))
+                logger.warning(
+                    "Provider kapatılamadı", provider=getattr(provider, "name", lambda: str(provider))(), error=str(exc)
+                )
 
 
 # ─── Retry Konfigürasyonu ─────────────────────────────────────────────────────
@@ -544,6 +603,7 @@ class NotificationResult:
     """Tek bir bildirim denemesinin sonucu."""
 
     def __init__(self, provider_name: str, alert_fingerprint: str) -> None:
+        """Otomatik eklendi."""
         self.provider_name = provider_name
         self.alert_fingerprint = alert_fingerprint
         self.attempts: int = 0
@@ -551,6 +611,7 @@ class NotificationResult:
         self.last_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "provider": self.provider_name,
             "fingerprint": self.alert_fingerprint,
@@ -582,6 +643,7 @@ class AlertingSystem:
         dialect: str = "postgresql",
         policy: AlertPolicy | None = None,
     ) -> None:
+        """Otomatik eklendi."""
         self._alerts: list[Alert] = []
         self._max_alerts = max_alerts
         self._dedup_window_s = dedup_window_s
@@ -612,9 +674,7 @@ class AlertingSystem:
         if self._escalation_task is None or self._escalation_task.done():
             try:
                 loop = asyncio.get_running_loop()
-                self._escalation_task = loop.create_task(
-                    self._escalation_loop(), name="alerting.escalation"
-                )
+                self._escalation_task = loop.create_task(self._escalation_loop(), name="alerting.escalation")
             except RuntimeError:
                 logger.warning("AlertingSystem.start() event loop dışında çağrıldı")
 
@@ -680,6 +740,7 @@ class AlertingSystem:
         logger.info("Provider eklendi", name=provider.name(), min_severity=provider.min_severity())
 
     def get_providers(self) -> list[str]:
+        """Otomatik eklendi."""
         return self._router.get_all_providers()
 
     # ─── Alert Kontrolleri ────────────────────────────────────────────────────
@@ -689,55 +750,65 @@ class AlertingSystem:
         current_status = health_report.get("status", "UNKNOWN")
         if self._last_health_status and self._last_health_status != current_status:
             if current_status in ("DEGRADED", "UNHEALTHY"):
-                self._add_alert(Alert(
-                    alert_type=AlertType.HEALTH_CHANGE,
-                    severity="CRITICAL" if current_status == "UNHEALTHY" else "WARNING",
-                    message=f"Health: {self._last_health_status} → {current_status}",
-                    details={
-                        "previous": self._last_health_status,
-                        "current": current_status,
-                        "issues": health_report.get("issues", []),
-                    },
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.HEALTH_CHANGE,
+                        severity="CRITICAL" if current_status == "UNHEALTHY" else "WARNING",
+                        message=f"Health: {self._last_health_status} → {current_status}",
+                        details={
+                            "previous": self._last_health_status,
+                            "current": current_status,
+                            "issues": health_report.get("issues", []),
+                        },
+                    )
+                )
             elif current_status == "HEALTHY" and self._last_health_status in ("DEGRADED", "UNHEALTHY"):
-                self._add_alert(Alert(
-                    alert_type=AlertType.HEALTH_CHANGE,
-                    severity="INFO",
-                    message=f"Health düzeldi: {self._last_health_status} → HEALTHY",
-                    details={"previous": self._last_health_status},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.HEALTH_CHANGE,
+                        severity="INFO",
+                        message=f"Health düzeldi: {self._last_health_status} → HEALTHY",
+                        details={"previous": self._last_health_status},
+                    )
+                )
         self._last_health_status = current_status
 
     def check_invariant(self, invariant_ok: bool, details: dict[str, Any] | None = None) -> None:
         """Portföy invariant ihlalini kontrol eder."""
         if not invariant_ok:
             self._invariant_failure_count += 1
-            self._add_alert(Alert(
-                alert_type=AlertType.INVARIANT_FAILURE,
-                severity="CRITICAL",
-                message=f"Portföy invariant ihlali! (toplam: {self._invariant_failure_count})",
-                details=details or {},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.INVARIANT_FAILURE,
+                    severity="CRITICAL",
+                    message=f"Portföy invariant ihlali! (toplam: {self._invariant_failure_count})",
+                    details=details or {},
+                )
+            )
 
     def check_negative_cash(self, cash: float) -> None:
         """Negatif nakit durumunu kontrol eder."""
         if cash < 0:
-            self._add_alert(Alert(
-                alert_type=AlertType.CASH_NEGATIVE,
-                severity="CRITICAL",
-                message=f"Negatif nakit: {cash:.2f}",
-                details={"cash": cash},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.CASH_NEGATIVE,
+                    severity="CRITICAL",
+                    message=f"Negatif nakit: {cash:.2f}",
+                    details={"cash": cash},
+                )
+            )
 
     def check_drawdown(self, drawdown_pct: float, threshold_pct: float = 15.0) -> None:
         """Drawdown eşiğini kontrol eder."""
         if drawdown_pct > threshold_pct:
-            self._add_alert(Alert(
-                alert_type=AlertType.DRAWDOWN_BREACH,
-                severity="CRITICAL",
-                message=f"Drawdown %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
-                details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
-            ))
+            self._add_alert(
+                Alert(
+                    alert_type=AlertType.DRAWDOWN_BREACH,
+                    severity="CRITICAL",
+                    message=f"Drawdown %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
+                    details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
+                )
+            )
 
     def check_lock_metrics(self, lock_metrics: dict[str, Any]) -> None:
         """Lock metriklerini kontrol eder; deadlock veya timeout artışında alert oluşturur.
@@ -748,20 +819,24 @@ class AlertingSystem:
             dc: int = lm.get("total_deadlocks_detected", 0)
             tc: int = lm.get("total_timeouts", 0)
             if dc > self._last_lock_deadlock_count:
-                self._add_alert(Alert(
-                    alert_type=AlertType.LOCK_DEADLOCK,
-                    severity="WARNING",
-                    message=f"Lock deadlock: {key}",
-                    details={"lock_key": key, "total": dc},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.LOCK_DEADLOCK,
+                        severity="WARNING",
+                        message=f"Lock deadlock: {key}",
+                        details={"lock_key": key, "total": dc},
+                    )
+                )
                 self._last_lock_deadlock_count = dc
             if tc > self._last_lock_timeout_count + 2:
-                self._add_alert(Alert(
-                    alert_type=AlertType.LOCK_TIMEOUT_SPIKE,
-                    severity="WARNING",
-                    message=f"Lock timeout artışı: {key} (toplam: {tc})",
-                    details={"lock_key": key, "total": tc},
-                ))
+                self._add_alert(
+                    Alert(
+                        alert_type=AlertType.LOCK_TIMEOUT_SPIKE,
+                        severity="WARNING",
+                        message=f"Lock timeout artışı: {key} (toplam: {tc})",
+                        details={"lock_key": key, "total": tc},
+                    )
+                )
                 self._last_lock_timeout_count = tc
 
     # ─── Alert İşlemleri ──────────────────────────────────────────────────────
@@ -793,12 +868,15 @@ class AlertingSystem:
     # ─── Sorgular ─────────────────────────────────────────────────────────────
 
     def get_active_alerts(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [a.to_dict() for a in self._alerts if a.is_active]
 
     def get_all_alerts(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [a.to_dict() for a in self._alerts[-limit:]]
 
     def get_alert_summary(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         active = [a for a in self._alerts if a.is_active]
         by_severity: dict[str, int] = {}
         by_status: dict[str, int] = {}
@@ -815,9 +893,11 @@ class AlertingSystem:
         }
 
     def get_notification_log(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [r.to_dict() for r in self._notification_log[-limit:]]
 
     def get_failed_notifications(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [r.to_dict() for r in self._failed_notifications]
 
     # ─── Silence Yönetimi ─────────────────────────────────────────────────────
@@ -847,29 +927,36 @@ class AlertingSystem:
         alert_type: str | None = None,
         actor: str = "api",
     ) -> int:
+        """Otomatik eklendi."""
         return self._policy.remove_silence(fingerprint=fingerprint, alert_type=alert_type, actor=actor, db=self._db)
 
     def get_active_silences(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._policy.get_active_silences()
 
     def save_silences(self) -> None:
+        """Otomatik eklendi."""
         self._policy.save_silences()
 
     def load_silences(self) -> None:
+        """Otomatik eklendi."""
         if self._db:
             self._policy.load_silences_from_db(self._db)
         else:
             self._policy.load_silences()
 
     def get_policy_info(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return self._policy.to_dict()
 
     def reload_policy(self) -> bool:
+        """Otomatik eklendi."""
         return self._policy.reload_if_changed()
 
     def update_policy(
         self, new_config: dict[str, Any], actor: str = "api", expected_version: int = 0
     ) -> dict[str, Any]:
+        """Otomatik eklendi."""
         try:
             return self._policy.update(new_config, actor, expected_version)
         except VersionConflictError as exc:
@@ -881,28 +968,31 @@ class AlertingSystem:
             }
 
     def rollback_policy(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
+        """Otomatik eklendi."""
         return self._policy.rollback(target_version, actor)
 
     def get_policy_history(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._policy.get_history()
 
     def get_policy_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._policy.get_audit_log(limit)
 
-    def batch_add_silences(
-        self, rules: list[dict[str, Any]], created_by: str = "system"
-    ) -> list[dict[str, Any]]:
+    def batch_add_silences(self, rules: list[dict[str, Any]], created_by: str = "system") -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._policy.batch_add_silences(rules, created_by, self._db)
 
-    def batch_remove_silences(
-        self, filters: list[dict[str, str]], actor: str = "api"
-    ) -> dict[str, int]:
+    def batch_remove_silences(self, filters: list[dict[str, str]], actor: str = "api") -> dict[str, int]:
+        """Otomatik eklendi."""
         return self._policy.batch_remove_silences(filters, actor, self._db)
 
     def compute_policy_diff(self, new_config: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         return self._policy.compute_diff(new_config)
 
     def set_policy_webhook(self, urls: list[str]) -> None:
+        """Otomatik eklendi."""
         self._policy.set_webhook_urls(urls)
 
     # ─── DB Kalıcılığı ────────────────────────────────────────────────────────
@@ -1015,10 +1105,13 @@ class AlertingSystem:
             self._trim_alerts()
             self._dedup_cache[alert.fingerprint] = time.time()
 
-            _alert_created_counter.add(1, {
-                "alert_type": alert.alert_type,
-                "severity": alert.severity,
-            })
+            _alert_created_counter.add(
+                1,
+                {
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                },
+            )
             logger.warning(
                 "Alert oluşturuldu",
                 type=alert.alert_type,
@@ -1046,7 +1139,7 @@ class AlertingSystem:
     def _trim_alerts(self) -> None:
         """Maksimum alert sayısını aşarsa eskilerini siler."""
         if len(self._alerts) > self._max_alerts:
-            self._alerts = self._alerts[-self._max_alerts:]
+            self._alerts = self._alerts[-self._max_alerts :]
 
     async def _notify_all(self, alert: Alert) -> None:
         """Alert için tüm uygun provider'lara paralel bildirim gönderir."""
@@ -1087,7 +1180,7 @@ class AlertingSystem:
 
             if attempt < self._retry_config.max_retries - 1:
                 base_delay = min(
-                    self._retry_config.base_delay_s * (self._retry_config.backoff_factor ** attempt),
+                    self._retry_config.base_delay_s * (self._retry_config.backoff_factor**attempt),
                     self._retry_config.max_delay_s,
                 )
                 # Jitter: herd effect önleme

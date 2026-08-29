@@ -109,6 +109,7 @@ class FamaFrenchFactorBuilder:
         min_volume_tl: float = 100_000,  # Minimum günlük hacim (TL)
         min_market_cap: float = 50_000_000,  # Minimum piyasa değeri (50M TL)
     ):
+        """Otomatik eklendi."""
         self.size_breakpoint = size_breakpoint
         self.bm_low = bm_low
         self.bm_high = bm_high
@@ -316,7 +317,8 @@ class FamaFrenchFactorBuilder:
         bl_mask = big & low_bm
 
         # Her portföyün ortalama getirisi
-        def safe_mean(mask):
+        def safe_mean(mask) -> Any:
+            """Otomatik eklendi."""
             if np.sum(mask) == 0:
                 return 0.0
             return float(np.mean(returns[mask]))
@@ -361,7 +363,8 @@ class FamaFrenchFactorBuilder:
         sw_mask = small & weak
         bw_mask = big & weak
 
-        def safe_mean(mask):
+        def safe_mean(mask) -> Any:
+            """Otomatik eklendi."""
             if np.sum(mask) == 0:
                 return 0.0
             return float(np.mean(returns[mask]))
@@ -405,7 +408,8 @@ class FamaFrenchFactorBuilder:
         sa_mask = small & aggressive
         ba_mask = big & aggressive
 
-        def safe_mean(mask):
+        def safe_mean(mask) -> Any:
+            """Otomatik eklendi."""
             if np.sum(mask) == 0:
                 return 0.0
             return float(np.mean(returns[mask]))
@@ -465,6 +469,7 @@ class FamaFrenchDataFetcher:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, Any] = {}
 
     async def fetch_and_build_factors(
@@ -601,6 +606,7 @@ class FamaFrenchDataFetcher:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
         def _fetch_one(ticker: str) -> tuple[str, dict]:
+            """Otomatik eklendi."""
             try:
                 stock = yf.Ticker(f"{ticker}.IS")
                 info = stock.info or {}

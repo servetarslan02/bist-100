@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Cross-Platform Startup Script v2.0 (Resilience-Enhanced)
 
@@ -89,26 +90,27 @@ APP_CONTAINERS = [
 # =====================================================
 
 
-def ensure_env_file():
+def ensure_env_file() -> Any:
     """ ".env dosyası yoksa .env.example'dan oluştur, otomatik şifre üret."""
     env_path = PROJECT_ROOT / ".env"
     example_path = PROJECT_ROOT / ".env.example"
 
     if env_path.exists():
-        print("[OK] .env dosyası mevcut.")
+        logger.info("[OK] .env dosyası mevcut.")
         return True
 
     if not example_path.exists():
-        print("[HATA] .env.example dosyası bulunamadı!")
+        logger.info("[HATA] .env.example dosyası bulunamadı!")
         return False
 
-    print("[!] .env dosyası bulunamadı, .env.example'dan oluşturuluyor...")
+    logger.info("[!] .env dosyası bulunamadı, .env.example'dan oluşturuluyor...")
 
     # .env.example'ı oku
     content = example_path.read_text(encoding="utf-8")
 
     # Otomatik güçlü şifreler üret
-    def gen_password(length=24):
+    def gen_password(length=24) -> Any:
+        """Otomatik eklendi."""
         return secrets.token_urlsafe(length)
 
     pg_password = gen_password()
@@ -146,11 +148,11 @@ def ensure_env_file():
         content = "\n".join(new_lines)
 
     env_path.write_text(content, encoding="utf-8")
-    print("[OK] .env dosyası oluşturuldu (otomatik şifreler üretildi).")
-    print("     ⚠️  Şifreleri kaydedin! Bir daha gösterilmeyecek.")
-    print(f"     POSTGRES_PASSWORD: {pg_password[:8]}...")
-    print(f"     REDIS_PASSWORD: {redis_password[:8]}...")
-    print(f"     GRAFANA_PASSWORD: {grafana_password[:8]}...")
+    logger.info("[OK] .env dosyası oluşturuldu (otomatik şifreler üretildi).")
+    logger.info("     ⚠️  Şifreleri kaydedin! Bir daha gösterilmeyecek.")
+    logger.info(f"     POSTGRES_PASSWORD: {pg_password[:8]}...")
+    logger.info(f"     REDIS_PASSWORD: {redis_password[:8]}...")
+    logger.info(f"     GRAFANA_PASSWORD: {grafana_password[:8]}...")
     return True
 
 
@@ -173,10 +175,10 @@ def is_docker_running() -> bool:
         return False
 
 
-def start_docker_desktop():
+def start_docker_desktop() -> Any:
     """Docker Desktop'ı platforma göre başlat."""
     system = platform.system()
-    print("[!] Docker motoru kapalı. Docker Desktop başlatılıyor...")
+    logger.info("[!] Docker motoru kapalı. Docker Desktop başlatılıyor...")
 
     if system == "Windows":
         local_app_data = os.environ.get("LOCALAPPDATA", "")
@@ -187,7 +189,7 @@ def start_docker_desktop():
         ]
         for path in candidates:
             if os.path.exists(path):
-                print(f"[*] Docker Desktop çalıştırılıyor: {path}")
+                logger.info(f"[*] Docker Desktop çalıştırılıyor: {path}")
                 subprocess.Popen([path], shell=True)
                 break
         else:
@@ -206,18 +208,18 @@ def start_docker_desktop():
             try:
                 subprocess.Popen(["systemctl", "start", "docker"])
             except FileNotFoundError:
-                print("[HATA] Docker başlatılamadı. Elle başlatın: systemctl start docker")
+                logger.info("[HATA] Docker başlatılamadı. Elle başlatın: systemctl start docker")
                 return False
 
-    print("[*] Docker daemon hazır olması bekleniyor (maks 60sn)...")
+    logger.info("[*] Docker daemon hazır olması bekleniyor (maks 60sn)...")
     for i in range(30):
         time.sleep(2)
         if is_docker_running():
-            print("[OK] Docker daemon aktif!")
+            logger.info("[OK] Docker daemon aktif!")
             return True
-        print(f"    Bekleniyor... ({i + 1}/30)")
+        logger.info(f"    Bekleniyor... ({i + 1}/30)")
 
-    print("[HATA] Docker başlatılamadı. Elle açıp tekrar deneyin.")
+    logger.info("[HATA] Docker başlatılamadı. Elle açıp tekrar deneyin.")
     return False
 
 
@@ -226,7 +228,7 @@ def start_docker_desktop():
 # =====================================================
 
 
-def ensure_mtls_certs():
+def ensure_mtls_certs() -> Any:
     """mTLS sertifikaları yoksa otomatik oluştur."""
     certs_dir = PROJECT_ROOT / "infrastructure" / "mtls" / "certs"
     ca_crt = certs_dir / "ca.crt"
@@ -234,32 +236,38 @@ def ensure_mtls_certs():
     client_crt = certs_dir / "client.crt"
 
     if ca_crt.exists() and server_crt.exists() and client_crt.exists():
-        print("[OK] mTLS güvenlik sertifikaları mevcut.")
+        logger.info("[OK] mTLS güvenlik sertifikaları mevcut.")
         return True
 
-    print("[*] mTLS sertifikaları oluşturuluyor...")
+    logger.info("[*] mTLS sertifikaları oluşturuluyor...")
     try:
         mtls_dir = PROJECT_ROOT / "infrastructure" / "mtls"
         res = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-v", f"{mtls_dir}:/work",
-                "-w", "/work",
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{mtls_dir}:/work",
+                "-w",
+                "/work",
                 "alpine:latest",
-                "sh", "-c", "apk add --no-cache openssl bash >/dev/null 2>&1 && bash generate_certs.sh"
+                "sh",
+                "-c",
+                "apk add --no-cache openssl bash >/dev/null 2>&1 && bash generate_certs.sh",
             ],
             capture_output=True,
             text=True,
             timeout=60,
         )
         if res.returncode == 0 and ca_crt.exists():
-            print("[OK] mTLS sertifikaları başarıyla oluşturuldu.")
+            logger.info("[OK] mTLS sertifikaları başarıyla oluşturuldu.")
             return True
         else:
-            print(f"[UYARI] Sertifika oluşturulamadı: {res.stderr}")
+            logger.info(f"[UYARI] Sertifika oluşturulamadı: {res.stderr}")
             return False
     except Exception as e:
-        print(f"[UYARI] Sertifika oluşturma hatası: {e}")
+        logger.info(f"[UYARI] Sertifika oluşturma hatası: {e}")
         return False
 
 
@@ -343,19 +351,19 @@ def get_block_device_id() -> str:
     return "8:0"
 
 
-def apply_ssd_write_limit():
+def apply_ssd_write_limit() -> Any:
     """Tüm data container'larına cgroup v2 ile 512 MB/s yazma limiti uygula."""
     # Linux değilse atla
     if platform.system() != "Linux":
-        print("[*] SSD limit: Sadece Linux'ta uygulanır, atlanıyor.")
+        logger.info("[*] SSD limit: Sadece Linux'ta uygulanır, atlanıyor.")
         return True
 
     # cgroup v2 kontrolü
     if not os.path.exists("/sys/fs/cgroup/io.max"):
-        print("[*] SSD limit: cgroup v2 io.max mevcut değil, atlanıyor.")
+        logger.info("[*] SSD limit: cgroup v2 io.max mevcut değil, atlanıyor.")
         return True
 
-    print(f"\n[*] SSD yazma hızı limiti uygulanıyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
+    logger.info(f"\n[*] SSD yazma hızı limiti uygulanıyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
 
     device_id = get_block_device_id()
     applied = 0
@@ -381,19 +389,19 @@ def apply_ssd_write_limit():
                 verify = f.read().strip()
 
             if str(SSD_WRITE_LIMIT_BYTES) in verify:
-                print(f"  ✅ {name} → {SSD_WRITE_LIMIT_MBPS} MB/s")
+                logger.info(f"  ✅ {name} → {SSD_WRITE_LIMIT_MBPS} MB/s")
                 applied += 1
             else:
                 failed += 1
 
         except PermissionError:
-            print(f"  ⚠️  {name} → izin hatası (sudo ile çalıştırın veya atlanıyor)")
+            logger.info(f"  ⚠️  {name} → izin hatası (sudo ile çalıştırın veya atlanıyor)")
             skipped += 1
         except Exception as e:
-            print(f"  ⚠️  {name} → {e}")
+            logger.info(f"  ⚠️  {name} → {e}")
             skipped += 1
 
-    print(f"[*] SSD limit: {applied} uygulandı, {skipped} atlandı, {failed} başarısız")
+    logger.info(f"[*] SSD limit: {applied} uygulandı, {skipped} atlandı, {failed} başarısız")
     return True
 
 
@@ -402,9 +410,9 @@ def apply_ssd_write_limit():
 # =====================================================
 
 
-def wait_for_containers_healthy(timeout_s: int = 180):
+def wait_for_containers_healthy(timeout_s: int = 180) -> Any:
     """Tüm container'ların healthy olmasını bekle."""
-    print(f"\n[*] Servislerin hazır olması bekleniyor (maks {timeout_s}sn)...")
+    logger.info(f"\n[*] Servislerin hazır olması bekleniyor (maks {timeout_s}sn)...")
     start = time.time()
     last_status = {}
 
@@ -433,17 +441,17 @@ def wait_for_containers_healthy(timeout_s: int = 180):
                 all_healthy = False
 
         if all_healthy:
-            print("[OK] Tüm servisler healthy!")
+            logger.info("[OK] Tüm servisler healthy!")
             return True
 
         elapsed = int(time.time() - start)
         if unhealthy:
-            print(f"    [{elapsed}s] Bekleniyor: {', '.join(unhealthy[:5])}")
+            logger.info(f"    [{elapsed}s] Bekleniyor: {', '.join(unhealthy[:5])}")
         else:
-            print(f"    [{elapsed}s] Bekleniyor...")
+            logger.info(f"    [{elapsed}s] Bekleniyor...")
         time.sleep(5)
 
-    print("[UYARI] Bazı servisler henüz healthy olmadı (timeout)")
+    logger.info("[UYARI] Bazı servisler henüz healthy olmadı (timeout)")
     return False
 
 
@@ -452,15 +460,15 @@ def wait_for_containers_healthy(timeout_s: int = 180):
 # =====================================================
 
 
-def setup_backup_cron():
+def setup_backup_cron() -> Any:
     """Otomatik backup cron'u kur (sadece Linux/Mac)."""
     if platform.system() == "Windows":
-        print("[*] Windows: Backup cron atlandı (Task Scheduler ile kurulabilir)")
+        logger.info("[*] Windows: Backup cron atlandı (Task Scheduler ile kurulabilir)")
         return
 
     script_path = PROJECT_ROOT / "scripts" / "backup_alpha.sh"
     if not script_path.exists():
-        print("[UYARI] backup_alpha.sh bulunamadı, cron atlandı")
+        logger.info("[UYARI] backup_alpha.sh bulunamadı, cron atlandı")
         return
 
     cron_line = f"0 2 * * * {script_path} >> {PROJECT_ROOT}/logs/backup.log 2>&1"
@@ -472,7 +480,7 @@ def setup_backup_cron():
 
         # Zaten ekli mi?
         if "backup_alpha.sh" in current_cron:
-            print("[OK] Backup cron zaten mevcut.")
+            logger.info("[OK] Backup cron zaten mevcut.")
             return
 
         # Yeni crontab oluştur
@@ -485,16 +493,16 @@ def setup_backup_cron():
         )
 
         if proc.returncode == 0:
-            print("[OK] Backup cron eklendi: her gün 02:00")
+            logger.info("[OK] Backup cron eklendi: her gün 02:00")
             # Logs dizini oluştur
             (PROJECT_ROOT / "logs").mkdir(exist_ok=True)
         else:
-            print(f"[UYARI] Backup cron eklenemedi: {proc.stderr[:200]}")
+            logger.info(f"[UYARI] Backup cron eklenemedi: {proc.stderr[:200]}")
 
     except FileNotFoundError:
-        print("[UYARI] crontab bulunamadı, backup cron atlandı")
+        logger.info("[UYARI] crontab bulunamadı, backup cron atlandı")
     except Exception as e:
-        print(f"[UYARI] Backup cron hatası: {e}")
+        logger.info(f"[UYARI] Backup cron hatası: {e}")
 
 
 # =====================================================
@@ -502,9 +510,9 @@ def setup_backup_cron():
 # =====================================================
 
 
-def verify_resilience():
+def verify_resilience() -> Any:
     """Resilience bileşenlerini doğrula."""
-    print("\n[*] Resilience bileşenleri doğrulanıyor...")
+    logger.info("\n[*] Resilience bileşenleri doğrulanıyor...")
     checks = []
 
     # .env dosyası
@@ -575,14 +583,14 @@ def verify_resilience():
     all_ok = True
     for name, ok in checks:
         status = "✅" if ok else "❌"
-        print(f"  {status} {name}")
+        logger.info(f"  {status} {name}")
         if not ok:
             all_ok = False
 
     if all_ok:
-        print("[OK] Tüm resilience bileşenleri doğrulandı!")
+        logger.info("[OK] Tüm resilience bileşenleri doğrulandı!")
     else:
-        print("[UYARI] Bazı resilience bileşenleri eksik!")
+        logger.info("[UYARI] Bazı resilience bileşenleri eksik!")
 
     return all_ok
 
@@ -592,11 +600,11 @@ def verify_resilience():
 # =====================================================
 
 
-def print_service_status():
+def print_service_status() -> Any:
     """Servis durumu özeti."""
-    print("\n" + "=" * 72)
-    print("  SERVİS DURUMU")
-    print("=" * 72)
+    logger.info("\n" + "=" * 72)
+    logger.info("  SERVİS DURUMU")
+    logger.info("=" * 72)
 
     all_containers = DATA_CONTAINERS + APP_CONTAINERS
     running = 0
@@ -613,36 +621,36 @@ def print_service_status():
             )
             status = result.stdout.strip()
             if status == "running":
-                print(f"  ✅ {name}")
+                logger.info(f"  ✅ {name}")
                 running += 1
             else:
-                print(f"  ❌ {name} → {status}")
+                logger.info(f"  ❌ {name} → {status}")
         except Exception:
-            print(f"  ❌ {name} → bulunamadı")
+            logger.info(f"  ❌ {name} → bulunamadı")
 
-    print(f"\n  Toplam: {running}/{total} servis çalışıyor")
+    logger.info(f"\n  Toplam: {running}/{total} servis çalışıyor")
 
 
-def print_access_points():
+def print_access_points() -> Any:
     """Erişim noktaları."""
-    print("\n" + "=" * 72)
-    print("  ERİŞİM NOKTALARI")
-    print("=" * 72)
-    print("  🌐 Web Dashboard:    http://localhost:3000")
-    print("  📡 REST API:         http://localhost:8000")
-    print("  📚 API Docs:         http://localhost:8000/docs")
-    print("  📊 Grafana:          http://localhost:3001")
-    print("  📈 Prometheus:       http://localhost:9090")
-    print("  🔬 MLflow:           http://localhost:5000")
-    print("  🗄️  ClickHouse:       http://localhost:8123")
-    print("  🐘 PostgreSQL:       localhost:5432")
-    print("  🐘 PG Replica:       localhost:5433")
-    print("  🔴 Redis:            localhost:6379")
-    print("  📨 NATS:             localhost:4222")
-    print("  🔷 Traefik:          http://localhost:8080")
-    print("  🏥 Autoheal:         otomatik unhealthy container restart")
-    print("  💾 Backup:           her gün 02:00 (cron)")
-    print("=" * 72)
+    logger.info("\n" + "=" * 72)
+    logger.info("  ERİŞİM NOKTALARI")
+    logger.info("=" * 72)
+    logger.info("  🌐 Web Dashboard:    http://localhost:3000")
+    logger.info("  📡 REST API:         http://localhost:8000")
+    logger.info("  📚 API Docs:         http://localhost:8000/docs")
+    logger.info("  📊 Grafana:          http://localhost:3001")
+    logger.info("  📈 Prometheus:       http://localhost:9090")
+    logger.info("  🔬 MLflow:           http://localhost:5000")
+    logger.info("  🗄️  ClickHouse:       http://localhost:8123")
+    logger.info("  🐘 PostgreSQL:       localhost:5432")
+    logger.info("  🐘 PG Replica:       localhost:5433")
+    logger.info("  🔴 Redis:            localhost:6379")
+    logger.info("  📨 NATS:             localhost:4222")
+    logger.info("  🔷 Traefik:          http://localhost:8080")
+    logger.info("  🏥 Autoheal:         otomatik unhealthy container restart")
+    logger.info("  💾 Backup:           her gün 02:00 (cron)")
+    logger.info("=" * 72)
 
 
 # =====================================================
@@ -650,42 +658,43 @@ def print_access_points():
 # =====================================================
 
 
-def main():
-    print("=" * 72)
-    print("      ALPHA BIST — OTONOM PIYASA ZEKASI VE QUANT PLATFORMU")
-    print("      v2.0 — Resilience-Enhanced Startup")
-    print("=" * 72)
-    print(f"  Proje Dizini: {PROJECT_ROOT}")
-    print(f"  SSD Yazma Limiti: {SSD_WRITE_LIMIT_MBPS} MB/s")
-    print(f"  Data Servisleri: {len(DATA_CONTAINERS)}")
-    print(f"  Uygulama Servisleri: {len(APP_CONTAINERS)}")
-    print("=" * 72)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 72)
+    logger.info("      ALPHA BIST — OTONOM PIYASA ZEKASI VE QUANT PLATFORMU")
+    logger.info("      v2.0 — Resilience-Enhanced Startup")
+    logger.info("=" * 72)
+    logger.info(f"  Proje Dizini: {PROJECT_ROOT}")
+    logger.info(f"  SSD Yazma Limiti: {SSD_WRITE_LIMIT_MBPS} MB/s")
+    logger.info(f"  Data Servisleri: {len(DATA_CONTAINERS)}")
+    logger.info(f"  Uygulama Servisleri: {len(APP_CONTAINERS)}")
+    logger.info("=" * 72)
 
     # 1. .env dosyası kontrolü
-    print("\n[ADIM 1/7] Ortam değişkenleri kontrol ediliyor...")
+    logger.info("\n[ADIM 1/7] Ortam değişkenleri kontrol ediliyor...")
     if not ensure_env_file():
         sys.exit(1)
 
     # 2. Docker kontrolü
-    print("\n[ADIM 2/7] Docker motoru kontrol ediliyor...")
+    logger.info("\n[ADIM 2/7] Docker motoru kontrol ediliyor...")
     if not is_docker_running():
         success = start_docker_desktop()
         if not success:
-            print("\n[HATA] Docker başlatılamadı.")
-            print("  Çözüm:")
-            print("    Windows: Docker Desktop'ı elle açın")
-            print("    Linux:   sudo systemctl start docker")
-            print("    Mac:     Docker Desktop'ı elle açın")
-            print("\n  Docker çalışırken tekrar deneyin: python start.py")
+            logger.info("\n[HATA] Docker başlatılamadı.")
+            logger.info("  Çözüm:")
+            logger.info("    Windows: Docker Desktop'ı elle açın")
+            logger.info("    Linux:   sudo systemctl start docker")
+            logger.info("    Mac:     Docker Desktop'ı elle açın")
+            logger.info("\n  Docker çalışırken tekrar deneyin: python start.py")
             sys.exit(1)
     else:
-        print("[OK] Docker motoru aktif ve hazır.")
+        logger.info("[OK] Docker motoru aktif ve hazır.")
 
     # 2.1 mTLS Sertifikaları kontrolü
     ensure_mtls_certs()
 
     # 3. Docker Compose Up
-    print("\n[ADIM 3/7] Mikro-servisler Docker Compose ile ayağa kaldırılıyor...")
+    logger.info("\n[ADIM 3/7] Mikro-servisler Docker Compose ile ayağa kaldırılıyor...")
     try:
         subprocess.run(
             ["docker", "compose", "up", "-d", "--build"],
@@ -694,27 +703,27 @@ def main():
             capture_output=True,
             text=True,
         )
-        print("[OK] Tüm servisler başlatıldı.")
+        logger.info("[OK] Tüm servisler başlatıldı.")
     except subprocess.CalledProcessError as e:
-        print(f"[HATA] Servisler başlatılamadı: {e}")
+        logger.info(f"[HATA] Servisler başlatılamadı: {e}")
         if e.stderr:
-            print(f"  Hata: {e.stderr[:500]}")
+            logger.info(f"  Hata: {e.stderr[:500]}")
         sys.exit(1)
 
     # 4. Container'ların healthy olmasını bekle
-    print("\n[ADIM 4/7] Servislerin hazır olması bekleniyor...")
+    logger.info("\n[ADIM 4/7] Servislerin hazır olması bekleniyor...")
     wait_for_containers_healthy(timeout_s=180)
 
     # 5. SSD yazma hızı limiti uygula
-    print("\n[ADIM 5/7] SSD yazma hızı limiti uygulanıyor...")
+    logger.info("\n[ADIM 5/7] SSD yazma hızı limiti uygulanıyor...")
     apply_ssd_write_limit()
 
     # 6. Backup cron kur
-    print("\n[ADIM 6/7] Otomatik backup kuruluyor...")
+    logger.info("\n[ADIM 6/7] Otomatik backup kuruluyor...")
     setup_backup_cron()
 
     # 7. Resilience doğrulama
-    print("\n[ADIM 7/7] Resilience bileşenleri doğrulanıyor...")
+    logger.info("\n[ADIM 7/7] Resilience bileşenleri doğrulanıyor...")
     verify_resilience()
 
     # Servis durumu özeti
@@ -724,23 +733,23 @@ def main():
     print_access_points()
 
     # Browser aç
-    print("\n🌐 Web Dashboard Açılıyor: http://localhost:3000")
+    logger.info("\n🌐 Web Dashboard Açılıyor: http://localhost:3000")
     time.sleep(2)
     try:
         webbrowser.open("http://localhost:3000")
     except Exception:
         logger.warning("Caught Exception in main", exc_info=True)
 
-    print("\n" + "=" * 72)
-    print("      ✅ ALPHA BIST BAŞARIYLA ÇALIŞIYOR!")
-    print(f"      SSD Yazma Limiti: {SSD_WRITE_LIMIT_MBPS} MB/s")
-    print("      Backup: Her gün 02:00")
-    print("      Autoheal: Aktif")
-    print("      Resilience: Doğrulandı")
-    print("=" * 72)
-    print("\n  Durdurmak için: docker compose down")
-    print("  Loglar için:    docker compose logs -f")
-    print("  Backup için:    bash scripts/backup_alpha.sh")
+    logger.info("\n" + "=" * 72)
+    logger.info("      ✅ ALPHA BIST BAŞARIYLA ÇALIŞIYOR!")
+    logger.info(f"      SSD Yazma Limiti: {SSD_WRITE_LIMIT_MBPS} MB/s")
+    logger.info("      Backup: Her gün 02:00")
+    logger.info("      Autoheal: Aktif")
+    logger.info("      Resilience: Doğrulandı")
+    logger.info("=" * 72)
+    logger.info("\n  Durdurmak için: docker compose down")
+    logger.info("  Loglar için:    docker compose logs -f")
+    logger.info("  Backup için:    bash scripts/backup_alpha.sh")
 
 
 if __name__ == "__main__":

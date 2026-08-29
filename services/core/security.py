@@ -20,12 +20,12 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import structlog
 
 # Merkezi OTel tracing dekoratörü ve tracer
-from services.core.otel import otel_trace, get_tracer
+from services.core.otel import get_tracer, otel_trace
 
 # passlib — bcrypt ile güvenli şifre hashleme (isteğe bağlı)
 try:
@@ -49,6 +49,7 @@ tracer = get_tracer(__name__)
 
 
 class Role(StrEnum):
+    """Otomatik eklendi."""
     VIEWER = "VIEWER"
     ANALYST = "ANALYST"
     OPERATOR = "OPERATOR"
@@ -57,6 +58,7 @@ class Role(StrEnum):
 
 
 class Permission(StrEnum):
+    """Otomatik eklendi."""
     READ_MARKET = "READ_MARKET"
     READ_PORTFOLIO = "READ_PORTFOLIO"
     RUN_BACKTEST = "RUN_BACKTEST"
@@ -68,14 +70,9 @@ class Permission(StrEnum):
 
 
 # Role → Permission mapping
-ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
+ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.VIEWER: {Permission.READ_MARKET, Permission.READ_PORTFOLIO},
-    Role.ANALYST: {
-        Permission.READ_MARKET, 
-        Permission.READ_PORTFOLIO, 
-        Permission.RUN_BACKTEST, 
-        Permission.RUN_SCENARIO
-    },
+    Role.ANALYST: {Permission.READ_MARKET, Permission.READ_PORTFOLIO, Permission.RUN_BACKTEST, Permission.RUN_SCENARIO},
     Role.OPERATOR: {
         Permission.READ_MARKET,
         Permission.READ_PORTFOLIO,
@@ -97,17 +94,18 @@ class User:
     role: Role
     password_hash: str = ""
     session_token: str = ""
-    token_expires: Optional[datetime] = None
+    token_expires: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
 
 
 class AuthenticationService:
     """Kimlik doğrulama servisidir. Bağımlılıkları DI ile alır."""
 
     def __init__(self) -> None:
-        self._users: Dict[str, User] = {}
-        self._sessions: Dict[str, str] = {}  # token → user_id
+        """Otomatik eklendi."""
+        self._users: dict[str, User] = {}
+        self._sessions: dict[str, str] = {}  # token → user_id
 
     @otel_trace("security.create_user")
     def create_user(self, username: str, password: str, role: Role = Role.VIEWER) -> User:
@@ -125,7 +123,7 @@ class AuthenticationService:
         logger.info("Kullanıcı oluşturuldu.", username=username, role=role.value)
         return user
 
-    def authenticate(self, username: str, password: str) -> Optional[str]:
+    def authenticate(self, username: str, password: str) -> str | None:
         """Kullanıcı bilgilerini doğrular ve geçerliyse JWT access token döndürür.
 
         Args:
@@ -165,7 +163,7 @@ class AuthenticationService:
             return token
 
     @otel_trace("security.validate_token")
-    def validate_token(self, token: str) -> Optional[User]:
+    def validate_token(self, token: str) -> User | None:
         """Verilen JWT token'ı doğrular ve ilgili User objesini döner."""
         from .jwt_manager import JWTError, jwt_manager
 
@@ -194,14 +192,14 @@ class AuthenticationService:
         try:
             if _USE_PASSLIB and ":" not in stored_hash:
                 return _pwd_context.verify(password, stored_hash)
-            
+
             salt, hash_hex = stored_hash.split(":")
             hash_val = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
             return hmac.compare_digest(hash_val.hex(), hash_hex)
         except Exception:
             return False
 
-    def _find_user(self, username: str) -> Optional[User]:
+    def _find_user(self, username: str) -> User | None:
         """Username'e göre kullanıcı arar."""
         for user in self._users.values():
             if user.username == username:
@@ -250,9 +248,10 @@ class SystemStateMachine:
     STATES = ["STARTING", "INITIALIZING", "READY", "DEGRADED", "RECOVERY", "FAILED"]
 
     def __init__(self) -> None:
+        """Otomatik eklendi."""
         self._state = "STARTING"
-        self._substates: Dict[str, str] = {}
-        self._history: List[Dict[str, Any]] = []
+        self._substates: dict[str, str] = {}
+        self._history: list[dict[str, Any]] = []
 
     @property
     def state(self) -> str:
@@ -266,7 +265,7 @@ class SystemStateMachine:
 
         old_state = self._state
         self._state = new_state
-        
+
         self._history.append(
             {
                 "from": old_state,
@@ -290,7 +289,7 @@ class SystemStateMachine:
         self._substates[component] = state
 
     @otel_trace("security.get_health")
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Tüm bileşenlerin birleşik sağlık durumunu döner."""
         return {
             "state": self._state,
@@ -312,7 +311,7 @@ class SafetyGovernance:
     ]
 
     @staticmethod
-    def validate_ai_action(action: str, context: Dict[str, Any]) -> bool:
+    def validate_ai_action(action: str, context: dict[str, Any]) -> bool:
         """AI eyleminin güvenli olup olmadığını kurallarla kontrol eder."""
         with tracer.start_as_current_span("security.validate_ai_action") as span:
             span.set_attribute("action", action)
@@ -351,7 +350,8 @@ safety_governance = SafetyGovernance()
 # Encryption Utilities
 # =============================================================================
 
-def encrypt_data(data: str, key: Optional[bytes] = None) -> Any:
+
+def encrypt_data(data: str, key: bytes | None = None) -> Any:
     """Verilen metni Fernet (AES-128-CBC) algoritması ile şifreler."""
     if not _USE_CRYPTO:
         raise RuntimeError("cryptography paketi bulunamadı. Kurulum: pip install cryptography")

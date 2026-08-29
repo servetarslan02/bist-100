@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Dinamik Tatil Senaryoları Gerçek Dünya Testi
 ==========================================================
@@ -26,17 +29,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class _EmptyModule:
-    def __getattr__(self, name):
-        return type('Fake', (), {'__init__': lambda s, *a, **k: None})()
+    """Otomatik eklendi."""
+    def __getattr__(self, name) -> Any:
+        """Otomatik eklendi."""
+        return type("Fake", (), {"__init__": lambda s, *a, **k: None})()
 
 
-if 'services' not in sys.modules:
-    sys.modules['services'] = _EmptyModule()
-if 'services.core' not in sys.modules:
-    sys.modules['services.core'] = _EmptyModule()
+if "services" not in sys.modules:
+    sys.modules["services"] = _EmptyModule()
+if "services.core" not in sys.modules:
+    sys.modules["services.core"] = _EmptyModule()
 
 
-def _load_module_direct(name, path):
+def _load_module_direct(name, path) -> Any:
+    """Otomatik eklendi."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -55,40 +61,47 @@ MarketCalendar = _mc_mod.MarketCalendar
 
 
 class TestResult:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.passed = 0
         self.failed = 0
         self.warnings = 0
         self.details = []
 
-    def ok(self, msg):
+    def ok(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.passed += 1
         self.details.append(f"  ✅ {msg}")
-        print(f"  ✅ {msg}")
+        logger.info(f"  ✅ {msg}")
 
-    def fail(self, msg):
+    def fail(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.failed += 1
         self.details.append(f"  ❌ {msg}")
-        print(f"  ❌ {msg}")
+        logger.info(f"  ❌ {msg}")
 
-    def warn(self, msg):
+    def warn(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.warnings += 1
         self.details.append(f"  ⚠️  {msg}")
-        print(f"  ⚠️  {msg}")
+        logger.info(f"  ⚠️  {msg}")
 
-    def summary(self):
+    def summary(self) -> Any:
+        """Otomatik eklendi."""
         total = self.passed + self.failed
-        return f"\n{'='*60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'='*60}"
+        return f"\n{'=' * 60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'=' * 60}"
 
 
 # =====================================================
 # SENARYO 1: Anlık Tatil İlan Edildi (Borsa Kapalı Kaldı)
 # =====================================================
 
-def test_sudden_holiday_declared(result: TestResult):
+
+def test_sudden_holiday_declared(result: TestResult) -> Any:
     """BIST anlık tatil ilan etti — sistem bunu yakalıyor mu?"""
-    print("\n⚡ SENARYO 1: Anlık Tatil İlan Edildi")
-    print("-" * 50)
+    logger.info("\n⚡ SENARYO 1: Anlık Tatil İlan Edildi")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_1"
     hm = HolidayManager(data_dir=test_dir)
@@ -147,10 +160,11 @@ def test_sudden_holiday_declared(result: TestResult):
 # SENARYO 2: Tatil Tarihi Değişti (Erteleme)
 # =====================================================
 
-def test_holiday_date_change(result: TestResult):
+
+def test_holiday_date_change(result: TestResult) -> Any:
     """Tatil tarihi değişti — sistem günceliyor mu?"""
-    print("\n📅 SENARYO 2: Tatil Tarihi Değişti (Erteleme)")
-    print("-" * 50)
+    logger.info("\n📅 SENARYO 2: Tatil Tarihi Değişti (Erteleme)")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_2"
     hm = HolidayManager(data_dir=test_dir)
@@ -192,10 +206,11 @@ def test_holiday_date_change(result: TestResult):
 # SENARYO 3: Tatil İptal Edildi (Çalışma Günü İlan Edildi)
 # =====================================================
 
-def test_holiday_cancelled(result: TestResult):
+
+def test_holiday_cancelled(result: TestResult) -> Any:
     """Tatil iptal edildi — sistem bunu handle ediyor mu?"""
-    print("\n❌ SENARYO 3: Tatil İptal Edildi (Çalışma Günü)")
-    print("-" * 50)
+    logger.info("\n❌ SENARYO 3: Tatil İptal Edildi (Çalışma Günü)")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_3"
     hm = HolidayManager(data_dir=test_dir)
@@ -224,10 +239,11 @@ def test_holiday_cancelled(result: TestResult):
 # SENARYO 4: Pipeline Etkisi (Tatil Günü İşlem Durdurma)
 # =====================================================
 
-def test_pipeline_halt_on_holiday(result: TestResult):
+
+def test_pipeline_halt_on_holiday(result: TestResult) -> Any:
     """Tatil gününde pipeline duruyor mu?"""
-    print("\n🔧 SENARYO 4: Pipeline Tatil Günü Duruyor mu?")
-    print("-" * 50)
+    logger.info("\n🔧 SENARYO 4: Pipeline Tatil Günü Duruyor mu?")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_4"
     hm = HolidayManager(data_dir=test_dir)
@@ -266,10 +282,11 @@ def test_pipeline_halt_on_holiday(result: TestResult):
 # SENARYO 5: Eşik Değeri Davranışı
 # =====================================================
 
-def test_threshold_behavior(result: TestResult):
+
+def test_threshold_behavior(result: TestResult) -> Any:
     """SuddenHolidayDetector eşik değerlerini test et."""
-    print("\n🎯 SENARYO 5: Eşik Değeri Davranışı")
-    print("-" * 50)
+    logger.info("\n🎯 SENARYO 5: Eşik Değeri Davranışı")
+    logger.info("-" * 50)
 
     detector = SuddenHolidayDetector()
     test_date = date(2026, 8, 28)
@@ -289,7 +306,7 @@ def test_threshold_behavior(result: TestResult):
     if detected:
         result.ok(f"Rapor 3/3: Tespit edildi (sayac={count}) ✓")
     else:
-        result.fail(f"Rapor 3/3: Tespit edilemedi!")
+        result.fail("Rapor 3/3: Tespit edilemedi!")
 
     # Farklı günlerin bağımsız olduğunu kontrol et
     other_date = date(2026, 8, 29)
@@ -302,17 +319,18 @@ def test_threshold_behavior(result: TestResult):
     # 1 saatlik interval ile zaman hesabı
     interval_seconds = 3600  # 1 saat
     detection_time = 3 * interval_seconds
-    result.ok(f"Eşik hesabı: 3 kontrol × {interval_seconds}s = {detection_time}s = {detection_time//60} dakika")
+    result.ok(f"Eşik hesabı: 3 kontrol × {interval_seconds}s = {detection_time}s = {detection_time // 60} dakika")
 
 
 # =====================================================
 # SENARYO 6: Cache Tutarlılığı (Restart Senaryosu)
 # =====================================================
 
-def test_cache_consistency(result: TestResult):
+
+def test_cache_consistency(result: TestResult) -> Any:
     """Restart sonrası cache tutarlılığını test et."""
-    print("\n💾 SENARYO 6: Cache Tutarlılığı (Restart)")
-    print("-" * 50)
+    logger.info("\n💾 SENARYO 6: Cache Tutarlılığı (Restart)")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_6"
     cache_file = Path(test_dir) / "holiday_cache.json"
@@ -361,10 +379,11 @@ def test_cache_consistency(result: TestResult):
 # SENARYO 7: Yarım Gün Dinamik Yönetimi
 # =====================================================
 
-def test_half_day_dynamic(result: TestResult):
+
+def test_half_day_dynamic(result: TestResult) -> Any:
     """Yarım gün dinik yönetimini test et."""
-    print("\n⏰ SENARYO 7: Yarım Gün Dinamik Yönetimi")
-    print("-" * 50)
+    logger.info("\n⏰ SENARYO 7: Yarım Gün Dinamik Yönetimi")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_7"
     hm = HolidayManager(data_dir=test_dir)
@@ -374,7 +393,7 @@ def test_half_day_dynamic(result: TestResult):
     if half_days_2026:
         result.ok(f"2026 yarım günleri: {len(half_days_2026)} gün")
         for hd in sorted(half_days_2026):
-            print(f"      📅 {hd}")
+            logger.info(f"      📅 {hd}")
 
     # Ramazan arifesi (2026-03-19)
     ramazan_eve = date(2026, 3, 19)
@@ -396,10 +415,11 @@ def test_half_day_dynamic(result: TestResult):
 # SENARYO 8: BIST Web Senkronizasyonu
 # =====================================================
 
-async def test_bist_sync(result: TestResult):
+
+async def test_bist_sync(result: TestResult) -> Any:
     """BIST web sitesinden tatil senkronizasyonunu test et."""
-    print("\n🌐 SENARYO 8: BIST Web Senkronizasyonu")
-    print("-" * 50)
+    logger.info("\n🌐 SENARYO 8: BIST Web Senkronizasyonu")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_8"
     hm = HolidayManager(data_dir=test_dir)
@@ -421,10 +441,11 @@ async def test_bist_sync(result: TestResult):
 # SENARYO 9: Eş Zamanlı Okuma/Yazma
 # =====================================================
 
-def test_concurrent_access(result: TestResult):
+
+def test_concurrent_access(result: TestResult) -> Any:
     """Eş zamanlı erişim senaryolarını test et."""
-    print("\n🔄 SENARYO 9: Eş Zamanlı Erişim")
-    print("-" * 50)
+    logger.info("\n🔄 SENARYO 9: Eş Zamanlı Erişim")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_9"
     hm = HolidayManager(data_dir=test_dir)
@@ -462,10 +483,11 @@ def test_concurrent_access(result: TestResult):
 # SENARYO 10: Gerçek Zamanlı Pipeline Simülasyonu
 # =====================================================
 
-def test_pipeline_simulation(result: TestResult):
+
+def test_pipeline_simulation(result: TestResult) -> Any:
     """Gerçek zamanlı pipeline davranışını simüle et."""
-    print("\n🎮 SENARYO 10: Gerçek Zamanlı Pipeline Simülasyonu")
-    print("-" * 50)
+    logger.info("\n🎮 SENARYO 10: Gerçek Zamanlı Pipeline Simülasyonu")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_dynamic_test_10"
     hm = HolidayManager(data_dir=test_dir)
@@ -478,13 +500,13 @@ def test_pipeline_simulation(result: TestResult):
     # 09:00 — piyasa kapalı (açılış öncesi)
     dt_09 = datetime(2026, 8, 28, 9, 0, tzinfo=IST)
     info_09 = cal.get_info(dt_09)
-    if info_09['session'] == 'CLOSED':
+    if info_09["session"] == "CLOSED":
         result.ok("09:00: Piyasa kapalı (açılış öncesi) ✓")
 
     # 10:30 — piyasa açık
     dt_10 = datetime(2026, 8, 28, 10, 30, tzinfo=IST)
     info_10 = cal.get_info(dt_10)
-    if info_10['session'] == 'CONTINUOUS':
+    if info_10["session"] == "CONTINUOUS":
         result.ok("10:30: Piyasa açık (sürekli müzayede) ✓")
 
     # Anlık tatil ilan edildi
@@ -492,16 +514,16 @@ def test_pipeline_simulation(result: TestResult):
 
     # 10:30 — artık piyasa kapalı olmalı
     info_10_after = cal.get_info(dt_10)
-    if info_10_after['session'] == 'CLOSED':
+    if info_10_after["session"] == "CLOSED":
         result.ok("10:30 (tatil sonrası): Piyasa kapalı ✓")
     else:
-        result.fail(f"10:30 (tatil sonrası): Piyasa hâlâ açık!")
+        result.fail("10:30 (tatil sonrası): Piyasa hâlâ açık!")
 
     # Tatil kaldırıldı — piyasa tekrar açık olmalı
     cal._hm.remove_holiday(today)
     cal = MarketCalendar(holidays=list(hm.get_holidays(2026)))
     info_10_restored = cal.get_info(dt_10)
-    if info_10_restored['session'] == 'CONTINUOUS':
+    if info_10_restored["session"] == "CONTINUOUS":
         result.ok("10:30 (tatil kaldırıldı): Piyasa tekrar açık ✓")
     else:
         result.fail("10:30 (tatil kaldırıldı): Piyasa hâlâ kapalı!")
@@ -511,11 +533,13 @@ def test_pipeline_simulation(result: TestResult):
 # ANA TEST RUNNER
 # =====================================================
 
-async def main():
-    print("=" * 60)
-    print("🧪 ALPHA BIST — Dinamik Tatil Senaryoları Testi")
-    print(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+
+async def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("🧪 ALPHA BIST — Dinamik Tatil Senaryoları Testi")
+    logger.info(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 60)
 
     result = TestResult()
 
@@ -530,7 +554,7 @@ async def main():
     test_concurrent_access(result)
     test_pipeline_simulation(result)
 
-    print(result.summary())
+    logger.info(result.summary())
 
     # Rapor
     report_path = Path(__file__).parent.parent / "reports" / "dynamic_holiday_audit.json"
@@ -544,7 +568,7 @@ async def main():
     }
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
-    print(f"\n📄 Rapor: {report_path}")
+    logger.info(f"\n📄 Rapor: {report_path}")
 
     return 0 if result.failed == 0 else 1
 

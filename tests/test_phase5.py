@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 5 Test Suite
 
@@ -7,7 +10,7 @@ Monte Carlo Engine, Probability Engine testleri.
 import sys
 
 
-def test_monte_carlo():
+def test_monte_carlo() -> Any:
     """Monte Carlo Engine testleri."""
     from services.intelligence.monte_carlo import monte_carlo_engine
 
@@ -30,20 +33,20 @@ def test_monte_carlo():
     assert result.p10 < result.p25 < result.p50 < result.p75 < result.p90
     assert 0 < result.prob_positive < 1
     passed += 1
-    print(f"  ✓ Basic simulation (P50={result.p50:.2f}, P(+%)={result.prob_positive:.2%})")
+    logger.info(f"  ✓ Basic simulation (P50={result.p50:.2f}, P(+%)={result.prob_positive:.2%})")
 
     # 2. Percentile ordering
     assert result.p10 < result.p50 < result.p90
     assert result.var_95 < 0  # VaR negatif (kayıp)
     assert result.cvar_95 < result.var_95  # CVaR daha kötü
     passed += 1
-    print(f"  ✓ Percentile ordering (P10={result.p10:.2f}, P90={result.p90:.2f})")
+    logger.info(f"  ✓ Percentile ordering (P10={result.p10:.2f}, P90={result.p90:.2f})")
 
     # 3. Probability consistency
     assert result.prob_minus_10pct <= result.prob_minus_5pct  # %10 kayıp < %5 kayıp
     assert result.prob_plus_10pct <= result.prob_plus_5pct  # %10 kazanç < %5 kazanç
     passed += 1
-    print("  ✓ Probability consistency")
+    logger.info("  ✓ Probability consistency")
 
     # 4. High volatility → wider distribution
     result_high_vol = monte_carlo_engine.simulate_price_paths(
@@ -60,13 +63,13 @@ def test_monte_carlo():
     # Normalize by price
     assert (spread_high / 100) > (spread_low / 305.25)
     passed += 1
-    print("  ✓ High volatility → wider spread")
+    logger.info("  ✓ High volatility → wider spread")
 
     # 5. Sample paths
     assert result.sample_paths is not None
     assert len(result.sample_paths) <= 100
     passed += 1
-    print(f"  ✓ Sample paths ({len(result.sample_paths)} paths)")
+    logger.info(f"  ✓ Sample paths ({len(result.sample_paths)} paths)")
 
     # 6. Dynamic scenario count
     count = monte_carlo_engine.compute_dynamic_scenario_count(
@@ -77,12 +80,12 @@ def test_monte_carlo():
     )
     assert count >= 1000
     passed += 1
-    print(f"  ✓ Dynamic scenario count: {count}")
+    logger.info(f"  ✓ Dynamic scenario count: {count}")
 
     return passed, failed
 
 
-def test_probability_engine():
+def test_probability_engine() -> Any:
     """Probability Engine testleri."""
     from services.intelligence.probability import (
         PredictionOutcome,
@@ -103,7 +106,7 @@ def test_probability_engine():
     assert dist.std_return > 0
     assert dist.percentiles[10] < dist.percentiles[50] < dist.percentiles[90]
     passed += 1
-    print(f"  ✓ Return distribution (mean={dist.mean_return:.2f}, std={dist.std_return:.2f})")
+    logger.info(f"  ✓ Return distribution (mean={dist.mean_return:.2f}, std={dist.std_return:.2f})")
 
     # 2. Hit rate
     predictions = [
@@ -116,7 +119,7 @@ def test_probability_engine():
     hit_rate = probability_engine.compute_hit_rate(predictions)
     assert hit_rate == 1.0  # Tüm tahminler doğru
     passed += 1
-    print(f"  ✓ Hit rate: {hit_rate:.2%}")
+    logger.info(f"  ✓ Hit rate: {hit_rate:.2%}")
 
     # 3. Hit rate with errors
     predictions_wrong = [
@@ -127,7 +130,7 @@ def test_probability_engine():
     hit_rate2 = probability_engine.compute_hit_rate(predictions_wrong)
     assert hit_rate2 < 1.0
     passed += 1
-    print(f"  ✓ Hit rate with errors: {hit_rate2:.2%}")
+    logger.info(f"  ✓ Hit rate with errors: {hit_rate2:.2%}")
 
     # 4. Calibration
     # İyi kalibre edilmiş tahminler
@@ -142,7 +145,7 @@ def test_probability_engine():
     assert cal.brier_score < 0.3  # İyi kalibrasyon
     assert 0 <= cal.calibration_error <= 1
     passed += 1
-    print(f"  ✓ Calibration (Brier={cal.brier_score:.3f}, ECE={cal.calibration_error:.3f})")
+    logger.info(f"  ✓ Calibration (Brier={cal.brier_score:.3f}, ECE={cal.calibration_error:.3f})")
 
     # 5. Probability from features
     features = {
@@ -158,7 +161,7 @@ def test_probability_engine():
     assert 0 <= prob["confidence"] <= 1
     assert prob["probability_positive"] > 0.5  # Pozitif features → yüksek olasılık
     passed += 1
-    print(f"  ✓ Probability from features: {prob['probability_positive']:.2%}")
+    logger.info(f"  ✓ Probability from features: {prob['probability_positive']:.2%}")
 
     # 6. Negative features
     features_neg = {
@@ -172,7 +175,7 @@ def test_probability_engine():
     prob_neg = probability_engine.compute_probability_from_features(features_neg)
     assert prob_neg["probability_positive"] < 0.5
     passed += 1
-    print(f"  ✓ Negative features: {prob_neg['probability_positive']:.2%}")
+    logger.info(f"  ✓ Negative features: {prob_neg['probability_positive']:.2%}")
 
     # 7. Empty predictions
     empty_hit = probability_engine.compute_hit_rate([])
@@ -180,15 +183,16 @@ def test_probability_engine():
     empty_cal = probability_engine.compute_calibration([])
     assert empty_cal.brier_score == 0.0
     passed += 1
-    print("  ✓ Empty predictions handled")
+    logger.info("  ✓ Empty predictions handled")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 5 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 5 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -199,21 +203,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

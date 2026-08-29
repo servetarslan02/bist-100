@@ -52,6 +52,7 @@ class SPECConfig:
 
 @dataclass
 class SPECResult:
+    """Otomatik eklendi."""
     ticker: str
     timestamp: datetime
     spec_score: float
@@ -73,6 +74,7 @@ class SPECEngine:
     """SPEC skor hesaplama motoru."""
 
     def __init__(self, config: SPECConfig | None = None):
+        """Otomatik eklendi."""
         self.config = config or SPECConfig()
 
     def compute_spec(
@@ -148,6 +150,7 @@ class SPECEngine:
         )
 
     def _compute_anomaly(self, state: dict[str, Any]) -> float:
+        """Otomatik eklendi."""
         vol_z = abs(_safe(state.get("volume_zscore", 0)))
         price_z = abs(_safe(state.get("price_change_1d_zscore", 0)))
         volat_z = abs(_safe(state.get("volatility_zscore", 0)))
@@ -271,6 +274,7 @@ class SPECEngine:
         return consensus, evidence
 
     def _compute_regime_compatibility(self, state: dict[str, Any], market_state: dict[str, Any]) -> tuple[float, dict]:
+        """Otomatik eklendi."""
         current_regime = market_state.get("regime", "UNKNOWN")
         asset_direction = "LONG" if _safe(state.get("momentum_20d", 0)) > 0 else "SHORT"
 
@@ -323,6 +327,7 @@ class SPECEngine:
         return min(max(normalized, 0), 1)
 
     def _compute_risk_asymmetry(self, state: dict[str, Any], ml_predictions: dict | None) -> float:
+        """Otomatik eklendi."""
         if ml_predictions:
             upside = _safe(ml_predictions.get("upside_75pct", 3.0))
             downside = abs(_safe(ml_predictions.get("downside_25pct", 3.0)))
@@ -336,12 +341,14 @@ class SPECEngine:
         return min(ratio / 3.0, 1.0)
 
     def _compute_historical_similarity(self, analogues: list[dict] | None) -> float:
+        """Otomatik eklendi."""
         if not analogues or len(analogues) == 0:
             return 0.5
         positive_count = sum(1 for a in analogues if _safe(a.get("outcome_return", 0)) > 0)
         return positive_count / len(analogues)
 
     def _compute_penalties(self, state: dict[str, Any], market_state: dict[str, Any]) -> tuple[float, dict[str, float]]:
+        """Otomatik eklendi."""
         penalties = {}
         vol_regime = state.get("volatility_regime", "NORMAL")
         if vol_regime == "EXTREME":
@@ -379,6 +386,7 @@ class SPECEngine:
         return total_penalty, penalties
 
     def _categorize(self, score: float) -> str:
+        """Otomatik eklendi."""
         if score >= 85:
             return "HIGH_CONVICTION"
         elif score >= 70:

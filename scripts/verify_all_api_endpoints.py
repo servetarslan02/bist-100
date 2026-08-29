@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — API Endpoint Doğrulama Scripti
 
@@ -37,7 +39,7 @@ failed_checks = 0
 warning_checks = 0
 
 
-def check(name: str, status: str, detail: str = ""):
+def check(name: str, status: str, detail: str = "") -> Any:
     """Tek bir kontrol sonucunu kaydet."""
     global total_checks, passed_checks, failed_checks, warning_checks
     total_checks += 1
@@ -52,14 +54,14 @@ def check(name: str, status: str, detail: str = ""):
         icon = "⚠️"
 
     results[name] = {"status": status, "detail": detail, "icon": icon}
-    print(f"  {icon} {name}" + (f" — {detail}" if detail else ""))
+    logger.info(f"  {icon} {name}" + (f" — {detail}" if detail else ""))
 
 
-def section(title: str):
+def section(title: str) -> Any:
     """Bölüm başlığı."""
-    print(f"\n{'=' * 60}")
-    print(f"  {title}")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  {title}")
+    logger.info(f"{'=' * 60}")
 
 
 # =====================================================
@@ -730,7 +732,7 @@ except Exception as e:
 
 section("SONUÇ RAPORU")
 
-print(f"""
+logger.info(f"""
   📊 Toplam Kontrol:    {total_checks}
   ✅ Başarılı:          {passed_checks}
   ❌ Başarısız:         {failed_checks}
@@ -740,23 +742,23 @@ print(f"""
 """)
 
 if failed_checks > 0:
-    print("  ❌ BAŞARISIZ KONTROLLER:")
+    logger.info("  ❌ BAŞARISIZ KONTROLLER:")
     for name, result in results.items():
         if result["status"] == "FAIL":
-            print(f"     • {name}: {result['detail']}")
+            logger.info(f"     • {name}: {result['detail']}")
 
 if warning_checks > 0:
-    print("\n  ⚠️  UYARILAR (servisler çalışmıyor olabilir):")
+    logger.info("\n  ⚠️  UYARILAR (servisler çalışmıyor olabilir):")
     for name, result in results.items():
         if result["status"] == "WARN":
-            print(f"     • {name}: {result['detail']}")
+            logger.info(f"     • {name}: {result['detail']}")
 
-print(f"\n{'=' * 60}")
+logger.info(f"\n{'=' * 60}")
 if failed_checks == 0:
-    print("  🎉 TÜM KRİTİK KONTROLLER BAŞARILI!")
+    logger.info("  🎉 TÜM KRİTİK KONTROLLER BAŞARILI!")
 else:
-    print(f"  ⚠️  {failed_checks} KRİTİK KONTROL BAŞARISIZ — düzeltme gerekli")
-print(f"{'=' * 60}\n")
+    logger.info(f"  ⚠️  {failed_checks} KRİTİK KONTROL BAŞARISIZ — düzeltme gerekli")
+logger.info(f"{'=' * 60}\n")
 
 # Exit code
 sys.exit(0 if failed_checks == 0 else 1)

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Historical Data Pipeline Tests
 
@@ -8,7 +11,7 @@ PIT-safe historical fundamental, KAP, news, catalyst testleri.
 import sys
 
 
-def _make_repo_with_fixtures():
+def _make_repo_with_fixtures() -> Any:
     """Test fixture'ları ile repository oluştur."""
     from services.data.historical_contracts import (
         CatalystSnapshot,
@@ -146,7 +149,7 @@ def _make_repo_with_fixtures():
 # =====================================================
 
 
-def test_fundamental_publication_pit():
+def test_fundamental_publication_pit() -> Any:
     """Fundamental veri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -178,7 +181,7 @@ def test_fundamental_publication_pit():
 # =====================================================
 
 
-def test_fundamental_period_selection():
+def test_fundamental_period_selection() -> Any:
     """Birden fazla snapshot varsa en güncel olanı seçilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -209,7 +212,7 @@ def test_fundamental_period_selection():
 # =====================================================
 
 
-def test_fundamental_future_rejection():
+def test_fundamental_future_rejection() -> Any:
     """Gelecekteki fundamental veri reddedilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -231,7 +234,7 @@ def test_fundamental_future_rejection():
 # =====================================================
 
 
-def test_fundamental_latest_known():
+def test_fundamental_latest_known() -> Any:
     """En son bilinen snapshot kullanılmalı (eksik dönem olsa bile)."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -255,7 +258,7 @@ def test_fundamental_latest_known():
 # =====================================================
 
 
-def test_kap_publication_pit():
+def test_kap_publication_pit() -> Any:
     """KAP event'leri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -284,7 +287,7 @@ def test_kap_publication_pit():
 # =====================================================
 
 
-def test_kap_duplicate_event():
+def test_kap_duplicate_event() -> Any:
     """Aynı KAP event'i tekrar eklenmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
@@ -322,7 +325,7 @@ def test_kap_duplicate_event():
 # =====================================================
 
 
-def test_kap_ticker_validation():
+def test_kap_ticker_validation() -> Any:
     """KAP event'leri doğru ticker ile eşleşmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -350,7 +353,7 @@ def test_kap_ticker_validation():
 # =====================================================
 
 
-def test_news_publication_pit():
+def test_news_publication_pit() -> Any:
     """Haber event'leri sadece publication tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -379,7 +382,7 @@ def test_news_publication_pit():
 # =====================================================
 
 
-def test_news_ticker_matching():
+def test_news_ticker_matching() -> Any:
     """Haberler doğru ticker ile eşleşmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -401,7 +404,7 @@ def test_news_ticker_matching():
 # =====================================================
 
 
-def test_news_duplicate_event():
+def test_news_duplicate_event() -> Any:
     """Aynı haber tekrar eklenmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
@@ -435,7 +438,7 @@ def test_news_duplicate_event():
 # =====================================================
 
 
-def test_sentiment_deterministic():
+def test_sentiment_deterministic() -> Any:
     """Aynı event'ler → aynı sentiment (deterministic)."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -462,7 +465,7 @@ def test_sentiment_deterministic():
 # =====================================================
 
 
-def test_catalyst_announcement_pit():
+def test_catalyst_announcement_pit() -> Any:
     """Catalyst sadece announcement tarihinden sonra kullanılabilir."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -491,7 +494,7 @@ def test_catalyst_announcement_pit():
 # =====================================================
 
 
-def test_catalyst_future_rejection():
+def test_catalyst_future_rejection() -> Any:
     """Gelecekteki announcement reddedilmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -513,7 +516,7 @@ def test_catalyst_future_rejection():
 # =====================================================
 
 
-def test_historical_snapshot_deterministic():
+def test_historical_snapshot_deterministic() -> Any:
     """Aynı snapshot → aynı feature (deterministic)."""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -537,7 +540,7 @@ def test_historical_snapshot_deterministic():
 # =====================================================
 
 
-def test_future_mutation_invariance():
+def test_future_mutation_invariance() -> Any:
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
@@ -589,7 +592,7 @@ def test_future_mutation_invariance():
 # =====================================================
 
 
-def test_missing_data_behavior():
+def test_missing_data_behavior() -> Any:
     """Eksik veri durumunda boş dict dönmeli (50 ile doldurma)."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import InMemoryHistoricalRepository
@@ -611,7 +614,7 @@ def test_missing_data_behavior():
 # =====================================================
 
 
-def test_stale_data_behavior():
+def test_stale_data_behavior() -> Any:
     """Eski veri STALE olarak işaretlenmeli."""
     from services.data.historical_adapter import HistoricalDataAdapter
     from services.data.historical_contracts import FundamentalSnapshot, InMemoryHistoricalRepository
@@ -645,7 +648,7 @@ def test_stale_data_behavior():
 # =====================================================
 
 
-def test_complete_historical_snapshot():
+def test_complete_historical_snapshot() -> Any:
     """Tam historical snapshot çalışıyor mu?"""
     from services.data.historical_adapter import HistoricalDataAdapter
 
@@ -684,7 +687,7 @@ def test_complete_historical_snapshot():
 # =====================================================
 
 
-def test_canonical_fundamental_score():
+def test_canonical_fundamental_score() -> Any:
     """Historical fundamental veri canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
@@ -710,7 +713,7 @@ def test_canonical_fundamental_score():
     return "Canonical fundamental score", len(issues) == 0, issues
 
 
-def test_canonical_news_score():
+def test_canonical_news_score() -> Any:
     """Historical news sentiment canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
@@ -738,7 +741,7 @@ def test_canonical_news_score():
     return "Canonical news score", len(issues) == 0, issues
 
 
-def test_canonical_catalyst_score():
+def test_canonical_catalyst_score() -> Any:
     """Historical catalyst canonical skoru etkiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.data.historical_adapter import HistoricalDataAdapter
@@ -770,10 +773,11 @@ def test_canonical_catalyst_score():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("  Historical Data Pipeline Tests")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  Historical Data Pipeline Tests")
+    logger.info("=" * 60)
 
     tests = [
         # Fundamental
@@ -819,22 +823,22 @@ def run_all():
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"
-        print(f"{icon} {name}")
+        logger.info(f"{icon} {name}")
         if ok:
             passed += 1
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\n  HATALAR:")
+        logger.info("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"    {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"    {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

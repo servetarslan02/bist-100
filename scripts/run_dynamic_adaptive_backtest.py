@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama Simülasyonu
 =================================================================================
@@ -63,23 +66,23 @@ BENCHMARK_TICKER = "XU100.IS"
 from services.data.historical_warehouse import historical_warehouse
 
 
-def load_bist_historical_data():
+def load_bist_historical_data() -> Any:
     """30 yıllık gerçek BIST verilerini yerel disk deposundan 0.3 saniyede yükler."""
-    print("=" * 90)
-    print("1. BIST-100 & LOKOMOTİF HİSSE VERİLERİ YEREL DİSKTEN YÜKLENİYOR (1997 - 2026)")
-    print("=" * 90)
+    logger.info("=" * 90)
+    logger.info("1. BIST-100 & LOKOMOTİF HİSSE VERİLERİ YEREL DİSKTEN YÜKLENİYOR (1997 - 2026)")
+    logger.info("=" * 90)
 
     bm_df, stock_dict = historical_warehouse.load_30y_data()
 
-    print(
+    logger.info(
         f"✓ BIST-100: {len(bm_df)} seans günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})"
     )
-    print(f"✓ {len(stock_dict)} hissenin 30 yıllık eksiksiz verisi hazırlandı.")
+    logger.info(f"✓ {len(stock_dict)} hissenin 30 yıllık eksiksiz verisi hazırlandı.")
 
-    print("  • Mum formasyonları hafızaya önbellekleniyor (Mikrosaniye hızlı simülasyon)...")
+    logger.info("  • Mum formasyonları hafızaya önbellekleniyor (Mikrosaniye hızlı simülasyon)...")
     for ticker, df_t in stock_dict.items():
         dynamic_candle_matrix.precompute_stock_patterns(ticker, df_t)
-    print("    ✓ Tüm formasyon olayları hafızaya alındı.\n")
+    logger.info("    ✓ Tüm formasyon olayları hafızaya alındı.\n")
 
     return bm_df, stock_dict
 
@@ -91,9 +94,9 @@ def run_stage_simulation(
     bm_df: pl.DataFrame,
     stock_dict: dict[str, pl.DataFrame],
     initial_capital: float = 100000.0,
-):
+) -> Any:
     """Belirli bir zaman dilimi için Next-Bar Open icralı dinamik simülasyon koşturur."""
-    print(f"\n>> {stage_name} ({start_year} - {end_year}) SİMÜLASYONU BAŞLATILIYOR...")
+    logger.info(f"\n>> {stage_name} ({start_year} - {end_year}) SİMÜLASYONU BAŞLATILIYOR...")
 
     COMMISSION_RATE = 0.0015
     SLIPPAGE_RATE = 0.0010
@@ -308,15 +311,15 @@ def run_stage_simulation(
     pf = round(wins / max(losses, 1e-9), 2)
     mega_winners = df_trades[df_trades["ret_pct"] >= 50] if total_trades > 0 else []
 
-    print("-" * 80)
-    print(f"📊 {stage_name} SONUÇLARI:")
-    print(f"  • Nihai Portföy Değeri  : {final_equity:,.0f} ₺ (Başlangıç: {initial_capital:,.0f} ₺)")
-    print(f"  • Motor Toplam Getirisi : %{total_engine_ret:+,.1f} | BIST-100: %{total_bm_ret:+,.1f}")
-    print(f"  • Net Alfa (Üstünlük)   : %{total_engine_ret - total_bm_ret:+,.1f}")
-    print(f"  • Maksimum Düşüş (DD)   : %{max_dd_engine:.2f} (BIST-100: %{max_dd_bm:.2f})")
-    print(f"  • Toplam İşlem Sayısı   : {total_trades} Adet (Kazanma Oranı: %{win_rate:.1f}, PF: {pf})")
-    print(f"  • +%50 Üzeri Mega Trend : {len(mega_winners)} Adet İşlem")
-    print("-" * 80)
+    logger.info("-" * 80)
+    logger.info(f"📊 {stage_name} SONUÇLARI:")
+    logger.info(f"  • Nihai Portföy Değeri  : {final_equity:,.0f} ₺ (Başlangıç: {initial_capital:,.0f} ₺)")
+    logger.info(f"  • Motor Toplam Getirisi : %{total_engine_ret:+,.1f} | BIST-100: %{total_bm_ret:+,.1f}")
+    logger.info(f"  • Net Alfa (Üstünlük)   : %{total_engine_ret - total_bm_ret:+,.1f}")
+    logger.info(f"  • Maksimum Düşüş (DD)   : %{max_dd_engine:.2f} (BIST-100: %{max_dd_bm:.2f})")
+    logger.info(f"  • Toplam İşlem Sayısı   : {total_trades} Adet (Kazanma Oranı: %{win_rate:.1f}, PF: {pf})")
+    logger.info(f"  • +%50 Üzeri Mega Trend : {len(mega_winners)} Adet İşlem")
+    logger.info("-" * 80)
 
     return {
         "stage": stage_name,
@@ -333,12 +336,13 @@ def run_stage_simulation(
     }
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     bm_df, stock_dict = load_bist_historical_data()
 
-    print("=" * 90)
-    print("🏆 KATI 3 AŞAMALI DIŞ ÖRNEKLEM (OUT-OF-SAMPLE) VE DİNAMİK ZEKÂ TESTİ")
-    print("=" * 90)
+    logger.info("=" * 90)
+    logger.info("🏆 KATI 3 AŞAMALI DIŞ ÖRNEKLEM (OUT-OF-SAMPLE) VE DİNAMİK ZEKÂ TESTİ")
+    logger.info("=" * 90)
 
     # 1. Aşama: In-Sample (1997 - 2018 / 21 Yıl)
     r1 = run_stage_simulation("AŞAMA 1: IN-SAMPLE EĞİTİM & GELİŞTİRME", 1997, 2018, bm_df, stock_dict, 100000.0)
@@ -351,17 +355,17 @@ def main():
         "AŞAMA 3: OUT-OF-SAMPLE 2 (BAĞIMSIZ KÖR CANLI DÖNEM)", 2024, 2026, bm_df, stock_dict, 100000.0
     )
 
-    print("\n" + "=" * 90)
-    print("📈 3 AŞAMALI KURUMSAL DOĞRULAMA ÖZETİ")
-    print("=" * 90)
-    print(f"{'AŞAMA / DÖNEM':<42} | {'MOTOR GETİRİ':<14} | {'BIST-100':<12} | {'NET ALFA':<12} | {'MAX DD'}")
-    print("-" * 90)
+    logger.info("\n" + "=" * 90)
+    logger.info("📈 3 AŞAMALI KURUMSAL DOĞRULAMA ÖZETİ")
+    logger.info("=" * 90)
+    logger.info(f"{'AŞAMA / DÖNEM':<42} | {'MOTOR GETİRİ':<14} | {'BIST-100':<12} | {'NET ALFA':<12} | {'MAX DD'}")
+    logger.info("-" * 90)
     for r in [r1, r2, r3]:
         if r:
-            print(
+            logger.info(
                 f"{r['stage']:<42} | %{r['engine_ret']:>+11.1f} | %{r['bm_ret']:>+9.1f} | %{r['alpha']:>+9.1f} | %{r['max_dd_engine']:>.2f}"
             )
-    print("=" * 90)
+    logger.info("=" * 90)
 
 
 if __name__ == "__main__":

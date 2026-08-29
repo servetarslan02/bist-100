@@ -75,16 +75,16 @@ from .signal_fusion import SignalFusionEngine
 # Engines
 from .spec_engine import SPECEngine
 from .trade_planner import TradePlanner
+from .valuation.engine import ValuationEngine
 
 # Valuation
 from .vector_memory import (
-    VectorMemoryStore,
     MarketRegimeMemory,
-    vector_memory_store,
+    VectorMemoryStore,
     market_regime_memory,
+    vector_memory_store,
 )
 from .world_state import WorldStateManager
-from .valuation.engine import ValuationEngine
 
 __all__ = [
     # Pipeline
@@ -130,4 +130,3 @@ __all__ = [
     # Valuation
     "ValuationEngine",
 ]
-

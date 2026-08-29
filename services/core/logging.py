@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST - Structured Logging"""
 
 import logging
@@ -6,7 +7,7 @@ import sys
 import structlog
 
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(log_level: str = "INFO") -> Any:
     """Configure structured logging for ALPHA BIST."""
 
     structlog.configure(

@@ -54,10 +54,11 @@ class CustomFilterEngine:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._filters: list[CustomFilter] = []
         self._setup_bist_filters()
 
-    def _setup_bist_filters(self):
+    def _setup_bist_filters(self) -> Any:
         """BIST'e özel hazır filtreler."""
 
         # Filtre 1: Minimum hacim
@@ -113,7 +114,7 @@ class CustomFilterEngine:
             )
         )
 
-    def add_filter(self, custom_filter: CustomFilter):
+    def add_filter(self, custom_filter: CustomFilter) -> Any:
         """Yeni filtre ekle.
 
         Args:
@@ -124,7 +125,7 @@ class CustomFilterEngine:
             self._filters = self._filters[-100:]
         logger.info("Custom filter added", name=custom_filter.name)
 
-    def remove_filter(self, name: str):
+    def remove_filter(self, name: str) -> Any:
         """Filtre kaldır.
 
         Args:
@@ -133,7 +134,7 @@ class CustomFilterEngine:
         self._filters = [f for f in self._filters if f.name != name]
         logger.info("Custom filter removed", name=name)
 
-    def enable_filter(self, name: str, enabled: bool = True):
+    def enable_filter(self, name: str, enabled: bool = True) -> Any:
         """Filtreyi aktif/pasif yap.
 
         Args:

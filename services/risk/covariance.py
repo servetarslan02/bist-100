@@ -73,6 +73,7 @@ class CovarianceEstimator:
     """Ledoit-Wolf shrinkage covariance estimator with guaranteed Positive Semi-Definiteness."""
 
     def __init__(self, shrinkage_target: str = "constant_correlation", min_eigenvalue: float = 1e-7):
+        """Otomatik eklendi."""
         self.shrinkage_target = shrinkage_target
         self.min_eigenvalue = min_eigenvalue
         logger.info("CovarianceEstimator initialized", target=shrinkage_target, min_eig=min_eigenvalue)
@@ -137,12 +138,12 @@ class CovarianceEstimator:
         variances = np.diag(sample_cov)
         variances = np.maximum(variances, self.min_eigenvalue)
         stds = np.sqrt(variances)
-        
+
         outer_stds = np.outer(stds, stds)
         outer_stds = np.maximum(outer_stds, 1e-12)
         corr = sample_cov / outer_stds
         np.fill_diagonal(corr, 1.0)
-        
+
         # Triu correlation mean
         triu_indices = np.triu_indices_from(corr, k=1)
         avg_corr = float(np.mean(corr[triu_indices])) if len(triu_indices[0]) > 0 else 0.0
@@ -258,4 +259,3 @@ class CovarianceEstimator:
 
 # Singleton
 covariance_estimator = CovarianceEstimator()
-

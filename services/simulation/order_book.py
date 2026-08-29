@@ -39,26 +39,31 @@ class OrderBookSnapshot:
 
     @property
     def best_bid(self) -> float:
+        """Otomatik eklendi."""
         return self.bids[0].price if self.bids else 0.0
 
     @property
     def best_ask(self) -> float:
+        """Otomatik eklendi."""
         return self.asks[0].price if self.asks else 0.0
 
     @property
     def mid_price(self) -> float:
+        """Otomatik eklendi."""
         if self.best_bid > 0 and self.best_ask > 0:
             return (self.best_bid + self.best_ask) / 2
         return 0.0
 
     @property
     def spread(self) -> float:
+        """Otomatik eklendi."""
         if self.best_bid > 0 and self.best_ask > 0:
             return self.best_ask - self.best_bid
         return 0.0
 
     @property
     def spread_pct(self) -> float:
+        """Otomatik eklendi."""
         mid = self.mid_price
         if mid > 0:
             return self.spread / mid * 100
@@ -76,6 +81,7 @@ class OrderBookSnapshot:
 
     @property
     def total_depth(self) -> int:
+        """Otomatik eklendi."""
         return self.bid_depth + self.ask_depth
 
     @property
@@ -99,6 +105,7 @@ class OrderBookSimulator:
         base_spread_pct: float = 0.1,
         depth_levels: int = 5,
     ):
+        """Otomatik eklendi."""
         self.tick_size = tick_size
         self.base_spread_pct = base_spread_pct
         self.depth_levels = depth_levels

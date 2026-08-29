@@ -64,6 +64,7 @@ class BreadthResult:
     fx_adjustment: float = 0.0  # Breadth'e uygulanan döviz düzeltmesi
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "advancing": self.advancing,
@@ -104,6 +105,7 @@ class MarketBreadthEngine:
         thrust_threshold: float = 0.615,
         volume_min: float = None,
     ):
+        """Otomatik eklendi."""
         self._mcclellan_short = mcclellan_short_ema
         self._mcclellan_long = mcclellan_long_ema
         self._thrust_threshold = thrust_threshold
@@ -396,7 +398,7 @@ class MarketBreadthEngine:
             if d["total"] > 0
         }
 
-    def reset(self):
+    def reset(self) -> Any:
         """Cumulative state sıfırla (backtest için)."""
         self._ad_line_cumulative = 0
         self._mcclellan_summation = 0.0

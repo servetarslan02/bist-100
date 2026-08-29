@@ -63,6 +63,7 @@ class ScanPerformanceTracker:
     """
 
     def __init__(self, max_history: int = 10000):
+        """Otomatik eklendi."""
         self._max_history = max_history
         self._scan_metrics: list[ScanMetric] = []
         self._signal_outcomes: list[SignalOutcome] = []
@@ -75,7 +76,7 @@ class ScanPerformanceTracker:
         signals_generated: int,
         duration_ms: float,
         regime: str = "RANGE",
-    ):
+    ) -> Any:
         """Tarama kaydet.
 
         Args:
@@ -104,7 +105,7 @@ class ScanPerformanceTracker:
         if len(self._scan_metrics) > self._max_history:
             self._scan_metrics = self._scan_metrics[-self._max_history :]
 
-    def record_signal_outcome(self, outcome: SignalOutcome):
+    def record_signal_outcome(self, outcome: SignalOutcome) -> Any:
         """Sinyal sonucu kaydet (geriye dönük doğrulama).
 
         Args:
@@ -326,7 +327,7 @@ class ScanPerformanceTracker:
             "top_filters": self.get_top_performing_filters(limit=5),
         }
 
-    def clear(self):
+    def clear(self) -> Any:
         """Tüm geçmişi temizle."""
         self._scan_metrics.clear()
         self._signal_outcomes.clear()

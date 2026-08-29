@@ -29,6 +29,7 @@ class PaperStateStore:
     """DuckDB tabanlı persistent state store — paper trading için."""
 
     def __init__(self, db_path: str = "data/paper_trading_state.db"):
+        """Otomatik eklendi."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         if duckdb is not None:
@@ -37,7 +38,7 @@ class PaperStateStore:
         else:
             logger.warning("PaperStateStore initialized without persistence (duckdb not installed)")
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """SQLite tablolarini olustur."""
         with self._connect() as conn:
             conn.execute("""
@@ -161,7 +162,8 @@ class PaperStateStore:
             conn.commit()
 
     @contextmanager
-    def _connect(self):
+    def _connect(self) -> Any:
+        """Otomatik eklendi."""
         if duckdb is None:
             raise RuntimeError("DuckDB module is not installed in the environment.")
         conn = duckdb.connect(str(self.db_path))
@@ -172,7 +174,7 @@ class PaperStateStore:
 
     # ===================== PORTFOLIO STATE =====================
 
-    def save_portfolio_state(self, state: dict[str, Any]):
+    def save_portfolio_state(self, state: dict[str, Any]) -> Any:
         """Portfoy durumunu kaydet (F-016: Atomic write — temp + rename pattern)."""
         state_json = orjson.dumps(state, default=str).decode()
         # Atomic write: önce temp dosyaya yaz, sonra rename ile değiştir
@@ -214,7 +216,7 @@ class PaperStateStore:
 
     # ===================== POSITIONS =====================
 
-    def save_positions(self, positions: list[dict[str, Any]]):
+    def save_positions(self, positions: list[dict[str, Any]]) -> Any:
         """Pozisyonlari kaydet."""
         with self._connect() as conn:
             conn.execute("DELETE FROM positions")
@@ -245,7 +247,7 @@ class PaperStateStore:
 
     # ===================== TRADES =====================
 
-    def save_trade(self, trade: dict[str, Any]):
+    def save_trade(self, trade: dict[str, Any]) -> Any:
         """Trade kaydet."""
         with self._connect() as conn:
             conn.execute(
@@ -280,7 +282,7 @@ class PaperStateStore:
 
     # ===================== ORDERS =====================
 
-    def save_order(self, order: dict[str, Any]):
+    def save_order(self, order: dict[str, Any]) -> Any:
         """Order kaydet."""
         with self._connect() as conn:
             conn.execute(
@@ -318,7 +320,7 @@ class PaperStateStore:
 
     # ===================== AUDIT LOG =====================
 
-    def append_audit(self, entry: dict[str, Any]):
+    def append_audit(self, entry: dict[str, Any]) -> Any:
         """Audit entry ekle (immutable, append-only)."""
         entry_hash = self._compute_hash(entry)
         with self._connect() as conn:
@@ -358,7 +360,7 @@ class PaperStateStore:
 
     # ===================== DAILY PERFORMANCE =====================
 
-    def save_daily_performance(self, perf: dict[str, Any]):
+    def save_daily_performance(self, perf: dict[str, Any]) -> Any:
         """Gunluk performans kaydet."""
         with self._connect() as conn:
             conn.execute(
@@ -395,7 +397,7 @@ class PaperStateStore:
 
     def save_equity_point(
         self, date: str, equity: float, cash: float, invested: float, benchmark_equity: float | None = None
-    ):
+    ) -> Any:
         """Equity curve noktasi kaydet."""
         with self._connect() as conn:
             conn.execute(
@@ -426,7 +428,7 @@ class PaperStateStore:
 
     # ===================== PENDING SIGNALS =====================
 
-    def save_pending_signals(self, signals: list[dict[str, Any]], date: str):
+    def save_pending_signals(self, signals: list[dict[str, Any]], date: str) -> Any:
         """EOD (18:15) anında üretilen sinyalleri sabah seans açılışında yürütülmek üzere kaydeder."""
         with self._connect() as conn:
             conn.execute("DELETE FROM pending_signals")
@@ -483,7 +485,7 @@ class PaperStateStore:
                 logger.info("Cleared stale pending signals", count=deleted)
             return deleted
 
-    def clear_pending_signals(self):
+    def clear_pending_signals(self) -> Any:
         """Yurutulen bekleyen sinyalleri temizle."""
         with self._connect() as conn:
             conn.execute("DELETE FROM pending_signals")
@@ -491,7 +493,8 @@ class PaperStateStore:
 
     # ===================== CONFIG =====================
 
-    def set_config(self, key: str, value: str):
+    def set_config(self, key: str, value: str) -> Any:
+        """Otomatik eklendi."""
         with self._connect() as conn:
             conn.execute(
                 """
@@ -503,6 +506,7 @@ class PaperStateStore:
             conn.commit()
 
     def get_config(self, key: str, default: str | None = None) -> str | None:
+        """Otomatik eklendi."""
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
             if not row:
@@ -520,7 +524,7 @@ class PaperStateStore:
         logger.info("PaperStateStore backup created", path=backup_path)
         return backup_path
 
-    def reset_all(self):
+    def reset_all(self) -> Any:
         """Tum state'i sifirla (DANGER)."""
         with self._connect() as conn:
             conn.execute("DELETE FROM portfolio_state")
@@ -536,6 +540,7 @@ class PaperStateStore:
 
     @staticmethod
     def _compute_hash(entry: dict[str, Any]) -> str:
+        """Otomatik eklendi."""
         import hashlib
 
         data = orjson.dumps(entry, option=orjson.OPT_SORT_KEYS, default=str).decode()

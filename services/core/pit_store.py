@@ -11,25 +11,31 @@ Her veri kaydı:
 Kaynak: Quant research — pandas index alignment ile gelecek veri sızıntısı
 """
 
+import functools
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.pit_store")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -54,6 +60,7 @@ class PointInTimeStore:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         # ticker → field_name → [PITRecord] (zaman sıralı)
         self._store: dict[str, dict[str, list[PITRecord]]] = {}
 
@@ -65,7 +72,7 @@ class PointInTimeStore:
         value: Any,
         valid_from: datetime,
         source: str = "",
-    ):
+    ) -> Any:
         """Yeni veri kaydet (veya mevcut kaydı güncelle)."""
         if ticker not in self._store:
             self._store[ticker] = {}
@@ -161,7 +168,7 @@ class PointInTimeStore:
         data: dict[str, Any],
         valid_from: datetime,
         source: str = "",
-    ):
+    ) -> Any:
         """Toplu veri kaydetme."""
         for field_name, value in data.items():
             self.insert(ticker, field_name, value, valid_from, source)

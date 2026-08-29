@@ -24,14 +24,20 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.audit_log")
 meter = metrics.get_meter("alpha-bist.audit_log")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -58,11 +64,12 @@ class AuditLog:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._entries: list[AuditEntry] = []
         self._index: dict[str, list[int]] = {}  # entity_id â†’ [entry indices]
 
     @otel_trace("audit_log.log")
-    def log(self, entry: AuditEntry):
+    def log(self, entry: AuditEntry) -> Any:
         """Audit kaydÄ± ekle (append-only)."""
         idx = len(self._entries)
         self._entries.append(entry)
@@ -89,7 +96,7 @@ class AuditLog:
         reasons: list[str],
         risks: list[str],
         correlation_id: str = "",
-    ):
+    ) -> Any:
         """Karar kaydÄ±."""
         self.log(
             AuditEntry(
@@ -116,7 +123,7 @@ class AuditLog:
         approved: bool,
         checks: list[dict],
         correlation_id: str = "",
-    ):
+    ) -> Any:
         """Risk kontrolÃ¼ kaydÄ±."""
         self.log(
             AuditEntry(
@@ -143,7 +150,7 @@ class AuditLog:
         price: float,
         order_type: str,
         correlation_id: str = "",
-    ):
+    ) -> Any:
         """Emir kaydÄ±."""
         self.log(
             AuditEntry(
@@ -174,7 +181,7 @@ class AuditLog:
         price: float,
         commission: float,
         correlation_id: str = "",
-    ):
+    ) -> Any:
         """Dolum kaydÄ±."""
         self.log(
             AuditEntry(
@@ -203,7 +210,7 @@ class AuditLog:
         old_value: Any,
         new_value: Any,
         reason: str,
-    ):
+    ) -> Any:
         """State deÄŸiÅŸikliÄŸi kaydÄ±."""
         self.log(
             AuditEntry(
@@ -227,7 +234,7 @@ class AuditLog:
         old_value: Any,
         new_value: Any,
         actor: str = "user",
-    ):
+    ) -> Any:
         """Config deÄŸiÅŸikliÄŸi kaydÄ±."""
         self.log(
             AuditEntry(
@@ -314,4 +321,3 @@ class AuditLog:
 
 # Singleton
 audit_log = AuditLog()
-

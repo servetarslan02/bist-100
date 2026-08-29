@@ -34,7 +34,6 @@ from services.learning.drift_monitor import drift_monitor
 logger = structlog.get_logger()
 
 
-
 @dataclass
 class ModelOutcome:
     """Tek model sonucu."""
@@ -101,6 +100,7 @@ class ModelDegradationMonitor:
         alert_cooldown_hours: int = 6,
         auto_remove_threshold: float = 0.30,
     ):
+        """Otomatik eklendi."""
         self.window_size = window_size
         self.baseline_window = baseline_window
         self.accuracy_drop_threshold = accuracy_drop_threshold
@@ -181,9 +181,11 @@ class ModelDegradationMonitor:
             )
 
         # Son window_size outcome
-        recent = outcomes[-self.window_size:]
+        recent = outcomes[-self.window_size :]
         # Baseline: ondan önceki outcomes
-        baseline = outcomes[:-self.window_size] if len(outcomes) > self.window_size else outcomes[:self.baseline_window]
+        baseline = (
+            outcomes[: -self.window_size] if len(outcomes) > self.window_size else outcomes[: self.baseline_window]
+        )
 
         # Mevcut accuracy
         current_accuracy = sum(1 for o in recent if o.is_correct) / len(recent)
@@ -210,7 +212,7 @@ class ModelDegradationMonitor:
             # Rolling accuracy'lerin dağılımını hesapla
             rolling_accs = []
             for i in range(0, len(baseline) - self.window_size, max(1, self.window_size // 4)):
-                window = baseline[i:i + self.window_size]
+                window = baseline[i : i + self.window_size]
                 acc = sum(1 for o in window if o.is_correct) / len(window)
                 rolling_accs.append(acc)
 
@@ -230,7 +232,7 @@ class ModelDegradationMonitor:
         if len(baseline) >= 20 and len(recent) >= 20:
             baseline_preds = [o.predicted for o in baseline]
             recent_preds = [o.predicted for o in recent]
-            
+
             # Baseline'ı referans olarak ayarla ve güncel window ile karşılaştır
             ref_key = f"pred_{model_id}"
             drift_monitor.set_reference(ref_key, baseline_preds)
@@ -242,10 +244,7 @@ class ModelDegradationMonitor:
                     severity = "ALERT" if severity == "WARNING" else "WARNING"
 
         # Should remove
-        should_remove = (
-            severity == "CRITICAL"
-            or (accuracy_drop > self.auto_remove_threshold and trend == "degrading")
-        )
+        should_remove = severity == "CRITICAL" or (accuracy_drop > self.auto_remove_threshold and trend == "degrading")
 
         # Recommendation
         recommendation = self._generate_recommendation(
@@ -404,7 +403,7 @@ class ModelDegradationMonitor:
         chunk_size = self.window_size
         chunks = []
         for i in range(max(0, len(outcomes) - 3 * chunk_size), len(outcomes), chunk_size):
-            chunk = outcomes[i:i + chunk_size]
+            chunk = outcomes[i : i + chunk_size]
             if len(chunk) >= chunk_size // 2:
                 acc = sum(1 for o in chunk if o.is_correct) / len(chunk)
                 chunks.append(acc)

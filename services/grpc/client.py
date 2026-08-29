@@ -35,21 +35,27 @@ try:
 except ImportError:
     HAS_PROTOBUF = False
 
-import structlog
 import functools
+
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.grpc_client")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -62,7 +68,7 @@ def _get_correlation_metadata() -> list[tuple[str, str]]:
         if cid:
             return [("x-correlation-id", cid)]
     except ImportError:
-        pass
+        logger.error("Exception caught", exc_info=True)
     return []
 
 
@@ -91,7 +97,8 @@ class BaseGRPCClient:
         self._default_deadline = 10.0  # saniye — gRPC çağrıları için varsayılan deadline
 
     @otel_trace("grpc.connect")
-    async def connect(self):
+    async def connect(self) -> Any:
+        """Otomatik eklendi."""
         if not HAS_GRPC:
             logger.warning("gRPC not available (grpcio not installed)")
             return False
@@ -145,7 +152,8 @@ class BaseGRPCClient:
             return False
 
     @otel_trace("grpc.close")
-    async def close(self):
+    async def close(self) -> Any:
+        """Otomatik eklendi."""
         if self._channel:
             try:
                 await self._channel.close()
@@ -154,18 +162,21 @@ class BaseGRPCClient:
             self._channel = None
             self._stub = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
+        """Otomatik eklendi."""
         await self.connect()
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *args) -> Any:
+        """Otomatik eklendi."""
         await self.close()
 
 
 class MarketClient(BaseGRPCClient):
     """Piyasa verisi gRPC istemcisi — Protobuf native."""
 
-    async def connect(self):
+    async def connect(self) -> Any:
+        """Otomatik eklendi."""
         if await super().connect():
             self._stub = market_pb2_grpc.MarketServiceStub(self._channel)
             return True
@@ -236,7 +247,8 @@ class MarketClient(BaseGRPCClient):
 class SignalClient(BaseGRPCClient):
     """Sinyal gRPC istemcisi — Protobuf native."""
 
-    async def connect(self):
+    async def connect(self) -> Any:
+        """Otomatik eklendi."""
         if await super().connect():
             self._stub = market_pb2_grpc.SignalServiceStub(self._channel)
             return True
@@ -306,7 +318,8 @@ class SignalClient(BaseGRPCClient):
 class PortfolioClient(BaseGRPCClient):
     """Portföy gRPC istemcisi — Protobuf native."""
 
-    async def connect(self):
+    async def connect(self) -> Any:
+        """Otomatik eklendi."""
         if await super().connect():
             self._stub = market_pb2_grpc.PortfolioServiceStub(self._channel)
             return True
@@ -387,7 +400,8 @@ class PortfolioClient(BaseGRPCClient):
 class RiskClient(BaseGRPCClient):
     """Risk gRPC istemcisi — Protobuf native."""
 
-    async def connect(self):
+    async def connect(self) -> Any:
+        """Otomatik eklendi."""
         if await super().connect():
             self._stub = market_pb2_grpc.RiskServiceStub(self._channel)
             return True

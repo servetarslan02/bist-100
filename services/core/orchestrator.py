@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -25,21 +26,26 @@ import polars as pl
 import structlog
 from opentelemetry import metrics, trace
 
-import functools
-
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.orchestrator")
 meter = metrics.get_meter("alpha-bist.orchestrator")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 _pipeline_runs = meter.create_counter(
     "alpha.orchestrator.pipeline_runs.total",
@@ -63,7 +69,7 @@ _bg_loop = None
 _bg_thread = None
 
 
-def _get_bg_loop():
+def _get_bg_loop() -> Any:
     """Arka plan asyncio event loop al veya oluştur (sync→async köprüsü)."""
     global _bg_loop, _bg_thread
     if _bg_loop is None or _bg_loop.is_closed():
@@ -103,6 +109,7 @@ class MasterOrchestrator:
     """Tüm servisleri orkestre eden ana sınıf."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._initialized = False
         self._services: dict[str, Any] = {}
         self._simulation_results: dict[str, Any] = {}  # MC simulation cache
@@ -170,7 +177,7 @@ class MasterOrchestrator:
     ]
 
     @otel_trace("orchestrator.initialize")
-    async def initialize(self):
+    async def initialize(self) -> Any:
         """Tüm servisleri başlat."""
         if self._initialized:
             return
@@ -220,7 +227,8 @@ class MasterOrchestrator:
             if eb:
                 from services.core.event_schema import EventType
 
-                async def _on_simulation_completed(event):
+                async def _on_simulation_completed(event) -> Any:
+                    """Otomatik eklendi."""
                     ticker = event.data.get("ticker", "")
                     if ticker:
                         if not hasattr(self, "_simulation_results"):
@@ -242,7 +250,8 @@ class MasterOrchestrator:
             if eb:
                 from services.core.event_schema import EventType
 
-                async def _on_regime_transition(event):
+                async def _on_regime_transition(event) -> Any:
+                    """Otomatik eklendi."""
                     old_regime = event.data.get("old_regime", "")
                     new_regime = event.data.get("new_regime", "")
                     logger.info("Regime transition detected", old=old_regime, new=new_regime)
@@ -259,7 +268,8 @@ class MasterOrchestrator:
             if eb:
                 from services.core.event_schema import EventType
 
-                async def _on_agent_analysis(event):
+                async def _on_agent_analysis(event) -> Any:
+                    """Otomatik eklendi."""
                     ticker = event.data.get("ticker", "")
                     direction = event.data.get("direction", "")
                     confidence = event.data.get("confidence", 0)
@@ -283,7 +293,7 @@ class MasterOrchestrator:
         self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
 
-    def _get_thread_pool(self):
+    def _get_thread_pool(self) -> Any:
         """Shared thread pool for sync→async bridging (lazy init)."""
         if self._thread_pool is None:
             import concurrent.futures
@@ -291,7 +301,7 @@ class MasterOrchestrator:
             self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="orch-async")
         return self._thread_pool
 
-    def _run_agent_async(self, coro):
+    def _run_agent_async(self, coro) -> Any:
         """Run an async agent coroutine from sync context."""
         import asyncio as _asyncio
 
@@ -738,6 +748,7 @@ class MasterOrchestrator:
                 sim_expected_return=monte_carlo.get("expected_return", 0),
                 sim_prob_positive=monte_carlo.get("prob_positive", 0),
                 ml_return_5d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 5 else 0,
+                news_sentiment=features.get("news_sentiment", 0.0),
                 ml_return_20d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 20 else 0,
                 spec_score=spec.get("spec_score", 50) if isinstance(spec, dict) else 50,
                 world_alignment=world_state.get("global_risk_appetite", 0.5) if isinstance(world_state, dict) else 0.5,
@@ -838,11 +849,12 @@ class MasterOrchestrator:
                     actual_portfolio_value = DEFAULT_PORTFOLIO_VALUE
                     actual_positions = {}
 
+                price_val = float(prices[-1]) if len(prices) > 0 else 0.0
                 risk_result = rg.check_order(
                     ticker=ticker,
                     side=decision.get("action", "HOLD"),
                     quantity=trade_plan.get("quantity", 0) if isinstance(trade_plan, dict) else 0,
-                    price=float(prices[-1]),
+                    price=price_val,
                     portfolio_value=actual_portfolio_value,
                     current_positions=actual_positions,
                     model_confidence=fused_signal.get("fused_confidence", 0.5),
@@ -1002,7 +1014,16 @@ class MasterOrchestrator:
                 )
                 result["signal"] = fused_signal
                 decision = self._make_decision(
-                    ticker, prices, features, fused_signal, agent_result, regime, monte_carlo, forecast, spec, world_state
+                    ticker,
+                    prices,
+                    features,
+                    fused_signal,
+                    agent_result,
+                    regime,
+                    monte_carlo,
+                    forecast,
+                    spec,
+                    world_state,
                 )
                 self._apply_learning_feedback(decision, regime)
                 result["decision"] = decision
@@ -1010,8 +1031,15 @@ class MasterOrchestrator:
                 # 9. İşlem planı ve risk
                 trade_plan = self._create_trade_plan(ticker, decision, prices, features, spec)
                 result["trade_plan"] = trade_plan
-                result["risk"] = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
+                risk_check = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
+                result["risk"] = risk_check
                 result["compliance"] = self._check_compliance(ticker, decision, trade_plan, prices)
+
+                # Execute decision if risk check passed
+                if risk_check.get("allowed"):
+                    pm = self._services.get("portfolio_manager")
+                    if pm and hasattr(pm, "execute_decision"):
+                        pm.execute_decision(decision)
 
                 # 10. Bağlam ve öğrenme
                 result["context"] = self._build_context()
@@ -1023,7 +1051,9 @@ class MasterOrchestrator:
 
                     result = integration_bridge.enhance_pipeline_result(ticker, result, features, regime)
                     confidence = fused_signal.get("confidence", 0.5) if isinstance(fused_signal, dict) else 0.5
-                    result["decision"] = integration_bridge.enhance_trade_plan(ticker, decision, prices, regime, confidence)
+                    result["decision"] = integration_bridge.enhance_trade_plan(
+                        ticker, decision, prices, regime, confidence
+                    )
                     predicted_dir = 1.0 if decision.get("direction") == "BUY" else 0.0
                     integration_bridge.record_model_outcome(
                         model_id=decision.get("model_id", "ensemble"),
@@ -1052,7 +1082,7 @@ class MasterOrchestrator:
         date: str,
         market_data: dict[str, Any],
         sector_map: dict[str, str] | None = None,
-    ) -> "PipelineReport":
+    ) -> PipelineReport:
         """Birden fazla hisse için tam pipeline'ı bir tarih için çalıştırır.
 
         Args:

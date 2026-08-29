@@ -22,6 +22,7 @@ logger = structlog.get_logger()
 
 
 class Regime(StrEnum):
+    """Otomatik eklendi."""
     BULL = "BULL"
     BEAR = "BEAR"
     SIDEWAYS = "SIDEWAYS"
@@ -65,6 +66,7 @@ class RegimeEngine:
     }
 
     def __init__(self, use_hmm: bool = True):
+        """Otomatik eklendi."""
         self._current_regime: RegimeState | None = None
         self._regime_history: deque = deque(maxlen=1000)
         self._transition_counts: dict[str, dict[str, int]] = {}
@@ -239,6 +241,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_bear(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth < 50:
@@ -255,6 +258,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_sideways(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         # 45-55 arası en yüksek
@@ -268,6 +272,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_high_vol(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol > 20:
@@ -281,6 +286,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_low_vol(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol < 20:
@@ -293,6 +299,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_risk_on(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         ra = f.get("risk_appetite", 0.5)
         if ra > 0.5:
@@ -306,6 +313,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_risk_off(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         ra = f.get("risk_appetite", 0.5)
         if ra < 0.5:
@@ -319,6 +327,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_crisis(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol > 30:
@@ -335,6 +344,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_recovery(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if 35 < breadth < 60:
@@ -351,6 +361,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_momentum_expansion(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth > 60:
@@ -367,6 +378,7 @@ class RegimeEngine:
         return min(1.0, score)
 
     def _score_momentum_contraction(self, f: dict) -> float:
+        """Otomatik eklendi."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth < 45:

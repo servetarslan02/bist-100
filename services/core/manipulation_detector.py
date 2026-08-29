@@ -8,10 +8,10 @@ Geliştirmeler:
 - Layering: birden fazla seviyede emir manipülasyonu
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
-import functools
 import numpy as np
 import structlog
 from opentelemetry import trace
@@ -19,25 +19,33 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.manipulation_detector")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class ManipulationAlert:
+    """Otomatik eklendi."""
     alert_type: str  # WASH_TRADING, SPOOFING, LAYERING, VOLUME_MANIP, PRICE_CLUSTER
     severity: str  # LOW, MEDIUM, HIGH, CRITICAL
     description: str
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 

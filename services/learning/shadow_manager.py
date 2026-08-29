@@ -54,6 +54,7 @@ class ShadowModeManager:
     """Shadow mode yöneticisi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._shadow_active: bool = False
         self._champion_id: str | None = None
         self._challenger_id: str | None = None
@@ -62,7 +63,7 @@ class ShadowModeManager:
         self._champion_returns: deque = deque(maxlen=5000)
         self._challenger_returns: deque = deque(maxlen=5000)
 
-    def start_shadow(self, champion_id: str, challenger_id: str):
+    def start_shadow(self, champion_id: str, challenger_id: str) -> Any:
         """Shadow mode başlat."""
         self._shadow_active = True
         self._champion_id = champion_id
@@ -79,7 +80,7 @@ class ShadowModeManager:
         ticker: str,
         champion_pred: dict,
         challenger_pred: dict,
-    ):
+    ) -> Any:
         """Her iki modelden prediction kaydet."""
         if not self._shadow_active:
             return
@@ -93,7 +94,7 @@ class ShadowModeManager:
             )
         )
 
-    def record_outcome(self, ticker: str, actual_return: float):
+    def record_outcome(self, ticker: str, actual_return: float) -> Any:
         """Outcome kaydet — her iki model için."""
         if not self._shadow_active:
             return
@@ -199,7 +200,7 @@ class ShadowModeManager:
 
         return result
 
-    def stop_shadow(self):
+    def stop_shadow(self) -> Any:
         """Shadow mode durdur."""
         self._shadow_active = False
         logger.info(

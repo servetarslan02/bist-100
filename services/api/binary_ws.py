@@ -45,29 +45,38 @@ try:
 except ImportError:
     HAS_PROTOBUF = False
 
-import orjson
-
-import structlog
 import functools
+
+import orjson
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_binary_ws")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
-    def async_decorator(func):
+
+    def async_decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        async def wrapper(self, *args, **kwargs):
+        async def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return await func(self, *args, **kwargs)
+
         return wrapper
+
     return async_decorator
 
 
@@ -96,6 +105,7 @@ class ProtobufMessage:
 
     @classmethod
     def _next_sequence(cls) -> int:
+        """Otomatik eklendi."""
         cls._sequence += 1
         return cls._sequence
 
@@ -567,16 +577,17 @@ class BinaryWebSocket:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._clients: set = set()
         self._running = False
         self._msg_handler: callable | None = None
 
-    def on_message(self, handler: callable):
+    def on_message(self, handler: callable) -> Any:
         """Mesaj handler'ı kaydet."""
         self._msg_handler = handler
 
     @otel_trace("binary_ws.handler")
-    async def handler(self, websocket, path=None):
+    async def handler(self, websocket, path=None) -> Any:
         """WebSocket bağlantı handler'ı."""
         self._clients.add(websocket)
         client_id = id(websocket)
@@ -618,7 +629,7 @@ class BinaryWebSocket:
     @otel_trace("binary_ws.broadcast_tick")
     async def broadcast_tick(
         self, ticker: str, price: float, change: float, change_pct: float, volume: int, bid: float = 0, ask: float = 0
-    ):
+    ) -> Any:
         """Tüm istemcilere fiyat yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_tick(
             ticker=ticker,
@@ -633,7 +644,7 @@ class BinaryWebSocket:
 
     async def broadcast_ohlcv(
         self, ticker: str, open_p: float, high: float, low: float, close: float, volume: int, timeframe: str = "1m"
-    ):
+    ) -> Any:
         """Tüm istemcilere OHLCV yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_ohlcv(
             ticker=ticker,
@@ -648,7 +659,7 @@ class BinaryWebSocket:
 
     async def broadcast_signal(
         self, ticker: str, direction: str, confidence: float, target_price: float, stop_loss: float, reason: str = ""
-    ):
+    ) -> Any:
         """Tüm istemcilere sinyal yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_signal(
             ticker=ticker,
@@ -662,7 +673,7 @@ class BinaryWebSocket:
 
     async def broadcast_portfolio(
         self, total_value: float, cash: float, daily_pnl: float, daily_pnl_pct: float, positions: list = None
-    ):
+    ) -> Any:
         """Tüm istemcilere portföy durumu yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_portfolio(
             total_value=total_value,
@@ -675,7 +686,7 @@ class BinaryWebSocket:
 
     async def broadcast_risk(
         self, var_95: float, cvar_95: float, sharpe: float, max_drawdown: float, volatility: float, beta: float
-    ):
+    ) -> Any:
         """Tüm istemcilere risk metrikleri yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_risk(
             var_95=var_95,
@@ -687,7 +698,7 @@ class BinaryWebSocket:
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_regime(self, regime: str, confidence: float, vix: float = 0, breadth: float = 0):
+    async def broadcast_regime(self, regime: str, confidence: float, vix: float = 0, breadth: float = 0) -> Any:
         """Tüm istemcilere piyasa rejimi yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_regime(
             regime=regime,
@@ -699,7 +710,7 @@ class BinaryWebSocket:
 
     async def broadcast_event(
         self, event_type: str, ticker: str, title: str, summary: str = "", sentiment: float = 0, impact_score: float = 0
-    ):
+    ) -> Any:
         """Tüm istemcilere olay yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_event(
             event_type=event_type,
@@ -719,7 +730,7 @@ class BinaryWebSocket:
         severity: str = "INFO",
         value: float = 0,
         threshold: float = 0,
-    ):
+    ) -> Any:
         """Tüm istemcilere alarm yayınla (Protobuf binary)."""
         message = ProtobufMessage.encode_alert(
             alert_type=alert_type,
@@ -731,12 +742,12 @@ class BinaryWebSocket:
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_json(self, data: dict[str, Any]):
+    async def broadcast_json(self, data: dict[str, Any]) -> Any:
         """JSON fallback — eski istemciler için."""
         message = orjson.dumps(data, default=str)
         await self._broadcast_binary(message)
 
-    async def _broadcast_binary(self, message: bytes):
+    async def _broadcast_binary(self, message: bytes) -> Any:
         """Binary mesajı tüm istemcilere gönder."""
         if not self._clients:
             return
@@ -751,7 +762,7 @@ class BinaryWebSocket:
         self._clients -= disconnected
 
     @otel_trace("binary_ws.start")
-    async def start(self, host: str = "0.0.0.0", port: int = 8765):
+    async def start(self, host: str = "0.0.0.0", port: int = 8765) -> Any:
         """Binary WebSocket sunucusunu başlat."""
         if not HAS_WEBSOCKETS:
             logger.warning("websockets not installed, Binary WS disabled")
@@ -770,7 +781,7 @@ class BinaryWebSocket:
                 await asyncio.sleep(1)
 
     @otel_trace("binary_ws.stop")
-    async def stop(self):
+    async def stop(self) -> Any:
         """Sunucuyu durdur."""
         self._running = False
         for client in list(self._clients):

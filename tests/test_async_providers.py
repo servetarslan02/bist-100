@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Async Provider Testleri
 
@@ -22,7 +25,7 @@ from services.core.async_http import AsyncHTTPClient, close_all_clients, get_cli
 # =====================================================
 
 
-async def test_client_creation():
+async def test_client_creation() -> Any:
     """Client oluşturma çalışmalı."""
     issues = []
 
@@ -36,7 +39,7 @@ async def test_client_creation():
     assert len(issues) == 0, f"Client Creation: {issues}"
 
 
-async def test_client_singleton():
+async def test_client_singleton() -> Any:
     """Singleton client aynı instance döndürmeli."""
     issues = []
 
@@ -50,7 +53,7 @@ async def test_client_singleton():
     assert len(issues) == 0, f"Client Singleton: {issues}"
 
 
-async def test_client_timeout():
+async def test_client_timeout() -> Any:
     """Timeout çalışmalı."""
 
     client = AsyncHTTPClient(timeout=0.1, max_retries=1)
@@ -67,7 +70,7 @@ async def test_client_timeout():
     )
 
 
-async def test_client_retry():
+async def test_client_retry() -> Any:
     """Retry mekanizması çalışmalı."""
     issues = []
 
@@ -83,7 +86,7 @@ async def test_client_retry():
     assert len(issues) == 0, f"Client Retry: {issues}"
 
 
-async def test_client_close():
+async def test_client_close() -> Any:
     """Client kapatma çalışmalı."""
     issues = []
 
@@ -101,7 +104,7 @@ async def test_client_close():
     assert len(issues) == 0, f"Client Close: {issues}"
 
 
-async def test_context_manager():
+async def test_context_manager() -> Any:
     """Context manager çalışmalı."""
     issues = []
 
@@ -120,7 +123,7 @@ async def test_context_manager():
 # =====================================================
 
 
-async def test_bist_provider_async():
+async def test_bist_provider_async() -> Any:
     """BIST provider async methodlara sahip olmalı."""
     issues = []
 
@@ -143,7 +146,7 @@ async def test_bist_provider_async():
     assert len(issues) == 0, f"BIST Provider Async: {issues}"
 
 
-async def test_kap_provider_async():
+async def test_kap_provider_async() -> Any:
     """KAP provider async methodlara sahip olmalı."""
     issues = []
 
@@ -160,7 +163,7 @@ async def test_kap_provider_async():
     assert len(issues) == 0, f"KAP Provider Async: {issues}"
 
 
-async def test_news_provider_async():
+async def test_news_provider_async() -> Any:
     """News provider zaten async olmalı."""
     issues = []
 
@@ -180,7 +183,7 @@ async def test_news_provider_async():
 # =====================================================
 
 
-async def test_config_file_exists():
+async def test_config_file_exists() -> Any:
     """Config dosyaları mevcut olmalı."""
     issues = []
 
@@ -194,7 +197,7 @@ async def test_config_file_exists():
     assert len(issues) == 0, f"Config File Exists: {issues}"
 
 
-async def test_config_json_valid():
+async def test_config_json_valid() -> Any:
     """Config dosyaları geçerli JSON olmalı."""
     issues = []
 
@@ -214,7 +217,7 @@ async def test_config_json_valid():
     assert len(issues) == 0, f"Config JSON Valid: {issues}"
 
 
-async def test_config_values():
+async def test_config_values() -> Any:
     """Config değerleri mantıklı olmalı."""
     issues = []
 
@@ -245,10 +248,11 @@ async def test_config_values():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("ASYNC PROVIDER & CONFIG TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("ASYNC PROVIDER & CONFIG TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # HTTP Client
@@ -277,36 +281,37 @@ async def run_all():
             await test_func()
             name = test_func.__name__
             passed += 1
-            print(f"\n✅ {name}")
-            print("   PASSED")
+            logger.info(f"\n✅ {name}")
+            logger.info("   PASSED")
         except AssertionError as e:
             name = test_func.__name__
             failed += 1
             issues = [str(e)]
-            print(f"\n❌ {name}")
+            logger.info(f"\n❌ {name}")
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
         except Exception as e:
             name = test_func.__name__
             failed += 1
             issues = [f"Exception: {e}"]
-            print(f"\n❌ {name}")
+            logger.info(f"\n❌ {name}")
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

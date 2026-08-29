@@ -55,6 +55,7 @@ class HyperparameterTuner:
         cv_folds: int = 3,
         pruning: bool = True,
     ):
+        """Otomatik eklendi."""
         self.n_trials = n_trials
         self.timeout_seconds = timeout_seconds
         self.cv_folds = cv_folds
@@ -82,7 +83,8 @@ class HyperparameterTuner:
 
         start_time = time.time()
 
-        def objective(trial):
+        def objective(trial) -> Any:
+            """Otomatik eklendi."""
             params = {
                 "n_estimators": trial.suggest_int("n_estimators", 100, 1000),
                 "max_depth": trial.suggest_int("max_depth", 3, 10),
@@ -162,7 +164,8 @@ class HyperparameterTuner:
 
         start_time = time.time()
 
-        def objective(trial):
+        def objective(trial) -> Any:
+            """Otomatik eklendi."""
             params = {
                 "max_depth": trial.suggest_int("max_depth", 3, 10),
                 "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
@@ -227,7 +230,8 @@ class HyperparameterTuner:
 
         start_time = time.time()
 
-        def objective(trial):
+        def objective(trial) -> Any:
+            """Otomatik eklendi."""
             params = {
                 "iterations": trial.suggest_int("iterations", 100, 1000),
                 "depth": trial.suggest_int("depth", 4, 10),

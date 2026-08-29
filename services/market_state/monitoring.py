@@ -136,6 +136,7 @@ class MarketStateMonitor:
     """Market state monitoring — Prometheus + Grafana."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._metrics = MarketStateMetrics()
         self._history: list[MarketStateMetrics] = []
         self._max_history = 1000
@@ -155,7 +156,7 @@ class MarketStateMonitor:
         alert_count: int = 0,
         critical_alerts: int = 0,
         compute_duration_ms: float = 0.0,
-    ):
+    ) -> Any:
         """Metrikleri güncelle."""
         self._metrics = MarketStateMetrics(
             regime_value=REGIME_ENCODING.get(regime, 0),

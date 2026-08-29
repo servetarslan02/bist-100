@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 8 Test Suite (Health Monitor)
 
@@ -15,7 +18,7 @@ import sys
 from datetime import UTC, datetime
 
 
-def test_init():
+def test_init() -> Any:
     """Health monitor init."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -23,18 +26,18 @@ def test_init():
     assert len(m._module_status) == 0
     assert len(m._error_history) == 0
     assert len(m._restart_requests) == 0
-    print("✅ Init")
+    logger.info("✅ Init")
 
 
-def test_singleton():
+def test_singleton() -> Any:
     """Singleton doğru mu?"""
     from services.learning.health_monitor import learning_health_monitor
 
     assert learning_health_monitor is not None
-    print("✅ Singleton")
+    logger.info("✅ Singleton")
 
 
-def test_check_health():
+def test_check_health() -> Any:
     """Health check çalışıyor mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -44,10 +47,10 @@ def test_check_health():
     assert report.overall_status in ["HEALTHY", "WARNING", "CRITICAL"]
     assert len(report.modules) > 0
     assert report.timestamp is not None
-    print(f"✅ Check health: {report.overall_status}, {len(report.modules)} modules")
+    logger.info(f"✅ Check health: {report.overall_status}, {len(report.modules)} modules")
 
 
-def test_check_health_modules():
+def test_check_health_modules() -> Any:
     """Tüm modüller kontrol edilmeli."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -64,10 +67,10 @@ def test_check_health_modules():
     ]
     for mod in expected_modules:
         assert mod in report.modules, f"Missing module: {mod}"
-    print(f"✅ Check health modules: {list(report.modules.keys())}")
+    logger.info(f"✅ Check health modules: {list(report.modules.keys())}")
 
 
-def test_check_health_module_status():
+def test_check_health_module_status() -> Any:
     """Her modülün status'ü doğru mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -78,10 +81,10 @@ def test_check_health_module_status():
         assert health.status in ["HEALTHY", "WARNING", "CRITICAL", "DEGRADED", "RESTARTING"]
         assert health.module == name
         assert health.last_check is not None
-    print("✅ Check health module status")
+    logger.info("✅ Check health module status")
 
 
-def test_overall_status_critical():
+def test_overall_status_critical() -> Any:
     """Critical modül varsa overall CRITICAL olmalı."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -91,12 +94,12 @@ def test_overall_status_critical():
     critical_modules = [name for name, h in report.modules.items() if h.status == "CRITICAL"]
     if critical_modules:
         assert report.overall_status == "CRITICAL"
-        print(f"✅ Overall status critical: {critical_modules}")
+        logger.info(f"✅ Overall status critical: {critical_modules}")
     else:
-        print("✅ Overall status: no critical modules")
+        logger.info("✅ Overall status: no critical modules")
 
 
-def test_overall_status_warning():
+def test_overall_status_warning() -> Any:
     """Warning modül varsa WARNING olmalı (critical yoksa)."""
     from services.learning.health_monitor import LearningHealthMonitor, ModuleHealth
 
@@ -115,10 +118,10 @@ def test_overall_status_warning():
     # Critical yoksa warning olmalı
     if not report.critical_modules:
         assert report.overall_status in ["WARNING", "HEALTHY"]
-    print(f"✅ Overall status warning: {report.overall_status}")
+    logger.info(f"✅ Overall status warning: {report.overall_status}")
 
 
-def test_restart_request():
+def test_restart_request() -> Any:
     """Restart isteği."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -126,10 +129,10 @@ def test_restart_request():
     m.request_restart("test_module")
 
     assert "test_module" in m._restart_requests
-    print("✅ Restart request")
+    logger.info("✅ Restart request")
 
 
-def test_restart_request_duplicate():
+def test_restart_request_duplicate() -> Any:
     """Duplicate restart isteği eklenmemeli."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -138,10 +141,10 @@ def test_restart_request_duplicate():
     m.request_restart("test_module")  # Duplicate
 
     assert len(m._restart_requests) == 1
-    print("✅ Restart request duplicate")
+    logger.info("✅ Restart request duplicate")
 
 
-def test_get_restart_requests():
+def test_get_restart_requests() -> Any:
     """Restart istekleri alındıktan sonra temizlenmeli."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -157,10 +160,10 @@ def test_get_restart_requests():
     # İkinci çağrıda temizlenmiş olmalı
     requests2 = m.get_restart_requests()
     assert len(requests2) == 0
-    print("✅ Get restart requests (cleared after read)")
+    logger.info("✅ Get restart requests (cleared after read)")
 
 
-def test_error_recording():
+def test_error_recording() -> Any:
     """Hata kaydetme."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -171,10 +174,10 @@ def test_error_recording():
     assert m._error_history[0]["module"] == "test_module"
     assert m._error_history[0]["error"] == "Test error message"
     assert "timestamp" in m._error_history[0]
-    print("✅ Error recording")
+    logger.info("✅ Error recording")
 
 
-def test_error_recording_multiple():
+def test_error_recording_multiple() -> Any:
     """Birden fazla hata kayıt."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -185,10 +188,10 @@ def test_error_recording_multiple():
 
     assert len(m._error_history) == 3
     assert m._error_history[2]["module"] == "mod1"
-    print("✅ Error recording multiple")
+    logger.info("✅ Error recording multiple")
 
 
-def test_error_updates_module_status():
+def test_error_updates_module_status() -> Any:
     """Hata modül status'unu güncellemeli."""
     from services.learning.health_monitor import LearningHealthMonitor, ModuleHealth
 
@@ -207,10 +210,10 @@ def test_error_updates_module_status():
 
     assert m._module_status["test"].error_count == 1
     assert m._module_status["test"].last_error == "New error"
-    print("✅ Error updates module status")
+    logger.info("✅ Error updates module status")
 
 
-def test_uptime():
+def test_uptime() -> Any:
     """Uptime hesaplanıyor mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -219,10 +222,10 @@ def test_uptime():
 
     assert "uptime_hours" in report
     assert report["uptime_hours"] >= 0
-    print(f"✅ Uptime: {report['uptime_hours']} hours")
+    logger.info(f"✅ Uptime: {report['uptime_hours']} hours")
 
 
-def test_report():
+def test_report() -> Any:
     """Rapor doğru mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -234,10 +237,10 @@ def test_report():
     assert report["status"] == "OK"
     assert report["error_count"] == 1
     assert report["pending_restarts"] == 1
-    print(f"✅ Report: errors={report['error_count']}, restarts={report['pending_restarts']}")
+    logger.info(f"✅ Report: errors={report['error_count']}, restarts={report['pending_restarts']}")
 
 
-def test_report_empty():
+def test_report_empty() -> Any:
     """Boş rapor."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -247,10 +250,10 @@ def test_report_empty():
     assert report["status"] == "OK"
     assert report["error_count"] == 0
     assert report["pending_restarts"] == 0
-    print("✅ Report empty")
+    logger.info("✅ Report empty")
 
 
-def test_recommendations():
+def test_recommendations() -> Any:
     """Critical modül varsa recommendation olmalı."""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -259,12 +262,12 @@ def test_recommendations():
 
     if report.critical_modules:
         assert len(report.recommendations) > 0
-        print(f"✅ Recommendations: {report.recommendations}")
+        logger.info(f"✅ Recommendations: {report.recommendations}")
     else:
-        print("✅ No critical → no recommendations")
+        logger.info("✅ No critical → no recommendations")
 
 
-def test_module_health_fields():
+def test_module_health_fields() -> Any:
     """ModuleHealth alanları doğru mu?"""
     from services.learning.health_monitor import LearningHealthMonitor
 
@@ -278,13 +281,14 @@ def test_module_health_fields():
         assert hasattr(health, "error_count")
         assert hasattr(health, "last_error")
         assert hasattr(health, "uptime_hours")
-    print("✅ Module health fields")
+    logger.info("✅ Module health fields")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_init,
         test_singleton,
@@ -317,19 +321,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 8 TEST SONUÇLARI (Health Monitor)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 8 TEST SONUÇLARI (Health Monitor)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

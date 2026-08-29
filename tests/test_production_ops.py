@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Production Operations Testleri
 
@@ -47,7 +50,7 @@ from services.core.monitoring_security import (
 # =====================================================
 
 
-async def test_webhook_payload_format():
+async def test_webhook_payload_format() -> Any:
     """Webhook payload doğru formatta olmalı."""
     issues = []
 
@@ -74,7 +77,7 @@ async def test_webhook_payload_format():
     return "Webhook Payload Format", len(issues) == 0, issues
 
 
-async def test_webhook_provider_interface():
+async def test_webhook_provider_interface() -> Any:
     """Webhook provider interface doğru olmalı."""
     issues = []
 
@@ -90,7 +93,7 @@ async def test_webhook_provider_interface():
     return "Webhook Provider Interface", len(issues) == 0, issues
 
 
-async def test_log_provider():
+async def test_log_provider() -> Any:
     """Log provider her zaman başarılı olmalı."""
     issues = []
 
@@ -112,7 +115,7 @@ async def test_log_provider():
 # =====================================================
 
 
-async def test_retry_config():
+async def test_retry_config() -> Any:
     """Retry yapılandırması doğru olmalı."""
     issues = []
 
@@ -127,7 +130,7 @@ async def test_retry_config():
     return "Retry Config", len(issues) == 0, issues
 
 
-async def test_notification_result_tracking():
+async def test_notification_result_tracking() -> Any:
     """Notification result takibi doğru olmalı."""
     issues = []
 
@@ -147,21 +150,26 @@ async def test_notification_result_tracking():
     return "Notification Result Tracking", len(issues) == 0, issues
 
 
-async def test_retry_with_failing_provider():
+async def test_retry_with_failing_provider() -> Any:
     """Başarısız provider retry yapmalı."""
     issues = []
 
     class FailingProvider:
+        """Otomatik eklendi."""
         def __init__(self):
+            """Otomatik eklendi."""
             self.attempts = 0
 
-        def name(self):
+        def name(self) -> Any:
+            """Otomatik eklendi."""
             return "failing"
 
-        def min_severity(self):
+        def min_severity(self) -> Any:
+            """Otomatik eklendi."""
             return "INFO"
 
-        async def send(self, alert):
+        async def send(self, alert) -> Any:
+            """Otomatik eklendi."""
             self.attempts += 1
             return False
 
@@ -184,18 +192,22 @@ async def test_retry_with_failing_provider():
     return "Retry With Failing Provider", len(issues) == 0, issues
 
 
-async def test_retry_with_succeeding_provider():
+async def test_retry_with_succeeding_provider() -> Any:
     """Başarılı provider ilk denemede dönmeli."""
     issues = []
 
     class SucceedingProvider:
-        def name(self):
+        """Otomatik eklendi."""
+        def name(self) -> Any:
+            """Otomatik eklendi."""
             return "succeeding"
 
-        def min_severity(self):
+        def min_severity(self) -> Any:
+            """Otomatik eklendi."""
             return "INFO"
 
-        async def send(self, alert):
+        async def send(self, alert) -> Any:
+            """Otomatik eklendi."""
             return True
 
     alerting = AlertingSystem()
@@ -217,7 +229,7 @@ async def test_retry_with_succeeding_provider():
 # =====================================================
 
 
-async def test_alert_deduplication():
+async def test_alert_deduplication() -> Any:
     """Aynı alert tekrar üretilmemeli (dedup window içinde)."""
     issues = []
 
@@ -244,7 +256,7 @@ async def test_alert_deduplication():
     return "Alert Deduplication", len(issues) == 0, issues
 
 
-async def test_dedup_window_expiry():
+async def test_dedup_window_expiry() -> Any:
     """Dedup window dolduğunda aynı alert tekrar üretilmeli."""
     issues = []
 
@@ -265,7 +277,7 @@ async def test_dedup_window_expiry():
     return "Dedup Window Expiry", len(issues) == 0, issues
 
 
-async def test_fingerprint_stability():
+async def test_fingerprint_stability() -> Any:
     """Aynı koşullar aynı fingerprint üretmeli."""
     issues = []
 
@@ -288,18 +300,22 @@ async def test_fingerprint_stability():
 # =====================================================
 
 
-async def test_failed_notification_logging():
+async def test_failed_notification_logging() -> Any:
     """Başarısız bildirimler kaydedilmeli."""
     issues = []
 
     class FailProvider:
-        def name(self):
+        """Otomatik eklendi."""
+        def name(self) -> Any:
+            """Otomatik eklendi."""
             return "fail"
 
-        def min_severity(self):
+        def min_severity(self) -> Any:
+            """Otomatik eklendi."""
             return "INFO"
 
-        async def send(self, alert):
+        async def send(self, alert) -> Any:
+            """Otomatik eklendi."""
             return False
 
     alerting = AlertingSystem()
@@ -315,18 +331,22 @@ async def test_failed_notification_logging():
     return "Failed Notification Logging", len(issues) == 0, issues
 
 
-async def test_notification_log():
+async def test_notification_log() -> Any:
     """Bildirim log'u tutulmalı."""
     issues = []
 
     class OkProvider:
-        def name(self):
+        """Otomatik eklendi."""
+        def name(self) -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
-        def min_severity(self):
+        def min_severity(self) -> Any:
+            """Otomatik eklendi."""
             return "INFO"
 
-        async def send(self, alert):
+        async def send(self, alert) -> Any:
+            """Otomatik eklendi."""
             return True
 
     alerting = AlertingSystem()
@@ -347,7 +367,7 @@ async def test_notification_log():
 # =====================================================
 
 
-async def test_datasource_config():
+async def test_datasource_config() -> Any:
     """Datasource config doğru payload üretmeli."""
     issues = []
 
@@ -370,7 +390,7 @@ async def test_datasource_config():
     return "Datasource Config", len(issues) == 0, issues
 
 
-async def test_grafana_provisioner_status():
+async def test_grafana_provisioner_status() -> Any:
     """Provisioner status doğru bilgi vermeli."""
     issues = []
 
@@ -386,7 +406,7 @@ async def test_grafana_provisioner_status():
     return "Grafana Provisioner Status", len(issues) == 0, issues
 
 
-async def test_dashboard_version_tracking():
+async def test_dashboard_version_tracking() -> Any:
     """Dashboard versiyon takibi doğru olmalı."""
     issues = []
 
@@ -415,7 +435,7 @@ async def test_dashboard_version_tracking():
     return "Dashboard Version Tracking", len(issues) == 0, issues
 
 
-async def test_dashboard_json_valid():
+async def test_dashboard_json_valid() -> Any:
     """Dashboard JSON dosyası geçerli olmalı."""
     issues = []
 
@@ -449,7 +469,7 @@ async def test_dashboard_json_valid():
 # =====================================================
 
 
-async def test_static_token_provider():
+async def test_static_token_provider() -> Any:
     """Static token provider doğru çalışmalı."""
     issues = []
 
@@ -480,7 +500,7 @@ async def test_static_token_provider():
     return "Static Token Provider", len(issues) == 0, issues
 
 
-async def test_oauth_provider_stub():
+async def test_oauth_provider_stub() -> Any:
     """OAuth provider stub çalışmalı."""
     issues = []
 
@@ -495,7 +515,7 @@ async def test_oauth_provider_stub():
     return "OAuth Provider Stub", len(issues) == 0, issues
 
 
-async def test_auth_manager_multi_provider():
+async def test_auth_manager_multi_provider() -> Any:
     """Auth manager çoklu provider denemeli."""
     issues = []
 
@@ -520,7 +540,7 @@ async def test_auth_manager_multi_provider():
     return "Auth Manager Multi Provider", len(issues) == 0, issues
 
 
-async def test_auth_result_roles():
+async def test_auth_result_roles() -> Any:
     """AuthResult role kontrolü doğru olmalı."""
     issues = []
 
@@ -545,10 +565,11 @@ async def test_auth_result_roles():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("PRODUCTION OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("PRODUCTION OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Webhook
@@ -592,27 +613,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

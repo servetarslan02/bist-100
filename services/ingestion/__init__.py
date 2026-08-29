@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Ingestion Service v2.0
 
@@ -26,7 +27,7 @@ from .retry_policy import HTTPStatusError, RetryExhaustedError, RetryPolicy, get
 # from .orchestrator_integration import IngestionOrchestrator, IngestionResult, PipelineReport, ingestion_orchestrator
 
 
-def get_orchestrator():
+def get_orchestrator() -> Any:
     """Lazy import — sadece gerektiğinde yüklenir."""
     from .orchestrator_integration import IngestionOrchestrator, ingestion_orchestrator
 

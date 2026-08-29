@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Attribution Engine v1.0
 
@@ -186,7 +187,7 @@ class AttributionEngine:
             return 1.0
         return 0
 
-    def _extract_lessons(self, actual, expected, macro, flow, momentum, event, regime, technical):
+    def _extract_lessons(self, actual, expected, macro, flow, momentum, event, regime, technical) -> Any:
         """Dersler çıkar."""
         what_worked = []
         what_failed = []

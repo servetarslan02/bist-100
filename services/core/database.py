@@ -79,17 +79,19 @@ _MAX_RETRIES: int = 3
 _RETRY_BASE_DELAY: float = 1.0  # saniye
 
 # Bağlantı hatası anahtar kelimeleri — sınıflandırma için
-_CONN_ERROR_KEYWORDS: frozenset[str] = frozenset({
-    "connection",
-    "closed",
-    "terminated",
-    "reset",
-    "broken",
-    "interfaceerror",
-    "connectiondoesnotexisterror",
-    "too many clients",
-    "ssl connection has been closed",
-})
+_CONN_ERROR_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "connection",
+        "closed",
+        "terminated",
+        "reset",
+        "broken",
+        "interfaceerror",
+        "connectiondoesnotexisterror",
+        "too many clients",
+        "ssl connection has been closed",
+    }
+)
 
 
 def _is_connection_error(exc: Exception) -> bool:
@@ -124,7 +126,7 @@ async def _retry_async(
             last_error = exc
             if attempt < max_retries:
                 # Jitter: tam backoff yerine rastgele dağılım (herd effect önleme)
-                base = _RETRY_BASE_DELAY * (2 ** attempt)
+                base = _RETRY_BASE_DELAY * (2**attempt)
                 jitter = random.uniform(0, base * 0.3)
                 delay = base + jitter
                 _db_retry_counter.add(1, {"operation": name, "attempt": str(attempt + 1)})
@@ -177,6 +179,7 @@ async def get_pg_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             return _pg_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
+            """Otomatik eklendi."""
             return await asyncpg.create_pool(
                 host=settings.postgres_host,
                 port=settings.postgres_port,
@@ -224,6 +227,7 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             return _pg_replica_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
+            """Otomatik eklendi."""
             return await asyncpg.create_pool(
                 host=replica_host,
                 port=replica_port,
@@ -368,6 +372,7 @@ db_router = DatabaseRouter()
 
 # ─── PostgreSQL Helpers ───────────────────────────────────────────────────────
 
+
 async def close_pg_pool() -> None:
     """Primary ve replica PostgreSQL pool'larını kapatır."""
     global _pg_pool, _pg_replica_pool, _pg_healthy
@@ -435,7 +440,7 @@ async def pg_execute(query: str, *args: Any) -> str:
                     )
                     _db_retry_counter.add(1, {"operation": "pg.execute"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "execute"})
@@ -466,7 +471,7 @@ async def pg_fetch(query: str, *args: Any) -> list[Any]:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetch"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetch"})
@@ -494,7 +499,7 @@ async def pg_fetchrow(query: str, *args: Any) -> Any | None:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetchrow"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetchrow"})
@@ -522,7 +527,7 @@ async def pg_fetchval(query: str, *args: Any) -> Any:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetchval"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetchval"})
@@ -683,6 +688,7 @@ async def get_redis() -> Any:
             return _redis
         try:
             from .redis_sentinel import get_ha_redis
+
             _redis = await get_ha_redis()
         except Exception:
             _redis = aioredis.from_url(
@@ -704,9 +710,10 @@ async def close_redis() -> None:
     if _redis:
         try:
             from .redis_sentinel import close_ha_redis
+
             await close_ha_redis()
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
         try:
             await _redis.aclose()
         except Exception as exc:
@@ -791,9 +798,7 @@ async def check_db_health() -> dict[str, Any]:
         try:
             client = get_ch_client()
             result = client.query("SELECT 1")
-            health["clickhouse"] = (
-                "healthy" if result.result_rows and result.result_rows[0][0] == 1 else "degraded"
-            )
+            health["clickhouse"] = "healthy" if result.result_rows and result.result_rows[0][0] == 1 else "degraded"
         except Exception as exc:
             health["clickhouse"] = f"error: {str(exc)[:100]}"
 

@@ -10,6 +10,7 @@ ROADMAP v3.0:
 KURAL: BULL'da momentum, BEAR'da quality, SIDEWAYS'da mean reversion.
 """
 
+import functools
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,20 +18,25 @@ from typing import Any
 
 import numpy as np
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.regime_detector")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -51,6 +57,7 @@ class RegimeDetector:
     REGIMES = ["BULL", "BEAR", "SIDEWAYS", "HIGH_VOL", "LOW_VOL"]
 
     def __init__(self, lookback_days: int = 60):
+        """Otomatik eklendi."""
         self.lookback_days = lookback_days
         self._regime_history: deque = deque(maxlen=252)
         self._current_regime = "UNKNOWN"
@@ -302,6 +309,7 @@ class RegimeDetector:
 
     @otel_trace("regime_detector.get_regime_history")
     def get_regime_history(self) -> list[dict]:
+        """Otomatik eklendi."""
         return list(self._regime_history)
 
 

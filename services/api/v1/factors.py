@@ -1,3 +1,4 @@
+from typing import Any
 """Factors API — Gerçek BIST Faktör Analiz ve Exposure Motoru."""
 
 from fastapi import APIRouter, Depends, Query
@@ -9,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/scores/{ticker}")
-async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Hisse bazlı çoklu faktör skorları (Momentum, Value, Quality, Volatility, Liquidity, Size)."""
     radar = get_cached("radar:data") or []
     item = next((x for x in radar if x.get("symbol") == ticker.upper()), None)
@@ -43,7 +44,7 @@ async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(c
 
 
 @router.get("/exposure/{ticker}")
-async def factor_exposure(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def factor_exposure(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Faktör beta katsayıları (Fama-French 5 Faktör Modeli)."""
     scores = await factor_scores(ticker)
     f = scores.get("factors", {})
@@ -63,7 +64,7 @@ async def factor_exposure(ticker: str, user=Depends(get_current_user), _=Depends
 
 
 @router.get("/portfolio-exposure")
-async def portfolio_exposure(portfolio_id: int = Query(1), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def portfolio_exposure(portfolio_id: int = Query(1), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tüm portföyün ağırlıklı faktör maruziyeti."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
 

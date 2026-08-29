@@ -14,39 +14,41 @@ Tüm parametreler kesin olarak DONDURULMUŞTUR:
 - BIST İşlem Sürtünmesi: %0.074 komisyon + %0.050 slippage = %0.124
 """
 
-import os
-import orjson
+from datetime import timedelta
+from typing import Any
+
 import numpy as np
-
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Tuple
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-import xgboost as xgb
-
 import structlog
+
 logger = structlog.get_logger()
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
-    extract_point_in_time_features,
-    detect_market_regime,
     ModelTrainer,
+    detect_market_regime,
+    extract_point_in_time_features,
+    load_all_market_data,
 )
 
 
-def run_final_holdout_validation():
+def run_final_holdout_validation() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — FINAL HOLDOUT VALIDATION (3-WAY SPLIT)")
     logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
 
     features_by_ticker = {}
@@ -68,13 +70,26 @@ def run_final_holdout_validation():
     val_dates = common_dates[split_train_idx:split_val_idx]
     holdout_dates = common_dates[split_val_idx:-5]  # Son 5 gün kapanmamış trade'ler hariç
 
-    logger.info(f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)")
-    logger.info(f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
-    logger.info(f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)")
+    logger.info(
+        f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)"
+    )
+    logger.info(
+        f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)"
+    )
+    logger.info(
+        f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)"
+    )
     logger.info("-----------------------------------------------------------------")
     logger.info("⚠️ UYARI: Final Holdout verisi hiçbir parametre seçiminde veya optimizasyonda kullanılmamıştır.\n")
 
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "XGBoost_Model",
+        "Cross_Sectional_Momentum",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+    ]
 
     INITIAL_CAPITAL = 10_000_000.0
     TRANSACTION_FEE_PCT = 0.00074
@@ -83,11 +98,11 @@ def run_final_holdout_validation():
 
     # DONDURULMUŞ PARAMETRELER (FROZEN PARAMETERS)
     regime_max_positions = {
-        "BULL_TREND": 5,        # 100% Equity
-        "LOW_VOLATILITY": 4,    # 80% Equity
-        "SIDEWAYS_RANGE": 2,    # 40% Equity
-        "BEAR_MARKET": 1,       # 20% Equity
-        "HIGH_VOLATILITY": 1,   # 20% Equity
+        "BULL_TREND": 5,  # 100% Equity
+        "LOW_VOLATILITY": 4,  # 80% Equity
+        "SIDEWAYS_RANGE": 2,  # 40% Equity
+        "BEAR_MARKET": 1,  # 20% Equity
+        "HIGH_VOLATILITY": 1,  # 20% Equity
     }
 
     regime_min_score_threshold = {
@@ -110,23 +125,26 @@ def run_final_holdout_validation():
     logger.info("🚀 [1/4] Alpha BIST Optimized (Dondurulmuş Parametreler) Final Holdout'ta Koşuluyor...", flush=True)
     trainer_opt = ModelTrainer(feature_cols)
     portfolio_cash_opt = INITIAL_CAPITAL
-    positions_opt: Dict[str, Dict[str, Any]] = {}
+    positions_opt: dict[str, dict[str, Any]] = {}
     equity_opt = []
     daily_rets_opt = []
     holding_periods_opt = []
     daily_exposures_opt = []
     daily_cash_pct_opt = []
-    monthly_perf_opt: Dict[str, Dict[str, float]] = {}
-    regime_pnl_opt: Dict[str, Dict[str, float]] = {r: {"pnl": 0.0, "trades": 0, "wins": 0} for r in ["BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE", "HIGH_VOLATILITY", "LOW_VOLATILITY"]}
-    
+    monthly_perf_opt: dict[str, dict[str, float]] = {}
+    regime_pnl_opt: dict[str, dict[str, float]] = {
+        r: {"pnl": 0.0, "trades": 0, "wins": 0}
+        for r in ["BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE", "HIGH_VOLATILITY", "LOW_VOLATILITY"]
+    }
+
     total_costs_opt = 0.0
     trades_opt = 0
     wins_opt = 0
     losses_opt = 0
     gross_win_pnl_opt = 0.0
     gross_loss_pnl_opt = 0.0
-    smoothed_scores_opt: Dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
-    pending_evals_opt: List[Dict[str, Any]] = []
+    smoothed_scores_opt: dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
+    pending_evals_opt: list[dict[str, Any]] = []
     completed_wins_opt = {m: 0 for m in models}
     completed_totals_opt = {m: 0 for m in models}
 
@@ -134,7 +152,7 @@ def run_final_holdout_validation():
     logger.info("🚀 [2/4] Alpha BIST Original (Naive 5-Day Churn) Final Holdout'ta Koşuluyor...", flush=True)
     trainer_orig = ModelTrainer(feature_cols)
     portfolio_cash_orig = INITIAL_CAPITAL
-    positions_orig: Dict[str, Dict[str, Any]] = {}
+    positions_orig: dict[str, dict[str, Any]] = {}
     equity_orig = []
     daily_rets_orig = []
     total_costs_orig = 0.0
@@ -143,12 +161,16 @@ def run_final_holdout_validation():
     losses_orig = 0
     gross_win_pnl_orig = 0.0
     gross_loss_pnl_orig = 0.0
-    pending_evals_orig: List[Dict[str, Any]] = []
+    pending_evals_orig: list[dict[str, Any]] = []
     completed_wins_orig = {m: 0 for m in models}
     completed_totals_orig = {m: 0 for m in models}
 
     # Benchmark Başlangıç Değerleri
-    start_xu100 = float(xu100_close.loc[holdout_dates[0]]) if holdout_dates[0] in xu100_close.index else float(xu100_close.iloc[0])
+    start_xu100 = (
+        float(xu100_close.loc[holdout_dates[0]])
+        if holdout_dates[0] in xu100_close.index
+        else float(xu100_close.iloc[0])
+    )
     equity_xu100 = []
     equity_ew = []
     daily_rets_xu100 = []
@@ -157,7 +179,7 @@ def run_final_holdout_validation():
     current_fold = 0
 
     for step_i, current_date in enumerate(holdout_dates):
-        date_str = current_date.strftime("%Y-%m-%d")
+        current_date.strftime("%Y-%m-%d")
         month_key = current_date.strftime("%Y-%m")
 
         # 0. Kapanan tahmin havuzlarını güncelle
@@ -184,7 +206,7 @@ def run_final_holdout_validation():
         # 1. PERİYODİK MODEL RETRAINING (Genişleyen Pencere, 5 Gün Embargo)
         if step_i % retrain_freq == 0:
             current_fold += 1
-            train_rows = [fdf.loc[:current_date - timedelta(days=7)] for fdf in features_by_ticker.values()]
+            train_rows = [fdf.loc[: current_date - timedelta(days=7)] for fdf in features_by_ticker.values()]
             comb_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer_opt.retrain_fold(comb_train)
             trainer_orig.retrain_fold(comb_train)
@@ -236,7 +258,9 @@ def run_final_holdout_validation():
             # Opt Sinyal (EMA Düzleştirmeli)
             raw_c_opt = sum(norm_w_opt[m] * batch_sigs_opt[tk][m] for m in models)
             smoothed_scores_opt[tk] = 0.50 * raw_c_opt + 0.50 * smoothed_scores_opt[tk]
-            cand_opt.append({"ticker": tk, "score": smoothed_scores_opt[tk], "close": cur_p, "future": fwd_p, "ret_5d": ret_5d})
+            cand_opt.append(
+                {"ticker": tk, "score": smoothed_scores_opt[tk], "close": cur_p, "future": fwd_p, "ret_5d": ret_5d}
+            )
 
             # Orig Sinyal (Ham)
             raw_c_orig = sum(norm_w_orig[m] * batch_sigs_orig[tk][m] for m in models)
@@ -246,8 +270,12 @@ def run_final_holdout_validation():
                 p_opt = 1 if batch_sigs_opt[tk][m] > 0 else -1
                 p_orig = 1 if batch_sigs_orig[tk][m] > 0 else -1
                 act_sign = 1 if ret_5d > 0 else -1
-                pending_evals_opt.append({"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_opt == act_sign)})
-                pending_evals_orig.append({"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_orig == act_sign)})
+                pending_evals_opt.append(
+                    {"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_opt == act_sign)}
+                )
+                pending_evals_orig.append(
+                    {"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (p_orig == act_sign)}
+                )
 
         # 5. POZİSYON ÇIKIŞLARI
         # A) OPTIMIZED EXIT (Trailing Stop + Dynamic Barrier)
@@ -259,15 +287,15 @@ def run_final_holdout_validation():
             pos["highest_price"] = max(pos.get("highest_price", pos["entry_price"]), cur_p)
 
             should_exit = False
-            if pnl_pct <= -6.0:
-                should_exit = True
-            elif pos["highest_price"] > pos["entry_price"] * 1.06 and cur_p < pos["highest_price"] * 0.96:
-                should_exit = True
-            elif pnl_pct >= 25.0:
-                should_exit = True
-            elif pos["days_held"] >= 10 and smoothed_scores_opt[tk] < -0.10:
-                should_exit = True
-            elif pos["days_held"] >= 60:
+            if (
+                pnl_pct <= -6.0
+                or pos["highest_price"] > pos["entry_price"] * 1.06
+                and cur_p < pos["highest_price"] * 0.96
+                or pnl_pct >= 25.0
+                or pos["days_held"] >= 10
+                and smoothed_scores_opt[tk] < -0.10
+                or pos["days_held"] >= 60
+            ):
                 should_exit = True
 
             if should_exit:
@@ -301,7 +329,7 @@ def run_final_holdout_validation():
             cur_p = float(features_by_ticker[tk].loc[current_date]["close"])
             pos["days_held"] += 1
             pnl_pct = (cur_p / pos["entry_price"] - 1.0) * 100.0
-            
+
             should_exit = False
             if pnl_pct <= -5.0 or pnl_pct >= 12.0 or pos["days_held"] >= 5:
                 should_exit = True
@@ -332,17 +360,23 @@ def run_final_holdout_validation():
         top_opt = [c for c in cand_opt if c["score"] >= min_score_opt and c["ticker"] not in positions_opt]
         slots_opt = max_pos_opt - len(positions_opt)
         if slots_opt > 0 and len(top_opt) > 0 and portfolio_cash_opt > 200_000:
-            tot_val_opt = portfolio_cash_opt + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions_opt.items())
+            tot_val_opt = portfolio_cash_opt + sum(
+                p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions_opt.items()
+            )
             alloc_slot = min(portfolio_cash_opt / slots_opt, tot_val_opt * 0.20)
             for c in top_opt[:slots_opt]:
                 shares = int((alloc_slot * (1.0 - TOTAL_FRICTION)) / c["close"])
                 if shares > 0:
                     cost = shares * c["close"]
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash_opt -= (cost + friction)
+                    portfolio_cash_opt -= cost + friction
                     total_costs_opt += friction
                     positions_opt[c["ticker"]] = {
-                        "shares": shares, "entry_price": c["close"], "days_held": 0, "highest_price": c["close"], "regime": current_regime
+                        "shares": shares,
+                        "entry_price": c["close"],
+                        "days_held": 0,
+                        "highest_price": c["close"],
+                        "regime": current_regime,
                     }
 
         # B) ORIGINAL ENTRY
@@ -350,27 +384,40 @@ def run_final_holdout_validation():
         top_orig = [c for c in cand_orig if c["score"] > 0.10 and c["ticker"] not in positions_orig]
         slots_orig = 5 - len(positions_orig)
         if slots_orig > 0 and len(top_orig) > 0 and portfolio_cash_orig > 200_000:
-            tot_val_orig = portfolio_cash_orig + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions_orig.items())
+            tot_val_orig = portfolio_cash_orig + sum(
+                p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions_orig.items()
+            )
             alloc_orig = min(portfolio_cash_orig / slots_orig, tot_val_orig * 0.20)
             for c in top_orig[:slots_orig]:
                 shares = int((alloc_orig * (1.0 - TOTAL_FRICTION)) / c["close"])
                 if shares > 0:
                     cost = shares * c["close"]
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash_orig -= (cost + friction)
+                    portfolio_cash_orig -= cost + friction
                     total_costs_orig += friction
-                    positions_orig[c["ticker"]] = {"shares": shares, "entry_price": c["close"], "days_held": 0, "regime": current_regime}
+                    positions_orig[c["ticker"]] = {
+                        "shares": shares,
+                        "entry_price": c["close"],
+                        "days_held": 0,
+                        "regime": current_regime,
+                    }
 
         # 7. GÜNLÜK DEĞERLER VE BENCHMARK
-        cur_eq_opt = portfolio_cash_opt + sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_opt.items())
+        cur_eq_opt = portfolio_cash_opt + sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_opt.items()
+        )
         equity_opt.append(cur_eq_opt)
 
-        invested_opt = sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_opt.items())
+        invested_opt = sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_opt.items()
+        )
         exp_opt = (invested_opt / cur_eq_opt) * 100.0 if cur_eq_opt > 0 else 0.0
         daily_exposures_opt.append(exp_opt)
         daily_cash_pct_opt.append(100.0 - exp_opt)
 
-        cur_eq_orig = portfolio_cash_orig + sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_orig.items())
+        cur_eq_orig = portfolio_cash_orig + sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions_orig.items()
+        )
         equity_orig.append(cur_eq_orig)
 
         # XU100
@@ -379,7 +426,12 @@ def run_final_holdout_validation():
         equity_xu100.append(eq_xu)
 
         # Equal-Weight 20
-        ew_val = INITIAL_CAPITAL * np.mean([float(fdf.loc[current_date]["close"]) / float(fdf.loc[holdout_dates[0]]["close"]) for fdf in features_by_ticker.values()])
+        ew_val = INITIAL_CAPITAL * np.mean(
+            [
+                float(fdf.loc[current_date]["close"]) / float(fdf.loc[holdout_dates[0]]["close"])
+                for fdf in features_by_ticker.values()
+            ]
+        )
         equity_ew.append(ew_val)
 
         if len(equity_opt) > 1:
@@ -390,7 +442,12 @@ def run_final_holdout_validation():
             daily_rets_orig.append(equity_orig[-1] / equity_orig[-2] - 1.0)
 
             if month_key not in monthly_perf_opt:
-                monthly_perf_opt[month_key] = {"strat_start": equity_opt[-2], "xu_start": equity_xu100[-2], "strat_end": cur_eq_opt, "xu_end": eq_xu}
+                monthly_perf_opt[month_key] = {
+                    "strat_start": equity_opt[-2],
+                    "xu_start": equity_xu100[-2],
+                    "strat_end": cur_eq_opt,
+                    "xu_end": eq_xu,
+                }
             else:
                 monthly_perf_opt[month_key]["strat_end"] = cur_eq_opt
                 monthly_perf_opt[month_key]["xu_end"] = eq_xu
@@ -401,12 +458,13 @@ def run_final_holdout_validation():
     n_years = len(holdout_dates) / 252.0
     rf_daily = 0.40 / 252.0
 
-    def calc_metrics(eq_list, daily_rets_list, trades_count, wins_count, gross_win, gross_loss, total_costs):
+    def calc_metrics(eq_list, daily_rets_list, trades_count, wins_count, gross_win, gross_loss, total_costs) -> Any:
+        """Otomatik eklendi."""
         eq_s = pd.Series(eq_list)
         d_s = pd.Series(daily_rets_list)
         tot_ret = (eq_s.iloc[-1] / INITIAL_CAPITAL - 1.0) * 100.0
         cagr = ((eq_s.iloc[-1] / INITIAL_CAPITAL) ** (1.0 / n_years) - 1.0) * 100.0
-        
+
         cummax = eq_s.cummax()
         max_dd = abs(((eq_s - cummax) / cummax).min()) * 100.0
 
@@ -424,21 +482,34 @@ def run_final_holdout_validation():
         net_pnl = eq_s.iloc[-1] - INITIAL_CAPITAL
 
         return {
-            "total_return": tot_ret, "cagr": cagr, "max_dd": max_dd, "sharpe": sharpe,
-            "sortino": sortino, "calmar": calmar, "win_rate": win_rate, "profit_factor": profit_factor,
-            "turnover": turnover, "net_pnl": net_pnl, "trades": trades_count, "costs": total_costs,
-            "final_equity": eq_s.iloc[-1]
+            "total_return": tot_ret,
+            "cagr": cagr,
+            "max_dd": max_dd,
+            "sharpe": sharpe,
+            "sortino": sortino,
+            "calmar": calmar,
+            "win_rate": win_rate,
+            "profit_factor": profit_factor,
+            "turnover": turnover,
+            "net_pnl": net_pnl,
+            "trades": trades_count,
+            "costs": total_costs,
+            "final_equity": eq_s.iloc[-1],
         }
 
-    m_opt = calc_metrics(equity_opt, daily_rets_opt, trades_opt, wins_opt, gross_win_pnl_opt, gross_loss_pnl_opt, total_costs_opt)
-    m_orig = calc_metrics(equity_orig, daily_rets_orig, trades_orig, wins_orig, gross_win_pnl_orig, gross_loss_pnl_orig, total_costs_orig)
+    m_opt = calc_metrics(
+        equity_opt, daily_rets_opt, trades_opt, wins_opt, gross_win_pnl_opt, gross_loss_pnl_opt, total_costs_opt
+    )
+    m_orig = calc_metrics(
+        equity_orig, daily_rets_orig, trades_orig, wins_orig, gross_win_pnl_orig, gross_loss_pnl_orig, total_costs_orig
+    )
     m_xu = calc_metrics(equity_xu100, daily_rets_xu100, 0, 0, 0, 0, 0)
     m_ew = calc_metrics(equity_ew, pd.Series(equity_ew).pct_change().dropna(), 0, 0, 0, 0, 0)
 
     # Beta & Alpha
     cov_mat = np.cov(daily_rets_opt, daily_rets_xu100)
     beta = cov_mat[0, 1] / cov_mat[1, 1] if cov_mat[1, 1] > 0 else 1.0
-    alpha_annual = (m_opt["cagr"] - (40.0 + beta * (m_xu["cagr"] - 40.0)))
+    alpha_annual = m_opt["cagr"] - (40.0 + beta * (m_xu["cagr"] - 40.0))
 
     avg_holding = np.mean(holding_periods_opt) if holding_periods_opt else 0.0
     avg_exp = np.mean(daily_exposures_opt)
@@ -447,19 +518,37 @@ def run_final_holdout_validation():
     logger.info("\n=================================================================")
     logger.info("📊 FINAL HOLDOUT KARŞILAŞTIRMA MATRİSİ (TAMAMEN GÖRÜLMEMİŞ DÖNEM)")
     logger.info("=================================================================")
-    logger.info(f"| Metrik | ALPHA BIST (Optimized) | ALPHA BIST (Original) | XU100 Buy & Hold | Equal-Weight BIST |")
-    logger.info(f"|---|---|---|---|---|")
-    logger.info(f"| **Bitiş Sermayesi** | **₺{m_opt['final_equity']:,.2f}** | ₺{m_orig['final_equity']:,.2f} | ₺{m_xu['final_equity']:,.2f} | ₺{m_ew['final_equity']:,.2f} |")
-    logger.info(f"| **Toplam Net Getiri** | **%{m_opt['total_return']:+.2f}** | %{m_orig['total_return']:+.2f} | %{m_xu['total_return']:+.2f} | %{m_ew['total_return']:+.2f} |")
-    logger.info(f"| **CAGR (Yıllık Getiri)** | **%{m_opt['cagr']:+.2f}** | %{m_orig['cagr']:+.2f} | %{m_xu['cagr']:+.2f} | %{m_ew['cagr']:+.2f} |")
-    logger.info(f"| **Maksimum Drawdown** | **%{m_opt['max_dd']:.2f}** | %{m_orig['max_dd']:.2f} | %{m_xu['max_dd']:.2f} | %{m_ew['max_dd']:.2f} |")
-    logger.info(f"| **Sharpe Oranı (Rf=%40)** | **{m_opt['sharpe']:.2f}** | {m_orig['sharpe']:.2f} | {m_xu['sharpe']:.2f} | {m_ew['sharpe']:.2f} |")
-    logger.info(f"| **Calmar Oranı** | **{m_opt['calmar']:.2f}** | {m_orig['calmar']:.2f} | {m_xu['calmar']:.2f} | {m_ew['calmar']:.2f} |")
-    logger.info(f"| **Kâr Faktörü (Profit Factor)** | **{m_opt['profit_factor']:.2f}** | {m_orig['profit_factor']:.2f} | - | - |")
+    logger.info("| Metrik | ALPHA BIST (Optimized) | ALPHA BIST (Original) | XU100 Buy & Hold | Equal-Weight BIST |")
+    logger.info("|---|---|---|---|---|")
+    logger.info(
+        f"| **Bitiş Sermayesi** | **₺{m_opt['final_equity']:,.2f}** | ₺{m_orig['final_equity']:,.2f} | ₺{m_xu['final_equity']:,.2f} | ₺{m_ew['final_equity']:,.2f} |"
+    )
+    logger.info(
+        f"| **Toplam Net Getiri** | **%{m_opt['total_return']:+.2f}** | %{m_orig['total_return']:+.2f} | %{m_xu['total_return']:+.2f} | %{m_ew['total_return']:+.2f} |"
+    )
+    logger.info(
+        f"| **CAGR (Yıllık Getiri)** | **%{m_opt['cagr']:+.2f}** | %{m_orig['cagr']:+.2f} | %{m_xu['cagr']:+.2f} | %{m_ew['cagr']:+.2f} |"
+    )
+    logger.info(
+        f"| **Maksimum Drawdown** | **%{m_opt['max_dd']:.2f}** | %{m_orig['max_dd']:.2f} | %{m_xu['max_dd']:.2f} | %{m_ew['max_dd']:.2f} |"
+    )
+    logger.info(
+        f"| **Sharpe Oranı (Rf=%40)** | **{m_opt['sharpe']:.2f}** | {m_orig['sharpe']:.2f} | {m_xu['sharpe']:.2f} | {m_ew['sharpe']:.2f} |"
+    )
+    logger.info(
+        f"| **Calmar Oranı** | **{m_opt['calmar']:.2f}** | {m_orig['calmar']:.2f} | {m_xu['calmar']:.2f} | {m_ew['calmar']:.2f} |"
+    )
+    logger.info(
+        f"| **Kâr Faktörü (Profit Factor)** | **{m_opt['profit_factor']:.2f}** | {m_orig['profit_factor']:.2f} | - | - |"
+    )
     logger.info(f"| **Kazanma Oranı (Win Rate)** | **%{m_opt['win_rate']:.1f}** | %{m_orig['win_rate']:.1f} | - | - |")
     logger.info(f"| **İşlem Sayısı (Trades)** | **{m_opt['trades']}** | {m_orig['trades']} | 1 | 20 |")
-    logger.info(f"| **Yıllık Devir Hızı (Turnover)** | **{m_opt['turnover']:.1f}/yıl** | {m_orig['turnover']:.1f}/yıl | 0.0 | 0.0 |")
-    logger.info(f"| **Toplam Ödenen Komisyon** | **₺{m_opt['costs']:,.2f}** | ₺{m_orig['costs']:,.2f} | ₺0.00 | ₺0.00 |")
+    logger.info(
+        f"| **Yıllık Devir Hızı (Turnover)** | **{m_opt['turnover']:.1f}/yıl** | {m_orig['turnover']:.1f}/yıl | 0.0 | 0.0 |"
+    )
+    logger.info(
+        f"| **Toplam Ödenen Komisyon** | **₺{m_opt['costs']:,.2f}** | ₺{m_orig['costs']:,.2f} | ₺0.00 | ₺0.00 |"
+    )
 
     logger.info("\n🔍 EK KURUMSAL RİSK VE POZİSYON METRİKLERİ:")
     logger.info(f"  • Ortalama Tutma Süresi (Avg Holding Period): {avg_holding:.1f} gün")
@@ -490,7 +579,7 @@ def run_final_holdout_validation():
     logger.info("\n=================================================================")
     logger.info("🎯 BİLİMSEL VE TAVİZSİZ NİHAİ KARAR:")
     logger.info("=================================================================")
-    
+
     if m_opt["total_return"] > 0 and m_opt["profit_factor"] >= 1.3 and m_opt["max_dd"] < m_xu["max_dd"]:
         verdict = "A) ROBUST"
         desc = "Final holdout dönemi pozitif net getiri üretti, kâr faktörü 1.30'un üzerinde kaldı ve maksimum drawdown benchmarktan belirgin şekilde daha düşük gerçekleşti. Edge kalıcı ve genelleştirilebilir."

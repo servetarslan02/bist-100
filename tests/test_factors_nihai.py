@@ -1,3 +1,4 @@
+from typing import Any
 """Factors Nihai Sistem Testleri — 10 Modül, 60+ Test."""
 
 import numpy as np
@@ -6,7 +7,9 @@ import numpy as np
 
 
 class TestPiotroski:
-    def test_strong_score(self):
+    """Otomatik eklendi."""
+    def test_strong_score(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.piotroski import calculate_f_score
 
         fin = {
@@ -32,7 +35,8 @@ class TestPiotroski:
         assert r["category"] == "STRONG"
         assert r["signal"] == "BUY"
 
-    def test_weak_score(self):
+    def test_weak_score(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.piotroski import calculate_f_score
 
         fin = {
@@ -57,20 +61,23 @@ class TestPiotroski:
         assert r["f_score"] <= 3
         assert r["category"] == "WEAK"
 
-    def test_backward_compat(self):
+    def test_backward_compat(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.piotroski import calculate_f_score_simple
 
         s = calculate_f_score_simple({"net_income": 100, "operating_cf": 150})
         assert 0 <= s <= 9
 
-    def test_sub_scores(self):
+    def test_sub_scores(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.piotroski import calculate_f_score
 
         r = calculate_f_score({"net_income": 100, "operating_cf": 150})
         assert "sub_scores" in r
         assert "profitability" in r["sub_scores"]
 
-    def test_custom_weights(self):
+    def test_custom_weights(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.piotroski import calculate_f_score
 
         weights = {
@@ -92,7 +99,9 @@ class TestPiotroski:
 
 
 class TestBeneish:
-    def test_with_raw_indices(self):
+    """Otomatik eklendi."""
+    def test_with_raw_indices(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.beneish import calculate_m_score
 
         r = calculate_m_score(
@@ -102,7 +111,8 @@ class TestBeneish:
         assert "category" in r
         assert r["manipulation_likely"] is False  # M-Score < -1.78
 
-    def test_manipulation_detected(self):
+    def test_manipulation_detected(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.beneish import calculate_m_score
 
         r = calculate_m_score(
@@ -112,7 +122,8 @@ class TestBeneish:
         assert r["manipulation_likely"] is True
         assert r["category"] == "HIGH_RISK"
 
-    def test_with_real_data(self):
+    def test_with_real_data(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.beneish import calculate_m_score
 
         current = {
@@ -146,13 +157,15 @@ class TestBeneish:
         assert "components" in r
         assert len(r["components"]) == 8
 
-    def test_backward_compat(self):
+    def test_backward_compat(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.beneish import calculate_m_score_simple
 
         m = calculate_m_score_simple({"dsri": 1.0, "gmi": 1.0})
         assert isinstance(m, float)
 
-    def test_risk_score(self):
+    def test_risk_score(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.beneish import calculate_m_score
 
         r = calculate_m_score(
@@ -165,7 +178,9 @@ class TestBeneish:
 
 
 class TestAltman:
-    def test_safe_zone(self):
+    """Otomatik eklendi."""
+    def test_safe_zone(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.altman import calculate_z_score
 
         fin = {
@@ -181,7 +196,8 @@ class TestAltman:
         assert r["z_score"] > 2.99
         assert r["zone"] == "SAFE"
 
-    def test_distress_zone(self):
+    def test_distress_zone(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.altman import calculate_z_score
 
         fin = {
@@ -196,7 +212,8 @@ class TestAltman:
         r = calculate_z_score(fin, turkey_adjusted=False)
         assert r["zone"] == "DISTRESS"
 
-    def test_turkey_adjustment(self):
+    def test_turkey_adjustment(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.altman import calculate_z_score
 
         fin = {
@@ -213,7 +230,8 @@ class TestAltman:
         assert r_turk["z_score"] != r_orig["z_score"]
         assert r_turk["adjustments"]["sector"] == 1.10
 
-    def test_backward_compat(self):
+    def test_backward_compat(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.altman import calculate_z_score_simple
 
         z = calculate_z_score_simple(
@@ -229,7 +247,8 @@ class TestAltman:
         )
         assert isinstance(z, float)
 
-    def test_signal(self):
+    def test_signal(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.altman import calculate_z_score
 
         fin = {
@@ -249,7 +268,9 @@ class TestAltman:
 
 
 class TestFamaFrench:
-    def test_factor_scores(self):
+    """Otomatik eklendi."""
+    def test_factor_scores(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.fama_french import calculate_factor_scores
 
         stock = {"pb_ratio": 5, "mom_6m": 10, "roe": 15, "market_cap": 1e9, "volatility": 25}
@@ -270,7 +291,8 @@ class TestFamaFrench:
         assert "momentum" in s
         assert "quality" in s
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.fama_french import calculate_factor_scores_batch
 
         universe = [
@@ -282,13 +304,15 @@ class TestFamaFrench:
         assert len(r) == 3
         assert "factor_scores" in r[0]
 
-    def test_factor_weights(self):
+    def test_factor_weights(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.fama_french import get_factor_weights
 
         w = get_factor_weights("BULL")
         assert w["momentum"] > w["low_vol"]
 
-    def test_factor_definitions(self):
+    def test_factor_definitions(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.fama_french import FACTOR_DEFINITIONS
 
         assert len(FACTOR_DEFINITIONS) >= 7
@@ -298,7 +322,9 @@ class TestFamaFrench:
 
 
 class TestBISTAnomalies:
-    def test_anomalies(self):
+    """Otomatik eklendi."""
+    def test_anomalies(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.bist_anomalies import calculate_bist_anomalies
 
         stock = {
@@ -313,14 +339,16 @@ class TestBISTAnomalies:
         assert "liquidity_premium" in r
         assert "fx_sensitivity" in r
 
-    def test_anomaly_score(self):
+    def test_anomaly_score(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.bist_anomalies import calculate_anomaly_score
 
         anomalies = {"dividend_yield": 0.5, "liquidity_premium": 0.3, "fx_sensitivity": 0.2}
         score = calculate_anomaly_score(anomalies)
         assert 0 <= score <= 100
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.bist_anomalies import calculate_bist_anomalies_batch
 
         universe = [{"ticker": "A", "dividend_yield": 5}, {"ticker": "B", "avg_volume": 1_000_000}]
@@ -333,7 +361,9 @@ class TestBISTAnomalies:
 
 
 class TestRanking:
-    def test_rank_stocks(self):
+    """Otomatik eklendi."""
+    def test_rank_stocks(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.ranking import rank_stocks
 
         stocks = [
@@ -346,7 +376,8 @@ class TestRanking:
         assert "factor_score" in ranked[0]
         assert "risk_adjusted_score" in ranked[0]
 
-    def test_regime_weights(self):
+    def test_regime_weights(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.ranking import rank_stocks
 
         stocks = [{"name": "A", "factors": {"momentum": 0.9, "quality": 0.5}, "risk_score": 80}]
@@ -354,7 +385,8 @@ class TestRanking:
         r_bear = rank_stocks([dict(stocks[0])], regime="BEAR")
         assert r_bull[0]["factor_score"] != r_bear[0]["factor_score"]
 
-    def test_sector_neutral(self):
+    def test_sector_neutral(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.ranking import rank_stocks
 
         stocks = [
@@ -365,7 +397,8 @@ class TestRanking:
         ranked = rank_stocks(stocks, sector_neutral=True)
         assert len(ranked) == 3
 
-    def test_top_bottom(self):
+    def test_top_bottom(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.ranking import get_bottom_n, get_top_n, rank_stocks
 
         stocks = [{"name": f"S{i}", "factors": {"value": i / 10}, "risk_score": 50} for i in range(10)]
@@ -378,7 +411,9 @@ class TestRanking:
 
 
 class TestPerformance:
-    def test_basic_performance(self):
+    """Otomatik eklendi."""
+    def test_basic_performance(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.performance import track_factor_performance
 
         r = track_factor_performance([0.01, 0.02, -0.01, 0.015, -0.005])
@@ -387,7 +422,8 @@ class TestPerformance:
         assert "max_drawdown" in r
         assert "win_rate" in r
 
-    def test_with_benchmark(self):
+    def test_with_benchmark(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.performance import track_factor_performance
 
         f = [0.01, 0.02, -0.01, 0.015, -0.005]
@@ -397,7 +433,8 @@ class TestPerformance:
         assert "beta" in r
         assert "information_ratio" in r
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.performance import track_factor_performance_batch
 
         factors = {"value": [0.01, 0.02, -0.01], "momentum": [0.02, 0.03, -0.02]}
@@ -405,7 +442,8 @@ class TestPerformance:
         assert len(r) == 2
         assert "value" in r
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.performance import track_factor_performance
 
         r = track_factor_performance([])
@@ -418,7 +456,9 @@ class TestPerformance:
 
 
 class TestFactorCorrelation:
-    def test_correlation(self):
+    """Otomatik eklendi."""
+    def test_correlation(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_correlation import calculate_factor_correlation
 
         factors = {
@@ -431,7 +471,8 @@ class TestFactorCorrelation:
         assert "diversification_score" in r
         assert "avg_correlation" in r
 
-    def test_rolling_correlation(self):
+    def test_rolling_correlation(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_correlation import calculate_rolling_correlation
 
         f1 = list(np.random.randn(100) * 0.02)
@@ -439,7 +480,8 @@ class TestFactorCorrelation:
         r = calculate_rolling_correlation(f1, f2, window=20)
         assert len(r) > 0
 
-    def test_insufficient_factors(self):
+    def test_insufficient_factors(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_correlation import calculate_factor_correlation
 
         r = calculate_factor_correlation({"value": [0.01, 0.02]})
@@ -450,7 +492,9 @@ class TestFactorCorrelation:
 
 
 class TestFactorRotation:
-    def test_detect_regime(self):
+    """Otomatik eklendi."""
+    def test_detect_regime(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_rotation import detect_regime
 
         # Bear market
@@ -458,7 +502,8 @@ class TestFactorRotation:
         r = detect_regime(returns)
         assert r["regime"] in ["BEAR", "HIGH_VOL", "NORMAL"]
 
-    def test_rotation_weights(self):
+    def test_rotation_weights(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_rotation import get_rotation_weights
 
         w = get_rotation_weights("BULL")
@@ -466,7 +511,8 @@ class TestFactorRotation:
         total = sum(w.values())
         assert abs(total - 1.0) < 0.01
 
-    def test_rotation_signal(self):
+    def test_rotation_signal(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_rotation import calculate_rotation_signal
 
         perf = {"value": 0.05, "momentum": 0.08, "quality": -0.02, "low_vol": -0.03}
@@ -474,7 +520,8 @@ class TestFactorRotation:
         assert "rotation_signal" in r
         assert "top_factors" in r
 
-    def test_regime_factor_map(self):
+    def test_regime_factor_map(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_rotation import REGIME_FACTOR_MAP
 
         assert "BULL" in REGIME_FACTOR_MAP
@@ -485,7 +532,9 @@ class TestFactorRotation:
 
 
 class TestTimeSeries:
-    def test_factor_returns(self):
+    """Otomatik eklendi."""
+    def test_factor_returns(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_time_series import calculate_factor_returns
 
         long = [0.05, 0.03, -0.02, 0.04]
@@ -494,14 +543,16 @@ class TestTimeSeries:
         assert len(r) == 4
         assert abs(r[0] - 0.03) < 0.001
 
-    def test_factor_trend(self):
+    def test_factor_trend(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_time_series import analyze_factor_trend
 
         returns = [0.01] * 60  # Upward trend
         r = analyze_factor_trend(returns, window=60)
         assert r["trend_direction"] == "UP"
 
-    def test_factor_momentum(self):
+    def test_factor_momentum(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_time_series import calculate_factor_momentum
 
         returns = [0.01, -0.005, 0.02, -0.01, 0.015] * 30
@@ -509,7 +560,8 @@ class TestTimeSeries:
         assert "mom_5d" in r
         assert "mom_20d" in r
 
-    def test_seasonality(self):
+    def test_seasonality(self) -> Any:
+        """Otomatik eklendi."""
         from services.factors.factor_time_series import detect_seasonality
 
         returns = [0.01, -0.005, 0.02] * 100
@@ -521,7 +573,8 @@ class TestTimeSeries:
 
 
 class TestIntegration:
-    def test_full_pipeline(self):
+    """Otomatik eklendi."""
+    def test_full_pipeline(self) -> Any:
         """Finansal veri → Piotroski + Beneish + Altman → Ranking."""
         from services.factors.altman import calculate_z_score
         from services.factors.piotroski import calculate_f_score
@@ -566,7 +619,7 @@ class TestIntegration:
         assert len(ranked) == 5
         assert ranked[0]["rank"] == 1
 
-    def test_factor_correlation_rotation(self):
+    def test_factor_correlation_rotation(self) -> Any:
         """Factor correlation + rotation pipeline."""
         from services.factors.factor_correlation import calculate_factor_correlation
         from services.factors.factor_rotation import detect_regime, get_rotation_weights

@@ -32,10 +32,11 @@ class DynamicCandleMatrix:
     """Yüksek hızlı dinamik kayan mum zekası motoru."""
 
     def __init__(self, lookback_window: int = 252):
+        """Otomatik eklendi."""
         self.lookback_window = lookback_window
         self._cache_events: dict[str, list[dict[str, Any]]] = {}
 
-    def precompute_stock_patterns(self, ticker: str, df: pl.DataFrame, forward_days: int = 5):
+    def precompute_stock_patterns(self, ticker: str, df: pl.DataFrame, forward_days: int = 5) -> Any:
         """Hisse verisindeki tüm formasyon olaylarını bir kez hesaplayıp önbelleğe alır."""
         from .candle_patterns import candle_engine
 

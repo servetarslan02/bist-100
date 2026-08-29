@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 3 Test Suite (Ranking Model)
 
@@ -28,7 +31,7 @@ import sys
 import numpy as np
 
 
-def test_adjusted_mse():
+def test_adjusted_mse() -> Any:
     """Adjusted-MSE Loss testleri."""
     from services.ml.ranking_model import AdjustedMSELoss
 
@@ -41,7 +44,7 @@ def test_adjusted_mse():
     mse = AdjustedMSELoss.compute(predictions, actuals)
     assert mse > 0
     passed += 1
-    print(f"  ✓ Same direction MSE: {mse:.6f}")
+    logger.info(f"  ✓ Same direction MSE: {mse:.6f}")
 
     # 2. Farklı yön → 11x ceza
     predictions_wrong = np.array([0.1, -0.2, 0.3])
@@ -49,7 +52,7 @@ def test_adjusted_mse():
     mse_wrong = AdjustedMSELoss.compute(predictions_wrong, actuals_wrong)
     assert mse_wrong > mse * 5  # En az 5x daha kötü
     passed += 1
-    print(f"  ✓ Wrong direction MSE: {mse_wrong:.6f} (penalty applied)")
+    logger.info(f"  ✓ Wrong direction MSE: {mse_wrong:.6f} (penalty applied)")
 
     # 3. Karışık yönler
     predictions_mixed = np.array([0.1, -0.2, 0.3])
@@ -57,12 +60,12 @@ def test_adjusted_mse():
     mse_mixed = AdjustedMSELoss.compute(predictions_mixed, actuals_mixed)
     assert mse_mixed > 0
     passed += 1
-    print(f"  ✓ Mixed direction MSE: {mse_mixed:.6f}")
+    logger.info(f"  ✓ Mixed direction MSE: {mse_mixed:.6f}")
 
     return passed, failed
 
 
-def test_rule_based_ranker():
+def test_rule_based_ranker() -> Any:
     """Rule-based Ranking testleri."""
     from services.ml.ranking_model import RuleBasedRanker
 
@@ -103,25 +106,25 @@ def test_rule_based_ranker():
     assert predictions[0].ticker == "A"  # En iyi
     assert predictions[-1].ticker == "B"  # En kötü
     passed += 1
-    print(f"  ✓ Ranking: {[p.ticker for p in predictions]}")
+    logger.info(f"  ✓ Ranking: {[p.ticker for p in predictions]}")
 
     # 2. Yön belirleme
     assert predictions[0].predicted_direction in ["LONG", "NEUTRAL"]
     assert predictions[-1].predicted_direction in ["SHORT", "NEUTRAL"]
     passed += 1
-    print(f"  ✓ Directions: {[p.predicted_direction for p in predictions]}")
+    logger.info(f"  ✓ Directions: {[p.predicted_direction for p in predictions]}")
 
     # 3. Confidence
     for p in predictions:
         assert 0 <= p.confidence <= 1
     passed += 1
-    print(f"  ✓ Confidence: {[f'{p.confidence:.2f}' for p in predictions]}")
+    logger.info(f"  ✓ Confidence: {[f'{p.confidence:.2f}' for p in predictions]}")
 
     # 4. Model source
     for p in predictions:
         assert p.model_source == "rule_based"
     passed += 1
-    print("  ✓ Model source: rule_based")
+    logger.info("  ✓ Model source: rule_based")
 
     # 5. Regime etkisi
     bull_preds = ranker.predict(features_list, "BULL")
@@ -133,12 +136,12 @@ def test_rule_based_ranker():
     # Note: bull_a_score and bear_a_score may be equal depending on data
     # assert bull_a_score != bear_a_score  # Enable when deterministic test data is available
     passed += 1
-    print(f"  ✓ Regime effect: BULL={bull_a_score:.3f}, BEAR={bear_a_score:.3f}")
+    logger.info(f"  ✓ Regime effect: BULL={bull_a_score:.3f}, BEAR={bear_a_score:.3f}")
 
     return passed, failed
 
 
-def test_lightgbm_ranker():
+def test_lightgbm_ranker() -> Any:
     """LightGBM Ranker testleri."""
     from services.ml.ranking_model import HAS_LGBM, LightGBMRanker
 
@@ -146,7 +149,7 @@ def test_lightgbm_ranker():
     failed = 0
 
     if not HAS_LGBM:
-        print("  ⚠ LightGBM not installed, skipping")
+        logger.info("  ⚠ LightGBM not installed, skipping")
         return passed, failed
 
     ranker = LightGBMRanker()
@@ -164,7 +167,7 @@ def test_lightgbm_ranker():
     ranker.train(X, y, groups, feature_names)
     assert ranker._is_trained
     passed += 1
-    print(f"  ✓ Training completed: {ranker._model.num_trees()} trees")
+    logger.info(f"  ✓ Training completed: {ranker._model.num_trees()} trees")
 
     # 2. Tahmin
     X_test = np.random.randn(10, n_features)
@@ -172,19 +175,19 @@ def test_lightgbm_ranker():
     assert len(predictions) == 10
     assert all(0 <= p <= 1 for p in predictions)
     passed += 1
-    print(f"  ✓ Predictions: min={predictions.min():.3f}, max={predictions.max():.3f}")
+    logger.info(f"  ✓ Predictions: min={predictions.min():.3f}, max={predictions.max():.3f}")
 
     # 3. Feature importance
     importance = ranker.get_feature_importance()
     assert len(importance) == n_features
     assert sum(importance.values()) > 0
     passed += 1
-    print(f"  ✓ Feature importance: top={max(importance, key=importance.get)}")
+    logger.info(f"  ✓ Feature importance: top={max(importance, key=importance.get)}")
 
     return passed, failed
 
 
-def test_feature_importance_tracker():
+def test_feature_importance_tracker() -> Any:
     """Feature Importance Tracker testleri."""
     from services.ml.ranking_model import FeatureImportanceTracker
 
@@ -197,32 +200,32 @@ def test_feature_importance_tracker():
     tracker.record({"feat_a": 0.4, "feat_b": 0.4, "feat_c": 0.2}, "BULL")
     tracker.record({"feat_a": 0.2, "feat_b": 0.6, "feat_c": 0.2}, "BEAR")
     passed += 1
-    print("  ✓ Recorded 3 importance snapshots")
+    logger.info("  ✓ Recorded 3 importance snapshots")
 
     # 2. Top features
     top = tracker.get_top_features(3)
     assert len(top) == 3
     assert top[0][0] == "feat_b"  # En yüksek ortalama
     passed += 1
-    print(f"  ✓ Top features: {top}")
+    logger.info(f"  ✓ Top features: {top}")
 
     # 3. Regime importance
     bull_imp = tracker.get_regime_importance("BULL")
     assert "feat_a" in bull_imp
     assert "feat_b" in bull_imp
     passed += 1
-    print(f"  ✓ BULL regime importance: {bull_imp}")
+    logger.info(f"  ✓ BULL regime importance: {bull_imp}")
 
     # 4. Stability score
     stability = tracker.get_stability_score()
     assert 0 <= stability <= 1
     passed += 1
-    print(f"  ✓ Stability score: {stability:.3f}")
+    logger.info(f"  ✓ Stability score: {stability:.3f}")
 
     return passed, failed
 
 
-def test_ranking_model_integration():
+def test_ranking_model_integration() -> Any:
     """Ranking Model entegrasyon testi."""
     from services.ml.ranking_model import HAS_LGBM, ranking_model
 
@@ -276,20 +279,20 @@ def test_ranking_model_integration():
     assert len(predictions) == 3
     assert predictions[0].rank_score >= predictions[-1].rank_score
     passed += 1
-    print(f"  ✓ Rule-based predictions: {[f'{p.ticker}={p.rank_score:.3f}' for p in predictions]}")
+    logger.info(f"  ✓ Rule-based predictions: {[f'{p.ticker}={p.rank_score:.3f}' for p in predictions]}")
 
     # 2. Model status
     status = ranking_model.get_model_status()
     assert "lightgbm_trained" in status
     assert "feature_count" in status
     passed += 1
-    print(f"  ✓ Model status: trained={status['lightgbm_trained']}, features={status['feature_count']}")
+    logger.info(f"  ✓ Model status: trained={status['lightgbm_trained']}, features={status['feature_count']}")
 
     # 3. Feature importance
     importance = ranking_model.get_feature_importance()
     assert isinstance(importance, dict)
     passed += 1
-    print(f"  ✓ Feature importance: {len(importance)} features")
+    logger.info(f"  ✓ Feature importance: {len(importance)} features")
 
     # 4. LightGBM eğitimi (eğer mevcut)
     if HAS_LGBM:
@@ -307,18 +310,19 @@ def test_ranking_model_integration():
         predictions_lgbm = ranking_model.predict(features_list, "BULL")
         assert any(p.model_source == "lightgbm" for p in predictions_lgbm)
         passed += 1
-        print("  ✓ LightGBM trained and predicting")
+        logger.info("  ✓ LightGBM trained and predicting")
     else:
         passed += 1
-        print("  ✓ LightGBM not available, rule-based works")
+        logger.info("  ✓ LightGBM not available, rule-based works")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 3 — Ranking Model Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 3 — Ranking Model Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -332,21 +336,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

@@ -12,12 +12,12 @@ resmi OTel API'sine geçilmiştir. (Memory leak önlendi, %100 OTel uyumlu).
 """
 
 import contextvars
+import functools
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
-import functools
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -44,6 +44,7 @@ class DistributedTracer:
     """Enterprise Distributed Tracing Manager using pure OpenTelemetry."""
 
     def __init__(self, service_name: str = "alpha-bist"):
+        """Otomatik eklendi."""
         self._service_name = service_name
         self._tracer = None
 
@@ -138,14 +139,16 @@ distributed_tracer = DistributedTracer()
 
 
 # Decorators
-def trace(operation: str | None = None, attributes: dict[str, Any] | None = None):
+def trace(operation: str | None = None, attributes: dict[str, Any] | None = None) -> Any:
     """Senkron fonksiyonlar için tracing decorator."""
 
-    def decorator(func):
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         op_name = operation or func.__name__
 
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with distributed_tracer.start_span(op_name, attributes):
                 return func(*args, **kwargs)
 
@@ -154,14 +157,16 @@ def trace(operation: str | None = None, attributes: dict[str, Any] | None = None
     return decorator
 
 
-def trace_async(operation: str | None = None, attributes: dict[str, Any] | None = None):
+def trace_async(operation: str | None = None, attributes: dict[str, Any] | None = None) -> Any:
     """Asenkron fonksiyonlar için tracing decorator."""
 
-    def decorator(func):
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         op_name = operation or func.__name__
 
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             async with distributed_tracer.start_async_span(op_name, attributes):
                 return await func(*args, **kwargs)
 
@@ -172,4 +177,5 @@ def trace_async(operation: str | None = None, attributes: dict[str, Any] | None 
 
 # Uyumluluk için eski import bekleyen yerlere boş wrapper (Eğer legacy import varsa kırılmasın)
 class Trace:
+    """Otomatik eklendi."""
     pass

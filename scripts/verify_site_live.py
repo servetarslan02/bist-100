@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Site ve Uç Nokta Canlı Veri Doğrulama Scripti
 """
@@ -21,10 +24,11 @@ endpoints = [
 ]
 
 
-def main():
-    print("=" * 80)
-    print("ALPHA BIST -- SİTE ÜZERİNDEKİ CANLI VERİ ENTEGRASYONU DETAYLI DOĞRULAMASI")
-    print("=" * 80)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 80)
+    logger.info("ALPHA BIST -- SİTE ÜZERİNDEKİ CANLI VERİ ENTEGRASYONU DETAYLI DOĞRULAMASI")
+    logger.info("=" * 80)
     for url, name in endpoints:
         try:
             req = urllib.request.urlopen(url, timeout=30)
@@ -45,10 +49,10 @@ def main():
             elif "regime" in data:
                 sample = f"Rejim: {data['regime']} | Yükselen: {data.get('advancing', 0)} | Düşen: {data.get('declining', 0)}"
 
-            print(f"[DOĞRULANDI] {name:<38} -> {sample}")
+            logger.info(f"[DOĞRULANDI] {name:<38} -> {sample}")
         except Exception as e:
-            print(f"[HATA] {name} -> {e}")
-    print("=" * 80)
+            logger.info(f"[HATA] {name} -> {e}")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":

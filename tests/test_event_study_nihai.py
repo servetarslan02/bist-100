@@ -1,3 +1,4 @@
+from typing import Any
 """Event Study Nihai Sistem Testleri — 14 Modül, 50+ Test."""
 
 from datetime import datetime, timedelta
@@ -9,7 +10,9 @@ import pytest
 
 
 class TestEstimationWindow:
-    def test_default_window(self):
+    """Otomatik eklendi."""
+    def test_default_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager()
@@ -18,14 +21,16 @@ class TestEstimationWindow:
         assert (end - start).days >= 50
         assert end < event_date  # Look-ahead bias kontrolü
 
-    def test_financial_results_window(self):
+    def test_financial_results_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager()
         start, end = mgr.get_window(datetime(2025, 6, 15), "FINANCIAL_RESULTS")
         assert (end - start).days >= 100
 
-    def test_gap_days(self):
+    def test_gap_days(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager(gap_days=6)
@@ -33,21 +38,24 @@ class TestEstimationWindow:
         _, end = mgr.get_window(event_date)
         assert (event_date - end).days >= 6
 
-    def test_validate_data_sufficient(self):
+    def test_validate_data_sufficient(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager()
         returns = np.random.randn(100) * 0.02
         assert mgr.validate_data(returns, "DEFAULT") is True
 
-    def test_validate_data_insufficient(self):
+    def test_validate_data_insufficient(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager()
         returns = np.random.randn(5) * 0.02
         assert mgr.validate_data(returns, "DEFAULT") is False
 
-    def test_extract_window_data(self):
+    def test_extract_window_data(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.estimation_window import EstimationWindowManager
 
         mgr = EstimationWindowManager()
@@ -63,7 +71,9 @@ class TestEstimationWindow:
 
 
 class TestEventWindow:
-    def test_default_window(self):
+    """Otomatik eklendi."""
+    def test_default_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -71,7 +81,8 @@ class TestEventWindow:
         assert start == -5
         assert end == 5
 
-    def test_financial_results_window(self):
+    def test_financial_results_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -79,7 +90,8 @@ class TestEventWindow:
         assert start == -5
         assert end == 5
 
-    def test_tcmb_window(self):
+    def test_tcmb_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -87,14 +99,16 @@ class TestEventWindow:
         assert start == -1
         assert end == 3
 
-    def test_window_size(self):
+    def test_window_size(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
         assert mgr.get_window_size("FINANCIAL_RESULTS") == 11
         assert mgr.get_window_size("DIVIDEND") == 7
 
-    def test_get_window_dates(self):
+    def test_get_window_dates(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -103,7 +117,8 @@ class TestEventWindow:
         assert start < event_date
         assert end > event_date
 
-    def test_align_to_event_day(self):
+    def test_align_to_event_day(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -113,7 +128,8 @@ class TestEventWindow:
         assert isinstance(aligned, dict)
         assert 0 in aligned  # Event günü
 
-    def test_sub_windows(self):
+    def test_sub_windows(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_window import EventWindowManager
 
         mgr = EventWindowManager()
@@ -128,7 +144,9 @@ class TestEventWindow:
 
 
 class TestExpectedReturn:
-    def test_market_model(self):
+    """Otomatik eklendi."""
+    def test_market_model(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.expected_return import calculate_expected_return
 
         sr = np.random.randn(100) * 0.02
@@ -139,7 +157,8 @@ class TestExpectedReturn:
         assert "r_squared" in result
         assert result["model"] == "market"
 
-    def test_fama_french_3(self):
+    def test_fama_french_3(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.expected_return import calculate_expected_return
 
         sr = np.random.randn(100) * 0.02
@@ -151,7 +170,8 @@ class TestExpectedReturn:
         assert "beta_smb" in result
         assert "beta_hml" in result
 
-    def test_insufficient_data(self):
+    def test_insufficient_data(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.expected_return import calculate_expected_return
 
         sr = np.random.randn(3) * 0.02
@@ -160,7 +180,8 @@ class TestExpectedReturn:
         assert result["alpha"] == 0.0
         assert result["beta_market"] == 1.0
 
-    def test_predict_value(self):
+    def test_predict_value(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.expected_return import calculate_expected_return_value
 
         params = {
@@ -174,7 +195,8 @@ class TestExpectedReturn:
         er = calculate_expected_return_value(params, 0.02)
         assert abs(er - (0.001 + 1.2 * 0.02)) < 0.0001
 
-    def test_backward_compat(self):
+    def test_backward_compat(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.expected_return import calculate_expected_return_simple
 
         sr = np.random.randn(50) * 0.02
@@ -188,7 +210,9 @@ class TestExpectedReturn:
 
 
 class TestAbnormalReturn:
-    def test_basic_ar(self):
+    """Otomatik eklendi."""
+    def test_basic_ar(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.abnormal_return import calculate_abnormal_return
 
         sr = np.array([0.05, -0.03, 0.02])
@@ -197,7 +221,8 @@ class TestAbnormalReturn:
         assert len(ar) == 3
         assert abs(ar[0] - 0.02) < 0.001  # 0.05 - 0.03
 
-    def test_with_alpha_beta(self):
+    def test_with_alpha_beta(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.abnormal_return import calculate_abnormal_return
 
         sr = np.array([0.05, -0.03, 0.02])
@@ -205,7 +230,8 @@ class TestAbnormalReturn:
         ar = calculate_abnormal_return(sr, mr, 0.01, 0.8)
         assert len(ar) == 3
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.abnormal_return import calculate_abnormal_return_batch
 
         stocks = {"A": np.random.randn(50) * 0.02, "B": np.random.randn(50) * 0.02}
@@ -220,14 +246,17 @@ class TestAbnormalReturn:
 
 
 class TestCAR:
-    def test_basic_car(self):
+    """Otomatik eklendi."""
+    def test_basic_car(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.car import calculate_car
 
         ar = np.array([0.01, 0.02, -0.005])
         car = calculate_car(ar)
         assert abs(car - 0.025) < 0.001
 
-    def test_car_window(self):
+    def test_car_window(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.car import calculate_car_window
 
         ar = np.array([0.01, 0.02, -0.005, 0.03, -0.01])
@@ -235,7 +264,8 @@ class TestCAR:
         car = calculate_car_window(ar, offsets, -1, 1)
         assert abs(car - (0.02 + -0.005 + 0.03)) < 0.001
 
-    def test_car_sub_windows(self):
+    def test_car_sub_windows(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.car import calculate_car_sub_windows
 
         ar = np.array([0.01, 0.02, -0.005, 0.03, -0.01])
@@ -246,7 +276,8 @@ class TestCAR:
         assert "post_event" in subs
         assert "full" in subs
 
-    def test_car_series(self):
+    def test_car_series(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.car import calculate_car_series
 
         ar = np.array([0.01, 0.02, -0.005])
@@ -255,7 +286,8 @@ class TestCAR:
         assert abs(series[0] - 0.01) < 0.001
         assert abs(series[2] - 0.025) < 0.001
 
-    def test_aar(self):
+    def test_aar(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.car import calculate_aar
 
         cars = {"A": 0.05, "B": -0.02, "C": 0.03}
@@ -267,7 +299,9 @@ class TestCAR:
 
 
 class TestStatisticalTest:
-    def test_significance_basic(self):
+    """Otomatik eklendi."""
+    def test_significance_basic(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import test_significance
 
         ar = np.random.randn(100) * 0.02
@@ -279,7 +313,8 @@ class TestStatisticalTest:
         assert "confidence_upper" in r
         assert "df" in r
 
-    def test_t_distribution(self):
+    def test_t_distribution(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import test_significance
 
         # Büyük CAR, düşük volatilite → significant olmalı
@@ -287,7 +322,8 @@ class TestStatisticalTest:
         r = test_significance(0.05, ar)
         assert r["significant"] is True
 
-    def test_not_significant(self):
+    def test_not_significant(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import test_significance
 
         # Küçük CAR, yüksek volatilite → significant olmamalı
@@ -295,7 +331,8 @@ class TestStatisticalTest:
         r = test_significance(0.001, ar)
         assert r["significant"] is False
 
-    def test_cross_sectional(self):
+    def test_cross_sectional(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import test_significance_cross_sectional
 
         cars = [0.05, -0.02, 0.03, 0.01, -0.01, 0.04, 0.02, -0.03, 0.06, 0.01]
@@ -304,7 +341,8 @@ class TestStatisticalTest:
         assert "mean_car" in r
         assert r["n_events"] == 10
 
-    def test_bonferroni(self):
+    def test_bonferroni(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import bonferroni_correction
 
         p_values = [0.01, 0.03, 0.04, 0.06, 0.08]
@@ -315,7 +353,8 @@ class TestStatisticalTest:
         assert r["significant_flags"][0] is False  # 0.01 == 0.01 (not <)
         assert r["significant_flags"][1] is False  # 0.03 > 0.01
 
-    def test_benjamini_hochberg(self):
+    def test_benjamini_hochberg(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import benjamini_hochberg_correction
 
         p_values = [0.001, 0.008, 0.039, 0.041, 0.060]
@@ -323,7 +362,8 @@ class TestStatisticalTest:
         assert r["n_tests"] == 5
         assert len(r["significant_flags"]) == 5
 
-    def test_wilcoxon(self):
+    def test_wilcoxon(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.statistical_test import wilcoxon_test
 
         cars = [0.05, -0.02, 0.03, 0.01, -0.01, 0.04, 0.02, -0.03, 0.06, 0.01]
@@ -336,7 +376,9 @@ class TestStatisticalTest:
 
 
 class TestImpact:
-    def test_basic_impact(self):
+    """Otomatik eklendi."""
+    def test_basic_impact(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.impact import calculate_event_impact
 
         r = calculate_event_impact(0.05, 0.01, 0.3)
@@ -344,7 +386,8 @@ class TestImpact:
         assert r["direction"] == "POSITIVE"
         assert r["significant"] is True
 
-    def test_event_type_weights(self):
+    def test_event_type_weights(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.impact import calculate_event_impact
 
         r1 = calculate_event_impact(0.05, 0.01, 0.3, "FINANCIAL_RESULTS")
@@ -352,7 +395,8 @@ class TestImpact:
         # FINANCIAL_RESULTS daha yüksek ağırlığa sahip
         assert r1["impact_score"] >= r2["impact_score"]
 
-    def test_impact_levels(self):
+    def test_impact_levels(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.impact import calculate_event_impact
 
         r_high = calculate_event_impact(0.15, 0.001, 0.8, "MERGER")
@@ -360,7 +404,8 @@ class TestImpact:
         assert r_high["impact_level"] in ["HIGH", "VERY_HIGH"]
         assert r_low["impact_level"] in ["LOW", "MEDIUM"]
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.impact import calculate_impact_batch
 
         events = [
@@ -376,32 +421,38 @@ class TestImpact:
 
 
 class TestKAPEvent:
-    def test_classify_financial(self):
+    """Otomatik eklendi."""
+    def test_classify_financial(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import classify_kap_event
 
         r = classify_kap_event("2025 yılı 3. dönem konsolide finansal sonuçları")
         assert r["event_type"] == "FINANCIAL_RESULTS"
         assert r["confidence"] > 0
 
-    def test_classify_dividend(self):
+    def test_classify_dividend(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import classify_kap_event
 
         r = classify_kap_event("Nakit temettü dağıtımı kararı")
         assert r["event_type"] == "DIVIDEND"
 
-    def test_classify_buyback(self):
+    def test_classify_buyback(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import classify_kap_event
 
         r = classify_kap_event("Pay geri alım programı")
         assert r["event_type"] == "BUYBACK"
 
-    def test_classify_unknown(self):
+    def test_classify_unknown(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import classify_kap_event
 
         r = classify_kap_event("Genel bilgilendirme")
         assert r["event_type"] == "UNKNOWN"
 
-    def test_analyze_kap_event(self):
+    def test_analyze_kap_event(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import analyze_kap_event
 
         est_sr = np.random.randn(100) * 0.02
@@ -422,7 +473,8 @@ class TestKAPEvent:
         assert "significance" in r
         assert "impact" in r
 
-    def test_analyze_kap_event_simple(self):
+    def test_analyze_kap_event_simple(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.kap_event import analyze_kap_event_simple
 
         sr = np.random.randn(50) * 0.02
@@ -442,7 +494,9 @@ class TestKAPEvent:
 
 
 class TestMacroEvent:
-    def test_tcmb_hawkish(self):
+    """Otomatik eklendi."""
+    def test_tcmb_hawkish(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_tcmb_event
 
         mr = np.array([0.01, -0.02, -0.015, 0.005])
@@ -450,7 +504,8 @@ class TestMacroEvent:
         assert r["surprise"] == 2.5
         assert r["direction"] == "HAWKISH"
 
-    def test_tcmb_dovish(self):
+    def test_tcmb_dovish(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_tcmb_event
 
         mr = np.array([-0.01, 0.02, 0.015, -0.005])
@@ -458,7 +513,8 @@ class TestMacroEvent:
         assert r["surprise"] == -2.5
         assert r["direction"] == "DOVISH"
 
-    def test_tcmb_neutral(self):
+    def test_tcmb_neutral(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_tcmb_event
 
         mr = np.array([0.001, -0.002, 0.001, 0.0])
@@ -466,7 +522,8 @@ class TestMacroEvent:
         assert r["surprise"] == 0.0
         assert r["direction"] == "NEUTRAL"
 
-    def test_macro_event_inflation(self):
+    def test_macro_event_inflation(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_macro_event
 
         mr = np.array([0.01, -0.02, -0.015, 0.005])
@@ -474,14 +531,16 @@ class TestMacroEvent:
         assert r["event_type"] == "INFLATION"
         assert r["direction"] == "NEGATIVE_SURPRISE"  # Beklentiden yüksek kötü
 
-    def test_macro_event_gdp(self):
+    def test_macro_event_gdp(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_macro_event
 
         mr = np.array([0.01, 0.02, 0.015, 0.005])
         r = analyze_macro_event("GDP", 5.5, 4.5, 4.0, mr)
         assert r["direction"] == "POSITIVE_SURPRISE"
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.macro_event import analyze_macro_events_batch
 
         mr = np.random.randn(20) * 0.015
@@ -497,7 +556,9 @@ class TestMacroEvent:
 
 
 class TestMultiFactor:
-    def test_fit_market(self):
+    """Otomatik eklendi."""
+    def test_fit_market(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.multi_factor import MultiFactorModel
 
         model = MultiFactorModel("market")
@@ -507,7 +568,8 @@ class TestMultiFactor:
         assert params["model"] == "market"
         assert params["r_squared"] >= 0
 
-    def test_fit_ff3(self):
+    def test_fit_ff3(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.multi_factor import MultiFactorModel
 
         model = MultiFactorModel("fama_french_3")
@@ -518,7 +580,8 @@ class TestMultiFactor:
         params = model.fit(sr, mr, smb_returns=smb, hml_returns=hml)
         assert params["model"] == "fama_french_3"
 
-    def test_predict(self):
+    def test_predict(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.multi_factor import MultiFactorModel
 
         model = MultiFactorModel("market")
@@ -528,14 +591,16 @@ class TestMultiFactor:
         er = model.predict(0.02)
         assert isinstance(er, float)
 
-    def test_predict_without_fit(self):
+    def test_predict_without_fit(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.multi_factor import MultiFactorModel
 
         model = MultiFactorModel("market")
         with pytest.raises(ValueError):
             model.predict(0.02)
 
-    def test_factors(self):
+    def test_factors(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.multi_factor import FamaFrenchFactors
 
         smb = FamaFrenchFactors.calculate_smb(
@@ -549,7 +614,9 @@ class TestMultiFactor:
 
 
 class TestCrossSectional:
-    def test_analyze(self):
+    """Otomatik eklendi."""
+    def test_analyze(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.cross_sectional import CrossSectionalEventStudy
 
         cs = CrossSectionalEventStudy()
@@ -563,7 +630,8 @@ class TestCrossSectional:
         assert "average_car" in r
         assert "t_statistic" in r
 
-    def test_analyze_by_type(self):
+    def test_analyze_by_type(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.cross_sectional import CrossSectionalEventStudy
 
         cs = CrossSectionalEventStudy()
@@ -576,7 +644,8 @@ class TestCrossSectional:
         assert "FIN" in r
         assert "DIV" in r
 
-    def test_regression(self):
+    def test_regression(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.cross_sectional import CrossSectionalEventStudy
 
         cs = CrossSectionalEventStudy()
@@ -590,7 +659,8 @@ class TestCrossSectional:
         r = cs.regression_analysis(events, ["volume", "size"])
         assert "coefficients" in r or "error" in r
 
-    def test_empty(self):
+    def test_empty(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.cross_sectional import CrossSectionalEventStudy
 
         cs = CrossSectionalEventStudy()
@@ -602,7 +672,9 @@ class TestCrossSectional:
 
 
 class TestEventClustering:
-    def test_detect_clusters(self):
+    """Otomatik eklendi."""
+    def test_detect_clusters(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_clustering import EventClusteringDetector
 
         detector = EventClusteringDetector(window_days=3)
@@ -614,7 +686,8 @@ class TestEventClustering:
         clusters = detector.detect_clusters(events)
         assert len(clusters) >= 1  # A ve B aynı cluster'da
 
-    def test_no_clusters(self):
+    def test_no_clusters(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_clustering import EventClusteringDetector
 
         detector = EventClusteringDetector(window_days=2)
@@ -625,7 +698,8 @@ class TestEventClustering:
         clusters = detector.detect_clusters(events)
         assert len(clusters) == 0
 
-    def test_cluster_statistics(self):
+    def test_cluster_statistics(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_clustering import EventClusteringDetector
 
         detector = EventClusteringDetector()
@@ -637,7 +711,8 @@ class TestEventClustering:
         assert stats["n_clusters"] == 2
         assert stats["avg_size"] == 2.5
 
-    def test_adjust_car(self):
+    def test_adjust_car(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_clustering import EventClusteringDetector
 
         detector = EventClusteringDetector(window_days=3)
@@ -655,7 +730,9 @@ class TestEventClustering:
 
 
 class TestEventDecay:
-    def test_decay_basic(self):
+    """Otomatik eklendi."""
+    def test_decay_basic(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_decay import EventImpactDecay
 
         decay = EventImpactDecay()
@@ -666,7 +743,8 @@ class TestEventDecay:
         assert "pattern" in r
         assert r["decay_rate"] > 0
 
-    def test_no_decay(self):
+    def test_no_decay(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_decay import EventImpactDecay
 
         decay = EventImpactDecay()
@@ -674,7 +752,8 @@ class TestEventDecay:
         r = decay.calculate_decay(ar)
         assert r["pattern"] == "PERSISTENT"
 
-    def test_batch(self):
+    def test_batch(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.event_decay import EventImpactDecay
 
         decay = EventImpactDecay()
@@ -691,7 +770,9 @@ class TestEventDecay:
 
 
 class TestSectorEvent:
-    def test_sector_event(self):
+    """Otomatik eklendi."""
+    def test_sector_event(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.sector_event import SectorEventAnalyzer
 
         analyzer = SectorEventAnalyzer()
@@ -702,7 +783,8 @@ class TestSectorEvent:
         assert "stock_car" in r
         assert "outperformed_bist" in r
 
-    def test_peer_comparison(self):
+    def test_peer_comparison(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.sector_event import SectorEventAnalyzer
 
         analyzer = SectorEventAnalyzer()
@@ -717,7 +799,8 @@ class TestSectorEvent:
         assert "rankings" in r
         assert "target_analysis" in r
 
-    def test_sector_rotation(self):
+    def test_sector_rotation(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.sector_event import SectorEventAnalyzer
 
         analyzer = SectorEventAnalyzer()
@@ -727,7 +810,8 @@ class TestSectorEvent:
         assert "outflow_sectors" in r
         assert "rotation_signal" in r
 
-    def test_get_sector_stocks(self):
+    def test_get_sector_stocks(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.sector_event import SectorEventAnalyzer
 
         analyzer = SectorEventAnalyzer()
@@ -735,7 +819,8 @@ class TestSectorEvent:
         assert "AKBNK" in stocks
         assert "GARAN" in stocks
 
-    def test_get_stock_sector(self):
+    def test_get_stock_sector(self) -> Any:
+        """Otomatik eklendi."""
         from services.event_study.sector_event import SectorEventAnalyzer
 
         analyzer = SectorEventAnalyzer()
@@ -747,7 +832,8 @@ class TestSectorEvent:
 
 
 class TestIntegration:
-    def test_full_pipeline(self):
+    """Otomatik eklendi."""
+    def test_full_pipeline(self) -> Any:
         """Tam pipeline: estimation → expected return → AR → CAR → test → impact."""
         from services.event_study.abnormal_return import calculate_abnormal_return
         from services.event_study.car import calculate_car
@@ -780,7 +866,7 @@ class TestIntegration:
         assert "t_statistic" in significance
         assert "impact_score" in impact
 
-    def test_kap_to_cross_sectional(self):
+    def test_kap_to_cross_sectional(self) -> Any:
         """KAP event → cross-sectional pipeline."""
         from services.event_study.cross_sectional import CrossSectionalEventStudy
         from services.event_study.kap_event import analyze_kap_event

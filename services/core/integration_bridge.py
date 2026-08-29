@@ -34,13 +34,13 @@ Kullanım:
 
 from __future__ import annotations
 
+import functools
 import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-import functools
 import numpy as np
 import structlog
 from opentelemetry import trace
@@ -48,14 +48,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.integration_bridge")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -142,10 +148,12 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
+        """Otomatik eklendi."""
         return self._state
 
     @property
     def failure_count(self) -> int:
+        """Otomatik eklendi."""
         return self._failure_count
 
     def reset(self) -> None:
@@ -177,17 +185,20 @@ class ModuleMetrics:
 
     @property
     def success_rate(self) -> float:
+        """Otomatik eklendi."""
         if self.total_calls == 0:
             return 0.0
         return self.successful_calls / self.total_calls
 
     @property
     def avg_latency_ms(self) -> float:
+        """Otomatik eklendi."""
         if self.successful_calls == 0:
             return 0.0
         return self.total_latency_ms / self.successful_calls
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "name": self.name,
             "total_calls": self.total_calls,
@@ -231,9 +242,11 @@ class PipelineEnhancementReport:
 
     @property
     def is_healthy(self) -> bool:
+        """Otomatik eklendi."""
         return self.failure_count == 0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "correlation_id": self.correlation_id,
@@ -322,6 +335,7 @@ class IntegrationBridge:
     """
 
     def __init__(self, config: BridgeConfig | None = None):
+        """Otomatik eklendi."""
         self.config = config or BridgeConfig()
         self._initialized = False
 

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Celery Async Task Queue Test Suite
 Doğrulanan Özellikler:
@@ -9,8 +10,9 @@ Doğrulanan Özellikler:
 6. Görev Durumu ve İlerleme Sorgulama (get_task_status)
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from services.tasks.queue import (
     BaseTaskWithDLQ,
@@ -24,13 +26,15 @@ from services.tasks.queue import (
 class TestCeleryConfiguration:
     """Celery yapılandırma, yönlendirme ve çizelge testleri."""
 
-    def test_celery_app_initialized(self):
+    def test_celery_app_initialized(self) -> Any:
+        """Otomatik eklendi."""
         assert celery_app is not None
         assert celery_app.conf.task_acks_late is True
         assert celery_app.conf.worker_prefetch_multiplier == 1
         assert celery_app.conf.timezone == "Europe/Istanbul"
 
-    def test_queue_routing_configuration(self):
+    def test_queue_routing_configuration(self) -> Any:
+        """Otomatik eklendi."""
         routes = celery_app.conf.task_routes
         assert routes["tasks.model_train"]["queue"] == "heavy"
         assert routes["tasks.data_backfill"]["queue"] == "heavy"
@@ -40,7 +44,8 @@ class TestCeleryConfiguration:
         assert routes["tasks.report_generate"]["queue"] == "fast"
         assert routes["tasks.health_check"]["queue"] == "fast"
 
-    def test_beat_schedule_configuration(self):
+    def test_beat_schedule_configuration(self) -> Any:
+        """Otomatik eklendi."""
         schedule = celery_app.conf.beat_schedule
         assert "morning-pre-market-check" in schedule
         assert "post-market-daily-report" in schedule
@@ -51,7 +56,8 @@ class TestCeleryConfiguration:
 class TestTaskSubmissionAndIdempotency:
     """Görev gönderimi, imzalama ve mükerrerlik testleri."""
 
-    def test_task_signature_generation(self):
+    def test_task_signature_generation(self) -> Any:
+        """Otomatik eklendi."""
         sig1 = _generate_task_signature("backtest", ("THYAO",), {"days": 30})
         sig2 = _generate_task_signature("backtest", ("THYAO",), {"days": 30})
         sig3 = _generate_task_signature("backtest", ("ASELS",), {"days": 30})
@@ -59,7 +65,8 @@ class TestTaskSubmissionAndIdempotency:
         assert sig1 == sig2
         assert sig1 != sig3
 
-    def test_idempotent_task_submission_deduplication(self):
+    def test_idempotent_task_submission_deduplication(self) -> Any:
+        """Otomatik eklendi."""
         with patch("services.tasks.queue.run_backtest_task.delay") as mock_delay:
             mock_res = MagicMock()
             mock_res.id = "task-mock-001"
@@ -77,7 +84,8 @@ class TestTaskSubmissionAndIdempotency:
             assert res2["status"] == "DEDUPLICATED"
             assert res2["task_id"] == "task-mock-001"
 
-    def test_invalid_task_type_submission(self):
+    def test_invalid_task_type_submission(self) -> Any:
+        """Otomatik eklendi."""
         res = submit_task("non_existent_task_name")
         assert res["success"] is False
         assert "Bilinmeyen görev" in res["error"]
@@ -86,7 +94,8 @@ class TestTaskSubmissionAndIdempotency:
 class TestTaskStatusAndDLQ:
     """Durum sorgulama ve DLQ entegrasyon testleri."""
 
-    def test_get_task_status_mocked(self):
+    def test_get_task_status_mocked(self) -> Any:
+        """Otomatik eklendi."""
         with patch.object(celery_app, "AsyncResult") as mock_async_result:
             mock_res = MagicMock()
             mock_res.status = "SUCCESS"
@@ -101,7 +110,8 @@ class TestTaskStatusAndDLQ:
             assert status["result"] == {"pnl": 15.5}
 
     @pytest.mark.asyncio
-    async def test_base_task_dlq_on_failure(self):
+    async def test_base_task_dlq_on_failure(self) -> Any:
+        """Otomatik eklendi."""
         task_instance = BaseTaskWithDLQ()
         task_instance.name = "tasks.backtest"
 

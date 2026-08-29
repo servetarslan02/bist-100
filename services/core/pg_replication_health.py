@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — PostgreSQL Replication Health Monitor
 
 Streaming replication durumunu kontrol eder.
@@ -7,8 +8,9 @@ Kullanım:
     python -m services.core.pg_replication_health
 """
 
-import structlog
 import functools
+
+import structlog
 from opentelemetry import trace
 
 from .database import get_pg_pool, get_pg_replica_pool
@@ -16,14 +18,20 @@ from .database import get_pg_pool, get_pg_replica_pool
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.pg_replication_health")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -127,8 +135,9 @@ if __name__ == "__main__":
 
     import orjson
 
-    async def main():
+    async def main() -> Any:
+        """Otomatik eklendi."""
         health = await check_replication_health()
-        print(orjson.dumps(health, option=orjson.OPT_INDENT_2).decode())
+        logger.info(orjson.dumps(health, option=orjson.OPT_INDENT_2).decode())
 
     asyncio.run(main())

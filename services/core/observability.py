@@ -10,6 +10,7 @@ ALPHA BIST — Observability & Monitoring v2.0
 - Health Check endpoints
 """
 
+import functools
 import os
 import threading
 import time
@@ -17,7 +18,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psutil
-import functools
 import structlog
 from opentelemetry import trace
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
@@ -25,15 +25,22 @@ from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_late
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.observability")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 # Standart histogram bucket'ları (saniye cinsinden)
 DEFAULT_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
@@ -43,16 +50,19 @@ class PrometheusMetrics:
     """Prometheus uyumlu metric sistemi — resmi prometheus_client ile."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._counters: dict[str, Counter] = {}
         self._gauges: dict[str, Gauge] = {}
         self._histograms: dict[str, Histogram] = {}
 
     def _get_or_create_counter(self, name: str, labels: list[str] = None) -> Counter:
+        """Otomatik eklendi."""
         if name not in self._counters:
             self._counters[name] = Counter(name, f"{name} counter", labels or [])
         return self._counters[name]
 
     def _get_or_create_gauge(self, name: str, labels: list[str] = None) -> Gauge:
+        """Otomatik eklendi."""
         if name not in self._gauges:
             self._gauges[name] = Gauge(name, f"{name} gauge", labels or [])
         return self._gauges[name]
@@ -60,11 +70,12 @@ class PrometheusMetrics:
     def _get_or_create_histogram(
         self, name: str, labels: list[str] = None, buckets: tuple = DEFAULT_BUCKETS
     ) -> Histogram:
+        """Otomatik eklendi."""
         if name not in self._histograms:
             self._histograms[name] = Histogram(name, f"{name} histogram", labels or [], buckets=buckets)
         return self._histograms[name]
 
-    def inc(self, name: str, value: int = 1, labels: dict[str, str] = None):
+    def inc(self, name: str, value: int = 1, labels: dict[str, str] = None) -> Any:
         """Counter artır."""
         label_names = list(labels.keys()) if labels else []
         counter = self._get_or_create_counter(name, label_names)
@@ -73,7 +84,7 @@ class PrometheusMetrics:
         else:
             counter.inc(value)
 
-    def set_gauge(self, name: str, value: float, labels: dict[str, str] = None):
+    def set_gauge(self, name: str, value: float, labels: dict[str, str] = None) -> Any:
         """Gauge ayarla."""
         label_names = list(labels.keys()) if labels else []
         gauge = self._get_or_create_gauge(name, label_names)
@@ -82,7 +93,7 @@ class PrometheusMetrics:
         else:
             gauge.set(value)
 
-    def observe(self, name: str, value: float, labels: dict[str, str] = None, buckets: tuple = None):
+    def observe(self, name: str, value: float, labels: dict[str, str] = None, buckets: tuple = None) -> Any:
         """Histogram gözlem (bucket desteği ile)."""
         label_names = list(labels.keys()) if labels else []
         hist = self._get_or_create_histogram(name, label_names, buckets or DEFAULT_BUCKETS)
@@ -91,7 +102,7 @@ class PrometheusMetrics:
         else:
             hist.observe(value)
 
-    def timed(self, name: str, labels: dict[str, str] = None, buckets: tuple = None):
+    def timed(self, name: str, labels: dict[str, str] = None, buckets: tuple = None) -> Any:
         """Context manager — işlem süresini ölçer."""
         label_names = list(labels.keys()) if labels else []
         hist = self._get_or_create_histogram(name, label_names, buckets or DEFAULT_BUCKETS)
@@ -100,8 +111,35 @@ class PrometheusMetrics:
         return hist.time()
 
     def get_metrics(self) -> dict[str, Any]:
-        """Geriye dönük uyumluluk için. Artık doğrudan /metrics üzerinden exposition kullanılıyor."""
-        return {"note": "Use /metrics endpoint for exposition."}
+        """Geriye dönük uyumluluk için dict formatında metrikler."""
+        histograms_dict = {}
+        for name, hist in self._histograms.items():
+            try:
+                collected = hist.collect()
+                samples = collected[0].samples if collected else []
+                buckets = {}
+                count = 0
+                sum_val = 0.0
+                for s in samples:
+                    if s.name.endswith("_bucket"):
+                        le = s.labels.get("le", "")
+                        buckets[le] = int(s.value)
+                    elif s.name.endswith("_count"):
+                        count = int(s.value)
+                    elif s.name.endswith("_sum"):
+                        sum_val = float(s.value)
+                histograms_dict[name] = {
+                    "count": count,
+                    "sum": sum_val,
+                    "buckets": buckets,
+                }
+            except Exception:
+                histograms_dict[name] = {"count": 0, "sum": 0.0, "buckets": {}}
+        return {
+            "counters": self._counters,
+            "gauges": self._gauges,
+            "histograms": histograms_dict,
+        }
 
     def get_prometheus_text(self) -> str:
         """Prometheus text exposition format (OpenMetrics compliant)."""
@@ -112,6 +150,7 @@ class DistributedTracing:
     """Dağıtık izleme — OpenTelemetry entegrasyonu ile."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._tracer = trace.get_tracer(__name__)
 
     def start_trace(self, operation: str) -> str:
@@ -122,7 +161,7 @@ class DistributedTracing:
         span.set_attribute("status", "started")
         return trace_id
 
-    def add_span(self, trace_id: str, operation: str, duration_ms: float = 0, status: str = "completed"):
+    def add_span(self, trace_id: str, operation: str, duration_ms: float = 0, status: str = "completed") -> Any:
         """Mevcut sisteme uyumlu dummy. Artık with tracer.start_as_current_span kullanılmalı."""
         pass
 
@@ -131,9 +170,11 @@ class DistributedTracing:
         return []
 
     def get_spans(self, trace_id: str) -> list[dict]:
+        """Otomatik eklendi."""
         return []
 
     def get_recent_traces(self, limit: int = 20) -> list[dict]:
+        """Otomatik eklendi."""
         return []
 
 
@@ -141,19 +182,22 @@ class PerformanceMonitor:
     """Performans izleme - Prometheus Histogramlara entegre."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         pass
 
     @otel_trace("observability.PerformanceMonitor.record_latency")
-    def record_latency(self, operation: str, latency_ms: float):
+    def record_latency(self, operation: str, latency_ms: float) -> Any:
         """Gecikme kaydet."""
         prometheus_metrics.observe("operation_latency_seconds", latency_ms / 1000.0, labels={"operation": operation})
 
     @otel_trace("observability.PerformanceMonitor.get_stats")
     def get_stats(self, operation: str) -> dict[str, float]:
+        """Otomatik eklendi."""
         return {"note": "Metrics exported to Prometheus"}
 
     @otel_trace("observability.PerformanceMonitor.get_all_stats")
     def get_all_stats(self) -> dict[str, dict]:
+        """Otomatik eklendi."""
         return {}
 
 
@@ -161,10 +205,11 @@ class CostMonitor:
     """Maliyet izleme - Prometheus Gaugelara entegre."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._total_cost: float = 0.0
 
     @otel_trace("observability.CostMonitor.record")
-    def record(self, provider: str, model: str, tokens: int, cost_usd: float):
+    def record(self, provider: str, model: str, tokens: int, cost_usd: float) -> Any:
         """Maliyet kaydet."""
         self._total_cost += cost_usd
         prometheus_metrics.inc("llm_tokens_total", tokens, labels={"provider": provider, "model": model})
@@ -173,6 +218,7 @@ class CostMonitor:
 
     @otel_trace("observability.CostMonitor.get_summary")
     def get_summary(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {"total_cost_usd": self._total_cost}
 
 
@@ -180,12 +226,14 @@ class ResourceMonitor:
     """Kaynak kullanımı izleme - psutil tabanlı ve arka plan destekli."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._process = psutil.Process(os.getpid())
         self._running = False
         self._thread = None
 
     @otel_trace("observability.ResourceMonitor.start_background_monitoring")
-    def start_background_monitoring(self, interval_seconds: int = 15):
+    def start_background_monitoring(self, interval_seconds: int = 15) -> Any:
+        """Otomatik eklendi."""
         if self._running:
             return
         self._running = True
@@ -193,12 +241,14 @@ class ResourceMonitor:
         self._thread.start()
 
     @otel_trace("observability.ResourceMonitor.stop_background_monitoring")
-    def stop_background_monitoring(self):
+    def stop_background_monitoring(self) -> Any:
+        """Otomatik eklendi."""
         self._running = False
         if self._thread:
             self._thread.join(timeout=2.0)
 
-    def _monitor_loop(self, interval: int):
+    def _monitor_loop(self, interval: int) -> Any:
+        """Otomatik eklendi."""
         while self._running:
             try:
                 self.snapshot()
@@ -207,7 +257,7 @@ class ResourceMonitor:
             time.sleep(interval)
 
     @otel_trace("observability.ResourceMonitor.snapshot")
-    def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0):
+    def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0) -> Any:
         """Gerçek donanım verilerini okur ve Prometheus'a yazar."""
         actual_cpu = self._process.cpu_percent(interval=None)
         actual_mem = self._process.memory_info().rss / (1024 * 1024)
@@ -219,7 +269,7 @@ class ResourceMonitor:
             disk = psutil.disk_usage("/")
             prometheus_metrics.set_gauge("system_disk_used_percent", disk.percent)
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     @otel_trace("observability.ResourceMonitor.get_current")
     def get_current(self) -> dict[str, Any]:
@@ -236,6 +286,7 @@ class ConfigManager:
     """Config yönetimi — versioned, auditable."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._config: dict[str, Any] = {}
         self._versions: list[dict] = []
         self._defaults: dict[str, Any] = {
@@ -251,10 +302,12 @@ class ConfigManager:
 
     @otel_trace("observability.ConfigManager.get")
     def get(self, key: str, default: Any = None) -> Any:
+        """Otomatik eklendi."""
         return self._config.get(key, self._defaults.get(key, default))
 
     @otel_trace("observability.ConfigManager.set")
-    def set(self, key: str, value: Any, actor: str = "system", reason: str = ""):
+    def set(self, key: str, value: Any, actor: str = "system", reason: str = "") -> Any:
+        """Otomatik eklendi."""
         old_value = self._config.get(key)
         self._config[key] = value
 
@@ -275,10 +328,12 @@ class ConfigManager:
 
     @otel_trace("observability.ConfigManager.get_history")
     def get_history(self, key: str) -> list[dict]:
+        """Otomatik eklendi."""
         return [v for v in self._versions if v["key"] == key]
 
     @otel_trace("observability.ConfigManager.get_all")
     def get_all(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         result = dict(self._defaults)
         result.update(self._config)
         return result
@@ -288,10 +343,12 @@ class HealthChecker:
     """Sistem sağlık kontrolü."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._components: dict[str, dict] = {}
 
     @otel_trace("observability.HealthChecker.register")
-    def register(self, component: str, check_fn: Any = None):
+    def register(self, component: str, check_fn: Any = None) -> Any:
+        """Otomatik eklendi."""
         self._components[component] = {
             "status": "UNKNOWN",
             "last_check": None,
@@ -299,7 +356,8 @@ class HealthChecker:
         }
 
     @otel_trace("observability.HealthChecker.update_status")
-    def update_status(self, component: str, status: str, details: str = ""):
+    def update_status(self, component: str, status: str, details: str = "") -> Any:
+        """Otomatik eklendi."""
         if component in self._components:
             self._components[component]["status"] = status
             self._components[component]["details"] = details
@@ -311,6 +369,7 @@ class HealthChecker:
 
     @otel_trace("observability.HealthChecker.check_all")
     def check_all(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         results = {}
         overall = "HEALTHY"
 

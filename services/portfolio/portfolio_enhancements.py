@@ -14,9 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
 
-import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -53,6 +51,7 @@ class PortfolioEnhancements:
     """Portföy yönetimi geliştirmeleri."""
 
     def __init__(self, constraints: PortfolioConstraints | None = None):
+        """Otomatik eklendi."""
         self.constraints = constraints or PortfolioConstraints()
         self._rebalance_history: list[RebalanceDecision] = []
 

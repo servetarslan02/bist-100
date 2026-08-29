@@ -41,6 +41,7 @@ class EvalReport:
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "agent_role": self.agent_role,
             "accuracy": self.accuracy,
@@ -73,6 +74,7 @@ class AgentSelfEvaluator:
         calibration_bins: int = 5,
         overconfidence_threshold: float = 0.15,
     ):
+        """Otomatik eklendi."""
         self.drift_threshold = drift_threshold
         self.min_samples = min_samples
         self.calibration_bins = calibration_bins
@@ -247,6 +249,7 @@ class MultiAgentEvaluator:
     """Tüm agent'ları değerlendir — toplu rapor."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.evaluator = AgentSelfEvaluator()
 
     def evaluate_all(

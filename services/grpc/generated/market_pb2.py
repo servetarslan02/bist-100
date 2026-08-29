@@ -2,6 +2,8 @@
 # NO CHECKED-IN PROTOBUF GENCODE
 # source: market.proto
 # Protobuf Python Version: 7.35.1
+import structlog
+logger = structlog.get_logger(__name__)
 """Generated protocol buffer code."""
 
 from google.protobuf import descriptor as _descriptor
@@ -13,7 +15,7 @@ from google.protobuf.internal import builder as _builder
 try:
     _runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 7, 35, 1, "", "market.proto")
 except Exception:
-    pass
+    logger.error("Exception caught", exc_info=True)
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()

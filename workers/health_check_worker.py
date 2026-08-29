@@ -17,6 +17,7 @@ class HealthCheckWorker:
     """Sistem sağlık kontrolü worker'ı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_check: str | None = None
 
     def run_full_check(self) -> dict[str, Any]:
@@ -45,6 +46,7 @@ class HealthCheckWorker:
         return result
 
     def get_status(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {"last_check": self._last_check}
 
 

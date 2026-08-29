@@ -27,7 +27,7 @@
 **Dosya:** `services/intelligence/monte_carlo.py`, satır ~158  
 **Kod:**
 ```python
-correlated_Z = np.einsum('ijk,lk->ijl', Z, L)  # Bu hatalı, düzelt
+correlated_Z = np.einsum("ijk,lk->ijl", Z, L)  # Bu hatalı, düzelt
 ```
 
 **Sorun:** `np.einsum('ijk,lk->ijl', Z, L)` ifadesi matematiksel olarak yanlış. Z'nin shape'i `(n_sims, horizon_days, n_assets)` ve L'nin shape'i `(n_assets, n_assets)`. Doğru einsum ifadesi `np.einsum('ijk,lk->ijl', Z, L)` değil, `Z @ L.T` olmalı (veya `np.einsum('ijk,lk->ijl', Z, L.T)`). Ayrıca yorumda "Bu hatalı, düzelt" yazıyor — kod bilinen bir hatayla deploy edilmiş.
@@ -36,7 +36,7 @@ correlated_Z = np.einsum('ijk,lk->ijl', Z, L)  # Bu hatalı, düzelt
 ```python
 correlated_Z = Z @ L.T  # (n_sims, horizon_days, n_assets) @ (n_assets, n_assets)
 # VEYA
-correlated_Z = np.einsum('ijk,lk->ijl', Z, L.T)
+correlated_Z = np.einsum("ijk,lk->ijl", Z, L.T)
 ```
 
 **Etki:** Korele edilmiş Monte Carlo simülasyonları tamamen yanlış sonuç üretir. Portföy riski yanlış hesaplanır.
@@ -117,14 +117,14 @@ pi = 0
 for i in range(n_assets):
     for j in range(n_assets):
         diff = returns[:, i] * returns[:, j] - sample_cov[i, j]
-        pi += np.sum(diff ** 2)
+        pi += np.sum(diff**2)
 pi /= n_samples  # ← HATALI
 
 # Rho: Target bias
 rho = np.sum((target - sample_cov) ** 2)  # ← HATALI
 
 # Gamma: Target variance
-gamma = np.sum(target ** 2)  # ← KULLANILMIYOR
+gamma = np.sum(target**2)  # ← KULLANILMIYOR
 
 # Optimal shrinkage
 if pi + rho > 0:
@@ -143,8 +143,8 @@ pi = 0
 for i in range(n_assets):
     for j in range(n_assets):
         diff = returns[:, i] * returns[:, j] - sample_cov[i, j]
-        pi += np.sum(diff ** 2)
-pi /= n_samples ** 2  # ← n²'ye böl
+        pi += np.sum(diff**2)
+pi /= n_samples**2  # ← n²'ye böl
 
 rho = np.sum((target - sample_cov) ** 2)  # Bu zaten doğru (scalar)
 
@@ -213,7 +213,7 @@ Z = rng.standard_normal((n_sims, horizon_days))
 **Kod:**
 ```python
 downside_returns = np.minimum(returns, 0)
-downside_std = np.sqrt(np.mean(downside_returns ** 2))
+downside_std = np.sqrt(np.mean(downside_returns**2))
 sortino = (np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0
 ```
 
@@ -228,7 +228,7 @@ Kod `target = 0` varsayıyor (makul). Ama `np.minimum(returns, 0)` yerine `np.mi
 ```python
 # Doğru:
 negative_returns = returns[returns < 0]
-downside_std = np.sqrt(np.mean(negative_returns ** 2)) if len(negative_returns) > 0 else 0
+downside_std = np.sqrt(np.mean(negative_returns**2)) if len(negative_returns) > 0 else 0
 ```
 
 **Etki:** Sortino ratio olduğundan yüksek görünür (daha az negatif getiri dahil edildiğinden std daha düşük çıkar).
@@ -240,7 +240,7 @@ downside_std = np.sqrt(np.mean(negative_returns ** 2)) if len(negative_returns) 
 **Dosya:** `services/backtest/engine.py`, satır ~160  
 **Kod:**
 ```python
-cagr_pct=round(((final / initial_capital) ** (1 / max(len(equity_curve) / 252, 0.01)) - 1) * 100, 2)
+cagr_pct = round(((final / initial_capital) ** (1 / max(len(equity_curve) / 252, 0.01)) - 1) * 100, 2)
 ```
 
 **Sorun:** `len(equity_curve)` equity curve'deki nokta sayısıdır. Bu noktalar her signal için eklenir (her gün değil). Eğer bir günde 5 signal varsa, 5 equity noktası oluşur. Bu durumda `len(equity_curve) / 252` gerçek yıl sayısını vermez.
@@ -364,11 +364,9 @@ bear_power = low[-1] - ema
 ```python
 for sim in range(num_simulations):
     for day in range(horizon_days):
-        stock_returns = np.array([
-            (returns_annual[i] - 0.5 * vols_annual[i] ** 2) * dt
-            + correlated_Z[sim, day, i]
-            for i in range(n)
-        ])
+        stock_returns = np.array(
+            [(returns_annual[i] - 0.5 * vols_annual[i] ** 2) * dt + correlated_Z[sim, day, i] for i in range(n)]
+        )
         daily_returns[sim, day] = np.sum(weights * stock_returns)
 ```
 
@@ -376,8 +374,8 @@ for sim in range(num_simulations):
 
 **Doğru Formül (Vektörize):**
 ```python
-drift = (returns_annual - 0.5 * vols_annual ** 2) * dt
-daily_returns = np.einsum('ijk,k->ij', correlated_Z, weights) + np.sum(weights * drift)
+drift = (returns_annual - 0.5 * vols_annual**2) * dt
+daily_returns = np.einsum("ijk,k->ij", correlated_Z, weights) + np.sum(weights * drift)
 ```
 
 **Etki:** Portföy Monte Carlo dakikalarca sürebilir, gerçek zamanlı kullanılamaz.
@@ -540,7 +538,8 @@ rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100
 **Kod:**
 ```python
 recent_transitions = [
-    t for t in self._transitions
+    t
+    for t in self._transitions
     if t.timestamp > (datetime.now(timezone.utc) - __import__("datetime").timedelta(days=30)).isoformat()
 ]
 ```
@@ -550,10 +549,10 @@ recent_transitions = [
 **Doğru Formül:**
 ```python
 from datetime import timedelta
+
 # ...
 recent_transitions = [
-    t for t in self._transitions
-    if t.timestamp > (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    t for t in self._transitions if t.timestamp > (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
 ]
 ```
 

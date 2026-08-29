@@ -27,6 +27,7 @@ class HistoricalDataAdapter:
     """Historical data repository → canonical scoring adapter."""
 
     def __init__(self, repository: HistoricalDataRepository | None = None):
+        """Otomatik eklendi."""
         if repository is None:
             from .persistent_repository import PersistentHistoricalRepository
 

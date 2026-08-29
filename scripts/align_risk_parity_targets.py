@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Kurumsal Hedefleri Yakalayan Risk Parity Optimizasyonu
 ===================================================================
@@ -17,7 +18,7 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        pass  # logger not yet initialized
+        logger.error("Exception caught", exc_info=True)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -29,10 +30,11 @@ from services.risk.risk_parity_engine import RiskParityEngine, RiskParityParamet
 logger = structlog.get_logger(__name__)
 
 
-def main():
-    print("=" * 105)
-    print("🎯 ALPHA BIST — HEDEF METRİKLER (MAX DD < %25, PF > 1.2, SHARPE > 0.7) DOĞRULAMA ÇALIŞMASI")
-    print("=" * 105)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 105)
+    logger.info("🎯 ALPHA BIST — HEDEF METRİKLER (MAX DD < %25, PF > 1.2, SHARPE > 0.7) DOĞRULAMA ÇALIŞMASI")
+    logger.info("=" * 105)
 
     warehouse = HistoricalDataWarehouse()
     bm_df, stock_dict = warehouse.load_30y_data()
@@ -76,35 +78,35 @@ def main():
 
     p, is_res, oos_res = best_candidate
 
-    print("\n" + "=" * 105)
-    print("🏆 BULUNAN NİHAİ KURUMSAL RİSK PARİTY MODELİ (TÜM HEDEFLER TESTİ):")
-    print("=" * 105)
-    print(f"  • İşlem Başına Risk Limiti   : %{p.risk_per_trade_pct * 100:.1f}")
-    print(f"  • Maksimum Tek Hisse Tavanı  : %{p.max_position_size_pct * 100:.1f}")
-    print(f"  • Portföy Açık Isı Tavanı    : %{p.max_portfolio_heat_pct * 100:.1f}")
-    print(f"  • Boğa ATR Trailing Mesafesi : {p.atr_trailing_bull_mult:.2f}x ATR")
-    print(f"  • RSI Aşırı Satım Eşiği      : {p.rsi_oversold:.1f}")
+    logger.info("\n" + "=" * 105)
+    logger.info("🏆 BULUNAN NİHAİ KURUMSAL RİSK PARİTY MODELİ (TÜM HEDEFLER TESTİ):")
+    logger.info("=" * 105)
+    logger.info(f"  • İşlem Başına Risk Limiti   : %{p.risk_per_trade_pct * 100:.1f}")
+    logger.info(f"  • Maksimum Tek Hisse Tavanı  : %{p.max_position_size_pct * 100:.1f}")
+    logger.info(f"  • Portföy Açık Isı Tavanı    : %{p.max_portfolio_heat_pct * 100:.1f}")
+    logger.info(f"  • Boğa ATR Trailing Mesafesi : {p.atr_trailing_bull_mult:.2f}x ATR")
+    logger.info(f"  • RSI Aşırı Satım Eşiği      : {p.rsi_oversold:.1f}")
 
-    print("\n📊 PERFORMANS VE HEDEF SKOR KARTI:")
-    print("-" * 105)
-    print(f"{'METRİK':<35} | {'IN-SAMPLE (1997-2023)':<32} | {'OOS (2024-2026)':<32}")
-    print("-" * 105)
-    print(f"{'Kümülatif Net Getiri':<35} | %{is_res.total_return_pct:>29,.1f} | %{oos_res.total_return_pct:>29,.1f}")
-    print(f"{'Yıllık Getiri (CAGR)':<35} | %{is_res.cagr:>29.2f} | %{oos_res.cagr:>29.2f}")
-    print(f"{'Sharpe Oranı':<35} | {is_res.sharpe_ratio:>30.2f} | {oos_res.sharpe_ratio:>30.2f}")
-    print(f"{'Sortino Oranı':<35} | {is_res.sortino_ratio:>30.2f} | {oos_res.sortino_ratio:>30.2f}")
-    print(f"{'Kâr Faktörü (Profit Factor)':<35} | {is_res.profit_factor:>30.2f} | {oos_res.profit_factor:>30.2f}")
-    print(f"{'Kazanma Oranı (Win Rate)':<35} | %{is_res.win_rate:>29.1f} | %{oos_res.win_rate:>29.1f}")
-    print(f"{'Maksimum Düşüş (Max DD)':<35} | %{is_res.max_drawdown:>29.2f} | %{oos_res.max_drawdown:>29.2f}")
-    print(f"{'Toplam İşlem Sayısı':<35} | {is_res.total_trades:>30} | {oos_res.total_trades:>30}")
-    print("-" * 105)
+    logger.info("\n📊 PERFORMANS VE HEDEF SKOR KARTI:")
+    logger.info("-" * 105)
+    logger.info(f"{'METRİK':<35} | {'IN-SAMPLE (1997-2023)':<32} | {'OOS (2024-2026)':<32}")
+    logger.info("-" * 105)
+    logger.info(f"{'Kümülatif Net Getiri':<35} | %{is_res.total_return_pct:>29,.1f} | %{oos_res.total_return_pct:>29,.1f}")
+    logger.info(f"{'Yıllık Getiri (CAGR)':<35} | %{is_res.cagr:>29.2f} | %{oos_res.cagr:>29.2f}")
+    logger.info(f"{'Sharpe Oranı':<35} | {is_res.sharpe_ratio:>30.2f} | {oos_res.sharpe_ratio:>30.2f}")
+    logger.info(f"{'Sortino Oranı':<35} | {is_res.sortino_ratio:>30.2f} | {oos_res.sortino_ratio:>30.2f}")
+    logger.info(f"{'Kâr Faktörü (Profit Factor)':<35} | {is_res.profit_factor:>30.2f} | {oos_res.profit_factor:>30.2f}")
+    logger.info(f"{'Kazanma Oranı (Win Rate)':<35} | %{is_res.win_rate:>29.1f} | %{oos_res.win_rate:>29.1f}")
+    logger.info(f"{'Maksimum Düşüş (Max DD)':<35} | %{is_res.max_drawdown:>29.2f} | %{oos_res.max_drawdown:>29.2f}")
+    logger.info(f"{'Toplam İşlem Sayısı':<35} | {is_res.total_trades:>30} | {oos_res.total_trades:>30}")
+    logger.info("-" * 105)
 
-    print("\n📅 YIL BAZINDA PERFORMANS (1997 - 2026):")
-    print("-" * 105)
-    print(
+    logger.info("\n📅 YIL BAZINDA PERFORMANS (1997 - 2026):")
+    logger.info("-" * 105)
+    logger.info(
         f"{'YIL':<6} | {'SİSTEM GETİRİSİ':<18} | {'BIST-100 GETİRİSİ':<18} | {'FARK (ALFA)':<14} | {'MAX DD':<12} | {'PF'}"
     )
-    print("-" * 105)
+    logger.info("-" * 105)
     years = sorted(list(set(d.year for d in bm_df.index)))
     for y in years:
         res = engine.simulate(p, start_year=y, end_year=y)
@@ -116,10 +118,10 @@ def main():
         )
         diff = res.total_return_pct - bm_y_ret
         kriz_tag = " ⚠️ KRİZ" if y in [2000, 2001, 2008, 2018] else ""
-        print(
+        logger.info(
             f"{y:<6} | %{res.total_return_pct:>15,.1f} | %{bm_y_ret:>15,.1f} | %{diff:>11,.1f} | %{res.max_drawdown:>9.2f} | {res.profit_factor:>4.2f}{kriz_tag}"
         )
-    print("=" * 105)
+    logger.info("=" * 105)
 
 
 if __name__ == "__main__":

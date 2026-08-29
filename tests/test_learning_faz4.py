@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 4 Test Suite (Feature Importance Tracker)
 
@@ -16,7 +19,7 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 
-def _make_tracker_with_data(n_records=30, n_features=5):
+def _make_tracker_with_data(n_records=30, n_features=5) -> Any:
     """Test verisiyle tracker oluştur."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -45,28 +48,28 @@ def _make_tracker_with_data(n_records=30, n_features=5):
 # ===================== INIT =====================
 
 
-def test_tracker_init():
+def test_tracker_init() -> Any:
     """Tracker başlatılıyor mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
     tracker = FeatureImportanceTracker()
     assert len(tracker._history) == 0
     assert len(tracker._last_importance) == 0
-    print("✅ Tracker init")
+    logger.info("✅ Tracker init")
 
 
-def test_tracker_singleton():
+def test_tracker_singleton() -> Any:
     """Singleton doğru mu?"""
     from services.learning.feature_tracker import feature_importance_tracker
 
     assert feature_importance_tracker is not None
-    print("✅ Tracker singleton")
+    logger.info("✅ Tracker singleton")
 
 
 # ===================== TRENDS =====================
 
 
-def test_trends_empty():
+def test_trends_empty() -> Any:
     """Boş tracker trends boş döndürmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -74,10 +77,10 @@ def test_trends_empty():
     trends = tracker.get_trends()
     assert isinstance(trends, dict)
     assert len(trends) == 0
-    print("✅ Trends empty")
+    logger.info("✅ Trends empty")
 
 
-def test_trends_with_data():
+def test_trends_with_data() -> Any:
     """Veri ile trends doğru mu?"""
     tracker = _make_tracker_with_data(n_records=30, n_features=5)
     trends = tracker.get_trends(top_n=3)
@@ -87,10 +90,10 @@ def test_trends_with_data():
         assert hasattr(trend, "avg_importance")
         assert hasattr(trend, "trend")
         assert trend.trend in ["increasing", "decreasing", "stable"]
-    print(f"✅ Trends with data: {len(trends)} features")
+    logger.info(f"✅ Trends with data: {len(trends)} features")
 
 
-def test_trends_top_n():
+def test_trends_top_n() -> Any:
     """Top N çalışıyor mu?"""
     tracker = _make_tracker_with_data(n_records=20, n_features=10)
 
@@ -100,20 +103,20 @@ def test_trends_top_n():
     assert len(trends_5) <= 5
     assert len(trends_3) <= 3
     assert len(trends_3) <= len(trends_5)
-    print(f"✅ Trends top_n: 5→{len(trends_5)}, 3→{len(trends_3)}")
+    logger.info(f"✅ Trends top_n: 5→{len(trends_5)}, 3→{len(trends_3)}")
 
 
-def test_trends_ordering():
+def test_trends_ordering() -> Any:
     """Trends importance'a göre sıralı mı?"""
     tracker = _make_tracker_with_data(n_records=20, n_features=5)
     trends = tracker.get_trends(top_n=5)
 
     importances = [t.avg_importance for t in trends.values()]
     assert importances == sorted(importances, reverse=True)
-    print("✅ Trends ordering: correct")
+    logger.info("✅ Trends ordering: correct")
 
 
-def test_trends_increasing():
+def test_trends_increasing() -> Any:
     """Artan trend tespit edilmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -138,10 +141,10 @@ def test_trends_increasing():
     trends = tracker.get_trends(top_n=1)
     assert "rising_feat" in trends
     assert trends["rising_feat"].trend == "increasing"
-    print(f"✅ Trends increasing: {trends['rising_feat'].trend}")
+    logger.info(f"✅ Trends increasing: {trends['rising_feat'].trend}")
 
 
-def test_trends_decreasing():
+def test_trends_decreasing() -> Any:
     """Azalan trend tespit edilmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -165,10 +168,10 @@ def test_trends_decreasing():
     trends = tracker.get_trends(top_n=1)
     assert "falling_feat" in trends
     assert trends["falling_feat"].trend == "decreasing"
-    print(f"✅ Trends decreasing: {trends['falling_feat'].trend}")
+    logger.info(f"✅ Trends decreasing: {trends['falling_feat'].trend}")
 
 
-def test_trends_window_days():
+def test_trends_window_days() -> Any:
     """Window days filtresi çalışıyor mu?"""
     tracker = _make_tracker_with_data(n_records=60, n_features=3)
 
@@ -177,13 +180,13 @@ def test_trends_window_days():
 
     # Kısa pencerede daha az veri → daha az feature
     assert len(trends_short) <= len(trends_long)
-    print(f"✅ Trends window: short={len(trends_short)}, long={len(trends_long)}")
+    logger.info(f"✅ Trends window: short={len(trends_short)}, long={len(trends_long)}")
 
 
 # ===================== REGIME IMPORTANCE =====================
 
 
-def test_regime_importance():
+def test_regime_importance() -> Any:
     """Regime-specific importance doğru mu?"""
     tracker = _make_tracker_with_data(n_records=30, n_features=3)
 
@@ -195,20 +198,20 @@ def test_regime_importance():
     for _name, val in bull_imp.items():
         assert isinstance(val, float)
         assert val >= 0
-    print(f"✅ Regime importance: BULL={len(bull_imp)}, BEAR={len(bear_imp)}")
+    logger.info(f"✅ Regime importance: BULL={len(bull_imp)}, BEAR={len(bear_imp)}")
 
 
-def test_regime_importance_empty():
+def test_regime_importance_empty() -> Any:
     """Olmayan rejim boş döndürmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
     tracker = FeatureImportanceTracker()
     result = tracker.get_regime_importance("UNKNOWN")
     assert len(result) == 0
-    print("✅ Regime importance empty")
+    logger.info("✅ Regime importance empty")
 
 
-def test_regime_importance_different():
+def test_regime_importance_different() -> Any:
     """Farklı rejimler farklı importance vermeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -280,13 +283,13 @@ def test_regime_importance_different():
 
     assert bull["feat_0"] > bull["feat_1"]  # BULL'da feat_0 daha önemli
     assert bear["feat_1"] > bear["feat_0"]  # BEAR'da feat_1 daha önemli
-    print(f"✅ Regime importance different: BULL feat_0={bull['feat_0']:.2f}, BEAR feat_1={bear['feat_1']:.2f}")
+    logger.info(f"✅ Regime importance different: BULL feat_0={bull['feat_0']:.2f}, BEAR feat_1={bear['feat_1']:.2f}")
 
 
 # ===================== FEATURE SELECTION =====================
 
 
-def test_feature_selection_empty():
+def test_feature_selection_empty() -> Any:
     """Boş tracker feature selection boş döndürmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -294,10 +297,10 @@ def test_feature_selection_empty():
     suggestions = tracker.suggest_feature_selection()
     assert isinstance(suggestions, list)
     assert len(suggestions) == 0
-    print("✅ Feature selection empty")
+    logger.info("✅ Feature selection empty")
 
 
-def test_feature_selection_low_importance():
+def test_feature_selection_low_importance() -> Any:
     """Düşük importance'lı feature'lar önerilmeli."""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -336,10 +339,10 @@ def test_feature_selection_low_importance():
     suggestions = tracker.suggest_feature_selection(min_importance=0.001)
     assert "low_feat" in suggestions
     assert "high_feat" not in suggestions
-    print(f"✅ Feature selection: {suggestions}")
+    logger.info(f"✅ Feature selection: {suggestions}")
 
 
-def test_feature_selection_custom_threshold():
+def test_feature_selection_custom_threshold() -> Any:
     """Custom threshold çalışıyor mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -367,13 +370,13 @@ def test_feature_selection_custom_threshold():
     # Düşük threshold → çıkarılmamalı
     suggestions_low = tracker.suggest_feature_selection(min_importance=0.0001)
     assert "med_feat" not in suggestions_low
-    print("✅ Feature selection custom threshold")
+    logger.info("✅ Feature selection custom threshold")
 
 
 # ===================== REPORT =====================
 
 
-def test_report_empty():
+def test_report_empty() -> Any:
     """Boş rapor doğru mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -383,10 +386,10 @@ def test_report_empty():
     assert report["status"] == "OK"
     assert report["total_records"] == 0
     assert report["unique_features"] == 0
-    print("✅ Report empty")
+    logger.info("✅ Report empty")
 
 
-def test_report_with_data():
+def test_report_with_data() -> Any:
     """Veri ile rapor doğru mu?"""
     tracker = _make_tracker_with_data(n_records=20, n_features=5)
     report = tracker.get_report()
@@ -395,10 +398,10 @@ def test_report_with_data():
     assert report["total_records"] > 0
     assert report["unique_features"] == 5
     assert "top_features" in report
-    print(f"✅ Report: {report['total_records']} records, {report['unique_features']} features")
+    logger.info(f"✅ Report: {report['total_records']} records, {report['unique_features']} features")
 
 
-def test_report_top_features():
+def test_report_top_features() -> Any:
     """Top features raporda doğru mu?"""
     tracker = _make_tracker_with_data(n_records=20, n_features=5)
     report = tracker.get_report()
@@ -408,13 +411,13 @@ def test_report_top_features():
     for _name, info in top.items():
         assert "importance" in info
         assert "trend" in info
-    print(f"✅ Report top features: {len(top)} features")
+    logger.info(f"✅ Report top features: {len(top)} features")
 
 
 # ===================== VOLATILITY =====================
 
 
-def test_trend_volatility():
+def test_trend_volatility() -> Any:
     """Volatility hesaplanıyor mu?"""
     from services.learning.feature_tracker import FeatureImportanceTracker
 
@@ -457,7 +460,7 @@ def test_trend_volatility():
 
     trends = tracker.get_trends(top_n=2)
     assert trends["stable_feat"].volatility < trends["volatile_feat"].volatility
-    print(
+    logger.info(
         f"✅ Volatility: stable={trends['stable_feat'].volatility:.4f}, volatile={trends['volatile_feat'].volatility:.4f}"
     )
 
@@ -465,7 +468,8 @@ def test_trend_volatility():
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_tracker_init,
         test_tracker_singleton,
@@ -499,19 +503,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 4 TEST SONUÇLARI (Feature Importance Tracker)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 4 TEST SONUÇLARI (Feature Importance Tracker)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

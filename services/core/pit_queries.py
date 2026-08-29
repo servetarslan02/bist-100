@@ -13,24 +13,30 @@ Kullanım:
     data = await pit_fetch(conn, "daily_performance", days=30)
 """
 
+import functools
 from datetime import datetime
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.pit_queries")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -373,7 +379,7 @@ async def pit_fetch_df(
     identifier: str,
     from_date: datetime | str,
     to_date: datetime | str,
-):
+) -> Any:
     """PIT-safe veriyi Polars DataFrame olarak döndür.
 
     Args:

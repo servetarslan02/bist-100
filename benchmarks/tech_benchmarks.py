@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Teknoloji Benchmark'ları
 Her teknolojinin değerini kanıtlamak için gerçek benchmark'lar.
@@ -16,7 +19,7 @@ import orjson
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def benchmark_json_serialization():
+def benchmark_json_serialization() -> Any:
     """ORJSON vs json — API response hız karşılaştırması."""
     import orjson
     import orjson as stdlib_json
@@ -66,7 +69,7 @@ def benchmark_json_serialization():
     }
 
 
-def benchmark_dataframe():
+def benchmark_dataframe() -> Any:
     """Polars vs Pandas — DataFrame işlem hız karşılaştırması."""
     try:
         from datetime import datetime, timedelta
@@ -130,7 +133,7 @@ def benchmark_dataframe():
         return {"test": "DataFrame Processing", "error": str(e)}
 
 
-def benchmark_ml_training():
+def benchmark_ml_training() -> Any:
     """LightGBM vs CatBoost vs XGBoost — Training hız karşılaştırması."""
     try:
         import lightgbm as lgb
@@ -209,7 +212,7 @@ def benchmark_ml_training():
         return {"test": "ML Training", "error": str(e)}
 
 
-def _compute_auc(y_true, y_pred):
+def _compute_auc(y_true, y_pred) -> Any:
     """AUC hesapla (scikit-learn olmadan)."""
     try:
         from sklearn.metrics import roc_auc_score
@@ -241,49 +244,49 @@ def _compute_auc(y_true, y_pred):
         return auc / (pos * neg)
 
 
-def run_all_benchmarks():
+def run_all_benchmarks() -> Any:
     """Tüm benchmark'ları çalıştır."""
-    print("=" * 60)
-    print("ALPHA BIST — Teknoloji Benchmark'ları")
-    print("=" * 60)
-    print()
+    logger.info("=" * 60)
+    logger.info("ALPHA BIST — Teknoloji Benchmark'ları")
+    logger.info("=" * 60)
+    logger.info()
 
     results = []
 
     # 1. JSON Serialization
-    print("1. JSON Serialization (ORJSON vs json)...")
+    logger.info("1. JSON Serialization (ORJSON vs json)...")
     r1 = benchmark_json_serialization()
     results.append(r1)
-    print(f"   json: {r1['json_time_s']}s | orjson: {r1['orjson_time_s']}s | Hız: {r1['speedup']}")
-    print()
+    logger.info(f"   json: {r1['json_time_s']}s | orjson: {r1['orjson_time_s']}s | Hız: {r1['speedup']}")
+    logger.info()
 
     # 2. DataFrame Processing
-    print("2. DataFrame Processing (Polars vs Pandas)...")
+    logger.info("2. DataFrame Processing (Polars vs Pandas)...")
     r2 = benchmark_dataframe()
     results.append(r2)
     if "error" not in r2:
-        print(f"   pandas: {r2['pandas_time_s']}s | polars: {r2['polars_time_s']}s | Hız: {r2['speedup']}")
+        logger.info(f"   pandas: {r2['pandas_time_s']}s | polars: {r2['polars_time_s']}s | Hız: {r2['speedup']}")
     else:
-        print(f"   Hata: {r2['error']}")
-    print()
+        logger.info(f"   Hata: {r2['error']}")
+    logger.info()
 
     # 3. ML Training
-    print("3. ML Training (LightGBM vs CatBoost vs XGBoost)...")
+    logger.info("3. ML Training (LightGBM vs CatBoost vs XGBoost)...")
     r3 = benchmark_ml_training()
     results.append(r3)
     if "error" not in r3:
         for name, data in r3["models"].items():
-            print(f"   {name}: {data['time_s']}s | AUC: {data['auc']}")
-        print(f"   Ensemble AUC: {r3['ensemble']['auc']} | İyileştirme: {r3['ensemble']['improvement_vs_best_single']}")
+            logger.info(f"   {name}: {data['time_s']}s | AUC: {data['auc']}")
+        logger.info(f"   Ensemble AUC: {r3['ensemble']['auc']} | İyileştirme: {r3['ensemble']['improvement_vs_best_single']}")
     else:
-        print(f"   Hata: {r3['error']}")
-    print()
+        logger.info(f"   Hata: {r3['error']}")
+    logger.info()
 
     # Save results
     output_path = "benchmarks/benchmark_results.json"
     with open(output_path, "w") as f:
         f.write(orjson.dumps(results, option=orjson.OPT_INDENT_2).decode())
-    print(f"Sonuçlar kaydedildi: {output_path}")
+    logger.info(f"Sonuçlar kaydedildi: {output_path}")
 
     return results
 

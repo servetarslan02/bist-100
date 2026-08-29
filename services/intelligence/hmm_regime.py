@@ -69,6 +69,7 @@ class HMMRegimeDetector:
         rolling_window: int = 63,
         retrain_interval: int = 63,
     ):
+        """Otomatik eklendi."""
         self.n_regimes = n_regimes
         self.rolling_window = rolling_window
         self.retrain_interval = retrain_interval

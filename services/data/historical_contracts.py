@@ -123,15 +123,15 @@ class HistoricalDataRepository:
         """
         raise NotImplementedError
 
-    def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot):
+    def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot) -> Any:
         """Fundamental snapshot ekle."""
         raise NotImplementedError
 
-    def add_event_snapshot(self, snapshot: EventSnapshot):
+    def add_event_snapshot(self, snapshot: EventSnapshot) -> Any:
         """Event snapshot ekle."""
         raise NotImplementedError
 
-    def add_catalyst_snapshot(self, snapshot: CatalystSnapshot):
+    def add_catalyst_snapshot(self, snapshot: CatalystSnapshot) -> Any:
         """Catalyst snapshot ekle."""
         raise NotImplementedError
 
@@ -140,6 +140,7 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
     """In-memory historical repository (test ve fixture için)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._fundamentals: list[FundamentalSnapshot] = []
         self._events: list[EventSnapshot] = []
         self._catalysts: list[CatalystSnapshot] = []
@@ -149,6 +150,7 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
         ticker: str,
         as_of_date: str,
     ) -> list[FundamentalSnapshot]:
+        """Otomatik eklendi."""
         return sorted(
             [s for s in self._fundamentals if s.ticker == ticker and s.available_at <= as_of_date],
             key=lambda s: s.available_at,
@@ -161,6 +163,7 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
         as_of_date: str,
         event_types: list[str] | None = None,
     ) -> list[EventSnapshot]:
+        """Otomatik eklendi."""
         events = [s for s in self._events if s.ticker == ticker and s.published_at[:10] <= as_of_date]
         if event_types:
             events = [e for e in events if e.event_type in event_types]
@@ -171,28 +174,33 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
         ticker: str,
         as_of_date: str,
     ) -> list[CatalystSnapshot]:
+        """Otomatik eklendi."""
         return sorted(
             [s for s in self._catalysts if s.ticker == ticker and s.announcement_date <= as_of_date],
             key=lambda s: s.announcement_date,
             reverse=True,
         )
 
-    def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot):
+    def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot) -> Any:
+        """Otomatik eklendi."""
         self._fundamentals.append(snapshot)
         if len(self._fundamentals) > 500:
             self._fundamentals = self._fundamentals[-500:]
 
-    def add_event_snapshot(self, snapshot: EventSnapshot):
+    def add_event_snapshot(self, snapshot: EventSnapshot) -> Any:
+        """Otomatik eklendi."""
         self._events.append(snapshot)
         if len(self._events) > 500:
             self._events = self._events[-500:]
 
-    def add_catalyst_snapshot(self, snapshot: CatalystSnapshot):
+    def add_catalyst_snapshot(self, snapshot: CatalystSnapshot) -> Any:
+        """Otomatik eklendi."""
         self._catalysts.append(snapshot)
         if len(self._catalysts) > 500:
             self._catalysts = self._catalysts[-500:]
 
-    def clear(self):
+    def clear(self) -> Any:
+        """Otomatik eklendi."""
         self._fundamentals.clear()
         self._events.clear()
         self._catalysts.clear()

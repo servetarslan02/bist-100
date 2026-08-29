@@ -64,6 +64,7 @@ class ModelRegistry:
     """
 
     def __init__(self, registry_path: str = "data/model_registry"):
+        """Otomatik eklendi."""
         self._registry_path = registry_path
         self._entries: dict[str, ModelEntry] = {}
         self._models: dict[str, Any] = {}
@@ -360,7 +361,7 @@ class ModelRegistry:
 
         return f"v{max(versions) + 1}"
 
-    def _save_model(self, key: str, model: Any):
+    def _save_model(self, key: str, model: Any) -> Any:
         """Model'i diske kaydet (SHA256 hash ile)."""
         try:
             from services.core.safe_pickle import safe_pickle_dump
@@ -382,7 +383,7 @@ class ModelRegistry:
             logger.error("model_load_failed", key=key, error=str(e))
         return None
 
-    def _save_registry(self):
+    def _save_registry(self) -> Any:
         """Registry metadata'sını diske kaydet."""
         try:
             data = {k: asdict(v) for k, v in self._entries.items()}
@@ -392,7 +393,7 @@ class ModelRegistry:
         except Exception as e:
             logger.error("registry_save_failed", error=str(e))
 
-    def _load_registry(self):
+    def _load_registry(self) -> Any:
         """Registry metadata'sını diskten yükle."""
         try:
             path = os.path.join(self._registry_path, "registry.json")

@@ -28,13 +28,14 @@ class WebSocketConnection:
     """Tek bir WebSocket bağlantısı."""
 
     def __init__(self, ws, channel: str, client_id: str):
+        """Otomatik eklendi."""
         self.ws = ws
         self.channel = channel
         self.client_id = client_id
         self.connected_at = datetime.now(UTC)
         self.messages_sent = 0
 
-    async def send(self, data: dict[str, Any]):
+    async def send(self, data: dict[str, Any]) -> Any:
         """Veri gönder."""
         try:
             message = orjson.dumps(data, default=str).decode()
@@ -43,7 +44,7 @@ class WebSocketConnection:
         except Exception as e:
             logger.warning("WebSocket send failed", client=self.client_id, error=str(e))
 
-    async def close(self):
+    async def close(self) -> Any:
         """Bağlantıyı kapat."""
         try:
             await self.ws.close()
@@ -57,11 +58,12 @@ class WebSocketServer:
     CHANNELS = ["market", "opportunities", "portfolio", "risk", "system"]
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._connections: dict[str, list[WebSocketConnection]] = {ch: [] for ch in self.CHANNELS}
         self._running = False
         self._message_queue: asyncio.Queue = asyncio.Queue()
 
-    async def start(self, host: str = "0.0.0.0", port: int = 8765):
+    async def start(self, host: str = "0.0.0.0", port: int = 8765) -> Any:
         """WebSocket sunucusunu başlat."""
         try:
             import websockets
@@ -69,14 +71,15 @@ class WebSocketServer:
             self._running = True
             logger.info("WebSocket server starting", host=host, port=port)
 
-            async def handler(ws, path):
+            async def handler(ws, path) -> Any:
+                """Otomatik eklendi."""
                 await self._handle_connection(ws, path)
 
             server = await websockets.serve(handler, host, port)
             logger.info("WebSocket server started", port=port)
 
             # Background task: message broadcaster
-            asyncio.create_task(self._broadcast_loop())
+            self._broadcast_task = asyncio.create_task(self._broadcast_loop())
 
             await server.wait_closed()
         except ImportError:
@@ -84,7 +87,7 @@ class WebSocketServer:
         except Exception as e:
             logger.error("WebSocket server error", error=str(e))
 
-    async def _handle_connection(self, ws, path: str):
+    async def _handle_connection(self, ws, path: str) -> Any:
         """Yeni WebSocket bağlantısını işle."""
         client_id = str(uuid.uuid4())[:8]
 
@@ -122,7 +125,7 @@ class WebSocketServer:
             if conn in self._connections[channel]:
                 self._connections[channel].remove(conn)
 
-    async def _handle_client_message(self, conn: WebSocketConnection, data: dict):
+    async def _handle_client_message(self, conn: WebSocketConnection, data: dict) -> Any:
         """İstemciden gelen mesajı işle."""
         msg_type = data.get("type", "")
 
@@ -140,11 +143,11 @@ class WebSocketServer:
                 self._connections[new_channel].append(conn)
                 await conn.send({"type": "subscribed", "channel": new_channel})
 
-    async def broadcast(self, channel: str, data: dict[str, Any]):
+    async def broadcast(self, channel: str, data: dict[str, Any]) -> Any:
         """Belirli kanala veri gönder."""
         await self._message_queue.put((channel, data))
 
-    async def _broadcast_loop(self):
+    async def _broadcast_loop(self) -> Any:
         """Mesaj kuyruğunu işleyip ilgili bağlantılara gönder."""
         while self._running:
             try:
@@ -169,7 +172,7 @@ class WebSocketServer:
             except Exception as e:
                 logger.error("Broadcast loop error", error=str(e))
 
-    async def broadcast_market(self, ticker: str, price: float, change_pct: float, volume: int):
+    async def broadcast_market(self, ticker: str, price: float, change_pct: float, volume: int) -> Any:
         """Piyasa verisi yayınla."""
         await self.broadcast(
             "market",
@@ -183,7 +186,7 @@ class WebSocketServer:
             },
         )
 
-    async def broadcast_opportunity(self, ticker: str, score: float, signal: str, direction: str):
+    async def broadcast_opportunity(self, ticker: str, score: float, signal: str, direction: str) -> Any:
         """Fırsat yayını."""
         await self.broadcast(
             "opportunities",
@@ -197,7 +200,7 @@ class WebSocketServer:
             },
         )
 
-    async def broadcast_portfolio(self, equity: float, pnl: float, pnl_pct: float):
+    async def broadcast_portfolio(self, equity: float, pnl: float, pnl_pct: float) -> Any:
         """Portföy yayını."""
         await self.broadcast(
             "portfolio",
@@ -210,7 +213,7 @@ class WebSocketServer:
             },
         )
 
-    async def broadcast_risk(self, alert_type: str, message: str, severity: str):
+    async def broadcast_risk(self, alert_type: str, message: str, severity: str) -> Any:
         """Risk alerti yayını."""
         await self.broadcast(
             "risk",
@@ -223,7 +226,7 @@ class WebSocketServer:
             },
         )
 
-    async def broadcast_system(self, component: str, status: str, details: str = ""):
+    async def broadcast_system(self, component: str, status: str, details: str = "") -> Any:
         """Sistem durumu yayını."""
         await self.broadcast(
             "system",
@@ -244,7 +247,7 @@ class WebSocketServer:
             "queue_size": self._message_queue.qsize(),
         }
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Sunucuyu durdur."""
         self._running = False
         for _channel, conns in self._connections.items():

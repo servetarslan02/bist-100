@@ -50,11 +50,7 @@ def tool_get_stock_metrics(ticker: str) -> dict[str, Any]:
             highs = df["High"].to_numpy()
             sup = round(float(np.min(lows[-20:])), 2)
             res = round(float(np.max(highs[-20:])), 2)
-            mom20 = (
-                round(float(((latest_price - closes[-20]) / closes[-20]) * 100), 2)
-                if len(closes) >= 20
-                else change
-            )
+            mom20 = round(float(((latest_price - closes[-20]) / closes[-20]) * 100), 2) if len(closes) >= 20 else change
 
             return {
                 "ticker": t,

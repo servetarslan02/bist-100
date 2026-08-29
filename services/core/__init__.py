@@ -94,7 +94,6 @@ __all__ = [
     "DistributedTracer",
     "Span",
     "Trace",
-
     "distributed_tracer",
     "correlation_id_var",
     "span_id_var",

@@ -35,6 +35,7 @@ class ReconciliationReport:
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "consensus_direction": self.consensus_direction,

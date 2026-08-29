@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Scanner Modules Test Suite v1.0
 
@@ -25,20 +26,24 @@ import pytest
 class TestScanDeduplicator:
     """Deduplication testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.deduplicator import ScanDeduplicator
 
         self.dedup = ScanDeduplicator(cooldown_seconds=5)
 
-    def test_first_scan_allowed(self):
+    def test_first_scan_allowed(self) -> Any:
+        """Otomatik eklendi."""
         assert self.dedup.should_scan("THYAO") is True
 
-    def test_cooldown_blocks(self):
+    def test_cooldown_blocks(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         assert self.dedup.should_scan("THYAO") is False
 
-    def test_cooldown_expires(self):
+    def test_cooldown_expires(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.deduplicator import ScanDeduplicator
 
         dedup = ScanDeduplicator(cooldown_seconds=0)  # 0 saniye cooldown
@@ -46,7 +51,8 @@ class TestScanDeduplicator:
         dedup.record_scan("THYAO", score=70)
         assert dedup.should_scan("THYAO") is True
 
-    def test_force_scan_bypasses_cooldown(self):
+    def test_force_scan_bypasses_cooldown(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         assert self.dedup.should_scan("THYAO") is False
@@ -54,7 +60,8 @@ class TestScanDeduplicator:
         self.dedup.force_scan("THYAO")
         assert self.dedup.should_scan("THYAO") is True
 
-    def test_force_scan_batch(self):
+    def test_force_scan_batch(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         self.dedup.should_scan("GARAN")
@@ -64,7 +71,8 @@ class TestScanDeduplicator:
         assert self.dedup.should_scan("THYAO") is True
         assert self.dedup.should_scan("GARAN") is True
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         self.dedup.should_scan("THYAO")  # Blocked
@@ -74,13 +82,15 @@ class TestScanDeduplicator:
         assert stats["total_blocked"] == 1
         assert stats["tracked_tickers"] == 1
 
-    def test_cooldown_remaining(self):
+    def test_cooldown_remaining(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         remaining = self.dedup.get_cooldown_remaining("THYAO")
         assert remaining > 0
 
-    def test_last_scan_info(self):
+    def test_last_scan_info(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=75, signal="MOMENTUM")
         info = self.dedup.get_last_scan_info("THYAO")
@@ -88,11 +98,13 @@ class TestScanDeduplicator:
         assert info["last_score"] == 75
         assert info["last_signal"] == "MOMENTUM"
 
-    def test_set_cooldown(self):
+    def test_set_cooldown(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.set_cooldown(10)
         assert self.dedup._cooldown == 10
 
-    def test_clear(self):
+    def test_clear(self) -> Any:
+        """Otomatik eklendi."""
         self.dedup.should_scan("THYAO")
         self.dedup.record_scan("THYAO", score=70)
         self.dedup.clear()
@@ -107,16 +119,19 @@ class TestScanDeduplicator:
 class TestAdaptiveScanScheduler:
     """Adaptive scheduler testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.scan_scheduler import AdaptiveScanScheduler
 
         self.scheduler = AdaptiveScanScheduler(base_interval=60)
 
-    def test_default_interval(self):
+    def test_default_interval(self) -> Any:
+        """Otomatik eklendi."""
         interval = self.scheduler.get_scan_interval()
         assert interval > 0
 
-    def test_high_volatility_reduces_interval(self):
+    def test_high_volatility_reduces_interval(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_market_state(volatility=0.10)
         low_vol_interval = self.scheduler.get_scan_interval()
 
@@ -125,7 +140,8 @@ class TestAdaptiveScanScheduler:
 
         assert high_vol_interval < low_vol_interval
 
-    def test_panic_regime_reduces_interval(self):
+    def test_panic_regime_reduces_interval(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_market_state(regime="RANGE")
         range_interval = self.scheduler.get_scan_interval()
 
@@ -134,7 +150,8 @@ class TestAdaptiveScanScheduler:
 
         assert panic_interval < range_interval
 
-    def test_event_reduces_interval(self):
+    def test_event_reduces_interval(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.update_market_state(has_event=False)
         normal_interval = self.scheduler.get_scan_interval()
 
@@ -143,7 +160,8 @@ class TestAdaptiveScanScheduler:
 
         assert event_interval < normal_interval
 
-    def test_interval_bounds(self):
+    def test_interval_bounds(self) -> Any:
+        """Otomatik eklendi."""
         # Minimum
         self.scheduler.update_market_state(volatility=1.0, regime="PANIC", has_event=True)
         interval = self.scheduler.get_scan_interval()
@@ -154,21 +172,25 @@ class TestAdaptiveScanScheduler:
         interval = self.scheduler.get_scan_interval()
         assert interval <= 300
 
-    def test_scan_mode(self):
+    def test_scan_mode(self) -> Any:
+        """Otomatik eklendi."""
         mode = self.scheduler.get_scan_mode()
         assert mode.value in ["CONTINUOUS", "SCHEDULED", "EVENT_DRIVEN", "PAUSED", "MANUAL"]
 
-    def test_trigger_event_scan(self):
+    def test_trigger_event_scan(self) -> Any:
+        """Otomatik eklendi."""
         self.scheduler.trigger_event_scan(["THYAO"])
         assert self.scheduler._has_recent_event is True
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
+        """Otomatik eklendi."""
         stats = self.scheduler.get_stats()
         assert "running" in stats
         assert "mode" in stats
         assert "current_interval_seconds" in stats
 
-    def test_volatility_scales(self):
+    def test_volatility_scales(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.scan_scheduler import AdaptiveScanScheduler
 
         s = AdaptiveScanScheduler()
@@ -186,18 +208,21 @@ class TestAdaptiveScanScheduler:
 class TestScanPersistence:
     """Scan persistence testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.scan_persistence import ScanPersistence, ScanResultRecord
 
         self.db_path = tempfile.mktemp(suffix=".db")
         self.persistence = ScanPersistence(db_path=self.db_path)
         self.ScanResultRecord = ScanResultRecord
 
-    def teardown_method(self):
+    def teardown_method(self) -> Any:
+        """Otomatik eklendi."""
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
-    def test_save_and_retrieve(self):
+    def test_save_and_retrieve(self) -> Any:
+        """Otomatik eklendi."""
         record = self.ScanResultRecord(
             scan_id="test_1",
             scan_type="batch",
@@ -220,7 +245,8 @@ class TestScanPersistence:
         assert history[0]["ticker"] == "THYAO"
         assert history[0]["score"] == 75.5
 
-    def test_save_batch_results(self):
+    def test_save_batch_results(self) -> Any:
+        """Otomatik eklendi."""
         results = [
             {"ticker": "THYAO", "score": 75, "signal": "MOMENTUM", "direction": "LONG"},
             {"ticker": "GARAN", "score": 65, "signal": "BREAKOUT", "direction": "LONG"},
@@ -230,7 +256,8 @@ class TestScanPersistence:
         stats = self.persistence.get_scan_stats(scan_type="batch", days=1)
         assert stats["total_records"] == 2
 
-    def test_get_scan_stats(self):
+    def test_get_scan_stats(self) -> Any:
+        """Otomatik eklendi."""
         # Kaydet
         for i in range(5):
             record = self.ScanResultRecord(
@@ -254,7 +281,8 @@ class TestScanPersistence:
         assert stats["total_records"] == 5
         assert stats["signals_generated"] == 3  # 3 tane sinyal var
 
-    def test_get_top_scanned_tickers(self):
+    def test_get_top_scanned_tickers(self) -> Any:
+        """Otomatik eklendi."""
         # Aynı hisseyi birden fazla kez kaydet
         for i in range(3):
             record = self.ScanResultRecord(
@@ -288,12 +316,14 @@ class TestScanPersistence:
 class TestScanPerformanceTracker:
     """Performance tracker testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.performance_tracker import ScanPerformanceTracker
 
         self.tracker = ScanPerformanceTracker()
 
-    def test_record_scan(self):
+    def test_record_scan(self) -> Any:
+        """Otomatik eklendi."""
         self.tracker.record_scan(
             scan_type="batch",
             tickers_scanned=800,
@@ -305,7 +335,8 @@ class TestScanPerformanceTracker:
         stats = self.tracker.get_stats()
         assert stats["total_scans"] == 1
 
-    def test_stats_by_scan_type(self):
+    def test_stats_by_scan_type(self) -> Any:
+        """Otomatik eklendi."""
         self.tracker.record_scan("batch", 800, 50, 5, 1500.0, "BULL")
         self.tracker.record_scan("live", 1, 0, 0, 50.0, "BULL")
         self.tracker.record_scan("event", 10, 3, 1, 200.0, "BULL")
@@ -316,7 +347,8 @@ class TestScanPerformanceTracker:
         live_stats = self.tracker.get_stats("live")
         assert live_stats["total_scans"] == 1
 
-    def test_regime_performance(self):
+    def test_regime_performance(self) -> Any:
+        """Otomatik eklendi."""
         self.tracker.record_scan("batch", 800, 50, 5, 1500.0, "BULL")
         self.tracker.record_scan("batch", 800, 30, 3, 1200.0, "BEAR")
 
@@ -324,7 +356,8 @@ class TestScanPerformanceTracker:
         assert "BULL" in regime_perf
         assert "BEAR" in regime_perf
 
-    def test_signal_accuracy(self):
+    def test_signal_accuracy(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.performance_tracker import SignalOutcome
 
         self.tracker.record_signal_outcome(
@@ -360,7 +393,8 @@ class TestScanPerformanceTracker:
         assert accuracy["total_signals"] == 2
         assert accuracy["correct_signals"] == 1
 
-    def test_top_performing_filters(self):
+    def test_top_performing_filters(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.performance_tracker import SignalOutcome
 
         for i in range(5):
@@ -383,7 +417,8 @@ class TestScanPerformanceTracker:
         assert len(top) > 0
         assert top[0]["signal_type"] == "MOMENTUM"
 
-    def test_summary(self):
+    def test_summary(self) -> Any:
+        """Otomatik eklendi."""
         self.tracker.record_scan("batch", 800, 50, 5, 1500.0, "BULL")
         summary = self.tracker.get_summary()
         assert "total_scans" in summary
@@ -397,23 +432,27 @@ class TestScanPerformanceTracker:
 class TestScanAlertManager:
     """Scan alert testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.scan_alerts import ScanAlertManager
 
         self.manager = ScanAlertManager()
 
-    def test_high_score_alert(self):
+    def test_high_score_alert(self) -> Any:
+        """Otomatik eklendi."""
         results = [{"ticker": "THYAO", "score": 85, "signal": "MOMENTUM", "direction": "LONG"}]
         alerts = self.manager.check_scan_results(results)
         assert any(a.alert_type.value == "HIGH_SCORE" for a in alerts)
 
-    def test_very_high_score_alert(self):
+    def test_very_high_score_alert(self) -> Any:
+        """Otomatik eklendi."""
         results = [{"ticker": "THYAO", "score": 95, "signal": "MOMENTUM", "direction": "LONG"}]
         alerts = self.manager.check_scan_results(results)
         severity_alerts = [a for a in alerts if a.severity.value == "WARNING"]
         assert len(severity_alerts) > 0
 
-    def test_new_signal_alert(self):
+    def test_new_signal_alert(self) -> Any:
+        """Otomatik eklendi."""
         # İlk tarama — sinyal yok
         results1 = [{"ticker": "THYAO", "score": 70, "signal": "", "direction": "NEUTRAL"}]
         self.manager.check_scan_results(results1)
@@ -423,17 +462,20 @@ class TestScanAlertManager:
         alerts = self.manager.check_scan_results(results2)
         assert any(a.alert_type.value == "NEW_SIGNAL" for a in alerts)
 
-    def test_volume_anomaly_alert(self):
+    def test_volume_anomaly_alert(self) -> Any:
+        """Otomatik eklendi."""
         results = [{"ticker": "THYAO", "score": 60, "signal": "", "direction": "NEUTRAL", "volume_zscore": 5.0}]
         alerts = self.manager.check_scan_results(results)
         assert any(a.alert_type.value == "ANOMALY" for a in alerts)
 
-    def test_no_alert_low_score(self):
+    def test_no_alert_low_score(self) -> Any:
+        """Otomatik eklendi."""
         results = [{"ticker": "THYAO", "score": 40, "signal": "", "direction": "NEUTRAL"}]
         alerts = self.manager.check_scan_results(results)
         assert len(alerts) == 0
 
-    def test_callback_called(self):
+    def test_callback_called(self) -> Any:
+        """Otomatik eklendi."""
         callback_called = []
         self.manager.register_callback(lambda a: callback_called.append(a))
 
@@ -441,7 +483,8 @@ class TestScanAlertManager:
         self.manager.check_scan_results(results)
         assert len(callback_called) > 0
 
-    def test_alert_summary(self):
+    def test_alert_summary(self) -> Any:
+        """Otomatik eklendi."""
         results = [{"ticker": "THYAO", "score": 85, "signal": "MOMENTUM", "direction": "LONG"}]
         self.manager.check_scan_results(results)
 
@@ -457,13 +500,15 @@ class TestScanAlertManager:
 class TestCustomFilterEngine:
     """Custom filter testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.custom_filters import CustomFilter, CustomFilterEngine
 
         self.engine = CustomFilterEngine()
         self.CustomFilter = CustomFilter
 
-    def test_min_volume_filter(self):
+    def test_min_volume_filter(self) -> Any:
+        """Otomatik eklendi."""
         results = [
             {"ticker": "THYAO", "score": 80, "volume": 500000, "price": 250.0},
             {"ticker": "SMALL", "score": 90, "volume": 50000, "price": 10.0},  # Düşük hacim
@@ -472,7 +517,8 @@ class TestCustomFilterEngine:
         assert len(filtered) == 1
         assert filtered[0]["ticker"] == "THYAO"
 
-    def test_min_price_filter(self):
+    def test_min_price_filter(self) -> Any:
+        """Otomatik eklendi."""
         results = [
             {"ticker": "THYAO", "score": 80, "price": 250.0, "volume": 500000},
             {"ticker": "PENNY", "score": 90, "price": 0.50, "volume": 500000},
@@ -480,7 +526,8 @@ class TestCustomFilterEngine:
         filtered, log = self.engine.apply_filters(results)
         assert len(filtered) == 1
 
-    def test_custom_filter_added(self):
+    def test_custom_filter_added(self) -> Any:
+        """Otomatik eklendi."""
         self.engine.add_filter(
             self.CustomFilter(
                 name="test_filter",
@@ -498,7 +545,8 @@ class TestCustomFilterEngine:
         assert len(filtered) == 1
         assert filtered[0]["ticker"] == "THYAO"
 
-    def test_score_adjustment(self):
+    def test_score_adjustment(self) -> Any:
+        """Otomatik eklendi."""
         self.engine.add_filter(
             self.CustomFilter(
                 name="bonus",
@@ -515,18 +563,21 @@ class TestCustomFilterEngine:
         assert len(filtered) == 1
         assert filtered[0].get("score_adjustment", 0) == 10.0 or filtered[0]["score"] == 90
 
-    def test_enable_disable_filter(self):
+    def test_enable_disable_filter(self) -> Any:
+        """Otomatik eklendi."""
         self.engine.enable_filter("min_volume", enabled=False)
         results = [{"ticker": "SMALL", "score": 90, "volume": 50000, "price": 10.0}]
         filtered, log = self.engine.apply_filters(results)
         assert len(filtered) == 1  # Filtre devre dışı
 
-    def test_get_filters(self):
+    def test_get_filters(self) -> Any:
+        """Otomatik eklendi."""
         filters = self.engine.get_filters()
         assert len(filters) > 0
         assert any(f["name"] == "min_volume" for f in filters)
 
-    def test_filter_stats(self):
+    def test_filter_stats(self) -> Any:
+        """Otomatik eklendi."""
         results = [
             {"ticker": "THYAO", "score": 80, "price": 250.0, "volume": 500000},
             {"ticker": "SMALL", "score": 90, "price": 0.50, "volume": 50000},
@@ -544,43 +595,51 @@ class TestCustomFilterEngine:
 class TestScanAPI:
     """Scan API testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         from services.scanner.scan_api import ScanAPI
 
         self.api = ScanAPI()
 
-    def test_get_status(self):
+    def test_get_status(self) -> Any:
+        """Otomatik eklendi."""
         status = self.api.get_status()
         assert "timestamp" in status
         assert "scheduler" in status
         assert "deduplicator" in status
 
-    def test_get_results(self):
+    def test_get_results(self) -> Any:
+        """Otomatik eklendi."""
         results = self.api.get_results(limit=10)
         assert "timestamp" in results
         assert "total_results" in results
 
-    def test_get_performance(self):
+    def test_get_performance(self) -> Any:
+        """Otomatik eklendi."""
         perf = self.api.get_performance()
         assert "timestamp" in perf
         assert "tracker" in perf
 
-    def test_get_alerts(self):
+    def test_get_alerts(self) -> Any:
+        """Otomatik eklendi."""
         alerts = self.api.get_alerts(limit=10)
         assert "timestamp" in alerts
         assert "summary" in alerts
 
-    def test_get_tiers(self):
+    def test_get_tiers(self) -> Any:
+        """Otomatik eklendi."""
         tiers = self.api.get_tiers()
         assert "timestamp" in tiers
         assert "summary" in tiers
 
-    def test_get_filters(self):
+    def test_get_filters(self) -> Any:
+        """Otomatik eklendi."""
         filters = self.api.get_filters()
         assert "timestamp" in filters
         assert "filters" in filters
 
-    def test_get_full_dashboard(self):
+    def test_get_full_dashboard(self) -> Any:
+        """Otomatik eklendi."""
         dashboard = self.api.get_full_dashboard()
         assert "timestamp" in dashboard
         assert "status" in dashboard
@@ -596,7 +655,7 @@ class TestScanAPI:
 class TestScannerIntegration:
     """Entegrasyon testleri."""
 
-    def test_dedup_with_scanner(self):
+    def test_dedup_with_scanner(self) -> Any:
         """Deduplication scanner ile entegrasyon."""
         from services.scanner.deduplicator import ScanDeduplicator
 
@@ -613,7 +672,7 @@ class TestScannerIntegration:
         dedup.force_scan("THYAO")
         assert dedup.should_scan("THYAO") is True
 
-    def test_alert_with_filter(self):
+    def test_alert_with_filter(self) -> Any:
         """Alert sistemi filtre ile entegrasyon."""
         from services.scanner.custom_filters import CustomFilterEngine
         from services.scanner.scan_alerts import ScanAlertManager
@@ -650,7 +709,7 @@ class TestScannerIntegration:
         # Sadece THYAO alert üretmeli
         assert all(a.ticker == "THYAO" for a in alerts)
 
-    def test_scheduler_with_dedup(self):
+    def test_scheduler_with_dedup(self) -> Any:
         """Scheduler dedup ile entegrasyon."""
         from services.scanner.deduplicator import ScanDeduplicator
         from services.scanner.scan_scheduler import AdaptiveScanScheduler

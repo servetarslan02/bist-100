@@ -36,6 +36,7 @@ class FeatureManifest:
     dependencies: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "feature_name": self.feature_name,
             "version": self.version,
@@ -60,11 +61,12 @@ class FeatureStore:
     """
 
     def __init__(self, store_path: str | None = None):
+        """Otomatik eklendi."""
         self._store_path = store_path
         self._manifests: dict[str, FeatureManifest] = {}
         self._feature_values: dict[str, dict[str, dict[str, float]]] = {}  # date → ticker → features
 
-    def register_feature(self, manifest: FeatureManifest):
+    def register_feature(self, manifest: FeatureManifest) -> Any:
         """Feature kaydet."""
         self._manifests[manifest.feature_name] = manifest
         logger.debug("Feature registered", name=manifest.feature_name, version=manifest.version)
@@ -75,7 +77,7 @@ class FeatureStore:
         date: str,
         features: dict[str, float],
         source: str = "alternative",
-    ):
+    ) -> Any:
         """Feature değerleri yaz.
 
         Args:
@@ -186,7 +188,7 @@ class FeatureStore:
             "sources": list(set(m.source for m in self._manifests.values())),
         }
 
-    def save(self, path: str | None = None):
+    def save(self, path: str | None = None) -> Any:
         """Feature store'u dosyaya kaydet."""
         save_path = path or self._store_path
         if not save_path:
@@ -204,7 +206,7 @@ class FeatureStore:
 
         logger.info("Feature store saved", path=save_path)
 
-    def load(self, path: str | None = None):
+    def load(self, path: str | None = None) -> Any:
         """Feature store'u dosyadan yükle."""
         load_path = path or self._store_path
         if not load_path or not Path(load_path).exists():
@@ -225,7 +227,7 @@ class FeatureStore:
         except Exception as e:
             logger.warning("Failed to load feature store", path=load_path, error=str(e))
 
-    def __del__(self):
+    def __del__(self) -> Any:
         """Auto-save on garbage collection."""
         try:
             if self._store_path and (self._manifests or self._feature_values):
@@ -233,7 +235,7 @@ class FeatureStore:
         except Exception as e:
             logger.debug("feature_store_autosave_failed", error=str(e))
 
-    def shutdown(self):
+    def shutdown(self) -> Any:
         """Explicit save and cleanup."""
         try:
             if self._store_path:

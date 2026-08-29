@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Ingestion Faz 1 Tests
 
@@ -23,7 +24,7 @@ from services.ingestion.reconciliation import SourceReconciler
 class TestSourceReconciler:
     """Cross-source reconciliation testleri."""
 
-    async def test_single_source(self):
+    async def test_single_source(self) -> Any:
         """Tek kaynak — düşük kalite."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price("THYAO", {"yfinance": 308.50})
@@ -32,7 +33,7 @@ class TestSourceReconciler:
         assert result.quality_score == 0.6
         assert len(result.warnings) > 0
 
-    async def test_consistent_sources(self):
+    async def test_consistent_sources(self) -> Any:
         """Tutarlı kaynaklar — yüksek kalite."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -47,7 +48,7 @@ class TestSourceReconciler:
         assert result.quality_score > 0.8
         assert result.source == "reconciled"
 
-    async def test_small_deviation_no_conflict(self):
+    async def test_small_deviation_no_conflict(self) -> Any:
         """Küçük sapma — çakışma yok."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -59,7 +60,7 @@ class TestSourceReconciler:
         )
         assert result.conflict is False
 
-    async def test_large_deviation_conflict(self):
+    async def test_large_deviation_conflict(self) -> Any:
         """Büyük sapma — çakışma var."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -72,7 +73,7 @@ class TestSourceReconciler:
         assert result.conflict is True
         assert len(result.warnings) > 0
 
-    async def test_weighted_canonical(self):
+    async def test_weighted_canonical(self) -> Any:
         """Ağırlıklı canonical price."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -85,14 +86,14 @@ class TestSourceReconciler:
         # Ağırlıklı ortalama: (100*1.0 + 110*0.85) / (1.0+0.85) = 193.5/1.85 ≈ 104.59
         assert 104.0 < result.canonical_price < 105.0
 
-    async def test_empty_prices(self):
+    async def test_empty_prices(self) -> Any:
         """Boş fiyat listesi."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price("THYAO", {})
         assert result.canonical_price == 0.0
         assert result.quality_score == 0.0
 
-    async def test_batch_reconcile(self):
+    async def test_batch_reconcile(self) -> Any:
         """Toplu uzlaştırma."""
         reconciler = SourceReconciler()
         results = await reconciler.reconcile_batch(
@@ -105,7 +106,7 @@ class TestSourceReconciler:
         assert "THYAO" in results
         assert "ASELS" in results
 
-    async def test_quality_report(self):
+    async def test_quality_report(self) -> Any:
         """Kalite raporu."""
         reconciler = SourceReconciler()
         results = await reconciler.reconcile_batch(
@@ -127,7 +128,7 @@ class TestSourceReconciler:
 class TestPointInTimeValidator:
     """Point-in-time validation testleri."""
 
-    def test_market_price_15min_delay(self):
+    def test_market_price_15min_delay(self) -> Any:
         """Market price 15dk gecikmeli."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)  # 10:00'da veri
@@ -135,35 +136,35 @@ class TestPointInTimeValidator:
         # 10:00 + 15dk = 10:15 → 10:10 < 10:15 → henüz bilinmiyor
         assert pit.is_available_at("market_price", data_ts, query_ts) is False
 
-    def test_market_price_after_delay(self):
+    def test_market_price_after_delay(self) -> Any:
         """Market price gecikme sonrası biliniyor."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)
         query_ts = datetime(2024, 1, 15, 10, 20, 0)  # 20dk sonra
         assert pit.is_available_at("market_price", data_ts, query_ts) is True
 
-    def test_kap_disclosure_immediate(self):
+    def test_kap_disclosure_immediate(self) -> Any:
         """KAP açıklaması anında biliniyor."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)
         query_ts = datetime(2024, 1, 15, 10, 0, 1)  # 1 saniye sonra
         assert pit.is_available_at("kap_disclosure", data_ts, query_ts) is True
 
-    def test_fundamental_next_day(self):
+    def test_fundamental_next_day(self) -> Any:
         """Bilanço ertesi gün biliniyor."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)
         query_ts = datetime(2024, 1, 16, 10, 0, 0)  # Ertesi gün
         assert pit.is_available_at("fundamental", data_ts, query_ts) is True
 
-    def test_fundamental_same_day_unknown(self):
+    def test_fundamental_same_day_unknown(self) -> Any:
         """Bilanço aynı gün bilinmiyor."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)
         query_ts = datetime(2024, 1, 15, 15, 0, 0)  # Aynı gün
         assert pit.is_available_at("fundamental", data_ts, query_ts) is False
 
-    def test_filter_available(self):
+    def test_filter_available(self) -> Any:
         """Filtreleme çalışır."""
         pit = PointInTimeValidator()
         data = [
@@ -178,7 +179,7 @@ class TestPointInTimeValidator:
         # 10:05 + 15dk = 10:20 → 10:10 < 10:20 → filtrelenir
         assert len(filtered) == 0
 
-    def test_filter_available_with_later_query(self):
+    def test_filter_available_with_later_query(self) -> Any:
         """Geç sorgu ile filtreleme."""
         pit = PointInTimeValidator()
         data = [
@@ -191,7 +192,7 @@ class TestPointInTimeValidator:
         # 10:20 + 15dk = 10:35 → 10:40 >= 10:35 → geçer
         assert len(filtered) == 2
 
-    def test_validate_no_lookahead(self):
+    def test_validate_no_lookahead(self) -> Any:
         """Look-ahead bias kontrolü."""
         pit = PointInTimeValidator()
         data = [
@@ -203,14 +204,14 @@ class TestPointInTimeValidator:
         assert report["clean"] is False
         assert report["violation_count"] > 0
 
-    def test_unknown_data_type(self):
+    def test_unknown_data_type(self) -> Any:
         """Bilinmeyen veri tipi — anında kabul et."""
         pit = PointInTimeValidator()
         data_ts = datetime(2024, 1, 15, 10, 0, 0)
         query_ts = datetime(2024, 1, 15, 10, 0, 1)
         assert pit.is_available_at("unknown_type", data_ts, query_ts) is True
 
-    def test_set_custom_delay(self):
+    def test_set_custom_delay(self) -> Any:
         """Özel gecikme tanımlama."""
         pit = PointInTimeValidator()
         pit.set_custom_delay("custom_type", timedelta(hours=2), "Custom delay")
@@ -229,27 +230,27 @@ class TestPointInTimeValidator:
 class TestEventDeduplicator:
     """Event deduplication testleri."""
 
-    def test_unique_event(self):
+    def test_unique_event(self) -> Any:
         """Unique event — duplicate değil."""
         dedup = EventDeduplicator()
         event = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
         assert dedup.is_duplicate(event) is False
 
-    def test_duplicate_event(self):
+    def test_duplicate_event(self) -> Any:
         """Duplicate event tespit edilir."""
         dedup = EventDeduplicator()
         event = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
         dedup.mark_seen(event)
         assert dedup.is_duplicate(event) is True
 
-    def test_check_and_mark(self):
+    def test_check_and_mark(self) -> Any:
         """check_and_mark tek adımda çalışır."""
         dedup = EventDeduplicator()
         event = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
         assert dedup.check_and_mark(event) is False  # İlk kez → unique
         assert dedup.check_and_mark(event) is True  # İkinci kez → duplicate
 
-    def test_different_events_not_duplicate(self):
+    def test_different_events_not_duplicate(self) -> Any:
         """Farklı event'ler duplicate değil."""
         dedup = EventDeduplicator()
         event1 = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
@@ -257,7 +258,7 @@ class TestEventDeduplicator:
         dedup.mark_seen(event1)
         assert dedup.is_duplicate(event2) is False
 
-    def test_different_ticker_not_duplicate(self):
+    def test_different_ticker_not_duplicate(self) -> Any:
         """Farklı ticker duplicate değil."""
         dedup = EventDeduplicator()
         event1 = {"event_type": "market_tick", "source": "yfinance", "ticker": "THYAO", "price": 308.50}
@@ -265,7 +266,7 @@ class TestEventDeduplicator:
         dedup.mark_seen(event1)
         assert dedup.is_duplicate(event2) is False
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
         """İstatistikler doğru."""
         dedup = EventDeduplicator()
         event = {"event_type": "test", "source": "test", "ticker": "TEST", "price": 100}
@@ -276,7 +277,7 @@ class TestEventDeduplicator:
         assert stats["total_duplicates"] == 1
         assert stats["total_unique"] == 1
 
-    def test_reset(self):
+    def test_reset(self) -> Any:
         """Sıfırlama çalışır."""
         dedup = EventDeduplicator()
         event = {"event_type": "test", "source": "test", "ticker": "TEST", "price": 100}
@@ -293,25 +294,25 @@ class TestEventDeduplicator:
 class TestIncrementalFetcher:
     """Incremental fetcher testleri."""
 
-    def test_should_fetch_first_time(self):
+    def test_should_fetch_first_time(self) -> Any:
         """İlk kez çekilmeli."""
         fetcher = IncrementalFetcher()
         assert fetcher.should_fetch("THYAO") is True
 
-    def test_should_fetch_after_interval(self):
+    def test_should_fetch_after_interval(self) -> Any:
         """Aralık geçtikten sonra çekilmeli."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO")
         # Hemen sonra → çekilmemeli
         assert fetcher.should_fetch("THYAO", min_interval_seconds=60) is False
 
-    def test_should_fetch_within_interval(self):
+    def test_should_fetch_within_interval(self) -> Any:
         """Aralık içinde → çekilmemeli."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO")
         assert fetcher.should_fetch("THYAO", min_interval_seconds=60) is False
 
-    def test_mark_fetched_success(self):
+    def test_mark_fetched_success(self) -> Any:
         """Başarılı çekme işaretleme."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO", success=True)
@@ -319,7 +320,7 @@ class TestIncrementalFetcher:
         assert "THYAO" in states
         assert states["THYAO"]["last_success"] is True
 
-    def test_mark_fetched_error(self):
+    def test_mark_fetched_error(self) -> Any:
         """Hatalı çekme işaretleme."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO", success=False, error="timeout")
@@ -327,7 +328,7 @@ class TestIncrementalFetcher:
         assert states["THYAO"]["last_success"] is False
         assert states["THYAO"]["last_error"] == "timeout"
 
-    def test_get_since_default(self):
+    def test_get_since_default(self) -> Any:
         """Varsayılan lookback."""
         fetcher = IncrementalFetcher(default_lookback_hours=2)
         since = fetcher.get_since("NEW_TICKER")
@@ -335,7 +336,7 @@ class TestIncrementalFetcher:
         now = datetime.now(UTC)
         assert (now - since).total_seconds() < 7200 + 10  # 2 saat + tolerans
 
-    def test_get_since_after_fetch(self):
+    def test_get_since_after_fetch(self) -> Any:
         """Çekme sonrası since güncellenir."""
         fetcher = IncrementalFetcher()
         before = datetime.now(UTC)
@@ -344,7 +345,7 @@ class TestIncrementalFetcher:
         since = fetcher.get_since("THYAO")
         assert before <= since <= after
 
-    def test_get_stale_tickers(self):
+    def test_get_stale_tickers(self) -> Any:
         """Eski ticker'ları bulur."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("FRESH", success=True)
@@ -358,7 +359,7 @@ class TestIncrementalFetcher:
         assert "STALE" in stale
         assert "FRESH" not in stale
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
         """İstatistikler doğru."""
         fetcher = IncrementalFetcher()
         fetcher.should_fetch("A")  # check
@@ -369,7 +370,7 @@ class TestIncrementalFetcher:
         assert stats["total_fetches"] == 1
         assert stats["total_skipped"] == 1
 
-    def test_reset(self):
+    def test_reset(self) -> Any:
         """Sıfırlama çalışır."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO")

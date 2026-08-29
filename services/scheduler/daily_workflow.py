@@ -124,6 +124,7 @@ class DailyWorkflow:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
         self._phase_handlers: dict[str, Callable] = {}
         self._jobs_run_today: int = 0
@@ -131,11 +132,11 @@ class DailyWorkflow:
         self._daily_report_generated: bool = False
         self._current_phase: str | None = None
 
-    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
+    def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]) -> Any:
         """Job handler kaydet."""
         self._handlers[job_type] = handler
 
-    def register_phase_handler(self, phase: str, handler: Callable):
+    def register_phase_handler(self, phase: str, handler: Callable) -> Any:
         """Faz başlangıcı handler'ı kaydet."""
         self._phase_handlers[phase] = handler
 
@@ -216,7 +217,7 @@ class DailyWorkflow:
             for name, phase in self.PHASES.items()
         }
 
-    def reset_daily_counters(self):
+    def reset_daily_counters(self) -> Any:
         """Günlük sayaçları sıfırla."""
         self._jobs_run_today = 0
         self._jobs_failed_today = 0

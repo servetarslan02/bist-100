@@ -26,6 +26,7 @@ class AlphaEngine:
     """ALPHA'nın ana motoru — v2.0"""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._universe: list[str] = []
         self._features_map: dict[str, dict[str, float]] = {}
         self._ml_scores: dict[str, float] = {}
@@ -62,7 +63,7 @@ class AlphaEngine:
         self._alert_manager = scan_alert_manager
         self._filter_engine = custom_filter_engine
 
-    def load_universe(self, tickers: list[str]):
+    def load_universe(self, tickers: list[str]) -> Any:
         """BIST evrenini yükle."""
         try:
             self._universe = tickers
@@ -339,7 +340,8 @@ class AlphaEngine:
     # Yardımcı Fonksiyonlar
     # =====================================================
 
-    async def _fetch_all_data(self):
+    async def _fetch_all_data(self) -> Any:
+        """Otomatik eklendi."""
         try:
             tickers = [f"{t}.IS" for t in self._universe]
             return yf.download(tickers, period="60d", group_by="ticker", threads=True, progress=False)
@@ -348,6 +350,7 @@ class AlphaEngine:
             return None
 
     def _compute_all_features(self, data) -> dict[str, dict[str, float]]:
+        """Otomatik eklendi."""
         import polars as pl
 
         from ..features.calculator import feature_calculator
@@ -382,6 +385,7 @@ class AlphaEngine:
         return features_map
 
     def _detect_regime(self) -> tuple:
+        """Otomatik eklendi."""
         if not self._features_map:
             return "RANGE", 0.5
 

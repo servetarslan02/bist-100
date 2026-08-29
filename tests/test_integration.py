@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Integration Test Suite v1.0
 
@@ -17,36 +20,36 @@ from datetime import UTC, date, datetime, timedelta
 import polars as pl
 
 
-def test_yahoo_finance_fetch():
+def test_yahoo_finance_fetch() -> Any:
     """Yahoo Finance'ten THYAO verisi cek."""
-    print("\n[Test] Yahoo Finance fetch...")
+    logger.info("\n[Test] Yahoo Finance fetch...")
     from services.data.data_source import data_source
 
     df = data_source.get_stock_data("THYAO.IS", period="1mo", interval="1d")
     assert not df.empty, "THYAO verisi bos!"
     assert "Close" in df.columns, "Close kolonu yok!"
     assert len(df) > 5, "Yetersiz veri!"
-    print(f"  ✅ THYAO: {len(df)} gun, son fiyat: {df['Close'].iloc[-1]:.2f}")
+    logger.info(f"  ✅ THYAO: {len(df)} gun, son fiyat: {df['Close'].iloc[-1]:.2f}")
     return True
 
 
-def test_bist_source_fetch():
+def test_bist_source_fetch() -> Any:
     """BISTSource'tan veri cekmeye calis."""
-    print("\n[Test] BISTSource fetch...")
+    logger.info("\n[Test] BISTSource fetch...")
     from services.data.data_source import BISTSource
 
     bist = BISTSource()
     df = bist.fetch("THYAO")
     if df is not None and not df.empty:
-        print(f"  ✅ BISTSource: {len(df)} satir")
+        logger.info(f"  ✅ BISTSource: {len(df)} satir")
     else:
-        print("  ⚠️ BISTSource bos dondu (web scrape basarisiz olabilir)")
+        logger.info("  ⚠️ BISTSource bos dondu (web scrape basarisiz olabilir)")
     return True
 
 
-def test_multiple_stocks():
+def test_multiple_stocks() -> Any:
     """Coklu hisse verisi cek."""
-    print("\n[Test] Multiple stocks fetch...")
+    logger.info("\n[Test] Multiple stocks fetch...")
     from services.data.data_source import data_source
 
     tickers = ["THYAO.IS", "GARAN.IS", "XU100.IS"]
@@ -56,34 +59,34 @@ def test_multiple_stocks():
     for t, df in results.items():
         assert not df.empty, f"{t} bos!"
         assert "Close" in df.columns, f"{t} Close yok!"
-    print(f"  ✅ Coklu hisse: {len(results)} hisse yuklendi")
+    logger.info(f"  ✅ Coklu hisse: {len(results)} hisse yuklendi")
     return True
 
 
-def test_universe_loaded():
+def test_universe_loaded() -> Any:
     """Evren yuklendi mi?"""
-    print("\n[Test] Universe loaded...")
+    logger.info("\n[Test] Universe loaded...")
     from services.ingestion.bist_universe import bist_universe
 
     assert len(bist_universe.BIST_100_TICKERS) > 0, "BIST 100 bos!"
     assert len(bist_universe.BIST_ALL_TICKERS) > 0, "BIST ALL bos!"
-    print(f"  ✅ Universe: BIST100={len(bist_universe.BIST_100_TICKERS)}, ALL={len(bist_universe.BIST_ALL_TICKERS)}")
+    logger.info(f"  ✅ Universe: BIST100={len(bist_universe.BIST_100_TICKERS)}, ALL={len(bist_universe.BIST_ALL_TICKERS)}")
     return True
 
 
-def test_sector_map():
+def test_sector_map() -> Any:
     """Sektor haritasi calisiyor mu?"""
-    print("\n[Test] Sector map...")
+    logger.info("\n[Test] Sector map...")
     from services.ingestion.bist_universe import bist_universe
 
     sector = bist_universe.get_ticker_sector("THYAO")
-    print(f"  ✅ THYAO sektoru: {sector}")
+    logger.info(f"  ✅ THYAO sektoru: {sector}")
     return True
 
 
-def test_daily_pipeline():
+def test_daily_pipeline() -> Any:
     """Gunluk pipeline calistir."""
-    print("\n[Test] Daily pipeline...")
+    logger.info("\n[Test] Daily pipeline...")
     from services.core.orchestrator import orchestrator
     from services.data.data_source import data_source
     from services.ingestion.bist_universe import bist_universe
@@ -106,13 +109,13 @@ def test_daily_pipeline():
 
     assert report is not None, "Rapor None!"
     assert report.system_health["status"] != "CRITICAL", "Pipeline kritik hata!"
-    print(f"  ✅ Pipeline: status={report.system_health['status']}, opportunities={len(report.top_opportunities)}")
+    logger.info(f"  ✅ Pipeline: status={report.system_health['status']}, opportunities={len(report.top_opportunities)}")
     return True
 
 
-def test_walk_forward_folds():
+def test_walk_forward_folds() -> Any:
     """Walk-forward fold olusturma."""
-    print("\n[Test] Walk-forward folds...")
+    logger.info("\n[Test] Walk-forward folds...")
     from services.backtest.walk_forward import WalkForwardEngine
 
     wf = WalkForwardEngine(train_days=20, test_days=5, step_days=5)
@@ -123,13 +126,13 @@ def test_walk_forward_folds():
     for f in folds:
         assert f["train_start"] < f["test_start"], "Train/Test overlap!"
         assert f["purge_start"] <= f["test_start"], "Purge gap yok!"
-    print(f"  ✅ Walk-forward: {len(folds)} fold olusturuldu")
+    logger.info(f"  ✅ Walk-forward: {len(folds)} fold olusturuldu")
     return True
 
 
-def test_backtest_engine():
+def test_backtest_engine() -> Any:
     """Backtest engine calistir."""
-    print("\n[Test] Backtest engine...")
+    logger.info("\n[Test] Backtest engine...")
     from services.backtest.engine import BacktestEngine
 
     bt = BacktestEngine()
@@ -149,13 +152,13 @@ def test_backtest_engine():
 
     assert result is not None, "Backtest sonucu None!"
     assert result.metrics.total_trades > 0, "Islem yapilmadi!"
-    print(f"  ✅ Backtest: {result.metrics.total_trades} islem, getiri={result.metrics.total_return_pct:.2f}%")
+    logger.info(f"  ✅ Backtest: {result.metrics.total_trades} islem, getiri={result.metrics.total_return_pct:.2f}%")
     return True
 
 
-def test_llm_fallback():
+def test_llm_fallback() -> Any:
     """LLM fallback calisiyor mu?"""
-    print("\n[Test] LLM fallback...")
+    logger.info("\n[Test] LLM fallback...")
     from services.agents.agent_system import AIFallback
 
     features = {"roc_5d": 5.0, "volume_zscore": 2.5, "rsi_14": 45, "trend_slope_20d": 0.01}
@@ -163,11 +166,11 @@ def test_llm_fallback():
 
     assert "direction" in result, "Direction yok!"
     assert result["direction"] in ["LONG", "SHORT", "NEUTRAL"], "Gecersiz direction!"
-    print(f"  ✅ Fallback: direction={result['direction']}, confidence={result['confidence']:.2f}")
+    logger.info(f"  ✅ Fallback: direction={result['direction']}, confidence={result['confidence']:.2f}")
     return True
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
     """Tum testleri calistir."""
     tests = [
         test_yahoo_finance_fetch,
@@ -185,9 +188,9 @@ def run_all_tests():
     failed = 0
     errors = []
 
-    print("=" * 70)
-    print("ALPHA BIST — INTEGRATION TEST SUITE v1.0")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("ALPHA BIST — INTEGRATION TEST SUITE v1.0")
+    logger.info("=" * 70)
 
     for test in tests:
         try:
@@ -196,16 +199,16 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append(f"{test.__name__}: {e}")
-            print(f"  ❌ FAILED: {e}")
+            logger.info(f"  ❌ FAILED: {e}")
 
-    print("\n" + "=" * 70)
-    print(f"SONUC: {passed} passed, {failed} failed, {len(tests)} total")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info(f"SONUC: {passed} passed, {failed} failed, {len(tests)} total")
+    logger.info("=" * 70)
 
     if errors:
-        print("\nHATALAR:")
+        logger.info("\nHATALAR:")
         for err in errors:
-            print(f"  • {err}")
+            logger.info(f"  • {err}")
 
     return failed == 0
 

@@ -52,6 +52,7 @@ class ScanDeduplicator:
         event_cooldown_seconds: int = 10,  # Event-driven: 10 saniye
         max_tracked_tickers: int = 1000,  # Maksimum takip edilen hisse
     ):
+        """Otomatik eklendi."""
         self._cooldown = cooldown_seconds
         self._event_cooldown = event_cooldown_seconds
         self._max_tracked = max_tracked_tickers
@@ -108,7 +109,7 @@ class ScanDeduplicator:
         signal: str = "",
         tier: int = 0,
         forced: bool = False,
-    ):
+    ) -> Any:
         """Tarama kaydet.
 
         Args:
@@ -143,7 +144,7 @@ class ScanDeduplicator:
                 forced=forced,
             )
 
-    def force_scan(self, ticker: str):
+    def force_scan(self, ticker: str) -> Any:
         """Zorla tarama (event-driven).
 
         Bir sonraki should_scan() çağrısında True döner.
@@ -155,7 +156,7 @@ class ScanDeduplicator:
         self._forced_tickers.add(ticker)
         logger.info("Force scan queued", ticker=ticker)
 
-    def force_scan_batch(self, tickers: list):
+    def force_scan_batch(self, tickers: list) -> Any:
         """Birden fazla hisse için zorla tarama.
 
         Args:
@@ -204,7 +205,7 @@ class ScanDeduplicator:
             "cooldown_remaining": round(self.get_cooldown_remaining(ticker), 1),
         }
 
-    def set_cooldown(self, seconds: int):
+    def set_cooldown(self, seconds: int) -> Any:
         """Cooldown süresini değiştir.
 
         Args:
@@ -242,13 +243,13 @@ class ScanDeduplicator:
         """
         return {ticker: self.get_last_scan_info(ticker) for ticker in self._records}
 
-    def clear(self):
+    def clear(self) -> Any:
         """Tüm kayıtları temizle."""
         self._records.clear()
         self._forced_tickers.clear()
         logger.info("Deduplicator cleared")
 
-    def _evict_oldest(self):
+    def _evict_oldest(self) -> Any:
         """En eski kaydı çıkar (limit aşımı)."""
         if not self._records:
             return

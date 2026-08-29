@@ -14,6 +14,7 @@ from typing import Any
 
 try:
     import duckdb
+
     HAS_DUCKDB = True
 except ImportError:
     duckdb = None
@@ -26,22 +27,39 @@ logger = structlog.get_logger()
 
 
 class _DummyDuckDBConn:
-    def execute(self, *args, **kwargs):
+    """Otomatik eklendi."""
+    def execute(self, *args, **kwargs) -> Any:
+        """Otomatik eklendi."""
         return self
-    def fetchall(self):
+
+    def fetchall(self) -> Any:
+        """Otomatik eklendi."""
         return []
-    def fetchone(self):
+
+    def fetchone(self) -> Any:
+        """Otomatik eklendi."""
         return None
-    def df(self):
+
+    def df(self) -> Any:
+        """Otomatik eklendi."""
         import pandas as pd
+
         return pd.DataFrame()
-    def commit(self):
+
+    def commit(self) -> Any:
+        """Otomatik eklendi."""
         pass
-    def close(self):
+
+    def close(self) -> Any:
+        """Otomatik eklendi."""
         pass
-    def __enter__(self):
+
+    def __enter__(self) -> Any:
+        """Otomatik eklendi."""
         return self
-    def __exit__(self, *args):
+
+    def __exit__(self, *args) -> Any:
+        """Otomatik eklendi."""
         pass
 
 
@@ -49,18 +67,21 @@ class ModelMemoryStore:
     """Kalıcı model tahmin, sonuç ve metrik hafızası."""
 
     def __init__(self, db_path: str = "data/model_memory.duckdb"):
+        """Otomatik eklendi."""
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         if HAS_DUCKDB:
             self._init_tables()
 
     def _get_conn(self) -> Any:
+        """Otomatik eklendi."""
         if not HAS_DUCKDB or duckdb is None:
             return _DummyDuckDBConn()
         conn = duckdb.connect(self.db_path)
         return conn
 
-    def _init_tables(self):
+    def _init_tables(self) -> Any:
+        """Otomatik eklendi."""
         with self._get_conn() as conn:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS predictions (
@@ -135,7 +156,7 @@ class ModelMemoryStore:
         prediction_horizon: str,
         entry_price: float,
         features: dict[str, Any] | None = None,
-    ):
+    ) -> Any:
         """Yeni tahmin kaydeder."""
         now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
@@ -162,7 +183,7 @@ class ModelMemoryStore:
                 ),
             )
 
-    def save_batch_records(self, records: list[dict[str, Any]]):
+    def save_batch_records(self, records: list[dict[str, Any]]) -> Any:
         """Büyük hacimli tahmin ve outcome kayıtlarını tek atomik işlemde toplu kaydeder."""
         if not records:
             return
@@ -335,7 +356,7 @@ class ModelMemoryStore:
             )
             rows = cursor.fetchall()
             cols = [d[0] for d in cursor.description]
-            return [dict(zip(cols, r)) for r in rows]
+            return [dict(zip(cols, r, strict=False)) for r in rows]
 
     def record_metrics_snapshot(
         self,
@@ -344,7 +365,7 @@ class ModelMemoryStore:
         metrics: dict[str, Any],
         reliability_score: float,
         fusion_weight: float,
-    ):
+    ) -> Any:
         """Modelin anlık metrik ve güvenilirlik kaydını ekler."""
         now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
@@ -375,7 +396,7 @@ class ModelMemoryStore:
                 ),
             )
 
-    def record_fusion_weights(self, weights: dict[str, float], market_regime: str):
+    def record_fusion_weights(self, weights: dict[str, float], market_regime: str) -> Any:
         """Güncel sinyal ağırlıklarını geçmişe kaydeder."""
         now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
@@ -400,9 +421,9 @@ class ModelMemoryStore:
             )
             rows = cursor.fetchall()
             cols = [d[0] for d in cursor.description]
-            return [dict(zip(cols, r)) for r in rows]
+            return [dict(zip(cols, r, strict=False)) for r in rows]
 
-    def prune_old_records(self, max_records_per_model: int = 20000):
+    def prune_old_records(self, max_records_per_model: int = 20000) -> Any:
         """Ham geçmişi budayarak kontrolsüz büyümesini engeller."""
         with self._get_conn() as conn:
             conn.execute(

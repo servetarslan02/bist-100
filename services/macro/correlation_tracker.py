@@ -61,13 +61,14 @@ class MacroCorrelationTracker:
     ]
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._window = macro_config.correlation.window_days
         self._history: dict[str, list[float]] = {}
         self._timestamps: dict[str, list[str]] = {}
         self._correlation_history: dict[str, list[float]] = {}  # pair → [corr1, corr2, ...]
         self._pair_key = lambda v1, v2: f"{v1}_{v2}" if v1 < v2 else f"{v2}_{v1}"
 
-    def update(self, macro_data: dict[str, float]):
+    def update(self, macro_data: dict[str, float]) -> Any:
         """Günlük veri güncelle.
 
         Args:

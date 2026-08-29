@@ -21,13 +21,14 @@ class BistMLScanner:
     """Canlı ML Ensemble Tarayıcı."""
 
     def __init__(self, models_dir: str = "ml/saved_models"):
+        """Otomatik eklendi."""
         self.models_dir = Path(models_dir)
         self.models = {}
         self._load_models()
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 
-    def _load_models(self):
+    def _load_models(self) -> Any:
         """Kayıtlı modelleri RAM'e yükler (SHA256 doğrulamalı)."""
         from services.core.safe_pickle import safe_pickle_load
 

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Ingestion Faz 3-6 Tests
 
@@ -32,13 +33,14 @@ logger = structlog.get_logger(__name__)
 class TestFullPipeline:
     """Full pipeline integration testleri."""
 
-    async def test_provider_manager_with_all_resilience(self):
+    async def test_provider_manager_with_all_resilience(self) -> Any:
         """Provider manager + circuit breaker + rate limiter + retry."""
         manager = ProviderManager()
 
         call_count = 0
 
-        async def flaky_provider(**kwargs):
+        async def flaky_provider(**kwargs) -> Any:
+            """Otomatik eklendi."""
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
@@ -52,17 +54,20 @@ class TestFullPipeline:
         assert result.data == {"price": 100.0}
         assert call_count == 3  # 2 fails + 1 success
 
-    async def test_multi_provider_failover(self):
+    async def test_multi_provider_failover(self) -> Any:
         """Çoklu provider failover zinciri."""
         manager = ProviderManager()
 
-        async def provider_a(**kwargs):
+        async def provider_a(**kwargs) -> Any:
+            """Otomatik eklendi."""
             raise ConnectionError("A down")
 
-        async def provider_b(**kwargs):
+        async def provider_b(**kwargs) -> Any:
+            """Otomatik eklendi."""
             raise TimeoutError("B timeout")
 
-        async def provider_c(**kwargs):
+        async def provider_c(**kwargs) -> Any:
+            """Otomatik eklendi."""
             return {"price": 200.0}
 
         manager.register("market", "a", provider_a, priority=0)
@@ -73,11 +78,12 @@ class TestFullPipeline:
         assert result is not None
         assert result.provider == "c"
 
-    async def test_health_tracking_after_failures(self):
+    async def test_health_tracking_after_failures(self) -> Any:
         """Hata sonrası sağlık takibi."""
         manager = ProviderManager()
 
-        async def failing(**kwargs):
+        async def failing(**kwargs) -> Any:
+            """Otomatik eklendi."""
             raise ConnectionError("down")
 
         manager.register("test", "provider", failing)
@@ -90,11 +96,12 @@ class TestFullPipeline:
         assert health["provider"]["total_failures"] > 0
         assert health["provider"]["success_rate"] < 1.0
 
-    async def test_circuit_breaker_opens_after_failures(self):
+    async def test_circuit_breaker_opens_after_failures(self) -> Any:
         """Ardışık hatalardan sonra circuit breaker açılır."""
         manager = ProviderManager()
 
-        async def failing(**kwargs):
+        async def failing(**kwargs) -> Any:
+            """Otomatik eklendi."""
             raise ConnectionError("down")
 
         manager.register("test", "provider", failing, circuit_breaker_config={"failure_threshold": 3})
@@ -106,11 +113,12 @@ class TestFullPipeline:
         states = manager.get_circuit_breaker_states()
         assert states["provider"]["state"] == "OPEN"
 
-    async def test_full_status_report(self):
+    async def test_full_status_report(self) -> Any:
         """Tam durum raporu."""
         manager = ProviderManager()
 
-        async def dummy(**kwargs):
+        async def dummy(**kwargs) -> Any:
+            """Otomatik eklendi."""
             return {"data": "test"}
 
         manager.register("test", "provider", dummy)
@@ -134,7 +142,7 @@ class TestFullPipeline:
 class TestReconciliationAdvanced:
     """Gelişmiş reconciliation testleri."""
 
-    async def test_three_source_consensus(self):
+    async def test_three_source_consensus(self) -> Any:
         """3 kaynak konsensüs."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -148,7 +156,7 @@ class TestReconciliationAdvanced:
         assert result.conflict is False
         assert result.quality_score > 0.8
 
-    async def test_two_source_one_outlier(self):
+    async def test_two_source_one_outlier(self) -> Any:
         """2 kaynak, 1 aykırı."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -160,7 +168,7 @@ class TestReconciliationAdvanced:
         )
         assert result.conflict is True
 
-    async def test_custom_max_deviation(self):
+    async def test_custom_max_deviation(self) -> Any:
         """Özel max sapma eşiği."""
         reconciler = SourceReconciler()
         result = await reconciler.reconcile_price(
@@ -173,7 +181,7 @@ class TestReconciliationAdvanced:
         )
         assert result.conflict is True
 
-    async def test_quality_report_aggregation(self):
+    async def test_quality_report_aggregation(self) -> Any:
         """Kalite raporu toplama."""
         reconciler = SourceReconciler()
         results = await reconciler.reconcile_batch(
@@ -196,7 +204,7 @@ class TestReconciliationAdvanced:
 class TestPITAdvanced:
     """Gelişmiş PIT testleri."""
 
-    def test_multi_data_type_filter(self):
+    def test_multi_data_type_filter(self) -> Any:
         """Çoklu veri tipi filtreleme."""
         pit = PointInTimeValidator()
 
@@ -217,7 +225,7 @@ class TestPITAdvanced:
         filtered_fund = pit.filter_available(fundamental_data, "fundamental", query_ts)
         assert len(filtered_fund) == 0
 
-    def test_lookahead_violation_report(self):
+    def test_lookahead_violation_report(self) -> Any:
         """Look-ahead bias ihlal raporu."""
         pit = PointInTimeValidator()
         data = [
@@ -228,7 +236,7 @@ class TestPITAdvanced:
         assert report["clean"] is False
         assert report["violation_count"] == 2
 
-    def test_custom_delay_per_type(self):
+    def test_custom_delay_per_type(self) -> Any:
         """Her veri tipi için özel gecikme."""
         pit = PointInTimeValidator()
         pit.set_custom_delay("custom", timedelta(hours=4), "Custom 4h delay")
@@ -246,7 +254,7 @@ class TestPITAdvanced:
 class TestDedupAdvanced:
     """Gelişmiş dedup testleri."""
 
-    def test_high_volume_dedup(self):
+    def test_high_volume_dedup(self) -> Any:
         """Yüksek hacim dedup."""
         dedup = EventDeduplicator()
 
@@ -264,7 +272,7 @@ class TestDedupAdvanced:
         assert stats["total_checked"] == 2000
         assert stats["total_duplicates"] == 1000
 
-    def test_different_source_not_duplicate(self):
+    def test_different_source_not_duplicate(self) -> Any:
         """Farklı kaynak duplicate değil."""
         dedup = EventDeduplicator()
         event1 = {"event_type": "tick", "source": "yfinance", "ticker": "THYAO", "price": 100}
@@ -281,7 +289,7 @@ class TestDedupAdvanced:
 class TestIncrementalAdvanced:
     """Gelişmiş incremental testleri."""
 
-    def test_multiple_ticker_tracking(self):
+    def test_multiple_ticker_tracking(self) -> Any:
         """Çoklu ticker takibi."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("THYAO")
@@ -292,7 +300,7 @@ class TestIncrementalAdvanced:
         assert fetcher.get_fetch_count("ASELS") == 1
         assert fetcher.get_fetch_count("NEW") == 0
 
-    def test_stale_ticker_detection(self):
+    def test_stale_ticker_detection(self) -> Any:
         """Eski ticker tespiti."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("FRESH")
@@ -308,7 +316,7 @@ class TestIncrementalAdvanced:
         assert "OLD" in stale
         assert "FRESH" not in stale
 
-    def test_reset_single_ticker(self):
+    def test_reset_single_ticker(self) -> Any:
         """Tek ticker sıfırlama."""
         fetcher = IncrementalFetcher()
         fetcher.mark_fetched("A")
@@ -326,7 +334,7 @@ class TestIncrementalAdvanced:
 class TestIngestionMetrics:
     """Metrics testleri."""
 
-    def test_metrics_no_crash_without_prometheus(self):
+    def test_metrics_no_crash_without_prometheus(self) -> Any:
         """Prometheus olmadan crash olmamalı."""
         metrics = IngestionMetrics()
         # Tüm metotlar no-op olmalı
@@ -350,7 +358,7 @@ class TestIngestionMetrics:
         assert hasattr(metrics, "record_incremental_fetch")
         assert hasattr(metrics, "record_incremental_skip")
 
-    def test_track_pipeline_context(self):
+    def test_track_pipeline_context(self) -> Any:
         """Pipeline tracking context manager."""
         metrics = IngestionMetrics()
         with metrics.track_pipeline("test"):
@@ -358,7 +366,7 @@ class TestIngestionMetrics:
         assert metrics is not None
         assert hasattr(metrics, "track_pipeline")
 
-    def test_track_provider_context(self):
+    def test_track_provider_context(self) -> Any:
         """Provider tracking context manager."""
         metrics = IngestionMetrics()
         with metrics.track_provider("yfinance", "market_price"):
@@ -366,7 +374,7 @@ class TestIngestionMetrics:
         assert metrics is not None
         assert hasattr(metrics, "track_provider")
 
-    def test_track_provider_on_failure(self):
+    def test_track_provider_on_failure(self) -> Any:
         """Provider failure tracking."""
         metrics = IngestionMetrics()
         try:
@@ -386,7 +394,7 @@ class TestIngestionMetrics:
 class TestCircuitBreakerAdvanced:
     """Gelişmiş circuit breaker testleri."""
 
-    def test_manager_multiple_providers(self):
+    def test_manager_multiple_providers(self) -> Any:
         """Çoklu provider circuit breaker."""
         manager = CircuitBreakerManager()
         manager.get_or_create("yfinance")
@@ -395,7 +403,7 @@ class TestCircuitBreakerAdvanced:
 
         assert len(manager.get_all_states()) == 3
 
-    def test_circuit_breaker_independence(self):
+    def test_circuit_breaker_independence(self) -> Any:
         """Circuit breaker bağımsızlığı."""
         manager = CircuitBreakerManager()
         cb1 = manager.get_or_create("a", failure_threshold=2)
@@ -409,7 +417,7 @@ class TestCircuitBreakerAdvanced:
         # B hâlâ kapalı
         assert cb2.state == CircuitState.CLOSED
 
-    def test_recovery_after_open(self):
+    def test_recovery_after_open(self) -> Any:
         """OPEN sonrası recovery."""
         cb = CircuitBreaker(name="test", failure_threshold=1, recovery_timeout_s=0.05)
         cb.record_failure()
@@ -432,7 +440,7 @@ class TestCircuitBreakerAdvanced:
 class TestRateLimiterAdvanced:
     """Gelişmiş rate limiter testleri."""
 
-    async def test_multiple_provider_limits(self):
+    async def test_multiple_provider_limits(self) -> Any:
         """Çoklu provider limitleri."""
         limiter = RateLimiter()
         limiter.set_limit("a", max_requests=10, window_seconds=60)
@@ -444,7 +452,7 @@ class TestRateLimiterAdvanced:
         assert stats["a"]["limit"] == 10
         assert stats["b"]["limit"] == 5
 
-    async def test_no_limit_provider(self):
+    async def test_no_limit_provider(self) -> Any:
         "Limitsiz provider."
         limiter = RateLimiter()
         # C için limit yok
@@ -461,11 +469,12 @@ class TestRateLimiterAdvanced:
 class TestProviderManagerAdvanced:
     """Gelişmiş provider manager testleri."""
 
-    async def test_enable_disable_provider(self):
+    async def test_enable_disable_provider(self) -> Any:
         """Provider enable/disable."""
         manager = ProviderManager()
 
-        async def dummy(**kwargs):
+        async def dummy(**kwargs) -> Any:
+            """Otomatik eklendi."""
             return "ok"
 
         manager.register("test", "provider", dummy)
@@ -478,11 +487,12 @@ class TestProviderManagerAdvanced:
         result = await manager.fetch("test")
         assert result is not None
 
-    async def test_multi_fetch(self):
+    async def test_multi_fetch(self) -> Any:
         """Çoklu ticker fetch."""
         manager = ProviderManager()
 
-        async def fetch(**kwargs):
+        async def fetch(**kwargs) -> Any:
+            """Otomatik eklendi."""
             ticker = kwargs.get("ticker", "unknown")
             return {"ticker": ticker, "price": 100}
 
@@ -491,11 +501,12 @@ class TestProviderManagerAdvanced:
         results = await manager.fetch_multi("test", ["A", "B", "C"])
         assert len(results) == 3
 
-    async def test_timeout_handling(self):
+    async def test_timeout_handling(self) -> Any:
         """Timeout işleme."""
         manager = ProviderManager()
 
-        async def slow(**kwargs):
+        async def slow(**kwargs) -> Any:
+            """Otomatik eklendi."""
             await asyncio.sleep(10)
             return "ok"
 

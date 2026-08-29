@@ -28,6 +28,7 @@ class LearningPipeline:
         trust_engine: ModelTrustEngine | None = None,
         fusion_engine: SignalFusionEngine | None = None,
     ):
+        """Otomatik eklendi."""
         self.store = memory_store or ModelMemoryStore()
         self.trust_engine = trust_engine or ModelTrustEngine()
         self.fusion_engine = fusion_engine or SignalFusionEngine()

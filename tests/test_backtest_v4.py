@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Backtest v4.0 Comprehensive Test Suite
 
@@ -49,7 +52,7 @@ from services.scanner.backtest_runner import (
 # =====================================================
 
 
-def make_market_data(n_stocks=100, n_days=252, seed=42):
+def make_market_data(n_stocks=100, n_days=252, seed=42) -> Any:
     """Gerçekçi market dataset."""
     np.random.seed(seed)
     tickers = [f"STOCK{i:04d}" for i in range(n_stocks)]
@@ -80,7 +83,7 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
 # =====================================================
 
 
-def test_sim_v3_buy_sell():
+def test_sim_v3_buy_sell() -> Any:
     """Temel alım-satım döngüsü."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000, slippage_rate=0.001)
@@ -114,7 +117,7 @@ def test_sim_v3_buy_sell():
     return "Sim V3 Buy/Sell", len(issues) == 0, issues
 
 
-def test_sim_v3_commission_bist():
+def test_sim_v3_commission_bist() -> Any:
     """BIST komisyon yapısı doğru olmalı."""
     issues = []
     amount = 100000.0
@@ -133,7 +136,7 @@ def test_sim_v3_commission_bist():
     return "BIST Commission", len(issues) == 0, issues
 
 
-def test_sim_v3_cash_invariant():
+def test_sim_v3_cash_invariant() -> Any:
     """Cash + cost_basis ≈ initial capital."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -155,7 +158,7 @@ def test_sim_v3_cash_invariant():
     return "Sim V3 Cash Invariant", len(issues) == 0, issues
 
 
-def test_sim_v3_equity_invariant():
+def test_sim_v3_equity_invariant() -> Any:
     """Equity = cash + market_value."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -171,7 +174,7 @@ def test_sim_v3_equity_invariant():
     return "Sim V3 Equity Invariant", len(issues) == 0, issues
 
 
-def test_sim_v3_oversell_prevention():
+def test_sim_v3_oversell_prevention() -> Any:
     """Olmayan pozisyon satılmamalı."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -189,7 +192,7 @@ def test_sim_v3_oversell_prevention():
     return "Sim V3 Oversell Prevention", len(issues) == 0, issues
 
 
-def test_sim_v3_max_positions():
+def test_sim_v3_max_positions() -> Any:
     """Max pozisyon limiti."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=10000000, max_positions=3)
@@ -205,7 +208,7 @@ def test_sim_v3_max_positions():
     return "Sim V3 Max Positions", len(issues) == 0, issues
 
 
-def test_sim_v3_win_rate():
+def test_sim_v3_win_rate() -> Any:
     """Win rate doğru hesaplanmalı."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -225,7 +228,7 @@ def test_sim_v3_win_rate():
     return "Sim V3 Win Rate", len(issues) == 0, issues
 
 
-def test_sim_v3_drawdown():
+def test_sim_v3_drawdown() -> Any:
     """Drawdown doğru hesaplanmalı."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -243,7 +246,7 @@ def test_sim_v3_drawdown():
     return "Sim V3 Drawdown", len(issues) == 0, issues
 
 
-def test_sim_v3_audit_trail():
+def test_sim_v3_audit_trail() -> Any:
     """Audit trail oluşmalı."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -265,7 +268,7 @@ def test_sim_v3_audit_trail():
     return "Sim V3 Audit Trail", len(issues) == 0, issues
 
 
-def test_sim_v3_invalid_price():
+def test_sim_v3_invalid_price() -> Any:
     """Geçersiz fiyat kabul edilmemeli."""
     issues = []
     sim = PortfolioSimulatorV3(initial_capital=100000)
@@ -290,7 +293,7 @@ def test_sim_v3_invalid_price():
 # =====================================================
 
 
-def test_persistence_save_load():
+def test_persistence_save_load() -> Any:
     """Save ve load cycle."""
     issues = []
     db_path = "/tmp/test_backtest_persist.db"
@@ -370,7 +373,7 @@ def test_persistence_save_load():
     return "Persistence Save/Load", len(issues) == 0, issues
 
 
-def test_persistence_recovery():
+def test_persistence_recovery() -> Any:
     """Restart sonrası recovery."""
     issues = []
     db_path = "/tmp/test_backtest_recovery.db"
@@ -421,7 +424,7 @@ def test_persistence_recovery():
 # =====================================================
 
 
-def test_feature_cache_v4():
+def test_feature_cache_v4() -> Any:
     """Feature cache v4.0 doğruluğu."""
     issues = []
     cache = FeatureCache()
@@ -451,7 +454,7 @@ def test_feature_cache_v4():
     return "Feature Cache v4", len(issues) == 0, issues
 
 
-def test_quality_cache_v4():
+def test_quality_cache_v4() -> Any:
     """Quality cache v4.0 doğruluğu."""
     issues = []
     cache = QualityCache()
@@ -479,7 +482,7 @@ def test_quality_cache_v4():
 # =====================================================
 
 
-def test_engine_v4_basic():
+def test_engine_v4_basic() -> Any:
     """Temel backtest çalışmalı."""
     issues = []
     market = make_market_data(20, 150, seed=42)
@@ -503,7 +506,7 @@ def test_engine_v4_basic():
     return "Engine V4 Basic", len(issues) == 0, issues
 
 
-def test_engine_v4_determinism():
+def test_engine_v4_determinism() -> Any:
     """Aynı veri → aynı sonuç."""
     issues = []
     market = make_market_data(15, 150, seed=123)
@@ -534,7 +537,7 @@ def test_engine_v4_determinism():
     return "Engine V4 Determinism", len(issues) == 0, issues
 
 
-def test_engine_v4_equity_invariant():
+def test_engine_v4_equity_invariant() -> Any:
     """Equity = cash + market_value her gün."""
     issues = []
     market = make_market_data(10, 150, seed=42)
@@ -550,7 +553,7 @@ def test_engine_v4_equity_invariant():
     return "Engine V4 Equity Invariant", len(issues) == 0, issues
 
 
-def test_engine_v4_look_ahead():
+def test_engine_v4_look_ahead() -> Any:
     """Look-ahead bias kontrolü."""
     issues = []
     market = make_market_data(10, 150, seed=42)
@@ -563,7 +566,7 @@ def test_engine_v4_look_ahead():
     return "Engine V4 Look-Ahead", len(issues) == 0, issues
 
 
-def test_engine_v4_survivorship():
+def test_engine_v4_survivorship() -> Any:
     """Survivorship bias kontrolü."""
     issues = []
     market = make_market_data(20, 150, seed=42)
@@ -578,7 +581,7 @@ def test_engine_v4_survivorship():
     return "Engine V4 Survivorship", len(issues) == 0, issues
 
 
-def test_engine_v4_persistence():
+def test_engine_v4_persistence() -> Any:
     """Backtest sonuçları persist edilmeli."""
     issues = []
     db_path = "/tmp/test_engine_v4_persist.db"
@@ -620,7 +623,7 @@ def test_engine_v4_persistence():
 # =====================================================
 
 
-def test_equivalence_old_new():
+def test_equivalence_old_new() -> Any:
     """v2.0 ve v4.0 aynı finansal sonuçları üretmeli.
 
     Not: Feature hesaplama aynı olduğu için skorlar aynı olmalı.
@@ -660,7 +663,7 @@ def test_equivalence_old_new():
 # =====================================================
 
 
-def test_benchmark_100_stocks():
+def test_benchmark_100_stocks() -> Any:
     """100 hisse / 1 yıl benchmark."""
     market = make_market_data(100, 252, seed=42)
     engine = BacktestEngineV4(BacktestConfig(lookback_days=60, initial_capital=100000))
@@ -682,7 +685,7 @@ def test_benchmark_100_stocks():
     )
 
 
-def test_benchmark_500_stocks():
+def test_benchmark_500_stocks() -> Any:
     """500 hisse / 1 yıl benchmark (50 hisse ile simüle)."""
     # 500 hisse çok uzun sürer, 50 hisse ile ölçekleme testi
     market = make_market_data(50, 252, seed=42)
@@ -705,7 +708,7 @@ def test_benchmark_500_stocks():
     )
 
 
-def test_benchmark_1000_stocks():
+def test_benchmark_1000_stocks() -> Any:
     """1000 hisse / 1 yıl benchmark (20 hisse ile smoke test)."""
     # 1000 hisse gerçek testi çok uzun sürer, smoke test
     market = make_market_data(20, 252, seed=42)
@@ -734,7 +737,7 @@ def test_benchmark_1000_stocks():
 # =====================================================
 
 
-def test_v2_feature_cache():
+def test_v2_feature_cache() -> Any:
     """v2.0 Feature Cache geriye uyumluluk."""
     issues = []
     cache = FeatureCacheV2()
@@ -758,7 +761,7 @@ def test_v2_feature_cache():
     return "V2 Feature Cache", len(issues) == 0, issues
 
 
-def test_v2_quality_cache():
+def test_v2_quality_cache() -> Any:
     """v2.0 Quality Cache geriye uyumluluk."""
     issues = []
     cache = QualityCacheV2()
@@ -777,7 +780,7 @@ def test_v2_quality_cache():
     return "V2 Quality Cache", len(issues) == 0, issues
 
 
-def test_v2_simulator_commission():
+def test_v2_simulator_commission() -> Any:
     """v2.0 Simulator geriye uyumluluk."""
     issues = []
     sim = PortfolioSimulatorV2(initial_capital=100000, commission_rate=0.001, slippage_rate=0.001)
@@ -795,7 +798,7 @@ def test_v2_simulator_commission():
     return "V2 Simulator Commission", len(issues) == 0, issues
 
 
-def test_v2_simulator_cash_invariant():
+def test_v2_simulator_cash_invariant() -> Any:
     """v2.0 Cash invariant geriye uyumluluk."""
     issues = []
     sim = PortfolioSimulatorV2(initial_capital=100000)
@@ -816,10 +819,11 @@ def test_v2_simulator_cash_invariant():
 # =====================================================
 
 
-def run_all():
-    print("=" * 70)
-    print("  ALPHA BIST — Backtest v4.0 Comprehensive Test Suite")
-    print("=" * 70)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 70)
+    logger.info("  ALPHA BIST — Backtest v4.0 Comprehensive Test Suite")
+    logger.info("=" * 70)
 
     tests = [
         # Portfolio Simulator v3.0
@@ -878,29 +882,29 @@ def run_all():
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}" + (f" ({extra})" if extra else ""))
+        logger.info(f"\n{icon} {name}" + (f" ({extra})" if extra else ""))
         if ok:
             passed += 1
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
         if "Benchmark" in name and extra:
             benchmark_results.append(f"  {name}: {extra}")
 
-    print(f"\n{'=' * 70}")
-    print(f"  SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 70}")
+    logger.info(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\n  HATALAR:")
+        logger.info("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"    {i}. {issue}")
+            logger.info(f"    {i}. {issue}")
     if benchmark_results:
-        print("\n  BENCHMARK SONUÇLARI:")
+        logger.info("\n  BENCHMARK SONUÇLARI:")
         for b in benchmark_results:
-            print(b)
-    print("=" * 70)
+            logger.info(b)
+    logger.info("=" * 70)
 
     return failed == 0
 

@@ -56,7 +56,7 @@ def round_to_bist_tick(price: float, side: str = "BUY", instrument_type: str = "
         rounded = steps * tick
         # 4 basamak yuvarlama ile float hassasiyetini temizle
         result = round(rounded, 2 if tick >= 0.01 else 4)
-        
+
         span.set_attribute("price.original", price)
         span.set_attribute("price.rounded", result)
         span.set_attribute("price.tick", tick)
@@ -71,7 +71,7 @@ def is_valid_bist_tick(price: float, tolerance: float = 1e-4, instrument_type: s
         tick = get_bist_tick_size(price, instrument_type)
         remainder = abs(price % tick)
         is_valid = remainder < tolerance or abs(remainder - tick) < tolerance
-        
+
         span.set_attribute("price", price)
         span.set_attribute("is_valid", is_valid)
         return is_valid

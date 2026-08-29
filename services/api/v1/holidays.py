@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Holiday Management API v1
 
@@ -11,7 +12,7 @@ Tatil günleri yönetim endpoint'leri:
 - GET  /holidays/audit    — Değişiklik logu
 """
 
-from datetime import date, datetime
+from datetime import date
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,17 +31,20 @@ router = APIRouter()
 
 class HolidayAddRequest(BaseModel):
     """Manuel tatil ekleme isteği."""
+
     date: str = Field(..., description="Tatil tarihi (YYYY-MM-DD)", examples=["2026-12-31"])
     reason: str = Field("", description="Tatil nedeni", examples=["BIST anlık tatil ilanı"])
 
 
 class HolidayRemoveRequest(BaseModel):
     """Tatil kaldırma isteği."""
+
     reason: str = Field("", description="Kaldırma nedeni", examples=["Tatil iptal edildi"])
 
 
 class HolidayResponse(BaseModel):
     """Tatil yanıt modeli."""
+
     date: str
     name: str
     is_half_day: bool
@@ -49,6 +53,7 @@ class HolidayResponse(BaseModel):
 
 class HolidayListResponse(BaseModel):
     """Tatil listesi yanıtı."""
+
     year: int
     holidays: list[HolidayResponse]
     half_days: list[str]
@@ -57,6 +62,7 @@ class HolidayListResponse(BaseModel):
 
 class HolidayStatusResponse(BaseModel):
     """Günlük tatil durumu."""
+
     date: str
     is_holiday: bool
     is_half_day: bool
@@ -67,6 +73,7 @@ class HolidayStatusResponse(BaseModel):
 
 class SyncResponse(BaseModel):
     """Senkronizasyon sonucu."""
+
     success: bool
     source: str
     holidays_found: int
@@ -83,7 +90,7 @@ async def list_holidays(
     year: int | None = Query(None, description="Yıl (varsayılan: mevcut yıl)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tüm tatil günlerini listele."""
     from ...core.holiday_manager import holiday_manager
 
@@ -102,17 +109,19 @@ async def list_holidays(
         sudden = holiday_manager._sudden_detector.get_confirmed()
         if d in sudden:
             source = "sudden"
-        elif (d.month, d.day) in [(1,1),(4,23),(5,1),(5,19),(7,15),(8,30),(10,29)]:
+        elif (d.month, d.day) in [(1, 1), (4, 23), (5, 1), (5, 19), (7, 15), (8, 30), (10, 29)]:
             source = "national"
         else:
             source = "religious"
 
-        result.append(HolidayResponse(
-            date=d.isoformat(),
-            name=name,
-            is_half_day=is_half,
-            source=source,
-        ))
+        result.append(
+            HolidayResponse(
+                date=d.isoformat(),
+                name=name,
+                is_half_day=is_half,
+                source=source,
+            )
+        )
 
     return HolidayListResponse(
         year=year,
@@ -126,7 +135,7 @@ async def list_holidays(
 async def today_status(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Bugünün tatil durumunu kontrol et."""
     from ...core.holiday_manager import holiday_manager
     from ...core.market_calendar import get_market_calendar
@@ -158,7 +167,7 @@ async def list_holidays_by_year(
     year: int,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Belirli bir yılın tatil günlerini listele."""
     from ...core.holiday_manager import holiday_manager
 
@@ -169,12 +178,14 @@ async def list_holidays_by_year(
     for d in sorted(holidays):
         name = holiday_manager._get_holiday_name(d)
         is_half = d in half_days
-        result.append(HolidayResponse(
-            date=d.isoformat(),
-            name=name,
-            is_half_day=is_half,
-            source="computed",
-        ))
+        result.append(
+            HolidayResponse(
+                date=d.isoformat(),
+                name=name,
+                is_half_day=is_half,
+                source="computed",
+            )
+        )
 
     return HolidayListResponse(
         year=year,
@@ -189,7 +200,7 @@ async def add_holiday(
     req: HolidayAddRequest,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Manuel tatil ekle (anlık ilan edilen tatiller için)."""
     from ...core.holiday_manager import holiday_manager
 
@@ -217,7 +228,7 @@ async def remove_holiday(
     reason: str = Query("", description="Kaldırma nedeni"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tatil gününü kaldır (iptal edilen tatiller için)."""
     from ...core.holiday_manager import holiday_manager
 
@@ -238,7 +249,7 @@ async def remove_holiday(
 async def sync_holidays(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """BIST/KAP tatil takvimini senkronize et."""
     from ...core.holiday_manager import holiday_manager
 
@@ -275,7 +286,7 @@ async def get_audit_log(
     limit: int = Query(50, description="Son N kayıt"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tatil değişiklik loglarını getir (audit trail)."""
     from ...core.holiday_manager import holiday_manager
 

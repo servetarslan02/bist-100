@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 import re
 import sys
 import urllib.request
@@ -14,9 +16,9 @@ try:
     html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8")
     matches = re.findall(r'value="([A-Z0-9]{3,6})"\s*data-title=', html)
     tickers.update(matches)
-    print(f"İş Yatırım Source Found: {len(matches)} tickers")
+    logger.info(f"İş Yatırım Source Found: {len(matches)} tickers")
 except Exception as e:
-    print("Is Yatirim Err:", e)
+    logger.info("Is Yatirim Err:", e)
 
 # Source 2: Bigpara live stock list
 try:
@@ -25,9 +27,9 @@ try:
     html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8")
     matches = re.findall(r"/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/", html)
     tickers.update([m.upper() for m in matches])
-    print(f"Bigpara Source Found: {len(matches)} tickers")
+    logger.info(f"Bigpara Source Found: {len(matches)} tickers")
 except Exception as e:
-    print("Bigpara Err:", e)
+    logger.info("Bigpara Err:", e)
 
 # Source 3: Mynet Finans
 try:
@@ -36,10 +38,10 @@ try:
     html = urllib.request.urlopen(req, timeout=10).read().decode("utf-8")
     matches = re.findall(r"/borsa/hisseler/([a-z0-9]{3,6})-", html)
     tickers.update([m.upper() for m in matches])
-    print(f"Mynet Source Found: {len(matches)} tickers")
+    logger.info(f"Mynet Source Found: {len(matches)} tickers")
 except Exception as e:
-    print("Mynet Err:", e)
+    logger.info("Mynet Err:", e)
 
 clean_tickers = sorted([t for t in tickers if 2 <= len(t) <= 6 and not t.isdigit()])
-print(f"TOTAL UNIQUE BIST TICKERS DISCOVERED: {len(clean_tickers)}")
-print("Örnekler:", clean_tickers[:30])
+logger.info(f"TOTAL UNIQUE BIST TICKERS DISCOVERED: {len(clean_tickers)}")
+logger.info("Örnekler:", clean_tickers[:30])

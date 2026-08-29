@@ -1,3 +1,4 @@
+from typing import Any
 """
 ⚠️  DEPRECATED — Bu dosya production DEĞİLDİR ve artık canonical değildir.
 
@@ -37,19 +38,14 @@ Endpoints:
 """
 
 import asyncio
-import orjson
 import os
-
-import sys
 import warnings
-from datetime import datetime, timezone
-from typing import Dict, List
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-import structlog
+from fastapi.responses import HTMLResponse, JSONResponse
 
 warnings.warn(
     "services.api.server is DEPRECATED. Use services.api.app instead. "
@@ -59,32 +55,21 @@ warnings.warn(
 )
 
 # Internal imports
-from services.core.database_dev import dev_db
+from services.core.alerting import alerting
 from services.core.logging import logger
-from services.core.audit_log import audit_log
+from services.core.monitoring import portfolio_monitor
+from services.core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
 from services.core.observability import (
-    prometheus_metrics, distributed_tracing, performance_monitor,
-    health_checker, config_manager
-)
-from services.core.infrastructure import (
-    notification_system, snapshot_system, cache_system, job_queue
+    health_checker,
+    performance_monitor,
+    prometheus_metrics,
 )
 from services.features.store import feature_store
-from services.intelligence.signal_fusion import signal_fusion
-from services.scanner.opportunity_engine import opportunity_engine
-from services.ml.ranking_model import ranking_model
-from services.core.decision_engine import decision_engine
-from services.simulation.execution_simulator import execution_simulator
-from services.portfolio.portfolio_manager import portfolio_manager
-from services.core.monitoring import portfolio_monitor
-from services.core.monitoring_security import monitoring_auth, extract_bearer_token, extract_api_key
-from services.core.alerting import alerting
-from services.learning.integrated_learning import learning_system
-from services.learning.outcome_tracker import outcome_tracker
+
 
 # ===================== LIFESPAN =====================
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> Any:
     """Uygulama başlangıç/bitiş yönetimi."""
     logger.info("🚀 ALPHA BIST API Server başlatılıyor...")
 
@@ -108,6 +93,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("🛑 API Server kapatılıyor...")
+
 
 # ===================== APP =====================
 app = FastAPI(
@@ -136,8 +122,9 @@ app.add_middleware(
 # API Key middleware (FAZ 5)
 _PUBLIC_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/api/health"}
 
+
 @app.middleware("http")
-async def api_key_middleware(request: Request, call_next):
+async def api_key_middleware(request: Request, call_next) -> Any:
     """API key kontrolü — public path'ler hariç."""
     path = request.url.path
     if path in _PUBLIC_PATHS or path.startswith("/ws"):
@@ -145,67 +132,75 @@ async def api_key_middleware(request: Request, call_next):
 
     # Production'da API key zorunlu
     from services.core.config import settings
+
     if settings.is_production:
         api_key = request.headers.get("X-API-Key", "")
         if not api_key:
-            return JSONResponse(
-                status_code=401,
-                content={"error": "API key required", "header": "X-API-Key"}
-            )
+            return JSONResponse(status_code=401, content={"error": "API key required", "header": "X-API-Key"})
 
     return await call_next(request)
+
 
 # ===================== WEBSOCKET MANAGER =====================
 class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        """Otomatik eklendi."""
+        self.active_connections: list[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> Any:
+        """Otomatik eklendi."""
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info("WebSocket bağlantısı", connections=len(self.active_connections))
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket) -> Any:
+        """Otomatik eklendi."""
         self.active_connections.remove(websocket)
         logger.info("WebSocket bağlantısı kapandı", connections=len(self.active_connections))
 
-    async def broadcast(self, message: Dict):
+    async def broadcast(self, message: dict) -> Any:
         """Tüm bağlı client'lara mesaj gönder."""
         disconnected = []
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception as e:
+            except Exception:
                 disconnected.append(connection)
 
         for conn in disconnected:
             if conn in self.active_connections:
                 self.active_connections.remove(conn)
 
-    async def send_personal(self, message: Dict, websocket: WebSocket):
+    async def send_personal(self, message: dict, websocket: WebSocket) -> Any:
         """Tek bir client'a mesaj gönder."""
         await websocket.send_json(message)
 
+
 manager = ConnectionManager()
 
+
 # ===================== BACKGROUND TASK =====================
-async def broadcast_updates():
+async def broadcast_updates() -> Any:
     """Periyodik olarak tüm client'lara güncelleme gönder."""
     while True:
         await asyncio.sleep(5)
         if manager.active_connections:
-            await manager.broadcast({
-                "type": "heartbeat",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "connections": len(manager.active_connections),
-            })
+            await manager.broadcast(
+                {
+                    "type": "heartbeat",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "connections": len(manager.active_connections),
+                }
+            )
+
 
 # ===================== ENDPOINTS =====================
 
+
 @app.get("/", response_class=HTMLResponse)
-async def root():
+async def root() -> Any:
     """Root endpoint — Dashboard'a yönlendir."""
     return """
     <!DOCTYPE html>
@@ -224,12 +219,13 @@ async def root():
     </html>
     """
 
+
 @app.get("/health")
-async def health_check():
+async def health_check() -> Any:
     """Sistem sağlık kontrolü."""
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     health = health_checker.check_all()
-    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    latency_ms = (datetime.now(UTC) - start).total_seconds() * 1000
 
     performance_monitor.record_latency("health_check", latency_ms)
     prometheus_metrics.inc("health_check_total")
@@ -239,6 +235,7 @@ async def health_check():
         "latency_ms": round(latency_ms, 2),
         "version": "2.0.0",
     }
+
 
 # NOTE: /api/market endpoint removed — canonical: v1/market.py via app.py
 
@@ -288,9 +285,10 @@ async def health_check():
 
 # NOTE: /api/tickers endpoint removed — canonical: v1/market.py via app.py
 
+
 # ===================== WEBSOCKET =====================
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)) -> Any:
     """Gerçek zamanlı WebSocket bağlantısı — token doğrulama gerekli."""
     if not token:
         await websocket.close(code=4001, reason="Authentication required: pass ?token=YOUR_API_KEY")
@@ -300,6 +298,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
     authenticated = False
     try:
         from services.core.monitoring_security import monitoring_auth
+
         if monitoring_auth.verify_admin_token(token) or monitoring_auth.verify_metrics_token(token):
             authenticated = True
     except Exception as e:
@@ -308,6 +307,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
     if not authenticated:
         try:
             from services.api.auth import jwt_handler
+
             payload = jwt_handler.verify_token(token)
             if payload:
                 authenticated = True
@@ -322,11 +322,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
     try:
         # İlk bağlantıda mevcut durumu gönder
-        await manager.send_personal({
-            "type": "init",
-            "message": "ALPHA BIST WebSocket bağlantısı aktif",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }, websocket)
+        await manager.send_personal(
+            {
+                "type": "init",
+                "message": "ALPHA BIST WebSocket bağlantısı aktif",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            websocket,
+        )
 
         while True:
             data = await websocket.receive_text()
@@ -336,37 +339,52 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
                 if action == "subscribe":
                     channels = msg.get("channels", [])
-                    await manager.send_personal({
-                        "type": "subscribed",
-                        "channels": channels,
-                    }, websocket)
+                    await manager.send_personal(
+                        {
+                            "type": "subscribed",
+                            "channels": channels,
+                        },
+                        websocket,
+                    )
 
                 elif action == "ping":
-                    await manager.send_personal({
-                        "type": "pong",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }, websocket)
+                    await manager.send_personal(
+                        {
+                            "type": "pong",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        },
+                        websocket,
+                    )
 
                 elif action == "get_ticker":
                     ticker = msg.get("ticker")
                     features = feature_store.get_all(ticker)
-                    await manager.send_personal({
-                        "type": "ticker_data",
-                        "ticker": ticker,
-                        "data": features,
-                    }, websocket)
+                    await manager.send_personal(
+                        {
+                            "type": "ticker_data",
+                            "ticker": ticker,
+                            "data": features,
+                        },
+                        websocket,
+                    )
 
                 else:
-                    await manager.send_personal({
-                        "type": "error",
-                        "message": f"Bilinmeyen action: {action}",
-                    }, websocket)
+                    await manager.send_personal(
+                        {
+                            "type": "error",
+                            "message": f"Bilinmeyen action: {action}",
+                        },
+                        websocket,
+                    )
 
             except json.JSONDecodeError:
-                await manager.send_personal({
-                    "type": "error",
-                    "message": "Geçersiz JSON",
-                }, websocket)
+                await manager.send_personal(
+                    {
+                        "type": "error",
+                        "message": "Geçersiz JSON",
+                    },
+                    websocket,
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
@@ -374,21 +392,25 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         logger.error("WebSocket error", error=str(e))
         manager.disconnect(websocket)
 
+
 # ===================== ERROR HANDLERS =====================
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
+async def http_exception_handler(request, exc) -> Any:
+    """Otomatik eklendi."""
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
             "status_code": exc.status_code,
             "detail": exc.detail,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
 
+
 @app.exception_handler(Exception)
-async def general_exception_handler(request, exc):
+async def general_exception_handler(request, exc) -> Any:
+    """Otomatik eklendi."""
     logger.error("Unhandled exception", error=str(exc))
     return JSONResponse(
         status_code=500,
@@ -396,25 +418,27 @@ async def general_exception_handler(request, exc):
             "error": True,
             "status_code": 500,
             "detail": "Internal server error",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
 
+
 # ===================== MONITORING ENDPOINTS =====================
 
+
 @app.get("/health/detailed")
-async def health_detailed():
+async def health_detailed() -> Any:
     """Detaylı sağlık raporu (portfolio + locks + components)."""
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     result = await portfolio_monitor.get_health_detailed()
-    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    latency_ms = (datetime.now(UTC) - start).total_seconds() * 1000
     result["latency_ms"] = round(latency_ms, 2)
     prometheus_metrics.inc("health_detailed_total")
     return result
 
 
 @app.get("/metrics")
-async def prometheus_metrics_endpoint(request: Request):
+async def prometheus_metrics_endpoint(request: Request) -> Any:
     """Prometheus text format metrics (Bearer token gerekli)."""
     client_ip = request.client.host if request.client else "unknown"
     if not monitoring_auth.check_rate_limit(client_ip):
@@ -422,8 +446,7 @@ async def prometheus_metrics_endpoint(request: Request):
 
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_metrics_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_metrics_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         monitoring_auth.record_failed_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Invalid or missing credentials")
 
@@ -435,7 +458,7 @@ async def prometheus_metrics_endpoint(request: Request):
 
 
 @app.get("/admin/lock-metrics")
-async def admin_lock_metrics(request: Request):
+async def admin_lock_metrics(request: Request) -> Any:
     """Lock performans metrikleri (admin — token gerekli)."""
     client_ip = request.client.host if request.client else "unknown"
     if not monitoring_auth.check_rate_limit(client_ip):
@@ -443,8 +466,7 @@ async def admin_lock_metrics(request: Request):
 
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         monitoring_auth.record_failed_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Admin access required")
 
@@ -453,7 +475,7 @@ async def admin_lock_metrics(request: Request):
 
 
 @app.get("/admin/portfolio")
-async def admin_portfolio(request: Request):
+async def admin_portfolio(request: Request) -> Any:
     """Portfolio sağlık ve muhasebe durumu (admin — token gerekli)."""
     client_ip = request.client.host if request.client else "unknown"
     if not monitoring_auth.check_rate_limit(client_ip):
@@ -461,8 +483,7 @@ async def admin_portfolio(request: Request):
 
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         monitoring_auth.record_failed_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Admin access required")
 
@@ -471,13 +492,11 @@ async def admin_portfolio(request: Request):
 
 
 @app.get("/admin/alerts")
-async def admin_alerts(request: Request):
+async def admin_alerts(request: Request) -> Any:
     """Aktif alert'ler (admin — token gerekli)."""
-    client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     return {
@@ -488,21 +507,20 @@ async def admin_alerts(request: Request):
 
 
 @app.get("/admin/auth-status")
-async def admin_auth_status():
+async def admin_auth_status() -> Any:
     """Authentication durumu (public)."""
     return monitoring_auth.get_auth_status()
 
 
 # ===================== POLICY MANAGEMENT ENDPOINTS =====================
 
+
 @app.get("/admin/policy")
-async def admin_policy_get(request: Request):
+async def admin_policy_get(request: Request) -> Any:
     """Mevcut alert policy."""
-    client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     return {
@@ -512,13 +530,12 @@ async def admin_policy_get(request: Request):
 
 
 @app.post("/admin/policy")
-async def admin_policy_update(request: Request):
+async def admin_policy_update(request: Request) -> Any:
     """Policy güncelle."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json()
@@ -529,13 +546,12 @@ async def admin_policy_update(request: Request):
 
 
 @app.post("/admin/policy/rollback")
-async def admin_policy_rollback(request: Request):
+async def admin_policy_rollback(request: Request) -> Any:
     """Policy rollback."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json() if request.headers.get("content-type") == "application/json" else {}
@@ -547,37 +563,34 @@ async def admin_policy_rollback(request: Request):
 
 
 @app.get("/admin/policy/history")
-async def admin_policy_history(request: Request):
+async def admin_policy_history(request: Request) -> Any:
     """Policy versiyon geçmişi."""
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     return {"history": alerting.get_policy_history()}
 
 
 @app.get("/admin/policy/audit")
-async def admin_policy_audit(request: Request):
+async def admin_policy_audit(request: Request) -> Any:
     """Policy audit log."""
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     return {"audit_log": alerting.get_policy_audit_log()}
 
 
 @app.post("/admin/silence")
-async def admin_silence_add(request: Request):
+async def admin_silence_add(request: Request) -> Any:
     """Alert susturma ekle."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json()
@@ -592,13 +605,12 @@ async def admin_silence_add(request: Request):
 
 
 @app.delete("/admin/silence")
-async def admin_silence_remove(request: Request):
+async def admin_silence_remove(request: Request) -> Any:
     """Alert susturma kaldır."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json() if request.headers.get("content-type") == "application/json" else {}
@@ -611,12 +623,11 @@ async def admin_silence_remove(request: Request):
 
 
 @app.post("/admin/policy/diff")
-async def admin_policy_diff(request: Request):
+async def admin_policy_diff(request: Request) -> Any:
     """Policy diff (uygulamadan)."""
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json()
@@ -625,13 +636,12 @@ async def admin_policy_diff(request: Request):
 
 
 @app.post("/admin/silence/batch")
-async def admin_silence_batch_add(request: Request):
+async def admin_silence_batch_add(request: Request) -> Any:
     """Toplu susturma ekle."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json()
@@ -644,13 +654,12 @@ async def admin_silence_batch_add(request: Request):
 
 
 @app.delete("/admin/silence/batch")
-async def admin_silence_batch_remove(request: Request):
+async def admin_silence_batch_remove(request: Request) -> Any:
     """Toplu susturma kaldır."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json() if request.headers.get("content-type") == "application/json" else {}
@@ -663,13 +672,12 @@ async def admin_silence_batch_remove(request: Request):
 
 
 @app.post("/admin/policy/lock")
-async def admin_policy_lock(request: Request):
+async def admin_policy_lock(request: Request) -> Any:
     """Policy düzenleme kilidi al."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     body = await request.json() if request.headers.get("content-type") == "application/json" else {}
@@ -679,21 +687,23 @@ async def admin_policy_lock(request: Request):
     acquired = alerting._policy.acquire_edit_lock(owner, timeout)
     if not acquired:
         lock_info = alerting._policy.get_lock_info()
-        raise HTTPException(status_code=409, detail={
-            "error": "Policy is locked by another user",
-            "lock_info": lock_info,
-        })
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "Policy is locked by another user",
+                "lock_info": lock_info,
+            },
+        )
     return {"success": True, "owner": owner, "timeout_s": timeout}
 
 
 @app.delete("/admin/policy/lock")
-async def admin_policy_unlock(request: Request):
+async def admin_policy_unlock(request: Request) -> Any:
     """Policy düzenleme kilidi bırak."""
     client_ip = request.client.host if request.client else "unknown"
     token = extract_bearer_token(request.headers.get("authorization"))
     api_key = extract_api_key(dict(request.headers))
-    if not (monitoring_auth.verify_admin_token(token or "") or
-            monitoring_auth.verify_admin_token(api_key or "")):
+    if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     owner = f"api:{client_ip}"
@@ -706,6 +716,7 @@ async def admin_policy_unlock(request: Request):
 # ===================== MAIN =====================
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "server:app",
         host="0.0.0.0",

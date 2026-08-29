@@ -47,6 +47,7 @@ class BISTTradingEnv:
         tickers: list[str],
         config: BISTEnvConfig | None = None,
     ):
+        """Otomatik eklendi."""
         self.features = features
         self.prices = prices
         self.tickers = tickers
@@ -63,7 +64,8 @@ class BISTTradingEnv:
         self.observation_space = self._make_obs_space()
         self.action_space = self._make_action_space()
 
-    def _make_obs_space(self):
+    def _make_obs_space(self) -> Any:
+        """Otomatik eklendi."""
         try:
             from gymnasium import spaces
 
@@ -72,7 +74,8 @@ class BISTTradingEnv:
         except ImportError:
             return None
 
-    def _make_action_space(self):
+    def _make_action_space(self) -> Any:
+        """Otomatik eklendi."""
         try:
             from gymnasium import spaces
 
@@ -80,14 +83,15 @@ class BISTTradingEnv:
         except ImportError:
             return None
 
-    def reset(self, seed=None):
+    def reset(self, seed=None) -> Any:
+        """Otomatik eklendi."""
         self._current_step = 0
         self._capital = self.config.initial_capital
         self._positions = {t: 0.0 for t in self.tickers}
         self._portfolio_values = [self.config.initial_capital]
         return self._get_obs(), {}
 
-    def step(self, actions):
+    def step(self, actions) -> Any:
         """Multi-stock step.
 
         Args:
@@ -143,7 +147,7 @@ class BISTTradingEnv:
 
         return self._get_obs(), reward, done, False, {}
 
-    def _get_obs(self):
+    def _get_obs(self) -> Any:
         """Observation."""
         obs = []
         for ticker in self.tickers:

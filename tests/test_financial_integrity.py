@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Financial Integrity Testleri
 
@@ -26,7 +29,8 @@ from services.portfolio.portfolio_manager import (
 )
 
 
-async def setup():
+async def setup() -> Any:
+    """Otomatik eklendi."""
     dev_db._db = None
     await dev_db.init()
     from conftest import safe_cleanup_tables
@@ -46,7 +50,7 @@ async def setup():
 # =====================================================
 
 
-async def test_invariant_detects_negative_cash():
+async def test_invariant_detects_negative_cash() -> Any:
     """Negatif cash invariant bozmalı."""
     issues = []
 
@@ -64,7 +68,7 @@ async def test_invariant_detects_negative_cash():
     return "Invariant Detects Negative Cash", len(issues) == 0, issues
 
 
-async def test_invariant_details_present():
+async def test_invariant_details_present() -> Any:
     """Invariant details doğru bilgi vermeli."""
     issues = []
 
@@ -93,7 +97,7 @@ async def test_invariant_details_present():
     return "Invariant Details Present", len(issues) == 0, issues
 
 
-async def test_invariant_normal_operation():
+async def test_invariant_normal_operation() -> Any:
     """Normal operasyonda invariant True olmalı."""
     issues = []
 
@@ -117,7 +121,7 @@ async def test_invariant_normal_operation():
     return "Invariant Normal Operation", len(issues) == 0, issues
 
 
-async def test_invariant_after_restart():
+async def test_invariant_after_restart() -> Any:
     """Restart sonrası invariant korunmalı."""
     issues = []
 
@@ -152,7 +156,7 @@ async def test_invariant_after_restart():
     return "Invariant After Restart", len(issues) == 0, issues
 
 
-async def test_invariant_multi_instance():
+async def test_invariant_multi_instance() -> Any:
     """Multi-instance sonrası invariant korunmalı."""
     issues = []
 
@@ -185,7 +189,7 @@ async def test_invariant_multi_instance():
 # =====================================================
 
 
-async def test_trades_list_limit():
+async def test_trades_list_limit() -> Any:
     """Trades listesi sınırlı olmalı."""
     issues = []
 
@@ -202,7 +206,7 @@ async def test_trades_list_limit():
     return "Trades List Limit", len(issues) == 0, issues
 
 
-async def test_cash_ledger_limit():
+async def test_cash_ledger_limit() -> Any:
     """Cash ledger listesi sınırlı olmalı."""
     issues = []
 
@@ -218,7 +222,7 @@ async def test_cash_ledger_limit():
     return "Cash Ledger Limit", len(issues) == 0, issues
 
 
-async def test_equity_curve_limit():
+async def test_equity_curve_limit() -> Any:
     """Equity curve listesi sınırlı olmalı."""
     issues = []
 
@@ -235,7 +239,7 @@ async def test_equity_curve_limit():
     return "Equity Curve Limit", len(issues) == 0, issues
 
 
-async def test_position_history_limit():
+async def test_position_history_limit() -> Any:
     """Position history listesi sınırlı olmalı."""
     issues = []
 
@@ -257,7 +261,7 @@ async def test_position_history_limit():
 # =====================================================
 
 
-async def test_invalid_price_handling():
+async def test_invalid_price_handling() -> Any:
     """Geçersiz fiyat exception üretmemeli, graceful fail olmalı."""
     issues = []
 
@@ -281,7 +285,7 @@ async def test_invalid_price_handling():
     return "Invalid Price Handling", len(issues) == 0, issues
 
 
-async def test_oversell_prevention():
+async def test_oversell_prevention() -> Any:
     """Mevcut pozisyondan fazla satış engellenmeli."""
     issues = []
 
@@ -300,7 +304,7 @@ async def test_oversell_prevention():
     return "Oversell Prevention", len(issues) == 0, issues
 
 
-async def test_commission_accounting():
+async def test_commission_accounting() -> Any:
     """Komisyon muhasebesi doğru olmalı."""
     issues = []
 
@@ -338,10 +342,11 @@ async def test_commission_accounting():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("FINANCIAL INTEGRITY TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("FINANCIAL INTEGRITY TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_invariant_detects_negative_cash,
@@ -371,27 +376,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

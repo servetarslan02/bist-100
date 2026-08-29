@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — News Provider v2.0 (Düzeltilmiş)
 
@@ -145,9 +146,23 @@ def is_relevant_to_bist_and_macro(title: str, summary: str = "") -> bool:
 
     # Pozitif alaka kontrolü: Kelime sınırı ile (substring değil)
     turkey_bist_keywords = [
-        r"türkiye", r"turkiye", r"türk\b", r"turk\b", r"bist\b", r"borsa istanbul",
-        r"tcmb", r"merkez bankası", r"kap\b", r"tüik", r"tuik", r"hazine",
-        r"istanbul", r"ankara", r"izmir", r"lira\b", r"try\b",
+        r"türkiye",
+        r"turkiye",
+        r"türk\b",
+        r"turk\b",
+        r"bist\b",
+        r"borsa istanbul",
+        r"tcmb",
+        r"merkez bankası",
+        r"kap\b",
+        r"tüik",
+        r"tuik",
+        r"hazine",
+        r"istanbul",
+        r"ankara",
+        r"izmir",
+        r"lira\b",
+        r"try\b",
     ]
     if any(re.search(kw, text) for kw in turkey_bist_keywords):
         return True
@@ -317,6 +332,7 @@ class NewsProvider:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         # RSS feed'leri config'den oku (hardcoded yerine)
         self._rss_feeds = self._load_rss_feeds()
         logger.info("NewsProvider initialized", feeds=len(self._rss_feeds))
@@ -351,7 +367,8 @@ class NewsProvider:
             "Accept": "application/rss+xml, application/xml, text/xml, */*",
         }
 
-        async def _fetch_single_feed(session, feed_url):
+        async def _fetch_single_feed(session, feed_url) -> Any:
+            """Otomatik eklendi."""
             items = []
             try:
                 async with session.get(feed_url, timeout=aiohttp.ClientTimeout(total=3.0, connect=1.5)) as resp:

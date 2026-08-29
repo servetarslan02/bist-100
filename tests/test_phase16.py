@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 16 Test Suite
 
@@ -7,7 +10,7 @@ Portfolio Enhancements, Universe Enhancements, Security testleri.
 import sys
 
 
-def test_portfolio_enhancements():
+def test_portfolio_enhancements() -> Any:
     """Portfolio Enhancements testleri."""
 
     from services.portfolio.enhancements import (
@@ -26,28 +29,28 @@ def test_portfolio_enhancements():
     assert result["stopaj"] == 100
     assert result["net"] == 900
     passed += 1
-    print(f"  ✓ Dividend tax: gross={result['gross']}, net={result['net']}")
+    logger.info(f"  ✓ Dividend tax: gross={result['gross']}, net={result['net']}")
 
     # 2. Tax model - capital gains
     result = tax_model.compute_capital_gains_tax(5000)
     assert result["tax"] == 0  # Currently 0% in Turkey
     assert result["net"] == 5000
     passed += 1
-    print(f"  ✓ Capital gains: {result}")
+    logger.info(f"  ✓ Capital gains: {result}")
 
     # 3. Tax model - commission
     result = tax_model.compute_commission_tax(100)
     assert result["bsmv"] == 5.0  # 5% BSMV
     assert result["total"] == 105.0
     passed += 1
-    print(f"  ✓ Commission tax: total={result['total']}")
+    logger.info(f"  ✓ Commission tax: total={result['total']}")
 
     # 4. Dividend handler
     result = dividend_handler.process_dividend("THYAO", 100, 5.25, "2026-06-01", "2026-06-15")
     assert result["gross_dividend"] == 525.0
     assert result["net_dividend"] == 472.5
     passed += 1
-    print(f"  ✓ Dividend: net={result['net_dividend']}")
+    logger.info(f"  ✓ Dividend: net={result['net_dividend']}")
 
     # 5. Benchmark comparison
     p_returns = [0.01, -0.005, 0.02, -0.01, 0.015]
@@ -58,7 +61,7 @@ def test_portfolio_enhancements():
     assert "tracking_error" in result
     assert "information_ratio" in result
     passed += 1
-    print(f"  ✓ Benchmark: alpha={result['alpha_annual']:.4f}, beta={result['beta']:.2f}")
+    logger.info(f"  ✓ Benchmark: alpha={result['alpha_annual']:.4f}, beta={result['beta']:.2f}")
 
     # 6. Performance attribution
     result = performance_attribution.decompose(
@@ -70,7 +73,7 @@ def test_portfolio_enhancements():
     assert "allocation_effect" in result
     assert "selection_effect" in result
     passed += 1
-    print(
+    logger.info(
         f"  ✓ Attribution: allocation={result['allocation_effect']:.2f}%, selection={result['selection_effect']:.2f}%"
     )
 
@@ -80,12 +83,12 @@ def test_portfolio_enhancements():
     usd_amount = multi_currency.convert(47880, "TRY", "USD")
     assert abs(usd_amount - 1000) < 10  # Approximately 1000 USD
     passed += 1
-    print(f"  ✓ Multi-currency: 1000 USD = {try_amount:.0f} TRY")
+    logger.info(f"  ✓ Multi-currency: 1000 USD = {try_amount:.0f} TRY")
 
     return passed, failed
 
 
-def test_universe_enhancements():
+def test_universe_enhancements() -> Any:
     """Universe Enhancements testleri."""
     from services.ingestion.universe_enhancements import (
         cross_source_reconciliation,
@@ -103,26 +106,26 @@ def test_universe_enhancements():
     score_low = universe_enhancements.compute_liquidity_score(1000, 2.0, 50e6)
     assert score_low < 40
     passed += 1
-    print(f"  ✓ Liquidity: high={score:.0f}, low={score_low:.0f}")
+    logger.info(f"  ✓ Liquidity: high={score:.0f}, low={score_low:.0f}")
 
     # 2. Listing status
     status = universe_enhancements.classify_listing_status("THYAO")
     assert status == "ACTIVE"
     passed += 1
-    print(f"  ✓ Listing status: {status}")
+    logger.info(f"  ✓ Listing status: {status}")
 
     # 3. Cross-source reconciliation
     result = cross_source_reconciliation.reconcile_price({"yfinance": 305.25, "kap": 305.30, "matriks": 305.20})
     assert result["status"] == "CONSISTENT"
     assert result["consensus_price"] > 0
     passed += 1
-    print(f"  ✓ Reconciliation: {result['status']}, price={result['consensus_price']:.2f}")
+    logger.info(f"  ✓ Reconciliation: {result['status']}, price={result['consensus_price']:.2f}")
 
     # 4. Reconciliation with conflict
     result2 = cross_source_reconciliation.reconcile_price({"yfinance": 305.25, "kap": 350.00})
     assert result2["status"] in ["MINOR_CONFLICT", "MAJOR_CONFLICT"]
     passed += 1
-    print(f"  ✓ Conflict detection: {result2['status']}")
+    logger.info(f"  ✓ Conflict detection: {result2['status']}")
 
     # 5. Outlier detection (Z-score)
     values = [100, 101, 99, 100, 101, 100, 99, 101, 100, 1000]
@@ -130,13 +133,13 @@ def test_universe_enhancements():
     assert len(outliers) >= 1
     assert 9 in outliers  # Index of 1000
     passed += 1
-    print(f"  ✓ Z-score outliers: {outliers}")
+    logger.info(f"  ✓ Z-score outliers: {outliers}")
 
     # 6. IQR outlier detection
     outliers = outlier_detector.detect_iqr_outliers(values)
     # IQR may or may not detect with small sample
     passed += 1
-    print(f"  ✓ IQR outliers: {outliers} ({len(outliers)} found)")
+    logger.info(f"  ✓ IQR outliers: {outliers} ({len(outliers)} found)")
 
     # 7. Survivorship bias
     survivorship_bias._delisted.clear()
@@ -147,12 +150,12 @@ def test_universe_enhancements():
     assert "OLD_COMPANY" not in active
     assert "THYAO" in active
     passed += 1
-    print(f"  ✓ Survivorship: {len(active)} active from 3")
+    logger.info(f"  ✓ Survivorship: {len(active)} active from 3")
 
     return passed, failed
 
 
-def test_security():
+def test_security() -> Any:
     """Security & Governance testleri."""
     from services.core.security import (
         Permission,
@@ -175,40 +178,40 @@ def test_security():
     assert user.username == "testuser"
     assert user.role == Role.ANALYST
     passed += 1
-    print(f"  ✓ User created: {user.username}")
+    logger.info(f"  ✓ User created: {user.username}")
 
     # 2. Authenticate
     token = auth_service.authenticate("testuser", "password123")
     assert token is not None
     assert len(token) > 20
     passed += 1
-    print(f"  ✓ Authenticated, token length: {len(token)}")
+    logger.info(f"  ✓ Authenticated, token length: {len(token)}")
 
     # 3. Validate token
     validated = auth_service.validate_token(token)
     assert validated is not None
     assert validated.username == "testuser"
     passed += 1
-    print("  ✓ Token validated")
+    logger.info("  ✓ Token validated")
 
     # 4. Wrong password
     bad_token = auth_service.authenticate("testuser", "wrongpassword")
     assert bad_token is None
     passed += 1
-    print("  ✓ Wrong password rejected")
+    logger.info("  ✓ Wrong password rejected")
 
     # 5. Authorization - analyst can run backtest
     assert authz_service.check_permission(user, Permission.RUN_BACKTEST)
     assert not authz_service.check_permission(user, Permission.LIVE_EXECUTION)
     passed += 1
-    print("  ✓ Authorization: ANALYST can backtest, cannot execute")
+    logger.info("  ✓ Authorization: ANALYST can backtest, cannot execute")
 
     # 6. Authorization - admin can do everything
     admin = User(user_id="admin", username="admin", role=Role.ADMIN)
     assert authz_service.check_permission(admin, Permission.LIVE_EXECUTION)
     assert authz_service.check_permission(admin, Permission.MANAGE_USERS)
     passed += 1
-    print("  ✓ Admin has all permissions")
+    logger.info("  ✓ Admin has all permissions")
 
     # 7. Secret redaction
     text = "API_KEY=ghp_abc123def456 and Bearer sk-proj-xyz789"
@@ -216,7 +219,7 @@ def test_security():
     assert "ghp_abc123" not in redacted
     assert "sk-proj-xyz789" not in redacted
     passed += 1
-    print("  ✓ Secrets redacted")
+    logger.info("  ✓ Secrets redacted")
 
     # 8. System state machine
     system_state.transition("INITIALIZING", "startup")
@@ -226,22 +229,23 @@ def test_security():
     system_state.transition("DEGRADED", "LLM down")
     assert system_state.state == "DEGRADED"
     passed += 1
-    print(f"  ✓ State machine: {system_state.state}")
+    logger.info(f"  ✓ State machine: {system_state.state}")
 
     # 9. Safety governance
     assert safety_governance.validate_ai_action("read_data", {})
     assert not safety_governance.validate_ai_action("bypass_risk", {})
     assert not safety_governance.validate_ai_action("modify_portfolio", {"source": "ai"})
     passed += 1
-    print("  ✓ Safety governance: AI restrictions enforced")
+    logger.info("  ✓ Safety governance: AI restrictions enforced")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 16 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 16 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -253,21 +257,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

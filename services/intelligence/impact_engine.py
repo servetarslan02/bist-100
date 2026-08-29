@@ -111,11 +111,12 @@ class ImpactEngine:
     """Event → Asset Impact Propagation Engine."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.rules = PROPAGATION_RULES
         self._instrument_sector_map: dict[str, list[str]] = {}
         self._sector_stocks: dict[str, list[int]] = {}
 
-    def load_sector_map(self, instrument_sector: dict[str, str]):
+    def load_sector_map(self, instrument_sector: dict[str, str]) -> Any:
         """Load instrument → sector mapping."""
         self._instrument_sector_map = instrument_sector
 

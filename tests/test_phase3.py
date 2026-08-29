@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 3 Test Suite
 
@@ -7,7 +10,7 @@ World State, Regime Engine, Macro Sensitivity testleri.
 import sys
 
 
-def test_world_state():
+def test_world_state() -> Any:
     """World State testleri."""
     from services.intelligence.world_state import WorldStateManager
 
@@ -21,28 +24,28 @@ def test_world_state():
     assert state.global_risk_appetite == 0.5
     assert state.usd_strength == 0.5
     passed += 1
-    print("  ✓ Başlangıç değerleri 0.5")
+    logger.info("  ✓ Başlangıç değerleri 0.5")
 
     # 2. Event update
     delta = wsm.update_from_event("FED_RATE_HIKE", {})
     assert len(delta) > 0
     assert wsm.current_state.us_rate_pressure > 0.5
     passed += 1
-    print("  ✓ Event update")
+    logger.info("  ✓ Event update")
 
     # 3. Decay
     state.global_risk_appetite = 0.8
     state.apply_decay(1)  # 1 saat
     assert 0.7 < state.global_risk_appetite < 0.8
     passed += 1
-    print("  ✓ Decay")
+    logger.info("  ✓ Decay")
 
     # 4. VIX normalize (0-1 state ile karışmamalı)
     state.vix_level = 35.0
     vec = state.to_vector()
     assert abs(vec[8] - 0.35) < 0.01  # 35/100 = 0.35
     passed += 1
-    print("  ✓ VIX normalize")
+    logger.info("  ✓ VIX normalize")
 
     # 5. Invariant (0-1 arası)
     vec = state.to_vector()
@@ -50,7 +53,7 @@ def test_world_state():
     state.from_vector(vec)
     assert state.global_risk_appetite <= 1.0
     passed += 1
-    print("  ✓ Invariant (clamp)")
+    logger.info("  ✓ Invariant (clamp)")
 
     # 6. Macro update
     wsm.update_from_macro(
@@ -63,25 +66,25 @@ def test_world_state():
     state = wsm.current_state
     assert state.vix_level == 18.0
     passed += 1
-    print("  ✓ Macro update")
+    logger.info("  ✓ Macro update")
 
     # 7. State dict
     d = wsm.get_state_dict()
     assert "global_risk_appetite" in d
     assert "usd_strength" in d
     passed += 1
-    print("  ✓ State dict")
+    logger.info("  ✓ State dict")
 
     # 8. State vector
     v = wsm.get_state_vector()
     assert len(v) == 10
     passed += 1
-    print("  ✓ State vector")
+    logger.info("  ✓ State vector")
 
     return passed, failed
 
 
-def test_regime_engine():
+def test_regime_engine() -> Any:
     """Regime Engine testleri."""
     from services.intelligence.regime import Regime, regime_engine
 
@@ -103,7 +106,7 @@ def test_regime_engine():
     assert result.regime in [Regime.BULL, Regime.RISK_ON, Regime.MOMENTUM_EXPANSION], f"Got: {result.regime}"
     assert result.confidence >= 0  # 0 olabilir (eşit rejimler)
     passed += 1
-    print(f"  ✓ Bull detection: {result.regime.value} (confidence={result.confidence})")
+    logger.info(f"  ✓ Bull detection: {result.regime.value} (confidence={result.confidence})")
 
     # 2. Bear regime
     features = {
@@ -121,7 +124,7 @@ def test_regime_engine():
         f"Got: {result.regime}"
     )
     passed += 1
-    print(f"  ✓ Bear detection: {result.regime.value}")
+    logger.info(f"  ✓ Bear detection: {result.regime.value}")
 
     # 3. Crisis regime
     features = {
@@ -137,7 +140,7 @@ def test_regime_engine():
     result = regime_engine.detect_regime(features)
     assert result.regime in [Regime.CRISIS, Regime.BEAR], f"Got: {result.regime}"
     passed += 1
-    print(f"  ✓ Crisis detection: {result.regime.value}")
+    logger.info(f"  ✓ Crisis detection: {result.regime.value}")
 
     # 4. Sideways regime
     features = {
@@ -153,7 +156,7 @@ def test_regime_engine():
     result = regime_engine.detect_regime(features)
     assert result.regime in [Regime.SIDEWAYS, Regime.LOW_VOLATILITY], f"Got: {result.regime}"
     passed += 1
-    print(f"  ✓ Sideways detection: {result.regime.value}")
+    logger.info(f"  ✓ Sideways detection: {result.regime.value}")
 
     # 5. Regime weights
     weights = regime_engine.get_regime_weights(Regime.BULL)
@@ -161,24 +164,24 @@ def test_regime_engine():
     weights = regime_engine.get_regime_weights(Regime.CRISIS)
     assert weights.get("defensive", 0) > weights.get("momentum", 0)
     passed += 1
-    print("  ✓ Regime weights")
+    logger.info("  ✓ Regime weights")
 
     # 6. Transition matrix
     matrix = regime_engine.get_transition_matrix()
     assert isinstance(matrix, dict)
     passed += 1
-    print("  ✓ Transition matrix")
+    logger.info("  ✓ Transition matrix")
 
     # 7. History
     history = regime_engine.get_history()
     assert len(history) >= 4
     passed += 1
-    print(f"  ✓ History ({len(history)} entries)")
+    logger.info(f"  ✓ History ({len(history)} entries)")
 
     return passed, failed
 
 
-def test_macro_sensitivity():
+def test_macro_sensitivity() -> Any:
     """Macro Sensitivity testleri."""
     from services.intelligence.macro_sensitivity import macro_sensitivity_engine
 
@@ -190,7 +193,7 @@ def test_macro_sensitivity():
     assert bank_sens.get("interest_rate", 0) > 0.7
     assert bank_sens.get("usdtry", 0) < bank_sens.get("interest_rate", 0)
     passed += 1
-    print("  ✓ Bank sector sensitivity")
+    logger.info("  ✓ Bank sector sensitivity")
 
     # 2. Aviation sensitivity (negatif değerler = şirket için olumsuz)
     avia_sens = macro_sensitivity_engine.get_sector_sensitivity("AVIATION")
@@ -198,7 +201,7 @@ def test_macro_sensitivity():
     assert abs(avia_sens.get("usdtry", 0)) > 0.5  # |−0.8| > 0.5
     assert avia_sens.get("oil", 0) < 0  # Petrol artışı havacılık için negatif
     passed += 1
-    print("  ✓ Aviation sector sensitivity")
+    logger.info("  ✓ Aviation sector sensitivity")
 
     # 3. Macro impact calculation
     impact = macro_sensitivity_engine.compute_macro_impact(
@@ -208,40 +211,41 @@ def test_macro_sensitivity():
     assert impact.get("oil_impact", 0) < 0  # Petrol artış = negatif
     assert impact.get("total_macro_impact", 0) < 0
     passed += 1
-    print(f"  ✓ THYAO macro impact: {impact.get('total_macro_impact')}")
+    logger.info(f"  ✓ THYAO macro impact: {impact.get('total_macro_impact')}")
 
     # 4. Bank interest rate sensitivity
     impact = macro_sensitivity_engine.compute_macro_impact("AKBNK", "BANK", {"interest_rate_change": 0.05})
     assert impact.get("interest_rate_impact", 0) > 0  # Faiz artışı = bankalar için pozitif
     passed += 1
-    print(f"  ✓ AKBNK interest impact: {impact.get('interest_rate_impact')}")
+    logger.info(f"  ✓ AKBNK interest impact: {impact.get('interest_rate_impact')}")
 
     # 5. Scenario impact
     impact = macro_sensitivity_engine.compute_scenario_impact("THYAO", "AVIATION", "OIL_SHOCK_20_PCT")
     assert impact.get("oil_impact", 0) < 0
     passed += 1
-    print(f"  ✓ Oil shock scenario: {impact.get('oil_impact')}")
+    logger.info(f"  ✓ Oil shock scenario: {impact.get('oil_impact')}")
 
     # 6. Company override
     macro_sensitivity_engine.set_company_sensitivity("CUSTOM", {"usdtry": 0.99, "interest_rate": 0.01})
     sens = macro_sensitivity_engine.get_company_sensitivity("CUSTOM", "BANK")
     assert sens.get("usdtry") == 0.99
     passed += 1
-    print("  ✓ Company sensitivity override")
+    logger.info("  ✓ Company sensitivity override")
 
     # 7. Unknown sector fallback
     sens = macro_sensitivity_engine.get_sector_sensitivity("UNKNOWN_SECTOR")
     assert sens == macro_sensitivity_engine.get_sector_sensitivity("OTHER")
     passed += 1
-    print("  ✓ Unknown sector fallback")
+    logger.info("  ✓ Unknown sector fallback")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 3 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 3 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -253,21 +257,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

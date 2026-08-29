@@ -4,25 +4,31 @@ Structured metric abstraction.
 Prometheus bağımlılığı yok — in-memory counter/gauge/histogram.
 """
 
+import functools
 import time
 from collections import defaultdict
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.production_metrics")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -34,31 +40,32 @@ class ProductionMetrics:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._counters: dict[str, float] = defaultdict(float)
         self._gauges: dict[str, float] = {}
         self._histograms: dict[str, list] = defaultdict(list)
         self._last_reset = time.time()
 
     @otel_trace("production_metrics.inc")
-    def inc(self, name: str, value: float = 1.0, labels: dict | None = None):
+    def inc(self, name: str, value: float = 1.0, labels: dict | None = None) -> Any:
         """Counter artır."""
         key = self._key(name, labels)
         self._counters[key] += value
 
     @otel_trace("production_metrics.set_gauge")
-    def set_gauge(self, name: str, value: float, labels: dict | None = None):
+    def set_gauge(self, name: str, value: float, labels: dict | None = None) -> Any:
         """Gauge ayarla."""
         key = self._key(name, labels)
         self._gauges[key] = value
 
     @otel_trace("production_metrics.observe")
-    def observe(self, name: str, value: float, labels: dict | None = None):
+    def observe(self, name: str, value: float, labels: dict | None = None) -> Any:
         """Histogram gözlem."""
         key = self._key(name, labels)
         self._histograms[key].append(value)
 
     @otel_trace("production_metrics.timer")
-    def timer(self, name: str, labels: dict | None = None):
+    def timer(self, name: str, labels: dict | None = None) -> Any:
         """Context manager — zaman ölçümü."""
         return _Timer(self, name, labels)
 
@@ -86,7 +93,7 @@ class ProductionMetrics:
         return result
 
     @otel_trace("production_metrics.reset")
-    def reset(self):
+    def reset(self) -> Any:
         """Tüm metrikleri sıfırla."""
         self._counters.clear()
         self._gauges.clear()
@@ -95,6 +102,7 @@ class ProductionMetrics:
 
     @staticmethod
     def _key(name: str, labels: dict | None) -> str:
+        """Otomatik eklendi."""
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
             return f"{name}{{{label_str}}}"
@@ -105,16 +113,19 @@ class _Timer:
     """Context manager for timing."""
 
     def __init__(self, metrics: ProductionMetrics, name: str, labels: dict | None):
+        """Otomatik eklendi."""
         self._metrics = metrics
         self._name = name
         self._labels = labels
         self._start = 0
 
-    def __enter__(self):
+    def __enter__(self) -> Any:
+        """Otomatik eklendi."""
         self._start = time.time()
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args) -> Any:
+        """Otomatik eklendi."""
         elapsed = time.time() - self._start
         self._metrics.observe(self._name, elapsed, self._labels)
 

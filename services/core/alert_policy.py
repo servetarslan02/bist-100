@@ -85,9 +85,11 @@ class PolicyDiff:
 
     @property
     def has_changes(self) -> bool:
+        """Otomatik eklendi."""
         return bool(self.changed_fields or self.added_keys or self.removed_keys)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "has_changes": self.has_changes,
             "changed_fields": self.changed_fields,
@@ -98,6 +100,7 @@ class PolicyDiff:
         }
 
     def summary(self) -> str:
+        """Otomatik eklendi."""
         parts = []
         if self.changed_fields:
             parts.append(f"changed: {', '.join(self.changed_fields)}")
@@ -110,6 +113,7 @@ class PolicyDiff:
 
 @dataclass
 class PolicyAuditEntry:
+    """Otomatik eklendi."""
     timestamp: float
     action: str
     version: int
@@ -118,6 +122,7 @@ class PolicyAuditEntry:
     diff: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         result = {
             "timestamp": self.timestamp,
             "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
@@ -138,6 +143,7 @@ class PolicyAuditEntry:
 
 @dataclass
 class SilenceRule:
+    """Otomatik eklendi."""
     alert_type: str | None = None
     fingerprint: str | None = None
     start_time: float = 0.0
@@ -148,14 +154,17 @@ class SilenceRule:
 
     @property
     def is_active(self) -> bool:
+        """Otomatik eklendi."""
         now = time.time()
         return self.start_time <= now <= self.end_time
 
     @property
     def is_expired(self) -> bool:
+        """Otomatik eklendi."""
         return time.time() > self.end_time
 
     def matches(self, alert_type: str, fingerprint: str) -> bool:
+        """Otomatik eklendi."""
         if not self.is_active:
             return False
         if self.alert_type and self.alert_type != alert_type:
@@ -163,6 +172,7 @@ class SilenceRule:
         return not (self.fingerprint and self.fingerprint != fingerprint)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "alert_type": self.alert_type,
             "fingerprint": self.fingerprint,
@@ -179,6 +189,7 @@ class SilenceRule:
 
     @staticmethod
     def _ts_iso(ts: float) -> str:
+        """Otomatik eklendi."""
         return datetime.fromtimestamp(ts, tz=UTC).isoformat() if ts else ""
 
 
@@ -193,6 +204,7 @@ class VersionConflictError(Exception):
 
 @dataclass
 class AlertPolicy:
+    """Otomatik eklendi."""
     escalation_timeouts: dict[str, int] = field(default_factory=lambda: dict(FALLBACK_ESCALATION_TIMEOUT_S))
     notification_routing: dict[str, list[str]] = field(default_factory=lambda: dict(FALLBACK_NOTIFICATION_ROUTING))
     severity_thresholds: dict[str, float] = field(default_factory=lambda: dict(FALLBACK_SEVERITY_THRESHOLDS))
@@ -211,7 +223,8 @@ class AlertPolicy:
     # =====================================================
 
     @classmethod
-    def load(cls, path: str = None) -> "AlertPolicy":
+    def load(cls, path: str = None) -> AlertPolicy:
+        """Otomatik eklendi."""
         config_path = path or str(DEFAULT_POLICY_PATH)
         policy = cls(_config_path=config_path)
         if not os.path.exists(config_path):
@@ -226,6 +239,7 @@ class AlertPolicy:
             return cls(_config_path=config_path)
 
     def reload_if_changed(self) -> bool:
+        """Otomatik eklendi."""
         if not self._config_path or not os.path.exists(self._config_path):
             return False
         try:
@@ -488,6 +502,7 @@ class AlertPolicy:
     # =====================================================
 
     def rollback(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not self._history:
             return {"success": False, "error": "No history"}
 
@@ -519,11 +534,11 @@ class AlertPolicy:
     # WEBHOOK NOTIFICATION
     # =====================================================
 
-    def set_webhook_urls(self, urls: list[str]):
+    def set_webhook_urls(self, urls: list[str]) -> Any:
         """Policy değişiklik webhook URL'leri."""
         self._webhook_urls = urls
 
-    def _notify_change(self, action: str, diff: PolicyDiff):
+    def _notify_change(self, action: str, diff: PolicyDiff) -> Any:
         """Policy değişikliği bildirimi."""
         if not self._webhook_urls or not diff.has_changes:
             return
@@ -553,7 +568,7 @@ class AlertPolicy:
                 except Exception:
                     logger.warning("Webhook notification failed (no event loop)")
 
-    async def _send_webhook(self, url: str, payload: dict[str, Any]):
+    async def _send_webhook(self, url: str, payload: dict[str, Any]) -> Any:
         """Webhook gönder (retry ile)."""
         import aiohttp
 
@@ -598,6 +613,7 @@ class AlertPolicy:
         created_by: str = "system",
         db=None,
     ) -> SilenceRule:
+        """Otomatik eklendi."""
         rule = SilenceRule(
             alert_type=alert_type,
             fingerprint=fingerprint,
@@ -709,6 +725,7 @@ class AlertPolicy:
         return {"removed": removed_count}
 
     def remove_silence(self, fingerprint: str = None, alert_type: str = None, actor: str = "api", db=None) -> int:
+        """Otomatik eklendi."""
         before = len(self.silence_rules)
         removed_rules = [
             r
@@ -736,14 +753,17 @@ class AlertPolicy:
         return removed
 
     def is_silenced(self, alert_type: str, fingerprint: str) -> bool:
+        """Otomatik eklendi."""
         self._cleanup_expired_silences()
         return any(r.matches(alert_type, fingerprint) for r in self.silence_rules)
 
     def get_active_silences(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         self._cleanup_expired_silences()
         return [r.to_dict() for r in self.silence_rules if r.is_active]
 
-    def load_silences_from_db(self, db):
+    def load_silences_from_db(self, db) -> Any:
+        """Otomatik eklendi."""
         try:
             rows = db.execute("SELECT * FROM alert_silences WHERE end_time > ?", (time.time(),)).fetchall()
             self.silence_rules = []
@@ -761,7 +781,8 @@ class AlertPolicy:
         except Exception as e:
             logger.warning("Silence DB load failed", error=str(e))
 
-    def _persist_silence_to_db(self, rule: SilenceRule, db):
+    def _persist_silence_to_db(self, rule: SilenceRule, db) -> Any:
+        """Otomatik eklendi."""
         try:
             db.execute(
                 "INSERT OR IGNORE INTO alert_silences "
@@ -780,7 +801,8 @@ class AlertPolicy:
         except Exception as e:
             logger.warning("Silence DB persist failed", error=str(e))
 
-    def _remove_silence_from_db(self, rule: SilenceRule, db):
+    def _remove_silence_from_db(self, rule: SilenceRule, db) -> Any:
+        """Otomatik eklendi."""
         try:
             if rule.fingerprint:
                 db.execute("DELETE FROM alert_silences WHERE fingerprint = ?", (rule.fingerprint,))
@@ -794,6 +816,7 @@ class AlertPolicy:
     # =====================================================
 
     def validate(self) -> list[str]:
+        """Otomatik eklendi."""
         errors = []
         for alert_type, timeout in self.escalation_timeouts.items():
             if not isinstance(timeout, (int, float)) or timeout < 0:
@@ -810,25 +833,31 @@ class AlertPolicy:
         return errors
 
     def get_escalation_timeout(self, alert_type: str) -> int | None:
+        """Otomatik eklendi."""
         return self.escalation_timeouts.get(alert_type)
 
     def get_notification_channels(self, severity: str) -> list[str]:
+        """Otomatik eklendi."""
         return self.notification_routing.get(severity, ["log"])
 
     def get_threshold(self, key: str, default: float = 0.0) -> float:
+        """Otomatik eklendi."""
         return self.severity_thresholds.get(key, default)
 
     def get_history(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._history[-20:]
 
     def get_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [e.to_dict() for e in self._audit_log[-limit:]]
 
     # =====================================================
     # INTERNAL
     # =====================================================
 
-    def _save_history(self):
+    def _save_history(self) -> Any:
+        """Otomatik eklendi."""
         self._history.append(
             {
                 "version": self._version,
@@ -841,7 +870,8 @@ class AlertPolicy:
         if len(self._history) > 50:
             self._history = self._history[-50:]
 
-    def _add_audit(self, action: str, details: dict[str, Any], diff: PolicyDiff = None):
+    def _add_audit(self, action: str, details: dict[str, Any], diff: PolicyDiff = None) -> Any:
+        """Otomatik eklendi."""
         entry = PolicyAuditEntry(
             timestamp=time.time(),
             action=action,
@@ -854,7 +884,8 @@ class AlertPolicy:
         if len(self._audit_log) > 500:
             self._audit_log = self._audit_log[-500:]
 
-    def _save_to_file(self):
+    def _save_to_file(self) -> Any:
+        """Otomatik eklendi."""
         if not self._config_path:
             return
         try:
@@ -864,10 +895,12 @@ class AlertPolicy:
         except Exception as e:
             logger.warning("Policy save failed", error=str(e))
 
-    def _cleanup_expired_silences(self):
+    def _cleanup_expired_silences(self) -> Any:
+        """Otomatik eklendi."""
         self.silence_rules = [r for r in self.silence_rules if not r.is_expired]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "version": self._version,
             "escalation_timeouts": self.escalation_timeouts,
@@ -876,7 +909,8 @@ class AlertPolicy:
         }
 
     @classmethod
-    def _from_dict(cls, data: dict[str, Any], config_path: str = "") -> "AlertPolicy":
+    def _from_dict(cls, data: dict[str, Any], config_path: str = "") -> AlertPolicy:
+        """Otomatik eklendi."""
         policy = cls(_config_path=config_path)
         policy._last_modified = os.path.getmtime(config_path) if config_path and os.path.exists(config_path) else 0
         policy._version = data.get("version", 0)
@@ -889,7 +923,8 @@ class AlertPolicy:
         return policy
 
 
-def ensure_default_config(path: str = None):
+def ensure_default_config(path: str = None) -> Any:
+    """Otomatik eklendi."""
     config_path = path or str(DEFAULT_POLICY_PATH)
     if os.path.exists(config_path):
         return

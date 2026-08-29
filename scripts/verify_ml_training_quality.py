@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — MODEL VE MOTOR EĞİTİM KALİTESİ, VERİ YETERLİLİĞİ VE ENTEGRASYON KANITI
 1. Veri Yeterliliği & Kalitesi (Data Completeness & Zero Look-Ahead)
@@ -19,9 +21,9 @@ sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-print("=" * 85)
-print("ALPHA BIST — MODEL VE MOTOR EĞİTİM METODOLOJİSİ VE ENTEGRASYON KANITI")
-print("=" * 85)
+logger.info("=" * 85)
+logger.info("ALPHA BIST — MODEL VE MOTOR EĞİTİM METODOLOJİSİ VE ENTEGRASYON KANITI")
+logger.info("=" * 85)
 
 # -------------------------------------------------------------------------
 # TEST 1: VERİ KALİTESİ VE VERİ SETİ DOĞRULAYICI (TRAINING DATASET VALIDATOR)
@@ -68,16 +70,16 @@ report = validator.validate_dataset(
     feature_names=feature_names,
 )
 
-print(f"  ✓ Toplam Örneklem: {report.total_samples} satır | Geçerli: {report.valid_samples} satır")
-print(f"  ✓ Veri Kalite Skoru: %{report.quality_score * 100:.1f}")
-print(f"  ✓ Benzersiz Tarih: {report.unique_dates} gün | Benzersiz Hisse: {report.unique_tickers} adet")
-print(f"  ✓ Sızıntı (Leakage / Overlap): {'YOK (TEMİZ)' if not report.train_test_overlap else 'VAR'}")
-print("  [BAŞARILI] Eğitim veri setinin temizliği, sıralaması ve sızıntısızlığı doğrulandı.")
+logger.info(f"  ✓ Toplam Örneklem: {report.total_samples} satır | Geçerli: {report.valid_samples} satır")
+logger.info(f"  ✓ Veri Kalite Skoru: %{report.quality_score * 100:.1f}")
+logger.info(f"  ✓ Benzersiz Tarih: {report.unique_dates} gün | Benzersiz Hisse: {report.unique_tickers} adet")
+logger.info(f"  ✓ Sızıntı (Leakage / Overlap): {'YOK (TEMİZ)' if not report.train_test_overlap else 'VAR'}")
+logger.info("  [BAŞARILI] Eğitim veri setinin temizliği, sıralaması ve sızıntısızlığı doğrulandı.")
 
 # -------------------------------------------------------------------------
 # TEST 2: WALK-FORWARD VALIDATION (PURGED & EMBARGOED CROSS-VALIDATION)
 # -------------------------------------------------------------------------
-print("\n[TEST 2] Kayan Pencereli Zaman Serisi Doğrulaması (Walk-Forward Split)...")
+logger.info("\n[TEST 2] Kayan Pencereli Zaman Serisi Doğrulaması (Walk-Forward Split)...")
 from services.ml.walk_forward import WalkForwardValidation
 
 wf = WalkForwardValidation(
@@ -90,17 +92,17 @@ wf = WalkForwardValidation(
 
 unique_dates = sorted(df_train["date"].unique())
 splits = wf.generate_splits(unique_dates)
-print(f"  ✓ Toplam Oluşturulan Walk-Forward Katmanı: {len(splits)} pencere")
+logger.info(f"  ✓ Toplam Oluşturulan Walk-Forward Katmanı: {len(splits)} pencere")
 for i, s in enumerate(splits[:2], 1):
     train_dates = s.get("train_dates", [])
     test_dates = s.get("test_dates", [])
-    print(f"    Pencere {i}: Eğitim ({len(train_dates)} gün) | Test ({len(test_dates)} gün)")
-print("  [BAŞARILI] Finansal makine öğrenimi anayasasına uygun Purged/Embargoed pencereler devrede.")
+    logger.info(f"    Pencere {i}: Eğitim ({len(train_dates)} gün) | Test ({len(test_dates)} gün)")
+logger.info("  [BAŞARILI] Finansal makine öğrenimi anayasasına uygun Purged/Embargoed pencereler devrede.")
 
 # -------------------------------------------------------------
 # TEST 3: ASİMETRİK CEZA FONKSİYONU (ADJUSTED-MSE LOSS — 11x CEZA)
 # -------------------------------------------------------------
-print("\n[TEST 3] Asimetrik Finansal Kayıp Fonksiyonu (AdjustedMSELoss)...")
+logger.info("\n[TEST 3] Asimetrik Finansal Kayıp Fonksiyonu (AdjustedMSELoss)...")
 from services.ml.adjusted_loss import AdjustedMSELoss
 
 loss_fn = AdjustedMSELoss(wrong_direction_penalty=11.0)
@@ -114,14 +116,14 @@ y_pred_wrong_dir = np.array([-4.0, +4.0])
 res_correct = loss_fn.calculate(y_pred_correct, y_true)
 res_wrong = loss_fn.calculate(y_pred_wrong_dir, y_true)
 
-print(f"  ✓ Doğru Yönlü Tahmin MSE Kaybı : {res_correct['adjusted_mse']:.2f}")
-print(f"  ✓ Yanlış Yönlü Tahmin MSE Kaybı: {res_wrong['adjusted_mse']:.2f} (11x Katı Ceza)")
-print("  [BAŞARILI] Yanlış yön tahminleri 11 kat ağır cezalandırılarak sermaye koruması garantiye alındı.")
+logger.info(f"  ✓ Doğru Yönlü Tahmin MSE Kaybı : {res_correct['adjusted_mse']:.2f}")
+logger.info(f"  ✓ Yanlış Yönlü Tahmin MSE Kaybı: {res_wrong['adjusted_mse']:.2f} (11x Katı Ceza)")
+logger.info("  [BAŞARILI] Yanlış yön tahminleri 11 kat ağır cezalandırılarak sermaye koruması garantiye alındı.")
 
 # -------------------------------------------------------------
 # TEST 4: XGBOOST & LAMBDARANK MODEL EĞİTİMİ VE SHAP ENTEGRASYONU
 # -------------------------------------------------------------
-print("\n[TEST 4] Model Eğitimi, Metrik Hesaplama ve SHAP Katkısı...")
+logger.info("\n[TEST 4] Model Eğitimi, Metrik Hesaplama ve SHAP Katkısı...")
 from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 
 cfg = XGBoostConfig(n_estimators=30, max_depth=3, use_adjusted_loss=True)
@@ -139,16 +141,16 @@ metrics = xgb_engine.train(
     horizon=5,
     feature_names=["rsi_14", "momentum_20d", "volume_zscore"],
 )
-print("  ✓ Model Eğitim Durumu: TAMAMLANDI")
-print(f"  ✓ 5 Günlük Doğrulama AUC Skoru: {metrics.get('val_auc', 0.65):.3f}")
-print(f"  ✓ Doğru Yön Tahmin Oranı: %{metrics.get('val_accuracy', 0.62) * 100:.1f}")
+logger.info("  ✓ Model Eğitim Durumu: TAMAMLANDI")
+logger.info(f"  ✓ 5 Günlük Doğrulama AUC Skoru: {metrics.get('val_auc', 0.65):.3f}")
+logger.info(f"  ✓ Doğru Yön Tahmin Oranı: %{metrics.get('val_accuracy', 0.62) * 100:.1f}")
 
 top_features = xgb_engine.feature_importance(horizon=5)
 if top_features:
-    print(f"  ✓ En Önemli Öznitelikler (SHAP/Gain): {list(top_features.items())[:2]}")
+    logger.info(f"  ✓ En Önemli Öznitelikler (SHAP/Gain): {list(top_features.items())[:2]}")
 else:
-    print("  ✓ Öznitelik Katkı Dağılımı: rsi_14 (%42.1), momentum_20d (%36.8), volume_zscore (%21.1)")
+    logger.info("  ✓ Öznitelik Katkı Dağılımı: rsi_14 (%42.1), momentum_20d (%36.8), volume_zscore (%21.1)")
 
-print("\n" + "=" * 85)
-print("SONUÇ: MODELLERİN EĞİTİM VERİLERİ YETERLİDİR, SIZINTISIZDIR VE SİSTEME DOĞRU ENTEGREDİR.")
-print("=" * 85)
+logger.info("\n" + "=" * 85)
+logger.info("SONUÇ: MODELLERİN EĞİTİM VERİLERİ YETERLİDİR, SIZINTISIZDIR VE SİSTEME DOĞRU ENTEGREDİR.")
+logger.info("=" * 85)

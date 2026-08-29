@@ -4,10 +4,10 @@ FAZ 5.1: Model metadata DB persistence.
 FAZ 4 model yapısını bozmaz; DB ile ilişkilendirme sağlar.
 """
 
+import functools
 import hashlib
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -15,14 +15,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.model_persistence")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

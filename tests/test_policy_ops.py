@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Any
 """
 Policy Operations Testleri
 
@@ -32,7 +33,7 @@ logger = structlog.get_logger(__name__)
 # =====================================================
 
 
-async def test_policy_diff_no_changes():
+async def test_policy_diff_no_changes() -> Any:
     """Aynı config diff'inde değişiklik olmamalı."""
     issues = []
 
@@ -45,7 +46,7 @@ async def test_policy_diff_no_changes():
     return "Policy Diff No Changes", len(issues) == 0, issues
 
 
-async def test_policy_diff_changed_fields():
+async def test_policy_diff_changed_fields() -> Any:
     """Değişen alanlar doğru tespit edilmeli."""
     issues = []
 
@@ -70,7 +71,7 @@ async def test_policy_diff_changed_fields():
     return "Policy Diff Changed Fields", len(issues) == 0, issues
 
 
-async def test_policy_diff_added_removed():
+async def test_policy_diff_added_removed() -> Any:
     """Eklenen/silinen alanlar tespit edilmeli."""
     issues = []
 
@@ -94,7 +95,7 @@ async def test_policy_diff_added_removed():
     return "Policy Diff Added Removed", len(issues) == 0, issues
 
 
-async def test_policy_diff_summary():
+async def test_policy_diff_summary() -> Any:
     """Diff summary doğru olmalı."""
     issues = []
 
@@ -115,7 +116,7 @@ async def test_policy_diff_summary():
     return "Policy Diff Summary", len(issues) == 0, issues
 
 
-async def test_policy_diff_on_update():
+async def test_policy_diff_on_update() -> Any:
     """Update sonrası diff döndürülmeli."""
     issues = []
 
@@ -137,7 +138,7 @@ async def test_policy_diff_on_update():
 # =====================================================
 
 
-async def test_optimistic_lock_version_conflict():
+async def test_optimistic_lock_version_conflict() -> Any:
     """Yanlış version ile update reddedilmeli."""
     issues = []
 
@@ -158,7 +159,7 @@ async def test_optimistic_lock_version_conflict():
     return "Optimistic Lock Version Conflict", len(issues) == 0, issues
 
 
-async def test_optimistic_lock_correct_version():
+async def test_optimistic_lock_correct_version() -> Any:
     """Doğru version ile update başarılı olmalı."""
     issues = []
 
@@ -176,7 +177,7 @@ async def test_optimistic_lock_correct_version():
     return "Optimistic Lock Correct Version", len(issues) == 0, issues
 
 
-async def test_optimistic_lock_no_version_check():
+async def test_optimistic_lock_no_version_check() -> Any:
     "Version=0 ile kontrol yapılmamalı."
     issues = []
 
@@ -191,7 +192,7 @@ async def test_optimistic_lock_no_version_check():
     return "Optimistic Lock No Check", len(issues) == 0, issues
 
 
-async def test_edit_lock():
+async def test_edit_lock() -> Any:
     """Edit lock doğru çalışmalı."""
     issues = []
 
@@ -233,7 +234,7 @@ async def test_edit_lock():
     return "Edit Lock", len(issues) == 0, issues
 
 
-async def test_edit_lock_wrong_owner_release():
+async def test_edit_lock_wrong_owner_release() -> Any:
     """Yanlış owner lock bırakamamalı."""
     issues = []
 
@@ -252,7 +253,7 @@ async def test_edit_lock_wrong_owner_release():
     return "Edit Lock Wrong Owner", len(issues) == 0, issues
 
 
-async def test_concurrent_policy_update():
+async def test_concurrent_policy_update() -> Any:
     """Çakışan güncellemeler version conflict üretmeli."""
     issues = []
 
@@ -285,7 +286,7 @@ async def test_concurrent_policy_update():
 # =====================================================
 
 
-async def test_policy_webhook_config():
+async def test_policy_webhook_config() -> Any:
     """Webhook URL'leri yapılandırılabilmeli."""
     issues = []
 
@@ -298,7 +299,7 @@ async def test_policy_webhook_config():
     return "Policy Webhook Config", len(issues) == 0, issues
 
 
-async def test_policy_change_triggers_notification():
+async def test_policy_change_triggers_notification() -> Any:
     """Policy değişikliği webhook tetiklemeli."""
     issues = []
 
@@ -325,7 +326,7 @@ async def test_policy_change_triggers_notification():
 # ============================================================
 
 
-async def test_batch_add_silences():
+async def test_batch_add_silences() -> Any:
     """Toplu susturma ekleme çalışmalı."""
     issues = []
 
@@ -367,7 +368,7 @@ async def test_batch_add_silences():
     return "Batch Add Silences", len(issues) == 0, issues
 
 
-async def test_batch_remove_silences():
+async def test_batch_remove_silences() -> Any:
     """Toplu susturma kaldırma çalışmalı."""
     issues = []
 
@@ -404,7 +405,7 @@ async def test_batch_remove_silences():
     return "Batch Remove Silences", len(issues) == 0, issues
 
 
-async def test_batch_silence_transaction():
+async def test_batch_silence_transaction() -> Any:
     """Batch işlemi transaction kullanmalı."""
     issues = []
 
@@ -434,7 +435,7 @@ async def test_batch_silence_transaction():
     return "Batch Silence Transaction", len(issues) == 0, issues
 
 
-async def test_batch_silence_audit():
+async def test_batch_silence_audit() -> Any:
     """Batch işlemleri audit log'a yazılmalı."""
     issues = []
 
@@ -470,7 +471,7 @@ async def test_batch_silence_audit():
 # =====================================================
 
 
-async def test_audit_log_completeness():
+async def test_audit_log_completeness() -> Any:
     """Her değişiklik audit log'a yazılmalı."""
     issues = []
 
@@ -500,7 +501,7 @@ async def test_audit_log_completeness():
     return "Audit Log Completeness", len(issues) == 0, issues
 
 
-async def test_audit_log_limit():
+async def test_audit_log_limit() -> Any:
     """Audit log limiti doğru çalışmalı."""
     issues = []
 
@@ -524,7 +525,7 @@ async def test_audit_log_limit():
 # =====================================================
 
 
-async def test_full_policy_workflow():
+async def test_full_policy_workflow() -> Any:
     """Tam policy iş akışı: update → diff → conflict → rollback."""
     issues = []
 
@@ -568,10 +569,11 @@ async def test_full_policy_workflow():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("POLICY OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("POLICY OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Diff
@@ -615,27 +617,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

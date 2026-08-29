@@ -86,6 +86,7 @@ class FeatureQualityMonitor:
         outlier_iqr_multiplier: float = 1.5,
         outlier_zscore_threshold: float = 3.0,
     ):
+        """Otomatik eklendi."""
         self.null_warning_threshold = null_warning_threshold
         self.null_critical_threshold = null_critical_threshold
         self.outlier_iqr_multiplier = outlier_iqr_multiplier
@@ -131,12 +132,18 @@ class FeatureQualityMonitor:
         issues = []
 
         # Null/NaN kontrolü
-        null_mask = np.isnan(values) if np.issubdtype(values.dtype, np.floating) else np.array([v is None for v in values])
+        null_mask = (
+            np.isnan(values) if np.issubdtype(values.dtype, np.floating) else np.array([v is None for v in values])
+        )
         null_count = int(np.sum(null_mask))
         null_ratio = null_count / len(values)
 
         # Geçerli değerler
-        valid_values = values[~null_mask] if np.issubdtype(values.dtype, np.floating) else np.array([float(v) for v in values if v is not None])
+        valid_values = (
+            values[~null_mask]
+            if np.issubdtype(values.dtype, np.floating)
+            else np.array([float(v) for v in values if v is not None])
+        )
 
         if len(valid_values) == 0:
             return FeatureQualityReport(
@@ -247,13 +254,15 @@ class FeatureQualityMonitor:
             reports.append(report)
 
         # History
-        self._history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "n_features": len(reports),
-            "n_valid": sum(1 for r in reports if r.is_valid),
-            "n_warning": sum(1 for r in reports if r.severity == "WARNING"),
-            "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
-        })
+        self._history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "n_features": len(reports),
+                "n_valid": sum(1 for r in reports if r.is_valid),
+                "n_warning": sum(1 for r in reports if r.severity == "WARNING"),
+                "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
+            }
+        )
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
 
@@ -326,8 +335,8 @@ class FeatureQualityMonitor:
 
         # CDF farkı
         all_values = np.sort(np.concatenate([baseline_sorted, current_sorted]))
-        cdf_baseline = np.searchsorted(baseline_sorted, all_values, side='right') / len(baseline_sorted)
-        cdf_current = np.searchsorted(current_sorted, all_values, side='right') / len(current_sorted)
+        cdf_baseline = np.searchsorted(baseline_sorted, all_values, side="right") / len(baseline_sorted)
+        cdf_current = np.searchsorted(current_sorted, all_values, side="right") / len(current_sorted)
 
         ks_statistic = float(np.max(np.abs(cdf_baseline - cdf_current)))
 
@@ -353,6 +362,7 @@ class FeatureQualityMonitor:
 
     @property
     def history(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return self._history
 
 

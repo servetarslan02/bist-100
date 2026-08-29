@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Database Performance Optimization Script
 
@@ -27,7 +28,7 @@ from services.core.database import check_db_health, get_pg_pool
 logger = structlog.get_logger()
 
 
-async def analyze_tables():
+async def analyze_tables() -> Any:
     """Tüm tabloları ANALYZ et."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -38,17 +39,17 @@ async def analyze_tables():
             ORDER BY tablename
         """)
 
-        print(f"\n📊 {len(tables)} tablo ANALYZ ediliyor...")
+        logger.info(f"\n📊 {len(tables)} tablo ANALYZ ediliyor...")
         for table in tables:
             schema = table["schemaname"]
             name = table["tablename"]
             await conn.execute(f'ANALYZE "{schema}"."{name}"')
-            print(f"  ✅ {schema}.{name}")
+            logger.info(f"  ✅ {schema}.{name}")
 
-    print("\n✅ ANALYZE tamamlandı.")
+    logger.info("\n✅ ANALYZE tamamlandı.")
 
 
-async def vacuum_tables():
+async def vacuum_tables() -> Any:
     """Kritik tabloları VACUUM et."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -69,20 +70,20 @@ async def vacuum_tables():
             LIMIT 20
         """)
 
-        print(f"\n🧹 {len(tables)} tablo VACUUM ediliyor (dead rows > 1000)...")
+        logger.info(f"\n🧹 {len(tables)} tablo VACUUM ediliyor (dead rows > 1000)...")
         for table in tables:
             schema = table["schemaname"]
             name = table["tablename"]
             dead = table["n_dead_tup"]
             pct = table["dead_pct"]
-            print(f"  🔄 {schema}.{name}: {dead} dead rows ({pct}%)")
+            logger.info(f"  🔄 {schema}.{name}: {dead} dead rows ({pct}%)")
             await conn.execute(f'VACUUM ANALYZE "{schema}"."{name}"')
-            print(f"  ✅ {schema}.{name} tamamlandı")
+            logger.info(f"  ✅ {schema}.{name} tamamlandı")
 
-    print("\n✅ VACUUM tamamlandı.")
+    logger.info("\n✅ VACUUM tamamlandı.")
 
 
-async def refresh_materialized_views():
+async def refresh_materialized_views() -> Any:
     """Materialized view'ları yenile."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -93,18 +94,18 @@ async def refresh_materialized_views():
             ORDER BY matviewname
         """)
 
-        print(f"\n🔄 {len(views)} materialized view yenileniyor...")
+        logger.info(f"\n🔄 {len(views)} materialized view yenileniyor...")
         for view in views:
             schema = view["schemaname"]
             name = view["matviewname"]
-            print(f"  🔄 {schema}.{name}...")
+            logger.info(f"  🔄 {schema}.{name}...")
             await conn.execute(f'REFRESH MATERIALIZED VIEW CONCURRENTLY "{schema}"."{name}"')
-            print(f"  ✅ {schema}.{name} tamamlandı")
+            logger.info(f"  ✅ {schema}.{name} tamamlandı")
 
-    print("\n✅ Materialized views yenilendi.")
+    logger.info("\n✅ Materialized views yenilendi.")
 
 
-async def show_slow_queries(limit: int = 20):
+async def show_slow_queries(limit: int = 20) -> Any:
     """Yavaş sorguları göster."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -127,23 +128,23 @@ async def show_slow_queries(limit: int = 20):
                 limit,
             )
 
-            print(f"\n🐌 En Yavaş {limit} Sorgu:")
-            print("-" * 100)
-            print(f"{'Ort. Süre':>10} {'Toplam':>10} {'Çağrı':>6} {'Satır':>8} {'Cache%':>7}  Sorgu")
-            print("-" * 100)
+            logger.info(f"\n🐌 En Yavaş {limit} Sorgu:")
+            logger.info("-" * 100)
+            logger.info(f"{'Ort. Süre':>10} {'Toplam':>10} {'Çağrı':>6} {'Satır':>8} {'Cache%':>7}  Sorgu")
+            logger.info("-" * 100)
 
             for q in queries:
                 query_short = q["query"][:60].replace("\n", " ")
-                print(
+                logger.info(
                     f"{q['mean_time_ms']:>9.1f}ms {q['total_time_ms']:>9.1f}ms {q['calls']:>6} {q['rows']:>8} {q['cache_hit_pct'] or 0:>6.1f}%  {query_short}"
                 )
 
         except Exception as e:
-            print(f"\n⚠️ pg_stat_statements extension bulunamadı: {e}")
-            print("   Docker-compose'da shared_preload_libraries'a pg_stat_statements ekleyin.")
+            logger.info(f"\n⚠️ pg_stat_statements extension bulunamadı: {e}")
+            logger.info("   Docker-compose'da shared_preload_libraries'a pg_stat_statements ekleyin.")
 
 
-async def show_table_sizes():
+async def show_table_sizes() -> Any:
     """Tablo boyutlarını göster."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -160,18 +161,18 @@ async def show_table_sizes():
             LIMIT 30
         """)
 
-        print("\n📦 Tablo Boyutları (Top 30):")
-        print("-" * 90)
-        print(f"{'Tablo':<30} {'Toplam':>10} {'Veri':>10} {'Index':>10} {'Satır':>10} {'Dead':>10}")
-        print("-" * 90)
+        logger.info("\n📦 Tablo Boyutları (Top 30):")
+        logger.info("-" * 90)
+        logger.info(f"{'Tablo':<30} {'Toplam':>10} {'Veri':>10} {'Index':>10} {'Satır':>10} {'Dead':>10}")
+        logger.info("-" * 90)
 
         for t in tables:
-            print(
+            logger.info(
                 f"{t['tablename']:<30} {t['total_size']:>10} {t['table_size']:>10} {t['index_size']:>10} {t['row_count']:>10} {t['dead_rows']:>10}"
             )
 
 
-async def show_index_usage():
+async def show_index_usage() -> Any:
     """Index kullanım istatistiklerini göster."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -187,16 +188,16 @@ async def show_index_usage():
             LIMIT 30
         """)
 
-        print("\n📉 En Az Kullanılan Indexler (Top 30):")
-        print("-" * 80)
-        print(f"{'Tablo':<25} {'Index':<30} {'Tarama':>8} {'Boyut':>10}")
-        print("-" * 80)
+        logger.info("\n📉 En Az Kullanılan Indexler (Top 30):")
+        logger.info("-" * 80)
+        logger.info(f"{'Tablo':<25} {'Index':<30} {'Tarama':>8} {'Boyut':>10}")
+        logger.info("-" * 80)
 
         for idx in indexes:
-            print(f"{idx['tablename']:<25} {idx['indexname']:<30} {idx['scans']:>8} {idx['size']:>10}")
+            logger.info(f"{idx['tablename']:<25} {idx['indexname']:<30} {idx['scans']:>8} {idx['size']:>10}")
 
 
-async def show_connection_stats():
+async def show_connection_stats() -> Any:
     """Bağlantı istatistiklerini göster."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -209,18 +210,18 @@ async def show_connection_stats():
                 (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_connections
         """)
 
-        print("\n🔌 Bağlantı İstatistikleri:")
-        print("-" * 40)
-        print(f"  Toplam bağlantı: {stats['total_connections']}/{stats['max_connections']}")
-        print(f"  Aktif:           {stats['active']}")
-        print(f"  Boşta:           {stats['idle']}")
-        print(f"  Idle in TX:      {stats['idle_in_tx']}")
+        logger.info("\n🔌 Bağlantı İstatistikleri:")
+        logger.info("-" * 40)
+        logger.info(f"  Toplam bağlantı: {stats['total_connections']}/{stats['max_connections']}")
+        logger.info(f"  Aktif:           {stats['active']}")
+        logger.info(f"  Boşta:           {stats['idle']}")
+        logger.info(f"  Idle in TX:      {stats['idle_in_tx']}")
 
         if stats["idle_in_tx"] > 5:
-            print(f"\n  ⚠️ Uyarı: {stats['idle_in_tx']} bağlantı idle in transaction durumunda!")
+            logger.info(f"\n  ⚠️ Uyarı: {stats['idle_in_tx']} bağlantı idle in transaction durumunda!")
 
 
-async def show_cache_hit_ratio():
+async def show_cache_hit_ratio() -> Any:
     """Cache hit ratio göster."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -235,17 +236,18 @@ async def show_cache_hit_ratio():
         """)
 
         pct = ratio["cache_hit_pct"] or 0
-        print(f"\n💾 Cache Hit Ratio: {pct}%")
+        logger.info(f"\n💾 Cache Hit Ratio: {pct}%")
 
         if pct < 95:
-            print("  ⚠️ Uyarı: Cache hit ratio düşük! shared_buffers artırılmalı.")
+            logger.info("  ⚠️ Uyarı: Cache hit ratio düşük! shared_buffers artırılmalı.")
         elif pct < 99:
-            print("  ℹ️ İyi, ama daha iyi olabilir.")
+            logger.info("  ℹ️ İyi, ama daha iyi olabilir.")
         else:
-            print("  ✅ Mükemmel!")
+            logger.info("  ✅ Mükemmel!")
 
 
-async def main():
+async def main() -> Any:
+    """Otomatik eklendi."""
     parser = argparse.ArgumentParser(description="ALPHA BIST DB Performance Optimization")
     parser.add_argument("--analyze", action="store_true", help="Tüm tabloları ANALYZ et")
     parser.add_argument("--vacuum", action="store_true", help="Dead row'ları VACUUM et")
@@ -262,10 +264,10 @@ async def main():
     # Sağlık kontrolü
     health = await check_db_health()
     if health.get("postgres") != "healthy":
-        print("❌ PostgreSQL bağlantısı kurulamadı!")
+        logger.info("❌ PostgreSQL bağlantısı kurulamadı!")
         sys.exit(1)
 
-    print("✅ PostgreSQL bağlantısı sağlıklı.")
+    logger.info("✅ PostgreSQL bağlantısı sağlıklı.")
 
     if args.all or args.analyze:
         await analyze_tables()
@@ -304,16 +306,16 @@ async def main():
             args.all,
         ]
     ):
-        print("\nKullanım: python scripts/optimize_db_performance.py --all")
-        print("  --analyze        ANALYZE tüm tablolar")
-        print("  --vacuum         VACUUM dead rows")
-        print("  --refresh-views  Materialized view yenile")
-        print("  --slow-queries   Yavaş sorguları göster")
-        print("  --table-sizes    Tablo boyutları")
-        print("  --index-usage    Index kullanımı")
-        print("  --connections    Bağlantı istatistikleri")
-        print("  --cache          Cache hit ratio")
-        print("  --all            Tüm analizler")
+        logger.info("\nKullanım: python scripts/optimize_db_performance.py --all")
+        logger.info("  --analyze        ANALYZE tüm tablolar")
+        logger.info("  --vacuum         VACUUM dead rows")
+        logger.info("  --refresh-views  Materialized view yenile")
+        logger.info("  --slow-queries   Yavaş sorguları göster")
+        logger.info("  --table-sizes    Tablo boyutları")
+        logger.info("  --index-usage    Index kullanımı")
+        logger.info("  --connections    Bağlantı istatistikleri")
+        logger.info("  --cache          Cache hit ratio")
+        logger.info("  --all            Tüm analizler")
 
 
 if __name__ == "__main__":

@@ -48,6 +48,7 @@ class ModelTrustEngine:
         weight_min: float = 0.05,
         weight_max: float = 0.35,
     ):
+        """Otomatik eklendi."""
         self.min_samples_threshold = min_samples_threshold
         self.prior_trust = prior_trust
         self.weight_min = weight_min

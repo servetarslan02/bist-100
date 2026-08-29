@@ -47,8 +47,9 @@ except ImportError:
     duckdb = None
     HAS_DUCKDB = False
 
-import structlog
 import functools
+
+import structlog
 from opentelemetry import trace
 
 try:
@@ -59,38 +60,51 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.state_store")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class _DummyDuckDBConn:
-    def execute(self, *args, **kwargs):
+    """Otomatik eklendi."""
+    def execute(self, *args, **kwargs) -> Any:
+        """Otomatik eklendi."""
         return self
 
-    def fetchall(self):
+    def fetchall(self) -> Any:
+        """Otomatik eklendi."""
         return []
 
-    def fetchone(self):
+    def fetchone(self) -> Any:
+        """Otomatik eklendi."""
         return None
 
-    def commit(self):
-        pass
+    def commit(self) -> Any:
+        """Otomatik eklendi."""
+        return None
 
-    def close(self):
-        pass
+    def close(self) -> Any:
+        """Otomatik eklendi."""
+        return None
 
 
 class CentralStateStore:
     """Merkezi state store â€” tÃ¼m in-memory state'ler iÃ§in DuckDB."""
 
     def __init__(self, db_path: str = "data/central_state.db"):
+        """Otomatik eklendi."""
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._memory_cache: dict[str, Any] = {}
@@ -101,7 +115,7 @@ class CentralStateStore:
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """TablolarÄ± oluÅŸtur."""
         with self._connect() as conn:
             conn.execute("""
@@ -178,7 +192,8 @@ class CentralStateStore:
             conn.commit()
 
     @contextmanager
-    def _connect(self):
+    def _connect(self) -> Any:
+        """Otomatik eklendi."""
         if not HAS_DUCKDB or duckdb is None:
             yield _DummyDuckDBConn()
             return
@@ -189,7 +204,7 @@ class CentralStateStore:
         finally:
             conn.close()
 
-    def _flush_buffer(self):
+    def _flush_buffer(self) -> Any:
         """Write buffer'Ä± flush et (batched write â€” SSD dostu)."""
         if not self._write_buffer:
             return
@@ -202,13 +217,13 @@ class CentralStateStore:
         self._write_buffer.clear()
         self._last_flush = time.time()
 
-    def _buffered_write(self, query: str, params: tuple):
+    def _buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write â€” toplu yaz (SSD dostu)."""
         self._write_buffer.append((query, params))
         if len(self._write_buffer) >= self._buffer_size:
             self._flush_buffer()
 
-    def periodic_flush(self):
+    def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafÄ±ndan Ã§aÄŸrÄ±lÄ±r)."""
         if time.time() - self._last_flush > self._flush_interval:
             self._flush_buffer()
@@ -223,7 +238,7 @@ class CentralStateStore:
         failure_count: int,
         last_failure: str | None = None,
         last_success: str | None = None,
-    ):
+    ) -> Any:
         """Circuit breaker durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
         self._buffered_write(
@@ -244,7 +259,7 @@ class CentralStateStore:
             row = cursor.fetchone()
             if row:
                 cols = [d[0] for d in cursor.description]
-                return dict(zip(cols, row))
+                return dict(zip(cols, row, strict=False))
         return None
 
     def load_all_circuit_states(self) -> dict[str, dict]:
@@ -255,11 +270,11 @@ class CentralStateStore:
             rows = cursor.fetchall()
             cols = [d[0] for d in cursor.description]
             name_idx = cols.index("name")
-            return {row[name_idx]: dict(zip(cols, row)) for row in rows}
+            return {row[name_idx]: dict(zip(cols, row, strict=False)) for row in rows}
 
     # ===================== PROVIDER RELIABILITY =====================
 
-    def save_provider_reliability(self, name: str, total_calls: int, total_failures: int, recent_results: list):
+    def save_provider_reliability(self, name: str, total_calls: int, total_failures: int, recent_results: list) -> Any:
         """Provider reliability skorunu kaydet."""
         now = datetime.now(UTC).isoformat()
         results_json = orjson.dumps(recent_results[-100:]).decode()
@@ -280,14 +295,14 @@ class CentralStateStore:
             row = cursor.fetchone()
             if row:
                 cols = [d[0] for d in cursor.description]
-                result = dict(zip(cols, row))
+                result = dict(zip(cols, row, strict=False))
                 result["recent_results"] = orjson.loads(result["recent_results"])
                 return result
         return None
 
     # ===================== RATE LIMITERS =====================
 
-    def save_rate_limiter(self, name: str, tokens: float):
+    def save_rate_limiter(self, name: str, tokens: float) -> Any:
         """Rate limiter token durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
         self._buffered_write(
@@ -308,7 +323,7 @@ class CentralStateStore:
     # ===================== LEARNING LOOP =====================
 
     @otel_trace("state_store.save_learning_state")
-    def save_learning_state(self, state: dict[str, Any]):
+    def save_learning_state(self, state: dict[str, Any]) -> Any:
         """Learning loop durumunu kaydet."""
         now = datetime.now(UTC).isoformat()
         with self._connect() as conn:
@@ -345,7 +360,7 @@ class CentralStateStore:
         confidence: float,
         regime: str,
         features: dict,
-    ):
+    ) -> Any:
         """Tahmin kaydet."""
         now = datetime.now(UTC).isoformat()
         features_json = orjson.dumps(features, default=str).decode()
@@ -361,7 +376,7 @@ class CentralStateStore:
             )
             conn.commit()
 
-    def update_prediction_outcome(self, ticker: str, outcome: dict):
+    def update_prediction_outcome(self, ticker: str, outcome: dict) -> Any:
         """Tahmin sonucunu gÃ¼ncelle."""
         outcome_json = orjson.dumps(outcome, default=str).decode()
         with self._connect() as conn:
@@ -398,7 +413,7 @@ class CentralStateStore:
                 results.append(d)
             return results
 
-    def cleanup_old_predictions(self, keep_days: int = 30):
+    def cleanup_old_predictions(self, keep_days: int = 30) -> Any:
         """Eski tahminleri temizle (SSD dostu)."""
         with self._connect() as conn:
             conn.execute(
@@ -412,7 +427,7 @@ class CentralStateStore:
 
     # ===================== SIGNAL FUSION =====================
 
-    def save_fusion_weights(self, weights: dict[str, float]):
+    def save_fusion_weights(self, weights: dict[str, float]) -> Any:
         """Signal fusion aÄŸÄ±rlÄ±klarÄ±nÄ± kaydet."""
         now = datetime.now(UTC).isoformat()
         weights_json = orjson.dumps(weights).decode()
@@ -437,7 +452,7 @@ class CentralStateStore:
 
     # ===================== CORRELATION TRACKER =====================
 
-    def save_correlation_history(self, var1: str, var2: str, values: list[float]):
+    def save_correlation_history(self, var1: str, var2: str, values: list[float]) -> Any:
         """Korelasyon geÃ§miÅŸini kaydet."""
         now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(values).decode()
@@ -468,7 +483,7 @@ class CentralStateStore:
 
     # ===================== CHAMPION CHALLENGER =====================
 
-    def save_champion_entry(self, data: dict):
+    def save_champion_entry(self, data: dict) -> Any:
         """Champion challenger kaydÄ± ekle."""
         now = datetime.now(UTC).isoformat()
         data_json = orjson.dumps(data, default=str).decode()
@@ -525,7 +540,7 @@ class CentralStateStore:
             "table_counts": stats,
         }
 
-    def flush(self):
+    def flush(self) -> Any:
         """Manuel flush."""
         self._flush_buffer()
 
@@ -540,14 +555,16 @@ state_store = CentralStateStore()
 # =====================================================
 
 
-def _flush_on_exit():
+def _flush_on_exit() -> Any:
+    """Otomatik eklendi."""
     try:
         state_store.flush()
     except Exception:
         logger.warning("Caught Exception in _flush_on_exit", exc_info=True)
 
 
-def _flush_on_signal(signum, frame):
+def _flush_on_signal(signum, frame) -> Any:
+    """Otomatik eklendi."""
     try:
         logger.info(f"Signal {signum} received, flushing state store buffer...")
         state_store.flush()
@@ -561,4 +578,3 @@ try:
     signal.signal(signal.SIGINT, _flush_on_signal)
 except (ValueError, OSError):
     logger.warning("Error in _flush_on_signal: (ValueError, OSError)", exc_info=True)
-

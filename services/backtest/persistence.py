@@ -26,6 +26,8 @@ try:
     import duckdb
 except ImportError:
     duckdb = None
+import contextlib
+
 import orjson
 import structlog
 
@@ -41,6 +43,7 @@ class BacktestPersistence:
     """
 
     def __init__(self, db_path: str = DB_PATH):
+        """Otomatik eklendi."""
         self._db_path = db_path
         self._conn: duckdb.DuckDBPyConnection | None = None
         if duckdb is not None:
@@ -58,13 +61,11 @@ class BacktestPersistence:
     def close(self) -> None:
         """Bağlantıyı kapat."""
         if self._conn:
-            try:
+            with contextlib.suppress(Exception):
                 self._conn.close()
-            except Exception:
-                pass
             self._conn = None
 
-    def _ensure_db(self):
+    def _ensure_db(self) -> Any:
         """DB ve tabloları oluştur."""
         conn = self._get_conn()
         try:

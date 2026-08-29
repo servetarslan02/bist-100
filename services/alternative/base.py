@@ -34,13 +34,14 @@ class RateLimiter:
     """
 
     def __init__(self, max_requests: int = 60, window_seconds: int = 60):
+        """Otomatik eklendi."""
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._tokens = max_requests
         self._last_refill = time.monotonic()
         self._lock = asyncio.Lock()
 
-    async def acquire(self):
+    async def acquire(self) -> Any:
         """Token al (yoksa bekle)."""
         async with self._lock:
             now = time.monotonic()
@@ -63,6 +64,7 @@ class RateLimiter:
 
 
 class CircuitState(StrEnum):
+    """Otomatik eklendi."""
     CLOSED = "CLOSED"  # Normal çalışma
     OPEN = "OPEN"  # Servis kesik, istek yok
     HALF_OPEN = "HALF_OPEN"  # Test aşaması
@@ -89,12 +91,13 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
+        """Otomatik eklendi."""
         if self._state == CircuitState.OPEN:
-            if time.monotonic() - self._last_failure_time > self.recovery_timeout_seconds:
+            if time.monotonic() - self._last_failure_time >= self.recovery_timeout_seconds:
                 self._state = CircuitState.HALF_OPEN
         return self._state
 
-    def record_success(self):
+    def record_success(self) -> Any:
         """Başarılı istek kaydet."""
         if self._state == CircuitState.HALF_OPEN:
             self._success_count += 1
@@ -106,7 +109,7 @@ class CircuitBreaker:
         elif self._state == CircuitState.CLOSED:
             self._failure_count = 0
 
-    def record_failure(self):
+    def record_failure(self) -> Any:
         """Başarısız istek kaydet."""
         self._failure_count += 1
         self._last_failure_time = time.monotonic()
@@ -148,6 +151,7 @@ class QualityReport:
     checks_failed: int = 0
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "is_valid": self.is_valid,
             "score": round(self.score, 4),
@@ -299,6 +303,7 @@ class BaseAdapter(ABC):
     circuit_breaker: CircuitBreaker = None
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.rate_limiter = RateLimiter(
             max_requests=self.rate_limit,
             window_seconds=60,
@@ -396,7 +401,7 @@ class BaseAdapter(ABC):
                 del self._cache_ttl[key]
         return None
 
-    def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None):
+    def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None) -> Any:
         """Cache'e yaz."""
         ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
         self._cache[key] = value
@@ -421,9 +426,10 @@ class AdapterRegistry:
     """Adapter kayıt ve yönetim merkezi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._adapters: dict[str, BaseAdapter] = {}
 
-    def register(self, adapter: BaseAdapter):
+    def register(self, adapter: BaseAdapter) -> Any:
         """Adapter kaydet."""
         self._adapters[adapter.source_name] = adapter
         logger.info("Adapter registered", source=adapter.source_name)

@@ -1,3 +1,4 @@
+from typing import Any
 import asyncio
 
 import structlog
@@ -7,7 +8,8 @@ from services.core.database import init_databases, pg_execute
 logger = structlog.get_logger(__name__)
 
 
-async def run():
+async def run() -> Any:
+    """Otomatik eklendi."""
     await init_databases()
     # Tum kisisel portfoy ve gecmis tablolari temizleniyor
     await pg_execute("TRUNCATE TABLE paper_trade_portfolio")

@@ -14,14 +14,15 @@ v2.0 Eklemeleri:
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = structlog.get_logger()
 
@@ -96,6 +97,7 @@ class EnsembleModel:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._state: EnsembleState | None = None
         self._diversity_threshold = 0.85  # Bu üstünde → redundant
         self._benefit_tolerance = 0.95  # Ensemble IC < best * tolerance → not beneficial
@@ -539,6 +541,7 @@ class EnsembleModel:
 
     @property
     def state(self) -> EnsembleState | None:
+        """Otomatik eklendi."""
         return self._state
 
     # =====================================================
@@ -613,13 +616,13 @@ class EnsembleModel:
     ) -> tuple[bool, str]:
         """Diversity + benefit gate birleşik karar.
 
-        Args:
-            diversity_report: Diversity analiz sonucu
-            benefit_report: Benefit analiz sonucu
-n            min_diversity: Minimum diversity skoru
+                Args:
+                    diversity_report: Diversity analiz sonucu
+                    benefit_report: Benefit analiz sonucu
+        n            min_diversity: Minimum diversity skoru
 
-        Returns:
-            (use_ensemble, reason)
+                Returns:
+                    (use_ensemble, reason)
         """
         # Düşük diversity → ensemble faydasız
         if diversity_report.diversity_score < min_diversity:
@@ -652,6 +655,7 @@ n            min_diversity: Minimum diversity skoru
 
     @property
     def is_loaded(self) -> bool:
+        """Otomatik eklendi."""
         return self._state is not None
 
 

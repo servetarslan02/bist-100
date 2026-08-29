@@ -44,6 +44,7 @@ class ModelRegistry:
     """Model versiyon kayıt defteri."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._records: deque = deque(maxlen=500)
         self._active_versions: dict[str, str] = {}  # regime → version
 
@@ -79,7 +80,7 @@ class ModelRegistry:
         logger.info("Model registered", model_id=model_id, version=version, status=status)
         return record
 
-    def promote_to_champion(self, version: str, regime: str = "UNKNOWN"):
+    def promote_to_champion(self, version: str, regime: str = "UNKNOWN") -> Any:
         """Versiyonu champion yap."""
         for r in self._records:
             if r.status == "CHAMPION" and r.regime == regime:
@@ -93,7 +94,7 @@ class ModelRegistry:
             self._active_versions[regime] = version
             logger.info("Model promoted to champion", version=version, regime=regime)
 
-    def promote_to_shadow(self, version: str):
+    def promote_to_shadow(self, version: str) -> Any:
         """Versiyonu shadow mode'a al."""
         record = self._get_version(version)
         if record:
@@ -140,7 +141,7 @@ class ModelRegistry:
             for r in self._records
         ]
 
-    def add_performance_record(self, version: str, metrics: dict):
+    def add_performance_record(self, version: str, metrics: dict) -> Any:
         """Performans kaydı ekle."""
         record = self._get_version(version)
         if record:
@@ -172,7 +173,7 @@ class ModelRegistry:
                 return r
         return None
 
-    def _cleanup_old_versions(self):
+    def _cleanup_old_versions(self) -> Any:
         """Eski versiyonları temizle."""
         cfg = learning_settings.model_registry
         if not cfg.auto_cleanup:
@@ -189,7 +190,7 @@ class ModelRegistry:
                 self._records.remove(r)
                 logger.debug("Cleaned up old version", version=r.version)
 
-    def cleanup_old_versions(self, keep_last: int = 20):
+    def cleanup_old_versions(self, keep_last: int = 20) -> Any:
         """Eski versiyonları temizle.
 
         Champion ve son N versiyonu tut, diğerlerini sil.

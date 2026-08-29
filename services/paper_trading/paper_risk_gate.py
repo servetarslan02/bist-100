@@ -36,6 +36,7 @@ class PaperRiskGate:
         liquidity_min_volume: int = 100_000,
         data_quality_min_stocks: int = 50,
     ):
+        """Otomatik eklendi."""
         self.max_position_pct = max_position_pct
         self.max_sector_pct = max_sector_pct
         self.max_portfolio_exposure_pct = max_portfolio_exposure_pct
@@ -55,9 +56,10 @@ class PaperRiskGate:
         return self._kill_switch_active
 
     def get_kill_switch_reason(self) -> str:
+        """Otomatik eklendi."""
         return self._kill_switch_reason
 
-    def reset_kill_switch(self):
+    def reset_kill_switch(self) -> Any:
         """Kill switch'i manuel resetle."""
         self._kill_switch_active = False
         self._kill_switch_reason = ""
@@ -121,6 +123,7 @@ class PaperRiskGate:
     # ===================== INDIVIDUAL CHECKS =====================
 
     def _check_kill_switch(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if self._kill_switch_active:
             return {
                 "check_name": "kill_switch",
@@ -131,6 +134,7 @@ class PaperRiskGate:
         return {"check_name": "kill_switch", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_data_quality(self, ok: bool) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not ok:
             return {
                 "check_name": "data_quality",
@@ -141,6 +145,7 @@ class PaperRiskGate:
         return {"check_name": "data_quality", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_model_validity(self, valid: bool) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not valid:
             return {
                 "check_name": "model_validity",
@@ -151,6 +156,7 @@ class PaperRiskGate:
         return {"check_name": "model_validity", "result": "PASS", "details": "OK", "severity": "INFO"}
 
     def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if side == "SELL":
             return {
                 "check_name": "position_size",
@@ -194,6 +200,7 @@ class PaperRiskGate:
     def _check_sector_concentration(
         self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str
     ) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not sector or side == "SELL":
             return {
                 "check_name": "sector_concentration",
@@ -238,6 +245,7 @@ class PaperRiskGate:
     def _check_portfolio_exposure(
         self, portfolio, ticker: str, side: str, quantity: int, price: float
     ) -> dict[str, Any]:
+        """Otomatik eklendi."""
         total_value = portfolio.get_total_value()
         if total_value <= 0:
             return {
@@ -272,6 +280,7 @@ class PaperRiskGate:
         }
 
     def _check_drawdown(self, portfolio) -> dict[str, Any]:
+        """Otomatik eklendi."""
         current_dd = portfolio.get_current_drawdown()
 
         if current_dd >= self.kill_switch_drawdown_pct:
@@ -300,6 +309,7 @@ class PaperRiskGate:
         }
 
     def _check_daily_loss(self, portfolio) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if len(portfolio._equity_curve) < 2:
             return {"check_name": "daily_loss", "result": "PASS", "details": "Not enough history", "severity": "INFO"}
 
@@ -315,7 +325,7 @@ class PaperRiskGate:
                 }
         return {"check_name": "daily_loss", "result": "PASS", "details": "OK", "severity": "INFO"}
 
-    def record_error(self):
+    def record_error(self) -> Any:
         """Ard arda hata sayacini artir."""
         self._consecutive_errors += 1
         if self._consecutive_errors >= self._max_consecutive_errors:
@@ -323,7 +333,7 @@ class PaperRiskGate:
             self._kill_switch_reason = f"{self._consecutive_errors} consecutive errors — kill switch activated"
             logger.critical(self._kill_switch_reason)
 
-    def clear_errors(self):
+    def clear_errors(self) -> Any:
         """Hata sayacini sifirla."""
         self._consecutive_errors = 0
 

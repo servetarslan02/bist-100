@@ -68,6 +68,7 @@ class ModelMonitor:
         window_size: int = 20,
         alert_cooldown_minutes: int = 60,
     ):
+        """Otomatik eklendi."""
         self.decay_z_threshold = decay_z_threshold
         self.retrain_z_threshold = retrain_z_threshold
         self.min_history = min_history
@@ -79,7 +80,7 @@ class ModelMonitor:
         self._last_alert: dict[str, datetime] = {}
         self._retrain_callbacks: list[Any] = []
 
-    def record_metric(self, metric_name: str, value: float, model_id: str = ""):
+    def record_metric(self, metric_name: str, value: float, model_id: str = "") -> Any:
         """Performans metriği kaydet."""
         if metric_name not in self._metric_history:
             self._metric_history[metric_name] = []
@@ -99,7 +100,7 @@ class ModelMonitor:
         if report.alert_level in ("WARNING", "CRITICAL"):
             self._emit_alert(report, model_id)
 
-    def record_prediction(self, prediction: float, actual: float | None = None, ticker: str = ""):
+    def record_prediction(self, prediction: float, actual: float | None = None, ticker: str = "") -> Any:
         """Tahmin kaydet."""
         self._prediction_history.append(
             {
@@ -337,7 +338,7 @@ class ModelMonitor:
             for a in alerts[-50:]
         ]
 
-    def register_retrain_callback(self, callback: Any):
+    def register_retrain_callback(self, callback: Any) -> Any:
         """Auto-retrain callback kaydet."""
         self._retrain_callbacks.append(callback)
         if len(self._retrain_callbacks) > 100:
@@ -360,7 +361,7 @@ class ModelMonitor:
         else:
             return "stable"
 
-    def _emit_alert(self, report: MonitorReport, model_id: str):
+    def _emit_alert(self, report: MonitorReport, model_id: str) -> Any:
         """Alert oluştur."""
         # Cooldown check
         alert_key = f"{model_id}_{report.metric_name}"

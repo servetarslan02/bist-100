@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — QuestDB Tick Data Consumer
 
 NATS event bus'tan MARKET_TICK olaylarını dinler ve QuestDB'ye yazar.
@@ -16,7 +17,6 @@ from datetime import UTC, datetime
 
 import structlog
 
-from ..core.config import settings
 from ..core.event_bus import EventType, event_bus
 from ..core.questdb_client import questdb_client
 
@@ -27,6 +27,7 @@ class QuestDBTickConsumer:
     """QuestDB tick veri tüketici — NATS'tan QuestDB'ye tick akışı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._buffer: list[dict] = []
         self._buffer_size = 100  # Toplu yazma için buffer boyutu
@@ -40,7 +41,7 @@ class QuestDBTickConsumer:
         self._max_retry_buffer_size = 1000  # Retry buffer üst sınırı
         self._last_flush = datetime.now(UTC)
 
-    async def start(self):
+    async def start(self) -> Any:
         """Consumer'ı başlat."""
         self._running = True
 
@@ -56,7 +57,7 @@ class QuestDBTickConsumer:
         await event_bus.subscribe(EventType.MARKET_TICK, self._on_tick)
 
         # Buffer flush döngüsü
-        asyncio.create_task(self._flush_loop())
+        self._flush_task = asyncio.create_task(self._flush_loop())
 
         logger.info(
             "QuestDB tick consumer started",
@@ -64,7 +65,7 @@ class QuestDBTickConsumer:
             flush_interval=self._flush_interval,
         )
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Consumer'ı durdur."""
         self._running = False
 
@@ -79,7 +80,7 @@ class QuestDBTickConsumer:
             total_errors=self._error_count,
         )
 
-    async def _on_tick(self, event):
+    async def _on_tick(self, event) -> Any:
         """MARKET_TICK olayını işle."""
         try:
             data = event.data
@@ -117,7 +118,7 @@ class QuestDBTickConsumer:
             logger.warning("QuestDB tick processing error", error=str(e))
             self._error_count += 1
 
-    async def _flush_loop(self):
+    async def _flush_loop(self) -> Any:
         """Periyodik buffer flush."""
         while self._running:
             try:
@@ -130,7 +131,7 @@ class QuestDBTickConsumer:
                 logger.warning("QuestDB flush loop error", error=str(e))
                 await asyncio.sleep(1)
 
-    async def _flush_buffer(self):
+    async def _flush_buffer(self) -> Any:
         """Buffer'ı QuestDB'ye yaz. Başarısız olursa retry yapar."""
         if not self._buffer:
             return
@@ -146,6 +147,7 @@ class QuestDBTickConsumer:
         success = await self._write_with_retry(ticks_to_write)
 
         if not success:
+            self._error_count += 1
             # Retry'lar da başarısız olduysa retry buffer'a kaydet (üst sınır ile)
             if len(self._retry_buffer) + len(ticks_to_write) <= self._max_retry_buffer_size:
                 self._retry_buffer.extend(ticks_to_write)

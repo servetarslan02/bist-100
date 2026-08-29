@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 1 Test Suite (Calibration)
 
@@ -15,7 +18,7 @@ import sys
 import numpy as np
 
 
-def test_brier_score_perfect():
+def test_brier_score_perfect() -> Any:
     """Brier score mükemmel tahmin için 0 vermeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -55,10 +58,10 @@ def test_brier_score_perfect():
     result = cal.calibrate(predictions)
     assert result.brier_score == 0.0, f"Brier score 0 değil: {result.brier_score}"
     assert result.overconfident is False
-    print(f"✅ Brier perfect: {result.brier_score}")
+    logger.info(f"✅ Brier perfect: {result.brier_score}")
 
 
-def test_brier_score_overconfident():
+def test_brier_score_overconfident() -> Any:
     """Brier score overconfident model için yüksek vermeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -76,10 +79,10 @@ def test_brier_score_overconfident():
         )
     result = cal.calibrate(predictions)
     assert result.brier_score > 0.2, f"Brier score düşük: {result.brier_score}"
-    print(f"✅ Brier overconfident: {result.brier_score}")
+    logger.info(f"✅ Brier overconfident: {result.brier_score}")
 
 
-def test_ece_overconfident():
+def test_ece_overconfident() -> Any:
     """ECE overconfident model için yüksek vermeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -97,10 +100,10 @@ def test_ece_overconfident():
     result = cal.calibrate(predictions)
     assert result.ece > 0.3, f"ECE düşük: {result.ece}"
     assert result.overconfident is True
-    print(f"✅ ECE overconfident: {result.ece:.4f}, overconfident: {result.overconfident}")
+    logger.info(f"✅ ECE overconfident: {result.ece:.4f}, overconfident: {result.overconfident}")
 
 
-def test_ece_calibrated():
+def test_ece_calibrated() -> Any:
     """ECE iyi kalibre edilmiş model için düşük vermeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -114,10 +117,10 @@ def test_ece_calibrated():
         predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
     result = cal.calibrate(predictions)
     assert result.ece < 0.15, f"ECE yüksek: {result.ece}"
-    print(f"✅ ECE calibrated: {result.ece}")
+    logger.info(f"✅ ECE calibrated: {result.ece}")
 
 
-def test_bins_created():
+def test_bins_created() -> Any:
     """Bin'ler doğru oluşturuluyor mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -131,10 +134,10 @@ def test_bins_created():
     result = cal.calibrate(predictions, n_bins=5)
     assert len(result.bins) > 0, "Bin oluşturulmadı"
     assert all(b.count > 0 for b in result.bins), "Boş bin var"
-    print(f"✅ Bins created: {len(result.bins)} bin")
+    logger.info(f"✅ Bins created: {len(result.bins)} bin")
 
 
-def test_regime_calibration():
+def test_regime_calibration() -> Any:
     """Rejim bazlı calibration çalışıyor mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -155,13 +158,13 @@ def test_regime_calibration():
     assert "BEAR" in result.regime_calibration
     # BEAR overconfident olmalı
     assert result.regime_calibration["BEAR"]["overconfident"] is True
-    print(
+    logger.info(
         f"✅ Regime calibration: BULL={result.regime_calibration['BULL']['brier_score']}, "
         f"BEAR={result.regime_calibration['BEAR']['brier_score']}"
     )
 
 
-def test_platt_scaling_fit():
+def test_platt_scaling_fit() -> Any:
     """Platt scaling parametreleri fit ediliyor mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -177,10 +180,10 @@ def test_platt_scaling_fit():
     assert params.fitted is True
     assert isinstance(params.a, float)
     assert isinstance(params.b, float)
-    print(f"✅ Platt scaling fitted: a={params.a}, b={params.b}")
+    logger.info(f"✅ Platt scaling fitted: a={params.a}, b={params.b}")
 
 
-def test_platt_scaling_adjust():
+def test_platt_scaling_adjust() -> Any:
     """Platt scaling confidence'ı ayarlıyor mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -197,10 +200,10 @@ def test_platt_scaling_adjust():
     adjusted = cal.adjust_confidence(0.9)
     # Platt scaling 0.9'u ~0.33'e çekmeli (true rate)
     assert abs(adjusted - 0.9) > 0.01, f"Adjustment yapılmadı: {adjusted}"
-    print(f"✅ Platt adjust: 0.9 → {adjusted:.4f}")
+    logger.info(f"✅ Platt adjust: 0.9 → {adjusted:.4f}")
 
 
-def test_platt_scaling_insufficient_data():
+def test_platt_scaling_insufficient_data() -> Any:
     """Yetersiz veri ile Platt scaling fit edilmemeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -209,20 +212,20 @@ def test_platt_scaling_insufficient_data():
 
     params = cal.fit_platt_scaling(predictions)
     assert params.fitted is False
-    print("✅ Platt scaling insufficient data → not fitted")
+    logger.info("✅ Platt scaling insufficient data → not fitted")
 
 
-def test_confidence_adjustment_no_calibration():
+def test_confidence_adjustment_no_calibration() -> Any:
     """Calibration yoksa confidence değişmemeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
     cal = ConfidenceCalibrator()
     adjusted = cal.adjust_confidence(0.8)
     assert adjusted == 0.8
-    print("✅ No calibration → no adjustment")
+    logger.info("✅ No calibration → no adjustment")
 
 
-def test_confidence_level():
+def test_confidence_level() -> Any:
     """Confidence level doğru belirleniyor mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -237,10 +240,10 @@ def test_confidence_level():
         predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
     result = cal.calibrate(predictions)
     assert result.confidence in ["HIGH", "MEDIUM"], f"Confidence level: {result.confidence}"
-    print(f"✅ Confidence level: {result.confidence}")
+    logger.info(f"✅ Confidence level: {result.confidence}")
 
 
-def test_calibration_report():
+def test_calibration_report() -> Any:
     """Calibration raporu doğru mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -258,20 +261,20 @@ def test_calibration_report():
     assert "metrics" in report
     assert "diagnosis" in report
     assert "brier_score" in report["metrics"]
-    print(f"✅ Calibration report: brier={report['metrics']['brier_score']}, ece={report['metrics']['ece']}")
+    logger.info(f"✅ Calibration report: brier={report['metrics']['brier_score']}, ece={report['metrics']['ece']}")
 
 
-def test_calibration_report_empty():
+def test_calibration_report_empty() -> Any:
     """Boş calibration raporu doğru mu?"""
     from services.learning.calibration import ConfidenceCalibrator
 
     cal = ConfidenceCalibrator()
     report = cal.get_calibration_report()
     assert report["status"] == "No calibration data"
-    print("✅ Empty calibration report")
+    logger.info("✅ Empty calibration report")
 
 
-def test_multiple_calibrations():
+def test_multiple_calibrations() -> Any:
     """Birden fazla calibration çalıştırılabilmeli."""
     from services.learning.calibration import ConfidenceCalibrator
 
@@ -287,10 +290,10 @@ def test_multiple_calibrations():
         cal.calibrate(predictions)
 
     assert len(cal._calibration_history) == 3
-    print(f"✅ Multiple calibrations: {len(cal._calibration_history)}")
+    logger.info(f"✅ Multiple calibrations: {len(cal._calibration_history)}")
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
     """Tüm testleri çalıştır."""
     tests = [
         test_brier_score_perfect,
@@ -320,19 +323,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 1 TEST SONUÇLARI (Calibration)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 1 TEST SONUÇLARI (Calibration)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

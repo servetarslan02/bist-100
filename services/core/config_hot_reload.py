@@ -16,15 +16,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import orjson
 import structlog
 from opentelemetry import trace
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.config-hot-reload")
@@ -44,6 +46,7 @@ class ConfigChange:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "change_id": self.change_id,
             "timestamp": self.timestamp.isoformat(),
@@ -76,6 +79,7 @@ class ConfigHotReload:
         auto_apply: bool = True,
         validate_before_apply: bool = True,
     ):
+        """Otomatik eklendi."""
         self._config_path = Path(config_path)
         self._watch_interval = watch_interval_seconds
         self._auto_apply = auto_apply
@@ -90,7 +94,7 @@ class ConfigHotReload:
         self._change_history: list[ConfigChange] = []
         self._max_history = 100
 
-    def on_change(self, callback: Callable):
+    def on_change(self, callback: Callable) -> Any:
         """
         Değişiklik callback'i ekle.
 
@@ -100,7 +104,7 @@ class ConfigHotReload:
         if len(self._callbacks) > 100:
             self._callbacks = self._callbacks[-100:]
 
-    def add_validator(self, validator: Callable):
+    def add_validator(self, validator: Callable) -> Any:
         """
         Validation callback ekle.
 
@@ -137,7 +141,7 @@ class ConfigHotReload:
                 logger.error("Config izleme hatası", error=str(exc))
             await asyncio.sleep(self._watch_interval)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """İzlemeyi durdur."""
         self._running = False
         logger.info("Config hot-reload stopped")
@@ -251,7 +255,7 @@ class ConfigHotReload:
         old_config: dict[str, Any],
         new_config: dict[str, Any],
         changed_keys: list[str],
-    ):
+    ) -> Any:
         """Callback'leri bildir."""
         for callback in self._callbacks:
             try:
@@ -309,7 +313,7 @@ class ConfigHotReload:
 
 
 # Singleton
-def _create_singleton() -> "ConfigHotReload":
+def _create_singleton() -> ConfigHotReload:
     """Singleton oluştur — config.json yolunu akıllıca belirle."""
     # Önce çalışma dizininde, sonra proje kökünde ara
     candidates = [
@@ -414,12 +418,13 @@ class SettingsBridge:
     }
 
     def __init__(self, reloader: ConfigHotReload | None = None) -> None:
+        """Otomatik eklendi."""
         self._reloader = reloader or config_hot_reload
         self._watching = False
         self._settings_history: list[tuple[datetime, dict[str, Any]]] = []
         self._max_history = 50
 
-    def start_watching(self):
+    def start_watching(self) -> Any:
         """Hot-reload izlemeyi başlat."""
         if self._watching:
             return
@@ -433,7 +438,7 @@ class SettingsBridge:
         self._watching = True
         logger.info("SettingsBridge started — watching for runtime config changes")
 
-    def stop_watching(self):
+    def stop_watching(self) -> Any:
         """İzlemeyi durdur."""
         self._watching = False
         logger.info("SettingsBridge stopped")
@@ -450,7 +455,7 @@ class SettingsBridge:
         old_config: dict[str, Any],
         new_config: dict[str, Any],
         changed_keys: list[str],
-    ):
+    ) -> Any:
         """Config değişikliğinde Settings güncelle."""
         import services.core.config as config_module
 

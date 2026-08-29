@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Portfolio Optimizer Test Suite
 Doğrulanan Özellikler:
@@ -15,16 +16,13 @@ import numpy as np
 import pytest
 
 from services.portfolio.portfolio_enhancements import (
-    PortfolioConstraints,
     PortfolioEnhancements,
-    portfolio_enhancements,
 )
 from services.portfolio.portfolio_optimizer import (
     OptimizationMethod,
     OptimizationResult,
     PortfolioOptimizer,
     PortfolioOptimizerConstraints,
-    portfolio_optimizer,
 )
 
 
@@ -32,7 +30,8 @@ class TestPortfolioOptimizer:
     """Portföy Optimizasyon Motoru Testleri."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self) -> Any:
+        """Otomatik eklendi."""
         np.random.seed(42)
         self.optimizer = PortfolioOptimizer()
         self.tickers = ["THYAO", "ASELS", "TUPRS", "GARAN", "BIMAS", "KCHOL", "SAHOL", "SISE", "EREGL", "AKBNK"]
@@ -76,7 +75,7 @@ class TestPortfolioOptimizer:
             "EREGL": 55.0,
         }
 
-    def test_risk_parity_optimization(self):
+    def test_risk_parity_optimization(self) -> Any:
         """Risk parity optimizasyonu ağırlık ve metrik doğrulaması."""
         res = self.optimizer.optimize(
             tickers=self.tickers,
@@ -99,7 +98,7 @@ class TestPortfolioOptimizer:
         total_inv = sum(res.weights.values())
         assert pytest.approx(total_inv + res.cash_weight, abs=1e-3) == 1.0
 
-    def test_hrp_optimization(self):
+    def test_hrp_optimization(self) -> Any:
         """Hierarchical Risk Parity (HRP) optimizasyon testi."""
         res = self.optimizer.optimize(
             tickers=self.tickers,
@@ -113,7 +112,7 @@ class TestPortfolioOptimizer:
         for w in res.weights.values():
             assert 0.0 <= w <= 0.10 + 1e-4
 
-    def test_max_sharpe_with_model_scores(self):
+    def test_max_sharpe_with_model_scores(self) -> Any:
         """Model skorları ve L2 regularization ile Max Sharpe testi."""
         res = self.optimizer.optimize(
             tickers=self.tickers,
@@ -128,7 +127,7 @@ class TestPortfolioOptimizer:
         # En yüksek skorlu THYAO pozisyon almalı
         assert "THYAO" in res.weights
 
-    def test_black_litterman_optimization(self):
+    def test_black_litterman_optimization(self) -> Any:
         """Black-Litterman model sinyali optimizasyon testi."""
         res = self.optimizer.optimize(
             tickers=self.tickers,
@@ -141,7 +140,7 @@ class TestPortfolioOptimizer:
         assert res.is_optimal is True
         assert sum(res.weights.values()) <= 0.80 + 1e-3  # SIDEWAYS rejim tavanı
 
-    def test_sector_concentration_cap(self):
+    def test_sector_concentration_cap(self) -> Any:
         """Sektör konsantrasyon tavanı (%30) kuralının uygulanması."""
         c = PortfolioOptimizerConstraints(max_sector_pct=0.25)
         res = self.optimizer.optimize(
@@ -156,7 +155,7 @@ class TestPortfolioOptimizer:
         for sec, sec_w in res.sector_exposures.items():
             assert sec_w <= 0.25 + 1e-3
 
-    def test_liquidity_haircut(self):
+    def test_liquidity_haircut(self) -> Any:
         """Düşük likiditeli hissede haircut (küçültme) kuralı."""
         res = self.optimizer.optimize(
             tickers=self.tickers,
@@ -170,7 +169,7 @@ class TestPortfolioOptimizer:
         if "EREGL" in res.weights:
             assert res.weights["EREGL"] < 0.08
 
-    def test_regime_adaptive_exposure(self):
+    def test_regime_adaptive_exposure(self) -> Any:
         """Rejim bazlı nakit kalkanı ve maruziyet tavanları."""
         # CRISIS rejimi: Maks %15 hisse maruziyeti, %85 nakit
         res_crisis = self.optimizer.optimize(
@@ -194,7 +193,7 @@ class TestPortfolioOptimizer:
         assert invested_bear <= 0.45 + 1e-3
         assert res_bear.cash_weight >= 0.55 - 1e-3
 
-    def test_dust_position_filter(self):
+    def test_dust_position_filter(self) -> Any:
         """Toz pozisyonların (%1.5 altı) temizlenmesi."""
         c = PortfolioOptimizerConstraints(min_position_pct=0.02)
         res = self.optimizer.optimize(
@@ -207,7 +206,7 @@ class TestPortfolioOptimizer:
         for w in res.weights.values():
             assert w >= 0.02
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> Any:
         """Uç durum testleri: Tek hisse, boş hisse, tekil matris."""
         # Boş hisse
         res_empty = self.optimizer.optimize(tickers=[], returns_matrix=np.empty((10, 0)))
@@ -237,7 +236,7 @@ class TestPortfolioOptimizer:
 class TestPortfolioEnhancements:
     """Portfolio Enhancements & Rebalance Karar Motoru Testleri."""
 
-    def test_turnover_penalty_stability(self):
+    def test_turnover_penalty_stability(self) -> Any:
         """Turnover penalty shrinkage stabilitesi ve sınır kontrolü."""
         pe = PortfolioEnhancements()
         target = {"THYAO": 0.30, "ASELS": 0.20, "GARAN": 0.50}
@@ -249,7 +248,7 @@ class TestPortfolioEnhancements:
         assert adjusted["THYAO"] <= 0.30
         assert pytest.approx(sum(adjusted.values()), abs=1e-4) == 1.0
 
-    def test_should_rebalance_decision(self):
+    def test_should_rebalance_decision(self) -> Any:
         """Rebalance maliyet-fayda analizi."""
         pe = PortfolioEnhancements()
         # Küçük sapma -> rebalance yapılmamalı (hysteresis)

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — NATS JetStream & Event-Driven Engine Test Suite
 Doğrulanan Özellikler:
@@ -7,23 +8,21 @@ Doğrulanan Özellikler:
 4. Dead Letter Queue Entegrasyonu & Mock Replay
 """
 
-import asyncio
 import pytest
 
 from services.core.event_enhancements import (
     EventEnhancements,
-    EventMetadata,
     RetryPolicy,
-    event_enhancements,
 )
 from services.core.event_schema import CanonicalEvent, EventType
-from services.nats.client import NatsClient, Subjects, nats_client
+from services.nats.client import NatsClient, Subjects
 
 
 class TestEventSchemaVersioning:
     """CanonicalEvent şema, versiyon ve doğrulama testleri."""
 
-    def test_canonical_event_creation_and_validation(self):
+    def test_canonical_event_creation_and_validation(self) -> Any:
+        """Otomatik eklendi."""
         event = CanonicalEvent(
             type=EventType.TICK,
             ticker="THYAO",
@@ -38,7 +37,8 @@ class TestEventSchemaVersioning:
         assert msg == "OK"
         assert event.timestamp > 0
 
-    def test_canonical_event_json_roundtrip(self):
+    def test_canonical_event_json_roundtrip(self) -> Any:
+        """Otomatik eklendi."""
         event = CanonicalEvent(
             type=EventType.SIGNAL,
             ticker="ASELS",
@@ -59,7 +59,8 @@ class TestEventSchemaVersioning:
         assert reconstructed.version == 1
         assert reconstructed.correlation_id == "test-corr-abc"
 
-    def test_canonical_event_dict_roundtrip(self):
+    def test_canonical_event_dict_roundtrip(self) -> Any:
+        """Otomatik eklendi."""
         event = CanonicalEvent(
             type=EventType.RISK,
             ticker="TUPRS",
@@ -79,7 +80,8 @@ class TestEventSchemaVersioning:
 class TestEventEnhancementsOrdering:
     """Idempotency, Retry ve Sequence Ordering testleri."""
 
-    def test_idempotency_deduplication(self):
+    def test_idempotency_deduplication(self) -> Any:
+        """Otomatik eklendi."""
         ee = EventEnhancements()
         event_id = "evt-unique-001"
 
@@ -98,7 +100,8 @@ class TestEventEnhancementsOrdering:
         assert res2 is None
         assert len(executed) == 1
 
-    def test_retry_policy_exponential_backoff(self):
+    def test_retry_policy_exponential_backoff(self) -> Any:
+        """Otomatik eklendi."""
         policy = RetryPolicy(max_retries=3, base_delay=0.5, exponential_base=2.0, jitter=False)
         ee = EventEnhancements(retry_policy=policy)
 
@@ -114,7 +117,8 @@ class TestEventEnhancementsOrdering:
         assert delay_1 == 1.0
         assert delay_2 == 2.0
 
-    def test_sequence_ordering_and_out_of_order_detection(self):
+    def test_sequence_ordering_and_out_of_order_detection(self) -> Any:
+        """Otomatik eklendi."""
         ee = EventEnhancements()
         key = "THYAO.ticks"
 
@@ -137,7 +141,8 @@ class TestNatsClientEngine:
     """NatsClient payload hazırlama, tracing ve DLQ yönlendirme testleri."""
 
     @pytest.mark.asyncio
-    async def test_nats_payload_preparation_and_stats(self):
+    async def test_nats_payload_preparation_and_stats(self) -> Any:
+        """Otomatik eklendi."""
         client = NatsClient()
         stats = client.get_stats()
         assert "connected" in stats
@@ -157,7 +162,8 @@ class TestNatsClientEngine:
         assert res is False  # Validation failure caught safely
 
     @pytest.mark.asyncio
-    async def test_nats_dlq_fallback_routing(self):
+    async def test_nats_dlq_fallback_routing(self) -> Any:
+        """Otomatik eklendi."""
         client = NatsClient()
         initial_dlq = client._total_dlq_routed
 

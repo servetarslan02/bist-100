@@ -55,6 +55,7 @@ class ScanResult:
     risks: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp.isoformat(),

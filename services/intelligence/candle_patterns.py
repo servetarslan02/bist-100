@@ -36,6 +36,7 @@ class CandleMetrics:
     is_doji: bool = False
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         self.body = abs(self.close - self.open)
         self.range = max(self.high - self.low, 1e-9)
         self.is_green = self.close >= self.open
@@ -78,6 +79,7 @@ class CandlePatternEngine:
     """Kurumsal 10/10 Seviye Mum ve Price Action Zeka Motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Mum formasyonları ve eşikleri
         self.min_body_ratio = 0.6  # Doji için max gövde/arası oran
         self.hammer_shadow_ratio = 2.0  # Çekiç için alt gölge/gövde oranı

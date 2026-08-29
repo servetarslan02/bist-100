@@ -22,6 +22,7 @@ class WeightAdjuster:
         decay_factor: float = 0.95,
         min_samples: int = 10,
     ):
+        """Otomatik eklendi."""
         self.min_weight = min_weight
         self.max_weight = max_weight
         self.decay_factor = decay_factor
@@ -88,11 +89,13 @@ class WeightAdjuster:
         self._weights = new_weights
 
         # Record history
-        self._history.append({
-            "timestamp": time.time(),
-            "weights": new_weights.copy(),
-            "metric_key": metric_key,
-        })
+        self._history.append(
+            {
+                "timestamp": time.time(),
+                "weights": new_weights.copy(),
+                "metric_key": metric_key,
+            }
+        )
 
         logger.info("Weights adjusted", weights=new_weights)
         return new_weights.copy()
@@ -121,6 +124,7 @@ class WeightAdjuster:
             # Try to get metrics from closed loop learning
             try:
                 from services.learning.closed_loop import closed_loop
+
                 model_metrics = closed_loop.get_metrics()
             except Exception:
                 logger.warning("No metrics available for weight adjustment")
@@ -130,7 +134,6 @@ class WeightAdjuster:
             return self._weights.copy()
 
         return self.adjust_weights(model_metrics, metric_key)
-
 
     # =====================================================
     # TRADE RESULT TRIGGER (v2.1)
@@ -165,12 +168,14 @@ class WeightAdjuster:
         act_dir = "UP" if actual_return > 0 else "DOWN"
         is_correct = pred_dir == act_dir
 
-        self._model_outcomes[model_id].append({
-            "prediction": prediction,
-            "actual_return": actual_return,
-            "is_correct": is_correct,
-            "timestamp": time.time(),
-        })
+        self._model_outcomes[model_id].append(
+            {
+                "prediction": prediction,
+                "actual_return": actual_return,
+                "is_correct": is_correct,
+                "timestamp": time.time(),
+            }
+        )
 
         # Son 200 outcome'u tut
         if len(self._model_outcomes[model_id]) > 200:

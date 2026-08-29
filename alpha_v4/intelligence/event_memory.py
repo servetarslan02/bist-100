@@ -13,6 +13,7 @@ import orjson
 
 @dataclass(frozen=True)
 class EventObservation:
+    """Otomatik eklendi."""
     event_type: str
     entity_id: str
     observed_at: datetime
@@ -21,6 +22,7 @@ class EventObservation:
     payload: dict
 
     def event_id(self) -> str:
+        """Otomatik eklendi."""
         body = {
             "event_type": self.event_type,
             "entity_id": self.entity_id,
@@ -32,6 +34,7 @@ class EventObservation:
         return sha256(orjson.dumps(body, option=orjson.OPT_SORT_KEYS).decode()).hexdigest()
 
     def validate(self) -> None:
+        """Otomatik eklendi."""
         if not self.evidence_id:
             raise ValueError("event requires evidence")
         if self.observed_at.tzinfo != UTC:

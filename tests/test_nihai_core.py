@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Nihai Core Sistemi Test Paketi
 
@@ -35,11 +36,12 @@ from services.core.transaction_helper import TransactionHelper
 class TestDeadLetterQueue:
     """DLQ testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.dlq = DeadLetterQueue(max_entries=100)
 
     @pytest.mark.asyncio
-    async def test_push_and_get(self):
+    async def test_push_and_get(self) -> Any:
         """Event push ve get."""
         entry = await self.dlq.push(
             event_id="evt1",
@@ -52,7 +54,7 @@ class TestDeadLetterQueue:
         assert entry.is_retryable
 
     @pytest.mark.asyncio
-    async def test_max_retries_exhausted(self):
+    async def test_max_retries_exhausted(self) -> Any:
         """Max retry aşılınca EXHAUSTED olmalı."""
         entry = await self.dlq.push(
             event_id="evt2",
@@ -66,7 +68,7 @@ class TestDeadLetterQueue:
         assert entry.status == DLQStatus.PENDING  # Status değişmez ama retryable=false
 
     @pytest.mark.asyncio
-    async def test_eviction(self):
+    async def test_eviction(self) -> Any:
         """Max entries aşılınca eski kayıt çıkarılmalı."""
         for i in range(105):
             await self.dlq.push(f"evt_{i}", "test", "{}", "error")
@@ -74,11 +76,12 @@ class TestDeadLetterQueue:
         assert stats["total_entries"] <= 100
 
     @pytest.mark.asyncio
-    async def test_retry_with_handler(self):
+    async def test_retry_with_handler(self) -> Any:
         """Retry handler ile başarılı retry."""
         retried_events = []
 
-        async def handler(payload):
+        async def handler(payload) -> Any:
+            """Otomatik eklendi."""
             retried_events.append(payload)
 
         self.dlq.register_retry_handler("test_event", handler)
@@ -92,7 +95,7 @@ class TestDeadLetterQueue:
         assert len(retried_events) == 1
 
     @pytest.mark.asyncio
-    async def test_stats(self):
+    async def test_stats(self) -> Any:
         """İstatistikler doğru olmalı."""
         await self.dlq.push("e1", "type_a", "{}", "err1")
         await self.dlq.push("e2", "type_b", "{}", "err2")
@@ -104,7 +107,7 @@ class TestDeadLetterQueue:
         assert stats["by_event_type"]["type_b"] == 1
 
     @pytest.mark.asyncio
-    async def test_remove_entry(self):
+    async def test_remove_entry(self) -> Any:
         """Kayıt silme."""
         await self.dlq.push("e1", "test", "{}", "err")
         stats_before = await self.dlq.get_stats()
@@ -128,10 +131,11 @@ class TestDeadLetterQueue:
 class TestJWTManager:
     """JWT testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.jwt = JWTManager(secret_key="test-secret-key-for-testing-only")
 
-    def test_generate_and_validate(self):
+    def test_generate_and_validate(self) -> Any:
         """Token oluştur ve doğrula."""
         token = self.jwt.generate_token(
             user_id="user1",
@@ -146,7 +150,7 @@ class TestJWTManager:
         assert claims.role == "ADMIN"
         assert "READ" in claims.permissions
 
-    def test_expired_token(self):
+    def test_expired_token(self) -> Any:
         """Süresi dolmuş token reddedilmeli."""
         # Manually create an expired token
         self.jwt.generate_token("user1", "ADMIN", ["READ"])
@@ -160,7 +164,7 @@ class TestJWTManager:
         with pytest.raises(JWTError, match="expired"):
             self.jwt.validate_token(expired_token)
 
-    def test_invalid_signature(self):
+    def test_invalid_signature(self) -> Any:
         """Geçersiz imza reddedilmeli."""
         jwt1 = JWTManager(secret_key="secret-1")
         jwt2 = JWTManager(secret_key="secret-2")
@@ -170,7 +174,7 @@ class TestJWTManager:
         with pytest.raises(JWTError, match="Invalid signature"):
             jwt2.validate_token(token)
 
-    def test_refresh_token(self):
+    def test_refresh_token(self) -> Any:
         """Refresh token ile yeni access token oluştur."""
         refresh = self.jwt.generate_token(
             "user1",
@@ -184,7 +188,7 @@ class TestJWTManager:
         assert claims.sub == "user1"
         assert claims.token_type == TokenType.ACCESS
 
-    def test_revoke_token(self):
+    def test_revoke_token(self) -> Any:
         """Token iptal et."""
         token = self.jwt.generate_token("user1", "ADMIN", ["READ"])
         assert self.jwt.validate_token(token) is not None
@@ -194,7 +198,7 @@ class TestJWTManager:
         with pytest.raises(JWTError, match="revoked"):
             self.jwt.validate_token(token)
 
-    def test_api_key_generation(self):
+    def test_api_key_generation(self) -> Any:
         """API key oluştur."""
         api_key = self.jwt.generate_api_key("user1", "ADMIN", ["READ", "WRITE"], name="test-key")
         assert api_key.startswith("ak_")
@@ -202,7 +206,7 @@ class TestJWTManager:
         claims = self.jwt.validate_token(api_key.replace("ak_", ""))
         assert claims.sub == "user1"
 
-    def test_custom_claims(self):
+    def test_custom_claims(self) -> Any:
         """Custom claims eklenebilmeli."""
         token = self.jwt.generate_token(
             "user1",
@@ -223,21 +227,21 @@ class TestJWTManager:
 class TestTransactionHelper:
     """Transaction helper testleri."""
 
-    def test_metrics_initial(self):
+    def test_metrics_initial(self) -> Any:
         """Başlangıç metrikleri sıfır olmalı."""
         helper = TransactionHelper()
         metrics = helper.get_metrics()
         assert metrics["total_transactions"] == 0
         assert metrics["committed"] == 0
 
-    def test_metrics_reset(self):
+    def test_metrics_reset(self) -> Any:
         """Metrik sıfırlama."""
         helper = TransactionHelper()
         helper._metrics.total_transactions = 5
         helper.reset_metrics()
         assert helper.get_metrics()["total_transactions"] == 0
 
-    def test_slow_queries_empty(self):
+    def test_slow_queries_empty(self) -> Any:
         """Boş query log."""
         helper = TransactionHelper()
         assert helper.get_slow_queries() == []
@@ -251,14 +255,16 @@ class TestTransactionHelper:
 class TestCircuitBreakerMetrics:
     """Circuit breaker metrics testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.collector = CircuitBreakerMetricsCollector()
 
-    def test_export_prometheus(self):
+    def test_export_prometheus(self) -> Any:
         """Prometheus format export."""
 
         # Create a mock breaker
         class MockBreaker:
+            """Otomatik eklendi."""
             name = "test_provider"
             state = type("State", (), {"value": "CLOSED"})()
             failure_count = 0
@@ -277,10 +283,11 @@ class TestCircuitBreakerMetrics:
         assert "test_provider" in prom
         assert "circuit_breaker_failures" in prom
 
-    def test_export_json(self):
+    def test_export_json(self) -> Any:
         """JSON format export."""
 
         class MockBreaker:
+            """Otomatik eklendi."""
             name = "test"
             state = type("State", (), {"value": "CLOSED"})()
             failure_count = 0
@@ -299,7 +306,7 @@ class TestCircuitBreakerMetrics:
         assert "test" in result["circuit_breakers"]
         assert result["summary"]["total"] == 1
 
-    def test_state_change_recording(self):
+    def test_state_change_recording(self) -> Any:
         """State change kaydı."""
         self.collector.record_state_change("test", "CLOSED", "OPEN")
         history = self.collector.get_history()
@@ -316,14 +323,15 @@ class TestCircuitBreakerMetrics:
 class TestConfigHotReload:
     """Config hot-reload testleri."""
 
-    def setup_method(self, tmp_path=None):
+    def setup_method(self, tmp_path=None) -> Any:
+        """Otomatik eklendi."""
         import os
         import tempfile
 
         self.tmp_dir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.tmp_dir, "test_config.json")
 
-    def test_load_config(self):
+    def test_load_config(self) -> Any:
         """Config yükleme."""
         with open(self.config_path, "w") as f:
             f.write(orjson.dumps({"key": "value"}).decode())
@@ -336,12 +344,12 @@ class TestConfigHotReload:
         config = reloader.get_current_config()
         assert config.get("key") == "value"
 
-    def test_change_history(self):
+    def test_change_history(self) -> Any:
         """Değişiklik geçmişi."""
         reloader = ConfigHotReload(self.config_path)
         assert reloader.get_change_history() == []
 
-    def test_validator(self):
+    def test_validator(self) -> Any:
         """Validator ekleme."""
         reloader = ConfigHotReload(self.config_path)
         reloader.add_validator(lambda c: (True, None))
@@ -356,10 +364,11 @@ class TestConfigHotReload:
 class TestImmutableAuditLog:
     """Audit log testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.audit = ImmutableAuditLog()
 
-    def test_log_entry(self):
+    def test_log_entry(self) -> Any:
         """Audit log kaydı."""
         entry = self.audit.log(
             user_id="admin",
@@ -372,7 +381,7 @@ class TestImmutableAuditLog:
         assert entry.entry_hash != ""
         assert entry.previous_hash == "genesis"
 
-    def test_hash_chain(self):
+    def test_hash_chain(self) -> Any:
         """Hash chain doğru oluşmalı."""
         e1 = self.audit.log("u1", "CREATE", "portfolio", "p1")
         e2 = self.audit.log("u2", "UPDATE", "portfolio", "p1")
@@ -381,7 +390,7 @@ class TestImmutableAuditLog:
         assert e2.previous_hash == e1.entry_hash
         assert e3.previous_hash == e2.entry_hash
 
-    def test_verify_integrity(self):
+    def test_verify_integrity(self) -> Any:
         """Bütünlük doğrulaması."""
         self.audit.log("u1", "CREATE", "portfolio", "p1")
         self.audit.log("u2", "UPDATE", "portfolio", "p1")
@@ -390,7 +399,7 @@ class TestImmutableAuditLog:
         assert is_valid
         assert error is None
 
-    def test_tamper_detection(self):
+    def test_tamper_detection(self) -> Any:
         """Değişiklik tespiti."""
         self.audit.log("u1", "CREATE", "portfolio", "p1")
         self.audit.log("u2", "UPDATE", "portfolio", "p1")
@@ -402,7 +411,7 @@ class TestImmutableAuditLog:
         assert not is_valid
         assert "hash" in error.lower() or "mismatch" in error.lower()
 
-    def test_compliance_report(self):
+    def test_compliance_report(self) -> Any:
         """Uyumluluk raporu."""
         self.audit.log("admin", "LOGIN", "session", "s1")
         self.audit.log("admin", "UPDATE", "config", "c1")
@@ -413,7 +422,7 @@ class TestImmutableAuditLog:
         assert report["actions"]["LOGIN"] == 1
         assert report["actions"]["UPDATE"] == 1
 
-    def test_export_db_triggers(self):
+    def test_export_db_triggers(self) -> Any:
         """DB trigger SQL export."""
         sql = self.audit.export_db_triggers()
         assert "prevent_audit_modification" in sql
@@ -429,21 +438,22 @@ class TestImmutableAuditLog:
 class TestDistributedTracing:
     """Tracing testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.tracer = DistributedTracer(service_name="test-service")
 
-    def test_generate_correlation_id(self):
+    def test_generate_correlation_id(self) -> Any:
         """Correlation ID üretimi."""
         cid = self.tracer.generate_correlation_id()
         assert len(cid) == 16
 
-    def test_start_trace(self):
+    def test_start_trace(self) -> Any:
         """Trace başlatma."""
         cid = self.tracer.start_trace("test.operation")
         assert cid is not None
         assert self.tracer.get_current_correlation_id() == cid
 
-    def test_span_lifecycle(self):
+    def test_span_lifecycle(self) -> Any:
         """Span yaşam döngüsü."""
         cid = self.tracer.start_trace("root")
 
@@ -455,7 +465,7 @@ class TestDistributedTracing:
         assert span.end_time is not None
         assert span.duration_ms >= 0
 
-    def test_slow_trace_detection(self):
+    def test_slow_trace_detection(self) -> Any:
         """Yavaş trace tespiti."""
         self.tracer._slow_threshold_ms = 0  # Her şey yavaş
 
@@ -467,7 +477,7 @@ class TestDistributedTracing:
         slow = self.tracer.get_slow_traces()
         assert len(slow) > 0
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
         """İstatistikler."""
         self.tracer.start_trace("op1")
         self.tracer.start_trace("op2")
@@ -475,7 +485,7 @@ class TestDistributedTracing:
         stats = self.tracer.get_stats()
         assert stats["total_traces"] >= 2
 
-    def test_context_manager(self):
+    def test_context_manager(self) -> Any:
         """Context manager kullanımı."""
         from services.core.distributed_tracing import SpanContextManager
 
@@ -483,12 +493,13 @@ class TestDistributedTracing:
             assert span is not None
             assert span.operation == "ctx_op"
 
-    def test_decorator(self):
+    def test_decorator(self) -> Any:
         """Decorator kullanımı."""
         from services.core.distributed_tracing import trace
 
         @trace("decorated_func")
-        def my_func():
+        def my_func() -> Any:
+            """Otomatik eklendi."""
             return 42
 
         result = my_func()
@@ -503,19 +514,20 @@ class TestDistributedTracing:
 class TestSystemGovernor:
     """System governor testleri."""
 
-    def setup_method(self):
+    def setup_method(self) -> Any:
+        """Otomatik eklendi."""
         self.governor = SystemStateGovernor()
 
-    def test_initial_state_full(self):
+    def test_initial_state_full(self) -> Any:
         """Başlangıç durumu FULL."""
         assert self.governor.state == SystemState.FULL
 
-    def test_all_features_enabled_in_full(self):
+    def test_all_features_enabled_in_full(self) -> Any:
         """FULL durumunda tüm feature'lar aktif."""
         for f in FeatureFlag:
             assert self.governor.is_allowed(f)
 
-    def test_transition_to_degraded(self):
+    def test_transition_to_degraded(self) -> Any:
         """DEGRADED geçiş."""
         self.governor.transition(SystemState.DEGRADED, "Test")
 
@@ -523,7 +535,7 @@ class TestSystemGovernor:
         assert not self.governor.is_allowed(FeatureFlag.ALTERNATIVE_DATA)
         assert self.governor.is_allowed(FeatureFlag.LIVE_TRADING)
 
-    def test_transition_to_readonly(self):
+    def test_transition_to_readonly(self) -> Any:
         """READ_ONLY geçiş."""
         self.governor.transition(SystemState.READ_ONLY, "Test")
 
@@ -531,14 +543,14 @@ class TestSystemGovernor:
         assert not self.governor.is_allowed(FeatureFlag.LIVE_TRADING)
         assert self.governor.is_allowed(FeatureFlag.READ_MARKET) if hasattr(FeatureFlag, "READ_MARKET") else True
 
-    def test_transition_to_shutdown(self):
+    def test_transition_to_shutdown(self) -> Any:
         """SHUTDOWN geçiş — tüm feature'lar devre dışı."""
         self.governor.transition(SystemState.SHUTDOWN, "Emergency")
 
         for f in FeatureFlag:
             assert not self.governor.is_allowed(f)
 
-    def test_transition_history(self):
+    def test_transition_history(self) -> Any:
         """Geçiş geçmişi."""
         self.governor.transition(SystemState.DEGRADED, "Reason 1")
         self.governor.transition(SystemState.READ_ONLY, "Reason 2")
@@ -548,7 +560,7 @@ class TestSystemGovernor:
         assert history[0]["from"] == "FULL"
         assert history[0]["to"] == "DEGRADED"
 
-    def test_fallback_response(self):
+    def test_fallback_response(self) -> Any:
         """Fallback response."""
         self.governor.transition(SystemState.DEGRADED, "Test")
 
@@ -571,7 +583,7 @@ class TestSystemGovernor:
         assert fallback_ro is not None
         assert fallback_ro["status"] == "read_only"
 
-    def test_force_feature(self):
+    def test_force_feature(self) -> Any:
         """Feature flag zorla."""
         self.governor.transition(SystemState.READ_ONLY, "Test")
         assert not self.governor.is_allowed(FeatureFlag.NEW_POSITIONS)
@@ -579,7 +591,7 @@ class TestSystemGovernor:
         self.governor.force_feature(FeatureFlag.NEW_POSITIONS, True)
         assert self.governor.is_allowed(FeatureFlag.NEW_POSITIONS)
 
-    def test_status(self):
+    def test_status(self) -> Any:
         """Durum özeti."""
         status = self.governor.get_status()
         assert status["state"] == "FULL"
@@ -587,13 +599,15 @@ class TestSystemGovernor:
         assert "enabled_features" in status
 
     @pytest.mark.asyncio
-    async def test_health_check(self):
+    async def test_health_check(self) -> Any:
         """Sağlık kontrolü."""
 
-        def healthy_check():
+        def healthy_check() -> Any:
+            """Otomatik eklendi."""
             return True
 
-        def unhealthy_check():
+        def unhealthy_check() -> Any:
+            """Otomatik eklendi."""
             return False
 
         self.governor.register_health_check("comp1", healthy_check)
@@ -604,7 +618,7 @@ class TestSystemGovernor:
         assert not results["comp2"].is_healthy
 
     @pytest.mark.asyncio
-    async def test_auto_degradation(self):
+    async def test_auto_degradation(self) -> Any:
         """Otomatik degradation."""
         # Register many unhealthy checks
         for i in range(10):
@@ -625,7 +639,7 @@ class TestCoreIntegration:
     """Entegrasyon testleri."""
 
     @pytest.mark.asyncio
-    async def test_dlq_with_tracing(self):
+    async def test_dlq_with_tracing(self) -> Any:
         """DLQ + tracing entegrasyonu."""
         dlq = DeadLetterQueue()
         tracer = DistributedTracer()
@@ -636,7 +650,7 @@ class TestCoreIntegration:
         assert entry is not None
         assert tracer.get_current_correlation_id() == cid
 
-    def test_audit_with_jwt(self):
+    def test_audit_with_jwt(self) -> Any:
         """Audit + JWT entegrasyonu."""
         jwt = JWTManager(secret_key="test-secret")
         audit = ImmutableAuditLog()
@@ -654,13 +668,14 @@ class TestCoreIntegration:
         is_valid, _ = audit.verify_integrity()
         assert is_valid
 
-    def test_governor_with_circuit_breaker_metrics(self):
+    def test_governor_with_circuit_breaker_metrics(self) -> Any:
         """Governor + circuit breaker metrics entegrasyonu."""
         governor = SystemStateGovernor()
         metrics = CircuitBreakerMetricsCollector()
 
         # Track metrics
         class MockBreaker:
+            """Otomatik eklendi."""
             name = "test"
             state = type("S", (), {"value": "CLOSED"})()
             failure_count = 0

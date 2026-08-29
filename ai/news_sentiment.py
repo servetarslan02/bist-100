@@ -101,9 +101,11 @@ class NewsSentimentAnalyzer:
         return result
 
     def analyze_batch(self, texts: list[dict[str, str]]) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         return [self.analyze(item.get("text", ""), item.get("ticker")) for item in texts]
 
     def get_market_sentiment(self, analyses: list[dict[str, Any]]) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not analyses:
             return {"overall": "NEUTRAL", "score": 0.0}
 

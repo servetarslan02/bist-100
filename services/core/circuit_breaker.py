@@ -17,14 +17,16 @@ import asyncio
 import inspect
 import random
 import time
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from opentelemetry import metrics, trace
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.circuit-breaker")
@@ -42,6 +44,7 @@ CB_FAILURES_COUNTER = meter.create_counter(
 
 
 class CircuitState(StrEnum):
+    """Otomatik eklendi."""
     CLOSED = "CLOSED"  # Normal çalışıyor
     OPEN = "OPEN"  # Hatalı, atla
     HALF_OPEN = "HALF_OPEN"  # Dene, başarırsa CLOSED
@@ -69,9 +72,7 @@ class CircuitBreaker:
 
     def _update_telemetry(self) -> None:
         """OTel gauge'u mevcut duruma göre günceller."""
-        state_val = {CircuitState.CLOSED: 0, CircuitState.HALF_OPEN: 1, CircuitState.OPEN: 2}.get(
-            self.state, 0
-        )
+        state_val = {CircuitState.CLOSED: 0, CircuitState.HALF_OPEN: 1, CircuitState.OPEN: 2}.get(self.state, 0)
         CB_STATE_GAUGE.set(state_val, {"provider": self.name})
 
     def _persist_to_store(self) -> None:
@@ -202,7 +203,7 @@ class RateLimiter:
             self.tokens = 0
             return wait_time
 
-    async def acquire_async(self):
+    async def acquire_async(self) -> Any:
         """Async token al — gerekirse bekle."""
         wait = self.acquire()
         if wait > 0:
@@ -228,6 +229,7 @@ class RetryPolicy:
     """
 
     def __init__(self, max_retries: int = 5, base_delay: float = 1.0, max_delay: float = 32.0):
+        """Otomatik eklendi."""
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -287,6 +289,7 @@ class ProviderReliability:
     """
 
     def __init__(self, name: str, window_size: int = 100):
+        """Otomatik eklendi."""
         self.name = name
         self.window_size = window_size
         self._results: list = []  # (success: bool, latency_ms: float, timestamp: datetime)
@@ -313,7 +316,7 @@ class ProviderReliability:
         )
         # Tek trim: sadece window_size kadar tut (1000 ve 100 çift-trim bug'u düzeldi)
         if len(self._results) > self.window_size:
-            self._results = self._results[-self.window_size:]
+            self._results = self._results[-self.window_size :]
 
     def get_score(self) -> float:
         """Güvenilirlik skoru (0-1)."""
@@ -376,6 +379,7 @@ class ProtectedProvider:
         retry_policy: RetryPolicy | None = None,
         reliability: ProviderReliability | None = None,
     ):
+        """Otomatik eklendi."""
         self.name = name
         self.func = func
         self.circuit = circuit_breaker or CircuitBreaker(name=name)

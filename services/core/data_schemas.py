@@ -28,14 +28,20 @@ from pydantic import BaseModel, Field, validator
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.data_schemas")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -50,13 +56,15 @@ class OHLCVSchema(BaseModel):
     volume: float = Field(ge=0)
 
     @validator("high")
-    def high_gte_low(self, v, values):
+    def high_gte_low(self, v, values) -> Any:
+        """Otomatik eklendi."""
         if "low" in values and v < values["low"]:
             raise ValueError("high must be >= low")
         return v
 
     @validator("open")
-    def open_in_range(self, v, values):
+    def open_in_range(self, v, values) -> Any:
+        """Otomatik eklendi."""
         if "high" in values and "low" in values and (v > values["high"] or v < values["low"]):
             raise ValueError("open must be between low and high")
         return v
@@ -70,7 +78,8 @@ class FeatureVectorSchema(BaseModel):
     features: dict[str, float]
 
     @validator("features")
-    def no_nan_inf(self, v):
+    def no_nan_inf(self, v) -> Any:
+        """Otomatik eklendi."""
         for key, val in v.items():
             if val is not None and (np.isnan(val) or np.isinf(val)):
                 raise ValueError(f"Feature '{key}' contains NaN/Inf")

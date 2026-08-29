@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Financial Data Quality & Data Contracts Test Suite
 Doğrulanan Özellikler:
@@ -11,10 +12,9 @@ Doğrulanan Özellikler:
 """
 
 import pytest
-from datetime import datetime, UTC
 
-from services.core.data_quality import DataQualityEngine, TradabilityMask, DataQualityChecker
 from services.core.data_integrity import DataIntegrityValidator
+from services.core.data_quality import DataQualityEngine
 
 try:
     import polars as pl
@@ -25,7 +25,8 @@ except ImportError:
 class TestFinancialDataContracts:
     """Temel finansal veri doğruluğu ve kontrat testleri."""
 
-    def test_valid_bar_is_tradable(self):
+    def test_valid_bar_is_tradable(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         mask = engine.check_tradability(
             ticker="THYAO",
@@ -41,7 +42,8 @@ class TestFinancialDataContracts:
         assert mask.volume_mask == 1.0
         assert mask.reasons == ["OK"]
 
-    def test_invalid_negative_or_zero_price(self):
+    def test_invalid_negative_or_zero_price(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         mask = engine.check_tradability(
             ticker="THYAO",
@@ -56,7 +58,8 @@ class TestFinancialDataContracts:
         assert mask.price_mask == 0.0
         assert any("Columns <= 0" in r for r in mask.reasons)
 
-    def test_invalid_ohlc_geometry(self):
+    def test_invalid_ohlc_geometry(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         # High lower than Low
         mask = engine.check_tradability(
@@ -72,7 +75,8 @@ class TestFinancialDataContracts:
         assert mask.price_mask == 0.0
         assert any("Anormal fiyat yapısı" in r for r in mask.reasons)
 
-    def test_circuit_breaker_limit_up_down(self):
+    def test_circuit_breaker_limit_up_down(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         # %9.9 artış (Tavan)
         mask = engine.check_tradability(
@@ -88,7 +92,8 @@ class TestFinancialDataContracts:
         assert mask.price_mask == 0.0
         assert any("Tavan/taban" in r for r in mask.reasons)
 
-    def test_zero_volume_and_halt_detection(self):
+    def test_zero_volume_and_halt_detection(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         # Sıfır hacim ve tüm fiyatlar eşit (Halt)
         mask = engine.check_tradability(
@@ -105,7 +110,8 @@ class TestFinancialDataContracts:
         assert mask.price_mask == 0.0
         assert any("Sıfır hacim ve Halt edilmiş" in r for r in mask.reasons)
 
-    def test_apply_mask_to_dict(self):
+    def test_apply_mask_to_dict(self) -> Any:
+        """Otomatik eklendi."""
         engine = DataQualityEngine()
         mask = engine.check_tradability(
             ticker="THYAO",
@@ -126,7 +132,8 @@ class TestDataIntegrityValidator:
     """Sistem veri bütünlüğü doğrulayıcı testleri."""
 
     @pytest.mark.asyncio
-    async def test_validate_on_startup_structure(self):
+    async def test_validate_on_startup_structure(self) -> Any:
+        """Otomatik eklendi."""
         validator = DataIntegrityValidator()
         results = await validator.validate_on_startup(
             clickhouse_client=None,

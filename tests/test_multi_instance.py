@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Multi-Instance Race Condition Testleri
 
@@ -13,7 +16,7 @@ from services.core.database_dev import dev_db
 from services.portfolio.main import PortfolioService
 
 
-async def setup_db():
+async def setup_db() -> Any:
     """Test DB'sini hazırla."""
     dev_db._db = None
     await dev_db.init()
@@ -37,11 +40,12 @@ async def setup_db():
 
 
 async def get_iid(symbol: str) -> int:
+    """Otomatik eklendi."""
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = ?", symbol)
     return row["id"] if row else 0
 
 
-async def test_parallel_buys():
+async def test_parallel_buys() -> Any:
     """İki instance paralel alım yapsın — toplam harcama tutarlı olmalı."""
     await setup_db()
     thyao_id = await get_iid("THYAO")
@@ -53,10 +57,12 @@ async def test_parallel_buys():
     await svc2.start()
 
     # Paralel alım — aynı anda
-    async def buy1():
+    async def buy1() -> Any:
+        """Otomatik eklendi."""
         return await svc1.execute_buy("THYAO", 50, 100.0, instrument_id=thyao_id)
 
-    async def buy2():
+    async def buy2() -> Any:
+        """Otomatik eklendi."""
         return await svc2.execute_buy("THYAO", 50, 100.0, instrument_id=thyao_id)
 
     r1, r2 = await asyncio.gather(buy1(), buy2())
@@ -89,7 +95,7 @@ async def test_parallel_buys():
     return "Parallel Buys", len(issues) == 0, issues
 
 
-async def test_concurrent_buy_sell():
+async def test_concurrent_buy_sell() -> Any:
     """Bir instance alırken diğeri satmaya çalışsın — tutarlılık korunmalı."""
     await setup_db()
     thyao_id = await get_iid("THYAO")
@@ -105,10 +111,12 @@ async def test_concurrent_buy_sell():
     svc2 = PortfolioService(initial_capital=100000)
     await svc2.start()
 
-    async def sell1():
+    async def sell1() -> Any:
+        """Otomatik eklendi."""
         return await svc1.execute_sell("THYAO", 100, 110.0, instrument_id=thyao_id)
 
-    async def sell2():
+    async def sell2() -> Any:
+        """Otomatik eklendi."""
         return await svc2.execute_sell("THYAO", 100, 110.0, instrument_id=thyao_id)
 
     r1, r2 = await asyncio.gather(sell1(), sell2())
@@ -131,7 +139,7 @@ async def test_concurrent_buy_sell():
     return "Concurrent Buy/Sell", len(issues) == 0, issues
 
 
-async def test_invariant_after_parallel_ops():
+async def test_invariant_after_parallel_ops() -> Any:
     """Paralel işlemler sonrası invariant korunmalı."""
     await setup_db()
     thyao_id = await get_iid("THYAO")
@@ -144,11 +152,13 @@ async def test_invariant_after_parallel_ops():
     await svc2.start()
 
     # Paralel farklı hisse alımları
-    async def ops1():
+    async def ops1() -> Any:
+        """Otomatik eklendi."""
         await svc1.execute_buy("THYAO", 50, 250.0, instrument_id=thyao_id)
         await svc1.update_prices({"THYAO": 260})
 
-    async def ops2():
+    async def ops2() -> Any:
+        """Otomatik eklendi."""
         await svc2.execute_buy("GARAN", 100, 100.0, instrument_id=garan_id)
         await svc2.update_prices({"GARAN": 95})
 
@@ -176,7 +186,7 @@ async def test_invariant_after_parallel_ops():
     return "Invariant After Parallel Ops", len(issues) == 0, issues
 
 
-async def test_restart_during_trade():
+async def test_restart_during_trade() -> Any:
     """Bir instance işlem yaparken diğeri restart etsin — veri kaybı olmamalı."""
     await setup_db()
     thyao_id = await get_iid("THYAO")
@@ -215,7 +225,7 @@ async def test_restart_during_trade():
     return "Restart During Trade", len(issues) == 0, issues
 
 
-async def test_cash_never_negative():
+async def test_cash_never_negative() -> Any:
     """Hiçbir durumda cash negatif olmamalı."""
     await setup_db()
     thyao_id = await get_iid("THYAO")
@@ -243,10 +253,11 @@ async def test_cash_never_negative():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("MULTI-INSTANCE RACE CONDITION TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("MULTI-INSTANCE RACE CONDITION TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_parallel_buys,
@@ -269,27 +280,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

@@ -109,10 +109,11 @@ class SignalFusionEngine:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._adaptive_weights: dict[str, float] = {}
         self._restore_weights()
 
-    def _restore_weights(self):
+    def _restore_weights(self) -> Any:
         """Restart sonrası ağırlıkları SQLite'dan geri yükle."""
         try:
             from services.core.state_store import state_store
@@ -124,7 +125,7 @@ class SignalFusionEngine:
         except Exception as e:
             logger.debug("Fusion weights restore skipped", error=str(e))
 
-    def _persist_weights(self):
+    def _persist_weights(self) -> Any:
         """Ağırlıkları SQLite'a kaydet."""
         try:
             from services.core.state_store import state_store
@@ -134,7 +135,7 @@ class SignalFusionEngine:
         except Exception:
             logger.warning("Caught Exception in _persist_weights", exc_info=True)
 
-    def set_adaptive_weights(self, weights: dict[str, float]):
+    def set_adaptive_weights(self, weights: dict[str, float]) -> Any:
         """Model Learning sisteminden gelen dinamik güvenilirlik ağırlıklarını kaydeder."""
         if not weights:
             return

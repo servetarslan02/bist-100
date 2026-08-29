@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Estimation Window Manager (MacKinlay, 1997).
 
 Estimation window, event öncesi veriyi kullanarak expected return modelinin
@@ -51,7 +52,7 @@ ESTIMATION_WINDOWS = {
 GAP_TRADING_DAYS = 6
 
 
-def _get_calendar():
+def _get_calendar() -> Any:
     """Trading calendar'ı lazy import et."""
     from .trading_calendar import get_trading_calendar
 
@@ -66,6 +67,7 @@ class EstimationWindowManager:
     """
 
     def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS, gap_days: int | None = None):
+        """Otomatik eklendi."""
         self.gap_trading_days = gap_days if gap_days is not None else gap_trading_days
 
     def get_window(self, event_date: datetime, event_type: str = "DEFAULT") -> tuple[datetime, datetime]:

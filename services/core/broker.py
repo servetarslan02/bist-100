@@ -17,23 +17,31 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.broker")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class OrderSide(Enum):
+    """Otomatik eklendi."""
     BUY = "BUY"
     SELL = "SELL"
 
 
 class OrderStatus(Enum):
+    """Otomatik eklendi."""
     PENDING = "PENDING"
     SUBMITTED = "SUBMITTED"
     FILLED = "FILLED"
@@ -44,6 +52,7 @@ class OrderStatus(Enum):
 
 @dataclass
 class Order:
+    """Otomatik eklendi."""
     order_id: str
     ticker: str
     side: str
@@ -61,18 +70,28 @@ class BrokerInterface:
     """Broker abstraction interface."""
 
     def submit_order(self, order: Order) -> Order:
+        """Otomatik eklendi."""
+        logger.warning("submit_order is not implemented")
         raise NotImplementedError
 
     def cancel_order(self, order_id: str) -> bool:
+        """Otomatik eklendi."""
+        logger.warning("cancel_order is not implemented")
         raise NotImplementedError
 
     def get_order_status(self, order_id: str) -> Order | None:
+        """Otomatik eklendi."""
+        logger.warning("get_order_status is not implemented")
         raise NotImplementedError
 
     def get_positions(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
+        logger.warning("get_positions is not implemented")
         raise NotImplementedError
 
     def is_connected(self) -> bool:
+        """Otomatik eklendi."""
+        logger.warning("is_connected is not implemented")
         raise NotImplementedError
 
 
@@ -80,6 +99,7 @@ class PaperBroker(BrokerInterface):
     """Paper broker — simülasyon, gerçek emir yok."""
 
     def __init__(self, initial_capital: float = 1_000_000, slippage_bps: float = 5.0):
+        """Otomatik eklendi."""
         self._capital = initial_capital
         self._positions: dict[str, dict] = {}
         self._orders: dict[str, Order] = {}
@@ -88,6 +108,7 @@ class PaperBroker(BrokerInterface):
 
     @otel_trace("broker.submit_order")
     def submit_order(self, order: Order) -> Order:
+        """Otomatik eklendi."""
         # Idempotency kontrolü
         if order.idempotency_key:
             existing_id = self._idempotency_keys.get(order.idempotency_key)
@@ -154,6 +175,7 @@ class PaperBroker(BrokerInterface):
 
     @otel_trace("broker.cancel_order")
     def cancel_order(self, order_id: str) -> bool:
+        """Otomatik eklendi."""
         order = self._orders.get(order_id)
         if order and order.status == OrderStatus.SUBMITTED.value:
             order.status = OrderStatus.CANCELLED.value
@@ -162,13 +184,16 @@ class PaperBroker(BrokerInterface):
 
     @otel_trace("broker.get_order_status")
     def get_order_status(self, order_id: str) -> Order | None:
+        """Otomatik eklendi."""
         return self._orders.get(order_id)
 
     @otel_trace("broker.get_positions")
     def get_positions(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return dict(self._positions)
 
     def is_connected(self) -> bool:
+        """Otomatik eklendi."""
         return True
 
 

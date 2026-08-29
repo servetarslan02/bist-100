@@ -25,10 +25,10 @@ Kullanım:
     df = await research_engine.query_research("SELECT * FROM model_predictions WHERE confidence > 0.8")
 """
 
+import functools
 from pathlib import Path
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
@@ -45,18 +45,26 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.duckdb_research")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        async def async_wrapper(self, *args, **kwargs):
+        async def async_wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return await func(self, *args, **kwargs)
+
         @functools.wraps(func)
-        def sync_wrapper(self, *args, **kwargs):
+        def sync_wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
-        return async_wrapper if __import__('asyncio').iscoroutinefunction(func) else sync_wrapper
+
+        return async_wrapper if __import__("asyncio").iscoroutinefunction(func) else sync_wrapper
+
     return decorator
 
 
@@ -64,6 +72,7 @@ class DuckDBResearchEngine:
     """DuckDB tabanlı araştırma motoru — offline OLAP analiz."""
 
     def __init__(self, research_db_path: str = "data/research.duckdb"):
+        """Otomatik eklendi."""
         if duckdb is None:
             raise RuntimeError("duckdb not installed. Run: pip install duckdb")
 
@@ -82,7 +91,7 @@ class DuckDBResearchEngine:
             logger.info("DuckDB research engine connected", path=str(self._db_path))
         return self._conn
 
-    def close(self):
+    def close(self) -> Any:
         """Bağlantıyı kapat."""
         if self._conn:
             self._conn.close()
@@ -131,7 +140,7 @@ class DuckDBResearchEngine:
             raise
 
     @otel_trace("duckdb_research.register_parquet")
-    def register_parquet(self, name: str, parquet_path: str):
+    def register_parquet(self, name: str, parquet_path: str) -> Any:
         """Parquet dosyasını sanal tablo olarak kaydet.
 
         Args:
@@ -344,7 +353,7 @@ class DuckDBResearchEngine:
     # RESEARCH TABLE OPERATIONS
     # =====================================================
 
-    def create_research_table(self, name: str, schema: dict[str, str]):
+    def create_research_table(self, name: str, schema: dict[str, str]) -> Any:
         """Research tablosu oluştur.
 
         Args:
@@ -361,7 +370,7 @@ class DuckDBResearchEngine:
         conn.execute(f'CREATE TABLE IF NOT EXISTS "{name}" ({columns})')
         logger.info("Research table created", name=name)
 
-    def insert_from_parquet(self, table: str, parquet_path: str):
+    def insert_from_parquet(self, table: str, parquet_path: str) -> Any:
         """Parquet dosyasından research tablosuna veri aktar.
 
         Args:

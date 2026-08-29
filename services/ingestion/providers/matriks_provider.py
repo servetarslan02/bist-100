@@ -25,6 +25,7 @@ class MatriksProvider:
     BASE_URL = "https://www.matriks.com"
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._client = get_client(
             "matriks",
             timeout=15.0,
@@ -45,6 +46,7 @@ class MatriksProvider:
         semaphore = asyncio.Semaphore(5)
 
         async def _fetch_one(ticker: str) -> tuple:
+            """Otomatik eklendi."""
             async with semaphore:
                 data = await self.fetch_stock_price(ticker)
                 return ticker, data

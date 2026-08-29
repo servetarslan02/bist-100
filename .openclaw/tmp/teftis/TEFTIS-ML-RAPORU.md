@@ -27,7 +27,8 @@
 
 ```python
 model.fit(
-    X_train, y_train,
+    X_train,
+    y_train,
     eval_set=[(X_test, y_test)],  # ← TEST VERİSİ EARLY STOPPING'DE KULLANILIYOR
     callbacks=[lgb.early_stopping(config.early_stopping_rounds, verbose=False)],
 )
@@ -53,7 +54,9 @@ model.fit(X_train, y_train, eval_set=[(X_val, y_val)], ...)
 ```python
 # Train final model on all data
 X_all, y_all, feat_names = self.prepare_dataset(
-    data_sorted, config.feature_names, config.target  # ← TÜM VERİ (test dönemleri dahil)
+    data_sorted,
+    config.feature_names,
+    config.target,  # ← TÜM VERİ (test dönemleri dahil)
 )
 final_model.fit(X_all, y_all)
 ```
@@ -78,6 +81,7 @@ kf = KFold(n_splits=self._config.cv_folds, shuffle=True, random_state=42)
 **Düzeltme:** `TimeSeriesSplit` kullan:
 ```python
 from sklearn.model_selection import TimeSeriesSplit
+
 kf = TimeSeriesSplit(n_splits=self._config.cv_folds)
 ```
 
@@ -556,7 +560,7 @@ for epoch in range(self._config.epochs):
     if val_loss < best_val_loss:
         best_state = {k: v.clone() for k, v in self._model.state_dict().items()}
 # ...
-if 'best_state' in locals():  # ← Eğer val_loss hiç iyileşmezse best_state yok
+if "best_state" in locals():  # ← Eğer val_loss hiç iyileşmezse best_state yok
     self._model.load_state_dict(best_state)
 ```
 
@@ -603,7 +607,7 @@ model.fit(X_train, y_train, **fit_params)  # ← sklearn API, DMatrix kullanılm
 **Kategori:** Feature Engineering  
 
 ```python
-if col.dtype.kind in ('i', 'u'):
+if col.dtype.kind in ("i", "u"):
     unique_count = len(np.unique(col[~np.isnan(col.astype(float))]))
     if unique_count < 20:
         cat_indices.append(i)

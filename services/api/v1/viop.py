@@ -1,3 +1,4 @@
+from typing import Any
 """VIOP API — Gerçek veriyle çalışan endpoint'ler."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,7 +31,7 @@ async def get_options(
     symbol: str = Query(..., description="Sözleşme kodu (ör. XU030)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Opsiyon sözleşme bilgisi ve Greeks."""
     contract = viop_catalog.get_contract(symbol)
     if not contract:
@@ -55,7 +56,7 @@ async def price_option(
     option_type: str = Query("call", description="call/put"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Black-Scholes opsiyon fiyatlaması."""
     price = black_scholes(S, K, T, r, sigma, option_type)
     greeks = calculate_greeks(S, K, T, r, sigma, option_type)
@@ -77,7 +78,7 @@ async def calculate_iv(
     option_type: str = Query("call", description="call/put"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Implied volatility hesapla (Newton-Raphson)."""
     iv = implied_volatility.calculate(market_price, S, K, T, r, option_type)
 
@@ -99,7 +100,7 @@ async def get_portfolio_greeks(
     positions: list[dict],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Portföy bazlı Greeks aggregation.
 
     positions: [{"option_type", "S", "K", "T", "r", "sigma", "quantity", "side"}]
@@ -120,7 +121,7 @@ async def get_portfolio_greeks(
 async def list_strategies(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Mevcut opsiyon stratejilerini listele."""
     return {
         "strategies": [
@@ -144,7 +145,7 @@ async def analyze_strategy(
     params: dict = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Strateji analizi yap."""
     if params is None:
         params = {}
@@ -235,7 +236,7 @@ async def calculate_hedge(
     contract_multiplier: float = Query(100, description="Sözleşme çarpanı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Delta hedge pozisyonu öner."""
     result = delta_hedger.hedge(portfolio_delta, spot_price, futures_price, contract_multiplier)
     return result.to_dict()
@@ -248,7 +249,7 @@ async def gamma_scalp(
     price_move_pct: float = Query(..., description="Fiyat hareketi (%)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Gamma scalping P&L hesabı."""
     return delta_hedger.gamma_scalp(portfolio_gamma, spot_price, price_move_pct)
 
@@ -263,7 +264,7 @@ async def calculate_margin(
     positions: list[dict],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """SPAN teminat hesapla.
 
     positions: [{"ticker", "value", "delta", "gamma", "vega", "spot_price"}]
@@ -286,7 +287,7 @@ async def check_arbitrage(
     time_to_expiry: float = Query(0.25, description="Vade (yıl)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Futures-spot arbitraj kontrolü."""
     result = futures_spot_arbitrage.analyze(spot_price, futures_price, risk_free_rate, dividend_yield, time_to_expiry)
     return result.to_dict()
@@ -307,7 +308,7 @@ async def check_parity(
     T: float = Query(0.25),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Put-Call Parity kontrolü."""
     return check_put_call_parity(call_price, put_price, spot_price, strike, r, T)
 
@@ -323,7 +324,7 @@ async def calculate_viop_risk(
     portfolio_value: float = Query(..., description="Portföy değeri"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """VIOP pozisyon risk hesabı."""
     return viop_risk.calculate_portfolio_viop_risk(viop_positions, portfolio_value)
 
@@ -338,7 +339,7 @@ async def list_contracts(
     category: str | None = Query(None, description="Kategori filtresi (endeks/döviz/emtia)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """VIOP sözleşmelerini listele."""
     if category:
         contracts = viop_catalog.get_contracts_by_category(category)
@@ -351,7 +352,7 @@ async def get_contract(
     symbol: str,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tek sözleşme detayı."""
     contract = viop_catalog.get_contract(symbol)
     if not contract:

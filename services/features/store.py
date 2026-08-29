@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Real Feature Store
 Redis ve bellek üzerinden anlık canlı öznitelikleri depolar ve sorgular.
@@ -20,7 +21,7 @@ class FeatureStore:
             return {k: float(v) for k, v in cached.items() if isinstance(v, (int, float, str))}
         return {}
 
-    def set_features(self, ticker: str, features: dict[str, float], ttl: int = 3600):
+    def set_features(self, ticker: str, features: dict[str, float], ttl: int = 3600) -> Any:
         """Öznitelikleri kaydet."""
         if features:
             set_cached(f"features:{ticker}", features, ttl=ttl)

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Portfolio Manager v2.0 — Kurumsal Muhasebe Testleri
 """
@@ -11,7 +14,7 @@ from services.portfolio.portfolio_manager import (
 )
 
 
-def test_commission_model():
+def test_commission_model() -> Any:
     """Komisyon modeli testleri."""
     cm = CommissionModel()
     issues = []
@@ -40,7 +43,7 @@ def test_commission_model():
     return "Commission Model", len(issues) == 0, issues
 
 
-def test_cash_ledger():
+def test_cash_ledger() -> Any:
     """Nakit hareket ledger testleri."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -66,7 +69,7 @@ def test_cash_ledger():
     return "Cash Ledger", len(issues) == 0, issues
 
 
-def test_position_history():
+def test_position_history() -> Any:
     """Pozisyon geçmişi audit trail testleri."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -107,7 +110,7 @@ def test_position_history():
     return "Position History", len(issues) == 0, issues
 
 
-def test_equity_curve():
+def test_equity_curve() -> Any:
     """Equity curve ve snapshot testleri."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -145,7 +148,7 @@ def test_equity_curve():
     return "Equity Curve", len(issues) == 0, issues
 
 
-def test_realized_pnl():
+def test_realized_pnl() -> Any:
     """Realized P&L muhasebesi testleri."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -176,7 +179,7 @@ def test_realized_pnl():
     return "Realized P&L", len(issues) == 0, issues
 
 
-def test_accounting_invariant():
+def test_accounting_invariant() -> Any:
     """EQUITY = CASH + MARKET_VALUE invariant testi."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -222,7 +225,7 @@ def test_accounting_invariant():
     return "Accounting Invariant", len(issues) == 0, issues
 
 
-def test_weighted_average_cost():
+def test_weighted_average_cost() -> Any:
     """Weighted average cost basis testi."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -259,7 +262,7 @@ def test_weighted_average_cost():
     return "Weighted Avg Cost", len(issues) == 0, issues
 
 
-def test_short_position():
+def test_short_position() -> Any:
     """Short pozisyon P&L testi."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -280,7 +283,7 @@ def test_short_position():
     return "Short Position", len(issues) == 0, issues
 
 
-def test_no_negative_weight():
+def test_no_negative_weight() -> Any:
     """Negatif weight/senaryo testleri."""
     pm = PortfolioManager(initial_capital=100000)
     issues = []
@@ -319,10 +322,11 @@ def test_no_negative_weight():
 # ============================================================
 
 
-def main():
-    print("=" * 60)
-    print("PORTFOLIO MANAGER v2.0 — KURUMSAL MUHASEBE TESTLERİ")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("PORTFOLIO MANAGER v2.0 — KURUMSAL MUHASEBE TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_commission_model,
@@ -343,23 +347,23 @@ def main():
     for test_func in tests:
         name, passed, issues = test_func()
         icon = "✅" if passed else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if passed:
             total_pass += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             total_fail += 1
             for issue in issues:
-                print(f"   ❌ {issue}")
+                logger.info(f"   ❌ {issue}")
                 all_issues.append(f"{name}: {issue}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
 
     return total_fail == 0
 

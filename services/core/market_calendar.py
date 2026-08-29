@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Market Calendar v2.0
 
@@ -11,10 +12,10 @@ Eylül 2025 güncel kurallar:
 - EBDKS: BIST-100 %6 düşüşte tetiklenir
 """
 
+import functools
 from datetime import date, datetime, time, timedelta
 from enum import StrEnum
 
-import functools
 import structlog
 from opentelemetry import trace
 
@@ -23,14 +24,20 @@ from .market_session_fsm import _TZ_ISTANBUL, BISTMarketPhase, bist_session_fsm
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.market_calendar")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -69,6 +76,7 @@ class MarketCalendar:
     HALF_CLOSING_END = time(12, 40)  # Yarım gün kapanış sonu
 
     def __init__(self, holidays: list[date] | None = None, half_days: list[date] | None = None):
+        """Otomatik eklendi."""
         from .holiday_manager import holiday_manager
 
         self._hm = holiday_manager
@@ -104,6 +112,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.is_trading_day")
     def is_trading_day(self, d: date | None = None) -> bool:
+        """Otomatik eklendi."""
         if d is None:
             d = date.today()
         if d.weekday() >= 5:
@@ -114,6 +123,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.is_market_open")
     def is_market_open(self, dt: datetime | None = None) -> bool:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if not self.is_trading_day(dt.date()):
@@ -123,6 +133,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.get_session")
     def get_session(self, dt: datetime | None = None) -> MarketSession:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if not self.is_trading_day(dt.date()):
@@ -143,6 +154,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.get_status")
     def get_status(self, dt: datetime | None = None) -> MarketStatus:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         session = self.get_session(dt)
@@ -157,6 +169,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.next_open")
     def next_open(self, dt: datetime | None = None) -> datetime:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if self.is_trading_day(dt.date()):
@@ -172,6 +185,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.next_close")
     def next_close(self, dt: datetime | None = None) -> datetime:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if self.is_trading_day(dt.date()):
@@ -189,6 +203,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.trading_days_between")
     def trading_days_between(self, start: date, end: date) -> int:
+        """Otomatik eklendi."""
         count = 0
         current = start
         while current <= end:
@@ -198,7 +213,8 @@ class MarketCalendar:
         return count
 
     @otel_trace("market_calendar.add_halt")
-    def add_halt(self, d: date, start: time, end: time):
+    def add_halt(self, d: date, start: time, end: time) -> Any:
+        """Otomatik eklendi."""
         if d not in self._halts:
             self._halts[d] = []
         self._halts[d].append((start, end))
@@ -228,6 +244,7 @@ class MarketCalendar:
 
     @otel_trace("market_calendar.get_info")
     def get_info(self, dt: datetime | None = None) -> dict:
+        """Otomatik eklendi."""
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         return {

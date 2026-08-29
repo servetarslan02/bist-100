@@ -15,7 +15,7 @@ _pipeline = LearningPipeline()
 
 
 @router.get("/status")
-async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Öğrenme ve model performans sistemi genel durumu."""
     try:
         latest = _pipeline.store.get_latest_metrics_all_models()
@@ -32,7 +32,7 @@ async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_l
 
 @router.get("/performance-matrix")
 @router.get("/metrics")
-async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tüm modellerin 30-Yıllık ve OOS karşılaştırmalı performans matrisi.
 
     Kaynak: Model registry (Redis/PostgreSQL). Veri yoksa boş döner.
@@ -97,7 +97,7 @@ _cached_report = None
 
 
 @router.get("/report")
-async def performance_report(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def performance_report(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """En son model ogrenme raporunu Markdown ve JSON olarak doner."""
     global _cached_report
     if _cached_report:
@@ -152,7 +152,7 @@ async def trigger_learning_cycle(
     background_tasks: BackgroundTasks = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Manuel veya seans sonu otomatik model öğrenme döngüsünü tetikler (arka planda)."""
     if background_tasks:
         background_tasks.add_task(_run_learning_cycle, regime)
@@ -165,7 +165,7 @@ async def trigger_learning_cycle(
         raise HTTPException(500, "Internal server error") from e
 
 
-def _run_learning_cycle(regime: str):
+def _run_learning_cycle(regime: str) -> Any:
     """Arka plan learning cycle görevi."""
     try:
         _pipeline.run_learning_cycle(current_regime=regime)
@@ -176,7 +176,7 @@ def _run_learning_cycle(regime: str):
 @router.post("/record_prediction")
 async def record_prediction(
     payload: dict[str, Any] = Body(...), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Yeni model tahminini kaydeder."""
     try:
         pred_id = _pipeline.record_model_prediction(
@@ -199,7 +199,7 @@ async def record_prediction(
 @router.post("/record_outcome")
 async def record_outcome(
     payload: dict[str, Any] = Body(...), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Tahmin sonucunu gerçek fiyatla bağlar."""
     try:
         res = _pipeline.record_market_outcome(
@@ -217,7 +217,7 @@ async def record_outcome(
 
 
 @router.get("/calibration")
-async def calibration(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def calibration(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Kalibrasyon sonuçları."""
     latest = _pipeline.store.get_latest_metrics_all_models()
     return {
@@ -230,13 +230,13 @@ async def calibration(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 
 @router.get("/drift")
-async def drift_detection(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def drift_detection(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Model ve feature drift denetimi."""
     return {"drift_detected": False, "status": "nominal", "message": "All models within stability thresholds"}
 
 
 @router.get("/champion-challenger")
-async def champion_challenger(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def champion_challenger(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Champion / Challenger liderlik durumu."""
     latest = _pipeline.store.get_latest_metrics_all_models()
     champion = latest[0]["model_id"] if latest else "LightGBM_LambdaRank"

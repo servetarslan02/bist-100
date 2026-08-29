@@ -1,31 +1,39 @@
+import functools
 import os
 import tempfile
 from typing import Any
 
 import orjson
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.redis_helper")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 _redis_client = None
 _redis_available = None
 _CACHE_FILE = os.path.join(tempfile.gettempdir(), "alpha_bist_cache.json")
 
 
-def _load_cache():
+def _load_cache() -> Any:
+    """Otomatik eklendi."""
     if os.path.exists(_CACHE_FILE):
         try:
             with open(_CACHE_FILE) as f:
@@ -35,7 +43,8 @@ def _load_cache():
     return {}
 
 
-def _save_cache(data):
+def _save_cache(data) -> Any:
+    """Otomatik eklendi."""
     try:
         with open(_CACHE_FILE, "w") as f:
             f.write(orjson.dumps(data).decode())
@@ -43,7 +52,8 @@ def _save_cache(data):
         logger.warning("Caught Exception in _save_cache", exc_info=True)
 
 
-def get_client():
+def get_client() -> Any:
+    """Otomatik eklendi."""
     global _redis_client, _redis_available
     if _redis_available is False:
         return None
@@ -75,6 +85,7 @@ def get_client():
 
 @otel_trace("redis_helper.get_cached")
 def get_cached(key: str) -> Any | None:
+    """Otomatik eklendi."""
     r = get_client()
     if r is None:
         cache = _load_cache()
@@ -92,6 +103,7 @@ def get_cached(key: str) -> Any | None:
 
 @otel_trace("redis_helper.set_cached")
 def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
+    """Otomatik eklendi."""
     r = get_client()
     if r is None:
         cache = _load_cache()
@@ -107,6 +119,7 @@ def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
 
 @otel_trace("redis_helper.delete_cached")
 def delete_cached(key: str) -> bool:
+    """Otomatik eklendi."""
     r = get_client()
     if r is None:
         cache = _load_cache()
@@ -122,4 +135,5 @@ def delete_cached(key: str) -> bool:
 
 
 def is_available() -> bool:
+    """Otomatik eklendi."""
     return True

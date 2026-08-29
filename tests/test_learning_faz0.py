@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 0 Test Suite
 
@@ -15,16 +18,16 @@ import numpy as np
 # ===================== CONFIG TESTS =====================
 
 
-def test_config_load():
+def test_config_load() -> Any:
     """Config yükleniyor mu?"""
     from services.learning.config.learning_config import LearningSettings, learning_settings
 
     assert learning_settings is not None
     assert isinstance(learning_settings, LearningSettings)
-    print("✅ Config yüklendi")
+    logger.info("✅ Config yüklendi")
 
 
-def test_config_calibration():
+def test_config_calibration() -> Any:
     """Calibration config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -36,10 +39,10 @@ def test_config_calibration():
     assert cfg.min_samples == 30
     assert cfg.n_bins == 10
     assert cfg.platt_scaling_enabled is True
-    print("✅ Calibration config doğru")
+    logger.info("✅ Calibration config doğru")
 
 
-def test_config_drift():
+def test_config_drift() -> Any:
     """Drift config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -52,10 +55,10 @@ def test_config_drift():
     assert cfg.zscore_warning == 2.5
     assert cfg.zscore_critical == 3.5
     assert cfg.min_samples == 100
-    print("✅ Drift config doğru")
+    logger.info("✅ Drift config doğru")
 
 
-def test_config_retrain():
+def test_config_retrain() -> Any:
     """Retrain config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -71,10 +74,10 @@ def test_config_retrain():
     assert cfg.wf_test_size == 21
     assert cfg.wf_purge_size == 5
     assert cfg.wf_embargo_size == 5
-    print("✅ Retrain config doğru")
+    logger.info("✅ Retrain config doğru")
 
 
-def test_config_shadow():
+def test_config_shadow() -> Any:
     """Shadow config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -84,10 +87,10 @@ def test_config_shadow():
     assert cfg.promote_threshold_pct == 10.0
     assert cfg.significance_p == 0.05
     assert cfg.canary_allocation_pct == 0.10
-    print("✅ Shadow config doğru")
+    logger.info("✅ Shadow config doğru")
 
 
-def test_config_feature_importance():
+def test_config_feature_importance() -> Any:
     """Feature importance config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -96,10 +99,10 @@ def test_config_feature_importance():
     assert cfg.trend_window_days == 30
     assert cfg.min_importance_threshold == 0.001
     assert cfg.shap_sample_size == 1000
-    print("✅ Feature importance config doğru")
+    logger.info("✅ Feature importance config doğru")
 
 
-def test_config_model_registry():
+def test_config_model_registry() -> Any:
     """Model registry config değerleri doğru mu?"""
     from services.learning.config.learning_config import learning_settings
 
@@ -107,13 +110,13 @@ def test_config_model_registry():
     assert cfg.max_versions == 20
     assert cfg.auto_cleanup is True
     assert cfg.archive_retired is True
-    print("✅ Model registry config doğru")
+    logger.info("✅ Model registry config doğru")
 
 
 # ===================== STATISTICAL TESTS =====================
 
 
-def test_psi_stable():
+def test_psi_stable() -> Any:
     """PSI stabil dağılım için düşük değer vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -125,10 +128,10 @@ def test_psi_stable():
     assert result.psi < 0.1, f"PSI çok yüksek: {result.psi}"
     assert result.drift_detected is False
     assert result.severity == "STABLE"
-    print(f"✅ PSI stabil: {result.psi}")
+    logger.info(f"✅ PSI stabil: {result.psi}")
 
 
-def test_psi_drift():
+def test_psi_drift() -> Any:
     """PSI farklı dağılımlar için yüksek değer vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -140,19 +143,19 @@ def test_psi_drift():
     assert result.psi > 0.2, f"PSI çok düşük: {result.psi}"
     assert result.drift_detected is True
     assert result.severity in ["ALERT", "CRITICAL"]
-    print(f"✅ PSI drift tespit: {result.psi}, severity: {result.severity}")
+    logger.info(f"✅ PSI drift tespit: {result.psi}, severity: {result.severity}")
 
 
-def test_psi_insufficient_data():
+def test_psi_insufficient_data() -> Any:
     """PSI yetersiz veri ile başa çıkmalı."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
     result = StatisticalTests.compute_psi(np.array([1, 2, 3]), np.array([1, 2]))
     assert result.severity == "INSUFFICIENT_DATA"
-    print("✅ PSI yetersiz veri handling")
+    logger.info("✅ PSI yetersiz veri handling")
 
 
-def test_ks_test_same():
+def test_ks_test_same() -> Any:
     """KS test aynı dağılımlar için yüksek p-value vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -163,10 +166,10 @@ def test_ks_test_same():
     result = StatisticalTests.ks_test(sample1, sample2)
     assert result.drift_detected is False
     assert result.p_value > 0.05
-    print(f"✅ KS test aynı dağılım: p={result.p_value}")
+    logger.info(f"✅ KS test aynı dağılım: p={result.p_value}")
 
 
-def test_ks_test_different():
+def test_ks_test_different() -> Any:
     """KS test farklı dağılımlar için düşük p-value vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -177,10 +180,10 @@ def test_ks_test_different():
     result = StatisticalTests.ks_test(sample1, sample2)
     assert result.drift_detected is True
     assert result.p_value < 0.01
-    print(f"✅ KS test farklı dağılım: p={result.p_value}")
+    logger.info(f"✅ KS test farklı dağılım: p={result.p_value}")
 
 
-def test_zscore_normal():
+def test_zscore_normal() -> Any:
     """Z-score normal değer için düşük vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -188,10 +191,10 @@ def test_zscore_normal():
     assert result["z_score"] < 2.5
     assert result["severity"] == "NORMAL"
     assert result["drift_detected"] is False
-    print(f"✅ Z-score normal: {result['z_score']}")
+    logger.info(f"✅ Z-score normal: {result['z_score']}")
 
 
-def test_zscore_critical():
+def test_zscore_critical() -> Any:
     """Z-score aşırı değer için yüksek vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -199,10 +202,10 @@ def test_zscore_critical():
     assert result["z_score"] > 3.5
     assert result["severity"] == "CRITICAL"
     assert result["drift_detected"] is True
-    print(f"✅ Z-score critical: {result['z_score']}")
+    logger.info(f"✅ Z-score critical: {result['z_score']}")
 
 
-def test_page_hinkley_no_drift():
+def test_page_hinkley_no_drift() -> Any:
     """Page-Hinkley stabil veri için drift tespit etmemeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -210,10 +213,10 @@ def test_page_hinkley_no_drift():
     data = np.random.normal(0, 1, 200)
 
     result = StatisticalTests.page_hinkley_test(data)
-    print(f"✅ Page-Hinkley no drift: max_dev={result.max_deviation}")
+    logger.info(f"✅ Page-Hinkley no drift: max_dev={result.max_deviation}")
 
 
-def test_page_hinkley_drift():
+def test_page_hinkley_drift() -> Any:
     """Page-Hinkley ani değişim için drift tespit etmeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -224,10 +227,10 @@ def test_page_hinkley_drift():
     result = StatisticalTests.page_hinkley_test(data, threshold=50)
     assert result.drift_detected is True
     assert result.change_point_index is not None
-    print(f"✅ Page-Hinkley drift tespit: change_point={result.change_point_index}")
+    logger.info(f"✅ Page-Hinkley drift tespit: change_point={result.change_point_index}")
 
 
-def test_adwin_no_drift():
+def test_adwin_no_drift() -> Any:
     """ADWIN stabil veri için drift tespit etmemeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -236,10 +239,10 @@ def test_adwin_no_drift():
 
     result = StatisticalTests.adwin_test(data)
     assert result.drift_detected is False
-    print(f"✅ ADWIN no drift: p={result.p_value}")
+    logger.info(f"✅ ADWIN no drift: p={result.p_value}")
 
 
-def test_adwin_drift():
+def test_adwin_drift() -> Any:
     """ADWIN ani değişim için drift tespit etmeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -248,10 +251,10 @@ def test_adwin_drift():
 
     result = StatisticalTests.adwin_test(data, delta=0.001)
     assert result.drift_detected is True
-    print(f"✅ ADWIN drift tespit: p={result.p_value}")
+    logger.info(f"✅ ADWIN drift tespit: p={result.p_value}")
 
 
-def test_welch_t_test_significant():
+def test_welch_t_test_significant() -> Any:
     """Welch's t-test farklı gruplar için anlamlı sonuç vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -261,10 +264,10 @@ def test_welch_t_test_significant():
 
     result = StatisticalTests.welch_t_test(sample1, sample2)
     assert result.significant is True
-    print(f"✅ Welch t-test significant: t={result.t_statistic}, p={result.p_value}")
+    logger.info(f"✅ Welch t-test significant: t={result.t_statistic}, p={result.p_value}")
 
 
-def test_welch_t_test_not_significant():
+def test_welch_t_test_not_significant() -> Any:
     """Welch's t-test benzer gruplar için anlamsız sonuç vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -274,10 +277,10 @@ def test_welch_t_test_not_significant():
 
     result = StatisticalTests.welch_t_test(sample1, sample2)
     assert result.significant is False
-    print(f"✅ Welch t-test not significant: p={result.p_value}")
+    logger.info(f"✅ Welch t-test not significant: p={result.p_value}")
 
 
-def test_brier_score_perfect():
+def test_brier_score_perfect() -> Any:
     """Brier score mükemmel tahmin için 0 vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -286,10 +289,10 @@ def test_brier_score_perfect():
 
     score = StatisticalTests.brier_score(predicted, actual)
     assert score == 0.0
-    print(f"✅ Brier score perfect: {score}")
+    logger.info(f"✅ Brier score perfect: {score}")
 
 
-def test_brier_score_random():
+def test_brier_score_random() -> Any:
     """Brier score rastgele tahmin için yüksek vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -298,10 +301,10 @@ def test_brier_score_random():
 
     score = StatisticalTests.brier_score(predicted, actual)
     assert score == 0.25
-    print(f"✅ Brier score random: {score}")
+    logger.info(f"✅ Brier score random: {score}")
 
 
-def test_sharpe_ratio():
+def test_sharpe_ratio() -> Any:
     """Sharpe ratio pozitif getiriler için pozitif vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -310,10 +313,10 @@ def test_sharpe_ratio():
 
     sharpe = StatisticalTests.sharpe_ratio(returns)
     assert sharpe > 0
-    print(f"✅ Sharpe ratio: {sharpe}")
+    logger.info(f"✅ Sharpe ratio: {sharpe}")
 
 
-def test_information_coefficient():
+def test_information_coefficient() -> Any:
     """IC yüksek korelasyonlu skorlar için yüksek vermeli."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -323,10 +326,10 @@ def test_information_coefficient():
 
     ic = StatisticalTests.information_coefficient(scores, actual_returns)
     assert ic > 0.3, f"IC çok düşük: {ic}"
-    print(f"✅ IC: {ic}")
+    logger.info(f"✅ IC: {ic}")
 
 
-def test_deflated_sharpe():
+def test_deflated_sharpe() -> Any:
     """Deflated Sharpe multiple testing için düzeltme yapmalı."""
     from services.learning.utils.statistical_tests import StatisticalTests
 
@@ -338,13 +341,13 @@ def test_deflated_sharpe():
     )
     # 10 model denendiğinde 2.0 Sharpe artık o kadar imkansız değil
     assert 0 <= deflated <= 1
-    print(f"✅ Deflated Sharpe: {deflated}")
+    logger.info(f"✅ Deflated Sharpe: {deflated}")
 
 
 # ===================== REFACTOR TESTS =====================
 
 
-def test_super_intelligence_uses_config():
+def test_super_intelligence_uses_config() -> Any:
     """SuperIntelligenceEngine config'den değerleri okuyor mu?"""
     from services.learning.super_intelligence import SuperIntelligenceEngine
 
@@ -354,10 +357,10 @@ def test_super_intelligence_uses_config():
     assert engine.drift_threshold == 0.2
     assert engine.max_models_history == 20
     assert engine.ab_test_window_days == 21
-    print("✅ SuperIntelligence config kullanıyor")
+    logger.info("✅ SuperIntelligence config kullanıyor")
 
 
-def test_continuous_learning_uses_config():
+def test_continuous_learning_uses_config() -> Any:
     """ContinuousLearningPipeline config'den değerleri okuyor mu?"""
     from services.learning.continuous_learning import ContinuousLearningPipeline
 
@@ -366,20 +369,20 @@ def test_continuous_learning_uses_config():
     assert pipeline.drift_check_interval == 1
     assert pipeline.performance_window == 21
     assert pipeline.min_samples_for_retrain == 500
-    print("✅ ContinuousLearning config kullanıyor")
+    logger.info("✅ ContinuousLearning config kullanıyor")
 
 
-def test_learning_loop_uses_config():
+def test_learning_loop_uses_config() -> Any:
     """LearningLoop config'den değerleri okuyor mu?"""
     from services.learning.learning_loop import LearningLoop
 
     loop = LearningLoop()
     # Decay check config'den okunmalı
     assert loop._state.retrain_needed is False
-    print("✅ LearningLoop config kullanıyor")
+    logger.info("✅ LearningLoop config kullanıyor")
 
 
-def test_healing_max_attempts():
+def test_healing_max_attempts() -> Any:
     """Healing max attempt kontrolü çalışıyor mu?"""
     from services.learning.super_intelligence import SuperIntelligenceEngine
 
@@ -394,14 +397,15 @@ def test_healing_max_attempts():
     assert result is False
     assert record["status"] == "FAILED"
     assert "Max attempts" in record.get("failure_reason", "")
-    print("✅ Healing max attempts çalışıyor")
+    logger.info("✅ Healing max attempts çalışıyor")
 
 
-def test_fallback_importance():
+def test_fallback_importance() -> Any:
     """SHAP fallback importance çalışıyor mu?"""
     from services.learning.utils.shap_helpers import SHAPHelpers
 
     class MockModel:
+        """Otomatik eklendi."""
         feature_importances_ = np.array([0.3, 0.5, 0.2])
 
     X = np.random.rand(10, 3)
@@ -410,13 +414,13 @@ def test_fallback_importance():
     result = SHAPHelpers._fallback_importance(MockModel(), X, feature_names)
     assert len(result.feature_importance) == 3
     assert result.top_features[0][0] == "feat_b"  # En yüksek importance
-    print("✅ SHAP fallback importance çalışıyor")
+    logger.info("✅ SHAP fallback importance çalışıyor")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
     """Tüm testleri çalıştır."""
     tests = [
         # Config tests
@@ -465,19 +469,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 0 TEST SONUÇLARI")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 0 TEST SONUÇLARI")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

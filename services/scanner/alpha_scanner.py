@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Alpha Scanner v1.0
 
@@ -25,6 +26,7 @@ logger = structlog.get_logger()
 
 
 class SignalType:
+    """Otomatik eklendi."""
     MOMENTUM = "MOMENTUM"  # Güçlü yükseliş devamı
     BREAKOUT = "BREAKOUT"  # Sıkışma → kırılım
     VOLUME_ANOMALY = "VOLUME_ANOMALY"  # Olağandışı hacim
@@ -99,6 +101,7 @@ class AlphaScanner(ScannerInterface):
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_scan: datetime | None = None
         self._scan_count: int = 0
         self._regime: str = "RANGE"
@@ -312,7 +315,7 @@ class AlphaScanner(ScannerInterface):
 
         return round(float(max(0, min(100, score))), 1)
 
-    def _generate_signal(self, r: ScannerResult):
+    def _generate_signal(self, r: ScannerResult) -> Any:
         """Sinyal üret."""
         score = r.opportunity_score
 

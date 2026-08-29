@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — TÜM MOTORLARIN BİRBİRİNE BAĞLILIĞI, İLETİŞİMİ VE ÇELİŞKİSİZLİK KANITI
 1. Konsensüs (Tam Uyum) Durumu
@@ -16,16 +18,16 @@ if sys.platform == "win32":
 
 from services.core.decision_engine import DecisionEngine, DecisionInput
 
-print("=" * 85)
-print("ALPHA BIST — MOTORLAR ARASI ÇELİŞKİSİZLİK VE BAĞLILIK DENETİMİ")
-print("=" * 85)
+logger.info("=" * 85)
+logger.info("ALPHA BIST — MOTORLAR ARASI ÇELİŞKİSİZLİK VE BAĞLILIK DENETİMİ")
+logger.info("=" * 85)
 
 engine = DecisionEngine()
 
 # -------------------------------------------------------------------------
 # TEST 1: TAM KONSENSÜS (Tüm Motorlar Uyum İçinde)
 # -------------------------------------------------------------------------
-print("\n[TEST 1] Tam Konsensüs Testi (ML, Teknik, Temel, KAP, Makro Hepsi Pozitif)...")
+logger.info("\n[TEST 1] Tam Konsensüs Testi (ML, Teknik, Temel, KAP, Makro Hepsi Pozitif)...")
 inp_consensus = DecisionInput(
     ticker="THYAO",
     price=300.0,
@@ -50,17 +52,17 @@ inp_consensus = DecisionInput(
     sim_var_95=-4.0,
 )
 dec_1 = engine.decide(inp_consensus)
-print(
+logger.info(
     f"  ✓ Karar: {dec_1.action} | Yön: {dec_1.direction} | Conviction: {dec_1.conviction} | Skor: {dec_1.score:.1f}/100"
 )
-print(f"  ✓ Hedef Fiyat: ₺{dec_1.target_price:.2f} | Stop Fiyat: ₺{dec_1.stop_price:.2f} (R:R 2.0x)")
+logger.info(f"  ✓ Hedef Fiyat: ₺{dec_1.target_price:.2f} | Stop Fiyat: ₺{dec_1.stop_price:.2f} (R:R 2.0x)")
 assert dec_1.action == "BUY", "Test 1 Başarısız!"
-print("  [BAŞARILI] Tüm motorlar dinlendi, tam uyumla AL kararı verildi.")
+logger.info("  [BAŞARILI] Tüm motorlar dinlendi, tam uyumla AL kararı verildi.")
 
 # -------------------------------------------------------------------------
 # TEST 2: ÇELİŞKİ ÇÖZÜMLEME (Teknik AL vs Bilanço/KAP Kötü)
 # -------------------------------------------------------------------------
-print("\n[TEST 2] Çelişki Çözümleme Testi (Grafik AL Diyor, Ama Bilanço & KAP Tehlikeli)...")
+logger.info("\n[TEST 2] Çelişki Çözümleme Testi (Grafik AL Diyor, Ama Bilanço & KAP Tehlikeli)...")
 inp_conflict = DecisionInput(
     ticker="XYZ_SPEK",
     price=100.0,
@@ -79,15 +81,15 @@ inp_conflict = DecisionInput(
     atr_pct=5.0,
 )
 dec_2 = engine.decide(inp_conflict)
-print(f"  ✓ Karar: {dec_2.action} | Yön: {dec_2.direction} | Skor: {dec_2.score:.1f}/100")
-print(f"  ✓ Gerekçe / Risk Süzgeci: {dec_2.reasons}")
+logger.info(f"  ✓ Karar: {dec_2.action} | Yön: {dec_2.direction} | Skor: {dec_2.score:.1f}/100")
+logger.info(f"  ✓ Gerekçe / Risk Süzgeci: {dec_2.reasons}")
 assert dec_2.action in ["NO_ACTION", "HOLD", "SELL"], "Test 2 Başarısız!"
-print("  [BAŞARILI] Motorlar çelişkiyi yakaladı; grafik tek başına yetersiz kaldı ve hatalı alım ENGELLENDİ.")
+logger.info("  [BAŞARILI] Motorlar çelişkiyi yakaladı; grafik tek başına yetersiz kaldı ve hatalı alım ENGELLENDİ.")
 
 # -------------------------------------------------------------------------
 # TEST 3: REJİM VE MAKRO VETO HAKEMLİĞİ (Ayı / Panik Piyasasında Sermaye Koruma)
 # -------------------------------------------------------------------------
-print("\n[TEST 3] Rejim ve Makro Veto Testi (Hisse İyi Ama Piyasa Rejimi Çöküş/Ayı)...")
+logger.info("\n[TEST 3] Rejim ve Makro Veto Testi (Hisse İyi Ama Piyasa Rejimi Çöküş/Ayı)...")
 inp_bear = DecisionInput(
     ticker="ASELS",
     price=400.0,
@@ -101,15 +103,15 @@ inp_bear = DecisionInput(
     atr_pct=3.0,
 )
 dec_3 = engine.decide(inp_bear)
-print(f"  ✓ Karar: {dec_3.action} | Yön: {dec_3.direction} | Skor: {dec_3.score:.1f}/100")
-print(f"  ✓ Rejim Filtre Uyarısı: {dec_3.reasons[0]}")
+logger.info(f"  ✓ Karar: {dec_3.action} | Yön: {dec_3.direction} | Skor: {dec_3.score:.1f}/100")
+logger.info(f"  ✓ Rejim Filtre Uyarısı: {dec_3.reasons[0]}")
 assert dec_3.action == "NO_ACTION", "Test 3 Başarısız!"
-print("  [BAŞARILI] Rejim motoru devreye girdi; piyasa riskli olduğu için işlem VETO edildi.")
+logger.info("  [BAŞARILI] Rejim motoru devreye girdi; piyasa riskli olduğu için işlem VETO edildi.")
 
 # -------------------------------------------------------------------------
 # TEST 4: MONTE CARLO RİSK SÜZGECİ (Aşırı VaR Kayıp Riski Engeli)
 # -------------------------------------------------------------------------
-print("\n[TEST 4] Monte Carlo Risk ve VaR Süzgeci Testi (Aşırı Oynaklık Cezası)...")
+logger.info("\n[TEST 4] Monte Carlo Risk ve VaR Süzgeci Testi (Aşırı Oynaklık Cezası)...")
 inp_var = DecisionInput(
     ticker="VOLATILE_TICK",
     price=50.0,
@@ -121,10 +123,10 @@ inp_var = DecisionInput(
     features={"rsi_14": 55.0},
 )
 dec_4 = engine.decide(inp_var)
-print(f"  ✓ Karar: {dec_4.action} | Skor: {dec_4.score:.1f}/100 (VaR Cezası Sonrası)")
+logger.info(f"  ✓ Karar: {dec_4.action} | Skor: {dec_4.score:.1f}/100 (VaR Cezası Sonrası)")
 assert dec_4.score < 70.0, "Test 4 Başarısız!"
-print("  [BAŞARILI] Monte Carlo risk motoru aşırı kuyruk riskini cezalandırdı ve skoru düşürdü.")
+logger.info("  [BAŞARILI] Monte Carlo risk motoru aşırı kuyruk riskini cezalandırdı ve skoru düşürdü.")
 
-print("\n" + "=" * 85)
-print("TÜM MOTORLARIN BİRBİRİYLE SENKRONİZE, ÇELİŞKİSİZ VE HATASIZ ÇALIŞTIĞI KANITLANDI.")
-print("=" * 85)
+logger.info("\n" + "=" * 85)
+logger.info("TÜM MOTORLARIN BİRBİRİYLE SENKRONİZE, ÇELİŞKİSİZ VE HATASIZ ÇALIŞTIĞI KANITLANDI.")
+logger.info("=" * 85)

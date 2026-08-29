@@ -102,6 +102,7 @@ class MomentumMotor:
     """Computes momentum features."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        """Otomatik eklendi."""
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -115,6 +116,7 @@ class VolumeMotor:
     """Computes volume-based features."""
 
     def compute(self, ticker: str, volume: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        """Otomatik eklendi."""
         result: dict[str, float] = {}
         if len(volume) < lookback:
             return result
@@ -128,6 +130,7 @@ class VolatilityMotor:
     """Computes volatility features."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        """Otomatik eklendi."""
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -140,6 +143,7 @@ class MeanReversionMotor:
     """Computes mean reversion features."""
 
     def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        """Otomatik eklendi."""
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -151,7 +155,10 @@ class MeanReversionMotor:
 class MicrostructureMotor:
     """Computes microstructure features."""
 
-    def compute(self, ticker: str, high: np.ndarray, low: np.ndarray, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+    def compute(
+        self, ticker: str, high: np.ndarray, low: np.ndarray, close: np.ndarray, lookback: int = 20
+    ) -> dict[str, float]:
+        """Otomatik eklendi."""
         result: dict[str, float] = {}
         if len(close) < lookback:
             return result
@@ -208,29 +215,21 @@ class WhyFallingMotor:
         features["fall_sector_selloff_20d"] = 1.0 if sector_return_20d < -8 else 0.0
 
         # Company-specific (piyasa ve sektör düşmemişse)
-        features["fall_company_specific_5d"] = 1.0 if (
-            market_return_5d > -1 and sector_return_5d > -2 and stock_return_5d < -5
-        ) else 0.0
+        features["fall_company_specific_5d"] = (
+            1.0 if (market_return_5d > -1 and sector_return_5d > -2 and stock_return_5d < -5) else 0.0
+        )
 
         # Liquidity event (hacim patlaması + fiyat düşüşü)
-        features["fall_liquidity_event"] = 1.0 if (
-            volume_zscore > 2 and stock_return_5d < -5
-        ) else 0.0
+        features["fall_liquidity_event"] = 1.0 if (volume_zscore > 2 and stock_return_5d < -5) else 0.0
 
         # Temporary panic (hızlı düşüş + negatif sentiment düşük)
-        features["fall_temporary_panic"] = 1.0 if (
-            stock_return_5d < -10 and news_sentiment > -0.3
-        ) else 0.0
+        features["fall_temporary_panic"] = 1.0 if (stock_return_5d < -10 and news_sentiment > -0.3) else 0.0
 
         # Oversold bounce potential (RSI < 30 + düşüş şiddetli)
-        features["fall_oversold_bounce"] = 1.0 if (
-            rsi < 30 and stock_return_5d < -5
-        ) else 0.0
+        features["fall_oversold_bounce"] = 1.0 if (rsi < 30 and stock_return_5d < -5) else 0.0
 
         # High volatility crash (ATR yüksek + düşüş)
-        features["fall_high_vol_crash"] = 1.0 if (
-            atr_pct > 5 and stock_return_5d < -5
-        ) else 0.0
+        features["fall_high_vol_crash"] = 1.0 if (atr_pct > 5 and stock_return_5d < -5) else 0.0
 
         # Düşüş nedeni geçici mi kalıcı mı? (Çok faktörlü)
         temporary_score = 0.0

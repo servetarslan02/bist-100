@@ -23,8 +23,8 @@ Kullanım:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -89,6 +89,7 @@ class BacktestEnhancements:
         market_impact_coefficient: float = 0.1,
         min_adv_threshold: float = 1_000_000,  # TL
     ):
+        """Otomatik eklendi."""
         self.max_participation_rate = max_participation_rate
         self.market_impact_coefficient = market_impact_coefficient
         self.min_adv_threshold = min_adv_threshold

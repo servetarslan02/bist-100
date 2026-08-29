@@ -8,39 +8,41 @@ Bu modül:
 5. Tamamen bağımsız 18 Walk-Forward Fold'unda gerçek BIST işlem maliyeti (%0.074) + slippage (%0.05) ile test eder.
 """
 
-import os
-import orjson
+from datetime import timedelta
+from typing import Any
+
 import numpy as np
-
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Tuple
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-import xgboost as xgb
-
 import structlog
+
 logger = structlog.get_logger()
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
-    extract_point_in_time_features,
-    detect_market_regime,
     ModelTrainer,
+    detect_market_regime,
+    extract_point_in_time_features,
+    load_all_market_data,
 )
 
 
-def run_institutional_portfolio_optimization():
+def run_institutional_portfolio_optimization() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — INSTITUTIONAL NOISE FILTER & TURNOVER OPTIMIZER")
     logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d",
-        "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
 
     features_by_ticker = {}
@@ -53,14 +55,23 @@ def run_institutional_portfolio_optimization():
     warmup_days = 120
     eval_dates = common_dates[warmup_days:-5]
 
-    logger.info(f"📊 Değerlendirme Aralığı: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})")
+    logger.info(
+        f"📊 Değerlendirme Aralığı: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})"
+    )
     logger.info(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)} hisse")
 
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "XGBoost_Model",
+        "Cross_Sectional_Momentum",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+    ]
 
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
-    positions: Dict[str, Dict[str, Any]] = {}
+    positions: dict[str, dict[str, Any]] = {}
     portfolio_equity_curve = []
     benchmark_equity_curve = []
     equal_weight_equity_curve = []
@@ -79,8 +90,8 @@ def run_institutional_portfolio_optimization():
     retrain_freq = 20
     current_fold = 0
 
-    monthly_performance: Dict[str, Dict[str, float]] = {}
-    regime_pnl: Dict[str, Dict[str, float]] = {
+    monthly_performance: dict[str, dict[str, float]] = {}
+    regime_pnl: dict[str, dict[str, float]] = {
         "BULL_TREND": {"pnl": 0.0, "trades": 0, "wins": 0},
         "BEAR_MARKET": {"pnl": 0.0, "trades": 0, "wins": 0},
         "SIDEWAYS_RANGE": {"pnl": 0.0, "trades": 0, "wins": 0},
@@ -92,20 +103,20 @@ def run_institutional_portfolio_optimization():
     SLIPPAGE_PCT = 0.00050
     TOTAL_FRICTION = TRANSACTION_FEE_PCT + SLIPPAGE_PCT
 
-    pending_evaluations: List[Dict[str, Any]] = []
+    pending_evaluations: list[dict[str, Any]] = []
     completed_wins = {m: 0 for m in models}
     completed_totals = {m: 0 for m in models}
 
     # Sinyal Düzleştirici (Signal EMA Smoothing)
-    smoothed_scores: Dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
+    smoothed_scores: dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
 
     # Rejim Bazlı Dinamik Nakit ve Pozisyon Sınırları (In-Sample Seçilen Kural)
     regime_max_positions = {
-        "BULL_TREND": 5,        # 100% Equity (5 hisse, %20)
-        "LOW_VOLATILITY": 4,    # 80% Equity
-        "SIDEWAYS_RANGE": 2,    # 40% Equity, 60% Cash (Testereden Korunma)
-        "BEAR_MARKET": 1,       # 20% Equity, 80% Cash (Maksimum Defans)
-        "HIGH_VOLATILITY": 1,   # 20% Equity, 80% Cash (Volatilite Kalkanı)
+        "BULL_TREND": 5,  # 100% Equity (5 hisse, %20)
+        "LOW_VOLATILITY": 4,  # 80% Equity
+        "SIDEWAYS_RANGE": 2,  # 40% Equity, 60% Cash (Testereden Korunma)
+        "BEAR_MARKET": 1,  # 20% Equity, 80% Cash (Maksimum Defans)
+        "HIGH_VOLATILITY": 1,  # 20% Equity, 80% Cash (Volatilite Kalkanı)
     }
 
     # Minimum Alım Skoru Eşiği
@@ -113,11 +124,14 @@ def run_institutional_portfolio_optimization():
         "BULL_TREND": 0.12,
         "LOW_VOLATILITY": 0.15,
         "SIDEWAYS_RANGE": 0.28,  # Sadece aşırı güçlü sinyalde al
-        "BEAR_MARKET": 0.35,      # Yalnızca olağanüstü fırsatta al
+        "BEAR_MARKET": 0.35,  # Yalnızca olağanüstü fırsatta al
         "HIGH_VOLATILITY": 0.40,  # Panik ortamında seçicilik maksimum
     }
 
-    logger.info(f"\n🚀 Optimize Edilmiş Walk-Forward Simülasyonu Başlıyor (Histerezis + Trailing Stop + Rejim Kalkanı)...", flush=True)
+    logger.info(
+        "\n🚀 Optimize Edilmiş Walk-Forward Simülasyonu Başlıyor (Histerezis + Trailing Stop + Rejim Kalkanı)...",
+        flush=True,
+    )
 
     for step_i, current_date in enumerate(eval_dates):
         date_str = current_date.strftime("%Y-%m-%d")
@@ -139,7 +153,7 @@ def run_institutional_portfolio_optimization():
             current_fold += 1
             train_rows = []
             for tk, fdf in features_by_ticker.items():
-                hist_df = fdf.loc[:current_date - timedelta(days=7)]
+                hist_df = fdf.loc[: current_date - timedelta(days=7)]
                 train_rows.append(hist_df)
             combined_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(combined_train)
@@ -180,25 +194,29 @@ def run_institutional_portfolio_optimization():
             smoothed_scores[tk] = 0.50 * raw_comp + 0.50 * smoothed_scores[tk]
             cur_comp = smoothed_scores[tk]
 
-            candidate_scores.append({
-                "ticker": tk,
-                "composite_score": cur_comp,
-                "close_price": float(row["close"]),
-                "atr_pct": float(row["atr_pct"]),
-                "signals": signals,
-                "future_price": float(row.get("future_price_5d", row["close"])),
-                "actual_ret_5d": float(row.get("target_5d_ret", 0.0)),
-            })
+            candidate_scores.append(
+                {
+                    "ticker": tk,
+                    "composite_score": cur_comp,
+                    "close_price": float(row["close"]),
+                    "atr_pct": float(row["atr_pct"]),
+                    "signals": signals,
+                    "future_price": float(row.get("future_price_5d", row["close"])),
+                    "actual_ret_5d": float(row.get("target_5d_ret", 0.0)),
+                }
+            )
 
             # Model geçmişine kaydet
             for m in models:
                 pred_sign = 1 if signals[m] > 0 else -1
                 act_sign = 1 if row.get("target_5d_ret", 0.0) > 0 else -1
-                pending_evaluations.append({
-                    "eval_date": current_date + timedelta(days=7),
-                    "model": m,
-                    "is_correct": (pred_sign == act_sign),
-                })
+                pending_evaluations.append(
+                    {
+                        "eval_date": current_date + timedelta(days=7),
+                        "model": m,
+                        "is_correct": (pred_sign == act_sign),
+                    }
+                )
 
         # 5. POZİSYON YÖNETİMİ: TRAILING-STOP & AKILLI ÇIKIŞ (5 GÜNLÜK ZORUNLU ÇIKIŞ KALDIRILDI)
         closed_tickers = []
@@ -210,28 +228,18 @@ def run_institutional_portfolio_optimization():
             pos["highest_price"] = max(pos.get("highest_price", entry_p), cur_price)
 
             should_exit = False
-            exit_reason = ""
 
             # Hard Stop-Loss (-6%)
-            if pnl_pct <= -6.0:
+            if (
+                pnl_pct <= -6.0
+                or pos["highest_price"] > entry_p * 1.06
+                and cur_price < pos["highest_price"] * 0.96
+                or pnl_pct >= 25.0
+                or pos["days_held"] >= 10
+                and smoothed_scores[tk] < -0.10
+                or pos["days_held"] >= 60
+            ):
                 should_exit = True
-                exit_reason = "STOP_LOSS"
-            # Trailing-Stop: Kâr +%6'yı aştıktan sonra zirveden %4 geri çekilirse kârı realize et
-            elif pos["highest_price"] > entry_p * 1.06 and cur_price < pos["highest_price"] * 0.96:
-                should_exit = True
-                exit_reason = "TRAILING_PROFIT_STOP"
-            # Take-Profit Mega Runner (+25%)
-            elif pnl_pct >= 25.0:
-                should_exit = True
-                exit_reason = "TAKE_PROFIT_RUNNER"
-            # Minimum 10 gün tutulduktan sonra sinyal negatife döndüyse çık
-            elif pos["days_held"] >= 10 and smoothed_scores[tk] < -0.10:
-                should_exit = True
-                exit_reason = "SIGNAL_REVERSAL"
-            # Maksimum 60 gün zaman limiti
-            elif pos["days_held"] >= 60:
-                should_exit = True
-                exit_reason = "MAX_TIME_LIMIT"
 
             if should_exit:
                 trade_val = pos["shares"] * cur_price
@@ -261,13 +269,14 @@ def run_institutional_portfolio_optimization():
         # 6. YENİ POZİSYON AÇILIŞI (HİSTEREZİS & SEÇİCİLİK KORUMASI)
         candidate_scores.sort(key=lambda x: x["composite_score"], reverse=True)
         top_candidates = [
-            c for c in candidate_scores
-            if c["composite_score"] >= min_entry_score and c["ticker"] not in positions
+            c for c in candidate_scores if c["composite_score"] >= min_entry_score and c["ticker"] not in positions
         ]
 
         open_slots = max_allowed_positions - len(positions)
         if open_slots > 0 and len(top_candidates) > 0 and portfolio_cash > 200_000:
-            total_port_val = portfolio_cash + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items())
+            total_port_val = portfolio_cash + sum(
+                p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items()
+            )
             target_alloc_per_slot = min(portfolio_cash / open_slots, total_port_val * 0.20)
 
             for cand in top_candidates[:open_slots]:
@@ -277,7 +286,7 @@ def run_institutional_portfolio_optimization():
                 if shares > 0:
                     cost = shares * cur_p
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash -= (cost + friction)
+                    portfolio_cash -= cost + friction
                     total_transaction_costs += friction
 
                     positions[cand["ticker"]] = {
@@ -290,22 +299,34 @@ def run_institutional_portfolio_optimization():
                     }
 
         # 7. GÜNLÜK EQUITY & BENCHMARK HESAPLAMA
-        current_equity = portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items())
+        current_equity = portfolio_cash + sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items()
+        )
         portfolio_equity_curve.append({"date": date_str, "equity": current_equity})
 
         cur_xu100 = float(xu100_close.loc[current_date]) if current_date in xu100_close.index else start_xu100
         xu100_equity = INITIAL_CAPITAL * (cur_xu100 / start_xu100)
         benchmark_equity_curve.append({"date": date_str, "equity": xu100_equity})
 
-        ew_eq = INITIAL_CAPITAL * np.mean([float(fdf.loc[current_date]["close"]) / float(fdf.loc[eval_dates[0]]["close"]) for fdf in features_by_ticker.values()])
+        ew_eq = INITIAL_CAPITAL * np.mean(
+            [
+                float(fdf.loc[current_date]["close"]) / float(fdf.loc[eval_dates[0]]["close"])
+                for fdf in features_by_ticker.values()
+            ]
+        )
         equal_weight_equity_curve.append({"date": date_str, "equity": ew_eq})
 
         if len(portfolio_equity_curve) > 1:
-            d_ret = (portfolio_equity_curve[-1]["equity"] / portfolio_equity_curve[-2]["equity"] - 1.0)
+            d_ret = portfolio_equity_curve[-1]["equity"] / portfolio_equity_curve[-2]["equity"] - 1.0
             daily_returns_strategy.append(d_ret)
 
             if month_key not in monthly_performance:
-                monthly_performance[month_key] = {"strat_start": portfolio_equity_curve[-2]["equity"], "xu100_start": benchmark_equity_curve[-2]["equity"], "strat_end": current_equity, "xu100_end": xu100_equity}
+                monthly_performance[month_key] = {
+                    "strat_start": portfolio_equity_curve[-2]["equity"],
+                    "xu100_start": benchmark_equity_curve[-2]["equity"],
+                    "strat_end": current_equity,
+                    "xu100_end": xu100_equity,
+                }
             else:
                 monthly_performance[month_key]["strat_end"] = current_equity
                 monthly_performance[month_key]["xu100_end"] = xu100_equity
@@ -321,7 +342,7 @@ def run_institutional_portfolio_optimization():
 
     total_return_strat = (final_strat_equity / INITIAL_CAPITAL - 1.0) * 100.0
     total_return_bench = (final_bench_equity / INITIAL_CAPITAL - 1.0) * 100.0
-    total_return_ew = (final_ew_equity / INITIAL_CAPITAL - 1.0) * 100.0
+    (final_ew_equity / INITIAL_CAPITAL - 1.0) * 100.0
 
     n_years = len(eval_dates) / 252.0
     cagr_strat = ((final_strat_equity / INITIAL_CAPITAL) ** (1.0 / n_years) - 1.0) * 100.0
@@ -353,15 +374,19 @@ def run_institutional_portfolio_optimization():
     profit_factor = (gross_profits / gross_losses) if gross_losses > 0 else 99.0
 
     net_pnl_strat = final_strat_equity - INITIAL_CAPITAL
-    annual_turnover = (total_trades_count * 2 / n_years)
+    annual_turnover = total_trades_count * 2 / n_years
 
     logger.info("\n=================================================================")
     logger.info("🏆 OPTİMİZE EDİLMİŞ INSTITUTIONAL BACKTEST RAPORU (TAM SİSTEM)")
     logger.info("=================================================================")
     logger.info(f"📊 Başlangıç Sermayesi: ₺{INITIAL_CAPITAL:,.2f}")
     logger.info(f"💰 Bitiş Sermayesi:      ₺{final_strat_equity:,.2f} (Net Kâr: ₺{net_pnl_strat:+,.2f})")
-    logger.info(f"📈 Toplam Net Getiri:    %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})")
-    logger.info(f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})")
+    logger.info(
+        f"📈 Toplam Net Getiri:    %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})"
+    )
+    logger.info(
+        f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})"
+    )
     logger.info(f"⚡ Sharpe Oranı (Rf=%40): {sharpe_strat:.2f} (XU100: {sharpe_bench:.2f})")
     logger.info(f"🛡️ Max Drawdown:         %{max_dd_strat:.2f} (XU100: %{max_dd_bench:.2f})")
     logger.info(f"💎 Sortino Oranı:        {sortino_strat:.2f}")
@@ -369,7 +394,9 @@ def run_institutional_portfolio_optimization():
     logger.info(f"🎯 Kazanma Oranı (Win Rate): %{win_rate:.1f} ({winning_trades}/{total_trades_count} İşlem)")
     logger.info(f"📊 Kâr Faktörü (Profit Factor): {profit_factor:.2f}")
     logger.info(f"🔄 Yıllık Devir Hızı (Turnover): {annual_turnover:.1f} işlem/yıl (📉 Churn %85 Azaldı!)")
-    logger.info(f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f} (📉 Maliyet ₺1.76M'den ₺264K'ya indi!)")
+    logger.info(
+        f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f} (📉 Maliyet ₺1.76M'den ₺264K'ya indi!)"
+    )
 
     logger.info("\n📅 AYLIK PERFORMANS KARŞILAŞTIRMASI (Strateji vs XU100):")
     logger.info("| Ay | ALPHA BIST Getiri | XU100 Getiri | Aylık Alfa |")

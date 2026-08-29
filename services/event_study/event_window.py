@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Event Window Manager (MacKinlay, 1997).
 
 Event window, event etkisinin hisse fiyatına yansıdığı dönemdir.
@@ -47,7 +48,7 @@ EVENT_WINDOWS = {
 }
 
 
-def _get_calendar():
+def _get_calendar() -> Any:
     """Trading calendar'ı lazy import et (circular dependency önleme)."""
     from .trading_calendar import get_trading_calendar
 

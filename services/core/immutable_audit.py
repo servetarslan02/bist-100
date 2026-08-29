@@ -14,13 +14,13 @@ Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.7
 """
 
+import functools
 import hashlib
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -28,14 +28,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.immutable_audit")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -72,12 +78,13 @@ class AuditEntry:
 
         return hashlib.sha256(f"{previous_hash}:{content}".encode()).hexdigest()[:32]
 
-    def seal(self, previous_hash: str = ""):
+    def seal(self, previous_hash: str = "") -> Any:
         """Hash'i hesapla ve kaydet (immutable seal)."""
         self.previous_hash = previous_hash
         self.entry_hash = self.compute_hash(previous_hash)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "entry_id": self.entry_id,
             "timestamp": self.timestamp.isoformat(),
@@ -106,6 +113,7 @@ class ImmutableAuditLog:
     """
 
     def __init__(self, storage_path: str | None = None):
+        """Otomatik eklendi."""
         self._entries: list[AuditEntry] = []
         self._last_hash: str = "genesis"
         self._storage_path = storage_path
@@ -300,7 +308,7 @@ class ImmutableAuditLog:
             },
         }
 
-    def _persist_entry(self, entry: AuditEntry):
+    def _persist_entry(self, entry: AuditEntry) -> Any:
         """Kaydı dosyaya yaz (append-only)."""
         try:
             with open(self._storage_path, "a") as f:

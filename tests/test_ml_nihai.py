@@ -1,3 +1,4 @@
+from typing import Any
 """ML Nihai Sistem Testleri — 6 Faz, 65+ Test."""
 
 import numpy as np
@@ -7,7 +8,9 @@ import pytest
 
 
 class TestCatBoost:
-    def test_train_predict(self):
+    """Otomatik eklendi."""
+    def test_train_predict(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostConfig, CatBoostModel
 
@@ -20,7 +23,8 @@ class TestCatBoost:
         preds = model.predict(X[80:])
         assert len(preds) == 20
 
-    def test_feature_importance(self):
+    def test_feature_importance(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
 
@@ -32,7 +36,8 @@ class TestCatBoost:
         assert fi is not None
         assert len(fi) == 5
 
-    def test_untrained(self):
+    def test_untrained(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
 
@@ -41,7 +46,8 @@ class TestCatBoost:
         assert model.predict(np.random.randn(10, 5)).sum() == 0
         assert model.feature_importance() is None
 
-    def test_save_load(self, tmp_path):
+    def test_save_load(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("catboost")
         from services.ml.catboost_model import CatBoostModel
 
@@ -57,7 +63,9 @@ class TestCatBoost:
 
 
 class TestXGBoost:
-    def test_train_predict(self):
+    """Otomatik eklendi."""
+    def test_train_predict(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 
@@ -70,7 +78,8 @@ class TestXGBoost:
         preds = model.predict(X[80:])
         assert len(preds) == 20
 
-    def test_feature_importance(self):
+    def test_feature_importance(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostModel
 
@@ -82,7 +91,8 @@ class TestXGBoost:
         assert fi is not None
         assert len(fi) == 5
 
-    def test_shap_values(self):
+    def test_shap_values(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("xgboost")
         from services.ml.xgboost_model import XGBoostModel
 
@@ -99,7 +109,9 @@ class TestXGBoost:
 
 
 class TestStackingEnsemble:
-    def test_stacking(self):
+    """Otomatik eklendi."""
+    def test_stacking(self) -> Any:
+        """Otomatik eklendi."""
         from sklearn.ensemble import RandomForestRegressor
         from sklearn.linear_model import Ridge
 
@@ -116,7 +128,8 @@ class TestStackingEnsemble:
         preds = ensemble.predict(X[150:])
         assert len(preds) == 50
 
-    def test_stacking_weights(self):
+    def test_stacking_weights(self) -> Any:
+        """Otomatik eklendi."""
         from sklearn.linear_model import Ridge
 
         from services.ml.stacking_ensemble import StackingEnsemble
@@ -131,7 +144,8 @@ class TestStackingEnsemble:
         assert len(weights) == 2
         assert abs(sum(weights.values()) - 1.0) < 0.1
 
-    def test_insufficient_models(self):
+    def test_insufficient_models(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.stacking_ensemble import StackingEnsemble
 
         ensemble = StackingEnsemble()
@@ -146,7 +160,9 @@ class TestStackingEnsemble:
 
 
 class TestModelRegistry:
-    def test_register_and_list(self, tmp_path):
+    """Otomatik eklendi."""
+    def test_register_and_list(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_registry import ModelRegistry
 
         registry = ModelRegistry(str(tmp_path / "registry"))
@@ -155,7 +171,8 @@ class TestModelRegistry:
         models = registry.list_models()
         assert len(models) == 2
 
-    def test_promote(self, tmp_path):
+    def test_promote(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_registry import ModelRegistry
 
         registry = ModelRegistry(str(tmp_path / "registry"))
@@ -168,7 +185,8 @@ class TestModelRegistry:
         champion2 = registry.get_champion("lgbm")
         assert champion2["entry"].version == "v2"
 
-    def test_compare_versions(self, tmp_path):
+    def test_compare_versions(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_registry import ModelRegistry
 
         registry = ModelRegistry(str(tmp_path / "registry"))
@@ -177,7 +195,8 @@ class TestModelRegistry:
         comp = registry.compare_versions("lgbm", "v1", "v2")
         assert comp["metrics_comparison"]["ic"]["b_better"] is True
 
-    def test_reject(self, tmp_path):
+    def test_reject(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_registry import ModelRegistry
 
         registry = ModelRegistry(str(tmp_path / "registry"))
@@ -188,7 +207,9 @@ class TestModelRegistry:
 
 
 class TestChampionChallenger:
-    def test_ab_test(self):
+    """Otomatik eklendi."""
+    def test_ab_test(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.champion_challenger import ChampionChallenger
 
         cc = ChampionChallenger(min_samples=5)
@@ -198,7 +219,8 @@ class TestChampionChallenger:
         result = cc.run_ab_test("challenger_v2")
         assert result.n_samples_champion == 10
 
-    def test_insufficient_data(self):
+    def test_insufficient_data(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.champion_challenger import ChampionChallenger
 
         cc = ChampionChallenger(min_samples=30)
@@ -206,7 +228,8 @@ class TestChampionChallenger:
         result = cc.run_ab_test("challenger")
         assert result.winner == "insufficient_data"
 
-    def test_shadow_summary(self):
+    def test_shadow_summary(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.champion_challenger import ChampionChallenger
 
         cc = ChampionChallenger()
@@ -220,7 +243,9 @@ class TestChampionChallenger:
 
 
 class TestHyperparameterTuner:
-    def test_tune_lightgbm(self):
+    """Otomatik eklendi."""
+    def test_tune_lightgbm(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.hyperparameter_tuner import HyperparameterTuner
 
         tuner = HyperparameterTuner(n_trials=3, timeout_seconds=30)
@@ -229,7 +254,8 @@ class TestHyperparameterTuner:
         result = tuner.tune_lightgbm(X[:80], y[:80], X[80:], y[80:])
         assert result.n_trials >= 0  # Might fail if lgbm not installed
 
-    def test_tune_xgboost(self):
+    def test_tune_xgboost(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.hyperparameter_tuner import HyperparameterTuner
 
         tuner = HyperparameterTuner(n_trials=3, timeout_seconds=30)
@@ -240,7 +266,9 @@ class TestHyperparameterTuner:
 
 
 class TestCalibration:
-    def test_calibration_check(self):
+    """Otomatik eklendi."""
+    def test_calibration_check(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration import ModelCalibration
 
         cal = ModelCalibration()
@@ -250,7 +278,8 @@ class TestCalibration:
         assert result.brier_score >= 0
         assert isinstance(result.is_calibrated, bool)
 
-    def test_platt_scaling(self):
+    def test_platt_scaling(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration import ModelCalibration
 
         cal = ModelCalibration()
@@ -259,7 +288,8 @@ class TestCalibration:
         calibrator, calibrated = cal.calibrate_platt(y_true, y_prob)
         assert len(calibrated) == len(y_true)
 
-    def test_isotonic(self):
+    def test_isotonic(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration import ModelCalibration
 
         cal = ModelCalibration()
@@ -273,7 +303,9 @@ class TestCalibration:
 
 
 class TestFeatureDrift:
-    def test_shap_history(self):
+    """Otomatik eklendi."""
+    def test_shap_history(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_drift import FeatureDriftDetector
 
         det = FeatureDriftDetector()
@@ -282,7 +314,8 @@ class TestFeatureDrift:
         reports = det.check_drift()
         assert len(reports) == 3
 
-    def test_drift_alert(self):
+    def test_drift_alert(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_drift import FeatureDriftDetector
 
         det = FeatureDriftDetector(psi_threshold=0.1)
@@ -292,7 +325,8 @@ class TestFeatureDrift:
         alerts = det.get_alerts()
         assert any(a.alert for a in alerts)
 
-    def test_insufficient_history(self):
+    def test_insufficient_history(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_drift import FeatureDriftDetector
 
         det = FeatureDriftDetector()
@@ -302,7 +336,9 @@ class TestFeatureDrift:
 
 
 class TestModelMonitor:
-    def test_metric_recording(self):
+    """Otomatik eklendi."""
+    def test_metric_recording(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_monitor import ModelMonitor
 
         mon = ModelMonitor(min_history=3)
@@ -311,7 +347,8 @@ class TestModelMonitor:
         report = mon.check_decay("ic")
         assert report.historical_mean > 0
 
-    def test_decay_detection(self):
+    def test_decay_detection(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_monitor import ModelMonitor
 
         mon = ModelMonitor(min_history=5, decay_z_threshold=-1.5)
@@ -322,7 +359,8 @@ class TestModelMonitor:
         report = mon.check_decay("ic")
         assert report.decay_detected is True
 
-    def test_prediction_drift(self):
+    def test_prediction_drift(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_monitor import ModelMonitor
 
         mon = ModelMonitor(min_history=5)
@@ -333,7 +371,8 @@ class TestModelMonitor:
         drift = mon.check_prediction_drift()
         assert "drift_detected" in drift
 
-    def test_win_rate(self):
+    def test_win_rate(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_monitor import ModelMonitor
 
         mon = ModelMonitor()
@@ -342,7 +381,8 @@ class TestModelMonitor:
         mon.record_prediction(0.8, actual=0)  # Wrong
         assert mon.get_win_rate() == pytest.approx(2 / 3, abs=0.01)
 
-    def test_summary(self):
+    def test_summary(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.model_monitor import ModelMonitor
 
         mon = ModelMonitor(min_history=3)
@@ -358,7 +398,9 @@ class TestModelMonitor:
 
 
 class TestMLIntegration:
-    def test_catboost_to_registry(self, tmp_path):
+    """Otomatik eklendi."""
+    def test_catboost_to_registry(self, tmp_path) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("catboost")
         """CatBoost → Model Registry pipeline."""
         from services.ml.catboost_model import CatBoostModel
@@ -379,7 +421,8 @@ class TestMLIntegration:
         champion = registry.get_champion("catboost")
         assert champion["entry"].version == "v1"
 
-    def test_xgboost_shap_to_drift(self):
+    def test_xgboost_shap_to_drift(self) -> Any:
+        """Otomatik eklendi."""
         pytest.importorskip("xgboost")
         """XGBoost → SHAP → Drift Detection pipeline."""
         from services.ml.feature_drift import FeatureDriftDetector
@@ -400,7 +443,7 @@ class TestMLIntegration:
             reports = det.check_drift()
             assert len(reports) > 0
 
-    def test_stacking_to_monitor(self):
+    def test_stacking_to_monitor(self) -> Any:
         """Stacking Ensemble → Model Monitor pipeline."""
         from sklearn.linear_model import Ridge
 

@@ -78,11 +78,12 @@ class MacroCalendarEngine:
     ]
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._events: list[MacroEvent] = []
         self._expectations: dict[str, float] = {}  # event_id → expected
         self._initialize_events()
 
-    def _initialize_events(self):
+    def _initialize_events(self) -> Any:
         """Takvim olaylarını başlat."""
         year = datetime.now(UTC).year
 
@@ -125,7 +126,7 @@ class MacroCalendarEngine:
 
         return sorted(upcoming, key=lambda e: e.date)
 
-    def register_expectation(self, event_id: str, expected: float):
+    def register_expectation(self, event_id: str, expected: float) -> Any:
         """Beklenti kaydet."""
         self._expectations[event_id] = expected
 

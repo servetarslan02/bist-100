@@ -1,16 +1,20 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — MLflow Model Experiment & Metrics Tracker Sync
 Synchronizes all active quant models, strategy experiments, metrics and registry entries to MLflow.
 """
 
 import os
+
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 
 import mlflow
 from mlflow.tracking import MlflowClient
 
 TRACKING_URI = "http://mlflow:5000"
-print(f"Connecting to MLflow Tracking Server at {TRACKING_URI}...")
+logger.info(f"Connecting to MLflow Tracking Server at {TRACKING_URI}...")
 mlflow.set_tracking_uri(TRACKING_URI)
 client = MlflowClient(TRACKING_URI)
 
@@ -283,21 +287,19 @@ ALL_EXPERIMENTS = [
 ]
 
 
-def sync_all():
-    print("=== STARTING MLFLOW MODEL & EXPERIMENT SYNCHRONIZATION ===")
+def sync_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=== STARTING MLFLOW MODEL & EXPERIMENT SYNCHRONIZATION ===")
 
     for exp_data in ALL_EXPERIMENTS:
         exp_name = exp_data["experiment_name"]
         exp = client.get_experiment_by_name(exp_name)
         if exp is None:
-            exp_id = client.create_experiment(
-                exp_name,
-                tags={"description": exp_data.get("description", "")}
-            )
-            print(f"\n[+] Created Experiment: {exp_name} (id={exp_id})")
+            exp_id = client.create_experiment(exp_name, tags={"description": exp_data.get("description", "")})
+            logger.info(f"\n[+] Created Experiment: {exp_name} (id={exp_id})")
         else:
             exp_id = exp.experiment_id
-            print(f"\n[*] Found Experiment: {exp_name} (id={exp_id})")
+            logger.info(f"\n[*] Found Experiment: {exp_name} (id={exp_id})")
 
         mlflow.set_experiment(exp_name)
 
@@ -307,7 +309,7 @@ def sync_all():
                 mlflow.set_tags(m.get("tags", {}))
                 mlflow.log_params(m.get("params", {}))
                 mlflow.log_metrics(m.get("metrics", {}))
-                print(f"  ✓ Run Logged: {run_name} (run_id={run.info.run_id})")
+                logger.info(f"  ✓ Run Logged: {run_name} (run_id={run.info.run_id})")
 
             # Register Model in MLflow Model Registry
             reg_name = m.get("registered_model")
@@ -318,17 +320,17 @@ def sync_all():
                         description=m.get("model_description", ""),
                         tags=m.get("tags", {}),
                     )
-                    print(f"  ★ Model Registered: {reg_name}")
+                    logger.info(f"  ★ Model Registered: {reg_name}")
                 except Exception:
                     # Model already exists, update tags
                     for tk, tv in m.get("tags", {}).items():
                         client.set_registered_model_tag(reg_name, tk, str(tv))
-                    print(f"  ★ Model Registry Updated: {reg_name}")
+                    logger.info(f"  ★ Model Registry Updated: {reg_name}")
 
-    print("\n========================================================")
-    print("ALL 5 EXPERIMENTS, 7 QUANT MODELS & REGISTRY ENTRIES SYNCED!")
-    print("Visit http://localhost:5000 to see Experiments and Models!")
-    print("========================================================")
+    logger.info("\n========================================================")
+    logger.info("ALL 5 EXPERIMENTS, 7 QUANT MODELS & REGISTRY ENTRIES SYNCED!")
+    logger.info("Visit http://localhost:5000 to see Experiments and Models!")
+    logger.info("========================================================")
 
 
 if __name__ == "__main__":

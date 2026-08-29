@@ -340,7 +340,7 @@ class StressTestEngine:
         key: str,
         scenario: dict[str, Any],
         scenario_type: str = "hypothetical",
-    ):
+    ) -> Any:
         """F-015: Dinamik senaryo ekleme.
 
         Statik senaryolar yerine runtime'da yeni senaryo eklenebilir.

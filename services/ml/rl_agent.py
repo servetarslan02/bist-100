@@ -57,6 +57,7 @@ class BISTTradingEnv:
         reward_type: str = "sharpe",
         action_space: str = "discrete",
     ):
+        """Otomatik eklendi."""
         self.features = features
         self.prices = prices
         self.returns = returns if returns is not None else np.diff(prices) / prices[:-1]
@@ -77,7 +78,7 @@ class BISTTradingEnv:
         self.observation_space = self._make_observation_space()
         self.action_space = self._make_action_space()
 
-    def _make_observation_space(self):
+    def _make_observation_space(self) -> Any:
         """Observation space oluştur."""
         try:
             from gymnasium import spaces
@@ -86,7 +87,7 @@ class BISTTradingEnv:
         except ImportError:
             return None
 
-    def _make_action_space(self):
+    def _make_action_space(self) -> Any:
         """Action space oluştur."""
         try:
             from gymnasium import spaces
@@ -98,7 +99,7 @@ class BISTTradingEnv:
         except ImportError:
             return None
 
-    def reset(self, seed=None):
+    def reset(self, seed=None) -> Any:
         """Environment'ı sıfırla."""
         self._current_step = 0
         self._capital = self.initial_capital
@@ -107,7 +108,7 @@ class BISTTradingEnv:
         self._trades = []
         return self._get_observation(), {}
 
-    def step(self, action):
+    def step(self, action) -> Any:
         """Bir adım ilerle."""
         if self._current_step >= len(self.returns) - 1:
             return self._get_observation(), 0.0, True, False, {}
@@ -147,7 +148,7 @@ class BISTTradingEnv:
 
         return self._get_observation(), reward, done, False, {}
 
-    def _get_observation(self):
+    def _get_observation(self) -> Any:
         """Observation döndür."""
         if self._current_step >= len(self.features):
             return np.zeros(self.features.shape[1] + 2, dtype=np.float32)

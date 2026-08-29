@@ -163,7 +163,7 @@ class TrainingDatasetValidator:
         returns: dict[str, float],
         date_groups: dict[str, str],
         report: DataQualityReport,
-    ):
+    ) -> Any:
         """Sample metadata doğruluğunu kontrol et."""
         valid = 0
         dropped = 0
@@ -222,7 +222,7 @@ class TrainingDatasetValidator:
         features_map: dict[str, dict],
         feature_names: list[str],
         report: DataQualityReport,
-    ):
+    ) -> Any:
         """Feature'larda NaN/inf/outlier kontrolü."""
         nan_counts: dict[str, int] = {f: 0 for f in feature_names}
         inf_counts: dict[str, int] = {f: 0 for f in feature_names}
@@ -300,7 +300,7 @@ class TrainingDatasetValidator:
         self,
         returns: dict[str, float],
         report: DataQualityReport,
-    ):
+    ) -> Any:
         """Target dağılım analizi."""
         values = list(returns.values())
         if not values:
@@ -346,7 +346,7 @@ class TrainingDatasetValidator:
         self,
         date_groups: dict[str, str],
         report: DataQualityReport,
-    ):
+    ) -> Any:
         """Cross-ticker sample oluşturma doğruluğu."""
         # Ticker'ları key'den çıkar
         tickers = set()
@@ -374,7 +374,7 @@ class TrainingDatasetValidator:
         date_groups: dict[str, str],
         test_dates: set,
         report: DataQualityReport,
-    ):
+    ) -> Any:
         """Train/test tarih overlap kontrolü."""
         train_dates = set(date_groups.values())
         overlap = train_dates & test_dates
@@ -384,7 +384,7 @@ class TrainingDatasetValidator:
             report.overlap_details = sorted(overlap)
             report.errors.append(f"LEAKAGE: {len(overlap)} train dates overlap with test dates")
 
-    def _compute_quality_score(self, report: DataQualityReport):
+    def _compute_quality_score(self, report: DataQualityReport) -> Any:
         """Genel kalite skoru hesapla (0-1)."""
         score = 1.0
 

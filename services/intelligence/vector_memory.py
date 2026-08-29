@@ -12,15 +12,15 @@ Semantik Vektör Benzerlik Arama & Rejim Belleği
 
 from __future__ import annotations
 
-import orjson
-import os
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import orjson
 import structlog
+
 from services.core.database import db_router
 
 logger = structlog.get_logger()
@@ -58,16 +58,17 @@ class VectorMemoryStore:
     """pgvector destekli ve NumPy fallback'li çok amaçlı vektör deposu."""
 
     def __init__(self, fallback_path: Path = FALLBACK_FILE):
+        """Otomatik eklendi."""
         self.fallback_path = fallback_path
         self._local_records: dict[str, VectorRecord] = {}
         self._load_fallback()
 
-    def _load_fallback(self):
+    def _load_fallback(self) -> Any:
         """Diskteki local fallback verisini yükler."""
         if not self.fallback_path.exists():
             return
         try:
-            with open(self.fallback_path, "r", encoding="utf-8") as f:
+            with open(self.fallback_path, encoding="utf-8") as f:
                 data = orjson.loads(f.read())
                 for k, v in data.items():
                     self._local_records[k] = VectorRecord(**v)
@@ -75,16 +76,16 @@ class VectorMemoryStore:
         except Exception as e:
             logger.error("Failed to load vector fallback", error=str(e))
 
-    def _save_fallback(self):
+    def _save_fallback(self) -> Any:
         """Yerel fallback verisini diske kaydeder (Fail-safe)."""
         try:
             self.fallback_path.parent.mkdir(parents=True, exist_ok=True)
             temp_path = self.fallback_path.with_suffix(".tmp")
-            
+
             dump_data = {k: asdict(v) for k, v in self._local_records.items()}
             with open(temp_path, "wb") as f:
                 f.write(orjson.dumps(dump_data))
-            
+
             temp_path.replace(self.fallback_path)
         except Exception as e:
             logger.error("Failed to save vector fallback", error=str(e))
@@ -127,10 +128,12 @@ class VectorMemoryStore:
                 query = """
                 INSERT INTO market_event_embeddings (item_id, category, embedding, metadata, text_content, created_at, updated_at)
                 VALUES ($1, $2, $3::vector, $4::jsonb, $5, NOW(), NOW())
-                ON CONFLICT (item_id, category) 
+                ON CONFLICT (item_id, category)
                 DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, text_content = EXCLUDED.text_content, updated_at = NOW();
                 """
-                await conn.execute(query, item_id, category, emb_str, orjson.dumps(record.metadata).decode("utf-8"), text_content)
+                await conn.execute(
+                    query, item_id, category, emb_str, orjson.dumps(record.metadata).decode("utf-8"), text_content
+                )
         except Exception as e:
             logger.warning("pgvector write skipped, stored in local fallback", error=str(e), item_id=item_id)
 
@@ -158,7 +161,7 @@ class VectorMemoryStore:
                 text_content=txt,
             )
             self._local_records[f"{category}:{item_id}"] = vr
-        
+
         self._save_fallback()
 
         # PostgreSQL / pgvector Bulk Insert
@@ -176,13 +179,13 @@ class VectorMemoryStore:
                 query = """
                 INSERT INTO market_event_embeddings (item_id, category, embedding, metadata, text_content, created_at, updated_at)
                 VALUES ($1, $2, $3::vector, $4::jsonb, $5, NOW(), NOW())
-                ON CONFLICT (item_id, category) 
+                ON CONFLICT (item_id, category)
                 DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, text_content = EXCLUDED.text_content, updated_at = NOW();
                 """
                 await conn.executemany(query, values)
         except Exception as e:
             logger.warning("pgvector bulk write skipped, stored in local fallback", error=str(e), count=len(records))
-            
+
         return True
 
     async def search_similar(
@@ -199,7 +202,7 @@ class VectorMemoryStore:
         try:
             async with db_router.read() as conn:
                 emb_str = f"[{','.join(str(x) for x in query_vec)}]"
-                
+
                 if category:
                     sql = f"""
                     SELECT item_id, category, 1 - (embedding <=> $1::vector) AS similarity,
@@ -229,7 +232,7 @@ class VectorMemoryStore:
                             meta = r["metadata"]
                             if isinstance(meta, str):
                                 meta = json.loads(meta)
-                                
+
                             results.append(
                                 SimilarityResult(
                                     item_id=r["item_id"],
@@ -275,6 +278,7 @@ class MarketRegimeMemory:
     """Piyasa rejimi ve tarihsel kriz / trend benzerlik motoru."""
 
     def __init__(self, vector_store: VectorMemoryStore | None = None):
+        """Otomatik eklendi."""
         self.store = vector_store or VectorMemoryStore()
 
     async def record_regime_fingerprint(

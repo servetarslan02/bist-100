@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — pgvector & Vector Memory Test Suite
 Doğrulanan Özellikler:
@@ -7,18 +8,19 @@ Doğrulanan Özellikler:
 4. Eşik değeri (min_similarity) ve uç durum (sıfır vektör, boş sonuç) doğrulaması
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
+
 from services.intelligence.vector_memory import (
-    VectorMemoryStore,
     MarketRegimeMemory,
-    VectorRecord,
-    SimilarityResult,
+    VectorMemoryStore,
 )
 
 
 @pytest.fixture(autouse=True)
-def mock_db_router():
+def mock_db_router() -> Any:
+    """Otomatik eklendi."""
     with patch("services.intelligence.vector_memory.db_router") as mock_router:
         mock_router.write.return_value.__aenter__.side_effect = Exception("Mock DB Offline")
         mock_router.read.return_value.__aenter__.side_effect = Exception("Mock DB Offline")
@@ -30,7 +32,8 @@ class TestVectorMemoryStore:
     """Vektör deposu ve semantik benzerlik arama testleri."""
 
     @pytest.mark.asyncio
-    async def test_store_and_search_similar_vectors(self):
+    async def test_store_and_search_similar_vectors(self) -> Any:
+        """Otomatik eklendi."""
         store = VectorMemoryStore()
 
         # Kayıtlar ekle (3 boyutlu basit test embeddingleri)
@@ -69,7 +72,8 @@ class TestVectorMemoryStore:
         assert results[0].distance < 0.05
 
     @pytest.mark.asyncio
-    async def test_category_filtering(self):
+    async def test_category_filtering(self) -> Any:
+        """Otomatik eklendi."""
         store = VectorMemoryStore()
 
         await store.store_embedding("reg_1", "regime", [0.5, 0.5])
@@ -85,7 +89,8 @@ class TestMarketRegimeMemory:
     """Tarihsel rejim ve kriz benzerlik analizi testleri."""
 
     @pytest.mark.asyncio
-    async def test_find_analogous_regimes(self):
+    async def test_find_analogous_regimes(self) -> Any:
+        """Otomatik eklendi."""
         regime_mem = MarketRegimeMemory()
 
         # 4 temel rejim parmak izi tanımla

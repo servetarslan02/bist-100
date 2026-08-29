@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Holiday Manager v2.0 Özellik Doğrulama Testi
 ==========================================================
@@ -20,24 +23,27 @@ import asyncio
 import importlib.util
 import json
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class _EmptyModule:
-    def __getattr__(self, name):
-        return type('Fake', (), {'__init__': lambda s, *a, **k: None})()
+    """Otomatik eklendi."""
+    def __getattr__(self, name) -> Any:
+        """Otomatik eklendi."""
+        return type("Fake", (), {"__init__": lambda s, *a, **k: None})()
 
 
-if 'services' not in sys.modules:
-    sys.modules['services'] = _EmptyModule()
-if 'services.core' not in sys.modules:
-    sys.modules['services.core'] = _EmptyModule()
+if "services" not in sys.modules:
+    sys.modules["services"] = _EmptyModule()
+if "services.core" not in sys.modules:
+    sys.modules["services.core"] = _EmptyModule()
 
 
-def _load_module_direct(name, path):
+def _load_module_direct(name, path) -> Any:
+    """Otomatik eklendi."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -56,40 +62,47 @@ _get_proxy = _hm_mod._get_proxy
 
 
 class TestResult:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.passed = 0
         self.failed = 0
         self.warnings = 0
         self.details = []
 
-    def ok(self, msg):
+    def ok(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.passed += 1
         self.details.append(f"  ✅ {msg}")
-        print(f"  ✅ {msg}")
+        logger.info(f"  ✅ {msg}")
 
-    def fail(self, msg):
+    def fail(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.failed += 1
         self.details.append(f"  ❌ {msg}")
-        print(f"  ❌ {msg}")
+        logger.info(f"  ❌ {msg}")
 
-    def warn(self, msg):
+    def warn(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.warnings += 1
         self.details.append(f"  ⚠️  {msg}")
-        print(f"  ⚠️  {msg}")
+        logger.info(f"  ⚠️  {msg}")
 
-    def summary(self):
+    def summary(self) -> Any:
+        """Otomatik eklendi."""
         total = self.passed + self.failed
-        return f"\n{'='*60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'='*60}"
+        return f"\n{'=' * 60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'=' * 60}"
 
 
 # =====================================================
 # TEST 1: Retry Mekanizması
 # =====================================================
 
-async def test_retry_mechanism(result: TestResult):
+
+async def test_retry_mechanism(result: TestResult) -> Any:
     """Retry mekanizmasının çalıştığını doğrula."""
-    print("\n🔄 TEST 1: Retry Mekanizması")
-    print("-" * 50)
+    logger.info("\n🔄 TEST 1: Retry Mekanizması")
+    logger.info("-" * 50)
 
     # Var olmayan URL — 3 deneme yapmalı
     start = datetime.now()
@@ -116,10 +129,11 @@ async def test_retry_mechanism(result: TestResult):
 # TEST 2: Proxy Desteği
 # =====================================================
 
-def test_proxy_support(result: TestResult):
+
+def test_proxy_support(result: TestResult) -> Any:
     """Proxy desteğini doğrula."""
-    print("\n🌐 TEST 2: Proxy Desteği")
-    print("-" * 50)
+    logger.info("\n🌐 TEST 2: Proxy Desteği")
+    logger.info("-" * 50)
 
     # Mevcut proxy'yi kontrol et
     proxy = _get_proxy()
@@ -136,10 +150,11 @@ def test_proxy_support(result: TestResult):
 # TEST 3: KAP Duyuru İzleyici
 # =====================================================
 
-async def test_kap_watcher(result: TestResult):
+
+async def test_kap_watcher(result: TestResult) -> Any:
     """KAP duyuru izleyicisini test et."""
-    print("\n📡 TEST 3: KAP Duyuru İzleyici")
-    print("-" * 50)
+    logger.info("\n📡 TEST 3: KAP Duyuru İzleyici")
+    logger.info("-" * 50)
 
     watcher = KAPHolidayWatcher()
 
@@ -164,10 +179,11 @@ async def test_kap_watcher(result: TestResult):
 # TEST 4: SuddenHolidayDetector KAP Entegrasyonu
 # =====================================================
 
-async def test_sudden_detector_kap(result: TestResult):
+
+async def test_sudden_detector_kap(result: TestResult) -> Any:
     """SuddenHolidayDetector KAP entegrasyonunu test et."""
-    print("\n⚡ TEST 4: SuddenHolidayDetector KAP Entegrasyonu")
-    print("-" * 50)
+    logger.info("\n⚡ TEST 4: SuddenHolidayDetector KAP Entegrasyonu")
+    logger.info("-" * 50)
 
     detector = SuddenHolidayDetector()
 
@@ -195,10 +211,11 @@ async def test_sudden_detector_kap(result: TestResult):
 # TEST 5: Audit Trail (Değişiklik Logu)
 # =====================================================
 
-def test_audit_trail(result: TestResult):
+
+def test_audit_trail(result: TestResult) -> Any:
     """Audit trail'in çalıştığını doğrula."""
-    print("\n📝 TEST 5: Audit Trail (Değişiklik Logu)")
-    print("-" * 50)
+    logger.info("\n📝 TEST 5: Audit Trail (Değişiklik Logu)")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_audit_test"
     hm = HolidayManager(data_dir=test_dir)
@@ -240,10 +257,11 @@ def test_audit_trail(result: TestResult):
 # TEST 6: HolidayManager KAP Entegrasyonu
 # =====================================================
 
-async def test_holiday_manager_kap(result: TestResult):
+
+async def test_holiday_manager_kap(result: TestResult) -> Any:
     """HolidayManager KAP entegrasyonunu test et."""
-    print("\n🔗 TEST 6: HolidayManager KAP Entegrasyonu")
-    print("-" * 50)
+    logger.info("\n🔗 TEST 6: HolidayManager KAP Entegrasyonu")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_kap_test"
     hm = HolidayManager(data_dir=test_dir)
@@ -253,7 +271,7 @@ async def test_holiday_manager_kap(result: TestResult):
     if kap_holidays:
         result.ok(f"KAP'tan {len(kap_holidays)} tatil çekildi")
         for d in kap_holidays:
-            print(f"      📅 {d}")
+            logger.info(f"      📅 {d}")
     else:
         result.warn("KAP'tan tatil çekilemedi (ağ erişimi veya BIST engeli)")
 
@@ -262,10 +280,11 @@ async def test_holiday_manager_kap(result: TestResult):
 # TEST 7: BIST Engelli Bölge Senaryosu
 # =====================================================
 
-async def test_blocked_region(result: TestResult):
+
+async def test_blocked_region(result: TestResult) -> Any:
     """BIST engelli bölge senaryosunu test et."""
-    print("\n🚫 TEST 7: BIST Engelli Bölge Senaryosu")
-    print("-" * 50)
+    logger.info("\n🚫 TEST 7: BIST Engelli Bölge Senaryosu")
+    logger.info("-" * 50)
 
     # Proxy olmadan BIST'e erişim dene
     html = await _fetch_with_retry(
@@ -282,6 +301,7 @@ async def test_blocked_region(result: TestResult):
     # KAP'a erişim dene
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
                 "https://www.kap.org.tr/tr",
@@ -297,6 +317,7 @@ async def test_blocked_region(result: TestResult):
     # Investing.com'a erişim dene
     try:
         import httpx
+
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
                 "https://tr.investing.com/holidays/turkey",
@@ -314,10 +335,11 @@ async def test_blocked_region(result: TestResult):
 # TEST 8: Cache + Audit Tutarlılığı
 # =====================================================
 
-def test_cache_audit_consistency(result: TestResult):
+
+def test_cache_audit_consistency(result: TestResult) -> Any:
     """Cache ve audit log tutarlılığını test et."""
-    print("\n💾 TEST 8: Cache + Audit Tutarlılığı")
-    print("-" * 50)
+    logger.info("\n💾 TEST 8: Cache + Audit Tutarlılığı")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_cache_audit_test"
     cache_file = Path(test_dir) / "holiday_cache.json"
@@ -364,10 +386,11 @@ def test_cache_audit_consistency(result: TestResult):
 # TEST 9: API Endpoint Doğrulama (Mock)
 # =====================================================
 
-def test_api_endpoints(result: TestResult):
+
+def test_api_endpoints(result: TestResult) -> Any:
     """API endpoint'lerinin varlığını doğrula."""
-    print("\n🔌 TEST 9: API Endpoint Doğrulama")
-    print("-" * 50)
+    logger.info("\n🔌 TEST 9: API Endpoint Doğrulama")
+    logger.info("-" * 50)
 
     # Modül import edilebiliyor mu?
     try:
@@ -378,12 +401,12 @@ def test_api_endpoints(result: TestResult):
             # Dosya içeriğini kontrol et
             content = api_path.read_text()
             endpoints = [
-                'list_holidays',
-                'today_status',
-                'add_holiday',
-                'remove_holiday',
-                'sync_holidays',
-                'get_audit_log',
+                "list_holidays",
+                "today_status",
+                "add_holiday",
+                "remove_holiday",
+                "sync_holidays",
+                "get_audit_log",
             ]
             for ep in endpoints:
                 if ep in content:
@@ -400,10 +423,11 @@ def test_api_endpoints(result: TestResult):
 # TEST 10: BIST Web Çekme (Gerçek Dünya)
 # =====================================================
 
-async def test_bist_web_fetch_real(result: TestResult):
+
+async def test_bist_web_fetch_real(result: TestResult) -> Any:
     """BIST web sitesinden gerçek dünya çekme testi."""
-    print("\n🌍 TEST 10: BIST Web Çekme (Gerçek Dünya)")
-    print("-" * 50)
+    logger.info("\n🌍 TEST 10: BIST Web Çekme (Gerçek Dünya)")
+    logger.info("-" * 50)
 
     from services.core.holiday_manager import fetch_bist_holidays_from_web
 
@@ -411,7 +435,7 @@ async def test_bist_web_fetch_real(result: TestResult):
     if holidays:
         result.ok(f"BIST web sitesinden {len(holiday)} tatil çekildi")
         for h in sorted(holidays)[:5]:
-            print(f"      📅 {h}")
+            logger.info(f"      📅 {h}")
     else:
         result.warn("BIST web sitesinden çekilemedi (engelli bölge veya sunucu hatası)")
 
@@ -420,11 +444,13 @@ async def test_bist_web_fetch_real(result: TestResult):
 # ANA TEST RUNNER
 # =====================================================
 
-async def main():
-    print("=" * 60)
-    print("🧪 ALPHA BIST — Holiday Manager v2.0 Özellik Testi")
-    print(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+
+async def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("🧪 ALPHA BIST — Holiday Manager v2.0 Özellik Testi")
+    logger.info(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 60)
 
     result = TestResult()
 
@@ -439,7 +465,7 @@ async def main():
     test_api_endpoints(result)
     await test_bist_web_fetch_real(result)
 
-    print(result.summary())
+    logger.info(result.summary())
 
     report_path = Path(__file__).parent.parent / "reports" / "holiday_v2_audit.json"
     report_path.parent.mkdir(exist_ok=True)
@@ -452,7 +478,7 @@ async def main():
     }
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
-    print(f"\n📄 Rapor: {report_path}")
+    logger.info(f"\n📄 Rapor: {report_path}")
 
     return 0 if result.failed == 0 else 1
 

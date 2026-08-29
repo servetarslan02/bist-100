@@ -37,6 +37,7 @@ class MemoryEntry:
     outcome: dict | None = None
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "task_id": self.task_id,
             "agent_role": self.agent_role,
@@ -57,10 +58,11 @@ class WorkingMemory:
     """
 
     def __init__(self, max_items: int = 100):
+        """Otomatik eklendi."""
         self.items: list[MemoryEntry] = []
         self.max_items = max_items
 
-    def add(self, entry: MemoryEntry):
+    def add(self, entry: MemoryEntry) -> Any:
         """Görev ekle."""
         self.items.append(entry)
         if len(self.items) > self.max_items:
@@ -87,11 +89,12 @@ class WorkingMemory:
                 return entry.direction
         return None
 
-    def clear(self):
+    def clear(self) -> Any:
         """Working memory'yi temizle."""
         self.items.clear()
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "count": len(self.items),
             "items": [e.to_dict() for e in self.items[-10:]],  # Son 10
@@ -106,6 +109,7 @@ class EpisodicMemory:
     """
 
     def __init__(self, max_items: int = 1000, min_confidence_for_episode: float = 0.6):
+        """Otomatik eklendi."""
         self.episodes: list[MemoryEntry] = []
         self.outcomes: dict[str, dict] = {}  # task_id → outcome
         self.accuracy_by_regime: dict[str, list[float]] = {}
@@ -113,7 +117,7 @@ class EpisodicMemory:
         self.max_items = max_items
         self._min_confidence = min_confidence_for_episode
 
-    def add(self, entry: MemoryEntry):
+    def add(self, entry: MemoryEntry) -> Any:
         """Önemli olay ekle."""
         # Sadece yüksek güven veya başarısız olayları kaydet
         if entry.confidence > self._min_confidence or entry.direction == "NO_TRADE":
@@ -127,7 +131,7 @@ class EpisodicMemory:
         actual_return: float,
         regime: str = "UNKNOWN",
         holding_days: int = 1,
-    ):
+    ) -> Any:
         """Sonuç kaydet — accuracy tracking."""
         episode = next((e for e in self.episodes if e.task_id == task_id), None)
         if not episode:
@@ -208,8 +212,7 @@ class EpisodicMemory:
         if regime:
             # Outcome'lardan rejim eşleşmesi bul
             regime_matches = [
-                e for e in filtered
-                if e.task_id in self.outcomes and self.outcomes[e.task_id].get("regime") == regime
+                e for e in filtered if e.task_id in self.outcomes and self.outcomes[e.task_id].get("regime") == regime
             ]
             if regime_matches:
                 return regime_matches[-limit:]
@@ -243,6 +246,7 @@ class EpisodicMemory:
         return {"calibrated": True, "calibration": calibration}
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "episode_count": len(self.episodes),
             "outcome_count": len(self.outcomes),
@@ -259,6 +263,7 @@ class SemanticMemory:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.patterns: dict[str, list[dict]] = {}  # ticker → patterns
         self.regime_patterns: dict[str, list[dict]] = {}  # regime → patterns
         self.sector_patterns: dict[str, list[dict]] = {}  # sector → patterns
@@ -269,7 +274,7 @@ class SemanticMemory:
         regime: str,
         pattern: dict[str, Any],
         sector: str | None = None,
-    ):
+    ) -> Any:
         """Kalıp ekle."""
         entry = {
             **pattern,
@@ -314,7 +319,7 @@ class SemanticMemory:
 
         return results[-limit:]
 
-    def prune_low_accuracy(self, threshold: float = 0.4):
+    def prune_low_accuracy(self, threshold: float = 0.4) -> Any:
         """Düşük doğruluklu kalıpları temizle.
 
         Not: Kalıplarda "accuracy" anahtarı yoksa, "confidence" kullanılır.
@@ -322,11 +327,11 @@ class SemanticMemory:
         """
         for ticker in list(self.patterns.keys()):
             self.patterns[ticker] = [
-                p for p in self.patterns[ticker]
-                if p.get("accuracy", p.get("confidence", 0.5)) >= threshold
+                p for p in self.patterns[ticker] if p.get("accuracy", p.get("confidence", 0.5)) >= threshold
             ]
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "ticker_patterns": sum(len(v) for v in self.patterns.values()),
             "regime_patterns": sum(len(v) for v in self.regime_patterns.values()),
@@ -350,6 +355,7 @@ class AgentMemory:
         max_episodic: int = 1000,
         persistence_path: str | None = None,
     ):
+        """Otomatik eklendi."""
         self.agent_role = agent_role
         self.working = WorkingMemory(max_items=max_working)
         self.episodic = EpisodicMemory(max_items=max_episodic)
@@ -363,7 +369,7 @@ class AgentMemory:
         direction: str,
         confidence: float,
         reasoning: str,
-    ):
+    ) -> Any:
         """Görev kaydet (tüm katmanlara)."""
         entry = MemoryEntry(
             task_id=task_id,
@@ -386,7 +392,7 @@ class AgentMemory:
         task_id: str,
         actual_return: float,
         regime: str = "UNKNOWN",
-    ):
+    ) -> Any:
         """Sonuç kaydet."""
         self.episodic.record_outcome(task_id, actual_return, regime)
 
@@ -418,7 +424,7 @@ class AgentMemory:
             "semantic_patterns": self.semantic.to_dict(),
         }
 
-    def save(self, path: str | None = None):
+    def save(self, path: str | None = None) -> Any:
         """Memory'yi dosyaya kaydet."""
         save_path = path or self._persistence_path
         if not save_path:
@@ -439,7 +445,7 @@ class AgentMemory:
 
         logger.info("Memory saved", path=save_path)
 
-    def load(self, path: str | None = None):
+    def load(self, path: str | None = None) -> Any:
         """Memory'yi dosyadan yükle."""
         load_path = path or self._persistence_path
         if not load_path or not Path(load_path).exists():
@@ -463,7 +469,9 @@ class AgentMemory:
                 except (TypeError, KeyError) as e:
                     logger.debug("Skipping invalid episodic memory entry", error=str(e))
 
-            logger.info("Memory loaded", path=load_path, working=len(self.working.items), episodic=len(self.episodic.episodes))
+            logger.info(
+                "Memory loaded", path=load_path, working=len(self.working.items), episodic=len(self.episodic.episodes)
+            )
         except orjson.JSONDecodeError as e:
             logger.warning("Corrupted memory file", path=load_path, error=str(e))
         except FileNotFoundError:
@@ -483,6 +491,7 @@ class MemoryConsolidator:
     """
 
     def __init__(self, consolidation_interval_hours: int = 24):
+        """Otomatik eklendi."""
         self.interval_hours = consolidation_interval_hours
         self._last_consolidation: dict[str, float] = {}
 

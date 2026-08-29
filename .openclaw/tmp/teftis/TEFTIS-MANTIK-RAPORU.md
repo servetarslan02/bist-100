@@ -53,10 +53,11 @@ try:
     loop = _asyncio.get_running_loop()
     # Zaten bir loop içinde — nested çalıştır
     import concurrent.futures
+
     with concurrent.futures.ThreadPoolExecutor() as pool:
         future = pool.submit(
             _asyncio.run,  # ← YENİ loop oluşturur
-            agent_pipe.run(...)
+            agent_pipe.run(...),
         )
         agent_pipeline_result = future.result(timeout=180)
 except RuntimeError:
@@ -463,6 +464,7 @@ def run_full_scan(universe, market_data=None):
     results = []
     try:
         from .alpha_engine import AlphaEngine
+
         alpha = AlphaEngine()  # ← Instance oluşturuluyor
         results.append({"engine": "alpha", "status": "available"})  # ← Sadece status
     except ImportError:
@@ -485,9 +487,12 @@ def run_full_scan(universe, market_data=None):
 ```python
 try:
     from services.macro import (
-        macro_surprise_model, macro_regime_detector,
-        macro_impact_analyzer, macro_stress_test,
-        macro_correlation_tracker, macro_factor_decomposition,
+        macro_surprise_model,
+        macro_regime_detector,
+        macro_impact_analyzer,
+        macro_stress_test,
+        macro_correlation_tracker,
+        macro_factor_decomposition,
     )
     from services.features.macro import macro_feature_engine
     # ...
@@ -630,6 +635,7 @@ def simulate(self, ..., seed=None):
 _pg_pool = None
 _pg_healthy = False
 
+
 async def get_pg_pool():
     global _pg_pool, _pg_healthy
     if _pg_pool is None:
@@ -654,9 +660,10 @@ async def get_pg_pool():
 def _db_available() -> bool:
     try:
         import socket
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(0.5)
-        result = s.connect_ex(('127.0.0.1', 5432))
+        result = s.connect_ex(("127.0.0.1", 5432))
         s.close()
         return result == 0
     except Exception:

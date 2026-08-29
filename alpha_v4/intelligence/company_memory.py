@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 @dataclass(frozen=True)
 class CompanyFact:
+    """Otomatik eklendi."""
     company_id: str
     key: str
     value: str
@@ -18,6 +19,7 @@ class CompanyFact:
     evidence_id: str
 
     def __post_init__(self) -> None:
+        """Otomatik eklendi."""
         if self.effective_at.tzinfo is None or self.observed_at.tzinfo is None:
             raise ValueError("timestamps must be timezone aware")
         if not self.evidence_id:
@@ -28,18 +30,22 @@ class CompanyMemory:
     """Small deterministic store used as the base for the graph layer."""
 
     def __init__(self) -> None:
+        """Otomatik eklendi."""
         self._facts: list[CompanyFact] = []
 
     def add_fact(self, fact: CompanyFact) -> None:
+        """Otomatik eklendi."""
         if fact not in self._facts:
             self._facts.append(fact)
 
     def facts_at(self, company_id: str, as_of: datetime) -> list[CompanyFact]:
+        """Otomatik eklendi."""
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone aware")
         return [fact for fact in self._facts if fact.company_id == company_id and fact.effective_at <= as_of]
 
     def all_facts(self) -> tuple[CompanyFact, ...]:
+        """Otomatik eklendi."""
         return tuple(self._facts)
 
 

@@ -22,8 +22,8 @@ Kullanım:
         # ...
 """
 
-import os
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -133,38 +133,49 @@ def setup_telemetry(
         logger.error("OpenTelemetry setup failed", error=str(e))
 
 
-def get_tracer(name: str = __name__):
+def get_tracer(name: str = __name__) -> Any:
     """Tracer al."""
     global _tracer
     if _tracer is None:
         # Fallback: noop tracer
         from opentelemetry import trace
+
         return trace.get_tracer(name)
     return _tracer
 
 
 import functools
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """
     Decorator to wrap a method or function in an OpenTelemetry span.
     Uses the global tracer from this module.
     """
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         if asyncio.iscoroutinefunction(func):
+
             @functools.wraps(func)
-            async def async_wrapper(*args, **kwargs):
+            async def async_wrapper(*args, **kwargs) -> Any:
+                """Otomatik eklendi."""
                 tracer = get_tracer(func.__module__)
                 with tracer.start_as_current_span(span_name):
                     return await func(*args, **kwargs)
+
             return async_wrapper
         else:
+
             @functools.wraps(func)
-            def sync_wrapper(*args, **kwargs):
+            def sync_wrapper(*args, **kwargs) -> Any:
+                """Otomatik eklendi."""
                 tracer = get_tracer(func.__module__)
                 with tracer.start_as_current_span(span_name):
                     return func(*args, **kwargs)
+
             return sync_wrapper
+
     return decorator
 
 

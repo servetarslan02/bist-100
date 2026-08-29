@@ -67,6 +67,7 @@ class LiquidityRiskEngine:
         default_adv_fallback: float = 20_000_000.0,  # Veri yoksa güvenli default ADV (20M TL)
         kyle_lambda_factor: float = 0.15,  # Piyasa etkisi katsayısı
     ):
+        """Otomatik eklendi."""
         self.max_adv_participation_pct = max_adv_participation_pct
         self.max_acceptable_spread_bps = max_acceptable_spread_bps
         self.default_adv_fallback = default_adv_fallback

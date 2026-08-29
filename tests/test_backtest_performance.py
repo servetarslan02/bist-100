@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Backtest Performance Testleri
 
@@ -28,7 +31,7 @@ from services.scanner.backtest_runner import (
 )
 
 
-def make_market_data(n_stocks=100, n_days=252, seed=42):
+def make_market_data(n_stocks=100, n_days=252, seed=42) -> Any:
     """1 yıllık gerçekçi market dataset."""
     np.random.seed(seed)
     tickers = [f"STOCK{i:04d}" for i in range(n_stocks)]
@@ -60,7 +63,7 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
 # =====================================================
 
 
-def test_feature_cache():
+def test_feature_cache() -> Any:
     """Feature cache doğru çalışmalı."""
     issues = []
     cache = FeatureCache()
@@ -92,7 +95,7 @@ def test_feature_cache():
     return "Feature Cache", len(issues) == 0, issues
 
 
-def test_quality_cache():
+def test_quality_cache() -> Any:
     """Quality cache doğru çalışmalı."""
     issues = []
     cache = QualityCache()
@@ -120,7 +123,7 @@ def test_quality_cache():
 # =====================================================
 
 
-def test_simulator_commission():
+def test_simulator_commission() -> Any:
     """Komisyon hesapları doğru olmalı."""
     issues = []
     sim = PortfolioSimulator(initial_capital=100000, commission_rate=0.001, slippage_rate=0.001)
@@ -145,7 +148,7 @@ def test_simulator_commission():
     return "Simulator Commission", len(issues) == 0, issues
 
 
-def test_simulator_cash_invariant():
+def test_simulator_cash_invariant() -> Any:
     """Cash invariant korunmalı."""
     issues = []
     sim = PortfolioSimulator(initial_capital=100000)
@@ -169,7 +172,7 @@ def test_simulator_cash_invariant():
     return "Simulator Cash Invariant", len(issues) == 0, issues
 
 
-def test_simulator_equity_snapshots():
+def test_simulator_equity_snapshots() -> Any:
     """Günlük equity snapshot oluşmalı."""
     issues = []
     sim = PortfolioSimulator(initial_capital=100000)
@@ -192,7 +195,7 @@ def test_simulator_equity_snapshots():
     return "Equity Snapshots", len(issues) == 0, issues
 
 
-def test_simulator_max_positions():
+def test_simulator_max_positions() -> Any:
     """Max pozisyon limiti çalışmalı."""
     issues = []
     sim = PortfolioSimulator(initial_capital=10000000, max_positions=3)
@@ -209,7 +212,7 @@ def test_simulator_max_positions():
     return "Max Positions", len(issues) == 0, issues
 
 
-def test_simulator_win_rate():
+def test_simulator_win_rate() -> Any:
     """Win rate doğru hesaplanmalı."""
     issues = []
     sim = PortfolioSimulator(initial_capital=100000)
@@ -237,7 +240,7 @@ def test_simulator_win_rate():
 # =====================================================
 
 
-def test_backtest_look_ahead():
+def test_backtest_look_ahead() -> Any:
     """Look-ahead bias kontrolü."""
     issues = []
     market = make_market_data(10, 150)
@@ -250,7 +253,7 @@ def test_backtest_look_ahead():
     return "Look-Ahead Bias", len(issues) == 0, issues
 
 
-def test_backtest_survivorship():
+def test_backtest_survivorship() -> Any:
     """Survivorship bias kontrolü."""
     issues = []
     market = make_market_data(20, 150)
@@ -270,7 +273,7 @@ def test_backtest_survivorship():
     return "Survivorship Bias", len(issues) == 0, issues
 
 
-def test_backtest_equity_invariant():
+def test_backtest_equity_invariant() -> Any:
     """Equity = cash + market_value invariant."""
     issues = []
     market = make_market_data(10, 150)
@@ -286,7 +289,7 @@ def test_backtest_equity_invariant():
     return "Equity Invariant", len(issues) == 0, issues
 
 
-def test_backtest_result_consistency():
+def test_backtest_result_consistency() -> Any:
     """Sonuçlar tutarlı olmalı."""
     issues = []
     market = make_market_data(10, 150)
@@ -311,7 +314,7 @@ def test_backtest_result_consistency():
 # =====================================================
 
 
-def test_benchmark_100():
+def test_benchmark_100() -> Any:
     """100 hisse / 1 yıl benchmark."""
     market = make_market_data(20, 120)
     runner = ScannerBacktestRunner(initial_capital=100000)
@@ -327,7 +330,7 @@ def test_benchmark_100():
     return "Benchmark 20", len(issues) == 0, issues, f"{elapsed:.1f}s, {result.total_scans} scans"
 
 
-def test_benchmark_500():
+def test_benchmark_500() -> Any:
     """500 hisse / 1 yıl benchmark."""
     market = make_market_data(50, 120)
     runner = ScannerBacktestRunner(initial_capital=100000)
@@ -343,7 +346,7 @@ def test_benchmark_500():
     return "Benchmark 50", len(issues) == 0, issues, f"{elapsed:.1f}s, {result.total_scans} scans"
 
 
-def test_benchmark_1000():
+def test_benchmark_1000() -> Any:
     """1000 hisse / 1 yıl benchmark."""
     market = make_market_data(100, 120)
     runner = ScannerBacktestRunner(initial_capital=1000000)
@@ -364,10 +367,11 @@ def test_benchmark_1000():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("BACKTEST PERFORMANCE TESTLERİ")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("BACKTEST PERFORMANCE TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_feature_cache,
@@ -401,23 +405,23 @@ def run_all():
             name, ok, issues, extra = test_func.__name__, False, [f"Exception: {e}"], ""
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}" + (f" ({extra})" if extra else ""))
+        logger.info(f"\n{icon} {name}" + (f" ({extra})" if extra else ""))
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

@@ -1,9 +1,13 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import asyncio
 
 from services.core.database import init_databases, pg_execute
 
 
-async def setup_tables():
+async def setup_tables() -> Any:
+    """Otomatik eklendi."""
     await init_databases()
 
     query = """
@@ -28,7 +32,7 @@ async def setup_tables():
     """
 
     await pg_execute(query)
-    print("Paper trade tables created successfully.")
+    logger.info("Paper trade tables created successfully.")
 
 
 if __name__ == "__main__":

@@ -41,6 +41,7 @@ class HyperOptimizer:
         n_splits: int = 3,
         timeout: int | None = 600,
     ):
+        """Otomatik eklendi."""
         self.n_trials = n_trials
         self.objective = objective
         self.n_splits = n_splits
@@ -68,7 +69,8 @@ class HyperOptimizer:
 
         tscv = TimeSeriesSplit(n_splits=self.n_splits)
 
-        def objective(trial):
+        def objective(trial) -> Any:
+            """Otomatik eklendi."""
             param = {
                 "objective": self.objective,
                 "metric": "ndcg" if self.objective == "lambdarank" else "rmse",
@@ -111,9 +113,7 @@ class HyperOptimizer:
                     train_groups = self._compute_fold_groups(groups, train_idx) if groups else None
                     val_groups = self._compute_fold_groups(groups, val_idx) if groups else None
 
-                    ds_train = lgb.Dataset(
-                        X_t, label=y_rank_t, group=train_groups, feature_name=feature_names
-                    )
+                    ds_train = lgb.Dataset(X_t, label=y_rank_t, group=train_groups, feature_name=feature_names)
                     ds_val = lgb.Dataset(
                         X_v, label=y_rank_v, group=val_groups, feature_name=feature_names, reference=ds_train
                     )
@@ -122,7 +122,9 @@ class HyperOptimizer:
                     ds_val = lgb.Dataset(X_v, label=y_v, feature_name=feature_names, reference=ds_train)
 
                 # Pruning callback
-                pruning_callback = optuna.integration.LightGBMPruningCallback(trial, "ndcg" if self.objective == "lambdarank" else "rmse")
+                pruning_callback = optuna.integration.LightGBMPruningCallback(
+                    trial, "ndcg" if self.objective == "lambdarank" else "rmse"
+                )
 
                 try:
                     gbm = lgb.train(
@@ -207,7 +209,6 @@ class HyperOptimizer:
         Returns:
             (best_params, report) tuple
         """
-        import optuna
 
         best_params = self.optimize(X_train, y_train, feature_names, groups)
 

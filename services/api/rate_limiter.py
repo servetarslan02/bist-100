@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — API Rate Limiter v1.0
 
@@ -48,6 +49,7 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._buckets: dict[str, dict[str, any]] = defaultdict(
             lambda: {
                 "tokens": 100,
@@ -113,13 +115,13 @@ class InMemoryRateLimiter:
             return "auth"
         return "default"
 
-    def reset(self, client_id: str, group: str = "default"):
+    def reset(self, client_id: str, group: str = "default") -> Any:
         """Rate limit sıfırla."""
         key = f"{client_id}:{group}"
         if key in self._buckets:
             del self._buckets[key]
 
-    def cleanup_stale(self, max_age_seconds: float = 3600):
+    def cleanup_stale(self, max_age_seconds: float = 3600) -> Any:
         """Son 1 saatten eski bucket'ları temizle (memory leak önleme)."""
         now = time.monotonic()
         stale_keys = [k for k, v in self._buckets.items() if now - v.get("last_refill", 0) > max_age_seconds]

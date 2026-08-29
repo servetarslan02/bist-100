@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Timestamped KAP Market Restriction & VBTS Registry
 
@@ -33,6 +34,7 @@ class KAPMarketRestrictionRegistry:
     """Zaman damgalı KAP piyasa tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._restrictions: dict[str, list[MarketRestrictionRecord]] = {}
         self._halted_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
@@ -46,7 +48,7 @@ class KAPMarketRestrictionRegistry:
         effective_date: str,
         end_date: str | None = None,
         details: str = "",
-    ):
+    ) -> Any:
         """Yeni bir piyasa tedbiri / kısıtı kaydeder."""
         record = MarketRestrictionRecord(
             ticker=ticker,

@@ -52,10 +52,11 @@ class ResearchMemory:
     """Araştırma hafızası."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._records: deque = deque(maxlen=10000)
         self._ticker_index: dict[str, list[ResearchRecord]] = {}
 
-    def add_record(self, record: ResearchRecord):
+    def add_record(self, record: ResearchRecord) -> Any:
         """Araştırma kaydı ekle."""
         if len(self._records) == self._records.maxlen:
             old_record = self._records.popleft()
@@ -146,7 +147,7 @@ class ResearchMemory:
         )
         return record
 
-    def save(self, path: str = "data/research_memory.json"):
+    def save(self, path: str = "data/research_memory.json") -> Any:
         """Memory'yi dosyaya kaydet."""
         data = {
             "records": [
@@ -170,7 +171,7 @@ class ResearchMemory:
             f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
         logger.info("Research memory saved", path=path, records=len(self._records))
 
-    def load(self, path: str = "data/research_memory.json"):
+    def load(self, path: str = "data/research_memory.json") -> Any:
         """Memory'yi dosyadan yükle."""
         if not Path(path).exists():
             return
@@ -211,11 +212,12 @@ class DataLineage:
     """Veri lineage takibi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._nodes_by_key: dict[str, LineageNode] = {}
         self._children_index: dict[str, list[str]] = {}
         self._keys: deque = deque(maxlen=10000)
 
-    def add_node(self, node: LineageNode):
+    def add_node(self, node: LineageNode) -> Any:
         """Lineage düğümü ekle."""
         key = f"{node.node_type}:{node.node_id}"
 

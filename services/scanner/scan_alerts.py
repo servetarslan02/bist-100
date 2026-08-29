@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 
 
 class ScanAlertSeverity(StrEnum):
+    """Otomatik eklendi."""
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
@@ -27,6 +28,7 @@ class ScanAlertSeverity(StrEnum):
 
 
 class ScanAlertType(StrEnum):
+    """Otomatik eklendi."""
     HIGH_SCORE = "HIGH_SCORE"
     NEW_SIGNAL = "NEW_SIGNAL"
     TIER_CHANGE = "TIER_CHANGE"
@@ -83,13 +85,14 @@ class ScanAlertManager:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._alerts: list[ScanAlert] = []
         self._rules: list[ScanAlertRule] = []
         self._callbacks: list[Callable] = []
         self._previous_signals: dict[str, str] = {}  # ticker → signal
         self._setup_default_rules()
 
-    def _setup_default_rules(self):
+    def _setup_default_rules(self) -> Any:
         """Varsayılan alert kuralları."""
         self._rules = [
             ScanAlertRule(
@@ -249,7 +252,7 @@ class ScanAlertManager:
 
         return new_alerts
 
-    def register_callback(self, callback: Callable):
+    def register_callback(self, callback: Callable) -> Any:
         """Alert callback kaydet.
 
         Args:
@@ -259,7 +262,7 @@ class ScanAlertManager:
         if len(self._callbacks) > 100:
             self._callbacks = self._callbacks[-100:]
 
-    def add_rule(self, rule: ScanAlertRule):
+    def add_rule(self, rule: ScanAlertRule) -> Any:
         """Yeni alert kuralı ekle.
 
         Args:
@@ -324,7 +327,7 @@ class ScanAlertManager:
             "active_rules": sum(1 for r in self._rules if r.enabled),
         }
 
-    def acknowledge_alert(self, alert_id: str):
+    def acknowledge_alert(self, alert_id: str) -> Any:
         """Alert'i onayla.
 
         Args:
@@ -335,7 +338,7 @@ class ScanAlertManager:
                 alert.acknowledged = True
                 break
 
-    def clear_old_alerts(self, max_age_hours: int = 24):
+    def clear_old_alerts(self, max_age_hours: int = 24) -> Any:
         """Eski alert'leri temizle.
 
         Args:

@@ -61,7 +61,8 @@ def compute_prediction(
 ) -> Prediction:
     """Model prediction'dan structured prediction üret."""
 
-    def _s(v):
+    def _s(v) -> Any:
+        """Otomatik eklendi."""
         return float(v) if isinstance(v, (int, float)) and np.isfinite(float(v)) else 0.0
 
     if ml_prediction > 1.0:

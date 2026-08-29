@@ -15,7 +15,7 @@ _MACRO_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 
 
 @router.get("/sources")
-async def data_sources(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def data_sources(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Alternatif veri kaynakları."""
     return {
         "sources": ["google_trends", "kap_rss", "financial_news", "social_sentiment", "macro_commodities"],
@@ -25,7 +25,7 @@ async def data_sources(user=Depends(get_current_user), _=Depends(check_rate_limi
 
 
 @router.get("/sentiment/{ticker}")
-async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """KAP ve Finansal Haberler üzerinden hisse bazlı canlı sentiment analizi (Fast In-Memory Cache)."""
     sym = ticker.upper()
     now = time.time()
@@ -83,7 +83,7 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
 
 
 @router.get("/news")
-async def live_news(limit: int = Query(default=20, le=50)):
+async def live_news(limit: int = Query(default=20, le=50)) -> Any:
     """Canlı KAP Bildirimleri ve Finans Haberleri Akışı (Önbellekli)."""
     global _NEWS_CACHE
     now = time.time()
@@ -109,7 +109,7 @@ async def live_news(limit: int = Query(default=20, le=50)):
 
 
 @router.get("/macro")
-async def live_macro():
+async def live_macro() -> Any:
     """Canlı Küresel Makro ve Emtia Verileri (Önbellekli)."""
     global _MACRO_CACHE
     now = time.time()

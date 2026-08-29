@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — MLflow Model Experiment & Metrics Tracker Sync
 Logs all active quant, ML and LLM models directly into MLflow backend PostgreSQL database.
@@ -172,8 +175,9 @@ MODELS = [
 ]
 
 
-def sync_to_mlflow():
-    print("Writing models directly into MLflow database (PostgreSQL)...")
+def sync_to_mlflow() -> Any:
+    """Otomatik eklendi."""
+    logger.info("Writing models directly into MLflow database (PostgreSQL)...")
     for item in MODELS:
         exp_name = item["experiment_name"]
         mlflow.set_experiment(exp_name)
@@ -185,9 +189,9 @@ def sync_to_mlflow():
                 mlflow.log_param(k, v)
             for k, v in item["metrics"].items():
                 mlflow.log_metric(k, v)
-            print(f"  ✓ Logged '{item['run_name']}' in experiment '{exp_name}'")
+            logger.info(f"  ✓ Logged '{item['run_name']}' in experiment '{exp_name}'")
 
-    print("\nAll models and experiments successfully written to MLflow!")
+    logger.info("\nAll models and experiments successfully written to MLflow!")
 
 
 if __name__ == "__main__":

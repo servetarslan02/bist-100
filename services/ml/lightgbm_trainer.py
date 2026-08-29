@@ -85,6 +85,7 @@ class TrainedModel:
     cs_features: list[str] = field(default_factory=list)  # CS-normalized feature names
 
     def predict(self, features: dict[str, Any]) -> float:
+        """Otomatik eklendi."""
         if self.model is None:
             raise ValueError("Model eğitilmemiş")
         vec = self._feature_vector(features)
@@ -93,6 +94,7 @@ class TrainedModel:
         return result if np.isfinite(result) else 0.0
 
     def predict_batch(self, features_list: list[dict[str, Any]]) -> list[float]:
+        """Otomatik eklendi."""
         if self.model is None:
             raise ValueError("Model eğitilmemiş")
         vecs = [self._feature_vector(f) for f in features_list]
@@ -100,6 +102,7 @@ class TrainedModel:
         return [float(p) if np.isfinite(p) else 0.0 for p in preds]
 
     def _feature_vector(self, features: dict[str, Any]) -> list[float]:
+        """Otomatik eklendi."""
         vec = []
         for name in self.feature_names:
             val = features.get(name)
@@ -116,7 +119,8 @@ class TrainedModel:
             arr = (arr - self.scaler_mean) / np.where(self.scaler_std > 0, self.scaler_std, 1.0)
         return arr.tolist()
 
-    def save(self, path: str):
+    def save(self, path: str) -> Any:
+        """Otomatik eklendi."""
         from services.core.safe_pickle import safe_pickle_dump
 
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -124,6 +128,7 @@ class TrainedModel:
 
     @classmethod
     def load(cls, path: str) -> "TrainedModel":
+        """Otomatik eklendi."""
         from services.core.safe_pickle import safe_pickle_load
 
         return safe_pickle_load(path)
@@ -144,6 +149,7 @@ class MultiHorizonModel:
 
     @property
     def primary_model(self) -> TrainedModel | None:
+        """Otomatik eklendi."""
         return self.horizon_models.get(self.primary_horizon)
 
     def predict(self, features: dict[str, Any]) -> float:
@@ -172,10 +178,12 @@ class MultiHorizonModel:
 
     @property
     def available_horizons(self) -> list[int]:
+        """Otomatik eklendi."""
         return sorted(self.horizon_models.keys())
 
     @property
     def total_train_samples(self) -> int:
+        """Otomatik eklendi."""
         return sum(m.train_samples for m in self.horizon_models.values())
 
     # Backward compatibility: TrainedModel interface
@@ -193,21 +201,25 @@ class MultiHorizonModel:
 
     @property
     def validation_score(self) -> float:
+        """Otomatik eklendi."""
         m = self.primary_model
         return m.validation_score if m else 0.0
 
     @property
     def validation_metrics(self) -> dict[str, float]:
+        """Otomatik eklendi."""
         m = self.primary_model
         return m.validation_metrics if m else {}
 
     @property
     def confidence_score(self) -> float:
+        """Otomatik eklendi."""
         m = self.primary_model
         return m.confidence_score if m else 0.0
 
     @property
     def feature_names(self) -> list[str]:
+        """Otomatik eklendi."""
         m = self.primary_model
         return m.feature_names if m else []
 
@@ -219,12 +231,14 @@ class MultiHorizonModel:
 
 @dataclass
 class TargetSpec:
+    """Otomatik eklendi."""
     horizon: int = 5
     name: str = "return_5d"
     method: str = "return"  # "return" | "log_return" | "binary"
 
     @property
     def label(self) -> str:
+        """Otomatik eklendi."""
         return f"{self.method}_{self.horizon}d"
 
 
@@ -237,6 +251,7 @@ DEFAULT_TARGETS = [
 
 
 def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> float | None:
+    """Otomatik eklendi."""
     target_idx = idx + spec.horizon
     if target_idx >= len(close):
         return None
@@ -258,6 +273,7 @@ def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> float | Non
 
 
 def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Otomatik eklendi."""
     defaults = {
         "mae": 0.0,
         "rmse": 0.0,
@@ -357,6 +373,7 @@ def compute_model_confidence(
     train_regime: str = "UNKNOWN",
     current_regime: str = "UNKNOWN",
 ) -> tuple[float, dict[str, Any]]:
+    """Otomatik eklendi."""
     details: dict[str, Any] = {"degradation_reasons": []}
     confidence = 1.0
 
@@ -418,6 +435,7 @@ class LightGBMTrainer:
     """LightGBM training pipeline v3.0 — date-space purge, multi-horizon."""
 
     def __init__(self, config: MLModelConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or MLModelConfig()
 
     def train(
@@ -541,7 +559,7 @@ class LightGBMTrainer:
                 for rank, idx in enumerate(sorted_indices):
                     y_rank[indices[idx]] = rank
 
-        y_train = y[train_indices]
+        y[train_indices]
         y_val = y[val_indices]
         y_rank_train = y_rank[train_indices]
         y_rank_val = y_rank[val_indices]
@@ -653,6 +671,7 @@ class LightGBMTrainer:
         date_groups: dict[str, str],
         feature_names: list[str],
     ) -> tuple[np.ndarray, np.ndarray, list[int], list[str]]:
+        """Otomatik eklendi."""
         X, y, tickers = [], [], []
         sorted_keys = sorted(features_map.keys(), key=lambda k: date_groups.get(k, ""))
         for key in sorted_keys:
@@ -673,9 +692,15 @@ class LightGBMTrainer:
             X.append(vec)
             y.append(returns[key])
             tickers.append(key)
-        return np.array(X), np.array(y), [], tickers  # groups boş — train'de _compute_groups_from_indices ile hesaplanır
+        return (
+            np.array(X),
+            np.array(y),
+            [],
+            tickers,
+        )  # groups boş — train'de _compute_groups_from_indices ile hesaplanır
 
     def _compute_impute_values(self, X: np.ndarray, feature_names: list[str]) -> dict[str, float]:
+        """Otomatik eklendi."""
         impute = {}
         for i, name in enumerate(feature_names):
             col = X[:, i]
@@ -734,6 +759,7 @@ class LightGBMTrainer:
         return groups
 
     def _compute_ndcg(self, y_true: np.ndarray, y_pred: np.ndarray, groups: list[int]) -> float:
+        """Otomatik eklendi."""
         if len(groups) == 0:
             if np.std(y_true) > 0 and np.std(y_pred) > 0:
                 return float(np.corrcoef(y_true, y_pred)[0, 1])
@@ -913,17 +939,13 @@ def check_feature_drift(
     detector = FeatureDriftDetector()
 
     # Feature importance drift
-    importance_drift = detector.detect_importance_drift(
-        current_importance, historical_importance
-    )
+    importance_drift = detector.detect_importance_drift(current_importance, historical_importance)
 
     # PSI hesapla
     psi_results = {}
     for fname in current_features:
         if fname in baseline_features:
-            psi = detector.compute_psi(
-                baseline_features[fname], current_features[fname]
-            )
+            psi = detector.compute_psi(baseline_features[fname], current_features[fname])
             psi_results[fname] = psi
 
     # Drift summary
@@ -1045,9 +1067,7 @@ def compute_oof_predictions(
 
             train_groups = trainer._compute_groups_from_indices(date_groups, tickers, train_idx)
 
-            ds_train = lgb.Dataset(
-                X_train_s, label=y_rank[train_idx], group=train_groups, feature_name=feature_names
-            )
+            ds_train = lgb.Dataset(X_train_s, label=y_rank[train_idx], group=train_groups, feature_name=feature_names)
 
             params = {
                 "objective": config.objective,
@@ -1099,6 +1119,7 @@ def validate_feature_contract(
     features_map: dict[str, dict],
     expected_features: list[str],
 ) -> tuple[bool, list[str]]:
+    """Otomatik eklendi."""
     violations = []
     if not features_map:
         return False, ["Empty features_map"]

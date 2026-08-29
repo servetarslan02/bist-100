@@ -64,6 +64,7 @@ class FeatureDriftDetector:
         n_bins: int = 10,
         alert_cooldown_hours: int = 24,
     ):
+        """Otomatik eklendi."""
         self.psi_threshold = psi_threshold
         self.importance_change_threshold = importance_change_threshold
         self.n_bins = n_bins
@@ -73,7 +74,7 @@ class FeatureDriftDetector:
         self._drift_history: list[dict[str, Any]] = []
         self._last_alert: dict[str, datetime] = {}
 
-    def record_shap(self, shap_values: dict[str, float]):
+    def record_shap(self, shap_values: dict[str, float]) -> Any:
         """SHAP importance kaydet."""
         self._shap_history.append(
             {
@@ -84,7 +85,7 @@ class FeatureDriftDetector:
         if len(self._shap_history) > 1000:
             self._shap_history = self._shap_history[-1000:]
 
-    def record_distribution(self, feature_data: dict[str, np.ndarray]):
+    def record_distribution(self, feature_data: dict[str, np.ndarray]) -> Any:
         """Feature dağılımı kaydet (PSI hesaplama için)."""
         self._feature_distributions.append(feature_data)
         if len(self._feature_distributions) > 500:
@@ -247,10 +248,12 @@ class FeatureDriftDetector:
         if ticker not in self._shap_by_ticker:
             self._shap_by_ticker[ticker] = []
 
-        self._shap_by_ticker[ticker].append({
-            **shap_values,
-            "_timestamp": datetime.now(UTC).isoformat(),
-        })
+        self._shap_by_ticker[ticker].append(
+            {
+                **shap_values,
+                "_timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         # Son 500 kaydı tut
         if len(self._shap_by_ticker[ticker]) > 500:
@@ -300,8 +303,8 @@ class FeatureDriftDetector:
         std_val = float(np.std(arr))
 
         if len(values) >= 4:
-            first_half = np.mean(arr[:len(arr)//2])
-            second_half = np.mean(arr[len(arr)//2:])
+            first_half = np.mean(arr[: len(arr) // 2])
+            second_half = np.mean(arr[len(arr) // 2 :])
             change = (second_half - first_half) / max(abs(first_half), 0.001)
 
             if change > 0.2:
@@ -363,13 +366,15 @@ class FeatureDriftDetector:
             change_ratio = (current_imp - hist_mean) / hist_mean
 
             if change_ratio > threshold:
-                strengthening.append({
-                    "feature": feature,
-                    "current_importance": round(current_imp, 6),
-                    "historical_importance": round(hist_mean, 6),
-                    "change_ratio": round(change_ratio, 4),
-                    "trend": "strengthening",
-                })
+                strengthening.append(
+                    {
+                        "feature": feature,
+                        "current_importance": round(current_imp, 6),
+                        "historical_importance": round(hist_mean, 6),
+                        "change_ratio": round(change_ratio, 4),
+                        "trend": "strengthening",
+                    }
+                )
 
         return sorted(strengthening, key=lambda x: x["change_ratio"], reverse=True)
 
@@ -412,13 +417,15 @@ class FeatureDriftDetector:
             change_ratio = (current_imp - hist_mean) / hist_mean
 
             if change_ratio < -threshold:
-                weakening.append({
-                    "feature": feature,
-                    "current_importance": round(current_imp, 6),
-                    "historical_importance": round(hist_mean, 6),
-                    "change_ratio": round(change_ratio, 4),
-                    "trend": "weakening",
-                })
+                weakening.append(
+                    {
+                        "feature": feature,
+                        "current_importance": round(current_imp, 6),
+                        "historical_importance": round(hist_mean, 6),
+                        "change_ratio": round(change_ratio, 4),
+                        "trend": "weakening",
+                    }
+                )
 
         return sorted(weakening, key=lambda x: x["change_ratio"])
 
@@ -507,7 +514,7 @@ class FeatureDriftDetector:
         else:
             return ""
 
-    def _check_distribution_drift(self, reports: list[DriftReport]):
+    def _check_distribution_drift(self, reports: list[DriftReport]) -> Any:
         """Distribution-based drift kontrolü (gerçek PSI formülü).
 
         PSI = Σ (P_current - P_reference) * ln(P_current / P_reference)
@@ -539,7 +546,7 @@ class FeatureDriftDetector:
                         feature, combined_score, existing.importance_trend, existing.severity
                     )
 
-    def _check_correlation_drift(self, reports: list[DriftReport]):
+    def _check_correlation_drift(self, reports: list[DriftReport]) -> Any:
         """Feature korelasyon drift kontrolü.
 
         Feature'lar arası korelasyon yapısı değiştiyse bu bir drift işaretidir.

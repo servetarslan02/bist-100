@@ -82,6 +82,7 @@ class MLBacktestEngine:
         risk_free_rate: float = 0.0,  # Risksiz faiz
         annualization_factor: int = 252,  # İş günü
     ):
+        """Otomatik eklendi."""
         self.initial_capital = initial_capital
         self.commission_rate = commission_rate
         self.slippage_rate = slippage_rate
@@ -317,6 +318,7 @@ class MLBacktestEngine:
 
         # Sırala
         def get_metric(r: BacktestResult) -> float:
+            """Otomatik eklendi."""
             return getattr(r, ranking_metric, 0.0)
 
         results.sort(key=get_metric, reverse=True)

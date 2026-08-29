@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """ALPHA BIST — Tüm Enhancement Testleri
 
 Test edilen modüller:
@@ -12,11 +15,7 @@ Kullanım:
     python -m pytest tests/test_all_enhancements.py -v
 """
 
-from __future__ import annotations
-
 import numpy as np
-import pytest
-
 
 # =====================================================
 # FEATURE STABILITY TESTS
@@ -26,11 +25,14 @@ import pytest
 class TestFeatureStability:
     """FeatureStabilityAnalyzer testleri."""
 
-    def test_import(self):
-        from services.ml.feature_stability import FeatureStabilityAnalyzer, feature_stability
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.ml.feature_stability import feature_stability
+
         assert feature_stability is not None
 
-    def test_record_and_check(self):
+    def test_record_and_check(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -46,7 +48,8 @@ class TestFeatureStability:
         assert summary.total_features == 2
         assert summary.overall_stability_score > 0.5
 
-    def test_detect_shift(self):
+    def test_detect_shift(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -62,7 +65,8 @@ class TestFeatureStability:
         # Shift tespit edilmeli
         assert summary.overall_stability_score < 1.0
 
-    def test_get_unstable_features(self):
+    def test_get_unstable_features(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.feature_stability import FeatureStabilityAnalyzer
 
         fs = FeatureStabilityAnalyzer()
@@ -81,11 +85,14 @@ class TestFeatureStability:
 class TestCalibrationEnhanced:
     """CalibrationEnhanced testleri."""
 
-    def test_import(self):
-        from services.ml.calibration_enhanced import CalibrationEnhanced, calibration_enhanced
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.ml.calibration_enhanced import calibration_enhanced
+
         assert calibration_enhanced is not None
 
-    def test_generate_out_of_fold(self):
+    def test_generate_out_of_fold(self) -> Any:
+        """Otomatik eklendi."""
         from sklearn.linear_model import Ridge
 
         from services.ml.calibration_enhanced import CalibrationEnhanced
@@ -101,7 +108,8 @@ class TestCalibrationEnhanced:
         assert len(result.predictions) == 200
         assert result.mean_brier >= 0
 
-    def test_record_and_check_drift(self):
+    def test_record_and_check_drift(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
@@ -116,20 +124,24 @@ class TestCalibrationEnhanced:
         assert drift.drift_detected
         assert drift.severity in ("WARNING", "ALERT")
 
-    def test_should_retrain(self):
+    def test_should_retrain(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
         schedule = ce.should_retrain_calibration()
         assert schedule.should_retrain  # İlk retrain
 
-    def test_compare_methods(self):
+    def test_compare_methods(self) -> Any:
+        """Otomatik eklendi."""
         from services.ml.calibration_enhanced import CalibrationEnhanced
 
         ce = CalibrationEnhanced()
         np.random.seed(42)
 
-        predictions = [{"confidence": np.random.random(), "outcome": float(np.random.random() > 0.5)} for _ in range(100)]
+        predictions = [
+            {"confidence": np.random.random(), "outcome": float(np.random.random() > 0.5)} for _ in range(100)
+        ]
 
         result = ce.compare_calibration_methods(predictions)
         assert "platt_brier" in result or "error" in result
@@ -143,11 +155,14 @@ class TestCalibrationEnhanced:
 class TestRegimeLimits:
     """RegimeLimitsManager testleri."""
 
-    def test_import(self):
-        from services.risk.regime_limits import RegimeLimitsManager, regime_limits
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.risk.regime_limits import regime_limits
+
         assert regime_limits is not None
 
-    def test_get_limits(self):
+    def test_get_limits(self) -> Any:
+        """Otomatik eklendi."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -158,7 +173,8 @@ class TestRegimeLimits:
         assert bull.max_position_pct > bear.max_position_pct
         assert bull.max_total_exposure > bear.max_total_exposure
 
-    def test_adjust_for_confidence(self):
+    def test_adjust_for_confidence(self) -> Any:
+        """Otomatik eklendi."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -171,7 +187,8 @@ class TestRegimeLimits:
 
         assert high > low
 
-    def test_check_sector_concentration(self):
+    def test_check_sector_concentration(self) -> Any:
+        """Otomatik eklendi."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -183,7 +200,8 @@ class TestRegimeLimits:
         # BANK = 0.30, BEAR limit = 0.20 → aşırı
         assert not is_within
 
-    def test_check_liquidity(self):
+    def test_check_liquidity(self) -> Any:
+        """Otomatik eklendi."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -191,7 +209,8 @@ class TestRegimeLimits:
         assert rm.check_liquidity("THYAO", liquidity_score=0.8, regime="BULL")
         assert not rm.check_liquidity("THYAO", liquidity_score=0.1, regime="CRISIS")
 
-    def test_get_all_regimes(self):
+    def test_get_all_regimes(self) -> Any:
+        """Otomatik eklendi."""
         from services.risk.regime_limits import RegimeLimitsManager
 
         rm = RegimeLimitsManager()
@@ -209,11 +228,14 @@ class TestRegimeLimits:
 class TestPortfolioEnhancements:
     """PortfolioEnhancements testleri."""
 
-    def test_import(self):
-        from services.portfolio.portfolio_enhancements import PortfolioEnhancements, portfolio_enhancements
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.portfolio.portfolio_enhancements import portfolio_enhancements
+
         assert portfolio_enhancements is not None
 
-    def test_turnover_penalty(self):
+    def test_turnover_penalty(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -226,8 +248,9 @@ class TestPortfolioEnhancements:
         # Penalty uygulandığı için target'a daha yakın ama tamamen eşit değil
         assert abs(adjusted["A"] - 0.5) < abs(current["A"] - 0.5)
 
-    def test_should_rebalance(self):
-        from services.portfolio.portfolio_enhancements import PortfolioEnhancements, PortfolioConstraints
+    def test_should_rebalance(self) -> Any:
+        """Otomatik eklendi."""
+        from services.portfolio.portfolio_enhancements import PortfolioConstraints, PortfolioEnhancements
 
         pe = PortfolioEnhancements(PortfolioConstraints(hysteresis_threshold=0.02))
 
@@ -245,7 +268,8 @@ class TestPortfolioEnhancements:
         )
         assert not decision.should_rebalance
 
-    def test_hysteresis(self):
+    def test_hysteresis(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -260,7 +284,8 @@ class TestPortfolioEnhancements:
         # B: diff=0.02 < 0.03 → current korunmalı
         assert filtered["B"] == 0.30
 
-    def test_sector_constraints(self):
+    def test_sector_constraints(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -274,7 +299,8 @@ class TestPortfolioEnhancements:
         bank_total = adjusted["GARAN"] + adjusted["AKBNK"]
         assert bank_total <= 0.301  # Floating point toleransı
 
-    def test_liquidity_constraints(self):
+    def test_liquidity_constraints(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -287,7 +313,8 @@ class TestPortfolioEnhancements:
         # B likidite yetersiz → çıkarılmalı
         assert adjusted["B"] == 0.0
 
-    def test_min_position(self):
+    def test_min_position(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -298,7 +325,8 @@ class TestPortfolioEnhancements:
         # C çok küçük → çıkarılmalı
         assert "C" not in filtered
 
-    def test_position_limits(self):
+    def test_position_limits(self) -> Any:
+        """Otomatik eklendi."""
         from services.portfolio.portfolio_enhancements import PortfolioEnhancements
 
         pe = PortfolioEnhancements()
@@ -318,11 +346,14 @@ class TestPortfolioEnhancements:
 class TestBacktestEnhancements:
     """BacktestEnhancements testleri."""
 
-    def test_import(self):
-        from services.backtest.backtest_enhancements import BacktestEnhancements, backtest_enhancements
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.backtest.backtest_enhancements import backtest_enhancements
+
         assert backtest_enhancements is not None
 
-    def test_t_plus_1(self):
+    def test_t_plus_1(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -337,7 +368,8 @@ class TestBacktestEnhancements:
         assert result.can_execute
         assert result.delay_days >= 2  # Hafta sonu
 
-    def test_market_impact(self):
+    def test_market_impact(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -351,7 +383,8 @@ class TestBacktestEnhancements:
         impact = be.estimate_market_impact("THYAO", trade_size=50_000_000, adv=100_000_000)
         assert not impact.is_feasible  # %50 participation
 
-    def test_delisted(self):
+    def test_delisted(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -362,7 +395,8 @@ class TestBacktestEnhancements:
         assert be.is_delisted("XYZ", "2026-07-01")
         assert not be.is_delisted("ABC", "2026-07-01")
 
-    def test_ipo_handling(self):
+    def test_ipo_handling(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -371,36 +405,42 @@ class TestBacktestEnhancements:
         assert not be.is_post_ipo("NEW", "2026-06-15", min_days=30)
         assert be.is_post_ipo("NEW", "2026-07-15", min_days=30)
 
-    def test_corporate_actions(self):
+    def test_corporate_actions(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements, CorporateAction
 
         be = BacktestEnhancements()
-        be.register_corporate_action(CorporateAction(
-            ticker="THYAO",
-            action_type="dividend",
-            ex_date="2026-06-15",
-            value=5.0,
-            description="Temettü",
-        ))
+        be.register_corporate_action(
+            CorporateAction(
+                ticker="THYAO",
+                action_type="dividend",
+                ex_date="2026-06-15",
+                value=5.0,
+                description="Temettü",
+            )
+        )
 
         actions = be.get_corporate_actions("THYAO", "2026-01-01", "2026-12-31")
         assert len(actions) == 1
 
-    def test_dividend_adjustment(self):
+    def test_dividend_adjustment(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
         adjusted = be.adjust_for_dividend(100.0, 5.0)
         assert adjusted == 95.0
 
-    def test_split_adjustment(self):
+    def test_split_adjustment(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
         adjusted = be.adjust_for_split(200.0, 2.0)
         assert adjusted == 100.0
 
-    def test_liquidity_check(self):
+    def test_liquidity_check(self) -> Any:
+        """Otomatik eklendi."""
         from services.backtest.backtest_enhancements import BacktestEnhancements
 
         be = BacktestEnhancements()
@@ -420,11 +460,14 @@ class TestBacktestEnhancements:
 class TestEventEnhancements:
     """EventEnhancements testleri."""
 
-    def test_import(self):
-        from services.core.event_enhancements import EventEnhancements, event_enhancements
+    def test_import(self) -> Any:
+        """Otomatik eklendi."""
+        from services.core.event_enhancements import event_enhancements
+
         assert event_enhancements is not None
 
-    def test_idempotency(self):
+    def test_idempotency(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -434,7 +477,8 @@ class TestEventEnhancements:
         assert ee.is_duplicate("event_1")
         assert not ee.is_duplicate("event_2")
 
-    def test_process_with_idempotency(self):
+    def test_process_with_idempotency(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -448,7 +492,8 @@ class TestEventEnhancements:
         assert result is None
         assert len(results) == 1
 
-    def test_retry_policy(self):
+    def test_retry_policy(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements, RetryPolicy
 
         ee = EventEnhancements(retry_policy=RetryPolicy(max_retries=3))
@@ -457,7 +502,8 @@ class TestEventEnhancements:
         assert ee.should_retry("event_1", attempt=2)
         assert not ee.should_retry("event_1", attempt=3)
 
-    def test_retry_delay(self):
+    def test_retry_delay(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements, RetryPolicy
 
         ee = EventEnhancements(retry_policy=RetryPolicy(base_delay=1.0, exponential_base=2.0, jitter=False))
@@ -468,7 +514,8 @@ class TestEventEnhancements:
 
         assert d0 < d1 < d2
 
-    def test_correlation_id(self):
+    def test_correlation_id(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -483,7 +530,8 @@ class TestEventEnhancements:
         assert "event_1" in linked
         assert "event_2" in linked
 
-    def test_sequence_number(self):
+    def test_sequence_number(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -492,7 +540,8 @@ class TestEventEnhancements:
         assert ee.get_next_sequence("topic_a") == 2
         assert ee.get_next_sequence("topic_b") == 1
 
-    def test_create_metadata(self):
+    def test_create_metadata(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()
@@ -502,7 +551,8 @@ class TestEventEnhancements:
         assert meta.correlation_id == "corr_1"
         assert meta.timestamp is not None
 
-    def test_stats(self):
+    def test_stats(self) -> Any:
+        """Otomatik eklendi."""
         from services.core.event_enhancements import EventEnhancements
 
         ee = EventEnhancements()

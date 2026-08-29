@@ -94,7 +94,9 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
     queued_signals = []
     if needs_rebalance:
         if isinstance(bm_df, pl.DataFrame):
-            common_dates = [d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10] for d in bm_df["Date"].to_list()]
+            common_dates = [
+                d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10] for d in bm_df["Date"].to_list()
+            ]
         elif hasattr(bm_df, "index"):
             common_dates = [d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10] for d in bm_df.index]
         else:

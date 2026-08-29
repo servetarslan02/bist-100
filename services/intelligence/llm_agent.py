@@ -311,6 +311,7 @@ Maksimum 3 cümle. Formatı:
     # ── Prompt Üreticiler ────────────────────────────────────────────────────
 
     def _build_news_prompt(self, text: str, ticker: str | None) -> str:
+        """Otomatik eklendi."""
         ticker_context = f"İlgili hisse: {ticker}." if ticker else ""
         return f"""Sen BIST-100 uzmanı bir finansal analistsın. {ticker_context}
 Aşağıdaki haberi analiz et. Gerekirse araçları kullanarak:
@@ -324,6 +325,7 @@ HABER:
 Analizini tamamla ve yapılandırılmış JSON çıktı ver."""
 
     def _build_kap_prompt(self, ticker: str, text: str, history: list[dict] | None) -> str:
+        """Otomatik eklendi."""
         history_note = ""
         if history:
             history_note = f"\nŞirketin son {len(history)} KAP bildirimi bağlamda mevcut."
@@ -346,6 +348,7 @@ geçmiş bildirimleri göz önünde bulundurarak belirle."""
         signals: dict[str, Any],
         conflicts: list[str],
     ) -> str:
+        """Otomatik eklendi."""
         signal_summary = ", ".join(
             f"{k}: {v.get('direction', 'N')} ({v.get('score', 50):.0f})" for k, v in signals.items()
         )
@@ -359,7 +362,7 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
 
     # ── Yardımcı Metodlar ────────────────────────────────────────────────────
 
-    def _evaluate_regime_override(self, analysis: AgentAnalysis, text: str):
+    def _evaluate_regime_override(self, analysis: AgentAnalysis, text: str) -> Any:
         """Önemli makro/jeopolitik haberlerde rejim override değerlendir."""
         if analysis.importance < 0.85:
             return
@@ -386,7 +389,7 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
                     importance=analysis.importance,
                 )
 
-    def _store_to_memory(self, analysis: AgentAnalysis):
+    def _store_to_memory(self, analysis: AgentAnalysis) -> Any:
         """Analiz sonucunu research memory'e yaz."""
         if not analysis.ticker:
             return

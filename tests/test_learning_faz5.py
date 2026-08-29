@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 5 Test Suite (Shadow Mode + Champion-Challenger)
 
@@ -23,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 # ===================== SHADOW MODE =====================
 
 
-def test_shadow_init():
+def test_shadow_init() -> Any:
     """Shadow manager init."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -32,10 +35,10 @@ def test_shadow_init():
     assert m._champion_id is None
     assert m._challenger_id is None
     assert len(m._predictions) == 0
-    print("✅ Shadow init")
+    logger.info("✅ Shadow init")
 
 
-def test_shadow_start():
+def test_shadow_start() -> Any:
     """Shadow mode başlatma."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -46,10 +49,10 @@ def test_shadow_start():
     assert m._champion_id == "champ_v1"
     assert m._challenger_id == "chall_v2"
     assert m._start_date is not None
-    print("✅ Shadow start")
+    logger.info("✅ Shadow start")
 
 
-def test_shadow_stop():
+def test_shadow_stop() -> Any:
     """Shadow mode durdurma."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -58,10 +61,10 @@ def test_shadow_stop():
     m.stop_shadow()
 
     assert m._shadow_active is False
-    print("✅ Shadow stop")
+    logger.info("✅ Shadow stop")
 
 
-def test_shadow_record_prediction():
+def test_shadow_record_prediction() -> Any:
     """Prediction kayıt."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -74,10 +77,10 @@ def test_shadow_record_prediction():
     assert len(m._predictions) == 2
     assert m._predictions[0].ticker == "THYAO"
     assert m._predictions[1].ticker == "ASELS"
-    print("✅ Shadow record prediction")
+    logger.info("✅ Shadow record prediction")
 
 
-def test_shadow_record_when_inactive():
+def test_shadow_record_when_inactive() -> Any:
     """Inactive iken prediction kayıt edilmemeli."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -85,10 +88,10 @@ def test_shadow_record_when_inactive():
     m.record_prediction("THYAO", {"direction": "LONG"}, {"direction": "LONG"})
 
     assert len(m._predictions) == 0
-    print("✅ Shadow record when inactive → ignored")
+    logger.info("✅ Shadow record when inactive → ignored")
 
 
-def test_shadow_record_outcome():
+def test_shadow_record_outcome() -> Any:
     """Outcome kayıt — her iki model için."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -103,10 +106,10 @@ def test_shadow_record_outcome():
     assert len(m._challenger_returns) == 1
     assert m._champion_returns[0] == 5.0
     assert m._challenger_returns[0] == 5.0
-    print("✅ Shadow record outcome")
+    logger.info("✅ Shadow record outcome")
 
 
-def test_shadow_record_outcome_short():
+def test_shadow_record_outcome_short() -> Any:
     """SHORT prediction outcome."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -119,10 +122,10 @@ def test_shadow_record_outcome_short():
 
     assert m._champion_returns[0] == -5.0
     assert m._challenger_returns[0] == -5.0
-    print("✅ Shadow record outcome SHORT")
+    logger.info("✅ Shadow record outcome SHORT")
 
 
-def test_shadow_evaluate_not_enough_time():
+def test_shadow_evaluate_not_enough_time() -> Any:
     """Yeterli süre geçmediyse evaluate None döndürmeli."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -131,10 +134,10 @@ def test_shadow_evaluate_not_enough_time():
 
     result = m.evaluate()
     assert result is None
-    print("✅ Shadow evaluate not enough time")
+    logger.info("✅ Shadow evaluate not enough time")
 
 
-def test_shadow_evaluate_not_enough_predictions():
+def test_shadow_evaluate_not_enough_predictions() -> Any:
     """Yeterli prediction yoksa evaluate None döndürmeli."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -150,10 +153,10 @@ def test_shadow_evaluate_not_enough_predictions():
 
     result = m.evaluate()
     assert result is None
-    print("✅ Shadow evaluate not enough predictions")
+    logger.info("✅ Shadow evaluate not enough predictions")
 
 
-def test_shadow_evaluate_challenger_better():
+def test_shadow_evaluate_challenger_better() -> Any:
     """Challenger daha iyi ise PROMOTE önerilmeli."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -171,10 +174,10 @@ def test_shadow_evaluate_challenger_better():
     # Challenger LONG dedi ve pozitif getiri → challenger pozitif, champion negatif
     assert result.challenger_sharpe > 0
     assert result.improvement_pct > 0
-    print(f"✅ Shadow evaluate challenger better: improvement={result.improvement_pct}%")
+    logger.info(f"✅ Shadow evaluate challenger better: improvement={result.improvement_pct}%")
 
 
-def test_shadow_evaluate_champion_better():
+def test_shadow_evaluate_champion_better() -> Any:
     """Champion daha iyi ise REJECT önerilmeli."""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -192,10 +195,10 @@ def test_shadow_evaluate_champion_better():
     # Champion LONG dedi ve pozitif getiri → champion pozitif, challenger negatif
     assert result.champion_sharpe > 0
     assert result.improvement_pct < 0
-    print(f"✅ Shadow evaluate champion better: improvement={result.improvement_pct}%")
+    logger.info(f"✅ Shadow evaluate champion better: improvement={result.improvement_pct}%")
 
 
-def test_shadow_status():
+def test_shadow_status() -> Any:
     """Status doğru mu?"""
     from services.learning.shadow_manager import ShadowModeManager
 
@@ -209,23 +212,23 @@ def test_shadow_status():
     assert status["champion_id"] == "c1"
     assert status["challenger_id"] == "c2"
     assert status["prediction_count"] == 0
-    print("✅ Shadow status")
+    logger.info("✅ Shadow status")
 
 
 # ===================== CHAMPION-CHALLENGER =====================
 
 
-def test_cc_init():
+def test_cc_init() -> Any:
     """Champion-challenger init."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
     engine = ChampionChallengerEngine()
     assert engine.get_champion() is None
     assert len(engine._champion_history) == 0
-    print("✅ CC init")
+    logger.info("✅ CC init")
 
 
-def test_cc_promote():
+def test_cc_promote() -> Any:
     """Champion promote."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -237,10 +240,10 @@ def test_cc_promote():
     assert champion.model_id == "model_v1"
     assert champion.version == "v1"
     assert champion.regime == "BULL"
-    print("✅ CC promote")
+    logger.info("✅ CC promote")
 
 
-def test_cc_promote_replaces_old():
+def test_cc_promote_replaces_old() -> Any:
     """Yeni promote eski champion'ı değiştirir."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -251,10 +254,10 @@ def test_cc_promote_replaces_old():
     champion = engine.get_champion()
     assert champion.model_id == "m2"
     assert champion.promoted_from == "m1"
-    print("✅ CC promote replaces old")
+    logger.info("✅ CC promote replaces old")
 
 
-def test_cc_reject():
+def test_cc_reject() -> Any:
     """Challenger reddetme."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -264,10 +267,10 @@ def test_cc_reject():
     assert len(engine._rejected_challengers) == 1
     assert engine._rejected_challengers[0]["model_id"] == "model_v3"
     assert engine._rejected_challengers[0]["reason"] == "Low performance"
-    print("✅ CC reject")
+    logger.info("✅ CC reject")
 
 
-def test_cc_multiple_rejects():
+def test_cc_multiple_rejects() -> Any:
     """Birden fazla reddetme."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -277,10 +280,10 @@ def test_cc_multiple_rejects():
     engine.reject("m3", "reason3", {})
 
     assert len(engine._rejected_challengers) == 3
-    print("✅ CC multiple rejects")
+    logger.info("✅ CC multiple rejects")
 
 
-def test_cc_rollback():
+def test_cc_rollback() -> Any:
     """Rollback çalışıyor mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -293,10 +296,10 @@ def test_cc_rollback():
     result = engine.rollback("v1")
     assert result is True
     assert engine.get_champion().version == "v1"
-    print("✅ CC rollback")
+    logger.info("✅ CC rollback")
 
 
-def test_cc_rollback_not_found():
+def test_cc_rollback_not_found() -> Any:
     """Olmayan versiyona rollback başarısız olmalı."""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -305,10 +308,10 @@ def test_cc_rollback_not_found():
 
     result = engine.rollback("v999")
     assert result is False
-    print("✅ CC rollback not found")
+    logger.info("✅ CC rollback not found")
 
 
-def test_cc_history():
+def test_cc_history() -> Any:
     """History doğru mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -322,10 +325,10 @@ def test_cc_history():
     assert history[0]["version"] == "v1"
     assert history[1]["version"] == "v2"
     assert history[2]["version"] == "v3"
-    print("✅ CC history")
+    logger.info("✅ CC history")
 
 
-def test_cc_report():
+def test_cc_report() -> Any:
     """Rapor doğru mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -337,10 +340,10 @@ def test_cc_report():
     assert report["current_champion"]["model_id"] == "m1"
     assert report["total_promotions"] == 1
     assert report["total_rejections"] == 1
-    print("✅ CC report")
+    logger.info("✅ CC report")
 
 
-def test_cc_promoted_from_tracking():
+def test_cc_promoted_from_tracking() -> Any:
     """promoted_from doğru takip ediliyor mu?"""
     from services.learning.champion_challenger import ChampionChallengerEngine
 
@@ -353,13 +356,14 @@ def test_cc_promoted_from_tracking():
     assert history[0]["promoted_from"] is None  # İlk champion
     assert history[1]["promoted_from"] == "m1"
     assert history[2]["promoted_from"] == "m2"
-    print("✅ CC promoted_from tracking")
+    logger.info("✅ CC promoted_from tracking")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_shadow_init,
         test_shadow_start,
@@ -396,19 +400,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 5 TEST SONUÇLARI (Shadow Mode + Champion-Challenger)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 5 TEST SONUÇLARI (Shadow Mode + Champion-Challenger)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

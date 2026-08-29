@@ -44,6 +44,7 @@ class SystemCheckpoint:
     hash_state: str  # Deterministik hash
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "checkpoint_id": self.checkpoint_id,
             "timestamp": self.timestamp.isoformat(),
@@ -78,13 +79,14 @@ class DeterministicRecovery:
     """
 
     def __init__(self, storage_path: str | None = None):
+        """Otomatik eklendi."""
         self._storage_path = Path(storage_path) if storage_path else Path(".alpha_checkpoints")
         self._storage_path.mkdir(parents=True, exist_ok=True)
         self._checkpoints: list[SystemCheckpoint] = []
         self._current_seed: int = 42
         self._execution_counter: int = 0
 
-    def set_seed(self, seed: int = 42):
+    def set_seed(self, seed: int = 42) -> Any:
         """Random seed ayarla (deterministik sonuçlar için)."""
         self._current_seed = seed
         np.random.seed(seed)
@@ -288,7 +290,7 @@ class DeterministicRecovery:
 
         return report
 
-    def _persist_checkpoint(self, checkpoint: SystemCheckpoint):
+    def _persist_checkpoint(self, checkpoint: SystemCheckpoint) -> Any:
         """Checkpoint'i diske yaz."""
         filepath = self._storage_path / f"{checkpoint.checkpoint_id}.json"
         try:
@@ -339,7 +341,7 @@ class DeterministicRecovery:
                 logger.debug("Handled exception", error=str(e), context="deterministic.py:338")
         return checkpoints
 
-    def cleanup_old_checkpoints(self, keep_last: int = 10):
+    def cleanup_old_checkpoints(self, keep_last: int = 10) -> Any:
         """Eski checkpoint'leri temizle."""
         files = sorted(self._storage_path.glob("cp_*.json"))
         if len(files) > keep_last:
@@ -356,6 +358,7 @@ class IdempotencyGuard:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._executed_operations: dict[str, Any] = {}
 
     def compute_operation_hash(self, operation: str, params: dict[str, Any]) -> str:
@@ -368,7 +371,7 @@ class IdempotencyGuard:
         op_hash = self.compute_operation_hash(operation, params)
         return op_hash in self._executed_operations
 
-    def record_execution(self, operation: str, params: dict[str, Any], result: Any):
+    def record_execution(self, operation: str, params: dict[str, Any], result: Any) -> Any:
         """İşlem kaydı yap."""
         op_hash = self.compute_operation_hash(operation, params)
         self._executed_operations[op_hash] = {
@@ -400,7 +403,7 @@ class IdempotencyGuard:
         self.record_execution(operation, params, result)
         return result
 
-    def clear_cache(self):
+    def clear_cache(self) -> Any:
         """Cache'i temizle."""
         self._executed_operations.clear()
 

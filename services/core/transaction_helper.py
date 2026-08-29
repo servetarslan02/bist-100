@@ -15,6 +15,7 @@ Referanslar:
 """
 
 import asyncio
+import functools
 import hashlib
 import time
 from collections.abc import Callable
@@ -23,20 +24,25 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.transaction_helper")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -52,6 +58,7 @@ class TransactionMetrics:
     total_duration_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_transactions": self.total_transactions,
             "committed": self.committed,
@@ -99,6 +106,7 @@ class TransactionHelper:
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
     ):
+        """Otomatik eklendi."""
         self._pool = pool
         self._default_timeout = default_timeout_seconds
         self._max_retries = max_retries
@@ -106,7 +114,7 @@ class TransactionHelper:
         self._metrics = TransactionMetrics()
         self._query_log: list[QueryMetrics] = []
 
-    def set_pool(self, pool: Any):
+    def set_pool(self, pool: Any) -> Any:
         """Connection pool'u ayarla."""
         self._pool = pool
 
@@ -115,7 +123,7 @@ class TransactionHelper:
         self,
         timeout_seconds: float | None = None,
         read_only: bool = False,
-    ):
+    ) -> Any:
         """
         Atomic transaction context manager.
 
@@ -188,7 +196,7 @@ class TransactionHelper:
         max_retries: int | None = None,
         timeout_seconds: float | None = None,
         read_only: bool = False,
-    ):
+    ) -> Any:
         """
         Retry ile atomic transaction.
 
@@ -223,7 +231,7 @@ class TransactionHelper:
         raise last_error
 
     @asynccontextmanager
-    async def savepoint(self, conn: Any, name: str):
+    async def savepoint(self, conn: Any, name: str) -> Any:
         """
         Nested transaction (savepoint).
 
@@ -287,7 +295,7 @@ class TransactionHelper:
             for q in slow[-50:]  # Son 50
         ]
 
-    def reset_metrics(self):
+    def reset_metrics(self) -> Any:
         """Metrikleri sÄ±fÄ±rla."""
         self._metrics = TransactionMetrics()
         self._query_log.clear()
@@ -301,6 +309,7 @@ class TransactionConnection:
     """
 
     def __init__(self, conn: Any, query_log: list[QueryMetrics]):
+        """Otomatik eklendi."""
         self._conn = conn
         self._query_log = query_log
 
@@ -404,4 +413,3 @@ class TransactionConnection:
 
 # Singleton
 transaction_helper = TransactionHelper()
-

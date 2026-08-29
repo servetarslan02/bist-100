@@ -29,11 +29,13 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     """SQLite tabanlı historical repository."""
 
     def __init__(self, db_path: str = "historical_data.db"):
+        """Otomatik eklendi."""
         self._db_path = db_path
         self._conn = None
         self._init_db()
 
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
+        """Otomatik eklendi."""
         if self._conn is None:
             self._conn = duckdb.connect(self._db_path)
             self._conn.execute("SET enable_progress_bar = false")
@@ -43,9 +45,9 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         """DuckDB'den dict listesi olarak sonuç çek."""
         result = conn.execute(query, params)
         columns = [desc[0] for desc in result.description]
-        return [dict(zip(columns, row)) for row in result.fetchall()]
+        return [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """Tabloları oluştur."""
         conn = self._get_conn()
         conn.execute("CREATE SEQUENCE IF NOT EXISTS fundamental_snapshots_seq START 1")
@@ -118,6 +120,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         ticker: str,
         as_of_date: str,
     ) -> list[FundamentalSnapshot]:
+        """Otomatik eklendi."""
         conn = self._get_conn()
         rows = self._fetchall_dicts(
             conn,
@@ -145,6 +148,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         as_of_date: str,
         event_types: list[str] | None = None,
     ) -> list[EventSnapshot]:
+        """Otomatik eklendi."""
         conn = self._get_conn()
         if event_types:
             placeholders = ",".join("?" * len(event_types))
@@ -185,6 +189,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         ticker: str,
         as_of_date: str,
     ) -> list[CatalystSnapshot]:
+        """Otomatik eklendi."""
         conn = self._get_conn()
         rows = self._fetchall_dicts(
             conn,
@@ -317,7 +322,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         rows = self._fetchall_dicts(conn, "SELECT value FROM ingestion_state WHERE key = ?", (key,))
         return rows[0]["value"] if rows else None
 
-    def set_last_ingestion_time(self, key: str, timestamp: str):
+    def set_last_ingestion_time(self, key: str, timestamp: str) -> Any:
         """Son ingestion timestamp'ini kaydet."""
         conn = self._get_conn()
         now = datetime.now(UTC).isoformat()
@@ -348,7 +353,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
             "event_tickers": event_tickers,
         }
 
-    def close(self):
+    def close(self) -> Any:
+        """Otomatik eklendi."""
         if self._conn:
             self._conn.close()
             self._conn = None

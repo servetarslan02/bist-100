@@ -22,13 +22,13 @@ Kullanım:
         await backfill_manager.backfill_all(...)
 """
 
+import functools
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import functools
 import duckdb
 import structlog
 from opentelemetry import trace
@@ -36,14 +36,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.downtime_tracker")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -66,13 +72,14 @@ class DowntimeTracker:
     }
 
     def __init__(self, db_path: str = "data/downtime.db"):
+        """Otomatik eklendi."""
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._startup_time: float | None = None
         self._downtime_seconds: float = 0.0
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """DuckDB tablolarını oluştur."""
         with self._connect() as conn:
             conn.execute("""
@@ -100,7 +107,8 @@ class DowntimeTracker:
             conn.commit()
 
     @contextmanager
-    def _connect(self):
+    def _connect(self) -> Any:
+        """Otomatik eklendi."""
         conn = duckdb.connect(str(self._db_path))
         try:
             yield conn
@@ -108,7 +116,7 @@ class DowntimeTracker:
             conn.close()
 
     @otel_trace("downtime_tracker.record_shutdown")
-    def record_shutdown(self):
+    def record_shutdown(self) -> Any:
         """Kapanış zamanını kaydet (graceful shutdown'ta çağrılır)."""
         now = time.time()
         now_iso = datetime.now(UTC).isoformat()
@@ -130,7 +138,7 @@ class DowntimeTracker:
         logger.info("Shutdown time recorded", time=now_iso)
 
     @otel_trace("downtime_tracker.record_startup")
-    def record_startup(self):
+    def record_startup(self) -> Any:
         """Başlangıç zamanını kaydet ve downtime hesapla."""
         self._startup_time = time.time()
         self._downtime_seconds = self._calculate_downtime()
@@ -222,7 +230,7 @@ class DowntimeTracker:
         except Exception:
             return 0.0
 
-    def _set_config(self, key: str, value: str):
+    def _set_config(self, key: str, value: str) -> Any:
         """Config anahtarını ayarla."""
         with self._connect() as conn:
             conn.execute(
@@ -297,7 +305,7 @@ class DowntimeTracker:
             )
             rows = cur.fetchall()
             cols = [d[0] for d in cur.description] if cur.description else []
-            return [dict(zip(cols, r)) for r in rows]
+            return [dict(zip(cols, r, strict=False)) for r in rows]
 
 
 # Singleton

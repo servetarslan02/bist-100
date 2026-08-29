@@ -36,8 +36,8 @@ kurban = sorted([d for d in computed if d.month in (5, 6, 7)])
 
 # YENİ (doğru)
 sorted_holidays = sorted(computed)
-ramazan = sorted_holidays[:3]   # İlk 3 gün = Ramazan
-kurban = sorted_holidays[3:7]   # Sonraki 4 gün = Kurban
+ramazan = sorted_holidays[:3]  # İlk 3 gün = Ramazan
+kurban = sorted_holidays[3:7]  # Sonraki 4 gün = Kurban
 ```
 
 **Etkilenen dosyalar:**

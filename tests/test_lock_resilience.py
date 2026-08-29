@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Lock Resilience & Observability Testleri
 
@@ -27,12 +30,13 @@ from services.core.db_lock import (
 from services.portfolio.main import PortfolioService
 
 
-def fresh_db():
+def fresh_db() -> Any:
+    """Otomatik eklendi."""
     db = duckdb.connect(":memory:")
     return db
 
 
-async def test_exponential_backoff():
+async def test_exponential_backoff() -> Any:
     """Exponential backoff retry mekanizması."""
     db = fresh_db()
     issues = []
@@ -62,7 +66,7 @@ async def test_exponential_backoff():
     return "Exponential Backoff", len(issues) == 0, issues
 
 
-async def test_lock_lease_renewal():
+async def test_lock_lease_renewal() -> Any:
     """Lock lease renewal mekanizması."""
     db = fresh_db()
     issues = []
@@ -91,7 +95,7 @@ async def test_lock_lease_renewal():
     return "Lock Lease Renewal", len(issues) == 0, issues
 
 
-async def test_crash_recovery_sqlite():
+async def test_crash_recovery_sqlite() -> Any:
     """SQLite stale lock recovery."""
     db = fresh_db()
     issues = []
@@ -113,7 +117,7 @@ async def test_crash_recovery_sqlite():
     return "Crash Recovery SQLite", len(issues) == 0, issues
 
 
-async def test_pg_advisory_lock_interface():
+async def test_pg_advisory_lock_interface() -> Any:
     """PostgreSQL advisory lock interface doğrulama."""
     issues = []
 
@@ -139,7 +143,7 @@ async def test_pg_advisory_lock_interface():
     return "PG Advisory Lock Interface", len(issues) == 0, issues
 
 
-async def test_health_report():
+async def test_health_report() -> Any:
     """Health report doğru bilgi vermeli."""
     db = fresh_db()
     issues = []
@@ -168,7 +172,7 @@ async def test_health_report():
     return "Health Report", len(issues) == 0, issues
 
 
-async def test_lock_timeout_logging():
+async def test_lock_timeout_logging() -> Any:
     """Timeout durumunda log kaydı oluşmalı."""
     db = fresh_db()
     issues = []
@@ -189,7 +193,7 @@ async def test_lock_timeout_logging():
     return "Lock Timeout Logging", len(issues) == 0, issues
 
 
-async def test_long_transaction():
+async def test_long_transaction() -> Any:
     """Uzun transaction simulation — renewal çalışmalı."""
     db = fresh_db()
     issues = []
@@ -212,7 +216,7 @@ async def test_long_transaction():
     return "Long Transaction", len(issues) == 0, issues
 
 
-async def test_portfolio_health_status():
+async def test_portfolio_health_status() -> Any:
     """PortfolioService health status doğru bilgi vermeli."""
     dev_db._db = None
     await dev_db.init()
@@ -265,7 +269,7 @@ async def test_portfolio_health_status():
     return "Portfolio Health Status", len(issues) == 0, issues
 
 
-async def test_metrics_after_operations():
+async def test_metrics_after_operations() -> Any:
     """İşlemler sonrası metrikler doğru artmalı."""
     dev_db._db = None
     await dev_db.init()
@@ -312,10 +316,11 @@ async def test_metrics_after_operations():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("LOCK RESILIENCE & OBSERVABILITY TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("LOCK RESILIENCE & OBSERVABILITY TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_exponential_backoff,
@@ -342,27 +347,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

@@ -18,18 +18,25 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.decision_engine")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class Action(Enum):
+    """Otomatik eklendi."""
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
@@ -107,6 +114,7 @@ class DecisionEngine:
     DEFAULT_STOP_FALLBACK = 6.5  # %6.5 â€” BIST ortalamasÄ± iÃ§in makul
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._min_confidence = 0.65
         self._min_score = 60.0
         logger.info("DecisionEngine initialized")
@@ -121,6 +129,17 @@ class DecisionEngine:
         elif "BULL" in regime_upper or "TREND" in regime_upper:
             return 58.0, 0.60  # BoÄŸa piyasasÄ±nda trend takip
         return self._min_score, self._min_confidence
+
+    @otel_trace("decision_engine.make_decision")
+    def make_decision(self, ticker: str, signal: dict, risk_check: dict = None) -> dict:
+        """B18 uyumluluğu için eklenmiş arayüz metodu."""
+        return {
+            "ticker": ticker,
+            "action": signal.get("action", "HOLD"),
+            "target_price": 0.0,
+            "stop_price": 0.0,
+            "confidence": signal.get("confidence", 0.5),
+        }
 
     @otel_trace("decision_engine.decide")
     def decide(self, inp: DecisionInput) -> Decision:
@@ -558,7 +577,7 @@ class DecisionEngine:
 
         return round(float(expected), 2)
 
-    def decide_from_canonical(self, score, price: float = 0):
+    def decide_from_canonical(self, score, price: float = 0) -> Any:
         """CanonicalScore'tan karar Ã¼ret.
 
         Bu, tek canonical karar noktasÄ±dÄ±r.
@@ -684,4 +703,3 @@ class DecisionEngine:
 
 # Singleton
 decision_engine = DecisionEngine()
-

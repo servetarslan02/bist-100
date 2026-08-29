@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 #!/usr/bin/env python3
+from typing import Any
 """
 ALPHA BIST — Protobuf Backward Compatibility Checker
 
@@ -12,11 +15,11 @@ Kullanım:
     python scripts/check_proto_compatibility.py
 """
 
-from __future__ import annotations
+import structlog
+logger = structlog.get_logger(__name__)
 
 import hashlib
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -110,13 +113,13 @@ def get_proto_hash(proto_path: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-def main():
+def main() -> Any:
     """Ana fonksiyon."""
     proto_dir = Path("proto")
     snapshot_file = Path(".proto_snapshot.json")
 
     if not proto_dir.exists():
-        print("⚠️  proto/ dizini bulunamadı")
+        logger.info("⚠️  proto/ dizini bulunamadı")
         return 0
 
     # Mevcut proto dosyalarını oku
@@ -137,12 +140,12 @@ def main():
         all_errors = []
         for proto_name, old_data in old_snapshot.items():
             if proto_name not in current_snapshot:
-                print(f"⚠️  {proto_name} dosyası silinmiş!")
+                logger.info(f"⚠️  {proto_name} dosyası silinmiş!")
                 continue
 
             # Hash aynıysa değişiklik yok
             if old_data["hash"] == current_snapshot[proto_name]["hash"]:
-                print(f"✅ {proto_name} — değişiklik yok")
+                logger.info(f"✅ {proto_name} — değişiklik yok")
                 continue
 
             # Field karşılaştırması
@@ -169,20 +172,20 @@ def main():
                         )
 
         if all_errors:
-            print("\n🚨 Backward Compatibility İhlalleri:\n")
+            logger.info("\n🚨 Backward Compatibility İhlalleri:\n")
             for error in all_errors:
-                print(f"  {error}")
-            print(f"\n{len(all_errors)} ihlal bulundu!")
+                logger.info(f"  {error}")
+            logger.info(f"\n{len(all_errors)} ihlal bulundu!")
             return 1
         else:
-            print("✅ Tüm proto dosyaları backward compatible")
+            logger.info("✅ Tüm proto dosyaları backward compatible")
     else:
-        print("📝 İlk snapshot oluşturuluyor...")
+        logger.info("📝 İlk snapshot oluşturuluyor...")
 
     # Snapshot'ı kaydet
     with open(snapshot_file, "w") as f:
         json.dump(current_snapshot, f, indent=2)
-    print(f"💾 Snapshot kaydedildi: {snapshot_file}")
+    logger.info(f"💾 Snapshot kaydedildi: {snapshot_file}")
 
     return 0
 

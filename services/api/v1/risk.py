@@ -1,3 +1,4 @@
+from typing import Any
 """
 Risk API v2.0 — Tüm endpoint'ler gerçek servislere bağlı.
 
@@ -35,55 +36,64 @@ router = APIRouter()
 # =====================================================
 
 
-def _get_dynamic_limits():
+def _get_dynamic_limits() -> Any:
+    """Otomatik eklendi."""
     from ...risk.dynamic_limits import dynamic_limits
 
     return dynamic_limits
 
 
-def _get_drawdown_system():
+def _get_drawdown_system() -> Any:
+    """Otomatik eklendi."""
     from ...risk.drawdown_response import drawdown_system
 
     return drawdown_system
 
 
-def _get_var_calculator():
+def _get_var_calculator() -> Any:
+    """Otomatik eklendi."""
     from ...risk.var_cvar import var_calculator
 
     return var_calculator
 
 
-def _get_stress_engine():
+def _get_stress_engine() -> Any:
+    """Otomatik eklendi."""
     from ...risk.stress_test import stress_test_engine
 
     return stress_test_engine
 
 
-def _get_tail_hedger():
+def _get_tail_hedger() -> Any:
+    """Otomatik eklendi."""
     from ...risk.tail_hedge import tail_hedger
 
     return tail_hedger
 
 
-def _get_risk_parity():
+def _get_risk_parity() -> Any:
+    """Otomatik eklendi."""
     from ...risk.risk_parity import risk_parity_optimizer
 
     return risk_parity_optimizer
 
 
-def _get_monitor():
+def _get_monitor() -> Any:
+    """Otomatik eklendi."""
     from ...risk.monitoring import risk_monitor
 
     return risk_monitor
 
 
-def _get_calibrator():
+def _get_calibrator() -> Any:
+    """Otomatik eklendi."""
     from ...risk.calibration import calibrator
 
     return calibrator
 
 
-def _get_position_sizer():
+def _get_position_sizer() -> Any:
+    """Otomatik eklendi."""
     from ...risk.position_sizing import position_sizer
 
     return position_sizer
@@ -100,7 +110,7 @@ async def risk_overview(
     regime: str = Query("SIDEWAYS", description="Mevcut piyasa rejimi"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Genel risk durumu — dynamic limits + drawdown + monitoring.
 
     Returns:
@@ -159,7 +169,7 @@ async def risk_dashboard(
     regime: str = Query("SIDEWAYS"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tam risk dashboard — tüm modüllerin birleşik özeti.
 
     Returns:
@@ -229,7 +239,7 @@ async def var_report(
     holding_days: int = Query(1, ge=1, le=30),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """VaR/CVaR detaylı rapor — 3 yöntem (parametrik, tarihsel, Monte Carlo)."""
     try:
         calc = _get_var_calculator()
@@ -273,7 +283,7 @@ async def portfolio_risk(
     regime: str = Query("SIDEWAYS", description="Piyasa rejimi"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Portföy risk metrikleri — VaR/CVaR, L-VaR, Konsantrasyon, Drawdown, Stres Testi."""
     try:
         from ...risk.orchestrator import risk_orchestrator
@@ -317,7 +327,7 @@ async def liquidity_risk(
     spread_bps: float | None = Query(None, description="Alış-satış makası (bps)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Enstrüman bazlı likidite riski, piyasa etkisi (Kyle's Lambda) ve L-VaR analizi."""
     try:
         from ...risk.liquidity_risk import liquidity_risk_engine
@@ -348,7 +358,6 @@ async def liquidity_risk(
         raise HTTPException(500, "Internal server error") from e
 
 
-
 # =====================================================
 # LIMITS & DRAWDOWN
 # =====================================================
@@ -362,7 +371,7 @@ async def risk_limits(
     vix: float | None = Query(None, description="VIX seviyesi"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Dinamik risk limitleri — volatilite/rejim/drawdown'a göre ayarlı.
 
     Args:
@@ -413,7 +422,7 @@ async def risk_limits(
 
 
 @router.get("/drawdown")
-async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Drawdown durumu — drawdown_response servisi.
 
     Returns:
@@ -458,7 +467,7 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
 
 
 @router.get("/stress-test/scenarios")
-async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Mevcut stres testi senaryoları.
 
     Returns:
@@ -497,7 +506,7 @@ async def run_stress_test(
     scenario: str = Query("all", description="Senaryo anahtarı veya 'all'"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Stres testi çalıştır.
 
     Args:
@@ -576,7 +585,7 @@ async def run_stress_test(
 
 
 @router.get("/tail-hedge")
-async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tail risk hedge stratejileri ve VIX seviyeleri.
 
     Returns:
@@ -609,7 +618,7 @@ async def analyze_tail_hedge(
     drawdown_pct: float = Query(0.0, description="Mevcut drawdown %"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Tail hedge analizi yap.
 
     Args:
@@ -649,7 +658,7 @@ async def analyze_tail_hedge(
 
 
 @router.get("/risk-parity")
-async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Risk parity optimizasyon bilgisi.
 
     Returns:
@@ -675,7 +684,7 @@ async def optimize_risk_parity(
     returns_data: list[list[float]] = Body(..., description="Getiri matrisi (n_days x n_assets)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Risk parity ağırlıkları hesapla.
 
     Args:
@@ -721,7 +730,7 @@ async def optimize_risk_parity(
 
 
 @router.get("/monitoring")
-async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Risk monitoring durumu — alert kuralları ve son metrikler.
 
     Returns:
@@ -761,7 +770,7 @@ async def risk_alerts(
     severity: str | None = Query(None, description="Severity filtresi: INFO, WARNING, BLOCK, CRITICAL"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Risk alert'leri.
 
     Args:
@@ -817,7 +826,7 @@ async def risk_alerts(
 
 
 @router.get("/calibration")
-async def calibration_quality(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def calibration_quality(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Kalibrasyon kalitesi — Brier score + calibration curve.
 
     Returns:
@@ -856,7 +865,7 @@ async def pre_trade_check(
     regime: str = Query("SIDEWAYS", description="Mevcut rejim"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """İşlem öncesi risk kontrolü — BIST kuralları + likidite + dynamic limits + drawdown."""
     try:
         from ...risk.orchestrator import PreTradeOrderRequest, risk_orchestrator
@@ -915,7 +924,6 @@ async def pre_trade_check(
         raise HTTPException(500, "Internal server error") from e
 
 
-
 # =====================================================
 # COMPLIANCE
 # =====================================================
@@ -926,7 +934,7 @@ async def compliance(
     regime: str = Query("SIDEWAYS"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Uyumluluk kontrolü — tüm limitler ve kurallar.
 
     Returns:
@@ -979,7 +987,8 @@ async def compliance(
 _cached_daily_returns = None
 
 
-def _get_historical_returns():
+def _get_historical_returns() -> Any:
+    """Otomatik eklendi."""
     global _cached_daily_returns
     if _cached_daily_returns is not None:
         return _cached_daily_returns
@@ -1006,7 +1015,7 @@ async def run_stress_test_quick(
     scenario: str = Query("gfc_2008"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """30-Yıllık BIST Deposu ve Ultra Hızlı Monte Carlo Motoru (<1ms Latency)."""
     try:
         daily_returns = _get_historical_returns()

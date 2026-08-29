@@ -40,6 +40,7 @@ class _RateLimiter:
     """
 
     def __init__(self, max_tokens: int = 10, refill_rate: float = 10 / 60):
+        """Otomatik eklendi."""
         self._max_tokens = max_tokens
         self._tokens = float(max_tokens)
         self._refill_rate = refill_rate  # saniyede kaç token
@@ -79,6 +80,7 @@ class SchedulerAPI:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         from .daily_workflow import daily_workflow
         from .job_monitor import job_monitor
         from .learning_scheduler import learning_scheduler

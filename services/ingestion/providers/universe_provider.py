@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — BIST Universe Auto-Discovery Provider v2.0
 TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfeder ve günceller.
@@ -9,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import orjson
-import requests
+import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -33,6 +34,7 @@ class StockInfo:
     source: str = ""
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.index_membership is None:
             self.index_membership = []
         if not self.last_updated:
@@ -43,7 +45,8 @@ class LiveUniverseScraper:
     """Canlı kamu ve finans kaynaklarından tüm BIST hisselerini çeker."""
 
     def __init__(self):
-        self.session = requests.Session()
+        """Otomatik eklendi."""
+        self.session = httpx.Client(follow_redirects=True)
         self.session.headers.update(
             {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -169,6 +172,7 @@ class UniverseAutoUpdater:
     CACHE_TTL_HOURS = 12
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.scraper = LiveUniverseScraper()
         self._universe: dict[str, StockInfo] = {}
         self._indices: dict[str, list[str]] = {
@@ -206,7 +210,7 @@ class UniverseAutoUpdater:
 
         return self._universe
 
-    def _refresh_index_compositions(self):
+    def _refresh_index_compositions(self) -> Any:
         """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirle."""
         BIST_100_BENCHMARK = [
             "AEFES",
@@ -422,7 +426,7 @@ class UniverseAutoUpdater:
         except Exception:
             return False
 
-    def _load_from_cache(self):
+    def _load_from_cache(self) -> Any:
         """Cache'den yükle."""
         try:
             with open(self.CACHE_FILE, encoding="utf-8") as f:
@@ -434,7 +438,7 @@ class UniverseAutoUpdater:
         except Exception as e:
             logger.debug("Cache load failed", error=str(e))
 
-    def _save_to_cache(self):
+    def _save_to_cache(self) -> Any:
         """Cache'e kaydet."""
         try:
             self.CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -455,26 +459,32 @@ universe_updater = UniverseAutoUpdater()
 
 
 def get_current_universe() -> dict[str, StockInfo]:
+    """Otomatik eklendi."""
     return universe_updater.get_universe()
 
 
 def get_bist_100() -> list[str]:
+    """Otomatik eklendi."""
     return universe_updater.get_index_members("XU100")
 
 
 def get_bist_30() -> list[str]:
+    """Otomatik eklendi."""
     return universe_updater.get_index_members("XU030")
 
 
 def get_bist_50() -> list[str]:
+    """Otomatik eklendi."""
     return universe_updater.get_index_members("XU050")
 
 
 def get_all_tickers() -> list[str]:
+    """Otomatik eklendi."""
     return list(universe_updater.get_universe().keys())
 
 
 def get_sector(ticker: str) -> str:
+    """Otomatik eklendi."""
     universe = universe_updater.get_universe()
     info = universe.get(ticker)
     return info.sector if info else "DIGER"

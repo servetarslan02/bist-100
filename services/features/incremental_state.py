@@ -12,6 +12,7 @@ class IncrementalStateManager:
     """Maintains incremental rolling state for features to avoid full recomputation."""
 
     def __init__(self, max_window: int = 500):
+        """Otomatik eklendi."""
         self.max_window = max_window
         self._buffers: dict[str, dict[str, list[float]]] = {}
         self._last_update: dict[str, float] = {}

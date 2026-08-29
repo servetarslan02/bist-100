@@ -10,6 +10,7 @@ Production-grade job execution with:
 """
 
 import asyncio
+import functools
 import hashlib
 import time
 from collections.abc import Awaitable, Callable
@@ -18,7 +19,6 @@ from typing import Any
 
 import orjson
 import structlog
-import functools
 from opentelemetry import trace
 
 from services.core.production_metrics import Metrics, production_metrics
@@ -26,18 +26,25 @@ from services.core.production_metrics import Metrics, production_metrics
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.worker")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class JobStatus(Enum):
+    """Otomatik eklendi."""
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
@@ -47,6 +54,7 @@ class JobStatus(Enum):
 
 
 class JobType(Enum):
+    """Otomatik eklendi."""
     MARKET_DATA_UPDATE = "market_data_update"
     FEATURE_CALCULATION = "feature_calculation"
     LIVE_INFERENCE = "live_inference"
@@ -73,6 +81,7 @@ class JobWorker:
         default_max_retries: int = 3,
         retry_base_delay: float = 5.0,
     ):
+        """Otomatik eklendi."""
         self._worker_id = worker_id
         self._default_timeout = default_timeout
         self._default_max_retries = default_max_retries
@@ -167,7 +176,7 @@ class JobWorker:
         except Exception:
             return False
 
-    async def shutdown(self, timeout: int = 30):
+    async def shutdown(self, timeout: int = 30) -> Any:
         """Graceful shutdown â€” tÃ¼m aktif job'larÄ± bekle."""
         logger.info("Worker shutting down", active_jobs=len(self._active_jobs))
         self._running = False
@@ -191,7 +200,7 @@ class JobWorker:
         payload: dict[str, Any],
         timeout: int,
         max_retries: int,
-    ):
+    ) -> Any:
         """Job Ã§alÄ±ÅŸtÄ±r â€” retry + timeout ile."""
         last_error = None
 
@@ -312,7 +321,7 @@ class JobWorker:
 
     _db_cache_result: bool = False
 
-    async def _update_job_status(self, job_id: int, status: JobStatus, retry_count: int | None = None):
+    async def _update_job_status(self, job_id: int, status: JobStatus, retry_count: int | None = None) -> Any:
         """Job durumunu gÃ¼ncelle."""
         if not self._db_available():
             return
@@ -335,7 +344,7 @@ class JobWorker:
         except Exception as e:
             logger.error("Failed to update job status", job_id=job_id, error=str(e))
 
-    async def _complete_job(self, job_id: int, result: Any):
+    async def _complete_job(self, job_id: int, result: Any) -> Any:
         """Job baÅŸarÄ±yla tamamlandÄ±."""
         if not self._db_available():
             return
@@ -352,7 +361,7 @@ class JobWorker:
         except Exception as e:
             logger.error("Failed to complete job", job_id=job_id, error=str(e))
 
-    async def _fail_job(self, job_id: int, error_message: str):
+    async def _fail_job(self, job_id: int, error_message: str) -> Any:
         """Job baÅŸarÄ±sÄ±z oldu."""
         if not self._db_available():
             return
@@ -371,4 +380,3 @@ class JobWorker:
 
 # Singleton
 job_worker = JobWorker()
-

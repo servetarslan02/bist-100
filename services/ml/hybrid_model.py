@@ -46,6 +46,7 @@ class HybridModel:
         conflict_threshold: float = 0.3,
         confidence_threshold: float = 0.4,
     ):
+        """Otomatik eklendi."""
         self.ml_weight = ml_weight
         self.sentiment_weight = sentiment_weight
         self.rl_weight = rl_weight
@@ -155,7 +156,7 @@ class HybridModel:
             for ml, sent, rl in zip(ml_scores, sentiment_scores, rl_actions, strict=False)
         ]
 
-    def set_regime_weights(self, regime: str, weights: dict[str, float]):
+    def set_regime_weights(self, regime: str, weights: dict[str, float]) -> Any:
         """Rejim ağırlıklarını güncelle."""
         self._regime_weights[regime] = weights
 

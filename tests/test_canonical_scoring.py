@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Canonical Scoring & Decision Pipeline Tests
 
@@ -19,7 +22,7 @@ import sys
 # =====================================================
 
 
-def _make_features():
+def _make_features() -> Any:
     """Test feature seti — tüm motorlardan."""
     return {
         # Calculator
@@ -115,7 +118,7 @@ def _make_features():
 # =====================================================
 
 
-def test_score_vector_dimensions():
+def test_score_vector_dimensions() -> Any:
     """ScoreVector12 boyut üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -149,7 +152,7 @@ def test_score_vector_dimensions():
     return "ScoreVector dimensions", len(issues) == 0, issues
 
 
-def test_all_motor_dimensions_nonzero():
+def test_all_motor_dimensions_nonzero() -> Any:
     """Tüm motor boyutları gerçekten0'dan farklı değer üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -167,7 +170,7 @@ def test_all_motor_dimensions_nonzero():
     return "Motor dimensions nonzero", len(issues) == 0, issues
 
 
-def test_seasonality_used():
+def test_seasonality_used() -> Any:
     """Seasonality boyutu gerçekten kullanılıyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -193,7 +196,7 @@ def test_seasonality_used():
 # =====================================================
 
 
-def test_missing_not_zero():
+def test_missing_not_zero() -> Any:
     """Eksik feature otomatik0'a dönüşmemeli."""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -214,7 +217,7 @@ def test_missing_not_zero():
     return "Missing not zero", len(issues) == 0, issues
 
 
-def test_data_quality_score():
+def test_data_quality_score() -> Any:
     """Veri kalitesi skoru feature availability'ye bağlı mı?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -237,7 +240,7 @@ def test_data_quality_score():
 # =====================================================
 
 
-def test_risk_opportunity_separate():
+def test_risk_opportunity_separate() -> Any:
     """Risk ve opportunity ayrı kavramlar mı?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -271,7 +274,7 @@ def test_risk_opportunity_separate():
 # =====================================================
 
 
-def test_decision_from_canonical():
+def test_decision_from_canonical() -> Any:
     """Decision Engine canonical score'dan karar üretiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
@@ -298,7 +301,7 @@ def test_decision_from_canonical():
     return "Decision from canonical", len(issues) == 0, issues
 
 
-def test_decision_is_deterministic():
+def test_decision_is_deterministic() -> Any:
     """Aynı input → aynı karar (deterministic)."""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
@@ -323,7 +326,7 @@ def test_decision_is_deterministic():
     return "Deterministic decision", len(issues) == 0, issues
 
 
-def test_decision_blocks_high_risk():
+def test_decision_blocks_high_risk() -> Any:
     """Yüksek riskli durumda BUY engelleniyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
@@ -345,7 +348,7 @@ def test_decision_blocks_high_risk():
     return "Decision blocks high risk", len(issues) == 0, issues
 
 
-def test_decision_low_confidence():
+def test_decision_low_confidence() -> Any:
     """Düşük confidence ile NO_ACTION üretiliyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
     from services.core.decision_engine import decision_engine
@@ -371,7 +374,7 @@ def test_decision_low_confidence():
 # =====================================================
 
 
-def test_regime_changes_scoring():
+def test_regime_changes_scoring() -> Any:
     """Rejim değişince skor değişiyor mu?"""
     from services.core.canonical_scoring import canonical_scoring
 
@@ -399,7 +402,7 @@ def test_regime_changes_scoring():
 # =====================================================
 
 
-def test_existing_ranking_unchanged():
+def test_existing_ranking_unchanged() -> Any:
     """Mevcut ranking model hala çalışıyor mu?"""
     from services.ml.ranking_model import ranking_model
 
@@ -417,7 +420,7 @@ def test_existing_ranking_unchanged():
     return "Existing ranking unchanged", len(issues) == 0, issues
 
 
-def test_existing_decision_input_still_works():
+def test_existing_decision_input_still_works() -> Any:
     """Mevcut DecisionInput API'si hala çalışıyor mu?"""
     from services.core.decision_engine import DecisionEngine, DecisionInput
 
@@ -447,10 +450,11 @@ def test_existing_decision_input_still_works():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("  Canonical Scoring & Decision Pipeline Tests")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  Canonical Scoring & Decision Pipeline Tests")
+    logger.info("=" * 60)
 
     tests = [
         test_score_vector_dimensions,
@@ -481,22 +485,22 @@ def run_all():
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"
-        print(f"{icon} {name}")
+        logger.info(f"{icon} {name}")
         if ok:
             passed += 1
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\n  HATALAR:")
+        logger.info("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"    {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"    {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

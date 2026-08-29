@@ -40,6 +40,7 @@ except ImportError:
 
 import contextlib
 import functools
+
 from opentelemetry import trace
 
 from .config import settings
@@ -47,14 +48,20 @@ from .config import settings
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.questdb_client")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -62,6 +69,7 @@ class QuestDBClient:
     """QuestDB istemcisi — ILP yazma + SQL sorgu."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._host = settings.questdb_host
         self._http_port = settings.questdb_http_port
         self._pg_port = settings.questdb_pg_port
@@ -86,7 +94,7 @@ class QuestDBClient:
             return False
 
     @otel_trace("questdb_client.close")
-    def close(self):
+    def close(self) -> Any:
         """Bağlantıyı kapat."""
         if self._ilp_socket:
             with contextlib.suppress(Exception):
@@ -245,7 +253,7 @@ class QuestDBClient:
             return []
 
     @otel_trace("questdb_client.query_df")
-    async def query_df(self, sql: str):
+    async def query_df(self, sql: str) -> Any:
         """SQL sorgusu çalıştır ve Polars DataFrame döndür."""
         import polars as pl
 

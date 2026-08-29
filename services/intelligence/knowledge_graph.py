@@ -49,15 +49,16 @@ class KnowledgeGraph:
     """Knowledge graph motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._entities: dict[str, Entity] = {}
         self._relations: deque = deque(maxlen=50000)
         self._index: dict[str, list[str]] = {}  # entity_id -> [relation_id]
 
-    def add_entity(self, entity: Entity):
+    def add_entity(self, entity: Entity) -> Any:
         """Entity ekle."""
         self._entities[entity.entity_id] = entity
 
-    def add_relation(self, relation: Relation):
+    def add_relation(self, relation: Relation) -> Any:
         """İlişki ekle."""
         self._relations.append(relation)
         idx = len(self._relations) - 1
@@ -154,7 +155,7 @@ class KnowledgeGraph:
 
         return impacts
 
-    def load_bist_defaults(self):
+    def load_bist_defaults(self) -> Any:
         """Varsayılan BIST entity'lerini yükle."""
         # Sektörler
         sectors = [
@@ -231,7 +232,7 @@ class KnowledgeGraph:
 
         logger.info("BIST defaults loaded", entities=len(self._entities), relations=len(self._relations))
 
-    def save(self, path: str = "data/knowledge_graph.json"):
+    def save(self, path: str = "data/knowledge_graph.json") -> Any:
         """Graph'u dosyaya kaydet."""
         data = {
             "entities": [
@@ -260,7 +261,7 @@ class KnowledgeGraph:
             f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
         logger.info("Knowledge graph saved", path=path, entities=len(self._entities), relations=len(self._relations))
 
-    def load(self, path: str = "data/knowledge_graph.json"):
+    def load(self, path: str = "data/knowledge_graph.json") -> Any:
         """Graph'u dosyadan yükle."""
         if not Path(path).exists():
             return

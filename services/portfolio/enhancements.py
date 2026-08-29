@@ -421,12 +421,13 @@ class MultiCurrencyHandler:
     """Çoklu para birimi desteği."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Başlangıç kurları — update_rate() ile güncellenmeli
         # Gerçek değerler TCMB API veya config'den yüklenmeli
         self._rates: dict[str, float] = {"TRY": 1.0, "USD": 47.88, "EUR": 55.38}
         self._rates_stale = True  # Kurların güncel olup olmadığını takip et
 
-    def update_rate(self, currency: str, rate_to_try: float):
+    def update_rate(self, currency: str, rate_to_try: float) -> Any:
         """Döviz kuru güncelle."""
         self._rates[currency] = rate_to_try
         self._rates_stale = False

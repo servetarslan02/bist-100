@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 5.4 Test Suite
 
@@ -12,7 +15,7 @@ import time
 # ────────────────────────────────────────────────────────────
 
 
-def test_broker_valid_order():
+def test_broker_valid_order() -> Any:
     """Geçerli order fill edilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
@@ -30,7 +33,7 @@ def test_broker_valid_order():
     assert result.avg_fill_price == 300.0
     assert broker.get_positions().get("THYAO", {}).get("qty") == 100
 
-    print("  ✓ Valid order: FILLED, qty=100, price=300")
+    logger.info("  ✓ Valid order: FILLED, qty=100, price=300")
     passed += 1
 
     return passed, failed
@@ -41,7 +44,7 @@ def test_broker_valid_order():
 # ────────────────────────────────────────────────────────────
 
 
-def test_broker_rejected_order():
+def test_broker_rejected_order() -> Any:
     """Yetersiz sermaye ile order reddedilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
@@ -55,7 +58,7 @@ def test_broker_rejected_order():
     assert result.status == OrderStatus.REJECTED.value, f"Expected REJECTED, got {result.status}"
     assert "capital" in result.reject_reason.lower() or "insufficient" in result.reject_reason.lower()
 
-    print(f"  ✓ Rejected order: {result.status}, reason={result.reject_reason}")
+    logger.info(f"  ✓ Rejected order: {result.status}, reason={result.reject_reason}")
     passed += 1
 
     return passed, failed
@@ -66,7 +69,7 @@ def test_broker_rejected_order():
 # ────────────────────────────────────────────────────────────
 
 
-def test_broker_duplicate_order():
+def test_broker_duplicate_order() -> Any:
     """Aynı idempotency_key ile iki order engellenmeli."""
     from services.core.broker import Order, OrderSide, PaperBroker
 
@@ -88,7 +91,7 @@ def test_broker_duplicate_order():
     assert result2.order_id == result1.order_id, "Duplicate should return same order"
     assert broker.get_positions().get("THYAO", {}).get("qty") == 100, "Should not double-fill"
 
-    print(f"  ✓ Duplicate blocked: same order_id={result1.order_id[:8]}")
+    logger.info(f"  ✓ Duplicate blocked: same order_id={result1.order_id[:8]}")
     passed += 1
 
     return passed, failed
@@ -99,7 +102,7 @@ def test_broker_duplicate_order():
 # ────────────────────────────────────────────────────────────
 
 
-def test_broker_cancel_order():
+def test_broker_cancel_order() -> Any:
     """Order iptal edilebilmeli."""
     from services.core.broker import Order, OrderSide, PaperBroker
 
@@ -114,7 +117,7 @@ def test_broker_cancel_order():
     cancelled = broker.cancel_order("cancel_test")
     assert not cancelled, "Filled order should not be cancellable"
 
-    print("  ✓ Cancel: filled order not cancellable")
+    logger.info("  ✓ Cancel: filled order not cancellable")
     passed += 1
 
     return passed, failed
@@ -125,7 +128,7 @@ def test_broker_cancel_order():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_valid():
+def test_risk_gate_valid() -> Any:
     """Geçerli order risk gate'den geçmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -150,7 +153,7 @@ def test_risk_gate_valid():
     assert decision.checks_passed >= 7
     assert decision.checks_failed == 0
 
-    print(f"  ✓ Valid order: allowed, passed={decision.checks_passed}")
+    logger.info(f"  ✓ Valid order: allowed, passed={decision.checks_passed}")
     passed += 1
 
     return passed, failed
@@ -161,7 +164,7 @@ def test_risk_gate_valid():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_position_limit():
+def test_risk_gate_position_limit() -> Any:
     """Pozisyon limiti aşıldığında reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -184,7 +187,7 @@ def test_risk_gate_position_limit():
     assert not decision.allowed, f"Should be rejected: {decision.reason}"
     assert "position" in decision.reason.lower() or "order" in decision.reason.lower()
 
-    print(f"  ✓ Position limit: rejected, reason={decision.reason}")
+    logger.info(f"  ✓ Position limit: rejected, reason={decision.reason}")
     passed += 1
 
     return passed, failed
@@ -195,7 +198,7 @@ def test_risk_gate_position_limit():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_confidence():
+def test_risk_gate_confidence() -> Any:
     """Düşük confidence reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -217,7 +220,7 @@ def test_risk_gate_confidence():
     assert not decision.allowed
     assert "confidence" in decision.reason.lower()
 
-    print(f"  ✓ Confidence rejection: {decision.reason}")
+    logger.info(f"  ✓ Confidence rejection: {decision.reason}")
     passed += 1
 
     return passed, failed
@@ -228,7 +231,7 @@ def test_risk_gate_confidence():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_market_closed():
+def test_risk_gate_market_closed() -> Any:
     """Market kapalıyken order reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -250,7 +253,7 @@ def test_risk_gate_market_closed():
     assert not decision.allowed
     assert "market" in decision.reason.lower() or "closed" in decision.reason.lower()
 
-    print(f"  ✓ Market closed: {decision.reason}")
+    logger.info(f"  ✓ Market closed: {decision.reason}")
     passed += 1
 
     return passed, failed
@@ -261,7 +264,7 @@ def test_risk_gate_market_closed():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_stale_data():
+def test_risk_gate_stale_data() -> Any:
     """Eski veri ile order reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -283,7 +286,7 @@ def test_risk_gate_stale_data():
     assert not decision.allowed
     assert "data" in decision.reason.lower()
 
-    print(f"  ✓ Stale data: {decision.reason}")
+    logger.info(f"  ✓ Stale data: {decision.reason}")
     passed += 1
 
     return passed, failed
@@ -294,7 +297,7 @@ def test_risk_gate_stale_data():
 # ────────────────────────────────────────────────────────────
 
 
-def test_circuit_breaker_open():
+def test_circuit_breaker_open() -> Any:
     """Circuit açıkken order reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -316,7 +319,7 @@ def test_circuit_breaker_open():
     assert not decision.allowed
     assert "circuit" in decision.reason.lower()
 
-    print(f"  ✓ Circuit open: {decision.reason}")
+    logger.info(f"  ✓ Circuit open: {decision.reason}")
     passed += 1
 
     return passed, failed
@@ -327,7 +330,7 @@ def test_circuit_breaker_open():
 # ────────────────────────────────────────────────────────────
 
 
-def test_circuit_breaker_recovery():
+def test_circuit_breaker_recovery() -> Any:
     """Circuit breaker recovery çalışmalı."""
     from services.core.circuit_breaker import CircuitBreaker, CircuitState
 
@@ -351,7 +354,7 @@ def test_circuit_breaker_recovery():
     cb.record_success()
     assert cb.state == CircuitState.CLOSED
 
-    print("  ✓ Circuit recovery: CLOSED→OPEN→HALF_OPEN→CLOSED")
+    logger.info("  ✓ Circuit recovery: CLOSED→OPEN→HALF_OPEN→CLOSED")
     passed += 1
 
     return passed, failed
@@ -362,7 +365,7 @@ def test_circuit_breaker_recovery():
 # ────────────────────────────────────────────────────────────
 
 
-def test_circuit_breaker_half_open_failure():
+def test_circuit_breaker_half_open_failure() -> Any:
     """Half-open'da failure tekrar OPEN yapmalı."""
     from services.core.circuit_breaker import CircuitBreaker, CircuitState
 
@@ -381,7 +384,7 @@ def test_circuit_breaker_half_open_failure():
     cb.record_failure()  # Half-open failure
     assert cb.state == CircuitState.OPEN
 
-    print("  ✓ Half-open failure: re-OPENED")
+    logger.info("  ✓ Half-open failure: re-OPENED")
     passed += 1
 
     return passed, failed
@@ -392,7 +395,7 @@ def test_circuit_breaker_half_open_failure():
 # ────────────────────────────────────────────────────────────
 
 
-def test_broker_sell_no_position():
+def test_broker_sell_no_position() -> Any:
     """Pozisyon olmadan satış reddedilmeli."""
     from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
@@ -406,7 +409,7 @@ def test_broker_sell_no_position():
     assert result.status == OrderStatus.REJECTED.value
     assert "position" in result.reject_reason.lower() or "insufficient" in result.reject_reason.lower()
 
-    print(f"  ✓ Sell no position: {result.reject_reason}")
+    logger.info(f"  ✓ Sell no position: {result.reject_reason}")
     passed += 1
 
     return passed, failed
@@ -417,7 +420,7 @@ def test_broker_sell_no_position():
 # ────────────────────────────────────────────────────────────
 
 
-def test_risk_gate_portfolio_exposure():
+def test_risk_gate_portfolio_exposure() -> Any:
     """Portföy exposure limiti aşıldığında reddedilmeli."""
     from services.core.risk_gate import RiskGate
 
@@ -447,7 +450,7 @@ def test_risk_gate_portfolio_exposure():
     assert not decision.allowed
     assert "exposure" in decision.reason.lower()
 
-    print(f"  ✓ Portfolio exposure: {decision.reason}")
+    logger.info(f"  ✓ Portfolio exposure: {decision.reason}")
     passed += 1
 
     return passed, failed
@@ -458,7 +461,8 @@ def test_risk_gate_portfolio_exposure():
 # ────────────────────────────────────────────────────────────
 
 
-def run_all():
+def run_all() -> Any:
+    """Otomatik eklendi."""
     tests = [
         ("Broker valid order", test_broker_valid_order),
         ("Broker rejected order", test_broker_rejected_order),
@@ -479,28 +483,28 @@ def run_all():
     total_passed = 0
     total_failed = 0
 
-    print("=" * 70)
-    print("FAZ 5.4 — Broker + Risk Gate + Circuit Breaker")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("FAZ 5.4 — Broker + Risk Gate + Circuit Breaker")
+    logger.info("=" * 70)
 
     for name, test_fn in tests:
-        print(f"\n▸ {name}")
+        logger.info(f"\n▸ {name}")
         try:
             p, f = test_fn()
             total_passed += p
             total_failed += f
             if f > 0:
-                print(f"  ⚠ {f} FAILED")
+                logger.info(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
 
-            print(f"  ✗ EXCEPTION: {e}")
+            logger.info(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1
 
-    print("\n" + "=" * 70)
-    print(f"SONUÇ: {total_passed} passed, {total_failed} failed")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info(f"SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info("=" * 70)
 
     return total_failed == 0
 

@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 
 
 class AlertSeverity(StrEnum):
+    """Otomatik eklendi."""
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
@@ -28,6 +29,7 @@ class AlertSeverity(StrEnum):
 
 
 class AlertType(StrEnum):
+    """Otomatik eklendi."""
     VAR_BREACH = "VAR_BREACH"
     DRAWDOWN = "DRAWDOWN"
     CONCENTRATION = "CONCENTRATION"
@@ -55,6 +57,7 @@ class Alert:
     acknowledged: bool = False
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if not self.timestamp:
             self.timestamp = datetime.now(UTC).isoformat()
 
@@ -101,13 +104,14 @@ class RiskMonitor:
     """Risk izleme ve alerting sistemi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._alerts: list[Alert] = []
         self._rules: list[AlertRule] = []
         self._metrics_history: list[RiskMetricsSnapshot] = []
         self._alert_callbacks: list[Callable] = []
         self._setup_default_rules()
 
-    def _setup_default_rules(self):
+    def _setup_default_rules(self) -> Any:
         """Varsayılan alert kuralları."""
         self._rules = [
             AlertRule(
@@ -287,25 +291,25 @@ class RiskMonitor:
 
         return new_alerts
 
-    def add_rule(self, rule: AlertRule):
+    def add_rule(self, rule: AlertRule) -> Any:
         """Yeni alert kuralı ekle."""
         self._rules.append(rule)
         if len(self._rules) > 100:
             self._rules = self._rules[-100:]
         logger.info("Alert rule added", rule_id=rule.rule_id, name=rule.name)
 
-    def remove_rule(self, rule_id: str):
+    def remove_rule(self, rule_id: str) -> Any:
         """Alert kuralı kaldır."""
         self._rules = [r for r in self._rules if r.rule_id != rule_id]
 
-    def enable_rule(self, rule_id: str, enabled: bool = True):
+    def enable_rule(self, rule_id: str, enabled: bool = True) -> Any:
         """Alert kuralını aktif/pasif yap."""
         for rule in self._rules:
             if rule.rule_id == rule_id:
                 rule.enabled = enabled
                 break
 
-    def register_callback(self, callback: Callable):
+    def register_callback(self, callback: Callable) -> Any:
         """Alert callback kaydet."""
         self._alert_callbacks.append(callback)
         if len(self._alert_callbacks) > 100:
@@ -330,7 +334,7 @@ class RiskMonitor:
 
         return filtered[-limit:]
 
-    def acknowledge_alert(self, alert_id: str):
+    def acknowledge_alert(self, alert_id: str) -> Any:
         """Alert'i onayla."""
         for alert in self._alerts:
             if alert.alert_id == alert_id:
@@ -431,7 +435,7 @@ class RiskMonitor:
 
         return generated_alerts
 
-    def ingest_pipeline_metrics(self, ticker: str, metrics: dict[str, Any]):
+    def ingest_pipeline_metrics(self, ticker: str, metrics: dict[str, Any]) -> Any:
         """Pipeline'dan gelen risk metriklerini monitoring'e besle."""
         try:
             if not hasattr(self, "_latest_metrics"):
@@ -448,7 +452,7 @@ class RiskMonitor:
         except Exception as e:
             logger.warning("Failed to ingest pipeline metrics", ticker=ticker, error=str(e))
 
-    def _check_alerts(self, ticker: str, metrics: dict[str, Any]):
+    def _check_alerts(self, ticker: str, metrics: dict[str, Any]) -> Any:
         """Basit alert kontrolü."""
         var_95 = abs(metrics.get("var_95", 0))
         if var_95 > 15:

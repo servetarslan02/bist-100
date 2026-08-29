@@ -40,6 +40,7 @@ class HistoricalIngestionPipeline:
         repository: PersistentHistoricalRepository,
         fundamental_provider: HistoricalFundamentalProvider | None = None,
     ):
+        """Otomatik eklendi."""
         self._repo = repository
         self._fund_provider = fundamental_provider or HistoricalFundamentalProvider()
 
@@ -314,7 +315,7 @@ class HistoricalIngestionPipeline:
                 (ticker,),
             )
             columns = [desc[0] for desc in result.description]
-            rows = [dict(zip(columns, row)) for row in result.fetchall()]
+            rows = [dict(zip(columns, row, strict=False)) for row in result.fetchall()]
 
             saved = 0
             for row in rows:

@@ -67,6 +67,7 @@ class ConfidenceCalibrator:
     """Model confidence kalibrasyon motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._calibration_history: deque = deque(maxlen=1000)
         self._platt_params: dict[str, PlattScalingParams] = {}  # regime → params
         self._last_calibration: CalibrationResult | None = None
@@ -231,7 +232,8 @@ class ConfidenceCalibrator:
         # P(y=1|f) = 1 / (1 + exp(a*f + b))
         from scipy.optimize import minimize
 
-        def loss(params):
+        def loss(params) -> Any:
+            """Otomatik eklendi."""
             a, b = params
             f = a * confidences + b
             # Numerik stabilite

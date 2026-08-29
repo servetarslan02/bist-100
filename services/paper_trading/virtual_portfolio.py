@@ -29,6 +29,7 @@ class VirtualPortfolio:
         state_store=None,
         strict_t2: bool = True,
     ):
+        """Otomatik eklendi."""
         self.initial_capital = initial_capital
         self.strict_t2 = strict_t2
         # T+2 Takas & Valörlü Bakiye Modeli
@@ -75,11 +76,11 @@ class VirtualPortfolio:
         return self.purchasing_power
 
     @cash.setter
-    def cash(self, value: float):
+    def cash(self, value: float) -> Any:
         """Geriye dönük uyumluluk için settled_cash'i günceller."""
         self.settled_cash = value
 
-    def roll_settlement_day(self):
+    def roll_settlement_day(self) -> Any:
         """BIST Seans Sonu Valör Kaydırma (T+2 -> T+1 -> Settled)."""
         self.settled_cash += self.unsettled_cash_t1
         self.unsettled_cash_t1 = self.unsettled_cash_t2
@@ -89,7 +90,7 @@ class VirtualPortfolio:
             "T+2 Settlement rolled", settled=self.settled_cash, t1=self.unsettled_cash_t1, t2=self.unsettled_cash_t2
         )
 
-    def _deduct_cash_hierarchical(self, amount: float):
+    def _deduct_cash_hierarchical(self, amount: float) -> Any:
         """Nakdi sırasıyla settled, t1 ve t2 havuzlarından düşer."""
         remaining = amount
         # 1. Settled cash'ten düş
@@ -113,7 +114,7 @@ class VirtualPortfolio:
 
     # ===================== PERSISTENCE =====================
 
-    def load_from_store(self):
+    def load_from_store(self) -> Any:
         """State store'dan yükle."""
         if not self._state_store:
             return
@@ -128,11 +129,13 @@ class VirtualPortfolio:
                 self._trades = snapshot.get("trades", [])
                 self._orders = snapshot.get("orders", [])
                 self._equity_curve = snapshot.get("equity_curve", [])
-                logger.info("VirtualPortfolio loaded from store", positions=len(self._positions), trades=len(self._trades))
+                logger.info(
+                    "VirtualPortfolio loaded from store", positions=len(self._positions), trades=len(self._trades)
+                )
         except Exception as e:
             logger.warning("VirtualPortfolio could not load state from store", error=str(e))
 
-    def save_to_store(self, date: str):
+    def save_to_store(self, date: str) -> Any:
         """State store'a kaydet."""
         if not self._state_store:
             return
@@ -295,11 +298,11 @@ class VirtualPortfolio:
             "trade": trade,
         }
 
-    def mark_to_market(self, prices: dict[str, float], date: str, record_equity: bool = True):
+    def mark_to_market(self, prices: dict[str, float], date: str, record_equity: bool = True) -> Any:
         """Mark-to-Market değerlemesi yap."""
         self.update_prices(prices, date, record_equity=record_equity)
 
-    def update_prices(self, prices: dict[str, float], date: str, record_equity: bool = True):
+    def update_prices(self, prices: dict[str, float], date: str, record_equity: bool = True) -> Any:
         """Fiyatları mark-to-market yap; istenirse gün sonu equity kaydı oluştur."""
         self._current_date = date
         for ticker, price in prices.items():
@@ -370,7 +373,7 @@ class VirtualPortfolio:
     _price_cache_ts: float = 0.0
     _PRICE_CACHE_TTL: float = 2.0  # saniye
 
-    def _sync_live_prices(self):
+    def _sync_live_prices(self) -> Any:
         """Açık pozisyonların güncel piyasa fiyatlarını Redis radarından eşitler.
         2 saniyelik cache ile Redis baskısını azaltır.
         """
@@ -449,7 +452,8 @@ class VirtualPortfolio:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # Async ortamda — background task olarak çalıştır
-                    async def _fetch_missing():
+                    async def _fetch_missing() -> Any:
+                        """Otomatik eklendi."""
                         for ticker in missing:
                             rows = await pg_fetch(
                                 "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1", ticker
@@ -492,10 +496,12 @@ class VirtualPortfolio:
         return self.total_cash + invested
 
     def get_invested_value(self) -> float:
+        """Otomatik eklendi."""
         self._sync_live_prices()
         return sum(p.get("market_value", 0.0) for p in self._positions.values())
 
     def get_unrealized_pnl(self) -> float:
+        """Otomatik eklendi."""
         self._sync_live_prices()
         total = 0.0
         for pos in self._positions.values():
@@ -507,6 +513,7 @@ class VirtualPortfolio:
         return total
 
     def get_position(self, ticker: str) -> dict[str, Any] | None:
+        """Otomatik eklendi."""
         self._sync_live_prices()
         return self._positions.get(ticker)
 
@@ -602,6 +609,7 @@ class VirtualPortfolio:
         return {t: round(p["market_value"] / total, 4) for t, p in self._positions.items()}
 
     def get_trades(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         if self._trades:
             trades = self._trades
         elif self._state_store:
@@ -617,6 +625,7 @@ class VirtualPortfolio:
         return trades
 
     def get_equity_curve(self) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         if self._equity_curve:
             return self._equity_curve
         if self._state_store:

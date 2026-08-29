@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Market Session Manager (Wrapper)
 
@@ -7,8 +8,9 @@ Tek kaynak: market_session_fsm.py
 Geriye uyumluluk için korunmuştur.
 """
 
-from datetime import datetime
 import functools
+from datetime import datetime
+
 import structlog
 from opentelemetry import trace
 
@@ -22,19 +24,26 @@ from .market_session_fsm import (
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.market_session")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 # Eski API'ye uyumluluk için enum mapping
 class MarketPhase:
+    """Otomatik eklendi."""
     CLOSED = "closed"
     PRE_MARKET = "pre_market"
     ACTIVE = "active"
@@ -49,10 +58,12 @@ class MarketSessionManager:
     """
 
     def __init__(self, holidays=None):
+        """Otomatik eklendi."""
         if holidays:
             bist_session_fsm.set_holidays(holidays)
 
     def now_istanbul(self) -> datetime:
+        """Otomatik eklendi."""
         return datetime.now(_TZ_ISTANBUL)
 
     @otel_trace("market_session.current_phase")
@@ -73,15 +84,18 @@ class MarketSessionManager:
 
     @otel_trace("market_session.is_trading_hours")
     def is_trading_hours(self) -> bool:
+        """Otomatik eklendi."""
         return bist_session_fsm.is_trading_hours()
 
     @otel_trace("market_session.is_pre_market")
     def is_pre_market(self) -> bool:
+        """Otomatik eklendi."""
         phase = bist_session_fsm.get_phase()
         return phase in (BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.OPENING_AUCTION_DETERMINATION)
 
     @otel_trace("market_session.is_post_market")
     def is_post_market(self) -> bool:
+        """Otomatik eklendi."""
         phase = bist_session_fsm.get_phase()
         return phase in (
             BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
@@ -91,6 +105,7 @@ class MarketSessionManager:
 
     @otel_trace("market_session.is_closed")
     def is_closed(self) -> bool:
+        """Otomatik eklendi."""
         return bist_session_fsm.is_closed()
 
     @otel_trace("market_session.should_run_trading_job")
@@ -101,6 +116,7 @@ class MarketSessionManager:
 
     @otel_trace("market_session.get_status")
     def get_status(self) -> dict:
+        """Otomatik eklendi."""
         return bist_session_fsm.get_status()
 
     @otel_trace("market_session.update_price")
@@ -125,7 +141,7 @@ class MarketSessionManager:
         }
 
     @otel_trace("market_session.reset_daily_circuit_breakers")
-    def reset_daily_circuit_breakers(self):
+    def reset_daily_circuit_breakers(self) -> Any:
         """Günlük devre kesici sayaçlarını sıfırla (seans sonunda)."""
         auto_circuit_breaker.reset_daily()
 

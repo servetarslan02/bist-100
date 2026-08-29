@@ -214,6 +214,7 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
 
                 def _has_word(kw: str) -> bool:
+                    """Otomatik eklendi."""
                     return bool(_re.search(r"\b" + _re.escape(kw) + r"\b", text_check))
 
                 macro_keywords = [
@@ -296,7 +297,7 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
 @router.get("/calendar")
 async def event_calendar(
     ticker: str | None = Query(default=None), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Canlı olay akışı ve KAP bildirim takvimi (629 Hisse destekli)."""
     events = await _get_live_events(ticker=ticker)
     return {
@@ -312,7 +313,7 @@ async def event_study(
     event_type: str = Query("earnings"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Hisse bazlı gerçek kümülatif aşırı getiri (CAR/AAR) analizi."""
     try:
         sym = ticker.upper()

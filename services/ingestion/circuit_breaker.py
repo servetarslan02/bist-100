@@ -83,6 +83,7 @@ class CircuitBreaker:
         half_open_max_calls: int = 3,
         success_threshold: int = 2,
     ):
+        """Otomatik eklendi."""
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout_s = recovery_timeout_s
@@ -103,7 +104,7 @@ class CircuitBreaker:
                 self._transition(CircuitState.HALF_OPEN)
         return self._state
 
-    def _transition(self, new_state: CircuitState):
+    def _transition(self, new_state: CircuitState) -> Any:
         """Durum geçişi."""
         old_state = self._state
         self._state = new_state
@@ -118,7 +119,7 @@ class CircuitBreaker:
             "Circuit breaker state change", name=self.name, old_state=old_state.value, new_state=new_state.value
         )
 
-    def record_success(self):
+    def record_success(self) -> Any:
         """Başarı kaydet."""
         # First check state (may trigger OPEN → HALF_OPEN transition)
         current = self.state
@@ -132,7 +133,7 @@ class CircuitBreaker:
         if current == CircuitState.HALF_OPEN and self._stats.consecutive_successes >= self.success_threshold:
             self._transition(CircuitState.CLOSED)
 
-    def record_failure(self):
+    def record_failure(self) -> Any:
         """Hata kaydet."""
         # First check state (may trigger OPEN → HALF_OPEN transition)
         current = self.state
@@ -149,7 +150,7 @@ class CircuitBreaker:
         elif current == CircuitState.HALF_OPEN:
             self._transition(CircuitState.OPEN)
 
-    def record_rejected(self):
+    def record_rejected(self) -> Any:
         """REDDEDilen istek kaydet (OPEN iken)."""
         self._stats.total_rejected += 1
 
@@ -186,7 +187,8 @@ class CircuitBreaker:
     def protect(self, func: Callable) -> Callable:
         """Decorator — async fonksiyonu circuit breaker ile sar."""
 
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             return await self.call(func, *args, **kwargs)
 
         wrapper.__name__ = func.__name__
@@ -197,14 +199,17 @@ class CircuitBreaker:
         """async with cb.context(): ... kullanımı için."""
 
         def __init__(self, cb: "CircuitBreaker"):
+            """Otomatik eklendi."""
             self._cb = cb
 
-        async def __aenter__(self):
+        async def __aenter__(self) -> Any:
+            """Otomatik eklendi."""
             if not self._cb.can_execute():
                 raise CircuitBreakerError(f"Circuit breaker '{self._cb.name}' is OPEN")
             return self
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
+        async def __aexit__(self, exc_type, exc_val, exc_tb) -> Any:
+            """Otomatik eklendi."""
             if exc_type is not None:
                 self._cb.record_failure()
                 return False  # Exception'ı yeniden fırlat
@@ -238,7 +243,7 @@ class CircuitBreaker:
             else None,
         }
 
-    def reset(self):
+    def reset(self) -> Any:
         """Sıfırla (test veya manuel recovery için)."""
         self._state = CircuitState.CLOSED
         self._stats = CircuitStats()
@@ -250,6 +255,7 @@ class CircuitBreakerManager:
     """Tüm circuit breaker'ları yönetir."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._breakers: dict[str, CircuitBreaker] = {}
 
     def get_or_create(
@@ -271,7 +277,7 @@ class CircuitBreakerManager:
         """Tüm circuit breaker durumları."""
         return {name: cb.get_state() for name, cb in self._breakers.items()}
 
-    def reset_all(self):
+    def reset_all(self) -> Any:
         """Tümünü sıfırla."""
         for cb in self._breakers.values():
             cb.reset()

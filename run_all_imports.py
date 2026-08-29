@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """ALPHA BIST — 162 modül import testi."""
 
 import importlib
@@ -172,19 +175,20 @@ ALL_MODULES = [
 ]
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     passed = failed = 0
     start = time.time()
     for mod in ALL_MODULES:
         try:
             importlib.import_module(mod)
-            print(f"  ✅ {mod}")
+            logger.info(f"  ✅ {mod}")
             passed += 1
         except Exception as e:
-            print(f"  ❌ {mod}: {e}")
+            logger.info(f"  ❌ {mod}: {e}")
             failed += 1
     elapsed = time.time() - start
-    print(f"\n{'=' * 60}\nSONUÇ: {passed} başarılı, {failed} başarısız ({elapsed:.1f}s)\n{'=' * 60}")
+    logger.info(f"\n{'=' * 60}\nSONUÇ: {passed} başarılı, {failed} başarısız ({elapsed:.1f}s)\n{'=' * 60}")
     sys.exit(0 if failed == 0 else 1)
 
 

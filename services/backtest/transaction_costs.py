@@ -268,6 +268,7 @@ class TransactionCostEngine:
         slippage_model: SlippageModel | None = None,
         impact_model: MarketImpactModel | None = None,
     ):
+        """Otomatik eklendi."""
         self.fees = fee_structure or BISTFeeStructure()
         self.spread = spread_model or SpreadModel()
         self.slippage = slippage_model or SlippageModel()

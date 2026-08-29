@@ -115,6 +115,7 @@ jobs:
 import pytest
 import os
 
+
 @pytest.fixture(autouse=True)
 def clean_env():
     """Her test sonrası env değişkenlerini temizle."""
@@ -167,9 +168,7 @@ await dev_db.pg_execute("INSERT OR IGNORE INTO sectors (code, name) VALUES ('T',
 **Etki:** Bu testler PostgreSQL'de hata verir, sadece SQLite dev_db'de çalışır.  
 **Düzeltme:** 
 ```python
-await dev_db.pg_execute(
-    "INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING"
-)
+await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
 ```
 
 ---
@@ -304,11 +303,14 @@ pythonpath = ["."]
 **Etki:** Benzer testler tekrar tekrar yazılıyor, coverage düşük kalıyor.  
 **Düzeltme:** Parametrize kullanın:
 ```python
-@pytest.mark.parametrize("ticker,expected", [
-    ("THYAO", True),
-    ("GARAN", True),
-    ("INVALID", False),
-])
+@pytest.mark.parametrize(
+    "ticker,expected",
+    [
+        ("THYAO", True),
+        ("GARAN", True),
+        ("INVALID", False),
+    ],
+)
 def test_ticker_validation(ticker, expected):
     assert validate_ticker(ticker) == expected
 ```
@@ -430,9 +432,7 @@ uvicorn[standard]==0.52.0
 **Dosya:** `tests/test_faz3_ranking.py` satır 18  
 
 ```python
-pytestmark = pytest.mark.skip(
-    reason="Eski RankingModel API'sini test ediyor..."
-)
+pytestmark = pytest.mark.skip(reason="Eski RankingModel API'sini test ediyor...")
 ```
 
 **Sorun:** Tüm dosya skip edilmiş. Eski API'ye ait testler hâlâ duruyor ama çalışmıyor.  
@@ -574,6 +574,7 @@ d = date(2026, 8, 15)  # Cumartesi
 **Düzeltme:** Dinamik tarih kullanın:
 ```python
 from datetime import date, timedelta
+
 today = date.today()
 monday = today - timedelta(days=today.weekday())
 ```
@@ -734,7 +735,8 @@ CMD ["npm", "start"]
 ```python
 from unittest.mock import patch, MagicMock
 
-@patch('services.ingestion.providers.yfinance.yf.download')
+
+@patch("services.ingestion.providers.yfinance.yf.download")
 def test_data_fetch(mock_download):
     mock_download.return_value = pd.DataFrame(...)
 ```
@@ -861,6 +863,7 @@ import sqlite3
 
 ```python
 import sqlite3
+
 db = sqlite3.connect(":memory:")
 alerting = AlertingSystem(db=db, dialect="sqlite")
 ```

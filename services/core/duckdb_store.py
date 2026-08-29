@@ -20,13 +20,13 @@ Kullanım:
 """
 
 import atexit
+import functools
 import signal
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-import functools
 import duckdb
 import structlog
 from opentelemetry import trace
@@ -39,14 +39,20 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.duckdb_store")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -54,6 +60,7 @@ class DuckDBStore:
     """DuckDB tabanlı local store — SQLite drop-in replacement."""
 
     def __init__(self, db_path: str = "data/central_state.db"):
+        """Otomatik eklendi."""
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: duckdb.DuckDBPyConnection | None = None
@@ -63,7 +70,7 @@ class DuckDBStore:
         self._flush_interval = 30.0
         self._init_connection()
 
-    def _init_connection(self):
+    def _init_connection(self) -> Any:
         """DuckDB bağlantısını başlat."""
         self._conn = duckdb.connect(str(self._db_path))
         # WAL mode + performans ayarları
@@ -71,7 +78,7 @@ class DuckDBStore:
         self._conn.execute("SET checkpoint_threshold = '16MB'")
 
     @contextmanager
-    def _get_conn(self):
+    def _get_conn(self) -> Any:
         """Bağlantı al (reconnect destekli)."""
         if self._conn is None:
             self._init_connection()
@@ -123,7 +130,7 @@ class DuckDBStore:
                 if stmt:
                     conn.execute(stmt)
 
-    def _flush_buffer(self):
+    def _flush_buffer(self) -> Any:
         """Write buffer'ı flush et."""
         if not self._write_buffer:
             return
@@ -133,22 +140,22 @@ class DuckDBStore:
         self._write_buffer.clear()
         self._last_flush = time.time()
 
-    def buffered_write(self, query: str, params: tuple):
+    def buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write — toplu yaz."""
         self._write_buffer.append((query, params))
         if len(self._write_buffer) >= self._buffer_size:
             self._flush_buffer()
 
-    def periodic_flush(self):
+    def periodic_flush(self) -> Any:
         """Periyodik flush."""
         if time.time() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
-    def flush(self):
+    def flush(self) -> Any:
         """Manuel flush."""
         self._flush_buffer()
 
-    def close(self):
+    def close(self) -> Any:
         """Bağlantıyı kapat."""
         self._flush_buffer()
         if self._conn:
@@ -188,7 +195,8 @@ class DuckDBStore:
             "table_counts": stats,
         }
 
-    def __del__(self):
+    def __del__(self) -> Any:
+        """Otomatik eklendi."""
         with suppress(Exception):
             self.close()
 
@@ -197,13 +205,15 @@ class DuckDBStore:
 _stores: list[DuckDBStore] = []
 
 
-def _flush_all_on_exit():
+def _flush_all_on_exit() -> Any:
+    """Otomatik eklendi."""
     for store in _stores:
         with suppress(Exception):
             store.flush()
 
 
-def _flush_all_on_signal(signum, frame):
+def _flush_all_on_signal(signum, frame) -> Any:
+    """Otomatik eklendi."""
     for store in _stores:
         with suppress(Exception):
             store.flush()
@@ -214,4 +224,4 @@ try:
     signal.signal(signal.SIGTERM, _flush_all_on_signal)
     signal.signal(signal.SIGINT, _flush_all_on_signal)
 except (ValueError, OSError):
-    pass
+    logger.error("Exception caught", exc_info=True)

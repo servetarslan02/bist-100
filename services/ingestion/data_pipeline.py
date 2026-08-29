@@ -33,6 +33,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class PipelineResult:
+    """Otomatik eklendi."""
     ticker: str
     accepted: bool
     quality_report: QualityReport | None
@@ -41,6 +42,7 @@ class PipelineResult:
     processing_time_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "accepted": self.accepted,
@@ -53,6 +55,7 @@ class PipelineResult:
 
 @dataclass
 class PipelineReport:
+    """Otomatik eklendi."""
     total: int
     accepted: int
     rejected: int
@@ -62,6 +65,7 @@ class PipelineReport:
     elapsed_s: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total": self.total,
             "accepted": self.accepted,
@@ -73,6 +77,7 @@ class PipelineReport:
         }
 
     def _count_rejections(self) -> dict[str, int]:
+        """Otomatik eklendi."""
         reasons = {}
         for r in self.results:
             if not r.accepted and r.rejection_reason:
@@ -88,6 +93,7 @@ class DataPipeline:
         min_quality_score: float = 70.0,
         require_passing: bool = True,
     ):
+        """Otomatik eklendi."""
         self._dq = DataQualityV2()
         self._calc = FeatureCalculator()
         self._tm = TradabilityMask()
@@ -205,7 +211,7 @@ class DataPipeline:
             return f"{warnings[0].check}: {warnings[0].message}"
         return "quality_failed"
 
-    def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float):
+    def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float) -> Any:
         """Audit kaydı."""
         self._audit_log.append(
             {

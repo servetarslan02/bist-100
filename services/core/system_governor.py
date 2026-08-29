@@ -15,6 +15,7 @@ Referanslar:
 """
 
 import asyncio
+import functools
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -23,20 +24,25 @@ from enum import StrEnum
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.system_governor")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -76,6 +82,7 @@ class StateTransition:
     triggered_by: str  # manual, auto, health_check
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "from": self.from_state.value,
             "to": self.to_state.value,
@@ -118,6 +125,7 @@ class SystemStateGovernor:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._state = SystemState.FULL
         self._feature_flags: dict[FeatureFlag, bool] = {f: True for f in FeatureFlag}
         self._transition_history: list[StateTransition] = []
@@ -162,6 +170,7 @@ class SystemStateGovernor:
 
     @property
     def state(self) -> SystemState:
+        """Otomatik eklendi."""
         return self._state
 
     def is_allowed(self, feature: FeatureFlag) -> bool:
@@ -225,7 +234,7 @@ class SystemStateGovernor:
 
         return True
 
-    def _apply_state(self):
+    def _apply_state(self) -> Any:
         """Duruma göre feature flag'leri ayarla."""
         # Reset all to True
         for f in FeatureFlag:
@@ -236,11 +245,11 @@ class SystemStateGovernor:
         for f in disabled:
             self._feature_flags[f] = False
 
-    def register_health_check(self, component: str, check_func: Callable):
+    def register_health_check(self, component: str, check_func: Callable) -> Any:
         """Sağlık kontrolü kaydet."""
         self._health_checks[component] = check_func
 
-    def register_callback(self, callback: Callable):
+    def register_callback(self, callback: Callable) -> Any:
         """State change callback'i kaydet."""
         self._callbacks.append(callback)
         if len(self._callbacks) > 100:
@@ -288,7 +297,7 @@ class SystemStateGovernor:
 
         return results
 
-    def _auto_degrade_or_recover(self, results: dict[str, HealthCheck]):
+    def _auto_degrade_or_recover(self, results: dict[str, HealthCheck]) -> Any:
         """Otomatik degradation veya recovery."""
         if not results:
             return
@@ -324,7 +333,7 @@ class SystemStateGovernor:
         old_state: SystemState,
         new_state: SystemState,
         reason: str,
-    ):
+    ) -> Any:
         """Callback'leri bildir."""
         for callback in self._callbacks:
             try:
@@ -353,7 +362,7 @@ class SystemStateGovernor:
         return [t.to_dict() for t in self._transition_history[-limit:]]
 
     @otel_trace("system_governor.force_feature")
-    def force_feature(self, feature: FeatureFlag, enabled: bool):
+    def force_feature(self, feature: FeatureFlag, enabled: bool) -> Any:
         """Feature flag'i zorla ayarla."""
         self._feature_flags[feature] = enabled
         logger.info("Feature flag forced", feature=feature.value, enabled=enabled)

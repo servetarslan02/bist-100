@@ -15,17 +15,20 @@ Prensipler:
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import orjson
+
 try:
     import polars as pl
 except ImportError:
     pl = None
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = structlog.get_logger()
 
@@ -59,6 +62,7 @@ class ParityCheckResult:
     tolerance: float = 1e-6
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "check_type": self.check_type,
             "is_parity": self.is_parity,
@@ -81,6 +85,7 @@ class ParityReport:
     checks: list[ParityCheckResult]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp,
             "config_hash": self.config_hash,
@@ -100,6 +105,7 @@ class BacktestScannerParity:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._feature_engine: Callable | None = None
         self._signal_engine: Callable | None = None
         self._risk_engine: Callable | None = None
@@ -112,7 +118,7 @@ class BacktestScannerParity:
         signal_engine: Callable,
         risk_engine: Callable | None = None,
         cost_engine: Callable | None = None,
-    ):
+    ) -> Any:
         """Motorları kaydet."""
         self._feature_engine = feature_engine
         self._signal_engine = signal_engine
@@ -266,6 +272,7 @@ class FeatureVersionLock:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._versions: dict[str, dict[str, Any]] = {}
         self._active_version: str = "v1.0"
 
@@ -274,7 +281,7 @@ class FeatureVersionLock:
         version: str,
         feature_names: list[str],
         computation_config: dict[str, Any],
-    ):
+    ) -> Any:
         """Feature versiyonu kaydet."""
         self._versions[version] = {
             "feature_names": feature_names,
@@ -288,7 +295,7 @@ class FeatureVersionLock:
         }
         logger.info("Feature version registered", version=version, features=len(feature_names))
 
-    def set_active_version(self, version: str):
+    def set_active_version(self, version: str) -> Any:
         """Aktif versiyonu ayarla."""
         if version not in self._versions:
             raise ValueError(f"Unknown feature version: {version}")

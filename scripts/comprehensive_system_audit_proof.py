@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 import os
 import pickle
 import subprocess
@@ -9,13 +12,15 @@ import numpy as np
 import orjson
 
 
-def print_banner(text):
-    print("\n" + "=" * 78)
-    print(f"  {text}")
-    print("=" * 78)
+def print_banner(text) -> Any:
+    """Otomatik eklendi."""
+    logger.info("\n" + "=" * 78)
+    logger.info(f"  {text}")
+    logger.info("=" * 78)
 
 
-def audit_containers():
+def audit_containers() -> Any:
+    """Otomatik eklendi."""
     print_banner("1. DOCKER KONTEYNER VE MIKROSERVIS DURUM DENETIMI")
     try:
         res = subprocess.run(
@@ -27,14 +32,15 @@ def audit_containers():
             found = [l for l in lines if exp in l]
             if found:
                 status = found[0].split("\t")[1] if len(found[0].split("\t")) > 1 else "Running"
-                print(f"  [OK] Konteyner: {exp:<18} | Durum: {status}")
+                logger.info(f"  [OK] Konteyner: {exp:<18} | Durum: {status}")
             else:
-                print(f"  [--] Konteyner: {exp:<18} | Durum: BULUNAMADI")
+                logger.info(f"  [--] Konteyner: {exp:<18} | Durum: BULUNAMADI")
     except Exception as e:
-        print(f"  [--] Docker sorgusu yapilamadi: {e}")
+        logger.info(f"  [--] Docker sorgusu yapilamadi: {e}")
 
 
-def audit_warehouse():
+def audit_warehouse() -> Any:
+    """Otomatik eklendi."""
     print_banner("2. 30 YILLIK TARIHSEL VERI AMBARI & DEPO DENETIMI")
     wh_path = "data/bist_30y_warehouse.db"
     if os.path.exists(wh_path):
@@ -46,16 +52,17 @@ def audit_warehouse():
         cur.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM benchmark_xu100")
         n_bm, min_b, max_b = cur.fetchone()
         conn.close()
-        print(f"  [OK] DuckDB Ambar Dosyasi   : {wh_path} ({size_mb:.2f} MB)")
-        print(
+        logger.info(f"  [OK] DuckDB Ambar Dosyasi   : {wh_path} ({size_mb:.2f} MB)")
+        logger.info(
             f"  [OK] BIST Hisse Mum Verisi  : {n_stocks} Hisse | {n_candles:,} Gunluk Bar ({min_s[:10]} -> {max_s[:10]})"
         )
-        print(f"  [OK] XU100 Benchmark Verisi : {n_bm:,} Gunluk Bar ({min_b[:10]} -> {max_b[:10]})")
+        logger.info(f"  [OK] XU100 Benchmark Verisi : {n_bm:,} Gunluk Bar ({min_b[:10]} -> {max_b[:10]})")
     else:
-        print("  [--] Warehouse veritabani bulunamadi!")
+        logger.info("  [--] Warehouse veritabani bulunamadi!")
 
 
-def audit_ml_models():
+def audit_ml_models() -> Any:
+    """Otomatik eklendi."""
     print_banner("3. EGITILMIS MAKINE OGRENIMI ENSEMBLE MODELLERI & CIKARIM (INFERENCE)")
     models = {
         "LightGBM": "ml/saved_models/lightgbm_model.pkl",
@@ -74,16 +81,17 @@ def audit_ml_models():
                 # Test inference
                 pred = m.predict(dummy_features)
                 pred_val = float(pred[0]) if hasattr(pred, "__iter__") else float(pred)
-                print(
+                logger.info(
                     f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Cikarim Testi: {pred_val:+.4f} (Calisiyor)"
                 )
             except Exception:
-                print(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Yuklendi")
+                logger.info(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Yuklendi")
         else:
-            print(f"  [--] {name:<12} | Dosya eksik: {path}")
+            logger.info(f"  [--] {name:<12} | Dosya eksik: {path}")
 
 
-def audit_backend_apis():
+def audit_backend_apis() -> Any:
+    """Otomatik eklendi."""
     print_banner("4. BACKEND CANLI API UÇ NOKTALARI VE DINAMIK YANITLAR (FastAPI :8000)")
     endpoints = [
         ("/api/v1/market/heatmap", "Canli Sektor Isi Haritasi", "sectors"),
@@ -105,12 +113,13 @@ def audit_backend_apis():
                 data = orjson.loads(resp.read().decode())
                 has_key = key in data if isinstance(data, dict) else False
                 count_info = len(data.get(key, [])) if has_key and isinstance(data.get(key), list) else "Var"
-                print(f"  [OK 200] {ep:<45} | {desc:<30} | '{key}': {count_info}")
+                logger.info(f"  [OK 200] {ep:<45} | {desc:<30} | '{key}': {count_info}")
         except Exception as e:
-            print(f"  [FAIL]   {ep:<45} | {desc:<30} | HATA: {e}")
+            logger.info(f"  [FAIL]   {ep:<45} | {desc:<30} | HATA: {e}")
 
 
-def audit_frontend_pages():
+def audit_frontend_pages() -> Any:
+    """Otomatik eklendi."""
     print_banner("5. FRONTEND 17 SAYFA ERISIM VE ZERO-MOCK RENDER KONTROLU (Next.js :3000)")
     pages = [
         ("/", "Ana Sayfa / Dashboard"),
@@ -136,9 +145,9 @@ def audit_frontend_pages():
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=5) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
-                print(f"  [OK 200] {p:<25} | {name:<30} | {len(html):,} bytes HTML")
+                logger.info(f"  [OK 200] {p:<25} | {name:<30} | {len(html):,} bytes HTML")
         except Exception as e:
-            print(f"  [FAIL]   {p:<25} | {name:<30} | HATA: {e}")
+            logger.info(f"  [FAIL]   {p:<25} | {name:<30} | HATA: {e}")
 
 
 if __name__ == "__main__":

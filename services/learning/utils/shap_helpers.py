@@ -521,13 +521,15 @@ class SHAPHelpers:
 
             contributions = []
             for name, value, shap_val in zip(feature_names, X_single[0], shap_values[0], strict=False):
-                contributions.append({
-                    "feature": name,
-                    "feature_value": round(float(value), 4),
-                    "shap_value": round(float(shap_val), 4),
-                    "abs_shap": round(float(abs(shap_val)), 4),
-                    "direction": "positive" if shap_val > 0 else "negative",
-                })
+                contributions.append(
+                    {
+                        "feature": name,
+                        "feature_value": round(float(value), 4),
+                        "shap_value": round(float(shap_val), 4),
+                        "abs_shap": round(float(abs(shap_val)), 4),
+                        "direction": "positive" if shap_val > 0 else "negative",
+                    }
+                )
 
             contributions.sort(key=lambda x: x["abs_shap"], reverse=True)
 
@@ -603,7 +605,7 @@ class SHAPHelpers:
                     interaction_feature = feature_names[best_idx]
                     interaction_values = X_sample[:, best_idx].tolist()
                 except Exception:
-                    pass
+                    logger.error("Exception caught", exc_info=True)
 
             return {
                 "target_feature": target_feature,
@@ -652,11 +654,13 @@ class SHAPHelpers:
             pairs = []
             for i in range(n):
                 for j in range(i + 1, n):
-                    pairs.append({
-                        "feature_1": feature_names[i],
-                        "feature_2": feature_names[j],
-                        "strength": round(float(mean_interaction[i, j]), 6),
-                    })
+                    pairs.append(
+                        {
+                            "feature_1": feature_names[i],
+                            "feature_2": feature_names[j],
+                            "strength": round(float(mean_interaction[i, j]), 6),
+                        }
+                    )
             pairs.sort(key=lambda x: x["strength"], reverse=True)
 
             return {
@@ -737,11 +741,13 @@ class SHAPCache:
     """SHAP value cache — tekrar hesaplama önleme."""
 
     def __init__(self, max_size: int = 50):
+        """Otomatik eklendi."""
         self._cache: dict[str, SHAPResult] = {}
         self._max_size = max_size
         self._access_order: list[str] = []
 
     def get(self, key: str) -> SHAPResult | None:
+        """Otomatik eklendi."""
         if key in self._cache:
             self._access_order.remove(key)
             self._access_order.append(key)
@@ -749,6 +755,7 @@ class SHAPCache:
         return None
 
     def put(self, key: str, result: SHAPResult) -> None:
+        """Otomatik eklendi."""
         if len(self._cache) >= self._max_size:
             oldest = self._access_order.pop(0)
             del self._cache[oldest]
@@ -756,6 +763,7 @@ class SHAPCache:
         self._access_order.append(key)
 
     def clear(self) -> None:
+        """Otomatik eklendi."""
         self._cache.clear()
         self._access_order.clear()
 

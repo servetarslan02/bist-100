@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — QuestDB Gerçek Integration Tests
 
 Gerçek fonksiyonel testler:
@@ -11,7 +12,6 @@ Kullanım:
     python -m pytest tests/test_questdb_integration.py -v
 """
 
-import asyncio
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,6 +54,7 @@ services_core.config = config_mod
 # event_bus mock
 event_bus_mod = types.ModuleType("services.core.event_bus")
 event_bus_mod.EventType = MagicMock()
+event_bus_mod.event_bus = MagicMock()
 event_bus_mod.subscribe = MagicMock()
 sys.modules["services.core.event_bus"] = event_bus_mod
 services_core.event_bus = event_bus_mod
@@ -91,13 +92,13 @@ QuestDBTickConsumer = consumer_mod.QuestDBTickConsumer
 class TestQuestDBClientFunctional:
     """QuestDB client fonksiyonel testler."""
 
-    def test_client_initial_state(self):
+    def test_client_initial_state(self) -> Any:
         """Client başlangıç durumu doğru mu."""
         client = QuestDBClient()
         assert client._connected is False
         assert client._ilp_socket is None
 
-    def test_tick_format_correct(self):
+    def test_tick_format_correct(self) -> Any:
         """Tick verisi doğru ILP formatında mı."""
         client = QuestDBClient()
         # Mock socket
@@ -119,7 +120,7 @@ class TestQuestDBClientFunctional:
         assert "bid=100.4" in sent_data
         assert "ask=100.6" in sent_data
 
-    def test_batch_tick_format_correct(self):
+    def test_batch_tick_format_correct(self) -> Any:
         """Toplu tick verisi doğru formatında mı."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -140,7 +141,7 @@ class TestQuestDBClientFunctional:
         assert "ticker=GARAN" in sent_data
         assert sent_data.count("market_ticks") == 2
 
-    def test_ohlcv_format_correct(self):
+    def test_ohlcv_format_correct(self) -> Any:
         """OHLCV verisi doğru formatında mı."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -158,7 +159,7 @@ class TestQuestDBClientFunctional:
         assert "close=103.0" in sent_data
         assert "volume=50000" in sent_data
 
-    def test_event_format_correct(self):
+    def test_event_format_correct(self) -> Any:
         """Event verisi doğru formatında mı."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -173,7 +174,7 @@ class TestQuestDBClientFunctional:
         assert "sentiment=0.8" in sent_data
         assert "importance=0.9" in sent_data
 
-    def test_write_when_disconnected_returns_false(self):
+    def test_write_when_disconnected_returns_false(self) -> Any:
         """Bağlantı yokken yazma denemesi False döndürmeli."""
         client = QuestDBClient()
         client._connected = False
@@ -183,7 +184,7 @@ class TestQuestDBClientFunctional:
         result = client.insert_tick("THYAO", 100.0, 1000)
         assert result is False
 
-    def test_write_failure_sets_disconnected(self):
+    def test_write_failure_sets_disconnected(self) -> Any:
         """Yazma hatası bağlantıyı kesmeli."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -196,7 +197,7 @@ class TestQuestDBClientFunctional:
         assert result is False
         assert client._connected is False
 
-    def test_close_cleans_up(self):
+    def test_close_cleans_up(self) -> Any:
         """Close bağlantıyı temizlemeli."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -218,7 +219,7 @@ class TestQuestDBClientFunctional:
 class TestQuestDBConsumerFunctional:
     """QuestDB consumer fonksiyonel testler."""
 
-    def test_consumer_initial_state(self):
+    def test_consumer_initial_state(self) -> Any:
         """Consumer başlangıç durumu doğru mu."""
         consumer = QuestDBTickConsumer()
         assert consumer._running is False
@@ -227,7 +228,7 @@ class TestQuestDBConsumerFunctional:
         assert consumer._error_count == 0
 
     @pytest.mark.asyncio
-    async def test_tick_added_to_buffer(self):
+    async def test_tick_added_to_buffer(self) -> Any:
         """Tick verisi buffer'a ekleniyor mu."""
         consumer = QuestDBTickConsumer()
         consumer._running = True
@@ -250,7 +251,7 @@ class TestQuestDBConsumerFunctional:
         assert consumer._buffer[0]["volume"] == 1000
 
     @pytest.mark.asyncio
-    async def test_index_tick_ignored(self):
+    async def test_index_tick_ignored(self) -> Any:
         """Index tick'leri ignore edilmeli."""
         consumer = QuestDBTickConsumer()
         consumer._running = True
@@ -267,7 +268,7 @@ class TestQuestDBConsumerFunctional:
         assert len(consumer._buffer) == 0
 
     @pytest.mark.asyncio
-    async def test_invalid_tick_ignored(self):
+    async def test_invalid_tick_ignored(self) -> Any:
         """Geçersiz tick verisi ignore edilmeli."""
         consumer = QuestDBTickConsumer()
         consumer._running = True
@@ -285,15 +286,17 @@ class TestQuestDBConsumerFunctional:
         assert len(consumer._buffer) == 0
 
     @pytest.mark.asyncio
-    async def test_buffer_flush_on_full(self):
+    async def test_buffer_flush_on_full(self) -> Any:
         """Buffer dolduğunda flush edilmeli."""
         consumer = QuestDBTickConsumer()
         consumer._running = True
         consumer._buffer_size = 3  # Küçük buffer
 
         # Mock flush — buffer'ı da temizlesin
-        async def mock_flush():
+        async def mock_flush() -> Any:
+            """Otomatik eklendi."""
             consumer._buffer.clear()
+
         consumer._flush_buffer = AsyncMock(side_effect=mock_flush)
 
         for i in range(3):
@@ -306,11 +309,18 @@ class TestQuestDBConsumerFunctional:
         assert len(consumer._buffer) == 0  # Flush sonrası buffer temizlenmeli
 
     @pytest.mark.asyncio
-    async def test_flush_buffer_writes_to_questdb(self):
+    async def test_flush_buffer_writes_to_questdb(self) -> Any:
         """Flush buffer QuestDB'ye yazıyor mu."""
         consumer = QuestDBTickConsumer()
         consumer._buffer = [
-            {"ticker": "THYAO", "price": 100.0, "volume": 1000, "bid": 99.0, "ask": 101.0, "timestamp": datetime.now(UTC)},
+            {
+                "ticker": "THYAO",
+                "price": 100.0,
+                "volume": 1000,
+                "bid": 99.0,
+                "ask": 101.0,
+                "timestamp": datetime.now(UTC),
+            },
             {"ticker": "GARAN", "price": 50.0, "volume": 500, "bid": 49.0, "ask": 51.0, "timestamp": datetime.now(UTC)},
         ]
 
@@ -330,11 +340,18 @@ class TestQuestDBConsumerFunctional:
             assert len(consumer._buffer) == 0
 
     @pytest.mark.asyncio
-    async def test_flush_buffer_handles_failure(self):
+    async def test_flush_buffer_handles_failure(self) -> Any:
         """Flush hatası yönetiliyor mu."""
         consumer = QuestDBTickConsumer()
         consumer._buffer = [
-            {"ticker": "THYAO", "price": 100.0, "volume": 1000, "bid": 99.0, "ask": 101.0, "timestamp": datetime.now(UTC)},
+            {
+                "ticker": "THYAO",
+                "price": 100.0,
+                "volume": 1000,
+                "bid": 99.0,
+                "ask": 101.0,
+                "timestamp": datetime.now(UTC),
+            },
         ]
 
         with patch("services.ingestion.questdb_consumer.questdb_client") as mock_client:
@@ -347,11 +364,18 @@ class TestQuestDBConsumerFunctional:
             assert consumer._write_count == 0
 
     @pytest.mark.asyncio
-    async def test_flush_reconnects_on_disconnected(self):
+    async def test_flush_reconnects_on_disconnected(self) -> Any:
         """Bağlantı yokken flush yeniden bağlanmalı."""
         consumer = QuestDBTickConsumer()
         consumer._buffer = [
-            {"ticker": "THYAO", "price": 100.0, "volume": 1000, "bid": 99.0, "ask": 101.0, "timestamp": datetime.now(UTC)},
+            {
+                "ticker": "THYAO",
+                "price": 100.0,
+                "volume": 1000,
+                "bid": 99.0,
+                "ask": 101.0,
+                "timestamp": datetime.now(UTC),
+            },
         ]
 
         with patch("services.ingestion.questdb_consumer.questdb_client") as mock_client:
@@ -366,11 +390,18 @@ class TestQuestDBConsumerFunctional:
             mock_client.insert_ticks_batch.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_flush_drops_ticks_on_reconnect_failure(self):
+    async def test_flush_drops_ticks_on_reconnect_failure(self) -> Any:
         """Yeniden bağlanma başarısızsa tick'ler düşmeli."""
         consumer = QuestDBTickConsumer()
         consumer._buffer = [
-            {"ticker": "THYAO", "price": 100.0, "volume": 1000, "bid": 99.0, "ask": 101.0, "timestamp": datetime.now(UTC)},
+            {
+                "ticker": "THYAO",
+                "price": 100.0,
+                "volume": 1000,
+                "bid": 99.0,
+                "ask": 101.0,
+                "timestamp": datetime.now(UTC),
+            },
         ]
 
         with patch("services.ingestion.questdb_consumer.questdb_client") as mock_client:
@@ -383,7 +414,7 @@ class TestQuestDBConsumerFunctional:
             assert consumer._write_count == 0
             assert len(consumer._buffer) == 0
 
-    def test_get_stats(self):
+    def test_get_stats(self) -> Any:
         """İstatistikler doğru mu."""
         consumer = QuestDBTickConsumer()
         consumer._running = True
@@ -409,16 +440,16 @@ class TestQuestDBConsumerFunctional:
 class TestIngestionIntegration:
     """Ingestion servisi QuestDB entegrasyonu."""
 
-    def test_consumer_singleton_same_instance(self):
+    def test_consumer_singleton_same_instance(self) -> Any:
         """Singleton aynı instance mı döndürüyor."""
         c1 = consumer_mod.questdb_tick_consumer
         c2 = consumer_mod.questdb_tick_consumer
         assert c1 is c2
 
-    def test_consumer_imported_in_main(self):
+    def test_consumer_imported_in_main(self) -> Any:
         """main.py'de consumer import edilmiş mi."""
         main_path = Path(__file__).parent.parent / "services" / "ingestion" / "main.py"
-        with open(main_path, "r") as f:
+        with open(main_path) as f:
             content = f.read()
         assert "questdb_tick_consumer" in content
         assert "questdb_tick_consumer.start()" in content
@@ -433,7 +464,7 @@ class TestIngestionIntegration:
 class TestDataFormat:
     """Veri formatı doğrulama."""
 
-    def test_tick_timestamp_is_nanoseconds(self):
+    def test_tick_timestamp_is_nanoseconds(self) -> Any:
         """Tick timestamp nanosecond cinsinden mi."""
         client = QuestDBClient()
         mock_socket = MagicMock()
@@ -451,7 +482,7 @@ class TestDataFormat:
         assert ts_ns > 1700000000000000000  # 2023'ten büyük
         assert ts_ns < 1800000000000000000  # 2027'den küçük
 
-    def test_ilp_line_format(self):
+    def test_ilp_line_format(self) -> Any:
         """ILP satır formatı doğru mu."""
         client = QuestDBClient()
         mock_socket = MagicMock()

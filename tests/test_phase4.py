@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 4 Test Suite
 
@@ -7,7 +10,7 @@ Valuation Engine (Multiples, DCF, Scenarios) testleri.
 import sys
 
 
-def test_valuation_engine():
+def test_valuation_engine() -> Any:
     """Valuation Engine testleri."""
     from services.intelligence.valuation.engine import valuation_engine
 
@@ -28,7 +31,7 @@ def test_valuation_engine():
     assert pe_result.sector_median == 11.0
     assert pe_result.upside_pct > 0  # P/E 8.5 vs sektör 11 → upside
     passed += 1
-    print(f"  ✓ Multiples valuation (P/E upside: {pe_result.upside_pct:.1f}%)")
+    logger.info(f"  ✓ Multiples valuation (P/E upside: {pe_result.upside_pct:.1f}%)")
 
     # 2. DCF (gerçekçi verilerle)
     dcf = valuation_engine.compute_dcf(
@@ -49,7 +52,7 @@ def test_valuation_engine():
     assert dcf.terminal_value > 0
     assert len(dcf.sensitivity_table) > 0
     passed += 1
-    print(f"  ✓ DCF (implied: {dcf.implied_price:.2f}, upside: {dcf.upside_pct:.1f}%)")
+    logger.info(f"  ✓ DCF (implied: {dcf.implied_price:.2f}, upside: {dcf.upside_pct:.1f}%)")
 
     # 3. Valuation scenarios
     scenarios = valuation_engine.compute_valuation_scenarios(
@@ -77,7 +80,7 @@ def test_valuation_engine():
     assert base.probability == 0.50
     assert bull.probability == 0.25
     passed += 1
-    print(
+    logger.info(
         f"  ✓ Scenarios (Bear: {bear.implied_price:.0f}, Base: {base.implied_price:.0f}, Bull: {bull.implied_price:.0f})"
     )
 
@@ -86,7 +89,7 @@ def test_valuation_engine():
     assert ev > 0
     assert bear.implied_price < ev < bull.implied_price
     passed += 1
-    print(f"  ✓ Expected value: {ev:.2f}")
+    logger.info(f"  ✓ Expected value: {ev:.2f}")
 
     # 5. Valuation summary
     summary = valuation_engine.compute_valuation_summary("THYAO", 305.25, multiples, dcf, scenarios)
@@ -95,7 +98,7 @@ def test_valuation_engine():
     assert summary.overall_view in ["UNDERVALUED", "FAIR", "OVERVALUED"]
     assert summary.expected_value > 0
     passed += 1
-    print(f"  ✓ Valuation summary: {summary.overall_view} (upside: {summary.overall_upside_pct:.1f}%)")
+    logger.info(f"  ✓ Valuation summary: {summary.overall_view} (upside: {summary.overall_upside_pct:.1f}%)")
 
     # 6. Negative DCF (wacc < terminal_growth → edge case)
     dcf2 = valuation_engine.compute_dcf(
@@ -111,18 +114,18 @@ def test_valuation_engine():
     )
     assert dcf2.terminal_value == 0  # Edge case: wacc < tg
     passed += 1
-    print("  ✓ DCF edge case (wacc < terminal_growth)")
+    logger.info("  ✓ DCF edge case (wacc < terminal_growth)")
 
     # 7. Empty multiples
     empty_multiples = valuation_engine.compute_multiples_valuation("TEST", 100, {}, {})
     assert len(empty_multiples) == 0
     passed += 1
-    print("  ✓ Empty multiples handled")
+    logger.info("  ✓ Empty multiples handled")
 
     return passed, failed
 
 
-def test_fundamental_integration():
+def test_fundamental_integration() -> Any:
     """Fundamental Provider + Valuation Engine entegrasyon."""
     from services.ingestion.providers.fundamental_provider import fundamental_provider
     from services.intelligence.valuation.engine import valuation_engine
@@ -154,7 +157,7 @@ def test_fundamental_integration():
         multiples = valuation_engine.compute_multiples_valuation("THYAO", price, company, sector)
         assert len(multiples) > 0
         passed += 1
-        print(f"  ✓ THYAO multiples: {len(multiples)} metrics")
+        logger.info(f"  ✓ THYAO multiples: {len(multiples)} metrics")
 
         # Scenarios
         scenarios = valuation_engine.compute_valuation_scenarios(
@@ -175,20 +178,21 @@ def test_fundamental_integration():
         )
         assert len(scenarios) == 3
         passed += 1
-        print(
+        logger.info(
             f"  ✓ THYAO scenarios: Bear={scenarios[0].implied_price:.0f}, Base={scenarios[1].implied_price:.0f}, Bull={scenarios[2].implied_price:.0f}"
         )
     else:
         failed += 2
-        print("  ✗ THYAO fundamental data not available")
+        logger.info("  ✗ THYAO fundamental data not available")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 4 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 4 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -199,21 +203,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

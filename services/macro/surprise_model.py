@@ -95,6 +95,7 @@ class MacroSurpriseModel:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._expectations: dict[str, dict] = {}  # indicator → {value, source, timestamp}
         self._surprise_history: list[SurpriseResult] = []
         self._active_surprises: dict[str, SurpriseResult] = {}
@@ -105,7 +106,7 @@ class MacroSurpriseModel:
         expected: float,
         source: str = "manual",
         confidence: float = 0.5,
-    ):
+    ) -> Any:
         """Beklenti değerini kaydet."""
         self._expectations[indicator] = {
             "value": expected,

@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Tüm 16 Sayfa ve 5 Temel İlke Denetim Testi
 """
@@ -31,10 +34,11 @@ PAGES = [
 ]
 
 
-def audit_all_pages():
-    print("=" * 80)
-    print("ALPHA BIST — 16 SAYFA DETAYLI DENETİM RAPORU")
-    print("=" * 80)
+def audit_all_pages() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 80)
+    logger.info("ALPHA BIST — 16 SAYFA DETAYLI DENETİM RAPORU")
+    logger.info("=" * 80)
 
     success_count = 0
     for path, title in PAGES:
@@ -42,15 +46,15 @@ def audit_all_pages():
         try:
             r = requests.get(url, timeout=3.0)
             status = "OK (200)" if r.status_code == 200 else f"HATA ({r.status_code})"
-            print(f"  • {path:<16} | {status:<10} | {title}")
+            logger.info(f"  • {path:<16} | {status:<10} | {title}")
             if r.status_code == 200:
                 success_count += 1
         except Exception as e:
-            print(f"  • {path:<16} | HATA       | {e}")
+            logger.info(f"  • {path:<16} | HATA       | {e}")
 
-    print("-" * 80)
-    print(f"Sonuç: {success_count}/{len(PAGES)} sayfa %100 çalışır durumda ve yayında.")
-    print("=" * 80)
+    logger.info("-" * 80)
+    logger.info(f"Sonuç: {success_count}/{len(PAGES)} sayfa %100 çalışır durumda ve yayında.")
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":

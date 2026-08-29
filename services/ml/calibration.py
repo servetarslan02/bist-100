@@ -15,7 +15,7 @@ Geliştirmeler (v2.0):
 - Net Reclassification Index (NRI)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -102,6 +102,7 @@ class ModelCalibration:
         drift_threshold: float = 0.05,
         bootstrap_n: int = 100,
     ):
+        """Otomatik eklendi."""
         self.n_bins = n_bins
         self.overconfidence_threshold = overconfidence_threshold
         self.ece_threshold = ece_threshold
@@ -489,14 +490,16 @@ class ModelCalibration:
             avg_pred = float(np.mean(y_prob[mask]))
             avg_actual = float(np.mean(y_true[mask]))
 
-            bins.append({
-                "lower": round(lower, 2),
-                "upper": round(upper, 2),
-                "avg_predicted": round(avg_pred, 4),
-                "avg_actual": round(avg_actual, 4),
-                "count": count,
-                "gap": round(abs(avg_pred - avg_actual), 4),
-            })
+            bins.append(
+                {
+                    "lower": round(lower, 2),
+                    "upper": round(upper, 2),
+                    "avg_predicted": round(avg_pred, 4),
+                    "avg_actual": round(avg_actual, 4),
+                    "count": count,
+                    "gap": round(abs(avg_pred - avg_actual), 4),
+                }
+            )
 
         # Perfect calibration line
         perfect = [{"x": round(b["avg_predicted"], 4), "y": round(b["avg_predicted"], 4)} for b in bins]
@@ -509,9 +512,7 @@ class ModelCalibration:
 
     # ===================== INTERNAL =====================
 
-    def _compare_calibrators(
-        self, y_true: np.ndarray, y_prob: np.ndarray
-    ) -> tuple[float, float, str]:
+    def _compare_calibrators(self, y_true: np.ndarray, y_prob: np.ndarray) -> tuple[float, float, str]:
         """Platt ve Isotonic'i karşılaştır — hangisi daha iyi?
 
         Returns:
@@ -628,39 +629,45 @@ class ModelCalibration:
         if len(self._calibration_history) >= 3:
             recent_ece = np.mean([h["ece"] for h in self._calibration_history[-3:]])
             if recent_ece > self.ece_threshold * 2:
-                self._alerts.append(CalibrationAlert(
-                    timestamp=now,
-                    alert_type="DEGRADATION",
-                    severity="HIGH",
-                    message=f"ECE {recent_ece:.4f} — kalibrasyon bozuluyor",
-                    metric="ece",
-                    value=recent_ece,
-                    threshold=self.ece_threshold,
-                ))
+                self._alerts.append(
+                    CalibrationAlert(
+                        timestamp=now,
+                        alert_type="DEGRADATION",
+                        severity="HIGH",
+                        message=f"ECE {recent_ece:.4f} — kalibrasyon bozuluyor",
+                        metric="ece",
+                        value=recent_ece,
+                        threshold=self.ece_threshold,
+                    )
+                )
 
         # Overconfidence alarmı
         if result.overconfident:
-            self._alerts.append(CalibrationAlert(
-                timestamp=now,
-                alert_type="OVERCONFIDENCE",
-                severity="MEDIUM",
-                message=f"Model overconfident — ECE={result.expected_calibration_error:.4f}",
-                metric="ece",
-                value=result.expected_calibration_error,
-                threshold=self.overconfidence_threshold,
-            ))
+            self._alerts.append(
+                CalibrationAlert(
+                    timestamp=now,
+                    alert_type="OVERCONFIDENCE",
+                    severity="MEDIUM",
+                    message=f"Model overconfident — ECE={result.expected_calibration_error:.4f}",
+                    metric="ece",
+                    value=result.expected_calibration_error,
+                    threshold=self.overconfidence_threshold,
+                )
+            )
 
         # Brier Skill Score negatifse (baseline'dan kötü)
         if result.brier_skill_score < 0:
-            self._alerts.append(CalibrationAlert(
-                timestamp=now,
-                alert_type="DEGRADATION",
-                severity="CRITICAL",
-                message=f"Brier Skill Score negatif ({result.brier_skill_score:.4f}) — baseline'dan kötü",
-                metric="brier_skill_score",
-                value=result.brier_skill_score,
-                threshold=0.0,
-            ))
+            self._alerts.append(
+                CalibrationAlert(
+                    timestamp=now,
+                    alert_type="DEGRADATION",
+                    severity="CRITICAL",
+                    message=f"Brier Skill Score negatif ({result.brier_skill_score:.4f}) — baseline'dan kötü",
+                    metric="brier_skill_score",
+                    value=result.brier_skill_score,
+                    threshold=0.0,
+                )
+            )
 
         # Alert history sınırla
         if len(self._alerts) > 100:

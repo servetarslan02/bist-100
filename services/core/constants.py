@@ -98,11 +98,13 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.constants")
 
+
 def _load_risk_free_rate() -> float:
     """TCMB politika faizini config dosyasından oku."""
     with tracer.start_as_current_span("constants._load_risk_free_rate") as span:
         try:
             from pathlib import Path
+
             import orjson
 
             config_path = Path(__file__).parent.parent.parent / "config" / "risk_free_rate.json"
@@ -116,7 +118,7 @@ def _load_risk_free_rate() -> float:
         except Exception as e:
             logger.warning("Failed to load risk_free_rate.json, using default 0.45", error=str(e))
             span.record_exception(e)
-            
+
         span.set_attribute("risk_free_rate", 0.45)
         return 0.45  # fallback
 

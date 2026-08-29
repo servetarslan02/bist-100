@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Tradability Mask v1.0
 
@@ -17,24 +18,30 @@ Mask = 0 → Fiyat güvenilir DEĞİL, feature hesaplamasından çıkar
 Kaynak: Du (2026) — mask-first design tek başına +0.44 Sharpe katkısı
 """
 
+import functools
 from dataclasses import dataclass
 
 import numpy as np
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.tradability_mask")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

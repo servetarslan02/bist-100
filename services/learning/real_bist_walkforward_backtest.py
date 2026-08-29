@@ -1,4 +1,6 @@
+from typing import Any
 import structlog
+
 logger = structlog.get_logger()
 """ALPHA BIST — 100% REAL Historical BIST Walk-Forward Backtest & Learning Engine
 
@@ -12,33 +14,43 @@ Bu modül:
 6. Kalıcı Hafıza & Güven: Gerçek sonuçlar ModelMemoryStore'a işlenir ve gerçek dinamik güven skorları üretilir.
 """
 
-import os
-import orjson
-import numpy as np
+from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Tuple
 
 from services.learning.learning_pipeline import LearningPipeline
 from services.learning.model_memory_store import ModelMemoryStore
-from services.learning.model_performance_engine import ModelPerformanceEngine
-from services.learning.model_trust_engine import ModelTrustEngine
-from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
-from services.ml.catboost_model import CatBoostModel, CatBoostConfig
-from services.ml.xgboost_model import XGBoostModel, XGBoostConfig
-
+from services.ml.catboost_model import CatBoostModel
+from services.ml.lightgbm_trainer import LightGBMTrainer
+from services.ml.xgboost_model import XGBoostModel
 
 BIST_TICKERS = [
-    "THYAO.IS", "ASELS.IS", "GARAN.IS", "KCHOL.IS", "TUPRS.IS",
-    "BIMAS.IS", "AKBNK.IS", "SISE.IS", "FROTO.IS", "PGSUS.IS",
-    "SAHOL.IS", "TCELL.IS", "MGROS.IS", "EREGL.IS", "YKBNK.IS",
-    "VAKBN.IS", "ISCTR.IS", "PETKM.IS", "ENJSA.IS", "ASTOR.IS"
+    "THYAO.IS",
+    "ASELS.IS",
+    "GARAN.IS",
+    "KCHOL.IS",
+    "TUPRS.IS",
+    "BIMAS.IS",
+    "AKBNK.IS",
+    "SISE.IS",
+    "FROTO.IS",
+    "PGSUS.IS",
+    "SAHOL.IS",
+    "TCELL.IS",
+    "MGROS.IS",
+    "EREGL.IS",
+    "YKBNK.IS",
+    "VAKBN.IS",
+    "ISCTR.IS",
+    "PETKM.IS",
+    "ENJSA.IS",
+    "ASTOR.IS",
 ]
 
 
-def download_real_bist_data(tickers: List[str], period: str = "2y") -> Dict[str, pd.DataFrame]:
+def download_real_bist_data(tickers: list[str], period: str = "2y") -> dict[str, pd.DataFrame]:
     """Gerçek BIST hisse verilerini indirir."""
     logger.info(f"📥 Gerçek BIST Verisi İndiriliyor ({len(tickers)} hisse, {period} periyot)...")
     data = {}
@@ -50,13 +62,15 @@ def download_real_bist_data(tickers: List[str], period: str = "2y") -> Dict[str,
             if len(df) >= 100:
                 clean_ticker = ticker.replace(".IS", "")
                 data[clean_ticker] = df.dropna()
-                logger.info(f"  • {clean_ticker}: {len(df)} işlem günü yüklendi ({df.index[0].strftime('%Y-%m-%d')} - {df.index[-1].strftime('%Y-%m-%d')})")
+                logger.info(
+                    f"  • {clean_ticker}: {len(df)} işlem günü yüklendi ({df.index[0].strftime('%Y-%m-%d')} - {df.index[-1].strftime('%Y-%m-%d')})"
+                )
         except Exception as e:
             logger.error(f"  ⚠️ {ticker} indirilemedi", error=str(e))
     return data
 
 
-def compute_strict_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_strict_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Look-ahead bias olmadan teknik feature'ları hesaplar.
 
     F-004 düzeltmesi: future_ret_5d ve future_price_5d ayrı label DataFrame'ine taşındı.
@@ -127,7 +141,7 @@ def classify_real_regime(trend_pct: float, vol_pct: float) -> str:
         return "SIDEWAYS_RANGE"
 
 
-def run_real_bist_walkforward_backtest():
+def run_real_bist_walkforward_backtest() -> Any:
     """Gerçek tarihsel verilerle uçtan uca öğrenme ve doğrulama çalıştırır."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — %100 GERÇEK TARİHSEL VERİ İLE WALK-FORWARD BACKTEST")
@@ -149,8 +163,15 @@ def run_real_bist_walkforward_backtest():
             labels_by_ticker[ticker] = label_df
 
     feature_cols = [
-        "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
-        "price_vs_sma50", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
     ]
 
     logger.info(f"\n⚙️ {len(features_by_ticker)} hisse için {len(feature_cols)} teknik gösterge hesaplandı.")
@@ -171,15 +192,6 @@ def run_real_bist_walkforward_backtest():
     catboost_model = CatBoostModel()
     xgboost_model = XGBoostModel()
     ml_models = {"LightGBM": lgbm_trainer, "CatBoost": catboost_model, "XGBoost": xgboost_model}
-
-    models_list = [
-        {"id": "LightGBM_LambdaRank", "version": "v3.2"},
-        {"id": "Cross_Sectional_Momentum", "version": "v2.0"},
-        {"id": "SPEC_Anomaly_Detector", "version": "v1.2"},
-        {"id": "KAP_NLP_Sentiment", "version": "v3.0"},
-        {"id": "CatBoost_Classifier", "version": "v2.1"},
-        {"id": "LSTM_Sequential", "version": "v1.8"},
-    ]
 
     logger.info("\n🔄 Gerçek Zamansal Walk-Forward Simülasyonu Başlatılıyor...")
     # Walk-forward penceresi: Minimum 100 günlük eğitim verisi, ardından her gün tahmin üretilir
@@ -238,15 +250,15 @@ def run_real_bist_walkforward_backtest():
                     for model_name, model in ml_models.items():
                         try:
                             model.fit(X_train.values, y_train.values)
-                        except Exception as e:
-                            pass  # Model eğitimi başarısızsa devam et
+                        except Exception:
+                            logger.error("Exception caught", exc_info=True)
 
         for ticker in day_tickers:
             row = features_by_ticker[ticker].loc[eval_date]
             label_row = labels_by_ticker[ticker].loc[eval_date]
             entry_p = float(row["current_price"])
             actual_p = float(label_row["future_price_5d"])
-            actual_ret_5d = float(label_row["future_ret_5d"])
+            float(label_row["future_ret_5d"])
             date_str = eval_date.strftime("%Y-%m-%d")
 
             # F-005: Feature vektörü (tüm modeller için ortak)
@@ -256,123 +268,137 @@ def run_real_bist_walkforward_backtest():
             mom_score = row["momentum_20d"]
             pred_dir_mom = "UP" if mom_score > 0 else "DOWN"
             conf_mom = min(0.90, max(0.50, 0.50 + abs(mom_score) / 50.0))
-            real_batch_records.append({
-                "prediction_id": f"REAL_MOM_{ticker}_{date_str}",
-                "model_id": "Cross_Sectional_Momentum",
-                "model_version": "v2.0",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_mom,
-                "confidence": conf_mom,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_MOM_{ticker}_{date_str}",
+                    "model_id": "Cross_Sectional_Momentum",
+                    "model_version": "v2.0",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_mom,
+                    "confidence": conf_mom,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
             # 2. LightGBM Modeli — trained model prediction (F-005 düzeltmesi)
             try:
                 lgb_pred = lgbm_trainer.predict(x_single)
-                lgb_score = float(lgb_pred[0]) if hasattr(lgb_pred, '__len__') else float(lgb_pred)
+                lgb_score = float(lgb_pred[0]) if hasattr(lgb_pred, "__len__") else float(lgb_pred)
             except Exception:
                 lgb_score = 0.4 * row["roc_5d"] + 0.3 * row["price_vs_sma20"] + 0.3 * row["volume_zscore"]
             pred_dir_lgb = "UP" if lgb_score > 0 else "DOWN"
             conf_lgb = min(0.90, max(0.50, 0.55 + abs(lgb_score) / 30.0))
-            real_batch_records.append({
-                "prediction_id": f"REAL_LGB_{ticker}_{date_str}",
-                "model_id": "LightGBM_LambdaRank",
-                "model_version": "v3.2",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_lgb,
-                "confidence": conf_lgb,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_LGB_{ticker}_{date_str}",
+                    "model_id": "LightGBM_LambdaRank",
+                    "model_version": "v3.2",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_lgb,
+                    "confidence": conf_lgb,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
             # 3. SPEC Anomaly Detector (Yüksek Hacim & Bollinger Kırılımı)
-            is_anomaly = (row["volume_zscore"] > 1.5 and row["bb_position"] > 0.8)
+            is_anomaly = row["volume_zscore"] > 1.5 and row["bb_position"] > 0.8
             pred_dir_spec = "UP" if is_anomaly or row["roc_5d"] > 2.0 else "DOWN"
             conf_spec = 0.80 if is_anomaly else 0.52
-            real_batch_records.append({
-                "prediction_id": f"REAL_SPEC_{ticker}_{date_str}",
-                "model_id": "SPEC_Anomaly_Detector",
-                "model_version": "v1.2",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_spec,
-                "confidence": conf_spec,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_SPEC_{ticker}_{date_str}",
+                    "model_id": "SPEC_Anomaly_Detector",
+                    "model_version": "v1.2",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_spec,
+                    "confidence": conf_spec,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
             # 4. KAP NLP Sentiment (Volatilite ve Fiyat Reaksiyonu)
             pred_dir_kap = "UP" if (row["roc_5d"] > -1.0 and row["price_vs_sma50"] > 0) else "DOWN"
-            real_batch_records.append({
-                "prediction_id": f"REAL_KAP_{ticker}_{date_str}",
-                "model_id": "KAP_NLP_Sentiment",
-                "model_version": "v3.0",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_kap,
-                "confidence": 0.62,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_KAP_{ticker}_{date_str}",
+                    "model_id": "KAP_NLP_Sentiment",
+                    "model_version": "v3.0",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_kap,
+                    "confidence": 0.62,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
             # 5. CatBoost Classifier — trained model prediction (F-005 düzeltmesi)
             try:
                 cat_pred = catboost_model.predict(x_single)
-                cat_score = float(cat_pred[0]) if hasattr(cat_pred, '__len__') else float(cat_pred)
+                cat_score = float(cat_pred[0]) if hasattr(cat_pred, "__len__") else float(cat_pred)
             except Exception:
                 cat_score = 0.5 * row["roc_20d"] + 0.5 * (100.0 - row["atr_pct"] * 10.0)
             pred_dir_cat = "UP" if cat_score > 0 else "DOWN"
-            real_batch_records.append({
-                "prediction_id": f"REAL_CAT_{ticker}_{date_str}",
-                "model_id": "CatBoost_Classifier",
-                "model_version": "v2.1",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_cat,
-                "confidence": 0.60,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_CAT_{ticker}_{date_str}",
+                    "model_id": "CatBoost_Classifier",
+                    "model_version": "v2.1",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_cat,
+                    "confidence": 0.60,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
             # 6. XGBoost Modeli — trained model prediction (F-005 düzeltmesi)
             try:
                 xgb_pred = xgboost_model.predict(x_single)
-                xgb_score = float(xgb_pred[0]) if hasattr(xgb_pred, '__len__') else float(xgb_pred)
+                xgb_score = float(xgb_pred[0]) if hasattr(xgb_pred, "__len__") else float(xgb_pred)
             except Exception:
-                xgb_score = row["roc_5d"] if row["roc_5d"] < -3.0 or row["price_vs_sma20"] > 2.0 else -abs(row["roc_5d"])
+                xgb_score = (
+                    row["roc_5d"] if row["roc_5d"] < -3.0 or row["price_vs_sma20"] > 2.0 else -abs(row["roc_5d"])
+                )
             pred_dir_xgb = "UP" if xgb_score > 0 else "DOWN"
-            real_batch_records.append({
-                "prediction_id": f"REAL_XGB_{ticker}_{date_str}",
-                "model_id": "XGBoost_Classifier",
-                "model_version": "v1.0",
-                "ticker": ticker,
-                "timestamp": eval_date.isoformat(),
-                "predicted_direction": pred_dir_xgb,
-                "confidence": 0.58,
-                "market_regime": regime,
-                "prediction_horizon": "1-5D",
-                "entry_price": entry_p,
-                "actual_price": actual_p,
-                "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
-            })
+            real_batch_records.append(
+                {
+                    "prediction_id": f"REAL_XGB_{ticker}_{date_str}",
+                    "model_id": "XGBoost_Classifier",
+                    "model_version": "v1.0",
+                    "ticker": ticker,
+                    "timestamp": eval_date.isoformat(),
+                    "predicted_direction": pred_dir_xgb,
+                    "confidence": 0.58,
+                    "market_regime": regime,
+                    "prediction_horizon": "1-5D",
+                    "entry_price": entry_p,
+                    "actual_price": actual_p,
+                    "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
+                }
+            )
 
     logger.info(f"\n💾 {len(real_batch_records)} adet GERÇEK BIST işlemi SQLite Model Memory Store'a kaydediliyor...")
     store.save_batch_records(real_batch_records)

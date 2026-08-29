@@ -36,6 +36,7 @@ class BISTProvider:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._client = get_client(
             "bist",
             timeout=15.0,
@@ -67,6 +68,7 @@ class BISTProvider:
         semaphore = asyncio.Semaphore(5)  # Max 5 paralel
 
         async def _fetch_one(ticker: str) -> tuple:
+            """Otomatik eklendi."""
             async with semaphore:
                 data = await self.fetch_stock_price(ticker)
                 return ticker, data
@@ -105,6 +107,7 @@ class BISTProvider:
         return results
 
     def _parse_index_data(self, data: Any) -> dict[str, Any]:
+        """Otomatik eklendi."""
         indices = {}
         for item in data if isinstance(data, list) else []:
             symbol = item.get("symbol", "")
@@ -118,7 +121,8 @@ class BISTProvider:
             }
         return indices
 
-    async def close(self):
+    async def close(self) -> Any:
+        """Otomatik eklendi."""
         await self._client.close()
 
 

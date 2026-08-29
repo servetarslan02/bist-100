@@ -13,27 +13,33 @@ Token yönetimi:
 - Default token production'da değiştirilmeli
 """
 
+import functools
 import hmac
 import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.monitoring_security")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -51,6 +57,7 @@ class MonitoringAuth:
     """Monitoring endpoint authentication."""
 
     def __init__(self, config: AuthConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or AuthConfig()
         self._rate_limiter: dict[str, list] = {}
         self._failed_attempts: dict[str, int] = {}
@@ -101,7 +108,7 @@ class MonitoringAuth:
         return True
 
     @otel_trace("monitoring_security.record_failed_attempt")
-    def record_failed_attempt(self, client_ip: str):
+    def record_failed_attempt(self, client_ip: str) -> Any:
         """Başarısız girişimi kaydet."""
         self._failed_attempts[client_ip] = self._failed_attempts.get(client_ip, 0) + 1
         if self._failed_attempts[client_ip] > 10:
@@ -167,6 +174,7 @@ class AuthProvider:
 
     @otel_trace("monitoring_security.AuthProvider.name")
     def name(self) -> str:
+        """Otomatik eklendi."""
         return self.__class__.__name__
 
 
@@ -180,6 +188,7 @@ class AuthResult:
     error: str = ""
 
     def has_role(self, role: str) -> bool:
+        """Otomatik eklendi."""
         return role in self.roles
 
 
@@ -194,6 +203,7 @@ class StaticTokenProvider(AuthProvider):
 
     @otel_trace("monitoring_security.StaticTokenProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
+        """Otomatik eklendi."""
         if not token:
             return AuthResult(authenticated=False, error="No token provided")
 
@@ -226,6 +236,7 @@ class JWTProvider(AuthProvider):
         jwks_url: str = "",
         jwks_cache_ttl_s: int = 3600,
     ):
+        """Otomatik eklendi."""
         self._secret = secret
         self._algorithm = algorithm
         self._issuer = issuer
@@ -238,6 +249,7 @@ class JWTProvider(AuthProvider):
 
     @otel_trace("monitoring_security.JWTProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
+        """Otomatik eklendi."""
         if not token:
             return AuthResult(authenticated=False, error="No token")
 
@@ -298,7 +310,7 @@ class JWTProvider(AuthProvider):
 
         return self._secret
 
-    async def _refresh_jwks_if_needed(self):
+    async def _refresh_jwks_if_needed(self) -> Any:
         """JWKS cache'ini yenile (TTL kontrolü)."""
         now = time.time()
         if now - self._jwks_last_fetch < self._jwks_cache_ttl_s:
@@ -335,6 +347,7 @@ class OAuthProvider(AuthProvider):
     def __init__(
         self, issuer: str = "", audience: str = "", jwks_url: str = "", secret: str = "", role_claim: str = "roles"
     ):
+        """Otomatik eklendi."""
         self._issuer = issuer
         self._audience = audience
         self._jwks_url = jwks_url
@@ -349,6 +362,7 @@ class OAuthProvider(AuthProvider):
 
     @otel_trace("monitoring_security.OAuthProvider.verify")
     async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
+        """Otomatik eklendi."""
         if not self._secret:
             return AuthResult(authenticated=False, error="OAuth not configured (no secret)")
         return await self._jwt_provider.verify(token, request_context)
@@ -366,10 +380,12 @@ class AuthManager:
     """Çoklu auth provider yöneticisi + RBAC."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._providers: list[AuthProvider] = []
 
     @otel_trace("monitoring_security.AuthManager.add_provider")
-    def add_provider(self, provider: AuthProvider):
+    def add_provider(self, provider: AuthProvider) -> Any:
+        """Otomatik eklendi."""
         self._providers.append(provider)
         if len(self._providers) > 100:
             self._providers = self._providers[-100:]
@@ -405,6 +421,7 @@ class AuthManager:
 
     @otel_trace("monitoring_security.AuthManager.get_providers")
     def get_providers(self) -> list[str]:
+        """Otomatik eklendi."""
         return [p.name() for p in self._providers]
 
 

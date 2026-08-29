@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 17 Test Suite
 
@@ -8,7 +11,7 @@ import asyncio
 import sys
 
 
-def test_observability():
+def test_observability() -> Any:
     """Observability & Monitoring testleri."""
     from services.core.observability import (
         config_manager,
@@ -30,13 +33,13 @@ def test_observability():
     assert prometheus_metrics._counters["events_total"] == 2
     assert prometheus_metrics._counters["events_total{type=tick}"] == 1
     passed += 1
-    print(f"  ✓ Counter: {prometheus_metrics._counters}")
+    logger.info(f"  ✓ Counter: {prometheus_metrics._counters}")
 
     # 2. Prometheus metrics - gauge
     prometheus_metrics.set_gauge("portfolio_equity", 105000.0)
     assert prometheus_metrics._gauges["portfolio_equity"] == 105000.0
     passed += 1
-    print(f"  ✓ Gauge: {prometheus_metrics._gauges}")
+    logger.info(f"  ✓ Gauge: {prometheus_metrics._gauges}")
 
     # 3. Prometheus metrics - histogram
     prometheus_metrics._histograms.clear()
@@ -46,7 +49,7 @@ def test_observability():
     assert "api_latency_ms" in metrics["histograms"]
     assert metrics["histograms"]["api_latency_ms"]["count"] == 5
     passed += 1
-    print(f"  ✓ Histogram: avg={metrics['histograms']['api_latency_ms']['avg']:.1f}ms")
+    logger.info(f"  ✓ Histogram: avg={metrics['histograms']['api_latency_ms']['avg']:.1f}ms")
 
     # 4. Distributed tracing
     distributed_tracing._traces.clear()
@@ -57,7 +60,7 @@ def test_observability():
     trace = distributed_tracing.get_trace(trace_id)
     assert len(trace) == 3  # start + 2 spans
     passed += 1
-    print(f"  ✓ Tracing: {len(trace)} spans")
+    logger.info(f"  ✓ Tracing: {len(trace)} spans")
 
     # 5. Performance monitor
     performance_monitor._latencies.clear()
@@ -68,7 +71,7 @@ def test_observability():
     assert stats["count"] == 3
     assert stats["avg_ms"] == 150.0
     passed += 1
-    print(f"  ✓ Performance: avg={stats['avg_ms']}ms")
+    logger.info(f"  ✓ Performance: avg={stats['avg_ms']}ms")
 
     # 6. Cost monitor
     cost_monitor._costs.clear()
@@ -79,7 +82,7 @@ def test_observability():
     assert summary["total_cost_usd"] == 0.045
     assert summary["total_entries"] == 2
     passed += 1
-    print(f"  ✓ Cost: ${summary['total_cost_usd']}")
+    logger.info(f"  ✓ Cost: ${summary['total_cost_usd']}")
 
     # 7. Config manager
     config_manager._config.clear()
@@ -90,7 +93,7 @@ def test_observability():
     assert len(history) == 1
     assert history[0]["actor"] == "admin"
     passed += 1
-    print(f"  ✓ Config: {config_manager.get('risk.max_position_pct')}")
+    logger.info(f"  ✓ Config: {config_manager.get('risk.max_position_pct')}")
 
     # 8. Health checker
     health_checker._components.clear()
@@ -102,12 +105,12 @@ def test_observability():
     assert result["overall"] == "DEGRADED"
     assert result["components"]["database"]["status"] == "HEALTHY"
     passed += 1
-    print(f"  ✓ Health: overall={result['overall']}")
+    logger.info(f"  ✓ Health: overall={result['overall']}")
 
     return passed, failed
 
 
-def test_recovery():
+def test_recovery() -> Any:
     """Recovery & Resilience testleri."""
     from services.core.recovery import (
         event_replay,
@@ -130,14 +133,14 @@ def test_recovery():
     count = event_replay.replay_from("2026-08-15T10:03:00", lambda e: replayed.append(e))
     assert count == 2  # 10:05 and 10:10
     passed += 1
-    print(f"  ✓ Event replay: {count} events replayed")
+    logger.info(f"  ✓ Event replay: {count} events replayed")
 
     # 2. Event replay range
     replayed2 = []
     count2 = event_replay.replay_range("2026-08-15T10:00:00", "2026-08-15T10:06:00", lambda e: replayed2.append(e))
     assert count2 == 2  # 10:00 and 10:05
     passed += 1
-    print(f"  ✓ Replay range: {count2} events")
+    logger.info(f"  ✓ Replay range: {count2} events")
 
     # 3. Graceful shutdown
     graceful_shutdown._shutdown_handlers.clear()
@@ -148,7 +151,7 @@ def test_recovery():
     assert len(shutdown_called) == 1
     assert graceful_shutdown.is_shutting_down
     passed += 1
-    print(f"  ✓ Graceful shutdown: {len(shutdown_called)} handlers called")
+    logger.info(f"  ✓ Graceful shutdown: {len(shutdown_called)} handlers called")
 
     # 4. Startup recovery
     result = asyncio.get_event_loop().run_until_complete(
@@ -157,7 +160,7 @@ def test_recovery():
     assert result["success"]
     assert len(result["steps"]) >= 3
     passed += 1
-    print(f"  ✓ Startup recovery: {len(result['steps'])} steps, success={result['success']}")
+    logger.info(f"  ✓ Startup recovery: {len(result['steps'])} steps, success={result['success']}")
 
     # 5. Failure injector
     failure_injector.clear_all()
@@ -167,7 +170,7 @@ def test_recovery():
     failure_injector.clear("database", "down")
     assert not failure_injector.is_failing("database")
     passed += 1
-    print("  ✓ Failure injector: inject/clear")
+    logger.info("  ✓ Failure injector: inject/clear")
 
     # 6. Multiple failures
     failure_injector.inject("redis", "down")
@@ -177,15 +180,16 @@ def test_recovery():
     failure_injector.clear_all()
     assert len(failure_injector.get_active()) == 0
     passed += 1
-    print(f"  ✓ Multiple failures: {len(active)} active")
+    logger.info(f"  ✓ Multiple failures: {len(active)} active")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  FAZ 17 — Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  FAZ 17 — Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
@@ -196,21 +200,21 @@ def main():
     ]
 
     for name, test_func in tests:
-        print(f"\n--- {name} ---")
+        logger.info(f"\n--- {name} ---")
         try:
             p, f = test_func()
             total_passed += p
             total_failed += f
         except Exception as e:
-            print(f"  ✗ Test crashed: {e}")
+            logger.info(f"  ✗ Test crashed: {e}")
             import traceback
 
             traceback.print_exc()
             total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

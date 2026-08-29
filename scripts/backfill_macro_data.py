@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Macro Data Backfill Script
 
@@ -17,14 +20,14 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def backfill_from_yahoo(years: int = 5):
+def backfill_from_yahoo(years: int = 5) -> Any:
     """Yahoo Finance'ten tarihsel veri çek."""
     from services.macro.historical_store import macro_historical_store
 
     try:
         import yfinance as yf
     except ImportError:
-        print("yfinance yüklü değil: pip install yfinance")
+        logger.info("yfinance yüklü değil: pip install yfinance")
         return
 
     indicators = {
@@ -41,7 +44,7 @@ def backfill_from_yahoo(years: int = 5):
     start_date = end_date - timedelta(days=years * 365)
 
     for name, symbol in indicators.items():
-        print(f"Backfilling {name} ({symbol})...")
+        logger.info(f"Backfilling {name} ({symbol})...")
         try:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(start=start_date, end=end_date)
@@ -57,23 +60,23 @@ def backfill_from_yahoo(years: int = 5):
                 )
                 count += 1
 
-            print(f"  {name}: {count} veri noktası kaydedildi")
+            logger.info(f"  {name}: {count} veri noktası kaydedildi")
 
         except Exception as e:
-            print(f"  {name} hatası: {e}")
+            logger.info(f"  {name} hatası: {e}")
 
 
-def backfill_from_tcmb(years: int = 5):
+def backfill_from_tcmb(years: int = 5) -> Any:
     """TCMB EVDS'ten tarihsel veri çek."""
     from services.macro.historical_store import macro_historical_store
 
     try:
         from services.ingestion.providers.tcmb_provider import tcmb_provider
     except ImportError:
-        print("TCMB provider bulunamadı")
+        logger.info("TCMB provider bulunamadı")
         return
 
-    print("TCMB EVDS backfill...")
+    logger.info("TCMB EVDS backfill...")
     try:
         # TCMB provider'dan tarihsel veri çek
         data = tcmb_provider.fetch_historical(years=years)
@@ -88,18 +91,19 @@ def backfill_from_tcmb(years: int = 5):
                         source="tcmb_evds",
                     )
                     count += 1
-                print(f"  TCMB_{indicator}: {count} veri noktası")
+                logger.info(f"  TCMB_{indicator}: {count} veri noktası")
     except Exception as e:
-        print(f"  TCMB hatası: {e}")
+        logger.info(f"  TCMB hatası: {e}")
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     parser = argparse.ArgumentParser(description="Macro Data Backfill")
     parser.add_argument("--years", type=int, default=5, help="Kaç yıllık veri")
     parser.add_argument("--indicators", type=str, default="all", help="İndikatörler (virgülle ayrılmış veya 'all')")
     args = parser.parse_args()
 
-    print(f"=== Macro Data Backfill ({args.years} yıl) ===\n")
+    logger.info(f"=== Macro Data Backfill ({args.years} yıl) ===\n")
 
     # Yahoo Finance
     backfill_from_yahoo(years=args.years)
@@ -111,9 +115,9 @@ def main():
     from services.macro.historical_store import macro_historical_store
 
     report = macro_historical_store.get_report()
-    print("\n=== Backfill Tamamlandı ===")
-    print(f"Toplam gösterge: {report['indicators']}")
-    print(f"Toplam veri noktası: {report['total_data_points']}")
+    logger.info("\n=== Backfill Tamamlandı ===")
+    logger.info(f"Toplam gösterge: {report['indicators']}")
+    logger.info(f"Toplam veri noktası: {report['total_data_points']}")
 
 
 if __name__ == "__main__":

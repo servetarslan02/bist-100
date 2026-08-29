@@ -46,6 +46,7 @@ _cached_macro_data: dict[str, Any] = {
 
 
 def _fetch_live_macro_data() -> dict[str, Any]:
+    """Otomatik eklendi."""
     global _last_macro_fetch, _cached_macro_data
     now = time.time()
     if _cached_macro_data and (now - _last_macro_fetch < _CACHE_TTL):
@@ -112,7 +113,7 @@ def _fetch_live_macro_data() -> dict[str, Any]:
         result["vix_level"] = vix_val
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
-        
+
         # Frontend expects specific keys for change percentages
         if "gold_ounce_change_pct" in result:
             result["gold_change_pct"] = result["gold_ounce_change_pct"]
@@ -169,7 +170,7 @@ def _fetch_live_macro_data() -> dict[str, Any]:
 @router.get("/world")
 @router.get("/state")
 @router.get("/indicators")
-async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Küresel makro piyasa durumu ve risk faktörleri (Canlı yfinance verileri)."""
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(None, _fetch_live_macro_data)
@@ -177,7 +178,7 @@ async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_li
 
 
 @router.get("/impact/{ticker}")
-async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Hisse bazlı makro etki ve duyarlılık analizi."""
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine
@@ -199,7 +200,7 @@ async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(ch
 
 
 @router.get("/sensitivity/{sector}")
-async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Sektör makro duyarlılık katsayıları."""
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine

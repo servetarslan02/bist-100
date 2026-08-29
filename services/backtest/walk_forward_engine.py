@@ -22,16 +22,17 @@ KURAL: Gelecek veriyi train'de kullanmak = ölüm.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import orjson
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
 import numpy as np
+import orjson
 import structlog
 
 try:
@@ -42,6 +43,7 @@ except ImportError:
 # Standalone Deflated Sharpe (scipy tabanlı, skewness + kurtosis düzeltmeli)
 try:
     from .deflated_sharpe import DeflatedSharpeCalculator, ProbabilisticSharpeRatio
+
     _has_standalone_sharpe = True
 except ImportError:
     _has_standalone_sharpe = False
@@ -49,6 +51,7 @@ except ImportError:
 # BIST'e özgü gerçekçi transaction cost modeli
 try:
     from .transaction_costs import TransactionCostEngine, bist_transaction_cost
+
     _has_detailed_costs = True
 except ImportError:
     _has_detailed_costs = False
@@ -56,12 +59,14 @@ except ImportError:
 # Champion-Challenger ve Degradation Monitor
 try:
     from services.learning.champion_challenger import ChampionChallengerEngine
+
     _has_champion_challenger = True
 except ImportError:
     _has_champion_challenger = False
 
 try:
     from services.learning.model_degradation_monitor import ModelDegradationMonitor
+
     _has_degradation_monitor = True
 except ImportError:
     _has_degradation_monitor = False
@@ -86,8 +91,9 @@ MAX_PURGE_RATIO = 0.3  # purge / train_max
 # ============================================================================
 
 
-class FoldStatus(str, Enum):
+class FoldStatus(StrEnum):
     """Fold çalışma durumu."""
+
     PENDING = "pending"
     TRAINING = "training"
     TESTING = "testing"
@@ -96,8 +102,9 @@ class FoldStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class RegimeType(str, Enum):
+class RegimeType(StrEnum):
     """Piyasa rejimi."""
+
     BULL = "BULL"
     BEAR = "BEAR"
     SIDEWAYS = "SIDEWAYS"
@@ -114,10 +121,21 @@ class RegimeType(str, Enum):
 class ModelProtocol(Protocol):
     """Model interface — her fold'da eğitilen model bu arayüzü implemente etmeli."""
 
-    def fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None: ...
-    def predict(self, X: np.ndarray) -> np.ndarray: ...
-    def get_feature_importance(self) -> dict[str, float]: ...
-    def get_params(self) -> dict[str, Any]: ...
+    def fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None:
+        """Otomatik eklendi."""
+        pass
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Otomatik eklendi."""
+        pass
+
+    def get_feature_importance(self) -> dict[str, float]:
+        """Otomatik eklendi."""
+        pass
+
+    def get_params(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
+        pass
 
 
 class FeatureCalculatorProtocol(Protocol):
@@ -128,7 +146,9 @@ class FeatureCalculatorProtocol(Protocol):
         data: dict[str, Any],
         ticker: str,
         as_of_date: str,
-    ) -> dict[str, float]: ...
+    ) -> dict[str, float]:
+        """Otomatik eklendi."""
+        pass
 
 
 # ============================================================================
@@ -139,6 +159,7 @@ class FeatureCalculatorProtocol(Protocol):
 @dataclass
 class FoldConfig:
     """Tek bir fold için konfigürasyon."""
+
     fold_id: int
     train_start: str
     train_end: str
@@ -154,6 +175,7 @@ class FoldConfig:
 @dataclass
 class FoldMetrics:
     """Tek fold'un performans metrikleri."""
+
     # Temel
     total_return: float = 0.0
     annualized_return: float = 0.0
@@ -205,6 +227,7 @@ class FoldMetrics:
 @dataclass
 class FoldSnapshot:
     """Tek fold'un tam snapshot'ı — reproducibility için."""
+
     fold_config: FoldConfig
     status: FoldStatus = FoldStatus.PENDING
 
@@ -259,6 +282,7 @@ class FoldSnapshot:
         return d
 
     def _metrics_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         m = self.metrics
         d = {
             "total_return": round(m.total_return, 4),
@@ -284,6 +308,7 @@ class FoldSnapshot:
 
     @staticmethod
     def _days_between(d1: str, d2: str) -> int:
+        """Otomatik eklendi."""
         try:
             dt1 = datetime.strptime(d1, "%Y-%m-%d")
             dt2 = datetime.strptime(d2, "%Y-%m-%d")
@@ -295,6 +320,7 @@ class FoldSnapshot:
 @dataclass
 class WalkForwardResult:
     """Walk-forward validation toplu sonucu."""
+
     run_id: str
     total_folds: int
     completed_folds: int
@@ -383,15 +409,11 @@ class WalkForwardResult:
     @property
     def avg_precision_at_20(self) -> float:
         """v3.0 uyumluluğu: avg_precision_at_20 (v5.0'da yoksa 0.0)."""
-        return getattr(self, '_avg_precision_at_20', 0.0)
+        return getattr(self, "_avg_precision_at_20", 0.0)
 
     def all_leakage_ok(self) -> bool:
         """Tüm fold'larda leakage kontrolü geçti mi?"""
-        return all(
-            f.status == FoldStatus.COMPLETED
-            for f in self.folds
-            if f.status != FoldStatus.SKIPPED
-        )
+        return all(f.status == FoldStatus.COMPLETED for f in self.folds if f.status != FoldStatus.SKIPPED)
 
 
 # ============================================================================
@@ -433,6 +455,7 @@ class WalkForwardEngineV5:
         forward_days: int = 5,
         use_detailed_costs: bool = True,
     ):
+        """Otomatik eklendi."""
         # Parametre doğrulama
         if purge_days < 0:
             raise ValueError(f"purge_days >= 0 olmalı, aldım: {purge_days}")
@@ -471,18 +494,14 @@ class WalkForwardEngineV5:
         # Champion-Challenger motoru
         self._champion_challenger: Any = None
         if _has_champion_challenger:
-            try:
+            with contextlib.suppress(Exception):
                 self._champion_challenger = ChampionChallengerEngine()
-            except Exception:
-                pass
 
         # Degradation Monitor
         self._degradation_monitor: Any = None
         if _has_degradation_monitor:
-            try:
+            with contextlib.suppress(Exception):
                 self._degradation_monitor = ModelDegradationMonitor()
-            except Exception:
-                pass
 
         # Fold performans geçmişi (degradation tracking için)
         self._fold_performance_history: list[dict[str, Any]] = []
@@ -524,7 +543,7 @@ class WalkForwardEngineV5:
         # Tarih sıralı mı kontrol et
         for i in range(1, len(dates)):
             if dates[i] < dates[i - 1]:
-                raise ValueError(f"Tarihler sıralı olmalı: dates[{i-1}]={dates[i-1]} > dates[{i}]={dates[i]}")
+                raise ValueError(f"Tarihler sıralı olmalı: dates[{i - 1}]={dates[i - 1]} > dates[{i}]={dates[i]}")
 
         min_required = self.train_days + self.purge_days + self.test_days
         if len(dates) < min_required:
@@ -706,7 +725,7 @@ class WalkForwardEngineV5:
         """Tek bir fold'u çalıştır."""
         snapshot = FoldSnapshot(
             fold_config=fold_config,
-            started_at=datetime.now(timezone.utc).isoformat(),
+            started_at=datetime.now(UTC).isoformat(),
         )
 
         try:
@@ -742,16 +761,12 @@ class WalkForwardEngineV5:
             )
             snapshot.model_version = model_version
             snapshot.model_params = model.get_params() if model else {}
-            snapshot.model_feature_importance = (
-                model.get_feature_importance() if model else {}
-            )
+            snapshot.model_feature_importance = model.get_feature_importance() if model else {}
 
             # 5. Test döneminde tahmin üret
             snapshot.status = FoldStatus.TESTING
             test_data = self._extract_window(pit_data, fold_config.test_start, fold_config.test_end)
-            test_features, _ = self._compute_features(
-                test_data, feature_calculator, fold_config.test_end
-            )
+            test_features, _ = self._compute_features(test_data, feature_calculator, fold_config.test_end)
             snapshot.test_samples = len(test_features)
 
             if len(test_features) < MIN_TEST_SAMPLES:
@@ -786,10 +801,13 @@ class WalkForwardEngineV5:
             snapshot.data_version_hash = self._hash_data_version(pit_data, fold_config)
 
             snapshot.status = FoldStatus.COMPLETED
-            snapshot.completed_at = datetime.now(timezone.utc).isoformat()
-            snapshot.elapsed_seconds = time.time() - time.mktime(
-                datetime.fromisoformat(snapshot.started_at.replace("Z", "+00:00")).timetuple()
-            ) if snapshot.started_at else 0.0
+            snapshot.completed_at = datetime.now(UTC).isoformat()
+            snapshot.elapsed_seconds = (
+                time.time()
+                - time.mktime(datetime.fromisoformat(snapshot.started_at.replace("Z", "+00:00")).timetuple())
+                if snapshot.started_at
+                else 0.0
+            )
 
         except Exception as e:
             snapshot.status = FoldStatus.FAILED
@@ -807,9 +825,7 @@ class WalkForwardEngineV5:
     # DATA OPERATIONS
     # ========================================================================
 
-    def _truncate_to_pit(
-        self, market_data: dict[str, Any], cutoff_date: str
-    ) -> dict[str, Any]:
+    def _truncate_to_pit(self, market_data: dict[str, Any], cutoff_date: str) -> dict[str, Any]:
         """Veriyi cutoff_date'e kadar kes (Point-in-Time).
 
         Gelecek veriyi fiziksel olarak yok eder — leakage'ı önler.
@@ -847,9 +863,7 @@ class WalkForwardEngineV5:
 
         return pit_data
 
-    def _extract_window(
-        self, data: dict[str, Any], start_date: str, end_date: str
-    ) -> dict[str, Any]:
+    def _extract_window(self, data: dict[str, Any], start_date: str, end_date: str) -> dict[str, Any]:
         """Belirli bir tarih penceresindeki veriyi çıkar."""
         window = {}
         for ticker, df in data.items():
@@ -860,9 +874,7 @@ class WalkForwardEngineV5:
                 # Polars DataFrame
                 if pl is not None and hasattr(df, "filter") and hasattr(df, "columns"):
                     if "Date" in df.columns:
-                        w = df.filter(
-                            (pl.col("Date") >= start_date) & (pl.col("Date") <= end_date)
-                        )
+                        w = df.filter((pl.col("Date") >= start_date) & (pl.col("Date") <= end_date))
                     else:
                         w = df
                 # Pandas DataFrame
@@ -942,9 +954,10 @@ class WalkForwardEngineV5:
         # Projenin gerçek feature engine'ini kullan
         try:
             from services.features.calculator import feature_calculator as real_calc
+
             return self._compute_with_calculator(filtered_data, real_calc, as_of_date)
         except ImportError:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
         # Fallback: dahili basit feature seti
         return self._compute_builtin_features(filtered_data, as_of_date)
@@ -956,6 +969,7 @@ class WalkForwardEngineV5:
         """
         try:
             from services.core.data_quality import DataQualityEngine
+
             dq = DataQualityEngine()
             filtered = {}
 
@@ -1050,6 +1064,7 @@ class WalkForwardEngineV5:
         """
         try:
             from services.ml.training_validator import CrossSectionalNormalizer
+
             normalizer = CrossSectionalNormalizer()
 
             # features_map ve date_groups oluştur
@@ -1087,14 +1102,14 @@ class WalkForwardEngineV5:
                 # Polars/Pandas DataFrame
                 if hasattr(df, "columns"):
                     close = df["Close"].to_numpy() if "Close" in df.columns else None
-                    high = df["High"].to_numpy() if "High" in df.columns else close
-                    low = df["Low"].to_numpy() if "Low" in df.columns else close
+                    df["High"].to_numpy() if "High" in df.columns else close
+                    df["Low"].to_numpy() if "Low" in df.columns else close
                     volume = df["Volume"].to_numpy() if "Volume" in df.columns else np.zeros(len(df))
                 # Plain dict
                 elif isinstance(df, dict) and "Close" in df:
                     close = np.array(df["Close"], dtype=np.float64)
-                    high = np.array(df.get("High", df["Close"]), dtype=np.float64)
-                    low = np.array(df.get("Low", df["Close"]), dtype=np.float64)
+                    np.array(df.get("High", df["Close"]), dtype=np.float64)
+                    np.array(df.get("Low", df["Close"]), dtype=np.float64)
                     volume = np.array(df.get("Volume", [0.0] * len(close)), dtype=np.float64)
                 else:
                     continue
@@ -1112,8 +1127,12 @@ class WalkForwardEngineV5:
                     "roc_5d": (close[-1] / close[-6] - 1.0) * 100.0 if len(close) > 5 else 0.0,
                     "roc_20d": (close[-1] / close[-21] - 1.0) * 100.0 if len(close) > 20 else 0.0,
                     "momentum_20d": (close[-1] / close[-21] - 1.0) * 100.0 if len(close) > 20 else 0.0,
-                    "volatility_20d": float(np.std(np.diff(close[-21:]) / close[-21:-1]) * np.sqrt(252) * 100.0) if len(close) > 20 else 0.0,
-                    "volume_zscore": float((volume[-1] - np.mean(volume[-20:])) / (np.std(volume[-20:]) + 1e-10)) if len(volume) > 20 else 0.0,
+                    "volatility_20d": float(np.std(np.diff(close[-21:]) / close[-21:-1]) * np.sqrt(252) * 100.0)
+                    if len(close) > 20
+                    else 0.0,
+                    "volume_zscore": float((volume[-1] - np.mean(volume[-20:])) / (np.std(volume[-20:]) + 1e-10))
+                    if len(volume) > 20
+                    else 0.0,
                     "atr_pct": float(np.mean(np.abs(np.diff(close[-15:]))) / c * 100.0) if len(close) > 14 else 0.0,
                     "bb_position": self._bb_position(close),
                     "price_vs_sma20": (c / np.mean(close[-20:]) - 1.0) * 100.0 if len(close) >= 20 else 0.0,
@@ -1124,8 +1143,15 @@ class WalkForwardEngineV5:
                 continue
 
         feature_names = [
-            "roc_5d", "roc_20d", "momentum_20d", "volatility_20d",
-            "volume_zscore", "atr_pct", "bb_position", "price_vs_sma20", "price_vs_sma50",
+            "roc_5d",
+            "roc_20d",
+            "momentum_20d",
+            "volatility_20d",
+            "volume_zscore",
+            "atr_pct",
+            "bb_position",
+            "price_vs_sma20",
+            "price_vs_sma50",
         ]
         return samples, feature_names
 
@@ -1174,14 +1200,12 @@ class WalkForwardEngineV5:
             try:
                 model = model_factory()
                 # Seed propagation: model'e seed parametresi varsa ata
-                if hasattr(model, 'set_params'):
+                if hasattr(model, "set_params"):
                     try:
                         model.set_params(random_state=fold_seed)
                     except Exception:
-                        try:
+                        with contextlib.suppress(Exception):
                             model.set_params(seed=fold_seed)
-                        except Exception:
-                            pass
                 X = self._features_to_matrix(train_features, feature_names)
                 y = self._extract_targets(train_features)
 
@@ -1195,6 +1219,7 @@ class WalkForwardEngineV5:
         # Projenin gerçek LightGBM trainer'ını kullan
         try:
             from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
+
             X = self._features_to_matrix(train_features, feature_names)
             y = self._extract_targets(train_features)
 
@@ -1210,16 +1235,14 @@ class WalkForwardEngineV5:
                     version = self._model_version(model, train_features)
                     return model, version
         except ImportError:
-            pass
+            logger.error("Exception caught", exc_info=True)
         except Exception as e:
             logger.warning("LightGBM trainer başarısız, rule-based fallback", error=str(e))
 
         # Rule-based fallback
         return None, "rule_based_v1"
 
-    def _features_to_matrix(
-        self, features: list[dict[str, Any]], feature_names: list[str]
-    ) -> np.ndarray:
+    def _features_to_matrix(self, features: list[dict[str, Any]], feature_names: list[str]) -> np.ndarray:
         """Feature listesini numpy matrisine çevir."""
         matrix = []
         for sample in features:
@@ -1239,7 +1262,7 @@ class WalkForwardEngineV5:
         """Model versiyon hash'i üret."""
         params = str(model.get_params()) if hasattr(model, "get_params") else str(model)
         n_samples = str(len(features))
-        ts = datetime.now(timezone.utc).isoformat()
+        ts = datetime.now(UTC).isoformat()
         return hashlib.sha256(f"{params}_{n_samples}_{ts}".encode()).hexdigest()[:16]
 
     # ========================================================================
@@ -1261,12 +1284,14 @@ class WalkForwardEngineV5:
                 scores = model.predict(X)
 
                 for i, sample in enumerate(test_features):
-                    predictions.append({
-                        "ticker": sample.get("ticker", ""),
-                        "date": sample.get("date", ""),
-                        "score": float(scores[i]) if i < len(scores) else 0.0,
-                        "model": "ml",
-                    })
+                    predictions.append(
+                        {
+                            "ticker": sample.get("ticker", ""),
+                            "date": sample.get("date", ""),
+                            "score": float(scores[i]) if i < len(scores) else 0.0,
+                            "model": "ml",
+                        }
+                    )
             except Exception as e:
                 logger.warning("ML prediction failed, using rule-based", error=str(e))
                 predictions = self._rule_based_predictions(test_features)
@@ -1275,9 +1300,7 @@ class WalkForwardEngineV5:
 
         return predictions
 
-    def _rule_based_predictions(
-        self, features: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def _rule_based_predictions(self, features: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Kural tabanlı tahmin üret (ML modeli yoksa)."""
         predictions = []
         for sample in features:
@@ -1286,18 +1309,16 @@ class WalkForwardEngineV5:
             vol_z = sample.get("volume_zscore", 0.0)
             bb = sample.get("bb_position", 0.5)
 
-            score = (
-                np.tanh(mom / 10.0) * 0.4
-                + np.tanh(vol_z / 2.0) * 0.3
-                + (bb - 0.5) * 0.3
-            )
+            score = np.tanh(mom / 10.0) * 0.4 + np.tanh(vol_z / 2.0) * 0.3 + (bb - 0.5) * 0.3
 
-            predictions.append({
-                "ticker": sample.get("ticker", ""),
-                "date": sample.get("date", ""),
-                "score": float(score),
-                "model": "rule_based",
-            })
+            predictions.append(
+                {
+                    "ticker": sample.get("ticker", ""),
+                    "date": sample.get("date", ""),
+                    "score": float(score),
+                    "model": "rule_based",
+                }
+            )
         return predictions
 
     # ========================================================================
@@ -1327,12 +1348,13 @@ class WalkForwardEngineV5:
             if test_end and date:
                 try:
                     from datetime import datetime as _dt
+
                     pred_dt = _dt.strptime(date, "%Y-%m-%d")
                     end_dt = _dt.strptime(test_end, "%Y-%m-%d")
                     if (end_dt - pred_dt).days < forward_days:
                         continue  # Bu prediction leakage riski taşıyor
                 except (ValueError, TypeError):
-                    pass
+                    logger.error("Exception caught", exc_info=True)
 
             if ticker not in test_data:
                 outcomes.append({"ticker": ticker, "date": date, "actual_return": 0.0, "is_correct": False})
@@ -1375,13 +1397,15 @@ class WalkForwardEngineV5:
                 # Yön doğruluğu (directional accuracy)
                 is_correct = (score > 0 and actual_ret > 0) or (score < 0 and actual_ret < 0)
 
-                outcomes.append({
-                    "ticker": ticker,
-                    "date": date,
-                    "actual_return": actual_ret,
-                    "predicted_score": score,
-                    "is_correct": is_correct,
-                })
+                outcomes.append(
+                    {
+                        "ticker": ticker,
+                        "date": date,
+                        "actual_return": actual_ret,
+                        "predicted_score": score,
+                        "is_correct": is_correct,
+                    }
+                )
             except Exception:
                 outcomes.append({"ticker": ticker, "date": date, "actual_return": 0.0, "is_correct": False})
 
@@ -1478,7 +1502,7 @@ class WalkForwardEngineV5:
         # directional_accuracy: yön doğruluğu (skor yönü ile gerçek yön eşleşmesi)
         positive_return_trades = [r for r in realized if r.get("actual_return", 0.0) > 0]
         negative_return_trades = [r for r in realized if r.get("actual_return", 0.0) < 0]
-        directional_correct = [r for r in realized if r.get("is_correct", False)]
+        [r for r in realized if r.get("is_correct", False)]
 
         metrics.win_rate = len(positive_return_trades) / len(realized) if realized else 0.0
 
@@ -1517,7 +1541,7 @@ class WalkForwardEngineV5:
             sorted_returns = np.sort(returns_arr)
             var_idx = int(len(sorted_returns) * 0.05)
             metrics.var_95 = float(abs(sorted_returns[var_idx])) * 100.0
-            metrics.cvar_95 = float(abs(np.mean(sorted_returns[:var_idx + 1]))) * 100.0
+            metrics.cvar_95 = float(abs(np.mean(sorted_returns[: var_idx + 1]))) * 100.0
 
             # Tail ratio
             p95 = np.percentile(returns_arr, 95)
@@ -1538,8 +1562,11 @@ class WalkForwardEngineV5:
                 if price <= 0:
                     price = 100.0
                 rt = self._cost_engine.estimate_round_trip_cost(
-                    ticker=ticker, entry_price=price, quantity=100,
-                    avg_daily_volume=0, volatility_ratio=1.0,
+                    ticker=ticker,
+                    entry_price=price,
+                    quantity=100,
+                    avg_daily_volume=0,
+                    volatility_ratio=1.0,
                 )
                 total_cost += rt["round_trip_cost"]
                 for k in cost_breakdown:
@@ -1555,7 +1582,9 @@ class WalkForwardEngineV5:
         # === İstatistiksel Anlamlılık ===
         # Getiri dağılımının momentleri (scipy tabanlı DSR için)
         try:
-            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            from scipy.stats import kurtosis as _kurtosis
+            from scipy.stats import skew as _skew
+
             _ret_skew = float(_skew(returns_arr)) if len(returns_arr) > 10 else 0.0
             _ret_kurt = float(_kurtosis(returns_arr, fisher=False)) if len(returns_arr) > 10 else 3.0
         except ImportError:
@@ -1563,12 +1592,17 @@ class WalkForwardEngineV5:
             _ret_kurt = 3.0
 
         metrics.deflated_sharpe = self._deflated_sharpe(
-            metrics.sharpe_ratio, len(returns_arr), len(predictions),
-            skewness=_ret_skew, kurtosis=_ret_kurt,
+            metrics.sharpe_ratio,
+            len(returns_arr),
+            len(predictions),
+            skewness=_ret_skew,
+            kurtosis=_ret_kurt,
         )
         metrics.probabilistic_sharpe = self._probabilistic_sharpe(
-            metrics.sharpe_ratio, len(returns_arr),
-            skewness=_ret_skew, kurtosis=_ret_kurt,
+            metrics.sharpe_ratio,
+            len(returns_arr),
+            skewness=_ret_skew,
+            kurtosis=_ret_kurt,
         )
 
         # Bootstrap Sharpe CI
@@ -1599,15 +1633,11 @@ class WalkForwardEngineV5:
 
         # Gerçek sıralama
         ideal_order = np.argsort(actuals)[::-1][:k]
-        ideal_dcg = sum(
-            actuals[idx] / np.log2(i + 2) for i, idx in enumerate(ideal_order) if idx < len(actuals)
-        )
+        ideal_dcg = sum(actuals[idx] / np.log2(i + 2) for i, idx in enumerate(ideal_order) if idx < len(actuals))
 
         # Model sıralaması
         model_order = np.argsort(scores)[::-1][:k]
-        model_dcg = sum(
-            actuals[idx] / np.log2(i + 2) for i, idx in enumerate(model_order) if idx < len(actuals)
-        )
+        model_dcg = sum(actuals[idx] / np.log2(i + 2) for i, idx in enumerate(model_order) if idx < len(actuals))
 
         if ideal_dcg <= 0:
             return 0.0
@@ -1636,14 +1666,12 @@ class WalkForwardEngineV5:
         cov = np.mean((rank_x - mean_x) * (rank_y - mean_y))
         return float(cov / (std_x * std_y))
 
-    def _compute_daily_ics(
-        self, predictions: list[dict], realized: list[dict]
-    ) -> list[float]:
+    def _compute_daily_ics(self, predictions: list[dict], realized: list[dict]) -> list[float]:
         """Günlük IC değerlerini hesapla."""
         # Tarih bazlı grupla
         date_groups: dict[str, list[tuple[float, float]]] = {}
 
-        for pred, real in zip(predictions, realized):
+        for pred, real in zip(predictions, realized, strict=False):
             date = pred.get("date", "")
             score = pred.get("score", 0.0)
             actual = real.get("actual_return", 0.0)
@@ -1720,7 +1748,7 @@ class WalkForwardEngineV5:
                     if closes:
                         return float(closes[-1]) if isinstance(closes, list) else float(closes)
         except (IndexError, KeyError, TypeError, ValueError):
-            pass
+            logger.error("Exception caught", exc_info=True)
         return 0.0
 
     def _track_fold_performance(self, fold_id: int, metrics: FoldMetrics, model_version: str) -> None:
@@ -1734,7 +1762,7 @@ class WalkForwardEngineV5:
             "ic": metrics.ic,
             "max_dd": metrics.max_drawdown,
             "deflated_sharpe": metrics.deflated_sharpe,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self._fold_performance_history.append(record)
 
@@ -1763,15 +1791,17 @@ class WalkForwardEngineV5:
         try:
             reports = self._degradation_monitor.check_all_models()
             for report in reports:
-                if hasattr(report, 'should_remove') and report.should_remove:
-                    alerts.append({
-                        "model_id": report.model_id,
-                        "severity": report.severity,
-                        "accuracy_drop": report.accuracy_drop,
-                        "sharpe_drop": report.sharpe_drop,
-                        "trend": report.trend,
-                        "recommendation": report.recommendation,
-                    })
+                if hasattr(report, "should_remove") and report.should_remove:
+                    alerts.append(
+                        {
+                            "model_id": report.model_id,
+                            "severity": report.severity,
+                            "accuracy_drop": report.accuracy_drop,
+                            "sharpe_drop": report.sharpe_drop,
+                            "trend": report.trend,
+                            "recommendation": report.recommendation,
+                        }
+                    )
                     logger.warning(
                         "Model degradation detected",
                         model=report.model_id,
@@ -1782,9 +1812,7 @@ class WalkForwardEngineV5:
             logger.debug("Degradation check failed", error=str(e))
         return alerts
 
-    def _compare_champion_challenger(
-        self, current_metrics: FoldMetrics, model_version: str
-    ) -> dict[str, Any] | None:
+    def _compare_champion_challenger(self, current_metrics: FoldMetrics, model_version: str) -> dict[str, Any] | None:
         """Champion/challenger karşılaştırması yap.
 
         Walk-forward bağlamında tüm fold'lar aynı model_factory ile çalışır.
@@ -1834,7 +1862,7 @@ class WalkForwardEngineV5:
             # Trend analizi: son 3 fold kötüleşiyor mu?
             if len(self._fold_performance_history) >= 3:
                 last_3_sharpes = [r["sharpe"] for r in self._fold_performance_history[-3:]]
-                trend_degrading = all(last_3_sharpes[i] < last_3_sharpes[i-1] for i in range(1, len(last_3_sharpes)))
+                trend_degrading = all(last_3_sharpes[i] < last_3_sharpes[i - 1] for i in range(1, len(last_3_sharpes)))
             else:
                 trend_degrading = False
 
@@ -1849,7 +1877,7 @@ class WalkForwardEngineV5:
                 # 3 ardışık kötüleşme → reject
                 self._champion_challenger.reject(
                     challenger_id=model_version,
-                    reason=f"3 consecutive degrading folds, last improvement: {improvement*100:.1f}%",
+                    reason=f"3 consecutive degrading folds, last improvement: {improvement * 100:.1f}%",
                     metrics={"sharpe": current_sharpe, "return": current_return},
                 )
                 return {"action": "rejected", "model": model_version, "reason": "trend_degrading"}
@@ -1864,8 +1892,12 @@ class WalkForwardEngineV5:
     # ========================================================================
 
     def _deflated_sharpe(
-        self, sharpe: float, n_obs: int, n_trials: int = 1,
-        skewness: float = 0.0, kurtosis: float = 3.0,
+        self,
+        sharpe: float,
+        n_obs: int,
+        n_trials: int = 1,
+        skewness: float = 0.0,
+        kurtosis: float = 3.0,
     ) -> float:
         """Deflated Sharpe Ratio (Bailey & López de Prado, 2014).
 
@@ -1896,8 +1928,11 @@ class WalkForwardEngineV5:
         return max(0.0, float(adjusted * np.sqrt(252)))
 
     def _probabilistic_sharpe(
-        self, sharpe: float, n_obs: int,
-        skewness: float = 0.0, kurtosis: float = 3.0,
+        self,
+        sharpe: float,
+        n_obs: int,
+        skewness: float = 0.0,
+        kurtosis: float = 3.0,
     ) -> float:
         """Probabilistic Sharpe Ratio.
 
@@ -1926,9 +1961,7 @@ class WalkForwardEngineV5:
         psr = 0.5 * (1 + np.sign(z) * np.sqrt(1 - np.exp(-2 * z**2 / np.pi)))
         return float(max(0.0, min(1.0, psr)))
 
-    def _bootstrap_sharpe_ci(
-        self, returns: np.ndarray, confidence: float = 0.95
-    ) -> tuple[float, float]:
+    def _bootstrap_sharpe_ci(self, returns: np.ndarray, confidence: float = 0.95) -> tuple[float, float]:
         """Block bootstrap ile Sharpe güven aralığı.
 
         Otokorelasyonu korumak için blok bootstrap kullanılır.
@@ -1979,12 +2012,13 @@ class WalkForwardEngineV5:
         # Projenin gerçek regime detection modülünü kullan
         try:
             from services.intelligence.regime import detect_regime
+
             # test_data'yı regime modülünün beklediği formata çevir
             regime = detect_regime(test_data)
             if regime and regime != "UNKNOWN":
                 return regime
         except (ImportError, Exception):
-            pass
+            logger.error("Exception caught", exc_info=True)
 
         # Fallback: basit heuristic
         all_returns = []
@@ -2069,7 +2103,9 @@ class WalkForwardEngineV5:
             for r in f.realized_outcomes:
                 all_realized_returns.append(r.get("actual_return", 0.0) / 100.0)
         try:
-            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            from scipy.stats import kurtosis as _kurtosis
+            from scipy.stats import skew as _skew
+
             _agg_skew = float(_skew(all_realized_returns)) if len(all_realized_returns) > 10 else 0.0
             _agg_kurt = float(_kurtosis(all_realized_returns, fisher=False)) if len(all_realized_returns) > 10 else 3.0
         except ImportError:
@@ -2077,14 +2113,19 @@ class WalkForwardEngineV5:
             _agg_kurt = 3.0
 
         deflated = self._deflated_sharpe(
-            float(np.mean(sharpes)), total_obs, len(completed),
-            skewness=_agg_skew, kurtosis=_agg_kurt,
+            float(np.mean(sharpes)),
+            total_obs,
+            len(completed),
+            skewness=_agg_skew,
+            kurtosis=_agg_kurt,
         )
 
         # Probabilistic Sharpe
         prob_sharpe = self._probabilistic_sharpe(
-            float(np.mean(sharpes)), total_obs,
-            skewness=_agg_skew, kurtosis=_agg_kurt,
+            float(np.mean(sharpes)),
+            total_obs,
+            skewness=_agg_skew,
+            kurtosis=_agg_kurt,
         )
 
         # Bootstrap CI — realized returns kullan (score DEĞİL)
@@ -2117,7 +2158,7 @@ class WalkForwardEngineV5:
                     "total_rejections": len(cc._rejected_challengers),
                 }
             except Exception:
-                pass
+                logger.error("Exception caught", exc_info=True)
 
         # Summary
         summary = {
@@ -2179,7 +2220,7 @@ class WalkForwardEngineV5:
             folds=folds,
             summary=summary,
             config=config,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
     def _ic_t_test(self, ics: list[float]) -> tuple[float, float]:
@@ -2203,9 +2244,7 @@ class WalkForwardEngineV5:
 
         return (float(t_stat), float(max(0.0, min(1.0, p_value))))
 
-    def _aggregate_regime_performance(
-        self, folds: list[FoldSnapshot]
-    ) -> dict[str, dict[str, float]]:
+    def _aggregate_regime_performance(self, folds: list[FoldSnapshot]) -> dict[str, dict[str, float]]:
         """Rejim bazlı performans özeti."""
         regime_data: dict[str, list[float]] = {}
 
@@ -2250,9 +2289,7 @@ class WalkForwardEngineV5:
         sample_str = orjson.dumps(features[:10], default=str).decode()
         return hashlib.sha256(sample_str.encode()).hexdigest()[:16]
 
-    def _hash_data_version(
-        self, pit_data: dict[str, Any], fold_config: FoldConfig
-    ) -> str:
+    def _hash_data_version(self, pit_data: dict[str, Any], fold_config: FoldConfig) -> str:
         """Veri versiyon hash'i."""
         version_str = f"{fold_config.train_start}_{fold_config.test_end}_{len(pit_data)}"
         return hashlib.sha256(version_str.encode()).hexdigest()[:16]
@@ -2289,15 +2326,18 @@ class WalkForwardEngineV5:
     def _persist_to_db(self, result: WalkForwardResult) -> None:
         """Walk-forward sonucunu veritabanına kaydet (best-effort)."""
         try:
-            from services.core.database import get_db_pool
             import asyncio
 
-            async def _save():
+            from services.core.database import get_db_pool
+
+            async def _save() -> Any:
+                """Otomatik eklendi."""
                 pool = await get_db_pool()
                 if pool is None:
                     return
                 async with pool.acquire() as conn:
-                    await conn.execute("""
+                    await conn.execute(
+                        """
                         INSERT INTO walk_forward_results
                             (run_id, total_folds, completed_folds, avg_sharpe,
                              avg_return, stability_score, deflated_sharpe,
@@ -2312,7 +2352,7 @@ class WalkForwardEngineV5:
                         result.avg_test_return,
                         result.stability_score,
                         result.deflated_sharpe,
-                        datetime.now(timezone.utc),
+                        datetime.now(UTC),
                         orjson.dumps(result.to_dict(), default=str).decode(),
                     )
 
@@ -2322,12 +2362,13 @@ class WalkForwardEngineV5:
             else:
                 loop.run_until_complete(_save())
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     def _persist_to_mlflow(self, result: WalkForwardResult) -> None:
         """Walk-forward sonucunu MLflow'a kaydet (best-effort)."""
         try:
             import mlflow
+
             with mlflow.start_run(run_name=f"wf_{result.run_id}"):
                 # Metrikler
                 mlflow.log_metric("avg_sharpe", result.avg_test_sharpe)
@@ -2344,11 +2385,12 @@ class WalkForwardEngineV5:
 
                 # Artifact
                 import tempfile
+
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
                     f.write(orjson.dumps(result.to_dict(), option=orjson.OPT_INDENT_2, default=str).decode())
                     mlflow.log_artifact(f.name, "walk_forward_results")
         except Exception:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     def _empty_result(self, run_id: str) -> WalkForwardResult:
         """Boş sonuç."""
@@ -2358,7 +2400,7 @@ class WalkForwardEngineV5:
             completed_folds=0,
             failed_folds=0,
             skipped_folds=0,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
 
 

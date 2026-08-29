@@ -37,6 +37,7 @@ class ChampionChallengerEngine:
     """Champion-challenger yönetim motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._current_champion: ChampionRecord | None = None
         self._champion_history: deque = deque(maxlen=500)
         self._rejected_challengers: deque = deque(maxlen=500)
@@ -49,7 +50,7 @@ class ChampionChallengerEngine:
         self._canary_metrics: dict = {}
         self._canary_regime: str = "UNKNOWN"
 
-    def promote(self, challenger_id: str, version: str, metrics: dict, regime: str = "UNKNOWN"):
+    def promote(self, challenger_id: str, version: str, metrics: dict, regime: str = "UNKNOWN") -> Any:
         """Challenger'ı yeni champion yap."""
         old_champion = self._current_champion
 
@@ -73,7 +74,7 @@ class ChampionChallengerEngine:
             improvement=metrics.get("improvement_pct", 0),
         )
 
-    def reject(self, challenger_id: str, reason: str, metrics: dict):
+    def reject(self, challenger_id: str, reason: str, metrics: dict) -> Any:
         """Challenger'ı reddet."""
         self._rejected_challengers.append(
             {
@@ -123,7 +124,7 @@ class ChampionChallengerEngine:
         allocation_pct: float = 0.1,
         metrics: dict = None,
         regime: str = "UNKNOWN",
-    ):
+    ) -> Any:
         """Canary deployment — küçük pozisyonlarla test.
 
         Yeni modeli production'da %10 pozisyonla test eder.

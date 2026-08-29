@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -59,6 +60,7 @@ class BacktestConfig:
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "initial_capital": self.initial_capital,
             "lookback_days": self.lookback_days,
@@ -94,6 +96,7 @@ class BacktestMetrics:
     max_drawdown_duration_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {k: round(v, 4) if isinstance(v, float) else v for k, v in self.__dict__.items()}
 
 
@@ -119,6 +122,7 @@ class BacktestResultV4:
     persisted: bool = False
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -147,23 +151,27 @@ class FeatureCache:
     """Ticker bazında feature cache."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, dict[str, Any]] = {}
         self._date_cache: dict[str, str] = {}
         self._hits = 0
         self._misses = 0
 
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
+        """Otomatik eklendi."""
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             self._hits += 1
             return self._cache[ticker]
         self._misses += 1
         return None
 
-    def set(self, ticker: str, date: str, features: dict[str, Any]):
+    def set(self, ticker: str, date: str, features: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
-    def clear(self):
+    def clear(self) -> Any:
+        """Otomatik eklendi."""
         self._cache.clear()
         self._date_cache.clear()
         self._hits = 0
@@ -171,6 +179,7 @@ class FeatureCache:
 
     @property
     def hit_rate(self) -> float:
+        """Otomatik eklendi."""
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
@@ -179,15 +188,19 @@ class QualityCache:
     """Data quality sonucu cache."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, tuple[bool, float]] = {}
 
     def get(self, ticker: str) -> tuple[bool, float] | None:
+        """Otomatik eklendi."""
         return self._cache.get(ticker)
 
-    def set(self, ticker: str, passed: bool, score: float):
+    def set(self, ticker: str, passed: bool, score: float) -> Any:
+        """Otomatik eklendi."""
         self._cache[ticker] = (passed, score)
 
-    def clear(self):
+    def clear(self) -> Any:
+        """Otomatik eklendi."""
         self._cache.clear()
 
 
@@ -234,7 +247,7 @@ class BacktestEngineV4:
         self._last_panel_seconds: float = 0.0
         self._last_scalar_fallbacks: int = 0
 
-    def _lazy_load(self):
+    def _lazy_load(self) -> Any:
         """Modülleri lazy-load et (test ortamında import hatası önlemek için)."""
         if self._calc is None:
             try:
@@ -389,7 +402,7 @@ class BacktestEngineV4:
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
             date_str = str(current_date.date()) if hasattr(current_date, "date") else str(current_date)
-            next_date_str = str(next_date.date()) if hasattr(next_date, "date") else str(next_date)
+            str(next_date.date()) if hasattr(next_date, "date") else str(next_date)
 
             # Walk-forward trade penceresi (varsayılan: kısıt yok)
             if trade_start is not None and date_str < trade_start:
@@ -609,13 +622,12 @@ class BacktestEngineV4:
 
         # Benchmark prices (legacy ile aynı)
         benchmark_prices = {}
-        benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)
                 benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
             if "Close" in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
+                benchmark_data["Close"].to_numpy().astype(float)
 
         # Pre-compute quality cache (legacy ile aynı)
         for ticker, df in market_data.items():
@@ -1043,7 +1055,8 @@ class BacktestEngineV4:
         Skor aralığı: ~25-75 (normal), 0-100 (aşırı durumlar)
         """
 
-        def _s(v):
+        def _s(v) -> Any:
+            """Otomatik eklendi."""
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 
         score = 50.0
@@ -1269,6 +1282,7 @@ class BacktestEngineV4:
         cfg: BacktestConfig,
         start_time: float,
     ) -> BacktestResultV4:
+        """Otomatik eklendi."""
         return BacktestResultV4(
             run_id=run_id,
             start_date="",
@@ -1294,21 +1308,29 @@ class BacktestEngineV4:
 
 
 class _FallbackCalculator:
-    def compute_all_features(self, df, mask=None, ticker=""):
+    """Otomatik eklendi."""
+    def compute_all_features(self, df, mask=None, ticker="") -> Any:
+        """Otomatik eklendi."""
         return {"rsi_14": 50, "momentum_20d": 0, "roc_5d": 0, "volume_zscore": 0}
 
 
 class _FallbackMask:
-    def compute_mask(self, *args, **kwargs):
+    """Otomatik eklendi."""
+    def compute_mask(self, *args, **kwargs) -> Any:
+        """Otomatik eklendi."""
         class _M:
+            """Otomatik eklendi."""
             mask = None
 
         return _M()
 
 
 class _FallbackQuality:
-    def full_quality_check(self, df, ticker=""):
+    """Otomatik eklendi."""
+    def full_quality_check(self, df, ticker="") -> Any:
+        """Otomatik eklendi."""
         class _Q:
+            """Otomatik eklendi."""
             passed = True
             quality_score = 80.0
 

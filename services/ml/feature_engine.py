@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """
 ALPHA BIST — Feature Engine v3.0 (Polars-Native)
 ==================================================
@@ -20,7 +23,6 @@ FEATURE GRUPLARI:
   G) Fundamental Proxy — temel veri yokken fiyat kaldıraç proxy'si
 """
 
-from __future__ import annotations
 
 import numpy as np
 import polars as pl
@@ -32,12 +34,13 @@ logger = structlog.get_logger()
 _feature_registry = None
 
 
-def _get_feature_registry():
+def _get_feature_registry() -> Any:
     """Feature registry'i lazy yükle."""
     global _feature_registry
     if _feature_registry is None:
         try:
             from services.features.contract import feature_registry
+
             _feature_registry = feature_registry
         except ImportError:
             _feature_registry = None
@@ -143,6 +146,8 @@ class FeatureEngine:
         benchmark_df: pl.DataFrame | None = None,
         sector_returns: pl.Series | None = None,
         universe_returns: dict[str, float] | None = None,
+        universe_rsi: dict[str, float] | None = None,
+        breadth_advance_ratio: float | None = None,
     ) -> dict[str, float]:
         """Tüm feature'ları hesapla ve tek dict olarak döndür."""
         if df is None or len(df) < 20:
@@ -181,7 +186,7 @@ class FeatureEngine:
 
         # F) Cross-Sectional
         if universe_returns:
-            features.update(self._cross_sectional(ticker, close, universe_returns))
+            features.update(self._cross_sectional(ticker, close, universe_returns, universe_rsi, breadth_advance_ratio))
 
         # G) Fundamental Proxy
         features.update(self._fundamental_proxy(close, volume))
@@ -213,6 +218,7 @@ class FeatureEngine:
     # A) Price Context
     # ------------------------------------------------------------------ #
     def _price_context(self, close: pl.Series, high: pl.Series, low: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         n = len(close)
 
@@ -260,6 +266,7 @@ class FeatureEngine:
     # B) Relative Strength
     # ------------------------------------------------------------------ #
     def _relative_strength_vs_bm(self, close: pl.Series, bm_close: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         stock_ret = close.pct_change()
         bm_ret = bm_close.pct_change()
@@ -281,6 +288,7 @@ class FeatureEngine:
         return f
 
     def _relative_strength_vs_sector(self, close: pl.Series, sect: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         stock_ret = close.pct_change()
 
@@ -298,6 +306,7 @@ class FeatureEngine:
     # C) Trend Quality
     # ------------------------------------------------------------------ #
     def _trend_quality(self, close: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         n = len(close)
         if n < 20:
@@ -355,6 +364,7 @@ class FeatureEngine:
     # D) Volume
     # ------------------------------------------------------------------ #
     def _volume_features(self, close: pl.Series, volume: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         n = len(volume)
         if n < 20:
@@ -405,6 +415,7 @@ class FeatureEngine:
     # E) Risk
     # ------------------------------------------------------------------ #
     def _risk_features(self, close: pl.Series, high: pl.Series, low: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         n = len(close)
         returns = close.pct_change().drop_nulls()
@@ -436,8 +447,14 @@ class FeatureEngine:
         ticker: str,
         close: pl.Series,
         universe_returns: dict[str, float],
+        universe_rsi: dict[str, float] | None = None,
+        breadth_advance_ratio: float | None = None,
     ) -> dict:
+        """Otomatik eklendi."""
         f = {}
+        if breadth_advance_ratio is not None:
+            f["breadth_advance_ratio"] = breadth_advance_ratio
+
         all_rets = list(universe_returns.values())
         if len(all_rets) < 5:
             return f
@@ -456,12 +473,20 @@ class FeatureEngine:
         rank = float(np.mean(arr <= this_ret))
         f["cs_rank_ret_1d"] = rank
 
+        if universe_rsi and len(universe_rsi) >= 5:
+            this_rsi = universe_rsi.get(ticker)
+            if this_rsi is not None:
+                rsi_arr = np.array(list(universe_rsi.values()))
+                rsi_rank = float(np.mean(rsi_arr <= this_rsi))
+                f["cs_rank_rsi_14"] = rsi_rank
+
         return f
 
     # ------------------------------------------------------------------ #
     # G) Fundamental Proxy
     # ------------------------------------------------------------------ #
     def _fundamental_proxy(self, close: pl.Series, volume: pl.Series) -> dict:
+        """Otomatik eklendi."""
         f = {}
         n = len(close)
 
@@ -500,16 +525,34 @@ def compute_universe_features(
     if benchmark_df is not None:
         benchmark_df = engine._normalize(benchmark_df)
 
-    # Her hisse için son günlük return
+    # Her hisse için son günlük return ve RSI (B23 Fix)
     universe_returns: dict[str, float] = {}
+    universe_rsi: dict[str, float] = {}
+    advancing = 0
+    total = 0
     for ticker, df in market_data.items():
         if df is not None and len(df) >= 2:
             try:
                 ret = float(df["Close"].pct_change()[-1])
                 if not np.isnan(ret):
                     universe_returns[ticker] = ret
+                    total += 1
+                    if ret > 0:
+                        advancing += 1
+
+                if len(df) >= 20:
+                    close = df["Close"].cast(pl.Float64)
+                    delta = close.diff()
+                    gain = delta.clip(lower_bound=0).rolling_mean(14)
+                    loss = (-delta.clip(upper_bound=0)).rolling_mean(14)
+                    rs = gain / loss.replace(0, None)
+                    rsi = float((100 - 100 / (1 + rs))[-1])
+                    if not np.isnan(rsi):
+                        universe_rsi[ticker] = rsi
             except Exception:
                 logger.warning("Caught Exception in compute_universe_features", exc_info=True)
+
+    breadth_advance_ratio = advancing / total if total > 0 else 0.5
 
     # Sektör bazlı ortalama return
     sector_series: dict[str, pl.Series] = {}
@@ -549,6 +592,8 @@ def compute_universe_features(
                 benchmark_df=benchmark_df,
                 sector_returns=sect_ret,
                 universe_returns=universe_returns,
+                universe_rsi=universe_rsi,
+                breadth_advance_ratio=breadth_advance_ratio,
             )
             result[ticker] = features
         except Exception as e:

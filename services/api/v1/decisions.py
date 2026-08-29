@@ -1,3 +1,4 @@
+from typing import Any
 """Decisions API — Gerçek servislere bağlı."""
 
 from fastapi import APIRouter, Depends, Query
@@ -10,7 +11,7 @@ router = APIRouter()
 @router.get("/list")
 async def list_decisions(
     portfolio_id: int = Query(1), limit: int = Query(50), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Karar listesi."""
     try:
         from ...core.database import pg_fetch
@@ -24,7 +25,7 @@ async def list_decisions(
 
 
 @router.get("/detail/{decision_id}")
-async def decision_detail(decision_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def decision_detail(decision_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Karar detayı."""
     try:
         from ...core.database import pg_fetchrow
@@ -38,19 +39,19 @@ async def decision_detail(decision_id: str, user=Depends(get_current_user), _=De
 @router.post("/create")
 async def create_decision(
     ticker: str = Query(...), action: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Yeni karar oluştur."""
     return {"status": "created", "ticker": ticker, "action": action}
 
 
 @router.get("/audit/{decision_id}")
-async def audit_trail(decision_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def audit_trail(decision_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Karar audit trail."""
     return {"decision_id": decision_id, "audit": [], "message": "Audit trail requires event bus logs"}
 
 
 @router.get("/pending-opportunities")
-async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Phase 18 (AlphaEngine) tarafindan uretilen en guncel firsatlari getirir."""
     try:
         import orjson
@@ -84,6 +85,6 @@ async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_
 
 
 @router.get("/plan")
-async def trade_plan(portfolio_id: int = Query(1), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def trade_plan(portfolio_id: int = Query(1), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """İşlem planı."""
     return {"plan": [], "message": "Requires active decisions"}

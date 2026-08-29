@@ -31,6 +31,7 @@ class ClosedLoopLearning:
     """Closed-loop learning system that tracks predictions and learns from outcomes."""
 
     def __init__(self, max_history: int = 10000):
+        """Otomatik eklendi."""
         self.max_history = max_history
         self._predictions: list[PredictionRecord] = []
         self._model_metrics: dict[str, dict[str, float]] = {}
@@ -56,7 +57,7 @@ class ClosedLoopLearning:
 
         # Trim history
         if len(self._predictions) > self.max_history:
-            self._predictions = self._predictions[-self.max_history:]
+            self._predictions = self._predictions[-self.max_history :]
 
     def record_outcome(
         self,
@@ -91,10 +92,7 @@ class ClosedLoopLearning:
 
     def _update_metrics(self, ticker: str) -> None:
         """Update model metrics based on resolved predictions."""
-        resolved = [
-            r for r in self._predictions
-            if r.ticker == ticker and r.actual_outcome is not None
-        ]
+        resolved = [r for r in self._predictions if r.ticker == ticker and r.actual_outcome is not None]
 
         if not resolved:
             return
@@ -145,9 +143,9 @@ class ClosedLoopLearning:
         tickers = set(r.ticker for r in self._predictions if r.actual_outcome is None)
         for ticker in tickers:
             pending = [
-                r for r in self._predictions
-                if r.ticker == ticker and r.actual_outcome is None
-                and now - r.timestamp <= lookback_seconds
+                r
+                for r in self._predictions
+                if r.ticker == ticker and r.actual_outcome is None and now - r.timestamp <= lookback_seconds
             ]
             if pending:
                 results[ticker] = {

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Intelligence Module Testleri
 
@@ -16,7 +19,7 @@ import sys
 # =====================================================
 
 
-async def test_evidence_claim_extraction():
+async def test_evidence_claim_extraction() -> Any:
     """Claim extraction çalışmalı."""
     issues = []
 
@@ -37,7 +40,7 @@ async def test_evidence_claim_extraction():
     return "Evidence Claim Extraction", len(issues) == 0, issues
 
 
-async def test_evidence_source_reliability():
+async def test_evidence_source_reliability() -> Any:
     """Kaynak güvenilirliği doğru sınıflanmalı."""
     issues = []
 
@@ -60,7 +63,7 @@ async def test_evidence_source_reliability():
     return "Evidence Source Reliability", len(issues) == 0, issues
 
 
-async def test_evidence_claim_classification():
+async def test_evidence_claim_classification() -> Any:
     """Claim tipi sınıflandırması çalışmalı."""
     issues = []
 
@@ -81,7 +84,7 @@ async def test_evidence_claim_classification():
     return "Evidence Claim Classification", len(issues) == 0, issues
 
 
-async def test_evidence_hallucination_detection():
+async def test_evidence_hallucination_detection() -> Any:
     """Hallucination detection çalışmalı."""
     issues = []
 
@@ -104,7 +107,7 @@ async def test_evidence_hallucination_detection():
     return "Evidence Hallucination Detection", len(issues) == 0, issues
 
 
-async def test_evidence_contradiction():
+async def test_evidence_contradiction() -> Any:
     """Çelişkili veri yönetimi çalışmalı."""
     issues = []
 
@@ -132,7 +135,7 @@ async def test_evidence_contradiction():
 # =====================================================
 
 
-async def test_learning_report():
+async def test_learning_report() -> Any:
     """Learning report döndürülmeli."""
     issues = []
 
@@ -148,7 +151,7 @@ async def test_learning_report():
     return "Learning Report", len(issues) == 0, issues
 
 
-async def test_learning_state_export():
+async def test_learning_state_export() -> Any:
     """State export/import çalışmalı."""
     issues = []
 
@@ -167,7 +170,7 @@ async def test_learning_state_export():
     return "Learning State Export", len(issues) == 0, issues
 
 
-async def test_learning_drift_detection():
+async def test_learning_drift_detection() -> Any:
     """Drift detection mekanizması çalışmalı."""
     issues = []
 
@@ -187,7 +190,7 @@ async def test_learning_drift_detection():
 # =====================================================
 
 
-async def test_super_intelligence_health():
+async def test_super_intelligence_health() -> Any:
     """Health status döndürülmeli."""
     issues = []
 
@@ -203,7 +206,7 @@ async def test_super_intelligence_health():
     return "Super Intelligence Health", len(issues) == 0, issues
 
 
-async def test_super_intelligence_module_status():
+async def test_super_intelligence_module_status() -> Any:
     """Module status güncellenebilmeli."""
     issues = []
 
@@ -220,7 +223,7 @@ async def test_super_intelligence_module_status():
     return "Super Intelligence Module Status", len(issues) == 0, issues
 
 
-async def test_super_intelligence_regime_model():
+async def test_super_intelligence_regime_model() -> Any:
     """Regime bazlı model seçimi çalışmalı."""
     issues = []
 
@@ -236,7 +239,7 @@ async def test_super_intelligence_regime_model():
     return "Super Intelligence Regime Model", len(issues) == 0, issues
 
 
-async def test_super_intelligence_performance_recording():
+async def test_super_intelligence_performance_recording() -> Any:
     """Performance recording çalışmalı."""
     issues = []
 
@@ -259,10 +262,11 @@ async def test_super_intelligence_performance_recording():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("INTELLIGENCE MODULE TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("INTELLIGENCE MODULE TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Evidence Engine
@@ -295,27 +299,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

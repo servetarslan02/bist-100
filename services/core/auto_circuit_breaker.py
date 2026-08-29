@@ -23,14 +23,20 @@ from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.auto_circuit_breaker")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -50,6 +56,7 @@ class CircuitBreakerEvent:
     market_phase: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "ticker": self.ticker,
             "event_type": self.event_type,
@@ -74,13 +81,14 @@ class AutoCircuitBreakerEngine:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._events: list[CircuitBreakerEvent] = []
         self._triggered_today: dict[str, list[float]] = {}  # ticker â†’ [threshold_pct, ...]
         self._bist100_reference: float = 0.0  # Ã–nceki kapanÄ±ÅŸ
         self._bist100_current: float = 0.0
         self._ebdks_triggered_today: int = 0
 
-    def set_bist100_reference(self, reference_price: float):
+    def set_bist100_reference(self, reference_price: float) -> Any:
         """BIST-100 referans fiyatÄ±nÄ± (Ã¶nceki kapanÄ±ÅŸ) ayarla."""
         self._bist100_reference = reference_price
 
@@ -219,7 +227,7 @@ class AutoCircuitBreakerEngine:
 
         return None
 
-    def reset_daily(self):
+    def reset_daily(self) -> Any:
         """GÃ¼nlÃ¼k sayaÃ§larÄ± sÄ±fÄ±rla (seans sonunda Ã§aÄŸrÄ±lÄ±r)."""
         self._triggered_today.clear()
         self._ebdks_triggered_today = 0
@@ -248,4 +256,3 @@ class AutoCircuitBreakerEngine:
 
 # Singleton
 auto_circuit_breaker = AutoCircuitBreakerEngine()
-

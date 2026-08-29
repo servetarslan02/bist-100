@@ -21,7 +21,9 @@ logger = logging.getLogger("alpha.scanner")
 
 
 class DynamicOpportunityScanner:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         # Tarama parametreleri
         self.min_volume = 1_000_000  # Min günlük hacim (TL)
         self.min_market_cap = 500_000_000  # Min piyasa değeri (TL)
@@ -47,6 +49,7 @@ class DynamicOpportunityScanner:
         }
 
     def scan_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Otomatik eklendi."""
         from ..ingestion.bist_universe import BISTUniverse
 
         uni = BISTUniverse()

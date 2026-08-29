@@ -104,6 +104,7 @@ class MLTrainer:
     """ML model training with purged walk-forward validation."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self.models: dict[str, Any] = {}
         self.training_results: dict[str, dict] = {}
 

@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Learning System Faz 6 Test Suite (Model Registry)
 
@@ -16,7 +19,7 @@ Model versioning testing:
 import sys
 
 
-def test_register():
+def test_register() -> Any:
     """Model kayıt."""
     from services.learning.model_registry import ModelRegistry
 
@@ -27,10 +30,10 @@ def test_register():
     assert record.version == "v1"
     assert record.status == "CANDIDATE"
     assert record.metrics["sharpe"] == 1.5
-    print("✅ Register")
+    logger.info("✅ Register")
 
 
-def test_register_with_regime():
+def test_register_with_regime() -> Any:
     """Regime ile kayıt."""
     from services.learning.model_registry import ModelRegistry
 
@@ -38,10 +41,10 @@ def test_register_with_regime():
     record = r.register("m1", "v1", {}, [], {}, {}, regime="BULL")
 
     assert record.regime == "BULL"
-    print("✅ Register with regime")
+    logger.info("✅ Register with regime")
 
 
-def test_register_with_status():
+def test_register_with_status() -> Any:
     """Özel status ile kayıt."""
     from services.learning.model_registry import ModelRegistry
 
@@ -49,10 +52,10 @@ def test_register_with_status():
     record = r.register("m1", "v1", {}, [], {}, {}, status="SHADOW")
 
     assert record.status == "SHADOW"
-    print("✅ Register with status")
+    logger.info("✅ Register with status")
 
 
-def test_register_multiple():
+def test_register_multiple() -> Any:
     """Birden fazla model kayıt."""
     from services.learning.model_registry import ModelRegistry
 
@@ -62,10 +65,10 @@ def test_register_multiple():
     r.register("m3", "v3", {}, [], {}, {})
 
     assert len(r._records) == 3
-    print("✅ Register multiple")
+    logger.info("✅ Register multiple")
 
 
-def test_promote_to_champion():
+def test_promote_to_champion() -> Any:
     """Champion yapma."""
     from services.learning.model_registry import ModelRegistry
 
@@ -77,10 +80,10 @@ def test_promote_to_champion():
     assert champion is not None
     assert champion.version == "v1"
     assert champion.status == "CHAMPION"
-    print("✅ Promote to champion")
+    logger.info("✅ Promote to champion")
 
 
-def test_promote_to_champion_retires_old():
+def test_promote_to_champion_retires_old() -> Any:
     """Yeni champion eski champion'ı retired yapmalı."""
     from services.learning.model_registry import ModelRegistry
 
@@ -96,10 +99,10 @@ def test_promote_to_champion_retires_old():
     assert v1.status == "RETIRED"
     assert v1.retired_at is not None
     assert v2.status == "CHAMPION"
-    print("✅ Promote retires old champion")
+    logger.info("✅ Promote retires old champion")
 
 
-def test_promote_to_shadow():
+def test_promote_to_shadow() -> Any:
     """Shadow yapma."""
     from services.learning.model_registry import ModelRegistry
 
@@ -109,10 +112,10 @@ def test_promote_to_shadow():
 
     v1 = r.get_version("v1")
     assert v1.status == "SHADOW"
-    print("✅ Promote to shadow")
+    logger.info("✅ Promote to shadow")
 
 
-def test_rollback():
+def test_rollback() -> Any:
     """Rollback."""
     from services.learning.model_registry import ModelRegistry
 
@@ -128,10 +131,10 @@ def test_rollback():
     v1 = r.get_version("v1")
     assert v1.status == "CHAMPION"
     assert v1.retired_at is None
-    print("✅ Rollback")
+    logger.info("✅ Rollback")
 
 
-def test_rollback_not_found():
+def test_rollback_not_found() -> Any:
     """Olmayan versiyona rollback."""
     from services.learning.model_registry import ModelRegistry
 
@@ -140,10 +143,10 @@ def test_rollback_not_found():
 
     result = r.rollback("v999")
     assert result is False
-    print("✅ Rollback not found")
+    logger.info("✅ Rollback not found")
 
 
-def test_rollback_only_retired():
+def test_rollback_only_retired() -> Any:
     """Sadece retired modellere rollback yapılmalı."""
     from services.learning.model_registry import ModelRegistry
 
@@ -152,10 +155,10 @@ def test_rollback_only_retired():
 
     result = r.rollback("v1")
     assert result is False  # CANDIDATE → rollback yapılamaz
-    print("✅ Rollback only retired")
+    logger.info("✅ Rollback only retired")
 
 
-def test_get_version():
+def test_get_version() -> Any:
     """Versiyon getirme."""
     from services.learning.model_registry import ModelRegistry
 
@@ -166,20 +169,20 @@ def test_get_version():
     assert v is not None
     assert v.model_id == "m1"
     assert v.metrics["sharpe"] == 1.5
-    print("✅ Get version")
+    logger.info("✅ Get version")
 
 
-def test_get_version_not_found():
+def test_get_version_not_found() -> Any:
     """Olmayan versiyon."""
     from services.learning.model_registry import ModelRegistry
 
     r = ModelRegistry()
     v = r.get_version("v999")
     assert v is None
-    print("✅ Get version not found")
+    logger.info("✅ Get version not found")
 
 
-def test_get_all_versions():
+def test_get_all_versions() -> Any:
     """Tüm versiyonlar."""
     from services.learning.model_registry import ModelRegistry
 
@@ -191,10 +194,10 @@ def test_get_all_versions():
     assert len(versions) == 2
     assert versions[0]["version"] == "v1"
     assert versions[1]["version"] == "v2"
-    print("✅ Get all versions")
+    logger.info("✅ Get all versions")
 
 
-def test_get_champion_regime():
+def test_get_champion_regime() -> Any:
     """Regime-specific champion."""
     from services.learning.model_registry import ModelRegistry
 
@@ -209,10 +212,10 @@ def test_get_champion_regime():
 
     assert bull.version == "v1"
     assert bear.version == "v2"
-    print("✅ Get champion regime")
+    logger.info("✅ Get champion regime")
 
 
-def test_add_performance_record():
+def test_add_performance_record() -> Any:
     """Performans kaydı ekleme."""
     from services.learning.model_registry import ModelRegistry
 
@@ -225,20 +228,20 @@ def test_add_performance_record():
     v = r.get_version("v1")
     assert len(v.performance_history) == 2
     assert v.performance_history[0]["sharpe"] == 1.5
-    print("✅ Add performance record")
+    logger.info("✅ Add performance record")
 
 
-def test_add_performance_record_not_found():
+def test_add_performance_record_not_found() -> Any:
     """Olmayan versiyona performans kaydı."""
     from services.learning.model_registry import ModelRegistry
 
     r = ModelRegistry()
     # Hata vermemeli, sessizce geçmeli
     r.add_performance_record("v999", {"sharpe": 1.5})
-    print("✅ Add performance record not found → silent")
+    logger.info("✅ Add performance record not found → silent")
 
 
-def test_report():
+def test_report() -> Any:
     """Rapor doğru mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -253,10 +256,10 @@ def test_report():
     assert report["total_versions"] == 3
     assert report["champions"] == 1
     assert report["shadows"] == 1
-    print(f"✅ Report: {report}")
+    logger.info(f"✅ Report: {report}")
 
 
-def test_report_empty():
+def test_report_empty() -> Any:
     """Boş rapor."""
     from services.learning.model_registry import ModelRegistry
 
@@ -264,10 +267,10 @@ def test_report_empty():
     report = r.get_report()
     assert report["total_versions"] == 0
     assert report["champions"] == 0
-    print("✅ Report empty")
+    logger.info("✅ Report empty")
 
 
-def test_cleanup_old_versions():
+def test_cleanup_old_versions() -> Any:
     """Eski versiyonlar temizleniyor mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -285,10 +288,10 @@ def test_cleanup_old_versions():
     # Champion + son 20 retired kalmalı
     retired = [rec for rec in r._records if rec.status == "RETIRED"]
     assert len(retired) <= 20
-    print(f"✅ Cleanup: {len(retired)} retired (max 20)")
+    logger.info(f"✅ Cleanup: {len(retired)} retired (max 20)")
 
 
-def test_created_at():
+def test_created_at() -> Any:
     """created_at doğru mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -297,10 +300,10 @@ def test_created_at():
 
     assert record.created_at is not None
     assert "T" in record.created_at  # ISO format
-    print(f"✅ Created at: {record.created_at}")
+    logger.info(f"✅ Created at: {record.created_at}")
 
 
-def test_features_stored():
+def test_features_stored() -> Any:
     """Features doğru saklanıyor mu?"""
     from services.learning.model_registry import ModelRegistry
 
@@ -309,13 +312,14 @@ def test_features_stored():
     record = r.register("m1", "v1", {}, features, {}, {})
 
     assert record.features == features
-    print(f"✅ Features stored: {record.features}")
+    logger.info(f"✅ Features stored: {record.features}")
 
 
 # ===================== MAIN =====================
 
 
-def run_all_tests():
+def run_all_tests() -> Any:
+    """Otomatik eklendi."""
     tests = [
         test_register,
         test_register_with_regime,
@@ -351,19 +355,19 @@ def run_all_tests():
         except Exception as e:
             failed += 1
             errors.append((test.__name__, str(e)))
-            print(f"❌ {test.__name__}: {e}")
+            logger.info(f"❌ {test.__name__}: {e}")
 
-    print(f"\n{'=' * 60}")
-    print("📊 FAZ 6 TEST SONUÇLARI (Model Registry)")
-    print(f"{'=' * 60}")
-    print(f"✅ Geçen: {passed}")
-    print(f"❌ Başarısız: {failed}")
-    print(f"📈 Toplam: {passed + failed}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("📊 FAZ 6 TEST SONUÇLARI (Model Registry)")
+    logger.info(f"{'=' * 60}")
+    logger.info(f"✅ Geçen: {passed}")
+    logger.info(f"❌ Başarısız: {failed}")
+    logger.info(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print("\n🔍 Hatalar:")
+        logger.info("\n🔍 Hatalar:")
         for name, err in errors:
-            print(f"  - {name}: {err}")
+            logger.info(f"  - {name}: {err}")
 
     return failed == 0
 

@@ -94,6 +94,7 @@ class FeatureVersionManager:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._versions: dict[str, list[VersionSnapshot]] = {}  # feature_name → [versions]
         self._current: dict[str, VersionSnapshot] = {}  # feature_name → current version
         self._history: list[dict[str, Any]] = []
@@ -185,9 +186,17 @@ class FeatureVersionManager:
         field_changes: dict[str, dict[str, Any]] = {}
 
         fields_to_compare = [
-            "source", "formula", "lookback", "frequency",
-            "available_at", "pit_safe", "value_range",
-            "validation_rules", "dependencies", "category", "description",
+            "source",
+            "formula",
+            "lookback",
+            "frequency",
+            "available_at",
+            "pit_safe",
+            "value_range",
+            "validation_rules",
+            "dependencies",
+            "category",
+            "description",
         ]
 
         for f in fields_to_compare:
@@ -319,9 +328,7 @@ class FeatureVersionManager:
             "total_features": len(self._versions),
             "total_versions": total_versions,
             "avg_versions_per_feature": round(total_versions / max(len(self._versions), 1), 2),
-            "features_with_multiple_versions": sum(
-                1 for v in self._versions.values() if len(v) > 1
-            ),
+            "features_with_multiple_versions": sum(1 for v in self._versions.values() if len(v) > 1),
         }
 
     def _contract_to_snapshot(self, contract: Any, version: int) -> VersionSnapshot:
@@ -393,13 +400,15 @@ class FeatureVersionManager:
         details: list[str] | None = None,
     ) -> None:
         """History kaydet."""
-        self._history.append({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "action": action,
-            "feature": feature_name,
-            "version": version,
-            "details": details or [],
-        })
+        self._history.append(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "action": action,
+                "feature": feature_name,
+                "version": version,
+                "details": details or [],
+            }
+        )
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
 

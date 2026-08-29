@@ -1,23 +1,25 @@
-"""FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION
-"""
+from typing import Any
+"""FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION"""
 
+import warnings
+from datetime import timedelta
+
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
-import lightgbm as lgb
-from catboost import CatBoostClassifier
 import xgboost as xgb
-import warnings
-warnings.filterwarnings('ignore')
-from scipy.stats import spearmanr
+from catboost import CatBoostClassifier
+
+warnings.filterwarnings("ignore")
+
+import structlog
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
+    detect_market_regime,
     extract_point_in_time_features,
-    detect_market_regime
+    load_all_market_data,
 )
-from services.learning.upside_capture_validator import detect_market_regime_v2
-import structlog
+
 logger = structlog.get_logger()
 
 
@@ -25,29 +27,59 @@ logger = structlog.get_logger()
 # M0: OLD TRAINER (REGRESSOR)
 # =====================================================================
 class ModelTrainerM0:
+    """Otomatik eklendi."""
     def __init__(self, feature_cols):
+        """Otomatik eklendi."""
         self.feature_cols = feature_cols
         self.lgb_model = None
         self.cat_model = None
         self.xgb_model = None
 
-    def retrain_fold(self, train_df):
-        if len(train_df) < 100: return
+    def retrain_fold(self, train_df) -> Any:
+        """Otomatik eklendi."""
+        if len(train_df) < 100:
+            return
         X = train_df[self.feature_cols].values
         y_reg = train_df["target_5d_ret"].values
         y_cls = train_df["target_5d_bin"].values
 
         train_data = lgb.Dataset(X, label=y_reg)
-        params_lgb = {"objective": "regression", "metric": "rmse", "learning_rate": 0.05, "num_leaves": 15, "min_data_in_leaf": 10, "verbose": -1, "seed": 42, "num_threads": 2}
+        params_lgb = {
+            "objective": "regression",
+            "metric": "rmse",
+            "learning_rate": 0.05,
+            "num_leaves": 15,
+            "min_data_in_leaf": 10,
+            "verbose": -1,
+            "seed": 42,
+            "num_threads": 2,
+        }
         self.lgb_model = lgb.train(params_lgb, train_data, num_boost_round=40)
 
-        self.cat_model = CatBoostClassifier(iterations=40, depth=4, learning_rate=0.06, verbose=0, random_seed=42, thread_count=2, allow_writing_files=False)
+        self.cat_model = CatBoostClassifier(
+            iterations=40,
+            depth=4,
+            learning_rate=0.06,
+            verbose=0,
+            random_seed=42,
+            thread_count=2,
+            allow_writing_files=False,
+        )
         self.cat_model.fit(X, y_cls)
 
-        self.xgb_model = xgb.XGBClassifier(n_estimators=40, max_depth=4, learning_rate=0.05, eval_metric="logloss", random_state=42, verbosity=0, n_jobs=2)
+        self.xgb_model = xgb.XGBClassifier(
+            n_estimators=40,
+            max_depth=4,
+            learning_rate=0.05,
+            eval_metric="logloss",
+            random_state=42,
+            verbosity=0,
+            n_jobs=2,
+        )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers, features_list):
+    def predict_batch_day(self, tickers, features_list) -> Any:
+        """Otomatik eklendi."""
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
@@ -88,46 +120,74 @@ class ModelTrainerM0:
             }
         return results
 
+
 # =====================================================================
 # M1: NEW TRAINER (RANKER) - PRODUCTION READY
 # =====================================================================
 class ModelTrainerM1:
+    """Otomatik eklendi."""
     def __init__(self, feature_cols):
+        """Otomatik eklendi."""
         self.feature_cols = feature_cols
         self.rank_model = None
         self.cat_model = None
         self.xgb_model = None
 
-    def retrain_fold(self, train_df):
-        if len(train_df) < 100: return
-        
+    def retrain_fold(self, train_df) -> Any:
+        """Otomatik eklendi."""
+        if len(train_df) < 100:
+            return
+
         # 1. Prepare Ranker Target (Cross-Sectional Relevance)
         # Using raw target_5d_ret to rank is mathematically equivalent to excess return ranking
-        df_sorted = train_df.sort_values('date').copy()
-        df_sorted['target_rank_pct'] = df_sorted.groupby('date')['target_5d_ret'].rank(pct=True, method='average')
-        df_sorted['relevance'] = (df_sorted['target_rank_pct'] * 4.999).fillna(0).astype(int)
-        groups = df_sorted.groupby('date').size().values
-        
+        df_sorted = train_df.sort_values("date").copy()
+        df_sorted["target_rank_pct"] = df_sorted.groupby("date")["target_5d_ret"].rank(pct=True, method="average")
+        df_sorted["relevance"] = (df_sorted["target_rank_pct"] * 4.999).fillna(0).astype(int)
+        groups = df_sorted.groupby("date").size().values
+
         X_df = df_sorted[self.feature_cols]
-        y_rel = df_sorted['relevance']
+        y_rel = df_sorted["relevance"]
 
         # Train LGBM Ranker
         self.rank_model = lgb.LGBMRanker(
-            n_estimators=40, learning_rate=0.05, num_leaves=15, 
-            min_data_in_leaf=10, objective='lambdarank', metric='ndcg',
-            random_state=42, n_jobs=2, verbose=-1
+            n_estimators=40,
+            learning_rate=0.05,
+            num_leaves=15,
+            min_data_in_leaf=10,
+            objective="lambdarank",
+            metric="ndcg",
+            random_state=42,
+            n_jobs=2,
+            verbose=-1,
         )
         self.rank_model.fit(X_df, y_rel, group=groups)
-        
+
         # Keep Classifiers exact same for fair comparison
         X = train_df[self.feature_cols].values
         y_cls = train_df["target_5d_bin"].values
-        self.cat_model = CatBoostClassifier(iterations=40, depth=4, learning_rate=0.06, verbose=0, random_seed=42, thread_count=2, allow_writing_files=False)
+        self.cat_model = CatBoostClassifier(
+            iterations=40,
+            depth=4,
+            learning_rate=0.06,
+            verbose=0,
+            random_seed=42,
+            thread_count=2,
+            allow_writing_files=False,
+        )
         self.cat_model.fit(X, y_cls)
-        self.xgb_model = xgb.XGBClassifier(n_estimators=40, max_depth=4, learning_rate=0.05, eval_metric="logloss", random_state=42, verbosity=0, n_jobs=2)
+        self.xgb_model = xgb.XGBClassifier(
+            n_estimators=40,
+            max_depth=4,
+            learning_rate=0.05,
+            eval_metric="logloss",
+            random_state=42,
+            verbosity=0,
+            n_jobs=2,
+        )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers, features_list):
+    def predict_batch_day(self, tickers, features_list) -> Any:
+        """Otomatik eklendi."""
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
@@ -164,7 +224,7 @@ class ModelTrainerM1:
             mr_pred = -np.tanh(roc_5 / 6.0) if abs(sma20_dev) > 5.0 else np.tanh(roc_5 / 8.0)
 
             results[tk] = {
-                "LightGBM_LambdaRank": float(lgb_preds[i]), # REAL LambdaRank now!
+                "LightGBM_LambdaRank": float(lgb_preds[i]),  # REAL LambdaRank now!
                 "CatBoost_Classifier": float(cat_preds[i]),
                 "XGBoost_Model": float(xgb_preds[i]),
                 "Cross_Sectional_Momentum": float(mom_pred),
@@ -173,26 +233,35 @@ class ModelTrainerM1:
             }
         return results
 
+
 # =====================================================================
 # WALK-FORWARD ENGINE
 # =====================================================================
-def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
+def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close) -> Any:
+    """Otomatik eklendi."""
     # Portföy Değişkenleri
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
     positions = {}
     portfolio_equity_curve = []
-    
+
     total_transaction_costs = 0.0
     total_trades_count = 0
     gross_profits = 0.0
     gross_losses = 0.0
-    
+
     TRANSACTION_FEE_PCT = 0.00074
     SLIPPAGE_PCT = 0.00050
     TOTAL_FRICTION = TRANSACTION_FEE_PCT + SLIPPAGE_PCT
 
-    models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
+    models = [
+        "LightGBM_LambdaRank",
+        "CatBoost_Classifier",
+        "XGBoost_Model",
+        "Cross_Sectional_Momentum",
+        "SPEC_Anomaly_Detector",
+        "LSTM_Sequential",
+    ]
     pending_evaluations = []
     completed_wins = {m: 0 for m in models}
     completed_totals = {m: 0 for m in models}
@@ -203,7 +272,8 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
         for pe in pending_evaluations:
             if pe["eval_date"] <= current_date:
                 completed_totals[pe["model"]] += 1
-                if pe["is_correct"]: completed_wins[pe["model"]] += 1
+                if pe["is_correct"]:
+                    completed_wins[pe["model"]] += 1
             else:
                 still_pending.append(pe)
         pending_evaluations = still_pending
@@ -213,18 +283,18 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
             train_rows = []
             for tk, fdf in features_by_ticker.items():
                 # T-7 Embargo strict implementation
-                hist_df = fdf.loc[:current_date - timedelta(days=7)]
+                hist_df = fdf.loc[: current_date - timedelta(days=7)]
                 if not hist_df.empty:
                     # ensure date column exists for Ranker
                     hist_df = hist_df.copy()
-                    hist_df['date'] = hist_df.index
+                    hist_df["date"] = hist_df.index
                     train_rows.append(hist_df)
             if train_rows:
                 combined_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
                 trainer.retrain_fold(combined_train)
 
         # 2. REGIME & WEIGHTS
-        current_regime = detect_market_regime(xu100_close, current_date)
+        detect_market_regime(xu100_close, current_date)
         weights = {}
         for m in models:
             n_done = completed_totals[m]
@@ -248,13 +318,15 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
             row = day_rows[i]
             signals = batch_signals[tk]
             composite_score = sum(norm_weights[m] * signals[m] for m in models)
-            candidate_scores.append({
-                "ticker": tk, "composite_score": composite_score, "close_price": float(row["close"])
-            })
+            candidate_scores.append(
+                {"ticker": tk, "composite_score": composite_score, "close_price": float(row["close"])}
+            )
             for m in models:
                 pred_sign = 1 if signals[m] > 0 else -1
                 act_sign = 1 if row.get("target_5d_ret", 0.0) > 0 else -1
-                pending_evaluations.append({"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (pred_sign == act_sign)})
+                pending_evaluations.append(
+                    {"eval_date": current_date + timedelta(days=7), "model": m, "is_correct": (pred_sign == act_sign)}
+                )
 
         # 4. EXITS
         closed_tickers = []
@@ -271,49 +343,71 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
                 portfolio_cash += net_val
                 closed_tickers.append(tk)
                 total_trades_count += 1
-                if net_trade_pnl > 0: gross_profits += net_trade_pnl
-                else: gross_losses += abs(net_trade_pnl)
-        for tk in closed_tickers: del positions[tk]
+                if net_trade_pnl > 0:
+                    gross_profits += net_trade_pnl
+                else:
+                    gross_losses += abs(net_trade_pnl)
+        for tk in closed_tickers:
+            del positions[tk]
 
         # 5. ENTRIES
         candidate_scores.sort(key=lambda x: x["composite_score"], reverse=True)
         # EXACT SAME PORTFOLIO RULES
         top_candidates = [c for c in candidate_scores if c["composite_score"] > 0.15 and c["ticker"] not in positions]
-        
+
         open_slots = 5 - len(positions)
         if open_slots > 0 and portfolio_cash > 200_000:
-            target_alloc_per_slot = min(portfolio_cash / open_slots, (portfolio_cash + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items())) * 0.20)
+            target_alloc_per_slot = min(
+                portfolio_cash / open_slots,
+                (
+                    portfolio_cash
+                    + sum(p["shares"] * features_by_ticker[t].loc[current_date]["close"] for t, p in positions.items())
+                )
+                * 0.20,
+            )
             for cand in top_candidates[:open_slots]:
                 alloc = target_alloc_per_slot * (1.0 - TOTAL_FRICTION)
                 shares = int(alloc / cand["close_price"])
                 if shares > 0:
                     cost = shares * cand["close_price"]
                     friction = cost * TOTAL_FRICTION
-                    portfolio_cash -= (cost + friction)
+                    portfolio_cash -= cost + friction
                     total_transaction_costs += friction
                     positions[cand["ticker"]] = {"shares": shares, "entry_price": cand["close_price"], "days_held": 0}
 
         # 6. EQUITY LOG
-        current_equity = portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items())
+        current_equity = portfolio_cash + sum(
+            p["shares"] * float(features_by_ticker[t].loc[current_date]["close"]) for t, p in positions.items()
+        )
         portfolio_equity_curve.append(current_equity)
 
     return portfolio_equity_curve, total_trades_count, gross_profits, gross_losses
 
+
 if __name__ == "__main__":
     logger.info("🚀 FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION")
-    
+
     stock_data, xu100_close = load_all_market_data()
-    feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", 
-                    "price_vs_sma50", "price_vs_sma200", "atr_pct", 
-                    "volatility_20d", "volume_zscore", "bb_position"]
-                    
+    feature_cols = [
+        "roc_5d",
+        "roc_20d",
+        "momentum_20d",
+        "price_vs_sma20",
+        "price_vs_sma50",
+        "price_vs_sma200",
+        "atr_pct",
+        "volatility_20d",
+        "volume_zscore",
+        "bb_position",
+    ]
+
     features_by_ticker = {tk: extract_point_in_time_features(df) for tk, df in stock_data.items() if len(df) >= 120}
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
-    
+
     # KESİNLİKLE FINAL HOLDOUT İZOLASYONU
     # Val_dates 120'den başlayıp en fazla 2025-10-31'e kadar gidebilir.
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
-    
+
     logger.info("==================================================")
     logger.info("FAZ 13.7 — PRODUCTION SAFETY AUDIT")
     logger.info("==================================================")
@@ -325,16 +419,17 @@ if __name__ == "__main__":
     logger.info("\n==================================================")
     logger.info("GERÇEK WALK-FORWARD SİMÜLASYONU (M0 vs M1)")
     logger.info("==================================================")
-    
+
     trainer_m0 = ModelTrainerM0(feature_cols)
     logger.info("Koşuluyor: M0 = V3 Baseline (Regression + Raw Return)...")
     eq_m0, tr_m0, gp_m0, gl_m0 = run_simulation(trainer_m0, val_dates, features_by_ticker, xu100_close)
-    
+
     trainer_m1 = ModelTrainerM1(feature_cols)
     logger.info("Koşuluyor: M1 = V3 Rebuild (LambdaRank + Rank Label)...")
     eq_m1, tr_m1, gp_m1, gl_m1 = run_simulation(trainer_m1, val_dates, features_by_ticker, xu100_close)
 
-    def print_metrics(name, eq_curve, trades, gp, gl):
+    def print_metrics(name, eq_curve, trades, gp, gl) -> Any:
+        """Otomatik eklendi."""
         init = 10_000_000.0
         final = eq_curve[-1]
         cagr = ((final / init) ** (252.0 / len(eq_curve)) - 1.0) * 100.0
@@ -342,22 +437,24 @@ if __name__ == "__main__":
         cummax = s.cummax()
         mdd = abs(((s - cummax) / cummax).min()) * 100.0
         pf = (gp / gl) if gl > 0 else 99.0
-        
+
         logger.info(f"\n{name} SONUÇLARI:")
         logger.info(f"Bitiş Sermayesi : ₺{final:,.2f}")
         logger.info(f"Net CAGR        : %{cagr:.2f}")
         logger.info(f"Max Drawdown    : %{mdd:.2f}")
         logger.info(f"Profit Factor   : {pf:.2f}")
         logger.info(f"Toplam İşlem    : {trades}")
-        
+
     print_metrics("M0 (ESKİ MODEL - REGRESSION)", eq_m0, tr_m0, gp_m0, gl_m0)
     print_metrics("M1 (YENİ MODEL - RANKER)", eq_m1, tr_m1, gp_m1, gl_m1)
-    
+
     logger.info("\n==================================================")
     logger.info("FAZ 13.8 — KARAR KURALI DEĞERLENDİRMESİ")
     logger.info("==================================================")
-    if eq_m1[-1] > eq_m0[-1] and (gp_m1/gl_m1) > (gp_m0/gl_m0):
+    if eq_m1[-1] > eq_m0[-1] and (gp_m1 / gl_m1) > (gp_m0 / gl_m0):
         logger.info("Karar: A) PRODUCTION CANDIDATE")
-        logger.info("Ranker mimarisi, hiçbir portföy/kural değişikliği yapılmaksızın yalnızca Alpha sinyal kalitesiyle V3 Baseline'ı yenmiştir.")
+        logger.info(
+            "Ranker mimarisi, hiçbir portföy/kural değişikliği yapılmaksızın yalnızca Alpha sinyal kalitesiyle V3 Baseline'ı yenmiştir."
+        )
     else:
         logger.info("Karar: C) REJECT (M0'ı net şekilde yenemedi)")

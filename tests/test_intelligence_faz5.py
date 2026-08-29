@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Intelligence Faz 2+5 Tests
 
@@ -27,7 +28,7 @@ from services.intelligence.prediction_layer import (
 class TestMLSignalFusion:
     """ML sinyal birleştirme testleri."""
 
-    def test_basic_fusion(self):
+    def test_basic_fusion(self) -> Any:
         """Temel fusion."""
         fusion = MLSignalFusion()
         signals = {
@@ -40,7 +41,7 @@ class TestMLSignalFusion:
         assert result.ticker == "THYAO"
         assert result.fused_direction in ["LONG", "SHORT", "NEUTRAL"]
 
-    def test_all_long_signals(self):
+    def test_all_long_signals(self) -> Any:
         """Tüm sinyaller LONG."""
         fusion = MLSignalFusion()
         signals = {comp: {"direction": "LONG", "score": 75} for comp in fusion.COMPONENTS}
@@ -48,14 +49,14 @@ class TestMLSignalFusion:
         assert result.fused_direction == "LONG"
         assert result.fused_confidence > 0.5
 
-    def test_all_short_signals(self):
+    def test_all_short_signals(self) -> Any:
         """Tüm sinyaller SHORT."""
         fusion = MLSignalFusion()
         signals = {comp: {"direction": "SHORT", "score": 25} for comp in fusion.COMPONENTS}
         result = fusion.fuse("THYAO", signals)
         assert result.fused_direction == "SHORT"
 
-    def test_conflicting_signals(self):
+    def test_conflicting_signals(self) -> Any:
         """Çelişkili sinyaller."""
         fusion = MLSignalFusion()
         signals = {
@@ -67,14 +68,14 @@ class TestMLSignalFusion:
         assert result.has_conflict is True
         assert len(result.conflict_details) > 0
 
-    def test_neutral_signals(self):
+    def test_neutral_signals(self) -> Any:
         """Nötr sinyaller."""
         fusion = MLSignalFusion()
         signals = {comp: {"direction": "NEUTRAL", "score": 50} for comp in fusion.COMPONENTS}
         result = fusion.fuse("THYAO", signals)
         assert result.fused_direction == "NEUTRAL"
 
-    def test_regime_based_weights(self):
+    def test_regime_based_weights(self) -> Any:
         """Rejime göre ağırlıklar farklı."""
         fusion = MLSignalFusion()
         signals = {
@@ -85,7 +86,7 @@ class TestMLSignalFusion:
         bear = fusion.fuse("THYAO", signals, regime="BEAR")
         assert bull.optimized_weights != bear.optimized_weights
 
-    def test_self_check_high_confidence(self):
+    def test_self_check_high_confidence(self) -> Any:
         """Self-check: çok yüksek confidence uyarısı."""
         fusion = MLSignalFusion()
         signals = {comp: {"direction": "LONG", "score": 95} for comp in fusion.COMPONENTS}
@@ -93,7 +94,7 @@ class TestMLSignalFusion:
         # Uyarı olabilir (confidence > 0.9)
         assert isinstance(result.self_check_warnings, list)
 
-    def test_self_check_all_neutral_high_score(self):
+    def test_self_check_all_neutral_high_score(self) -> Any:
         """Self-check: tüm nötr ama yüksek skor."""
         fusion = MLSignalFusion()
         signals = {comp: {"direction": "NEUTRAL", "score": 80} for comp in fusion.COMPONENTS}
@@ -101,20 +102,20 @@ class TestMLSignalFusion:
         if result.fused_score > 70:
             assert any("nötr" in w.lower() for w in result.self_check_warnings)
 
-    def test_component_scores_stored(self):
+    def test_component_scores_stored(self) -> Any:
         """Bileşen skorları saklanır."""
         fusion = MLSignalFusion()
         signals = {"technical": {"direction": "LONG", "score": 72}}
         result = fusion.fuse("THYAO", signals)
         assert result.component_scores["technical"] == 72
 
-    def test_empty_signals(self):
+    def test_empty_signals(self) -> Any:
         """Boş sinyaller."""
         fusion = MLSignalFusion()
         result = fusion.fuse("THYAO", {})
         assert result.fused_direction == "NEUTRAL"
 
-    def test_weight_history(self):
+    def test_weight_history(self) -> Any:
         """Ağırlık geçmişi."""
         fusion = MLSignalFusion()
         signals = {"technical": {"direction": "LONG", "score": 70}}
@@ -131,24 +132,24 @@ class TestMLSignalFusion:
 class TestPredictionLayer:
     """Prediction layer testleri."""
 
-    def test_compute_prediction_basic(self):
+    def test_compute_prediction_basic(self) -> Any:
         """Temel prediction."""
         pred = compute_prediction("THYAO", 3.0, 0.7, {"volatility_20d": 20, "atr_pct": 2}, horizon=5)
         assert isinstance(pred, Prediction)
         assert pred.direction == "UP"
         assert pred.ticker == "THYAO"
 
-    def test_compute_prediction_down(self):
+    def test_compute_prediction_down(self) -> Any:
         """Düşüş prediction."""
         pred = compute_prediction("THYAO", -3.0, 0.7, {"volatility_20d": 20, "atr_pct": 2}, horizon=5)
         assert pred.direction == "DOWN"
 
-    def test_compute_prediction_neutral(self):
+    def test_compute_prediction_neutral(self) -> Any:
         """Nötr prediction."""
         pred = compute_prediction("THYAO", 0.5, 0.3, {"volatility_20d": 20, "atr_pct": 2}, horizon=5)
         assert pred.direction == "NEUTRAL"
 
-    def test_quality_grades(self):
+    def test_quality_grades(self) -> Any:
         """Kalite sınıfları."""
         # Yüksek confidence + yüksek return + iyi R/R → A+
         pred_a = compute_prediction("T", 5.0, 0.9, {"volatility_20d": 15, "atr_pct": 1}, horizon=5)
@@ -158,17 +159,17 @@ class TestPredictionLayer:
         pred_d = compute_prediction("T", 0.5, 0.1, {"volatility_20d": 40, "atr_pct": 5}, horizon=5)
         assert pred_d.quality_grade in ["C", "D"]
 
-    def test_risk_reward(self):
+    def test_risk_reward(self) -> Any:
         """Risk/reward hesaplanır."""
         pred = compute_prediction("THYAO", 5.0, 0.7, {"volatility_20d": 20, "atr_pct": 2}, horizon=5)
         assert pred.risk_reward > 0
 
-    def test_uncertainty(self):
+    def test_uncertainty(self) -> Any:
         """Belirsizlik hesaplanır."""
         pred = compute_prediction("THYAO", 3.0, 0.7, {"volatility_20d": 30, "atr_pct": 2}, horizon=20)
         assert pred.uncertainty > 0
 
-    def test_multi_horizon_basic(self):
+    def test_multi_horizon_basic(self) -> Any:
         """Multi-horizon prediction."""
         result = compute_multi_horizon_predictions(
             "THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2}
@@ -179,7 +180,7 @@ class TestPredictionLayer:
         assert 20 in result.predictions
         assert 60 in result.predictions
 
-    def test_multi_horizon_consensus(self):
+    def test_multi_horizon_consensus(self) -> Any:
         """Multi-horizon consensus."""
         result = compute_multi_horizon_predictions(
             "THYAO", {"momentum_20d": 5, "rsi_14": 60, "volatility_20d": 20, "atr_pct": 2}
@@ -187,14 +188,14 @@ class TestPredictionLayer:
         assert result.consensus_direction in ["UP", "DOWN", "NEUTRAL"]
         assert 0 <= result.consensus_confidence <= 1
 
-    def test_multi_horizon_best_horizon(self):
+    def test_multi_horizon_best_horizon(self) -> Any:
         """En iyi horizon seçilir."""
         result = compute_multi_horizon_predictions(
             "THYAO", {"momentum_20d": 3, "rsi_14": 55, "volatility_20d": 20, "atr_pct": 2}
         )
         assert result.best_horizon in [1, 5, 20, 60]
 
-    def test_multi_horizon_with_ensemble(self):
+    def test_multi_horizon_with_ensemble(self) -> Any:
         """Ensemble ile multi-horizon."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: (2.0, 0.7))
@@ -205,7 +206,7 @@ class TestPredictionLayer:
         )
         assert result.predictions[5].model_source == "ensemble"
 
-    def test_multi_horizon_with_calibration(self):
+    def test_multi_horizon_with_calibration(self) -> Any:
         """Kalibrasyon ile multi-horizon."""
         cal = ConfidenceCalibrator(min_samples=5)
         for _ in range(50):
@@ -230,7 +231,7 @@ class TestPredictionLayer:
 class TestIntelligenceIntegration:
     """Tüm modüllerin entegrasyon testleri."""
 
-    def test_hmm_plus_ensemble(self):
+    def test_hmm_plus_ensemble(self) -> Any:
         """HMM + Ensemble entegrasyonu."""
         # HMM regime detection
         hmm = HMMRegimeDetector()
@@ -249,7 +250,7 @@ class TestIntelligenceIntegration:
 
         assert forecast.regime == regime_result.regime
 
-    def test_ensemble_plus_calibration(self):
+    def test_ensemble_plus_calibration(self) -> Any:
         """Ensemble + Calibration entegrasyonu."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: (2.0, 0.9))
@@ -262,7 +263,7 @@ class TestIntelligenceIntegration:
 
         assert calibrated <= forecast.ensemble_confidence
 
-    def test_ensemble_plus_prediction(self):
+    def test_ensemble_plus_prediction(self) -> Any:
         """Ensemble + Prediction entegrasyonu."""
         engine = EnsembleForecaster()
         engine.register_model("test", lambda f, h: (3.0, 0.8))
@@ -273,7 +274,7 @@ class TestIntelligenceIntegration:
         )
         assert result.predictions[5].model_source == "ensemble"
 
-    def test_advanced_mc_all_models(self):
+    def test_advanced_mc_all_models(self) -> Any:
         """Tüm MC modelleri çalışır."""
         mc = AdvancedMonteCarloEngine()
         gbm = mc.gbm_sim("T", 100, 0.15, 0.25, n_sims=500, seed=42)
@@ -286,7 +287,7 @@ class TestIntelligenceIntegration:
         assert student.model_type == "student_t"
         assert heston.model_type == "heston"
 
-    def test_full_pipeline_flow(self):
+    def test_full_pipeline_flow(self) -> Any:
         """Tam pipeline akışı."""
         features = {
             "momentum_20d": 3,

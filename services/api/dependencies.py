@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — API Dependencies v1.0
 
@@ -131,12 +132,13 @@ async def check_rate_limit(
         )
 
 
-async def require_role(required_roles: list[Role]):
+async def require_role(required_roles: list[Role]) -> Any:
     """Belirli roller gerektiren dependency."""
 
     async def checker(
         user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
+        """Otomatik eklendi."""
         role = Role(user.role)
         if role not in required_roles:
             raise HTTPException(
@@ -148,7 +150,7 @@ async def require_role(required_roles: list[Role]):
     return checker
 
 
-async def get_service_orchestrator():
+async def get_service_orchestrator() -> Any:
     """Orchestrator servisini getir."""
     from services.core.orchestrator import MasterOrchestrator
 

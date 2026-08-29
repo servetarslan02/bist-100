@@ -23,12 +23,14 @@ logger = structlog.get_logger()
 
 @dataclass
 class PreTradeValidationResult:
+    """Otomatik eklendi."""
     is_valid: bool
     rejection_code: str | None = None
     rejection_reason: str | None = None
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
@@ -37,22 +39,27 @@ class PreTradeRiskEngine:
     """BIST Emir Öncesi Çok Katmanlı Risk ve Uygunluk Motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Dinamik konfigürasyon ve tarihsel eligibility listeleri
         self._short_sale_eligible_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
         self._spk_banned_tickers: set[str] = set()
         self._custom_price_margins: dict[str, float] = {}  # Örn: %10, %5, %20
 
-    def set_short_sale_universe(self, tickers: list[str]):
+    def set_short_sale_universe(self, tickers: list[str]) -> Any:
+        """Otomatik eklendi."""
         self._short_sale_eligible_tickers = set(tickers)
 
-    def set_gross_settlement_universe(self, tickers: list[str]):
+    def set_gross_settlement_universe(self, tickers: list[str]) -> Any:
+        """Otomatik eklendi."""
         self._gross_settlement_tickers = set(tickers)
 
-    def set_spk_banned_universe(self, tickers: list[str]):
+    def set_spk_banned_universe(self, tickers: list[str]) -> Any:
+        """Otomatik eklendi."""
         self._spk_banned_tickers = set(tickers)
 
-    def set_custom_price_margin(self, ticker: str, margin_pct: float):
+    def set_custom_price_margin(self, ticker: str, margin_pct: float) -> Any:
+        """Otomatik eklendi."""
         self._custom_price_margins[ticker] = margin_pct
 
     def validate_order(

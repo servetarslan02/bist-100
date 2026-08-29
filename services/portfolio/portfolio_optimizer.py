@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Quantitative Portfolio Optimizer Engine v2.0
 
@@ -20,7 +21,6 @@ BIST-100 İçin Çok Yöntemli, Kısıt Duyarlı ve Deterministik Portföy Optim
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
 
 import numpy as np
 import structlog
@@ -35,6 +35,7 @@ logger = structlog.get_logger()
 
 
 class OptimizationMethod(StrEnum):
+    """Otomatik eklendi."""
     RISK_PARITY = "RISK_PARITY"
     HIERARCHICAL_RISK_PARITY = "HRP"
     MAX_SHARPE = "MAX_SHARPE"
@@ -86,6 +87,7 @@ class PortfolioOptimizer:
         cov_est: CovarianceEstimator = covariance_estimator,
         liq_engine: LiquidityRiskEngine = liquidity_risk_engine,
     ):
+        """Otomatik eklendi."""
         self.cov_estimator = cov_est
         self.liquidity_engine = liq_engine
 
@@ -277,7 +279,8 @@ class PortfolioOptimizer:
         init_w = 1.0 / np.sqrt(np.diag(cov_matrix))
         init_w = init_w / np.sum(init_w)
 
-        def objective(w):
+        def objective(w) -> Any:
+            """Otomatik eklendi."""
             w = np.maximum(w, 1e-8)
             port_var = w.T @ cov_matrix @ w
             marginal_contrib = cov_matrix @ w
@@ -318,7 +321,7 @@ class PortfolioOptimizer:
         sorted_indices = self._get_quasi_diag_order(link)
 
         # Recursive Bisection
-        weights = pd_hrp_bisection = np.ones(n)
+        weights = np.ones(n)
         items = [sorted_indices]
 
         while len(items) > 0:
@@ -366,7 +369,8 @@ class PortfolioOptimizer:
         n = cov_matrix.shape[0]
         init_w = np.ones(n) / n
 
-        def objective(w):
+        def objective(w) -> Any:
+            """Otomatik eklendi."""
             return w.T @ cov_matrix @ w + constraints.l2_regularization * np.sum(w**2)
 
         bounds = [(0.0, constraints.max_position_pct) for _ in range(n)]
@@ -395,7 +399,8 @@ class PortfolioOptimizer:
 
         rf_daily = 0.40 / 252.0  # %40 yıllık risksiz faiz bazlı
 
-        def objective(w):
+        def objective(w) -> Any:
+            """Otomatik eklendi."""
             port_ret = np.dot(w, expected_returns)
             port_var = w.T @ cov_matrix @ w
             port_vol = np.sqrt(max(port_var, 1e-8))
@@ -481,7 +486,7 @@ class PortfolioOptimizer:
             if l_score < 40.0:
                 haircut = max(0.20, l_score / 50.0)
                 weights[t] *= haircut
-                warnings.append(f"{t} düşük likidite nedeniyle %{round((1-haircut)*100, 1)} küçültüldü.")
+                warnings.append(f"{t} düşük likidite nedeniyle %{round((1 - haircut) * 100, 1)} küçültüldü.")
 
         # 2. Tozluluk / Minimum Pozisyon Filtresi (Küçük kalıntıları sıfırla)
         for t in list(weights.keys()):
@@ -504,7 +509,7 @@ class PortfolioOptimizer:
                 for t in weights:
                     if sector_map.get(t, "OTHER") == sec:
                         weights[t] *= scale
-                warnings.append(f"{sec} sektörü %{round(total*100, 1)} tavanı aştı, %30'a sıkıştırıldı.")
+                warnings.append(f"{sec} sektörü %{round(total * 100, 1)} tavanı aştı, %30'a sıkıştırıldı.")
 
         # 5. Hysteresis (Mevcut ağırlıktan fark %2'nin altındaysa mevcut ağırlığı koru)
         if current_weights:
@@ -527,7 +532,7 @@ class PortfolioOptimizer:
         if total_weight > max_allowed_exp and total_weight > 0:
             scale = max_allowed_exp / total_weight
             weights = {k: v * scale for k, v in weights.items()}
-            warnings.append(f"Piyasa rejimi [{regime}] maruziyet tavanı (%{round(max_allowed_exp*100)}) uygulandı.")
+            warnings.append(f"Piyasa rejimi [{regime}] maruziyet tavanı (%{round(max_allowed_exp * 100)}) uygulandı.")
 
         # Final temizleme ve nakit oranı
         clean_weights = {k: float(v) for k, v in weights.items() if v >= constraints.min_position_pct}
@@ -537,6 +542,7 @@ class PortfolioOptimizer:
         return clean_weights, cash_weight
 
     def _empty_result(self, method: OptimizationMethod, warnings: list[str]) -> OptimizationResult:
+        """Otomatik eklendi."""
         return OptimizationResult(
             weights={},
             method=method,

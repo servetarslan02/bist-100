@@ -42,6 +42,7 @@ class EventDeduplicator:
     """
 
     def __init__(self, window_hours: int = 24):
+        """Otomatik eklendi."""
         self._seen: dict[str, float] = {}  # hash → timestamp (epoch)
         self._window_seconds = window_hours * 3600
         self._stats = DedupStats()
@@ -86,7 +87,7 @@ class EventDeduplicator:
 
         return False
 
-    def mark_seen(self, event_data: dict[str, Any]):
+    def mark_seen(self, event_data: dict[str, Any]) -> Any:
         """Event'i işlenmiş olarak işaretle."""
         event_hash = self._compute_hash(event_data)
         self._seen[event_hash] = time.time()
@@ -105,7 +106,7 @@ class EventDeduplicator:
         self.mark_seen(event_data)
         return False
 
-    def _cleanup_if_needed(self):
+    def _cleanup_if_needed(self) -> Any:
         """Eski hash'leri temizle (periyodik)."""
         # Her 100 kontrolde bir temizle
         if self._stats.total_checked % 100 != 0:
@@ -119,7 +120,7 @@ class EventDeduplicator:
             self._stats.window_cleanups += 1
             logger.debug("Dedup cleanup", cleaned=cleaned, remaining=len(self._seen))
 
-    def cleanup(self):
+    def cleanup(self) -> Any:
         """Manuel temizleme."""
         cutoff = time.time() - self._window_seconds
         old_count = len(self._seen)
@@ -139,7 +140,7 @@ class EventDeduplicator:
             "window_cleanups": self._stats.window_cleanups,
         }
 
-    def reset(self):
+    def reset(self) -> Any:
         """Sıfırla."""
         self._seen.clear()
         self._stats = DedupStats()

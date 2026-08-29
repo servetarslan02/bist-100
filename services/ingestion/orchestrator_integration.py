@@ -80,6 +80,7 @@ class IngestionOrchestrator:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Resilience katmanları
         self._cb_manager = CircuitBreakerManager()
         self._rate_limiter = create_default_rate_limiter()
@@ -95,7 +96,7 @@ class IngestionOrchestrator:
         )
         self._register_providers()
 
-    def _register_providers(self):
+    def _register_providers(self) -> Any:
         """Provider'ları kaydet."""
         # Market data providers
         self._pm.register(

@@ -12,12 +12,14 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Direction(StrEnum):
+    """Otomatik eklendi."""
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
 
 
 class RiskLevel(StrEnum):
+    """Otomatik eklendi."""
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -25,6 +27,7 @@ class RiskLevel(StrEnum):
 
 
 class SignalStatus(StrEnum):
+    """Otomatik eklendi."""
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
     TRIGGERED = "TRIGGERED"
@@ -32,6 +35,7 @@ class SignalStatus(StrEnum):
 
 
 class MarketRegime(StrEnum):
+    """Otomatik eklendi."""
     RISK_ON = "RISK-ON"
     RISK_OFF = "RISK-OFF"
     TRENDING_UP = "TRENDING-UP"
@@ -46,6 +50,7 @@ class MarketRegime(StrEnum):
 
 
 class TimeHorizon(StrEnum):
+    """Otomatik eklendi."""
     SHORT = "1-5D"
     MEDIUM = "1-4W"
     LONG = "1-6M"
@@ -73,6 +78,7 @@ class MarketTick(BaseModel):
     @field_validator("price")
     @classmethod
     def _validate_price(cls, v: float) -> float:
+        """Otomatik eklendi."""
         if v <= 0:
             raise ValueError(f"Price must be positive, got {v}")
         return v
@@ -80,6 +86,7 @@ class MarketTick(BaseModel):
     @field_validator("volume")
     @classmethod
     def _validate_volume(cls, v: int) -> int:
+        """Otomatik eklendi."""
         if v < 0:
             raise ValueError(f"Volume must be non-negative, got {v}")
         return v
@@ -87,12 +94,14 @@ class MarketTick(BaseModel):
     @field_validator("quality")
     @classmethod
     def _validate_quality(cls, v: float) -> float:
+        """Otomatik eklendi."""
         if not 0 <= v <= 1:
             raise ValueError(f"Quality must be in [0,1], got {v}")
         return v
 
 
 class OHLCV(BaseModel):
+    """Otomatik eklendi."""
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -105,6 +114,7 @@ class OHLCV(BaseModel):
 
 
 class OrderBookSnapshot(BaseModel):
+    """Otomatik eklendi."""
     instrument_id: int
     timestamp: datetime
     bid_prices: list[float]
@@ -258,6 +268,7 @@ class WorldState(BaseModel):
     )
     @classmethod
     def _validate_01_range(cls, v: float, info) -> float:
+        """Otomatik eklendi."""
         if not 0 <= v <= 1:
             # Clamp to [0,1] instead of raising (for robustness)
             return max(0.0, min(1.0, v))
@@ -313,6 +324,7 @@ class Signal(BaseModel):
     @field_validator("confidence")
     @classmethod
     def _validate_confidence(cls, v: float) -> float:
+        """Otomatik eklendi."""
         if not 0 <= v <= 1:
             raise ValueError(f"Confidence must be in [0,1], got {v}")
         return v
@@ -320,6 +332,7 @@ class Signal(BaseModel):
     @field_validator("score")
     @classmethod
     def _validate_score(cls, v: float) -> float:
+        """Otomatik eklendi."""
         if not 0 <= v <= 100:
             raise ValueError(f"Score must be in [0,100], got {v}")
         return v
@@ -331,6 +344,7 @@ class Signal(BaseModel):
 
 
 class Position(BaseModel):
+    """Otomatik eklendi."""
     instrument_id: int
     ticker: str
     quantity: int
@@ -344,6 +358,7 @@ class Position(BaseModel):
 
 
 class Portfolio(BaseModel):
+    """Otomatik eklendi."""
     id: int | None = None
     name: str
     initial_capital: float = 100000
@@ -362,6 +377,7 @@ class Portfolio(BaseModel):
 
 
 class Prediction(BaseModel):
+    """Otomatik eklendi."""
     id: int | None = None
     model_version_id: int
     instrument_id: int
@@ -377,6 +393,7 @@ class Prediction(BaseModel):
 
 
 class Outcome(BaseModel):
+    """Otomatik eklendi."""
     prediction_id: int
     actual_return_pct: float
     actual_direction: Direction
@@ -392,6 +409,7 @@ class Outcome(BaseModel):
 
 
 class ScenarioResult(BaseModel):
+    """Otomatik eklendi."""
     scenario_name: str
     market_change_pct: float
     portfolio_impact: dict[str, Any]
@@ -399,6 +417,7 @@ class ScenarioResult(BaseModel):
 
 
 class SimulationResult(BaseModel):
+    """Otomatik eklendi."""
     id: int | None = None
     name: str
     simulation_type: str
@@ -417,6 +436,7 @@ class SimulationResult(BaseModel):
 
 
 class Alert(BaseModel):
+    """Otomatik eklendi."""
     id: int | None = None
     alert_type: str
     severity: RiskLevel

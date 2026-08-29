@@ -85,6 +85,7 @@ class AdaptiveScanScheduler:
         base_interval: int = 60,
         timezone_offset: int = 3,  # UTC+3 (Türkiye)
     ):
+        """Otomatik eklendi."""
         self._base_interval = base_interval
         self._tz_offset = timezone_offset
         self._running = False
@@ -106,7 +107,7 @@ class AdaptiveScanScheduler:
         self._last_scan_time: float = 0
         self._interval_history: list = []
 
-    def set_scan_callback(self, callback: Callable[[], Awaitable[None]]):
+    def set_scan_callback(self, callback: Callable[[], Awaitable[None]]) -> Any:
         """Tarama callback'i ata.
 
         Args:
@@ -119,7 +120,7 @@ class AdaptiveScanScheduler:
         volatility: float = None,
         regime: str = None,
         has_event: bool = None,
-    ):
+    ) -> Any:
         """Piyasa durumunu güncelle.
 
         Args:
@@ -167,7 +168,7 @@ class AdaptiveScanScheduler:
         """
         return self._is_market_hours()
 
-    async def start(self):
+    async def start(self) -> Any:
         """Scheduler'ı başlat."""
         if self._running:
             logger.warning("Scheduler already running")
@@ -233,13 +234,13 @@ class AdaptiveScanScheduler:
                 logger.error("Scheduler error", error=str(e))
                 await asyncio.sleep(5)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Scheduler'ı durdur."""
         self._running = False
         self._current_mode = ScanMode.PAUSED
         logger.info("Scan scheduler stopped", total_scans=self._total_scans)
 
-    def trigger_event_scan(self, tickers: list = None):
+    def trigger_event_scan(self, tickers: list = None) -> Any:
         """Event-driven tarama tetikle.
 
         Args:
@@ -251,7 +252,7 @@ class AdaptiveScanScheduler:
 
         logger.info("Event scan triggered", tickers=tickers, total_events=self._total_events_triggered)
 
-    def trigger_manual_scan(self):
+    def trigger_manual_scan(self) -> Any:
         """Manuel tarama tetikle."""
         self._current_mode = ScanMode.MANUAL
         logger.info("Manual scan triggered")

@@ -43,12 +43,7 @@ filtered = df.filter(pl.col("ticker") == "THYAO")
 result = filtered.select(["date", "close"])
 
 # ✅ Lazy (tercih edilen)
-result = (
-    pl.scan_parquet("data.parquet")
-    .filter(pl.col("ticker") == "THYAO")
-    .select(["date", "close"])
-    .collect()
-)
+result = pl.scan_parquet("data.parquet").filter(pl.col("ticker") == "THYAO").select(["date", "close"]).collect()
 ```
 
 ### Lazy API Avantajları
@@ -111,10 +106,11 @@ with duckdb.connect("data.duckdb") as conn:
 ```python
 import polars as pl
 
+
 def compute_features(df: pl.DataFrame) -> dict[str, float]:
     """Polars-native feature hesaplama."""
     close = df["Close"].cast(pl.Float64)
-    
+
     return {
         "roc_20d": float(close.pct_change(20)[-1]),
         "volatility": float(close.pct_change().rolling_std(20)[-1] * 252**0.5),

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """ALPHA BIST — Ensemble & Feature Engineering Yeni Modül Testleri
 
 Test edilen modüller:
@@ -16,11 +19,8 @@ Kullanım:
     python -m pytest tests/test_ensemble_features.py -v
 """
 
-from __future__ import annotations
 
 import numpy as np
-import pytest
-
 
 # =====================================================
 # WALK-FORWARD ENSEMBLE TESTS
@@ -30,12 +30,13 @@ import pytest
 class TestWalkForwardEnsemble:
     """WalkForwardEnsemble testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.learning.walkforward_ensemble import WalkForwardEnsemble, walkforward_ensemble
+        from services.learning.walkforward_ensemble import walkforward_ensemble
+
         assert walkforward_ensemble is not None
 
-    def test_empty_result(self):
+    def test_empty_result(self) -> Any:
         """Boş sonuç doğru yapıda olmalı."""
         from services.learning.walkforward_ensemble import WalkForwardEnsemble
 
@@ -47,7 +48,7 @@ class TestWalkForwardEnsemble:
         assert result.mean_ensemble_ic == 0.0
         assert result.final_weights == {}
 
-    def test_create_splits(self):
+    def test_create_splits(self) -> Any:
         """Split'ler doğru aralıklarda olmalı."""
         from services.learning.walkforward_ensemble import WalkForwardEnsemble
 
@@ -62,7 +63,7 @@ class TestWalkForwardEnsemble:
             if len(train_idx) > 0 and len(val_idx) > 0:
                 assert val_idx[0] - train_idx[-1] >= wf.embargo_days
 
-    def test_average_weights(self):
+    def test_average_weights(self) -> Any:
         """Ağırlık ortalaması doğru hesaplanmalı."""
         from services.learning.walkforward_ensemble import WalkForwardEnsemble
 
@@ -81,7 +82,7 @@ class TestWalkForwardEnsemble:
         # Normalize edilmiş olmalı
         assert abs(sum(avg.values()) - 1.0) < 0.01
 
-    def test_run_with_synthetic_data(self):
+    def test_run_with_synthetic_data(self) -> Any:
         """Sentetik veri ile walk-forward çalışmalı."""
         from sklearn.linear_model import Ridge
 
@@ -112,7 +113,7 @@ class TestWalkForwardEnsemble:
         assert result.final_weights
         assert -1.0 <= result.mean_ensemble_ic <= 1.0
 
-    def test_history_tracking(self):
+    def test_history_tracking(self) -> Any:
         """History tracking çalışmalı."""
         from services.learning.walkforward_ensemble import WalkForwardEnsemble
 
@@ -129,12 +130,13 @@ class TestWalkForwardEnsemble:
 class TestModelDegradationMonitor:
     """ModelDegradationMonitor testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.learning.model_degradation_monitor import ModelDegradationMonitor, degradation_monitor
+        from services.learning.model_degradation_monitor import degradation_monitor
+
         assert degradation_monitor is not None
 
-    def test_record_outcome(self):
+    def test_record_outcome(self) -> Any:
         """Sonuç kaydetme çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -144,7 +146,7 @@ class TestModelDegradationMonitor:
         assert "test_model" in monitor._outcomes
         assert len(monitor._outcomes["test_model"]) == 1
 
-    def test_check_model_insufficient_data(self):
+    def test_check_model_insufficient_data(self) -> Any:
         """Yetersiz veri ile kontrol çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -155,7 +157,7 @@ class TestModelDegradationMonitor:
         assert report.severity == "OK"
         assert "Yetersiz veri" in report.recommendation
 
-    def test_check_model_with_data(self):
+    def test_check_model_with_data(self) -> Any:
         """Yeterli veri ile kontrol çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -169,7 +171,7 @@ class TestModelDegradationMonitor:
         assert report.current_accuracy > 0.5
         assert report.severity in ("OK", "WARNING", "ALERT", "CRITICAL")
 
-    def test_auto_remove_degraded(self):
+    def test_auto_remove_degraded(self) -> Any:
         """Otomatik model çıkarma çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -184,7 +186,7 @@ class TestModelDegradationMonitor:
         # Kötü model accuracy düşük olmalı
         assert report.current_accuracy < 0.5
 
-    def test_restore_model(self):
+    def test_restore_model(self) -> Any:
         """Model geri alma çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -195,7 +197,7 @@ class TestModelDegradationMonitor:
         assert "test_model" not in monitor._removed_models
         assert not monitor.restore_model("nonexistent")
 
-    def test_get_model_summary(self):
+    def test_get_model_summary(self) -> Any:
         """Model özeti çalışmalı."""
         from services.learning.model_degradation_monitor import ModelDegradationMonitor
 
@@ -216,23 +218,26 @@ class TestModelDegradationMonitor:
 class TestFeatureSelector:
     """FeatureSelector testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.features.selection import FeatureSelector, feature_selector
+        from services.features.selection import feature_selector
+
         assert feature_selector is not None
 
-    def test_variance_threshold_filter(self):
+    def test_variance_threshold_filter(self) -> Any:
         """Varyans filtresi çalışmalı."""
         from services.features.selection import FeatureSelector
 
         np.random.seed(42)
         n = 100
-        X = np.column_stack([
-            np.random.randn(n),  # Normal varyans
-            np.ones(n) * 5.0,  # Sabit (düşük varyans)
-            np.random.randn(n) * 0.001,  # Çok düşük varyans
-            np.random.randn(n),  # Normal varyans
-        ])
+        X = np.column_stack(
+            [
+                np.random.randn(n),  # Normal varyans
+                np.ones(n) * 5.0,  # Sabit (düşük varyans)
+                np.random.randn(n) * 0.001,  # Çok düşük varyans
+                np.random.randn(n),  # Normal varyans
+            ]
+        )
         feature_names = ["normal", "constant", "low_var", "normal2"]
 
         selector = FeatureSelector(variance_threshold=0.001)
@@ -242,7 +247,7 @@ class TestFeatureSelector:
         assert "normal2" in result.selected_features
         assert "constant" in result.removed_features
 
-    def test_correlation_filter(self):
+    def test_correlation_filter(self) -> Any:
         """Korelasyon filtresi çalışmalı."""
         from services.features.selection import FeatureSelector
 
@@ -262,7 +267,7 @@ class TestFeatureSelector:
         assert len(result.selected_features) < 3
         assert "feat3" in result.selected_features
 
-    def test_select_pipeline(self):
+    def test_select_pipeline(self) -> Any:
         """Tam pipeline çalışmalı."""
         from sklearn.linear_model import Ridge
 
@@ -270,13 +275,15 @@ class TestFeatureSelector:
 
         np.random.seed(42)
         n = 200
-        X = np.column_stack([
-            np.random.randn(n),
-            np.random.randn(n),
-            np.ones(n) * 5.0,  # Sabit
-            np.random.randn(n),
-            np.random.randn(n),
-        ])
+        X = np.column_stack(
+            [
+                np.random.randn(n),
+                np.random.randn(n),
+                np.ones(n) * 5.0,  # Sabit
+                np.random.randn(n),
+                np.random.randn(n),
+            ]
+        )
         y = X[:, 0] * 0.5 + X[:, 1] * 0.3 + np.random.randn(n) * 0.1
         feature_names = ["f1", "f2", "constant", "f4", "f5"]
 
@@ -287,7 +294,7 @@ class TestFeatureSelector:
         assert result.n_selected <= 3
         assert "constant" in result.removed_features
 
-    def test_get_feature_importances(self):
+    def test_get_feature_importances(self) -> Any:
         """Feature importance çalışmalı."""
         from sklearn.linear_model import Ridge
 
@@ -313,12 +320,13 @@ class TestFeatureSelector:
 class TestFeatureLineage:
     """FeatureLineageTracker testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.features.lineage import FeatureLineageTracker, feature_lineage
+        from services.features.lineage import feature_lineage
+
         assert feature_lineage is not None
 
-    def test_record_and_get(self):
+    def test_record_and_get(self) -> Any:
         """Kaydetme ve sorgulama çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -335,7 +343,7 @@ class TestFeatureLineage:
         assert lineage.feature_name == "rsi_14"
         assert "close_price" in lineage.raw_sources
 
-    def test_get_raw_sources_recursive(self):
+    def test_get_raw_sources_recursive(self) -> Any:
         """Recursive raw source bulma çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -357,7 +365,7 @@ class TestFeatureLineage:
         sources = tracker.get_raw_sources("rsi_14")
         assert "close_price" in sources
 
-    def test_get_dependents(self):
+    def test_get_dependents(self) -> Any:
         """Bağımlı feature bulma çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -385,7 +393,7 @@ class TestFeatureLineage:
         assert "rsi_14" in dependents
         assert "macd" in dependents
 
-    def test_generate_dependency_graph(self):
+    def test_generate_dependency_graph(self) -> Any:
         """Dependency graph üretimi çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -402,7 +410,7 @@ class TestFeatureLineage:
         assert graph.edges
         assert "graph TD" in graph.mermaid
 
-    def test_trace_to_raw(self):
+    def test_trace_to_raw(self) -> Any:
         """Raw data'ya izleme çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -418,7 +426,7 @@ class TestFeatureLineage:
         assert trace["feature"] == "rsi_14"
         assert "close_price" in trace["raw_sources"]
 
-    def test_lineage_summary(self):
+    def test_lineage_summary(self) -> Any:
         """Lineage özeti çalışmalı."""
         from services.features.lineage import FeatureLineageTracker
 
@@ -439,12 +447,13 @@ class TestFeatureLineage:
 class TestFeatureVersionManager:
     """FeatureVersionManager testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.features.versioning import FeatureVersionManager, feature_version_manager
+        from services.features.versioning import feature_version_manager
+
         assert feature_version_manager is not None
 
-    def test_register_first_version(self):
+    def test_register_first_version(self) -> Any:
         """İlk kayıt version 1 olmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -466,7 +475,7 @@ class TestFeatureVersionManager:
         version = manager.register(contract)
         assert version == 1
 
-    def test_register_no_change_same_version(self):
+    def test_register_no_change_same_version(self) -> Any:
         """Değişiklik yoksa aynı version kalmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -489,7 +498,7 @@ class TestFeatureVersionManager:
         version2 = manager.register(contract)
         assert version2 == 1
 
-    def test_register_change_version_increases(self):
+    def test_register_change_version_increases(self) -> Any:
         """Değişiklik varsa version artmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -525,7 +534,7 @@ class TestFeatureVersionManager:
         version = manager.register(contract_v2)
         assert version == 2
 
-    def test_version_history(self):
+    def test_version_history(self) -> Any:
         """Version history çalışmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -543,14 +552,14 @@ class TestFeatureVersionManager:
                 pit_safe=True,
                 version=i + 1,
                 owner="test",
-                description=f"v{i+1}",
+                description=f"v{i + 1}",
             )
             manager.register(contract)
 
         history = manager.get_version_history("test_feature")
         assert len(history) == 3
 
-    def test_diff(self):
+    def test_diff(self) -> Any:
         """Version diff çalışmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -590,7 +599,7 @@ class TestFeatureVersionManager:
         assert "formula" in diff.changed_fields
         assert "lookback" in diff.changed_fields
 
-    def test_check_compatibility(self):
+    def test_check_compatibility(self) -> Any:
         """Uyumluluk kontrolü çalışmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -629,7 +638,7 @@ class TestFeatureVersionManager:
         assert not compat.is_compatible  # Formula değişikliği breaking
         assert len(compat.breaking_changes) > 0
 
-    def test_rollback(self):
+    def test_rollback(self) -> Any:
         """Rollback çalışmalı."""
         from services.features.contract import FeatureContract
         from services.features.versioning import FeatureVersionManager
@@ -647,7 +656,7 @@ class TestFeatureVersionManager:
                 pit_safe=True,
                 version=i + 1,
                 owner="test",
-                description=f"v{i+1}",
+                description=f"v{i + 1}",
             )
             manager.register(contract)
 
@@ -655,7 +664,7 @@ class TestFeatureVersionManager:
         current = manager.get_current_version("test_feature")
         assert current.version == 1
 
-    def test_summary(self):
+    def test_summary(self) -> Any:
         """Özet çalışmalı."""
         from services.features.versioning import FeatureVersionManager
 
@@ -673,12 +682,13 @@ class TestFeatureVersionManager:
 class TestFeatureDocGenerator:
     """FeatureDocGenerator testleri."""
 
-    def test_import(self):
+    def test_import(self) -> Any:
         """Import çalışmalı."""
-        from services.features.doc_generator import FeatureDocGenerator, feature_doc_generator
+        from services.features.doc_generator import feature_doc_generator
+
         assert feature_doc_generator is not None
 
-    def test_generate_catalog(self):
+    def test_generate_catalog(self) -> Any:
         """Katalog üretimi çalışmalı."""
         from services.features.doc_generator import FeatureDocGenerator
 
@@ -689,7 +699,7 @@ class TestFeatureDocGenerator:
         assert "rsi_14" in catalog
         assert "PIT-Safe" in catalog
 
-    def test_generate_dependency_graph(self):
+    def test_generate_dependency_graph(self) -> Any:
         """Dependency graph üretimi çalışmalı."""
         from services.features.doc_generator import FeatureDocGenerator
 
@@ -698,7 +708,7 @@ class TestFeatureDocGenerator:
 
         assert "graph TD" in graph
 
-    def test_generate_summary_report(self):
+    def test_generate_summary_report(self) -> Any:
         """Özet rapor üretimi çalışmalı."""
         from services.features.doc_generator import FeatureDocGenerator
 
@@ -709,7 +719,7 @@ class TestFeatureDocGenerator:
         assert "Toplam Feature" in report
         assert "Kategori Dağılımı" in report
 
-    def test_generate_feature_card(self):
+    def test_generate_feature_card(self) -> Any:
         """Feature kartı üretimi çalışmalı."""
         from services.features.contract import FeatureContract
         from services.features.doc_generator import FeatureDocGenerator
@@ -741,7 +751,7 @@ class TestFeatureDocGenerator:
 class TestEnsembleModelEnhancements:
     """EnsembleModel auto_prune ve should_use_ensemble testleri."""
 
-    def test_auto_prune_redundant(self):
+    def test_auto_prune_redundant(self) -> Any:
         """Auto-prune çalışmalı."""
         from services.ml.ensemble import EnsembleModel
 
@@ -762,7 +772,7 @@ class TestEnsembleModelEnhancements:
         assert len(removed) > 0
         assert "model_c" in pruned  # Bağımsız model kalmalı
 
-    def test_should_use_ensemble_beneficial(self):
+    def test_should_use_ensemble_beneficial(self) -> Any:
         """Faydalı ensemble onaylanmalı."""
         from services.ml.ensemble import EnsembleModel
 
@@ -791,9 +801,9 @@ class TestEnsembleModelEnhancements:
         assert use
         assert "faydalı" in reason.lower()
 
-    def test_should_use_ensemble_low_diversity(self):
+    def test_should_use_ensemble_low_diversity(self) -> Any:
         """Düşük diversity ile ensemble reddedilmeli."""
-        from services.ml.ensemble import EnsembleModel, BenefitReport, DiversityReport
+        from services.ml.ensemble import BenefitReport, DiversityReport, EnsembleModel
 
         model = EnsembleModel()
 
@@ -827,7 +837,7 @@ class TestEnsembleModelEnhancements:
 class TestStackingEnsembleEnhancements:
     """StackingEnsemble regime_smoothing ve regime_performance testleri."""
 
-    def test_regime_smoothing_same_regime(self):
+    def test_regime_smoothing_same_regime(self) -> Any:
         """Aynı rejimde smoothing etkisiz olmalı."""
         from services.ml.stacking_ensemble import StackingEnsemble
 
@@ -838,7 +848,7 @@ class TestStackingEnsembleEnhancements:
         pred = stacking.predict_with_regime_smoothing(X, "BULL", "BULL", 0.3)
         assert len(pred) == 10
 
-    def test_regime_smoothing_transition(self):
+    def test_regime_smoothing_transition(self) -> Any:
         """Rejim geçişinde smoothing çalışmalı."""
         from services.ml.stacking_ensemble import StackingEnsemble
 
@@ -858,7 +868,7 @@ class TestStackingEnsembleEnhancements:
 class TestWeightAdjusterEnhancements:
     """WeightAdjuster trigger_from_trade_result ve expanding_window_recalc testleri."""
 
-    def test_trigger_from_trade_result(self):
+    def test_trigger_from_trade_result(self) -> Any:
         """Trade result tetikleme çalışmalı."""
         from services.learning.weight_adjuster import WeightAdjuster
 
@@ -872,7 +882,7 @@ class TestWeightAdjusterEnhancements:
         weights = adjuster.get_weights()
         assert len(weights) > 0
 
-    def test_expanding_window_recalc(self):
+    def test_expanding_window_recalc(self) -> Any:
         """Expanding window recalculation çalışmalı."""
         from services.learning.weight_adjuster import WeightAdjuster
 
@@ -887,7 +897,7 @@ class TestWeightAdjusterEnhancements:
         assert len(weights) > 0
         assert abs(sum(weights.values()) - 1.0) < 0.01
 
-    def test_get_weight_change_log(self):
+    def test_get_weight_change_log(self) -> Any:
         """Ağırlık değişim log'u çalışmalı."""
         from services.learning.weight_adjuster import WeightAdjuster
 
@@ -904,7 +914,7 @@ class TestWeightAdjusterEnhancements:
 class TestFeatureDriftEnhancements:
     """FeatureDriftDetector per-ticker, time_series, strengthening testleri."""
 
-    def test_record_shap_per_ticker(self):
+    def test_record_shap_per_ticker(self) -> Any:
         """Ticker bazlı SHAP kaydetme çalışmalı."""
         from services.ml.feature_drift import FeatureDriftDetector
 
@@ -915,7 +925,7 @@ class TestFeatureDriftEnhancements:
         assert "THYAO" in detector._shap_by_ticker
         assert "GARAN" in detector._shap_by_ticker
 
-    def test_get_importance_time_series(self):
+    def test_get_importance_time_series(self) -> Any:
         """Importance zaman serisi çalışmalı."""
         from services.ml.feature_drift import FeatureDriftDetector
 
@@ -929,7 +939,7 @@ class TestFeatureDriftEnhancements:
         assert ts["feature"] == "rsi_14"
         assert len(ts["values"]) == 5
 
-    def test_get_strengthening_features(self):
+    def test_get_strengthening_features(self) -> Any:
         """Güçlenen feature'lar çalışmalı."""
         from services.ml.feature_drift import FeatureDriftDetector
 
@@ -948,7 +958,7 @@ class TestFeatureDriftEnhancements:
         rsi_entry = [s for s in strengthening if s["feature"] == "rsi_14"]
         assert len(rsi_entry) > 0
 
-    def test_get_weakening_features(self):
+    def test_get_weakening_features(self) -> Any:
         """Zayıflayan feature'lar çalışmalı."""
         from services.ml.feature_drift import FeatureDriftDetector
 
@@ -967,7 +977,7 @@ class TestFeatureDriftEnhancements:
         mom_entry = [w for w in weakening if w["feature"] == "momentum"]
         assert len(mom_entry) > 0
 
-    def test_get_ticker_shap_summary(self):
+    def test_get_ticker_shap_summary(self) -> Any:
         """Ticker SHAP özeti çalışmalı."""
         from services.ml.feature_drift import FeatureDriftDetector
 

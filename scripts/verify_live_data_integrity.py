@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — CANLI VERİ VE DİNAMİKLİK DENETİMİ (0 SAHTE VERİ KONTROLÜ)
 Tüm API uç noktalarını ve veri sağlayıcılarını sorgulayarak gelen verilerin gerçekliğini kanıtlar.
@@ -14,55 +17,56 @@ if sys.platform == "win32":
 os.environ.setdefault("JWT_SECRET", "alpha-bist-test-secret-key-32-chars-minimum")
 
 
-async def audit_all_live_data():
-    print("=" * 85)
-    print("ALPHA BIST — SİSTEM CANLILIK VE DİNAMİK VERİ DENETİM RAPORU")
-    print("=" * 85)
+async def audit_all_live_data() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 85)
+    logger.info("ALPHA BIST — SİSTEM CANLILIK VE DİNAMİK VERİ DENETİM RAPORU")
+    logger.info("=" * 85)
 
     # 1. Canlı KAP ve Finans Haberleri
     from services.ingestion.providers.news_provider import news_provider
 
     news = await news_provider.fetch_financial_news_rss(max_items=5)
-    print("\n[1. KAYNAK: KAP & Finans Haberleri]")
-    print("  • Veri Türü: Canlı RSS / Web Feed (Dinamik)")
+    logger.info("\n[1. KAYNAK: KAP & Finans Haberleri]")
+    logger.info("  • Veri Türü: Canlı RSS / Web Feed (Dinamik)")
     if news:
-        print(f'  • Alınan Son Haber: "{news[0].get("title", "")}"')
-        print(f"  • Kaynak: {news[0].get('source', '')} | Eşleşen Hisse: {news[0].get('matched_ticker')}")
+        logger.info(f'  • Alınan Son Haber: "{news[0].get("title", "")}"')
+        logger.info(f"  • Kaynak: {news[0].get('source', '')} | Eşleşen Hisse: {news[0].get('matched_ticker')}")
 
     # 2. Canlı Küresel Makro
     from services.ingestion.providers.macro_provider import MacroProvider
 
     macro = await MacroProvider().fetch_yahoo_macro()
-    print("\n[2. KAYNAK: Küresel Makro & Emtialar]")
-    print("  • Veri Türü: Canlı Borsa & FX Verisi (Dinamik)")
-    print(f"  • Dolar/TL (USDTRY): {macro.get('USDTRY', {}).get('price')} TL")
-    print(f"  • Dolar Endeksi (DXY): {macro.get('DXY', {}).get('price')}")
-    print(f"  • Brent Petrol: ${macro.get('BRENT', {}).get('price')}")
-    print(f"  • Ons Altın: ${macro.get('GOLD', {}).get('price')}")
+    logger.info("\n[2. KAYNAK: Küresel Makro & Emtialar]")
+    logger.info("  • Veri Türü: Canlı Borsa & FX Verisi (Dinamik)")
+    logger.info(f"  • Dolar/TL (USDTRY): {macro.get('USDTRY', {}).get('price')} TL")
+    logger.info(f"  • Dolar Endeksi (DXY): {macro.get('DXY', {}).get('price')}")
+    logger.info(f"  • Brent Petrol: ${macro.get('BRENT', {}).get('price')}")
+    logger.info(f"  • Ons Altın: ${macro.get('GOLD', {}).get('price')}")
 
     # 3. Canlı BIST Fiyatları ve BIST Evreni
     from services.ingestion.bist_universe import bist_universe
 
     tickers = bist_universe.get_tickers()
-    print("\n[3. KAYNAK: BIST Hisse Evreni]")
-    print("  • Veri Türü: Dinamik BIST Hisseleri Listesi")
-    print(f"  • Toplam Hisse Sayısı: {len(tickers)} hisse")
-    print(f"  • İlk 5 Hisse: {tickers[:5]}")
-    print(f"  • Son 5 Hisse: {tickers[-5:]}")
+    logger.info("\n[3. KAYNAK: BIST Hisse Evreni]")
+    logger.info("  • Veri Türü: Dinamik BIST Hisseleri Listesi")
+    logger.info(f"  • Toplam Hisse Sayısı: {len(tickers)} hisse")
+    logger.info(f"  • İlk 5 Hisse: {tickers[:5]}")
+    logger.info(f"  • Son 5 Hisse: {tickers[-5:]}")
 
     # 4. Canlı Temel Analiz Verileri
     from services.ingestion.providers.fundamental_provider import FundamentalProvider
 
     fund = await FundamentalProvider().fetch_fundamentals("THYAO")
-    print("\n[4. KAYNAK: Canlı Şirket Rasyoları (THYAO)]")
-    print(f"  • F/K (P/E): {fund.get('pe_ratio')}")
-    print(f"  • PD/DD (P/B): {fund.get('pb_ratio')}")
-    print(f"  • Piyasa Değeri: {fund.get('market_cap')}")
+    logger.info("\n[4. KAYNAK: Canlı Şirket Rasyoları (THYAO)]")
+    logger.info(f"  • F/K (P/E): {fund.get('pe_ratio')}")
+    logger.info(f"  • PD/DD (P/B): {fund.get('pb_ratio')}")
+    logger.info(f"  • Piyasa Değeri: {fund.get('market_cap')}")
 
-    print("\n" + "=" * 85)
-    print("SONUÇ: HİÇBİR VERİ ELLE YAZILMIŞ (STATİK/MOCK) DEĞİLDİR.")
-    print("TÜMÜ CANLI SAĞLAYICILARDAN DİNAMİK OLARAK ANLIK ÇEKİLMEKTEDİR.")
-    print("=" * 85)
+    logger.info("\n" + "=" * 85)
+    logger.info("SONUÇ: HİÇBİR VERİ ELLE YAZILMIŞ (STATİK/MOCK) DEĞİLDİR.")
+    logger.info("TÜMÜ CANLI SAĞLAYICILARDAN DİNAMİK OLARAK ANLIK ÇEKİLMEKTEDİR.")
+    logger.info("=" * 85)
 
 
 if __name__ == "__main__":

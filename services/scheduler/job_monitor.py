@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 
 
 class JobStatus(StrEnum):
+    """Otomatik eklendi."""
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     TIMEOUT = "TIMEOUT"
@@ -71,6 +72,7 @@ class JobMonitor:
     """
 
     def __init__(self, max_history: int = 1000, slow_threshold_ms: float = 30000):
+        """Otomatik eklendi."""
         self._max_history = max_history
         self._slow_threshold = slow_threshold_ms
         self._records: list[JobRecord] = []
@@ -89,7 +91,7 @@ class JobMonitor:
         retry_count: int = 0,
         phase: str = "",
         triggered_by: str = "scheduler",
-    ):
+    ) -> Any:
         """Job kaydet.
 
         Args:
@@ -252,13 +254,13 @@ class JobMonitor:
             for a in self._alerts[-limit:]
         ]
 
-    def register_callback(self, callback: Callable):
+    def register_callback(self, callback: Callable) -> Any:
         """Alert callback kaydet."""
         self._callbacks.append(callback)
         if len(self._callbacks) > 100:
             self._callbacks = self._callbacks[-100:]
 
-    def _fire_alert(self, alert: JobAlert):
+    def _fire_alert(self, alert: JobAlert) -> Any:
         """Alert tetikle."""
         self._alerts.append(alert)
         if len(self._alerts) > 500:
@@ -291,7 +293,7 @@ class JobMonitor:
             "per_job_stats": {jt: self.get_stats(jt) for jt in job_types},
         }
 
-    def clear(self):
+    def clear(self) -> Any:
         """Geçmişi temizle."""
         self._records.clear()
         self._alerts.clear()

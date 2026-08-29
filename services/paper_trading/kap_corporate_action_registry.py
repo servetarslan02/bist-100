@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Timestamped KAP Corporate Action & VBTS Registry
 
@@ -30,6 +31,7 @@ class KAPCorporateActionRegistry:
     """Zaman damgalı KAP tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._actions: dict[str, list[CorporateActionRecord]] = {}
         self._halted_tickers: set[str] = set()
         self._gross_settlement_tickers: set[str] = set()
@@ -42,7 +44,7 @@ class KAPCorporateActionRegistry:
         effective_date: str,
         end_date: str | None = None,
         details: str = "",
-    ):
+    ) -> Any:
         """Yeni bir kurumsal tedbir / olay kaydeder."""
         record = CorporateActionRecord(
             ticker=ticker,

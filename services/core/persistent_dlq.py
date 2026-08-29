@@ -21,6 +21,7 @@ Kullanım:
 """
 
 import asyncio
+import functools
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -30,8 +31,6 @@ from pathlib import Path
 from typing import Any
 
 import duckdb
-import orjson
-import functools
 import structlog
 from opentelemetry import metrics, trace
 
@@ -39,15 +38,23 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.dlq")
 meter = metrics.get_meter("alpha-bist.dlq")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
+
 meter = metrics.get_meter("alpha-bist.dlq")
 
 dlq_push_counter = meter.create_counter("alpha.dlq.pushes", description="Total events pushed to DLQ")
@@ -55,6 +62,7 @@ dlq_resolve_counter = meter.create_counter("alpha.dlq.resolved", description="To
 
 
 class DLQStatus(StrEnum):
+    """Otomatik eklendi."""
     PENDING = "PENDING"
     RETRYING = "RETRYING"
     RESOLVED = "RESOLVED"
@@ -79,10 +87,12 @@ class DLQEntry:
     resolved_at: datetime | None = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.created_at is None:
             self.created_at = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "entry_id": self.entry_id,
             "event_id": self.event_id,
@@ -98,10 +108,12 @@ class DLQEntry:
 
     @property
     def is_retryable(self) -> bool:
+        """Otomatik eklendi."""
         return self.status == DLQStatus.PENDING and self.retry_count < self.max_retries
 
     @property
     def is_ready_for_retry(self) -> bool:
+        """Otomatik eklendi."""
         if not self.is_retryable:
             return False
         if self.next_retry_at is None:
@@ -116,6 +128,7 @@ class PersistentDeadLetterQueue:
     """
 
     def __init__(self, db_path: str = "data/dlq.db", max_entries: int = 50000):
+        """Otomatik eklendi."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
@@ -130,7 +143,7 @@ class PersistentDeadLetterQueue:
 
         logger.info("PersistentDLQ initialized", db_path=str(self.db_path))
 
-    def _init_db(self):
+    def _init_db(self) -> Any:
         """SQLite tablolarını oluştur."""
         with self._connect() as conn:
             conn.execute("""
@@ -162,7 +175,8 @@ class PersistentDeadLetterQueue:
             conn.commit()
 
     @contextmanager
-    def _connect(self):
+    def _connect(self) -> Any:
+        """Otomatik eklendi."""
         conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
@@ -170,7 +184,7 @@ class PersistentDeadLetterQueue:
             conn.close()
 
     @otel_trace("persistent_dlq.register_retry_handler")
-    def register_retry_handler(self, event_type: str, handler: Callable):
+    def register_retry_handler(self, event_type: str, handler: Callable) -> Any:
         """Event type için retry handler kaydet."""
         self._retry_handlers[event_type] = handler
 
@@ -345,7 +359,7 @@ class PersistentDeadLetterQueue:
             conn.commit()
         return count
 
-    def _cleanup_resolved(self):
+    def _cleanup_resolved(self) -> Any:
         """Çözülmüş kayıtları temizle (son 24 saat tut)."""
         cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
         with self._connect() as conn:
@@ -358,7 +372,7 @@ class PersistentDeadLetterQueue:
             )
             conn.commit()
 
-    def _evict_oldest(self):
+    def _evict_oldest(self) -> Any:
         """Max entries aşıldığında en eski kayıtları çıkar."""
         with self._connect() as conn:
             count = conn.execute("SELECT COUNT(*) as cnt FROM dlq_entries").fetchone()["cnt"]

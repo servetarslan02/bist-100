@@ -7,39 +7,48 @@ Brüt takas kontrolü:
 - SPK tarafından belirlenir
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.gross_settlement")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class GrossSettlementStatus:
+    """Otomatik eklendi."""
     is_gross: bool
     effect: str = ""  # "NO_SHORT_SELL", "T_PLUS_0", "NONE"
     impact: str = ""  # Etki açıklaması
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "is_gross": self.is_gross,
             "effect": self.effect,
@@ -59,15 +68,16 @@ class GrossSettlementMonitor:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._gross_tickers: set[str] = set()
         self._gross_tickers_with_details: dict[str, dict[str, Any]] = {}  # Detaylı bilgi
 
-    def set_gross_tickers(self, tickers: list[str]):
+    def set_gross_tickers(self, tickers: list[str]) -> Any:
         """Brüt takaslı hisseleri güncelle."""
         self._gross_tickers = set(tickers)
         logger.info("Gross settlement tickers updated", count=len(tickers))
 
-    def set_gross_ticker_detail(self, ticker: str, details: dict[str, Any]):
+    def set_gross_ticker_detail(self, ticker: str, details: dict[str, Any]) -> Any:
         """Brüt takaslı hisse detay bilgisi ekle.
 
         Args:
@@ -76,11 +86,11 @@ class GrossSettlementMonitor:
         self._gross_tickers.add(ticker)
         self._gross_tickers_with_details[ticker] = details
 
-    def add_gross_ticker(self, ticker: str):
+    def add_gross_ticker(self, ticker: str) -> Any:
         """Brüt takaslı hisse ekle."""
         self._gross_tickers.add(ticker)
 
-    def remove_gross_ticker(self, ticker: str):
+    def remove_gross_ticker(self, ticker: str) -> Any:
         """Brüt takaslı hisse kaldır."""
         self._gross_tickers.discard(ticker)
         self._gross_tickers_with_details.pop(ticker, None)

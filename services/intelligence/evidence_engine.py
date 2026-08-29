@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 
 
 class ClaimType(StrEnum):
+    """Otomatik eklendi."""
     FACT = "FACT"  # Kaynakta doğrudan yazan
     INFERENCE = "INFERENCE"  # Veriden çıkarılan
     PREDICTION = "PREDICTION"  # Gelecek tahmini
@@ -32,6 +33,7 @@ class ClaimType(StrEnum):
 
 
 class VerificationResult(StrEnum):
+    """Otomatik eklendi."""
     VERIFIED = "VERIFIED"  # Doğrulandı
     UNVERIFIED = "UNVERIFIED"  # Doğrulanamadı
     REJECTED = "REJECTED"  # Reddedildi (yanlış)
@@ -39,6 +41,7 @@ class VerificationResult(StrEnum):
 
 
 class SourceReliability(StrEnum):
+    """Otomatik eklendi."""
     PRIMARY = "PRIMARY"  # Resmi kaynak (KAP, TCMB)
     FINANCIAL = "FINANCIAL"  # Güvenilir finansal veri
     NEWS = "NEWS"  # Güvenilir haber

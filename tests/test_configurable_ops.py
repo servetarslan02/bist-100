@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Configurable Operations Testleri
 
@@ -34,7 +37,7 @@ from services.core.monitoring_security import JWTProvider
 # =====================================================
 
 
-async def test_policy_load_from_file():
+async def test_policy_load_from_file() -> Any:
     """Config dosyasından policy yüklenmeli."""
     issues = []
 
@@ -66,7 +69,7 @@ async def test_policy_load_from_file():
     return "Policy Load From File", len(issues) == 0, issues
 
 
-async def test_policy_fallback_on_missing_file():
+async def test_policy_fallback_on_missing_file() -> Any:
     """Dosya yoksa fallback kullanılmalı."""
     issues = []
 
@@ -81,7 +84,7 @@ async def test_policy_fallback_on_missing_file():
     return "Policy Fallback Missing File", len(issues) == 0, issues
 
 
-async def test_policy_fallback_on_invalid_json():
+async def test_policy_fallback_on_invalid_json() -> Any:
     """Geçersiz JSON'da fallback kullanılmalı."""
     issues = []
 
@@ -98,7 +101,7 @@ async def test_policy_fallback_on_invalid_json():
     return "Policy Fallback Invalid JSON", len(issues) == 0, issues
 
 
-async def test_policy_validation():
+async def test_policy_validation() -> Any:
     """Geçersiz policy değerleri tespit edilmeli."""
     issues = []
 
@@ -126,7 +129,7 @@ async def test_policy_validation():
     return "Policy Validation", len(issues) == 0, issues
 
 
-async def test_policy_reload():
+async def test_policy_reload() -> Any:
     """Config dosyası değişirse reload yapılmalı."""
     issues = []
 
@@ -140,7 +143,7 @@ async def test_policy_reload():
         issues.append("İlk yükleme yanlış")
 
     # Dosyayı güncelle
-    time.sleep(0.1)
+    await asyncio.sleep(0.1)
     with open(config_path, "w") as f:
         f.write(orjson.dumps({"version": 2, "escalation_timeouts": {"cash_negative": 120}}).decode())
 
@@ -154,7 +157,7 @@ async def test_policy_reload():
     return "Policy Reload", len(issues) == 0, issues
 
 
-async def test_policy_reload_no_change():
+async def test_policy_reload_no_change() -> Any:
     """Dosya değişmemişse reload yapılmamalı."""
     issues = []
 
@@ -172,7 +175,7 @@ async def test_policy_reload_no_change():
     return "Policy Reload No Change", len(issues) == 0, issues
 
 
-async def test_policy_default_config():
+async def test_policy_default_config() -> Any:
     """Varsayılan config dosyası oluşturulmalı."""
     issues = []
 
@@ -198,7 +201,7 @@ async def test_policy_default_config():
 # =====================================================
 
 
-async def test_silence_add_and_check():
+async def test_silence_add_and_check() -> Any:
     """Susturma eklenebilmeli ve kontrol edilebilmeli."""
     issues = []
 
@@ -219,7 +222,7 @@ async def test_silence_add_and_check():
     return "Silence Add And Check", len(issues) == 0, issues
 
 
-async def test_silence_fingerprint_specific():
+async def test_silence_fingerprint_specific() -> Any:
     """Belirli fingerprint susturulmalı, diğerleri susturulmamalı."""
     issues = []
 
@@ -235,7 +238,7 @@ async def test_silence_fingerprint_specific():
     return "Silence Fingerprint Specific", len(issues) == 0, issues
 
 
-async def test_silence_expiry():
+async def test_silence_expiry() -> Any:
     """Süresi biten susturma otomatik kalkmalı."""
     issues = []
 
@@ -253,7 +256,7 @@ async def test_silence_expiry():
     return "Silence Expiry", len(issues) == 0, issues
 
 
-async def test_silence_remove():
+async def test_silence_remove() -> Any:
     """Susturma kaldırılabilmeli."""
     issues = []
 
@@ -273,7 +276,7 @@ async def test_silence_remove():
     return "Silence Remove", len(issues) == 0, issues
 
 
-async def test_silence_persistence():
+async def test_silence_persistence() -> Any:
     """Susturma durumu DB'ye kaydedilebilmeli ve yüklenebilmeli."""
     import duckdb
 
@@ -281,7 +284,7 @@ async def test_silence_persistence():
 
     db = duckdb.connect(":memory:")
     db.execute("""CREATE TABLE alert_silences (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         alert_type TEXT, fingerprint TEXT,
         start_time REAL NOT NULL, end_time REAL NOT NULL,
         reason TEXT, created_by TEXT DEFAULT 'system',
@@ -304,7 +307,7 @@ async def test_silence_persistence():
     return "Silence Persistence", len(issues) == 0, issues
 
 
-async def test_silence_in_alerting_system():
+async def test_silence_in_alerting_system() -> Any:
     """Susturma alerting sistemiyle entegre çalışmalı."""
     issues = []
 
@@ -332,7 +335,7 @@ async def test_silence_in_alerting_system():
     return "Silence In Alerting System", len(issues) == 0, issues
 
 
-async def test_silence_active_list():
+async def test_silence_active_list() -> Any:
     """Aktif susturma listesi doğru olmalı."""
     issues = []
 
@@ -354,7 +357,7 @@ async def test_silence_active_list():
 # =====================================================
 
 
-async def test_jwt_hs256_still_works():
+async def test_jwt_hs256_still_works() -> Any:
     """HS256 JWT doğrulama JWKS ile uyumlu olmalı."""
     issues = []
 
@@ -375,7 +378,7 @@ async def test_jwt_hs256_still_works():
     return "JWT HS256 JWKS", len(issues) == 0, issues
 
 
-async def test_jwt_key_selection():
+async def test_jwt_key_selection() -> Any:
     """Key seçimi doğru olmalı (HS256 → secret, RS256 → JWKS)."""
     issues = []
 
@@ -399,7 +402,7 @@ async def test_jwt_key_selection():
     return "JWT Key Selection", len(issues) == 0, issues
 
 
-async def test_jwt_jwks_cache():
+async def test_jwt_jwks_cache() -> Any:
     """JWKS cache TTL doğru çalışmalı."""
     issues = []
 
@@ -419,7 +422,7 @@ async def test_jwt_jwks_cache():
     return "JWT JWKS Cache", len(issues) == 0, issues
 
 
-async def test_jwt_expiration():
+async def test_jwt_expiration() -> Any:
     """Expired token reddedilmeli."""
     issues = []
 
@@ -446,7 +449,7 @@ async def test_jwt_expiration():
 # =====================================================
 
 
-async def test_policy_based_escalation():
+async def test_policy_based_escalation() -> Any:
     """Policy'deki timeout'a göre escalation yapılmalı."""
     issues = []
 
@@ -466,7 +469,7 @@ async def test_policy_based_escalation():
     for a in alerting._alerts:
         a.timestamp = time.time() - 1
 
-    alerting._check_escalations()
+    await alerting._check_escalations()
 
     active = alerting.get_active_alerts()
     if active and active[0]["status"] != "ESCALATED":
@@ -476,7 +479,7 @@ async def test_policy_based_escalation():
     return "Policy Based Escalation", len(issues) == 0, issues
 
 
-async def test_policy_notification_routing():
+async def test_policy_notification_routing() -> Any:
     """Policy routing'e göre bildirim gönderilmeli."""
     issues = []
 
@@ -504,10 +507,11 @@ async def test_policy_notification_routing():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("CONFIGURABLE OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("CONFIGURABLE OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Policy
@@ -549,27 +553,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

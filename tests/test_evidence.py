@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Evidence Verification Test Suite
 """
@@ -5,7 +8,7 @@ ALPHA BIST — Evidence Verification Test Suite
 import sys
 
 
-def test_evidence_engine():
+def test_evidence_engine() -> Any:
     """Evidence Engine testleri."""
     from services.intelligence.evidence_engine import (
         ClaimType,
@@ -22,7 +25,7 @@ def test_evidence_engine():
     claims = evidence_engine.extract_claims(text, "THYAO", "ai")
     assert len(claims) >= 2
     passed += 1
-    print(f"  ✓ Claim extraction: {len(claims)} claims")
+    logger.info(f"  ✓ Claim extraction: {len(claims)} claims")
 
     # 2. Claim type classification
     assert evidence_engine._classify_claim("KAP açıklandı") == ClaimType.FACT
@@ -30,7 +33,7 @@ def test_evidence_engine():
     assert evidence_engine._classify_claim("Tahminime göre yükselecek") == ClaimType.PREDICTION
     assert evidence_engine._classify_claim("Bence bu iyi bir yatırım") == ClaimType.OPINION
     passed += 1
-    print("  ✓ Claim type classification")
+    logger.info("  ✓ Claim type classification")
 
     # 3. Source reliability
     assert evidence_engine._get_source_type("kap.org.tr") == SourceReliability.PRIMARY
@@ -39,7 +42,7 @@ def test_evidence_engine():
     assert evidence_engine._get_source_type("twitter.com") == SourceReliability.SOCIAL
     assert evidence_engine._get_source_type("unknown.com") == SourceReliability.UNKNOWN
     passed += 1
-    print("  ✓ Source reliability")
+    logger.info("  ✓ Source reliability")
 
     # 4. Fact verification (primary source)
     from services.intelligence.evidence_engine import Claim
@@ -55,7 +58,7 @@ def test_evidence_engine():
     assert result.result == VerificationResult.VERIFIED
     assert result.evidence_score >= 70
     passed += 1
-    print(f"  ✓ Fact verification: {result.result.value}, score={result.evidence_score:.0f}")
+    logger.info(f"  ✓ Fact verification: {result.result.value}, score={result.evidence_score:.0f}")
 
     # 5. Prediction verification (lower confidence)
     claim_pred = Claim(
@@ -68,7 +71,7 @@ def test_evidence_engine():
     assert result_pred.claim_type == ClaimType.PREDICTION
     assert result_pred.evidence_score < result.evidence_score  # Daha düşük güven
     passed += 1
-    print(f"  ✓ Prediction: score={result_pred.evidence_score:.0f}")
+    logger.info(f"  ✓ Prediction: score={result_pred.evidence_score:.0f}")
 
     # 6. Social media (low reliability)
     claim_social = Claim(
@@ -81,7 +84,7 @@ def test_evidence_engine():
     assert result_social.source_reliability == SourceReliability.SOCIAL
     assert result_social.evidence_score < result.evidence_score  # Social < Primary
     passed += 1
-    print(f"  ✓ Social media: score={result_social.evidence_score:.0f}")
+    logger.info(f"  ✓ Social media: score={result_social.evidence_score:.0f}")
 
     # 7. Hallucination detection
     halluc = evidence_engine.detect_hallucination(
@@ -91,7 +94,7 @@ def test_evidence_engine():
     assert len(halluc["tickers_mentioned"]) >= 2
     assert len(halluc["prices_mentioned"]) >= 1
     passed += 1
-    print(f"  ✓ Hallucination detection: {len(halluc['tickers_mentioned'])} tickers")
+    logger.info(f"  ✓ Hallucination detection: {len(halluc['tickers_mentioned'])} tickers")
 
     # 8. Batch verification
     batch = [
@@ -102,34 +105,35 @@ def test_evidence_engine():
     assert len(results) == 2
     assert results[0].evidence_score > results[1].evidence_score
     passed += 1
-    print(f"  ✓ Batch: primary={results[0].evidence_score:.0f}, social={results[1].evidence_score:.0f}")
+    logger.info(f"  ✓ Batch: primary={results[0].evidence_score:.0f}, social={results[1].evidence_score:.0f}")
 
     return passed, failed
 
 
-def main():
-    print("=" * 60)
-    print("  Evidence Verification Test Suite")
-    print("=" * 60)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  Evidence Verification Test Suite")
+    logger.info("=" * 60)
 
     total_passed = 0
     total_failed = 0
 
-    print("\n--- Evidence Engine ---")
+    logger.info("\n--- Evidence Engine ---")
     try:
         p, f = test_evidence_engine()
         total_passed += p
         total_failed += f
     except Exception as e:
-        print(f"  ✗ Test crashed: {e}")
+        logger.info(f"  ✗ Test crashed: {e}")
         import traceback
 
         traceback.print_exc()
         total_failed += 1
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
-    print(f"{'=' * 60}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info(f"{'=' * 60}")
 
     return total_failed == 0
 

@@ -59,6 +59,7 @@ class AsyncHTTPClient:
         max_retry_delay_s: float = 30.0,
         headers: dict[str, str] | None = None,
     ) -> None:
+        """Otomatik eklendi."""
         self._timeout = aiohttp.ClientTimeout(total=timeout, connect=min(5.0, timeout / 3))
         self._max_retries = max_retries
         self._base_retry_delay_s = base_retry_delay_s
@@ -133,9 +134,7 @@ class AsyncHTTPClient:
                             return await resp.text()
                         elif resp.status == 429:
                             # Rate limited — Retry-After başlığını oku
-                            wait = float(
-                                resp.headers.get("Retry-After", self._jitter_delay(attempt))
-                            )
+                            wait = float(resp.headers.get("Retry-After", self._jitter_delay(attempt)))
                             logger.warning("Rate limit aşıldı", url=url, wait_s=wait)
                             await asyncio.sleep(wait)
                             continue
@@ -223,10 +222,12 @@ class AsyncHTTPClient:
                 await self._session.close()
                 self._session = None
 
-    async def __aenter__(self) -> "AsyncHTTPClient":
+    async def __aenter__(self) -> AsyncHTTPClient:
+        """Otomatik eklendi."""
         return self
 
     async def __aexit__(self, *args: Any) -> None:
+        """Otomatik eklendi."""
         await self.close()
 
 

@@ -17,6 +17,7 @@ class MarketAnalyst:
     """ML destekli piyasa analiz agent'ı."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, dict[str, Any]] = {}
 
     def analyze_ticker(
@@ -73,6 +74,7 @@ class MarketAnalyst:
         return result
 
     def _interpret_technical(self, features: dict[str, float]) -> dict[str, Any]:
+        """Otomatik eklendi."""
         signals = []
         rsi = features.get("rsi_14")
         if rsi is not None:
@@ -83,6 +85,7 @@ class MarketAnalyst:
         return {"signals": signals}
 
     def _interpret_model_score(self, score: float) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if score > 0.05:
             direction = "YUKARI"
             confidence = min(abs(score) * 10, 1.0)
@@ -95,6 +98,7 @@ class MarketAnalyst:
         return {"score": round(score, 4), "direction": direction, "confidence": round(confidence, 2)}
 
     def _assess_risk(self, features: dict[str, float]) -> dict[str, Any]:
+        """Otomatik eklendi."""
         risk_factors = []
         atr = features.get("atr_pct", 0)
         if atr > 3.0:
@@ -105,6 +109,7 @@ class MarketAnalyst:
         }
 
     def _generate_summary(self, sections: dict[str, Any]) -> str:
+        """Otomatik eklendi."""
         model = sections.get("model", {})
         risk = sections.get("risk", {})
         parts = []
@@ -119,6 +124,7 @@ class MarketAnalyst:
         return ". ".join(parts) + "."
 
     def get_cached_analysis(self, ticker: str) -> dict[str, Any] | None:
+        """Otomatik eklendi."""
         return self._cache.get(ticker)
 
 

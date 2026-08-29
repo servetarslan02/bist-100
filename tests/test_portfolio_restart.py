@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Portfolio State Recovery Testi
 
@@ -16,7 +19,8 @@ from services.core.database_dev import dev_db
 from services.portfolio.main import PortfolioService
 
 
-async def reset_db():
+async def reset_db() -> Any:
+    """Otomatik eklendi."""
     if dev_db._db is None:
         await dev_db.init()
     from conftest import safe_cleanup_tables
@@ -24,7 +28,8 @@ async def reset_db():
     await safe_cleanup_tables(dev_db)
 
 
-async def seed_instruments():
+async def seed_instruments() -> Any:
+    """Otomatik eklendi."""
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('AVIATION', 'H') ON CONFLICT (code) DO NOTHING")
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('BANK', 'B') ON CONFLICT (code) DO NOTHING")
     await dev_db.pg_execute(
@@ -42,11 +47,12 @@ async def seed_instruments():
 
 
 async def get_iid(symbol: str) -> int:
+    """Otomatik eklendi."""
     row = await dev_db.pg_fetchrow("SELECT id FROM instruments WHERE symbol = ?", symbol)
     return row["id"] if row else 0
 
 
-async def test_restart_recovery():
+async def test_restart_recovery() -> Any:
     """Tam restart recovery testi."""
     issues = []
 
@@ -181,7 +187,7 @@ async def test_restart_recovery():
     return "Restart Recovery", len(issues) == 0, issues
 
 
-async def test_restart_empty():
+async def test_restart_empty() -> Any:
     """Boş portfolio restart testi."""
     issues = []
 
@@ -209,7 +215,7 @@ async def test_restart_empty():
     return "Restart Empty", len(issues) == 0, issues
 
 
-async def test_restart_multiple_cycles():
+async def test_restart_multiple_cycles() -> Any:
     """Çoklu restart döngüsü testi."""
     issues = []
 
@@ -265,10 +271,11 @@ async def test_restart_multiple_cycles():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("PORTFOLIO STATE RECOVERY TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("PORTFOLIO STATE RECOVERY TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_restart_recovery,
@@ -289,27 +296,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

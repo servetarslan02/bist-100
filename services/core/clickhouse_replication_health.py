@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — ClickHouse Replication Health Monitor
 
 ReplicatedMergeTree tablolarının replikasyon durumunu kontrol eder.
@@ -17,14 +18,20 @@ from .database import ch_execute
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.clickhouse_replication_health")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -118,4 +125,4 @@ if __name__ == "__main__":
     import orjson
 
     _health = check_replication_health()
-    print(orjson.dumps(_health, option=orjson.OPT_INDENT_2).decode())
+    logger.info(orjson.dumps(_health, option=orjson.OPT_INDENT_2).decode())

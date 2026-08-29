@@ -165,12 +165,13 @@ class ModelTrainer:
     """Her fold için gerçek ML modellerini geçmiş verilerle eğiten sınıf."""
 
     def __init__(self, feature_cols: list[str]):
+        """Otomatik eklendi."""
         self.feature_cols = feature_cols
         self.lgb_model = None
         self.cat_model = None
         self.xgb_model = None
 
-    def retrain_fold(self, train_df: pl.DataFrame):
+    def retrain_fold(self, train_df: pl.DataFrame) -> Any:
         """t-5 öncesi verilerle modelleri fit eder."""
         if len(train_df) < 100:
             return
@@ -260,7 +261,8 @@ class ModelTrainer:
         return results
 
 
-def run_institutional_walkforward_backtest():
+def run_institutional_walkforward_backtest() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — INSTITUTIONAL WALK-FORWARD END-TO-END BACKTEST")
     logger.info("=================================================================")

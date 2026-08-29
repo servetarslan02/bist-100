@@ -24,11 +24,12 @@ class FundamentalProvider:
     """Şirket finansal verilerini çeker (async)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, dict] = {}
         self._cache_ttl_seconds = 3600  # 1 saat cache
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
-    async def _run_sync(self, func, *args, timeout: int = 30, **kwargs):
+    async def _run_sync(self, func, *args, timeout: int = 30, **kwargs) -> Any:
         """Blocking fonksiyonu async olarak çalıştır."""
         loop = asyncio.get_event_loop()
         try:
@@ -76,7 +77,8 @@ class FundamentalProvider:
         try:
             import yfinance as yf
 
-            def _fetch():
+            def _fetch() -> Any:
+                """Otomatik eklendi."""
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 info = t.info
@@ -162,7 +164,8 @@ class FundamentalProvider:
         try:
             import yfinance as yf
 
-            def _fetch():
+            def _fetch() -> Any:
+                """Otomatik eklendi."""
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 qf = t.quarterly_financials
@@ -193,7 +196,8 @@ class FundamentalProvider:
         try:
             import yfinance as yf
 
-            def _fetch():
+            def _fetch() -> Any:
+                """Otomatik eklendi."""
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 bs = t.balance_sheet
@@ -218,7 +222,8 @@ class FundamentalProvider:
         try:
             import yfinance as yf
 
-            def _fetch():
+            def _fetch() -> Any:
+                """Otomatik eklendi."""
                 yf_ticker = f"{ticker}.IS"
                 t = yf.Ticker(yf_ticker)
                 cf = t.cashflow
@@ -287,7 +292,7 @@ class FundamentalProvider:
 
         return summary
 
-    def clear_cache(self, ticker: str | None = None):
+    def clear_cache(self, ticker: str | None = None) -> Any:
         """Cache temizle."""
         if ticker:
             self._cache.pop(ticker, None)

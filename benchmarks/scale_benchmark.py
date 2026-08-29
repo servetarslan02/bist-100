@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Scale Benchmark (Production)
 
@@ -39,7 +42,7 @@ LOOKBACK = 60
 LEGACY_MAX_SCALE = 100  # legacy yol yalnızca bu ölçeğe kadar gerçek çalıştırılır
 
 
-def make_aligned_market(n_stocks, n_days, seed=42):
+def make_aligned_market(n_stocks, n_days, seed=42) -> Any:
     """Gerçek BIST gibi: tüm hisseler aynı işlem takvimini paylaşır."""
     rng = np.random.RandomState(seed)
     pl.date_range(
@@ -65,7 +68,7 @@ def make_aligned_market(n_stocks, n_days, seed=42):
     return market
 
 
-def measure(engine, market):
+def measure(engine, market) -> Any:
     """Tek run ölçümü."""
     proc = psutil.Process()
     rss_before = proc.memory_info().rss
@@ -99,17 +102,18 @@ def measure(engine, market):
     }
 
 
-def main():
-    print("=" * 78)
-    print("  ALPHA BIST — Scale Benchmark (100/500/1000 hisse × 1 yıl)")
-    print("=" * 78)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 78)
+    logger.info("  ALPHA BIST — Scale Benchmark (100/500/1000 hisse × 1 yıl)")
+    logger.info("=" * 78)
 
     report = {"date": datetime.now().isoformat(), "days": DAYS, "lookback": LOOKBACK, "scales": {}}
 
     legacy_cost_per_scan = None  # 100 hisseden ölçülen gerçek maliyet
 
     for scale in SCALES:
-        print(f"\n--- {scale} hisse × {DAYS} gün ---")
+        logger.info(f"\n--- {scale} hisse × {DAYS} gün ---")
         market = make_aligned_market(scale, DAYS)
         cfg = BacktestConfig(lookback_days=LOOKBACK, initial_capital=100000)
         entry = {}
@@ -117,7 +121,7 @@ def main():
         # --- Panel (yeni) yol: her ölçekte gerçek ölçüm ---
         engine_new = BacktestEngineV4(cfg, use_panel_features=True)
         entry["panel"] = measure(engine_new, market)
-        print(
+        logger.info(
             f"  PANEL : {entry['panel']['wall_seconds']:>8.2f}s | "
             f"{entry['panel']['scans_per_second']:>10,.0f} scans/s | "
             f"feature {entry['panel']['feature_seconds']:.2f}s | "
@@ -130,7 +134,7 @@ def main():
             engine_old = BacktestEngineV4(cfg, use_panel_features=False)
             entry["legacy"] = measure(engine_old, market)
             legacy_cost_per_scan = entry["legacy"]["wall_seconds"] / max(entry["legacy"]["total_scans"], 1)
-            print(
+            logger.info(
                 f"  LEGACY: {entry['legacy']['wall_seconds']:>8.2f}s | "
                 f"{entry['legacy']['scans_per_second']:>10,.0f} scans/s | "
                 f"feature {entry['legacy']['feature_seconds']:.2f}s | "
@@ -145,7 +149,7 @@ def main():
                 and entry["legacy"]["total_return_pct"] == entry["panel"]["total_return_pct"]
             )
             entry["equivalence_verified"] = same
-            print(f"  EŞDEĞERLİK: {'✓ BİREBİR' if same else '✗ FARK VAR'}")
+            logger.info(f"  EŞDEĞERLİK: {'✓ BİREBİR' if same else '✗ FARK VAR'}")
         else:
             # Ekstrapolasyon: ölçülen per-scan maliyeti × beklenen scan sayısı
             est_scans = entry["panel"]["total_scans"]  # aynı kontrol akışı → aynı scan sayısı
@@ -159,7 +163,7 @@ def main():
                     f"({legacy_cost_per_scan * 1000:.2f} ms/scan); gerçek çalıştırma yapılmadı"
                 ),
             }
-            print(f"  LEGACY: ~{est_wall:,.0f}s (ekstrapolasyon, {legacy_cost_per_scan * 1000:.2f} ms/scan)")
+            logger.info(f"  LEGACY: ~{est_wall:,.0f}s (ekstrapolasyon, {legacy_cost_per_scan * 1000:.2f} ms/scan)")
 
         if "legacy" in entry:
             entry["speedup"] = round(entry["legacy"]["wall_seconds"] / max(entry["panel"]["wall_seconds"], 1e-9), 1)
@@ -167,7 +171,7 @@ def main():
             entry["speedup"] = round(
                 entry["legacy_extrapolated"]["wall_seconds"] / max(entry["panel"]["wall_seconds"], 1e-9), 1
             )
-        print(f"  HIZLANMA: ~{entry['speedup']}×")
+        logger.info(f"  HIZLANMA: ~{entry['speedup']}×")
 
         report["scales"][str(scale)] = entry
         del market
@@ -204,7 +208,7 @@ def main():
     with open("reports/scale_benchmark.md", "w") as f:
         f.write("\n".join(lines) + "\n")
 
-    print("\nRapor: reports/scale_benchmark.json, reports/scale_benchmark.md")
+    logger.info("\nRapor: reports/scale_benchmark.json, reports/scale_benchmark.md")
     return report
 
 

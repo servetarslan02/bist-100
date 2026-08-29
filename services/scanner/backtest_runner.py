@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class BacktestTrade:
+    """Otomatik eklendi."""
     date: str
     ticker: str
     direction: str
@@ -44,6 +45,7 @@ class BacktestTrade:
     pnl: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "date": self.date,
             "ticker": self.ticker,
@@ -58,17 +60,20 @@ class BacktestTrade:
 
 @dataclass
 class BacktestSignal:
+    """Otomatik eklendi."""
     date: str
     ticker: str
     signal: str
     score: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {"date": self.date, "ticker": self.ticker, "signal": self.signal, "score": round(self.score, 2)}
 
 
 @dataclass
 class DailySnapshot:
+    """Otomatik eklendi."""
     date: str
     equity: float
     cash: float
@@ -78,6 +83,7 @@ class DailySnapshot:
     daily_return: float
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "date": self.date,
             "equity": round(self.equity, 2),
@@ -91,6 +97,7 @@ class DailySnapshot:
 
 @dataclass
 class BacktestResult:
+    """Otomatik eklendi."""
     start_date: str
     end_date: str
     total_scans: int
@@ -106,6 +113,7 @@ class BacktestResult:
     equity_curve: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "start_date": self.start_date,
             "end_date": self.end_date,
@@ -130,23 +138,28 @@ class FeatureCache:
     """Ticker bazında feature cache. Tarih değişince invalidation."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, dict[str, Any]] = {}
         self._date_cache: dict[str, str] = {}  # ticker → son hesap tarihi
 
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
+        """Otomatik eklendi."""
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             return self._cache[ticker]
         return None
 
-    def set(self, ticker: str, date: str, features: dict[str, Any]):
+    def set(self, ticker: str, date: str, features: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
-    def invalidate(self, ticker: str):
+    def invalidate(self, ticker: str) -> Any:
+        """Otomatik eklendi."""
         self._cache.pop(ticker, None)
         self._date_cache.pop(ticker, None)
 
-    def clear(self):
+    def clear(self) -> Any:
+        """Otomatik eklendi."""
         self._cache.clear()
         self._date_cache.clear()
 
@@ -155,15 +168,19 @@ class QualityCache:
     """Data quality sonucu cache."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._cache: dict[str, tuple[bool, float]] = {}
 
     def get(self, ticker: str) -> tuple[bool, float] | None:
+        """Otomatik eklendi."""
         return self._cache.get(ticker)
 
-    def set(self, ticker: str, passed: bool, score: float):
+    def set(self, ticker: str, passed: bool, score: float) -> Any:
+        """Otomatik eklendi."""
         self._cache[ticker] = (passed, score)
 
-    def clear(self):
+    def clear(self) -> Any:
+        """Otomatik eklendi."""
         self._cache.clear()
 
 
@@ -183,6 +200,7 @@ class PortfolioSimulator:
         max_position_pct: float = 0.10,
         max_positions: int = 20,
     ):
+        """Otomatik eklendi."""
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._commission_rate = commission_rate
@@ -196,9 +214,11 @@ class PortfolioSimulator:
         self._prev_equity = initial_capital
 
     def can_buy(self) -> bool:
+        """Otomatik eklendi."""
         return len(self._positions) < self._max_positions and self._cash > 0
 
     def execute_buy(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
+        """Otomatik eklendi."""
         if ticker in self._positions or not self.can_buy():
             return None
         if price <= 0 or np.isnan(price):
@@ -246,6 +266,7 @@ class PortfolioSimulator:
         return trade
 
     def execute_sell(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
+        """Otomatik eklendi."""
         if ticker not in self._positions:
             return None
         if price <= 0 or np.isnan(price):
@@ -280,7 +301,7 @@ class PortfolioSimulator:
         del self._positions[ticker]
         return trade
 
-    def update_equity(self, prices: dict[str, float], date: str):
+    def update_equity(self, prices: dict[str, float], date: str) -> Any:
         """Günlük equity snapshot."""
         market_value = sum(pos["quantity"] * prices.get(t, pos["entry_price"]) for t, pos in self._positions.items())
         equity = self._cash + market_value
@@ -305,6 +326,7 @@ class PortfolioSimulator:
         self._prev_equity = equity
 
     def get_summary(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         if not self._daily_snapshots:
             # Trade-based metrics only
             sell_trades = [t for t in self._trades if t.direction == "SELL"]
@@ -389,6 +411,7 @@ class ScannerBacktestRunner:
         slippage_rate: float = 0.001,
         min_quality_score: float = 70.0,
     ):
+        """Otomatik eklendi."""
         self._calc = feature_calculator
         self._tm = TradabilityMask()
         self._dq = DataQualityV2()
@@ -566,6 +589,7 @@ class ScannerBacktestRunner:
         )
 
     def _empty_result(self, dates) -> BacktestResult:
+        """Otomatik eklendi."""
         return BacktestResult(
             start_date="",
             end_date="",
@@ -595,7 +619,8 @@ class ScannerBacktestRunner:
         - technical: 20% (event ve ML yerine)
         """
 
-        def _s(v):
+        def _s(v) -> Any:
+            """Otomatik eklendi."""
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 
         # Momentum skoru

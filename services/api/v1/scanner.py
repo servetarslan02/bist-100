@@ -1,3 +1,4 @@
+from typing import Any
 """
 Scanner API v2.0 — Tüm endpoint'ler gerçek servislere bağlı ve optimize.
 
@@ -34,14 +35,14 @@ _SCAN_SIGNALS_CACHE = []
 _SCAN_SIGNALS_TIME = 0.0
 
 
-def _get_scan_api():
+def _get_scan_api() -> Any:
     """Scan API singleton'ı al."""
     from ...scanner.scan_api import scan_api
 
     return scan_api
 
 
-def _get_engine():
+def _get_engine() -> Any:
     """Alpha engine singleton'ı al."""
     from ...scanner.alpha_engine import alpha_engine
 
@@ -57,7 +58,7 @@ def _get_engine():
 @router.get("/opportunities")
 async def scanner_signals(
     limit: int = Query(50, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Canlı model sinyalleri ve piyasa fırsatları."""
     global _SCAN_SIGNALS_CACHE, _SCAN_SIGNALS_TIME
     now = time.time()
@@ -293,7 +294,7 @@ async def scanner_signals(
 
 
 @router.get("/status")
-async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tarama durumu — scheduler + dedup + scanner özeti."""
     try:
         api = _get_scan_api()
@@ -310,7 +311,7 @@ async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 
 @router.get("/dashboard")
-async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tam dashboard verisi — tüm modüllerin birleşik özeti."""
     try:
         api = _get_scan_api()
@@ -329,7 +330,7 @@ async def scan_results(
     limit: int = Query(1000, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Son tarama sonuçları."""
     try:
         api = _get_scan_api()
@@ -340,7 +341,7 @@ async def scan_results(
 
 
 @router.get("/tiers")
-async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tier bazlı özet — Tier 0-5 dağılımı + top opportunities."""
     try:
         api = _get_scan_api()
@@ -362,7 +363,7 @@ async def ticker_history(
     days: int = Query(30, ge=1, le=365),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Hisse tarama geçmişi."""
     try:
         api = _get_scan_api()
@@ -377,7 +378,7 @@ async def ticker_history(
 
 
 @router.get("/performance")
-async def scanner_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def scanner_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Scanner performans metrikleri."""
     return {
         "hit_rate_pct": 64.2,
@@ -391,7 +392,7 @@ async def scanner_performance(user=Depends(get_current_user), _=Depends(check_ra
 @router.get("/alerts")
 async def scanner_alerts(
     limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
-):
+) -> Any:
     """Tarayıcı alarmları ve bildirimleri."""
     return {
         "alerts": [
@@ -413,7 +414,7 @@ async def scanner_alerts(
 
 
 @router.get("/filters")
-async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Aktif filtreler."""
     return {
         "filters": [
@@ -426,7 +427,7 @@ async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_l
 
 
 @router.get("/dedup")
-async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Deduplication istatistikleri."""
     return {
         "total_signals_deduped": 420,
@@ -436,7 +437,7 @@ async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 
 @router.get("/scheduler")
-async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Scheduler istatistikleri."""
     return {
         "mode": "CANONICAL_BIST_DAILY",
@@ -457,12 +458,12 @@ async def trigger_scan(
     scan_type: str = Query("manual", pattern="^(manual|batch|event)$"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Manuel tarama tetikle."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
-        asyncio.create_task(run_unified_daily_cycle())
+        task = asyncio.create_task(run_unified_daily_cycle())
         return {"status": "triggered", "scan_type": scan_type, "message": "Unified daily scan & trade cycle queued."}
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -476,7 +477,7 @@ async def report_event(
     title: str = Query("", description="Event başlığı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Event bildirimi."""
     return {
         "event_type": event_type,

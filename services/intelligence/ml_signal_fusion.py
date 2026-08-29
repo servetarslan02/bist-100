@@ -93,6 +93,7 @@ class MLSignalFusion:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._optimized_weights: dict[str, dict[str, float]] = {}  # regime → weights
         self._weight_history: list[dict] = []
 

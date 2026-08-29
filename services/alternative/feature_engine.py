@@ -42,6 +42,7 @@ class AlternativeFeatureEngine:
     """
 
     def __init__(self, llm_client=None):
+        """Otomatik eklendi."""
         self._initialized = False
         self._feature_cache: dict[str, dict[str, float]] = {}
         self._feature_cache_ttl: dict[str, float] = {}
@@ -51,7 +52,7 @@ class AlternativeFeatureEngine:
         if llm_client:
             llm_sentiment.set_llm_client(llm_client)
 
-    def initialize(self):
+    def initialize(self) -> Any:
         """Adapter'ları kaydet."""
         if self._initialized:
             return

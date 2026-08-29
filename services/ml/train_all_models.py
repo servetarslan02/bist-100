@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Master Model Training Pipeline
 
 Tüm ML/AI modellerini gerçek feature matrisleri ve zamansal walk-forward validasyonu ile eğitir:
@@ -23,7 +24,8 @@ from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 logger = structlog.get_logger()
 
 
-def train_all_models():
+def train_all_models() -> Any:
+    """Otomatik eklendi."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST — TÜM MAKİNE ÖĞRENİMİ MODELLERİNİ EĞİTME HATTI")
     logger.info("=================================================================")
@@ -158,7 +160,7 @@ def train_all_models():
     logger.info("=================================================================")
 
 
-def train_all(model_type: str = "lightgbm"):
+def train_all(model_type: str = "lightgbm") -> Any:
     """Backward-compatible wrapper — queue.py bu metodu çağırır."""
     train_all_models()
     return {"model_type": model_type, "status": "completed"}

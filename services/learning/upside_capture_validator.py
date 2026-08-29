@@ -29,6 +29,7 @@ class UpsideCaptureValidator:
     """Validates model's ability to capture upside vs downside moves."""
 
     def __init__(self, min_capture_ratio: float = 0.5):
+        """Otomatik eklendi."""
         self.min_capture_ratio = min_capture_ratio
 
     def validate(
@@ -112,7 +113,6 @@ def detect_market_regime_v2(
         Regime string: BULL_TREND, BEAR_TREND, SIDEWAYS, HIGH_VOL, LOW_VOL
     """
     try:
-
         if hasattr(xu100_close, "filter"):
             hist = xu100_close.filter(xu100_close.index <= current_date)
         else:

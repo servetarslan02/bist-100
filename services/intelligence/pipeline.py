@@ -59,10 +59,12 @@ class IntelligencePipeline:
     """Intelligence modüllerini orchestrator'a bağlayan pipeline."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._modules = {}
         self._load_modules()
 
-    def _load_modules(self):
+    def _load_modules(self) -> Any:
+        """Otomatik eklendi."""
         module_map = {
             "signal_fusion": "services.intelligence.signal_fusion",
             "trade_planner": "services.intelligence.trade_planner",
@@ -163,7 +165,7 @@ class IntelligencePipeline:
             # Parallel pipeline yoksa sync çalıştır
             return self.run(ticker, features, market_data, regime)
 
-    def _run_signal_fusion(self, ticker, features, regime, output):
+    def _run_signal_fusion(self, ticker, features, regime, output) -> Any:
         """SignalFusionEngine.fuse_signals(ticker, signals)"""
         if "signal_fusion" not in self._modules:
             return
@@ -186,7 +188,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"signal_fusion:{str(e)[:80]}")
 
-    def _run_forecasting(self, ticker, features, output):
+    def _run_forecasting(self, ticker, features, output) -> Any:
         """ForecastingEngine.compute_forecasts(ticker, features, historical_returns)"""
         if "forecasting" not in self._modules:
             return
@@ -203,7 +205,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"forecasting:{str(e)[:80]}")
 
-    def _run_trade_planner(self, ticker, features, output):
+    def _run_trade_planner(self, ticker, features, output) -> Any:
         """TradePlanner.create_plan(ticker, price, features, spec_score, spec_category)"""
         if "trade_planner" not in self._modules:
             return
@@ -227,7 +229,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"trade_planner:{str(e)[:80]}")
 
-    def _run_monte_carlo(self, ticker, features, output):
+    def _run_monte_carlo(self, ticker, features, output) -> Any:
         """MonteCarloEngine.simulate_price_paths(ticker, current_price, expected_return_annual, volatility_annual)"""
         if "monte_carlo" not in self._modules:
             return
@@ -259,7 +261,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"monte_carlo:{str(e)[:80]}")
 
-    def _run_factor(self, ticker, features, output):
+    def _run_factor(self, ticker, features, output) -> Any:
         """FactorEngine.compute_factor_scores(ticker, fundamentals, technicals)"""
         if "factor_engine" not in self._modules:
             return
@@ -272,7 +274,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"factor_engine:{str(e)[:80]}")
 
-    def _run_world_state(self, features, output):
+    def _run_world_state(self, features, output) -> Any:
         """WorldStateManager.current_state"""
         if "world_state" not in self._modules:
             return
@@ -286,7 +288,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"world_state:{str(e)[:80]}")
 
-    def _run_spec(self, ticker, features, output):
+    def _run_spec(self, ticker, features, output) -> Any:
         """SPECEngine.compute_spec(ticker, asset_state, market_state)"""
         if "spec_engine" not in self._modules:
             return
@@ -304,13 +306,14 @@ class IntelligencePipeline:
             output.modules_failed.append(f"spec_engine:{str(e)[:80]}")
 
     def get_health(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_modules": 16,
             "loaded_modules": len(self._modules),
             "available": list(self._modules.keys()),
         }
 
-    def _run_probability(self, ticker, features, output):
+    def _run_probability(self, ticker, features, output) -> Any:
         """ProbabilityEngine.compute_return_distribution(ticker, historical_returns)"""
         if "probability" not in self._modules:
             return
@@ -323,7 +326,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"probability:{str(e)[:80]}")
 
-    def _run_evidence(self, ticker, output):
+    def _run_evidence(self, ticker, output) -> Any:
         """EvidenceVerificationEngine.extract_claims(text, ticker)"""
         if "evidence_engine" not in self._modules:
             return
@@ -336,7 +339,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"evidence_engine:{str(e)[:80]}")
 
-    def _run_knowledge_graph(self, ticker, output):
+    def _run_knowledge_graph(self, ticker, output) -> Any:
         """KnowledgeGraph — entity/rel araması"""
         if "knowledge_graph" not in self._modules:
             return
@@ -349,7 +352,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"knowledge_graph:{str(e)[:80]}")
 
-    def _run_impact(self, ticker, features, output):
+    def _run_impact(self, ticker, features, output) -> Any:
         """ImpactEngine.propagate(event_type, event_data, event_id, current_world_state)"""
         if "impact_engine" not in self._modules:
             return
@@ -368,7 +371,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"impact_engine:{str(e)[:80]}")
 
-    def _run_kap_extractor(self, ticker, output):
+    def _run_kap_extractor(self, ticker, output) -> Any:
         """KAPExtractor.extract(ticker, kap_id, title, summary)"""
         if "kap_extractor" not in self._modules:
             return
@@ -381,7 +384,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"kap_extractor:{str(e)[:80]}")
 
-    def _run_analysis_engines(self, features, output):
+    def _run_analysis_engines(self, features, output) -> Any:
         """PriceActionEngine.detect_patterns(open, high, low, close)"""
         if "analysis_engines" not in self._modules:
             return
@@ -399,7 +402,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"analysis_engines:{str(e)[:80]}")
 
-    def _run_macro_sensitivity(self, ticker, features, output):
+    def _run_macro_sensitivity(self, ticker, features, output) -> Any:
         """MacroSensitivityEngine.get_company_sensitivity(ticker, sector)"""
         if "macro_sensitivity" not in self._modules:
             return
@@ -412,7 +415,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"macro_sensitivity:{str(e)[:80]}")
 
-    def _run_research_memory(self, ticker, output):
+    def _run_research_memory(self, ticker, output) -> Any:
         """ResearchMemory.get_ticker_history(ticker, limit)"""
         if "research_memory" not in self._modules:
             return
@@ -424,7 +427,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"research_memory:{str(e)[:80]}")
 
-    def _run_scenario(self, ticker, features, output):
+    def _run_scenario(self, ticker, features, output) -> Any:
         """ScenarioEngine.run_scenario(scenario, positions)"""
         if "scenario" not in self._modules:
             return

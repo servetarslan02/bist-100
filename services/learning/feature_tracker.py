@@ -50,6 +50,7 @@ class FeatureImportanceTracker:
     """SHAP-based feature importance tracking."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._history: deque = deque(maxlen=10000)
         self._last_importance: dict[str, float] = {}
         self._regime_importance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -63,7 +64,7 @@ class FeatureImportanceTracker:
         regime: str = "UNKNOWN",
         model_version: str = "v1",
         sample_size: int | None = None,
-    ):
+    ) -> Any:
         """Feature importance kaydet.
 
         Args:
@@ -352,18 +353,21 @@ class FeatureImportanceTracker:
 
     def save_history(self, path: str) -> None:
         """Feature importance geçmişini dosyaya kaydet (orjson)."""
-        import orjson
         from pathlib import Path
+
+        import orjson
 
         data = []
         for h in self._history:
-            data.append({
-                "date": h.date,
-                "feature": h.feature,
-                "importance": h.importance,
-                "regime": h.regime,
-                "model_version": h.model_version,
-            })
+            data.append(
+                {
+                    "date": h.date,
+                    "feature": h.feature,
+                    "importance": h.importance,
+                    "regime": h.regime,
+                    "model_version": h.model_version,
+                }
+            )
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:

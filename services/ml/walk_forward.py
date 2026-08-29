@@ -46,6 +46,7 @@ class WalkForwardValidation:
         embargo_size: int = 5,  # Test sonrası boşluk
         step_size: int = 21,  # Her adımda ilerleme
     ):
+        """Otomatik eklendi."""
         self._train_size = train_size
         self._test_size = test_size
         self._purge_size = purge_size

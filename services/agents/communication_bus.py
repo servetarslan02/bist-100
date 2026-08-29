@@ -43,6 +43,7 @@ class Resolution:
     agents: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
+        """Otomatik eklendi."""
         return {
             "direction": self.direction,
             "confidence": self.confidence,
@@ -65,12 +66,13 @@ class AgentCommunicationBus:
     """
 
     def __init__(self, max_queue_per_role: int = 100, max_log: int = 1000):
+        """Otomatik eklendi."""
         self._message_queue: dict[AgentRole, list[AgentMessage]] = {role: [] for role in AgentRole}
         self._message_log: list[AgentMessage] = []
         self._max_queue = max_queue_per_role
         self._max_log = max_log
 
-    def send(self, message: AgentMessage):
+    def send(self, message: AgentMessage) -> Any:
         """Mesaj gönder."""
         queue = self._message_queue[message.receiver]
         queue.append(message)
@@ -97,7 +99,7 @@ class AgentCommunicationBus:
         message_type: str,
         payload: dict[str, Any],
         priority: str = "NORMAL",
-    ):
+    ) -> Any:
         """Tüm agent'lara gönder."""
         for role in AgentRole:
             if role != sender:
@@ -163,7 +165,7 @@ class AgentCommunicationBus:
             for m in messages[-limit:]
         ]
 
-    def clear(self):
+    def clear(self) -> Any:
         """Tüm kuyrukları temizle."""
         for role in AgentRole:
             self._message_queue[role] = []

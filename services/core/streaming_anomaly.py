@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Streaming Anomaly Detector v1.0
 
@@ -10,25 +11,31 @@ Veri ingestion anında anomali tespiti:
 Kaynak: Confluent streaming quality, Monte Carlo anomaly detection
 """
 
+import functools
 from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.streaming_anomaly")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -51,6 +58,7 @@ class StreamingAnomalyDetector:
     """
 
     def __init__(self, window_size: int = 100):
+        """Otomatik eklendi."""
         self._window_size = window_size
         self._price_history: dict[str, deque] = {}  # ticker → deque of prices
         self._volume_history: dict[str, deque] = {}

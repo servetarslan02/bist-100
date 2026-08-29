@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 """
 ALPHA BIST — Backtest Integration Test Suite
 
@@ -12,12 +15,11 @@ NIHAI-SPEC doğrultusunda entegrasyon testleri:
 8. Deterministic recovery
 """
 
-from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -48,7 +50,7 @@ def _make_ohlcv(n_days: int = 300, base_price: float = 100.0, seed: int = 42) ->
     return df
 
 
-def _make_market_data(tickers=None, n_days=300):
+def _make_market_data(tickers=None, n_days=300) -> Any:
     """Birden fazla hisse için market data üret."""
     if tickers is None:
         tickers = ["THYAO", "GARAN", "AKBNK", "ASELS", "EREGL"]
@@ -63,7 +65,7 @@ def _make_market_data(tickers=None, n_days=300):
 class TestPortfolioTransactionCosts:
     """TransactionCostEngine entegrasyonu testleri."""
 
-    def test_realistic_costs_include_all_components(self):
+    def test_realistic_costs_include_all_components(self) -> Any:
         """Gerçekçi maliyetler tüm bileşenleri içermeli (spread, slippage, impact)."""
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
@@ -98,7 +100,7 @@ class TestPortfolioTransactionCosts:
         assert legacy_trade.commission + legacy_trade.slippage > 0
         assert realistic_trade.commission + realistic_trade.slippage > 0
 
-    def test_realistic_sell_costs(self):
+    def test_realistic_sell_costs(self) -> Any:
         """SELL işleminde de realistic cost uygulanmalı."""
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
@@ -118,7 +120,7 @@ class TestPortfolioTransactionCosts:
         assert trades[1].commission > 0
         assert trades[1].slippage > 0
 
-    def test_cost_engine_buy_sell_symmetry(self):
+    def test_cost_engine_buy_sell_symmetry(self) -> Any:
         """BUY ve SELL maliyetleri simetrik olmalı (komisyon açısından)."""
         from services.backtest.transaction_costs import bist_transaction_cost
 
@@ -139,7 +141,7 @@ class TestPortfolioTransactionCosts:
 class TestAdvancedMetrics:
     """Gelişmiş metrik testleri."""
 
-    def test_var_cvar_computed(self):
+    def test_var_cvar_computed(self) -> Any:
         """VaR ve CVaR hesaplanmalı."""
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
@@ -162,7 +164,7 @@ class TestAdvancedMetrics:
         if metrics["var_95"] < 0:
             assert metrics["cvar_95"] <= metrics["var_95"], "CVaR should be <= VaR (more extreme losses)"
 
-    def test_max_dd_duration_tracked(self):
+    def test_max_dd_duration_tracked(self) -> Any:
         """Max drawdown duration izlenmeli."""
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
@@ -180,7 +182,7 @@ class TestAdvancedMetrics:
         assert "max_drawdown_duration_days" in metrics
         assert metrics["max_drawdown_duration_days"] >= 0
 
-    def test_sortino_correct_formula(self):
+    def test_sortino_correct_formula(self) -> Any:
         """Sortino formülü doğru: downside deviation = sqrt(mean(min(r,0)^2))."""
         from services.backtest.portfolio_sim import PortfolioSimulatorV3
 
@@ -204,7 +206,7 @@ class TestAdvancedMetrics:
 class TestBuySellAsymmetry:
     """BUY/SELL eşik asimetrisi doğrulaması."""
 
-    def test_buy_requires_higher_score_than_sell(self):
+    def test_buy_requires_higher_score_than_sell(self) -> Any:
         """BUY eşiği SELL eşiğinden yüksek olmalı (hysteresis)."""
         from services.backtest.engine_v4 import BacktestConfig
 
@@ -218,7 +220,7 @@ class TestBuySellAsymmetry:
         # Gap en az 10 puan olmalı
         assert buy_threshold - sell_threshold >= 10, "Hysteresis gap should be >= 10 points"
 
-    def test_score_clipping_bounds(self):
+    def test_score_clipping_bounds(self) -> Any:
         """Score 0-100 arasında clip'lenmeli."""
         from services.backtest.engine_v4 import BacktestEngineV4
 
@@ -252,7 +254,7 @@ class TestBuySellAsymmetry:
 class TestWalkForwardLeakage:
     """Walk-forward leakage koruması testleri."""
 
-    def test_fold_boundaries_respect_purge(self):
+    def test_fold_boundaries_respect_purge(self) -> Any:
         """Fold sınırları purge gap'i korumalı."""
         from services.backtest.walk_forward import WalkForwardEngine
 
@@ -274,7 +276,7 @@ class TestWalkForwardLeakage:
             gap = test_start_idx - train_end_idx - 1
             assert gap >= engine.purge_days, f"Purge gap ({gap}) < required ({engine.purge_days})"
 
-    def test_purge_embargo_split(self):
+    def test_purge_embargo_split(self) -> Any:
         """Purge/embargo split doğru olmalı."""
         from services.backtest.enhanced_walk_forward import PurgeEmbargoWalkForward
 
@@ -297,7 +299,7 @@ class TestWalkForwardLeakage:
 class TestEngineParity:
     """Legacy vs fast yol parity testi."""
 
-    def test_both_paths_same_score(self):
+    def test_both_paths_same_score(self) -> Any:
         """Legacy ve fast yollar aynı skoru üretmeli (aynı feature'larla)."""
         from services.backtest.engine_v4 import BacktestEngineV4
 
@@ -322,7 +324,7 @@ class TestEngineParity:
 class TestDeflatedSharpe:
     """Deflated Sharpe Ratio doğruluğu."""
 
-    def test_deflated_sharpe_with_multiple_strategies(self):
+    def test_deflated_sharpe_with_multiple_strategies(self) -> Any:
         """Çoklu strateji testinde deflated sharpe anlamlı olmalı."""
         from services.backtest.deflated_sharpe import DeflatedSharpeCalculator
 
@@ -344,7 +346,7 @@ class TestDeflatedSharpe:
         # Expected max sharpe < observed olmalı
         assert result.expected_max_sharpe < 2.5
 
-    def test_deflated_sharpe_single_strategy(self):
+    def test_deflated_sharpe_single_strategy(self) -> Any:
         """Tek stratejide deflated sharpe ~ raw sharpe olmalı."""
         from services.backtest.deflated_sharpe import DeflatedSharpeCalculator
 
@@ -357,7 +359,7 @@ class TestDeflatedSharpe:
         # Tek stratejide E[max_SR] ~ 0, dolayısıyla deflated ~ raw
         assert abs(result.deflated_sharpe - 2.0) < 1.0  # Yaklaşık eşit
 
-    def test_probabilistic_sharpe(self):
+    def test_probabilistic_sharpe(self) -> Any:
         """PSR 0-1 arasında olmalı."""
         from services.backtest.deflated_sharpe import ProbabilisticSharpeRatio
 
@@ -377,7 +379,7 @@ class TestDeflatedSharpe:
 class TestBenchmark:
     """Benchmark karşılaştırma testleri."""
 
-    def test_benchmark_comparison_metrics(self):
+    def test_benchmark_comparison_metrics(self) -> Any:
         """Tüm metrikler hesaplanmalı."""
         from services.backtest.benchmark import BenchmarkComparator
 
@@ -403,7 +405,7 @@ class TestBenchmark:
 class TestTransactionCosts:
     """İşlem maliyeti modeli testleri."""
 
-    def test_bist_commission_structure(self):
+    def test_bist_commission_structure(self) -> Any:
         """BIST komisyon yapısı doğru olmalı."""
         from services.backtest.transaction_costs import BISTFeeStructure
 
@@ -413,7 +415,7 @@ class TestTransactionCosts:
         assert fees.mkk_fee_pct == 0.00109
         assert fees.bsmv_rate == 0.05
 
-    def test_spread_tiers(self):
+    def test_spread_tiers(self) -> Any:
         """Likidite katmanlarına göre spread farklı olmalı."""
         from services.backtest.transaction_costs import LiquidityTier, SpreadModel
 
@@ -425,7 +427,7 @@ class TestTransactionCosts:
 
         assert s1 < s2 < s3 < s4, "Spread should increase with lower liquidity"
 
-    def test_market_impact_increases_with_size(self):
+    def test_market_impact_increases_with_size(self) -> Any:
         """Büyük emirler daha fazla market impact yaratmalı."""
         from services.backtest.transaction_costs import MarketImpactModel
 
@@ -435,7 +437,7 @@ class TestTransactionCosts:
 
         assert large_impact > small_impact
 
-    def test_total_cost_round_trip(self):
+    def test_total_cost_round_trip(self) -> Any:
         """Round-trip maliyet pozitif olmalı."""
         from services.backtest.transaction_costs import bist_transaction_cost
 
@@ -454,7 +456,7 @@ class TestTransactionCosts:
 class TestSurvivorship:
     """Survivorship bias testleri."""
 
-    def test_universe_at_date_excludes_delisted(self):
+    def test_universe_at_date_excludes_delisted(self) -> Any:
         """Delist edilen hisseler evrenden çıkarılmalı."""
         from services.backtest.survivorship import DelistingEvent, SurvivorshipBiasHandler
 
@@ -487,7 +489,7 @@ class TestSurvivorship:
 class TestDeterministicRecovery:
     """Deterministik recovery testleri."""
 
-    def test_checkpoint_restore(self):
+    def test_checkpoint_restore(self) -> Any:
         """Checkpoint'ten geri yükleme doğru olmalı."""
         from services.backtest.deterministic import DeterministicRecovery
 
@@ -504,14 +506,15 @@ class TestDeterministicRecovery:
         assert restored_portfolio == portfolio
         assert seed == 42
 
-    def test_idempotency_guard(self):
+    def test_idempotency_guard(self) -> Any:
         """Aynı işlem iki kez çalıştırılmamalı."""
         from services.backtest.deterministic import IdempotencyGuard
 
         guard = IdempotencyGuard()
         call_count = 0
 
-        def expensive_func():
+        def expensive_func() -> Any:
+            """Otomatik eklendi."""
             nonlocal call_count
             call_count += 1
             return 42
@@ -532,7 +535,7 @@ class TestDeterministicRecovery:
 class TestBiasDetector:
     """Bias detection testleri."""
 
-    def test_label_feature_alignment_check(self):
+    def test_label_feature_alignment_check(self) -> Any:
         """Label-feature alignment kontrolü çalışmalı."""
         from services.backtest.bias_detector import LookAheadBiasDetector
 
@@ -563,7 +566,7 @@ class TestBiasDetector:
 class TestScannerParity:
     """Scanner parity testleri."""
 
-    def test_feature_version_lock(self):
+    def test_feature_version_lock(self) -> Any:
         """Feature versiyon kilidi çalışmalı."""
         from services.backtest.scanner_parity import FeatureVersionLock
 
@@ -574,7 +577,7 @@ class TestScannerParity:
         assert lock.validate_version_match("v1.0")
         assert not lock.validate_version_match("v2.0")
 
-    def test_parity_config_hash(self):
+    def test_parity_config_hash(self) -> Any:
         """Parity config hash'i deterministik olmalı."""
         from services.backtest.scanner_parity import ParityConfig
 

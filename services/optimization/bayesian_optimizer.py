@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Çok Çekirdekli (Multi-Core) Yüksek Hızlı Bayesian Optimizasyon Motoru
 ==================================================================================
@@ -50,6 +51,7 @@ class StrategyParameters:
 
 @dataclass
 class OptimizationTrialResult:
+    """Otomatik eklendi."""
     trial_id: int
     params: StrategyParameters
     total_return_pct: float = 0.0
@@ -66,11 +68,12 @@ class BayesianMetricOptimizer:
     """Tüm CPU çekirdeklerini kullanan yüksek hızlı optimizasyon motoru."""
 
     def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame]):
+        """Otomatik eklendi."""
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
 
-    def _precompute_technicals(self):
+    def _precompute_technicals(self) -> Any:
         """Tüm teknik göstergeleri tek bir matriste RAM'e alır."""
         self.tech_cache = {}
         for ticker, df in self.stock_dict.items():
@@ -324,6 +327,7 @@ class BayesianMetricOptimizer:
         trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
+            """Otomatik eklendi."""
             params = StrategyParameters(
                 min_buyer_pressure=trial.suggest_float("min_buyer_pressure", 48.0, 65.0, step=1.0),
                 min_candle_score=trial.suggest_float("min_candle_score", 60.0, 85.0, step=5.0),
@@ -343,7 +347,7 @@ class BayesianMetricOptimizer:
             trial_results.append(res)
 
             if trial.number % 50 == 0:
-                print(
+                logger.info(
                     f"  [İlerleme] Deneme #{trial.number}/{n_trials} | En İyi Fitness: {res.fitness_score:.2f} | Getiri: %{res.total_return_pct:+,.1f}"
                 )
 

@@ -35,10 +35,12 @@ class PhaseResult:
 
     @property
     def success_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self.modules)
 
     @property
     def error_count(self) -> int:
+        """Otomatik eklendi."""
         return len(self.errors)
 
 
@@ -68,10 +70,11 @@ class ParallelIntelligencePipeline:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._modules = {}
         self._load_modules()
 
-    def _load_modules(self):
+    def _load_modules(self) -> Any:
         """Modülleri yükle."""
         module_map = {
             "regime": "services.intelligence.regime",
@@ -288,7 +291,7 @@ class ParallelIntelligencePipeline:
     # Module Runners
     # =====================================================
 
-    async def _safe_run(self, name: str, func, *args):
+    async def _safe_run(self, name: str, func, *args) -> Any:
         """Güvenli modül çalıştırma."""
         if name not in self._modules:
             return None
@@ -299,6 +302,7 @@ class ParallelIntelligencePipeline:
             return None
 
     async def _run_regime(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("regime")
         if not mod:
             return {}
@@ -307,6 +311,7 @@ class ParallelIntelligencePipeline:
         return {"regime": result.regime.value, "confidence": result.confidence}
 
     async def _run_hmm_regime(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("hmm_regime")
         if not mod:
             return {}
@@ -318,6 +323,7 @@ class ParallelIntelligencePipeline:
         return {"regime": result.regime, "confidence": result.confidence, "probabilities": result.probabilities}
 
     async def _run_world_state(self, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("world_state")
         if not mod:
             return {}
@@ -326,6 +332,7 @@ class ParallelIntelligencePipeline:
         return {"state": str(state)} if state else {}
 
     async def _run_macro_sensitivity(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("macro_sensitivity")
         if not mod:
             return {}
@@ -333,6 +340,7 @@ class ParallelIntelligencePipeline:
         return ms.get_company_sensitivity(ticker=ticker, sector="UNKNOWN") or {}
 
     async def _run_factor(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("factor_engine")
         if not mod:
             return {}
@@ -340,6 +348,7 @@ class ParallelIntelligencePipeline:
         return fe.compute_factor_scores(ticker=ticker, fundamentals=features, technicals=features) or {}
 
     async def _run_analysis_engines(self, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("analysis_engines")
         if not mod:
             return {}
@@ -352,6 +361,7 @@ class ParallelIntelligencePipeline:
         return {"patterns": str(patterns)} if patterns is not None else {}
 
     async def _run_evidence(self, ticker: str) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("evidence_engine")
         if not mod:
             return {}
@@ -360,6 +370,7 @@ class ParallelIntelligencePipeline:
         return {"claims_count": len(claims) if claims else 0}
 
     async def _run_impact(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("impact_engine")
         if not mod:
             return {}
@@ -376,6 +387,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_kap_extractor(self, ticker: str) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("kap_extractor")
         if not mod:
             return {}
@@ -383,6 +395,7 @@ class ParallelIntelligencePipeline:
         return ke.extract(ticker=ticker, kap_id="", title="", summary="") or {}
 
     async def _run_forecasting(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("forecasting")
         if not mod:
             return {}
@@ -398,6 +411,7 @@ class ParallelIntelligencePipeline:
         return {}
 
     async def _run_monte_carlo(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("monte_carlo")
         if not mod:
             return {}
@@ -418,6 +432,7 @@ class ParallelIntelligencePipeline:
         }
 
     async def _run_probability(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("probability")
         if not mod:
             return {}
@@ -425,6 +440,7 @@ class ParallelIntelligencePipeline:
         return pe.compute_return_distribution(ticker=ticker, historical_returns=[]) or {}
 
     async def _run_scenario(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("scenario")
         if not mod:
             return {}
@@ -435,6 +451,7 @@ class ParallelIntelligencePipeline:
     async def _run_signal_fusion(
         self, ticker: str, features: dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult
     ) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("signal_fusion")
         if not mod:
             return {}
@@ -485,6 +502,7 @@ class ParallelIntelligencePipeline:
         return result.__dict__ if hasattr(result, "__dict__") else {}
 
     async def _run_spec(self, ticker: str, features: dict, phase1: PhaseResult) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("spec_engine")
         if not mod:
             return {}
@@ -499,6 +517,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_trade_planner(self, ticker: str, features: dict, fusion_modules: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("trade_planner")
         if not mod:
             return {}
@@ -516,6 +535,7 @@ class ParallelIntelligencePipeline:
         )
 
     async def _run_knowledge_graph(self, ticker: str) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("knowledge_graph")
         if not mod:
             return {}
@@ -523,6 +543,7 @@ class ParallelIntelligencePipeline:
         return {"loaded": True}
 
     async def _run_research_memory(self, ticker: str) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("research_memory")
         if not mod:
             return {}
@@ -530,12 +551,14 @@ class ParallelIntelligencePipeline:
         return rm.get_ticker_history(ticker=ticker, limit=5) or {}
 
     async def _run_news_pipeline(self, ticker: str) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("news_pipeline")
         if not mod:
             return {}
         return {"available": True}
 
     async def _run_prediction_layer(self, ticker: str, features: dict) -> dict:
+        """Otomatik eklendi."""
         mod = self._modules.get("prediction_layer")
         if not mod:
             return {}

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
 
 import numpy as np
 import structlog
@@ -80,6 +79,7 @@ class FeatureStabilityAnalyzer:
         ks_alpha: float = 0.05,
         min_samples: int = 50,
     ):
+        """Otomatik eklendi."""
         self.psi_warning = psi_warning
         self.psi_alert = psi_alert
         self.psi_critical = psi_critical

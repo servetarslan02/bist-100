@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Çoklu Veri Akışının (KAP, Haber, Sosyal, Bilanço, Makro)
 Sisteme Kâr ve Koruma Katkısının Matematiksel Kanıtı
@@ -13,9 +15,9 @@ sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-print("=" * 85)
-print("ÇOKLU VERİ AKIŞININ (KAP, HABER, SOSYAL, BİLANÇO, MAKRO) SİSTEME KÂR KANITI")
-print("=" * 85)
+logger.info("=" * 85)
+logger.info("ÇOKLU VERİ AKIŞININ (KAP, HABER, SOSYAL, BİLANÇO, MAKRO) SİSTEME KÂR KANITI")
+logger.info("=" * 85)
 
 scenarios = [
     {
@@ -68,18 +70,18 @@ scenarios = [
 ]
 
 for s in scenarios:
-    print(f"\n>>> {s['case']}")
-    print(f"  • Hisse: {s['ticker']}")
-    print(f"  • Fiyat Durumu: {s['price_action']}")
-    print("  ❌ Sadece Grafiğe Bakan Klasik Robot:")
-    print(f"     - Kararı: {s['pure_technical_decision']}")
-    print(f"     - Getirisi: {s['pure_technical_pnl']}")
-    print("  ✅ KAP + Haber + Sosyal + Bilanço + Makro Beslemeli ALPHA Robot:")
-    print(f"     - Alınan Ek Veriler: {orjson.dumps(s['multi_data_features']).decode()}")
-    print(f"     - Motorun Yorumu: {s['alpha_engine_interpretation']}")
-    print(f"     - Üretilen Karar: {s['alpha_engine_decision']}")
-    print(f"     - Sağlanan Fayda: {s['alpha_engine_pnl']}")
+    logger.info(f"\n>>> {s['case']}")
+    logger.info(f"  • Hisse: {s['ticker']}")
+    logger.info(f"  • Fiyat Durumu: {s['price_action']}")
+    logger.info("  ❌ Sadece Grafiğe Bakan Klasik Robot:")
+    logger.info(f"     - Kararı: {s['pure_technical_decision']}")
+    logger.info(f"     - Getirisi: {s['pure_technical_pnl']}")
+    logger.info("  ✅ KAP + Haber + Sosyal + Bilanço + Makro Beslemeli ALPHA Robot:")
+    logger.info(f"     - Alınan Ek Veriler: {orjson.dumps(s['multi_data_features']).decode()}")
+    logger.info(f"     - Motorun Yorumu: {s['alpha_engine_interpretation']}")
+    logger.info(f"     - Üretilen Karar: {s['alpha_engine_decision']}")
+    logger.info(f"     - Sağlanan Fayda: {s['alpha_engine_pnl']}")
 
-print("\n" + "=" * 85)
-print("ÖZET: ÇOKLU VERİ FÜZYONU YANLIŞ İŞLEMLERİ %35 AZALTIR, SHARPE ORANINI 1.8+'E ÇIKARIR.")
-print("=" * 85)
+logger.info("\n" + "=" * 85)
+logger.info("ÖZET: ÇOKLU VERİ FÜZYONU YANLIŞ İŞLEMLERİ %35 AZALTIR, SHARPE ORANINI 1.8+'E ÇIKARIR.")
+logger.info("=" * 85)

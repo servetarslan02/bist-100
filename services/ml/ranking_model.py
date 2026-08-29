@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class OpportunityScore:
+    """Otomatik eklendi."""
     ticker: str
     score: float
     rank: int
@@ -36,6 +37,7 @@ class OpportunityScore:
 
 @dataclass
 class RankingResult:
+    """Otomatik eklendi."""
     scores: list[OpportunityScore]
     top_k: dict[int, list[OpportunityScore]]
     feature_importance: dict[str, float]
@@ -47,6 +49,7 @@ class RankingModel:
     """LambdaRank + Adjusted-MSE + Rejim-Aware + Ensemble."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._lgbm_model = None
         self._is_trained = False
         self._feature_names = [
@@ -541,6 +544,7 @@ class RankingModel:
             return {}
 
     def get_feature_importance(self) -> dict[str, float]:
+        """Otomatik eklendi."""
         return (
             dict(sorted(self._feature_importance.items(), key=lambda x: x[1], reverse=True))
             if self._feature_importance
@@ -553,6 +557,7 @@ class RankingModel:
         regime: str = "UNKNOWN",
         limit: int = 20,
     ) -> list[dict]:
+        """Otomatik eklendi."""
         result = self.rank(features_map, regime)
         return [
             {

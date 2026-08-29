@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Model Eğitimi & Kilitli Validasyon Çalıştırıcısı
 ============================================================
@@ -17,7 +18,7 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        pass  # logger not yet initialized
+        logger.error("Exception caught", exc_info=True)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -29,43 +30,44 @@ from ml.ensemble_trainer import BistEnsembleTrainer
 logger = structlog.get_logger(__name__)
 
 
-def main():
-    print("=" * 105)
-    print("🤖 ALPHA BIST — 30-YILLIK MAKİNE ÖĞRENİMİ ENSEMBLE EĞİTİMİ (1997 - 2026)")
-    print("=" * 105)
+def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 105)
+    logger.info("🤖 ALPHA BIST — 30-YILLIK MAKİNE ÖĞRENİMİ ENSEMBLE EĞİTİMİ (1997 - 2026)")
+    logger.info("=" * 105)
 
     start_t = time.time()
 
     # 1. Feature Matrix Oluşturma
-    print("\n📦 1. 30 YILLIK FEATURE MATRİSİ VE KOŞULLU BEKLENTİ ÖZELLİKLERİ HESAPLANIYOR...")
+    logger.info("\n📦 1. 30 YILLIK FEATURE MATRİSİ VE KOŞULLU BEKLENTİ ÖZELLİKLERİ HESAPLANIYOR...")
     builder = DatasetBuilder30Y()
     train_df, oos_df = builder.build_feature_matrix()
-    print(f"  • Train Seti (1997-2023) : {len(train_df):,} satır")
-    print(f"  • OOS Seti   (2024-2026) : {len(oos_df):,} satır")
+    logger.info(f"  • Train Seti (1997-2023) : {len(train_df):,} satır")
+    logger.info(f"  • OOS Seti   (2024-2026) : {len(oos_df):,} satır")
 
     # 2. Ensemble Eğitimi
-    print("\n🧠 2. ÇOK MODELLİ ENSEMBLE EĞİTİLİYOR (LightGBM + XGBoost + CatBoost)...")
+    logger.info("\n🧠 2. ÇOK MODELLİ ENSEMBLE EĞİTİLİYOR (LightGBM + XGBoost + CatBoost)...")
     trainer = BistEnsembleTrainer(train_df=train_df, oos_df=oos_df)
     summary = trainer.train_all()
 
     elapsed = time.time() - start_t
 
     # 3. Sonuç Raporu
-    print("\n" + "=" * 105)
-    print(f"🏆 MODEL EĞİTİMİ VE DOĞRULAMA TAMAMLANDI! (Toplam Süre: {elapsed:.1f} saniye)")
-    print("=" * 105)
-    print("📊 ENSEMBLE PERFORMANS METRİKLERİ:")
-    print(f"  • OOS Information Coefficient (IC) : {summary['ensemble_metrics']['oos_information_coefficient_ic']:.4f}")
-    print(f"  • OOS R² Skoru                     : {summary['ensemble_metrics']['oos_r2_score']:.4f}")
-    print(f"  • Eğitilen Modeller                : {', '.join(summary['models_trained'])}")
+    logger.info("\n" + "=" * 105)
+    logger.info(f"🏆 MODEL EĞİTİMİ VE DOĞRULAMA TAMAMLANDI! (Toplam Süre: {elapsed:.1f} saniye)")
+    logger.info("=" * 105)
+    logger.info("📊 ENSEMBLE PERFORMANS METRİKLERİ:")
+    logger.info(f"  • OOS Information Coefficient (IC) : {summary['ensemble_metrics']['oos_information_coefficient_ic']:.4f}")
+    logger.info(f"  • OOS R² Skoru                     : {summary['ensemble_metrics']['oos_r2_score']:.4f}")
+    logger.info(f"  • Eğitilen Modeller                : {', '.join(summary['models_trained'])}")
 
-    print("\n🔑 EN ÖNEMLİ 5 ÖZNİTELİK (SHAP / FEATURE IMPORTANCE):")
+    logger.info("\n🔑 EN ÖNEMLİ 5 ÖZNİTELİK (SHAP / FEATURE IMPORTANCE):")
     for idx, (feat, imp) in enumerate(list(summary["top_feature_importances"].items())[:5], 1):
-        print(f"  {idx}. {feat:<20} : %{imp:.2f}")
+        logger.info(f"  {idx}. {feat:<20} : %{imp:.2f}")
 
-    print("\n💾 Modeller başarıyla kaydedildi: 'ml/saved_models/'")
-    print("📁 Metrikler kaydedildi: 'data/model_metrics.json'")
-    print("=" * 105)
+    logger.info("\n💾 Modeller başarıyla kaydedildi: 'ml/saved_models/'")
+    logger.info("📁 Metrikler kaydedildi: 'data/model_metrics.json'")
+    logger.info("=" * 105)
 
 
 if __name__ == "__main__":

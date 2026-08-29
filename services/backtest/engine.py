@@ -143,7 +143,7 @@ class BacktestEngine:
         slippage_pct,
         dump_ledger,
         trades_writer,
-    ):
+    ) -> Any:
         """T+1 bekleyen emirleri execute et."""
         for order in pending_orders:
             ticker = order["ticker"]
@@ -286,7 +286,7 @@ class BacktestEngine:
         trailing_stop_pct,
         current_date,
         all_dates,
-    ):
+    ) -> Any:
         """Stop-loss ve trailing stop kontrolü, satışlar."""
         total_market_value = 0.0
         to_sell = []
@@ -336,7 +336,7 @@ class BacktestEngine:
 
         return capital, trade_id, total_market_value
 
-    def _queue_day_signals(self, current_date, signals_by_date, day_prices, pending_orders, market_regime):
+    def _queue_day_signals(self, current_date, signals_by_date, day_prices, pending_orders, market_regime) -> Any:
         """Gün sonu sinyallerini T+1 kuyruğuna ekle."""
         if current_date not in signals_by_date:
             return
@@ -369,7 +369,7 @@ class BacktestEngine:
         dump_ledger,
         daily_writer,
         current_date,
-    ):
+    ) -> Any:
         """Gün sonu muhasebeleştirme."""
         total_market_value = 0.0
         for t, p in positions.items():
@@ -414,7 +414,8 @@ class BacktestEngine:
         stop_loss_pct: float = 0.07,
         trailing_stop_pct: float = 0.15,
         market_regime: float = 1.0,
-    ):
+    ) -> Any:
+        """Otomatik eklendi."""
         import csv
         import os
         from collections import defaultdict
@@ -445,6 +446,8 @@ class BacktestEngine:
         exposure_history = []
         trade_id = 0
 
+        import contextlib
+        stack = contextlib.ExitStack()
         trades_writer = None
         daily_writer = None
         trades_file = None
@@ -456,8 +459,8 @@ class BacktestEngine:
             daily_csv_path = "data/ledgers/continuous_oos_daily.csv"
 
             # For continuous OOS, we want to overwrite cleanly
-            trades_file = open(trades_csv_path, "w", newline="", encoding="utf-8")
-            daily_file = open(daily_csv_path, "w", newline="", encoding="utf-8")
+            trades_file = stack.enter_context(open(trades_csv_path, "w", newline="", encoding="utf-8"))
+            daily_file = stack.enter_context(open(daily_csv_path, "w", newline="", encoding="utf-8"))
 
             trades_writer = csv.writer(trades_file)
             daily_writer = csv.writer(daily_file)
@@ -578,10 +581,7 @@ class BacktestEngine:
                 current_date,
             )
 
-        if dump_ledger and trades_file:
-            trades_file.close()
-        if dump_ledger and daily_file:
-            daily_file.close()
+        stack.close()
 
         metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
 

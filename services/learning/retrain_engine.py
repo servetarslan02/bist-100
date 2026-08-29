@@ -58,6 +58,7 @@ class RetrainEngine:
     """Walk-forward validated retrain orchestrator."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._retrain_history: deque = deque(maxlen=500)
         self._last_retrain: RetrainResult | None = None
         self._retrain_count: int = 0

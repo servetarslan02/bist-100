@@ -22,6 +22,7 @@ SLIPPAGE_RATE = 0.0010  # %0.10 slippage
 
 @dataclass
 class RiskParityParameters:
+    """Otomatik eklendi."""
     # Risk Yönetimi
     risk_per_trade_pct: float = 0.010  # Her işlemde portföyün en fazla %1.0'ı riske atılır
     max_position_size_pct: float = 0.10  # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
@@ -51,6 +52,7 @@ class RiskParityParameters:
 
 @dataclass
 class RiskAuditResult:
+    """Otomatik eklendi."""
     total_return_pct: float = 0.0
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
@@ -67,6 +69,7 @@ class RiskParityEngine:
     """Kurumsal Risk Parity ve Teyitli Kriz Kontrol Motoru."""
 
     def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame], sector_map: dict[str, str] = None):
+        """Otomatik eklendi."""
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self.sector_map = sector_map or {}  # {ticker: sector_name}
@@ -74,7 +77,7 @@ class RiskParityEngine:
             logger.warning("sector_map boş — sektör yoğunlaşma kontrolü devre dışı")
         self._precompute_technicals()
 
-    def _precompute_technicals(self):
+    def _precompute_technicals(self) -> Any:
         """Teknik göstergeleri RAM'e önbellekler."""
         self.tech_cache = {}
         for ticker, df in self.stock_dict.items():

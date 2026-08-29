@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Config Loader Testleri
 
@@ -21,7 +24,7 @@ from services.core.config_loader import ConfigLoader
 # =====================================================
 
 
-def test_config_load_from_file():
+def test_config_load_from_file() -> Any:
     """Config dosyasından yükleme çalışmalı."""
     ConfigLoader.reset()
     issues = []
@@ -39,7 +42,7 @@ def test_config_load_from_file():
     return "Config Load From File", len(issues) == 0, issues
 
 
-def test_config_dot_notation():
+def test_config_dot_notation() -> Any:
     """Dot notation ile erişim çalışmalı."""
     ConfigLoader.reset()
     issues = []
@@ -69,7 +72,7 @@ def test_config_dot_notation():
     return "Config Dot Notation", len(issues) == 0, issues
 
 
-def test_config_type_accessors():
+def test_config_type_accessors() -> Any:
     """Tip erişim metodları çalışmalı."""
     ConfigLoader.reset()
     issues = []
@@ -105,7 +108,7 @@ def test_config_type_accessors():
 # =====================================================
 
 
-def test_env_override():
+def test_env_override() -> Any:
     """Environment variable override çalışmalı."""
     ConfigLoader.reset()
     issues = []
@@ -138,7 +141,7 @@ def test_env_override():
     return "Env Override", len(issues) == 0, issues
 
 
-def test_env_type_conversion():
+def test_env_type_conversion() -> Any:
     """Env değişkenleri doğru tipe çevrilmeli."""
     ConfigLoader.reset()
     issues = []
@@ -170,7 +173,7 @@ def test_env_type_conversion():
 # =====================================================
 
 
-def test_secret_from_env():
+def test_secret_from_env() -> Any:
     """Secret'lar ENV'den okunmalı, config dosyasından değil."""
     ConfigLoader.reset()
     issues = []
@@ -189,7 +192,7 @@ def test_secret_from_env():
     return "Secret From Env", len(issues) == 0, issues
 
 
-def test_secret_empty_when_not_set():
+def test_secret_empty_when_not_set() -> Any:
     """ENV yoksa secret boş dönmeli."""
     ConfigLoader.reset()
     issues = []
@@ -214,7 +217,7 @@ def test_secret_empty_when_not_set():
 # =====================================================
 
 
-def test_environment_detection():
+def test_environment_detection() -> Any:
     """Ortam tespiti doğru olmalı."""
     ConfigLoader.reset()
     issues = []
@@ -244,7 +247,7 @@ def test_environment_detection():
 # =====================================================
 
 
-def test_deep_merge():
+def test_deep_merge() -> Any:
     """Deep merge çalışmalı."""
     issues = []
 
@@ -271,10 +274,11 @@ def test_deep_merge():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("CONFIG LOADER TESTLERİ")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("CONFIG LOADER TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_config_load_from_file,
@@ -301,23 +305,23 @@ def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

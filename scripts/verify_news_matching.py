@@ -1,3 +1,5 @@
+import structlog
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — TÜM 629+ BIST HİSSESİ HABER & KAP EŞLEŞTİRME KANITI
 Belli başlı hisseler değil, borsadaki 629+ hissenin tamamı için haber/KAP yakalama doğrulaması.
@@ -14,9 +16,9 @@ if sys.platform == "win32":
 from services.ingestion.bist_universe import bist_universe
 from services.ingestion.providers.news_provider import news_provider
 
-print("=" * 85)
-print("BIST TÜM HİSSELER İÇİN DİNAMİK HABER & KAP EŞLEŞTİRME TESTİ")
-print("=" * 85)
+logger.info("=" * 85)
+logger.info("BIST TÜM HİSSELER İÇİN DİNAMİK HABER & KAP EŞLEŞTİRME TESTİ")
+logger.info("=" * 85)
 
 test_cases = [
     {
@@ -48,20 +50,20 @@ test_cases = [
 ]
 
 total_stocks = len(bist_universe.BIST_ALL_TICKERS)
-print(f"\n✓ Dinamik Evrendeki Toplam Hisse Sayısı: {total_stocks} hisse")
+logger.info(f"\n✓ Dinamik Evrendeki Toplam Hisse Sayısı: {total_stocks} hisse")
 
-print("\nEşleştirme Doğrulaması:")
+logger.info("\nEşleştirme Doğrulaması:")
 all_passed = True
 for tc in test_cases:
     matched = news_provider.match_news_to_ticker(tc["news"], tc["ticker"])
     status = "BAŞARILI" if matched == tc["expected"] else "HATALI"
     if matched != tc["expected"]:
         all_passed = False
-    print(f'  [{status}] Ticker: {tc["ticker"]:<6} | Haber: "{tc["news"]["title"][:55]}..." -> Eşleşti: {matched}')
+    logger.info(f'  [{status}] Ticker: {tc["ticker"]:<6} | Haber: "{tc["news"]["title"][:55]}..." -> Eşleşti: {matched}')
 
 if all_passed:
-    print("\n" + "=" * 85)
-    print("KANITLANDI: HABERLER VE KAP AKIŞI BORSADAKİ TÜM HİSSELERİ (629+) KAPSAMAKTADIR.")
-    print("=" * 85)
+    logger.info("\n" + "=" * 85)
+    logger.info("KANITLANDI: HABERLER VE KAP AKIŞI BORSADAKİ TÜM HİSSELERİ (629+) KAPSAMAKTADIR.")
+    logger.info("=" * 85)
 else:
     sys.exit(1)

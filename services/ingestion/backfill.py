@@ -32,6 +32,7 @@ logger = structlog.get_logger()
 
 
 class BackfillPriority(StrEnum):
+    """Otomatik eklendi."""
     CRITICAL = "CRITICAL"  # Son 1 gün
     HIGH = "HIGH"  # Son 1 hafta
     MEDIUM = "MEDIUM"  # Son 1 ay
@@ -51,6 +52,7 @@ class DataGap:
 
     @property
     def gap_days(self) -> float:
+        """Otomatik eklendi."""
         return (self.gap_end - self.gap_start).total_seconds() / 86400
 
 
@@ -98,6 +100,7 @@ class BackfillManager:
         delay_between_chunks: float = 2.0,
         delay_between_tickers: float = 0.5,
     ):
+        """Otomatik eklendi."""
         self._max_lookback_days = max_lookback_days
         self._chunk_size = chunk_size
         self._delay_chunks = delay_between_chunks
@@ -421,7 +424,7 @@ class BackfillManager:
 
         return count
 
-    def stop(self):
+    def stop(self) -> Any:
         """Backfill'i durdur."""
         self._running = False
 

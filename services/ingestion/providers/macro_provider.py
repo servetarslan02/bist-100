@@ -70,6 +70,7 @@ class MacroProvider:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._client = get_client("macro", timeout=20.0, max_retries=3)
         self._tcmb_client = get_client("tcmb", timeout=30.0, max_retries=3)
         self._cache: dict[str, Any] = {}
@@ -83,9 +84,11 @@ class MacroProvider:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 
         async def _fetch_one(name: str, symbol: str) -> tuple:
+            """Otomatik eklendi."""
             try:
 
-                def _get():
+                def _get() -> Any:
+                    """Otomatik eklendi."""
                     t = yf.Ticker(symbol)
                     info = t.info
                     return {
@@ -128,6 +131,7 @@ class MacroProvider:
         start_date = (datetime.now(UTC) - timedelta(days=30)).strftime("%d-%m-%Y")
 
         async def _fetch_series(name: str, series_code: str) -> tuple:
+            """Otomatik eklendi."""
             try:
                 url = (
                     f"https://evds2.tcmb.gov.tr/service/evds/series={series_code}"
@@ -174,6 +178,7 @@ class MacroProvider:
         results = {}
 
         async def _fetch_series(name: str, series_id: str) -> tuple:
+            """Otomatik eklendi."""
             try:
                 url = "https://api.stlouisfed.org/fred/series/observations"
                 params = {

@@ -4,29 +4,36 @@ Merkezi risk kontrolÃ¼ â€” order gÃ¶nderilmeden Ã¶nce.
 Fail-safe, fail-closed.
 """
 
+import functools
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.risk_gate")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class RiskDecision:
+    """Otomatik eklendi."""
     allowed: bool
     reason: str = ""
     checks_passed: int = 0
@@ -34,6 +41,7 @@ class RiskDecision:
     details: dict[str, Any] = None
 
     def __post_init__(self):
+        """Otomatik eklendi."""
         if self.details is None:
             self.details = {}
 
@@ -51,6 +59,7 @@ class RiskGate:
         daily_loss_limit_pct: float = 5.0,
         macro_stress_threshold_pct: float = -15.0,
     ):
+        """Otomatik eklendi."""
         self.max_position_pct = max_position_pct
         self.max_portfolio_exposure_pct = max_portfolio_exposure_pct
         self.max_single_order_pct = max_single_order_pct
@@ -150,7 +159,7 @@ class RiskGate:
         reason = "; ".join(reasons) if reasons else "All checks passed"
         return RiskDecision(allowed, reason, checks_passed, checks_failed, details)
 
-    def _check_circuit_breakers(self, circuit_open: bool, ticker: str, details: dict):
+    def _check_circuit_breakers(self, circuit_open: bool, ticker: str, details: dict) -> Any:
         """Devre kesici ve fiyat limiti kontrolleri."""
         if circuit_open:
             return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
@@ -172,7 +181,7 @@ class RiskGate:
 
     def _check_position_limits(
         self, ticker, side, quantity, price, portfolio_value, current_positions, model_confidence
-    ):
+    ) -> Any:
         """Pozisyon boyutu ve confidence kontrolleri."""
         passed = failed = 0
         details = {}
@@ -215,7 +224,7 @@ class RiskGate:
 
         return passed, failed, details, reasons
 
-    def _check_bist_rules(self, ticker, side, price, order_value, portfolio_value, current_positions):
+    def _check_bist_rules(self, ticker, side, price, order_value, portfolio_value, current_positions) -> Any:
         """BIST kurallarÄ±: aÃ§Ä±ÄŸa satÄ±ÅŸ, halt, SPK uyumluluk."""
         passed = failed = 0
         details = {}
@@ -257,7 +266,7 @@ class RiskGate:
 
         return passed, failed, details
 
-    def _check_monte_carlo_var(self, mc_var_95, mc_cvar_95):
+    def _check_monte_carlo_var(self, mc_var_95, mc_cvar_95) -> Any:
         """Monte Carlo VaR/CVaR kontrolÃ¼."""
         passed = failed = 0
         reasons = []
@@ -274,7 +283,7 @@ class RiskGate:
         return passed, failed, reasons
 
     @otel_trace("risk_gate.set_macro_stress_result")
-    def set_macro_stress_result(self, stress_result: dict[str, Any]):
+    def set_macro_stress_result(self, stress_result: dict[str, Any]) -> Any:
         """Macro stres testi sonucunu risk gate'e besle."""
         self._macro_stress_result = stress_result
 
@@ -294,11 +303,12 @@ class RiskGate:
             return {"error": str(e)}
 
     @otel_trace("risk_gate.update_daily_pnl")
-    def update_daily_pnl(self, pnl: float):
+    def update_daily_pnl(self, pnl: float) -> Any:
+        """Otomatik eklendi."""
         self._daily_pnl = pnl
 
     @otel_trace("risk_gate.sync_daily_pnl")
-    def sync_daily_pnl(self):
+    def sync_daily_pnl(self) -> Any:
         """PortfolioManager'dan gÃ¼nlÃ¼k P&L otomatik Ã§ek."""
         try:
             from services.portfolio.portfolio_manager import portfolio_manager
@@ -315,10 +325,10 @@ class RiskGate:
             logger.debug("Daily PnL sync skipped", error=str(e))
 
     @otel_trace("risk_gate.reset_daily")
-    def reset_daily(self):
+    def reset_daily(self) -> Any:
+        """Otomatik eklendi."""
         self._daily_pnl = 0.0
 
 
 # Singleton
 risk_gate = RiskGate()
-

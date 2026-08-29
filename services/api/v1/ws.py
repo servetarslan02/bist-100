@@ -34,7 +34,9 @@ except ImportError:
 
 
 class ConnectionManager:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         # Kanal bazlı aktif WebSocket bağlantıları: "live", "radar", "events"
         self.active_connections: dict[str, set[WebSocket]] = {
             "live": set(),
@@ -44,7 +46,8 @@ class ConnectionManager:
         # Bağlantı format tercihi: websocket -> "json" | "protobuf"
         self._client_format: dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json"):
+    async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json") -> Any:
+        """Otomatik eklendi."""
         await websocket.accept()
         if channel not in self.active_connections:
             self.active_connections[channel] = set()
@@ -54,13 +57,15 @@ class ConnectionManager:
             f"WS client connected to channel: {channel} format: {fmt} (Total: {len(self.active_connections[channel])})"
         )
 
-    def disconnect(self, websocket: WebSocket, channel: str):
+    def disconnect(self, websocket: WebSocket, channel: str) -> Any:
+        """Otomatik eklendi."""
         if channel in self.active_connections and websocket in self.active_connections[channel]:
             self.active_connections[channel].remove(websocket)
             self._client_format.pop(websocket, None)
             logger.debug(f"WS client disconnected from {channel}")
 
-    async def broadcast(self, channel: str, message: dict[str, Any]):
+    async def broadcast(self, channel: str, message: dict[str, Any]) -> Any:
+        """Otomatik eklendi."""
         if channel not in self.active_connections or not self.active_connections[channel]:
             return
 
@@ -159,7 +164,8 @@ def _get_ws_format(websocket: WebSocket) -> str:
 
 
 @router.websocket("/live")
-async def websocket_live(websocket: WebSocket):
+async def websocket_live(websocket: WebSocket) -> Any:
+    """Otomatik eklendi."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "live", fmt)
     try:
@@ -185,7 +191,8 @@ async def websocket_live(websocket: WebSocket):
 
 
 @router.websocket("/radar")
-async def websocket_radar(websocket: WebSocket):
+async def websocket_radar(websocket: WebSocket) -> Any:
+    """Otomatik eklendi."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "radar", fmt)
     try:
@@ -210,7 +217,8 @@ async def websocket_radar(websocket: WebSocket):
 
 
 @router.websocket("/events")
-async def websocket_events(websocket: WebSocket):
+async def websocket_events(websocket: WebSocket) -> Any:
+    """Otomatik eklendi."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "events", fmt)
     try:
@@ -235,7 +243,7 @@ async def websocket_events(websocket: WebSocket):
 
 
 @router.websocket("/binary")
-async def websocket_binary(websocket: WebSocket):
+async def websocket_binary(websocket: WebSocket) -> Any:
     """Binary WebSocket — custom binary protocol.
 
     En küçük paket boyutu. Özel binary encoding.

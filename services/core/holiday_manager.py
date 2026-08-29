@@ -22,13 +22,13 @@ v2.0 DEĞİŞİKLİKLERİ:
 from __future__ import annotations
 
 import asyncio
+import functools
 import os
 import re
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -36,15 +36,22 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.holiday_manager")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 # =====================================================
 # 0. PROXY DESTEĞİ (BIST engelli bölgeler için)
@@ -484,6 +491,7 @@ class KAPHolidayWatcher:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._last_check: datetime | None = None
         self._last_announcement_time: datetime | None = None
         self._announced_holidays: set[date] = set()
@@ -516,9 +524,11 @@ class KAPHolidayWatcher:
         return new_holidays
 
     def get_last_announcement_time(self) -> datetime | None:
+        """Otomatik eklendi."""
         return self._last_announcement_time
 
     def get_announced_holidays(self) -> set[date]:
+        """Otomatik eklendi."""
         return self._announced_holidays.copy()
 
 
@@ -539,6 +549,7 @@ class SuddenHolidayDetector:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._confirmed_holidays: set[date] = set()
         self._suspected_holidays: dict[date, int] = {}  # date → fail count
         self._kap_watcher = KAPHolidayWatcher()
@@ -582,9 +593,11 @@ class SuddenHolidayDetector:
         return True
 
     def is_confirmed_holiday(self, d: date) -> bool:
+        """Otomatik eklendi."""
         return d in self._confirmed_holidays
 
     def get_confirmed(self) -> set[date]:
+        """Otomatik eklendi."""
         return self._confirmed_holidays.copy()
 
 
@@ -604,6 +617,7 @@ class HolidayManager:
     """
 
     def __init__(self, data_dir: str = "data"):
+        """Otomatik eklendi."""
         self._data_dir = Path(data_dir)
         self._data_dir.mkdir(exist_ok=True)
         self._cache_file = self._data_dir / "holiday_cache.json"

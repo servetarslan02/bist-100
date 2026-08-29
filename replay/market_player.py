@@ -18,6 +18,7 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 
 class PlaybackSpeed(Enum):
+    """Otomatik eklendi."""
     REALTIME = 1.0
     FAST_10X = 10.0
     FAST_100X = 100.0
@@ -26,6 +27,7 @@ class PlaybackSpeed(Enum):
 
 @dataclass
 class TickData:
+    """Otomatik eklendi."""
     timestamp: datetime
     ticker: str
     open: float
@@ -36,6 +38,7 @@ class TickData:
     phase: str = "CONTINUOUS"
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -52,6 +55,7 @@ class MarketPlayer:
     """Geçmiş piyasa verisini oynatan motor."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._data: pl.DataFrame | None = None
         self._tickers: list[str] = []
         self._is_playing: bool = False
@@ -129,10 +133,12 @@ class MarketPlayer:
 
         return result
 
-    def set_speed(self, speed: PlaybackSpeed):
+    def set_speed(self, speed: PlaybackSpeed) -> Any:
+        """Otomatik eklendi."""
         self._speed = speed
 
-    def on_tick(self, callback: Callable):
+    def on_tick(self, callback: Callable) -> Any:
+        """Otomatik eklendi."""
         self._on_tick_callbacks.append(callback)
 
     def play(self, start_index: int = 0, max_ticks: int | None = None) -> Generator[TickData, None, None]:
@@ -203,17 +209,21 @@ class MarketPlayer:
         finally:
             self._is_playing = False
 
-    def pause(self):
+    def pause(self) -> Any:
+        """Otomatik eklendi."""
         self._is_paused = True
 
-    def resume(self):
+    def resume(self) -> Any:
+        """Otomatik eklendi."""
         self._is_paused = False
 
-    def stop(self):
+    def stop(self) -> Any:
+        """Otomatik eklendi."""
         self._is_playing = False
         self._is_paused = False
 
     def get_status(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "is_playing": self._is_playing,
             "is_paused": self._is_paused,

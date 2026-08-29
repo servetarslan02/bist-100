@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — 10/10 Candlestick & Price Action Engine vs Baseline Benchmark
 ==========================================================================
@@ -38,12 +41,13 @@ BIST_TEST_STOCKS = [
 ]
 
 
-def run_benchmark():
-    print("=" * 80)
-    print("BIST-100 GERÇEK HİSSE VERİLERİ ÜZERİNDE 10/10 MUM MOTORU A/B TESTİ")
-    print("=" * 80)
-    print("Test Edilen Hisseler : 15 Öncü BIST-100 Hissesi")
-    print("Test Periyodu        : Son 1 Yıl (Günlük Gerçek Mumlar)\n")
+def run_benchmark() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 80)
+    logger.info("BIST-100 GERÇEK HİSSE VERİLERİ ÜZERİNDE 10/10 MUM MOTORU A/B TESTİ")
+    logger.info("=" * 80)
+    logger.info("Test Edilen Hisseler : 15 Öncü BIST-100 Hissesi")
+    logger.info("Test Periyodu        : Son 1 Yıl (Günlük Gerçek Mumlar)\n")
 
     # Gerçek verileri çek
     raw_data = yf.download(BIST_TEST_STOCKS, period="1y", interval="1d", progress=False, group_by="ticker")
@@ -114,7 +118,8 @@ def run_benchmark():
             continue
 
     # İstatistiksel Karşılaştırma
-    def calc_stats(trades):
+    def calc_stats(trades) -> Any:
+        """Otomatik eklendi."""
         if not trades:
             return {"count": 0, "win_rate": 0, "avg_ret": 0, "profit_factor": 0, "total_ret": 0}
         df_t = pl.DataFrame(trades)
@@ -135,23 +140,23 @@ def run_benchmark():
     s_base = calc_stats(baseline_trades)
     s_adv = calc_stats(advanced_trades)
 
-    print("-" * 80)
-    print(f"{'METRİK':<30} | {'ESKİ SİSTEM (Baseline)':<22} | {'YENİ 10/10 MUM MOTORU':<22}")
-    print("-" * 80)
-    print(f"{'Üretilen Sinyal Sayısı':<30} | {s_base['count']:<22} | {s_adv['count']:<22}")
-    print(
+    logger.info("-" * 80)
+    logger.info(f"{'METRİK':<30} | {'ESKİ SİSTEM (Baseline)':<22} | {'YENİ 10/10 MUM MOTORU':<22}")
+    logger.info("-" * 80)
+    logger.info(f"{'Üretilen Sinyal Sayısı':<30} | {s_base['count']:<22} | {s_adv['count']:<22}")
+    logger.info(
         f"{'Kazanma Oranı (Win Rate)':<30} | %{s_base['win_rate']:<21} | %{s_adv['win_rate']:<21} (ARTIŞ: +%{s_adv['win_rate'] - s_base['win_rate']:.1f})"
     )
-    print(f"{'İşlem Başına Ort. Getiri':<30} | %{s_base['avg_ret']:<21} | %{s_adv['avg_ret']:<21}")
-    print(f"{'Kar / Zarar Çarpanı (Profit Factor)':<30} | {s_base['profit_factor']:<22} | {s_adv['profit_factor']:<22}")
-    print(f"{'Kümülatif Toplam Alpha':<30} | +%{s_base['total_ret']:<20} | +%{s_adv['total_ret']:<20}")
-    print("-" * 80)
+    logger.info(f"{'İşlem Başına Ort. Getiri':<30} | %{s_base['avg_ret']:<21} | %{s_adv['avg_ret']:<21}")
+    logger.info(f"{'Kar / Zarar Çarpanı (Profit Factor)':<30} | {s_base['profit_factor']:<22} | {s_adv['profit_factor']:<22}")
+    logger.info(f"{'Kümülatif Toplam Alpha':<30} | +%{s_base['total_ret']:<20} | +%{s_adv['total_ret']:<20}")
+    logger.info("-" * 80)
 
     if s_adv["win_rate"] > s_base["win_rate"] and s_adv["profit_factor"] > s_base["profit_factor"]:
-        print(
+        logger.info(
             "✅ KANITLANDI: 10/10 Mum ve Price Action Motoru, eski sisteme kıyasla hem Kazanma Oranında hem de Kar Çarpanında belirgin üstünlük sağladı!"
         )
-    print("=" * 80)
+    logger.info("=" * 80)
 
 
 if __name__ == "__main__":

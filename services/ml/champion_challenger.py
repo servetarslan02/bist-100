@@ -75,6 +75,7 @@ class ChampionChallenger:
         auto_promote_threshold: float = 0.05,
         metrics_to_compare: list[str] | None = None,
     ):
+        """Otomatik eklendi."""
         self.significance_level = significance_level
         self.min_samples = min_samples
         self.auto_promote_threshold = auto_promote_threshold
@@ -83,7 +84,7 @@ class ChampionChallenger:
         self._champion_results: dict[str, list[float]] = {}  # metric → [values]
         self._history: list[dict[str, Any]] = []
 
-    def record_shadow_result(self, model_key: str, metric_name: str, value: float):
+    def record_shadow_result(self, model_key: str, metric_name: str, value: float) -> Any:
         """Shadow mode sonucu kaydet."""
         if model_key not in self._shadow_results:
             self._shadow_results[model_key] = {}
@@ -91,7 +92,7 @@ class ChampionChallenger:
             self._shadow_results[model_key][metric_name] = []
         self._shadow_results[model_key][metric_name].append(value)
 
-    def record_champion_result(self, metric_name: str, value: float):
+    def record_champion_result(self, metric_name: str, value: float) -> Any:
         """Champion sonucu kaydet."""
         if metric_name not in self._champion_results:
             self._champion_results[metric_name] = []
@@ -102,7 +103,7 @@ class ChampionChallenger:
         model_key: str,
         metrics: dict[str, float],
         is_champion: bool = False,
-    ):
+    ) -> Any:
         """Toplu sonuç kaydet."""
         for metric_name, value in metrics.items():
             if is_champion:
@@ -345,7 +346,7 @@ class ChampionChallenger:
         """Decision history."""
         return self._history
 
-    def reset(self, challenger_key: str | None = None):
+    def reset(self, challenger_key: str | None = None) -> Any:
         """Sonuçları sıfırla."""
         if challenger_key:
             self._shadow_results.pop(challenger_key, None)

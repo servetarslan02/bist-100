@@ -87,6 +87,7 @@ class ProviderManager:
         rate_limiter_instance: RateLimiter | None = None,
         circuit_breaker_manager: CircuitBreakerManager | None = None,
     ):
+        """Otomatik eklendi."""
         self._providers: dict[str, list[ProviderConfig]] = {}  # data_type → providers
         self._health: dict[str, ProviderHealth] = {}
         self._rate_limiter = rate_limiter_instance or rate_limiter
@@ -102,7 +103,7 @@ class ProviderManager:
         timeout_s: float = 30.0,
         retry_policy: RetryPolicy | None = None,
         circuit_breaker_config: dict | None = None,
-    ):
+    ) -> Any:
         """Provider kaydet."""
         if data_type not in self._providers:
             self._providers[data_type] = []
@@ -259,7 +260,8 @@ class ProviderManager:
         """
         semaphore = asyncio.Semaphore(5)  # Max 5 paralel
 
-        async def _fetch_one(ticker: str):
+        async def _fetch_one(ticker: str) -> Any:
+            """Otomatik eklendi."""
             async with semaphore:
                 return ticker, await self.fetch(data_type, *args, ticker=ticker, **kwargs)
 
@@ -330,7 +332,7 @@ class ProviderManager:
             "total_providers": sum(len(providers) for providers in self._providers.values()),
         }
 
-    def enable_provider(self, data_type: str, name: str):
+    def enable_provider(self, data_type: str, name: str) -> Any:
         """Provider'ı etkinleştir."""
         for p in self._providers.get(data_type, []):
             if p.name == name:
@@ -338,7 +340,7 @@ class ProviderManager:
                 logger.info("Provider enabled", data_type=data_type, name=name)
                 return
 
-    def disable_provider(self, data_type: str, name: str):
+    def disable_provider(self, data_type: str, name: str) -> Any:
         """Provider'ı devre dışı bırak."""
         for p in self._providers.get(data_type, []):
             if p.name == name:

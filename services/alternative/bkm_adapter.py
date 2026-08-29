@@ -180,8 +180,8 @@ class BKMAdapter(BaseAdapter):
         if not data:
             return {}
 
-        # Placeholder veri kontrolü
-        if data.get("data_source") == "placeholder":
+        # Sentetik/test veri kontrolü
+        if data.get("data_source") in ("mock", "placeholder"):
             return {}
 
         features = {

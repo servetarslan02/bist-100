@@ -20,6 +20,7 @@ logger = structlog.get_logger()
 
 
 class OrderStatus(StrEnum):
+    """Otomatik eklendi."""
     CREATED = "CREATED"
     VALIDATED = "VALIDATED"
     RISK_APPROVED = "RISK_APPROVED"
@@ -34,11 +35,13 @@ class OrderStatus(StrEnum):
 
 
 class OrderSide(StrEnum):
+    """Otomatik eklendi."""
     BUY = "BUY"
     SELL = "SELL"
 
 
 class OrderType(StrEnum):
+    """Otomatik eklendi."""
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOP_LIMIT = "STOP_LIMIT"

@@ -111,6 +111,7 @@ class FeatureRegistry:
     """Feature kayıt ve yönetim merkezi."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._contracts: dict[str, FeatureContract] = {}
         self._register_defaults()
 

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — BIST Universe v5.0 (Full Dynamic Auto-Discovery)
 Borsa İstanbul'daki TÜM hisseleri (600+ hisse) canlı kaynaklardan dinamik olarak yönetir.
@@ -15,10 +16,11 @@ class BISTUniverse:
     """BIST hisse evreni — 100% Dinamik Canlı Keşif."""
 
     def __init__(self, use_auto_discovery: bool = True):
+        """Otomatik eklendi."""
         self.logger = structlog.get_logger()
         self._updater = universe_updater
 
-    def refresh(self):
+    def refresh(self) -> Any:
         """Hisse evrenini canlı kaynaklardan yeniden tara."""
         self._updater.refresh_universe()
 
@@ -92,10 +94,12 @@ BIST_ALL = bist_universe.BIST_ALL_TICKERS
 
 
 def get_bist_universe() -> list[str]:
+    """Otomatik eklendi."""
     return bist_universe.get_tickers()
 
 
 def get_sector(ticker: str) -> str:
+    """Otomatik eklendi."""
     return bist_universe.get_ticker_sector(ticker)
 
 

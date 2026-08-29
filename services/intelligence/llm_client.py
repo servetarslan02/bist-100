@@ -44,6 +44,7 @@ class LLMClient:
     """
 
     def __init__(self, model_name: str = "gemini-2.5-flash"):
+        """Otomatik eklendi."""
         self.model_name = model_name or "gemini-2.5-flash"
         self.api_key = self._load_api_key()
         self._new_client = None
@@ -98,7 +99,7 @@ class LLMClient:
 
         return None
 
-    def _initialize_gemini(self):
+    def _initialize_gemini(self) -> Any:
         """Gemini API'yi başlat."""
         if GENAI_NEW_AVAILABLE:
             try:

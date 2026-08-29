@@ -1,14 +1,15 @@
+from __future__ import annotations
+
+from typing import Any
 """
 ALPHA BIST — Alpha Engine v2.0 (Enterprise-Grade)
 """
 
-from __future__ import annotations
 
 import datetime
 import functools
 import hashlib
 from pathlib import Path
-from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -26,14 +27,19 @@ tracer = trace.get_tracer("alpha-bist.alpha_engine")
 meter = metrics.get_meter("alpha-bist.alpha_engine")
 
 
-def otel_trace(span_name: str):
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -47,7 +53,7 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     return pl.from_pandas(df)
 
 
-def _detect_gpu_cuda():
+def _detect_gpu_cuda() -> Any:
     """Detect NVIDIA GPU CUDA capability."""
     try:
         import torch
@@ -60,7 +66,9 @@ def _detect_gpu_cuda():
 
 
 class AlphaEngine:
+    """Otomatik eklendi."""
     def __init__(self, exclude_features: list[str] = None):
+        """Otomatik eklendi."""
         has_gpu, dev_name = _detect_gpu_cuda()
         self.has_gpu = has_gpu
         self.gpu_device_name = dev_name
@@ -83,7 +91,8 @@ class AlphaEngine:
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
     @otel_trace("alpha_engine.fetch_data")
-    def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None):
+    def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None) -> Any:
+        """Otomatik eklendi."""
         if tickers is None:
             tickers = (
                 bist_universe.BIST_100_TICKERS
@@ -142,7 +151,8 @@ class AlphaEngine:
         train_end: datetime.datetime,
         snapshot_offsets: list[int] = None,
         forward_days: int = 20,
-    ):
+    ) -> Any:
+        """Otomatik eklendi."""
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
         rows = []
@@ -220,7 +230,8 @@ class AlphaEngine:
         return X, y, all_keys
 
     @otel_trace("alpha_engine.train")
-    def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True):
+    def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True) -> Any:
+        """Otomatik eklendi."""
         t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
         t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
@@ -255,7 +266,8 @@ class AlphaEngine:
         return True
 
     @otel_trace("alpha_engine.predict")
-    def predict(self, market_data, bm_df, sector_map, target_date_str: str):
+    def predict(self, market_data, bm_df, sector_map, target_date_str: str) -> Any:
+        """Otomatik eklendi."""
         if not self.model:
             raise ValueError("Model not trained")
 
@@ -295,7 +307,8 @@ class AlphaEngine:
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
 
-    def _save_model(self, path: str = "data/alpha_engine_model.pkl"):
+    def _save_model(self, path: str = "data/alpha_engine_model.pkl") -> Any:
+        """Otomatik eklendi."""
         if self.model is None:
             return
         try:
@@ -314,6 +327,7 @@ class AlphaEngine:
             logger.warning("Failed to save AlphaEngine model", error=str(e))
 
     def _load_model(self, path: str = "data/alpha_engine_model.pkl", max_age_hours: int = 24) -> bool:
+        """Otomatik eklendi."""
         if not Path(path).exists():
             return False
         try:
@@ -339,7 +353,8 @@ class AlphaEngine:
             return False
 
     @otel_trace("alpha_engine.run_daily_pipeline")
-    def run_daily_pipeline(self, date: str):
+    def run_daily_pipeline(self, date: str) -> Any:
+        """Otomatik eklendi."""
         end_date_dt = datetime.datetime.strptime(date, "%Y-%m-%d")
         start_date_dt = end_date_dt - datetime.timedelta(days=400)
 

@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — gRPC Server v2.0 (Protobuf Native)
 
@@ -29,21 +30,27 @@ try:
 except ImportError:
     HAS_PROTOBUF = False
 
-import structlog
 import functools
+
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.grpc_server")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -57,20 +64,21 @@ def _extract_correlation_from_context(context) -> None:
         if cid:
             correlation_id_var.set(cid)
     except (ImportError, Exception):
-        pass
+        logger.error("Exception caught", exc_info=True)
 
 
 class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBUF else object):
     """Piyasa verisi gRPC servisi — Protobuf native."""
 
     @otel_trace("grpc.server.StreamTicks")
-    def StreamTicks(self, request, context):
+    def StreamTicks(self, request, context) -> Any:
         """Anlık fiyat stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
         tickers = list(request.tickers)
         logger.info("gRPC StreamTicks started", tickers=tickers)
 
-        async def _generate():
+        async def _generate() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -96,7 +104,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
         return _generate()
 
     @otel_trace("grpc.server.GetTick")
-    def GetTick(self, request, context):
+    def GetTick(self, request, context) -> Any:
         """Tek seferlik fiyat (Protobuf)."""
         _extract_correlation_from_context(context)
         ticker = request.tickers[0] if request.tickers else ""
@@ -119,12 +127,13 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
     """Sinyal gRPC servisi — Protobuf native."""
 
     @otel_trace("grpc.server.StreamSignals")
-    def StreamSignals(self, request, context):
+    def StreamSignals(self, request, context) -> Any:
         """Sinyal stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
         min_confidence = request.min_confidence if hasattr(request, "min_confidence") else 0.5
 
-        async def _generate():
+        async def _generate() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -150,7 +159,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
         return _generate()
 
     @otel_trace("grpc.server.GetRecentSignals")
-    def GetRecentSignals(self, request, context):
+    def GetRecentSignals(self, request, context) -> Any:
         """Son sinyalleri al (Protobuf)."""
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
@@ -179,11 +188,12 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
     """Portföy gRPC servisi — Protobuf native."""
 
     @otel_trace("grpc.server.StreamPortfolio")
-    def StreamPortfolio(self, request, context):
+    def StreamPortfolio(self, request, context) -> Any:
         """Portföy durumu stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
 
-        async def _generate():
+        async def _generate() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -218,7 +228,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
         return _generate()
 
     @otel_trace("grpc.server.GetPortfolio")
-    def GetPortfolio(self, request, context):
+    def GetPortfolio(self, request, context) -> Any:
         """Anlık portföy durumu (Protobuf)."""
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
@@ -249,11 +259,12 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
     """Risk gRPC servisi — Protobuf native."""
 
     @otel_trace("grpc.server.StreamRisk")
-    def StreamRisk(self, request, context):
+    def StreamRisk(self, request, context) -> Any:
         """Risk metrikleri stream'i (Protobuf binary)."""
         _extract_correlation_from_context(context)
 
-        async def _generate():
+        async def _generate() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     from ..core.redis_helper import get_cached
@@ -277,7 +288,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
         return _generate()
 
     @otel_trace("grpc.server.GetRisk")
-    def GetRisk(self, request, context):
+    def GetRisk(self, request, context) -> Any:
         """Anlık risk durumu (Protobuf)."""
         _extract_correlation_from_context(context)
         from ..core.redis_helper import get_cached
@@ -294,7 +305,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
         )
 
 
-async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
+async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051) -> Any:
     """gRPC sunucusunu başlat — tüm servisleri register eder.
 
     Best Practices:
@@ -388,7 +399,8 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
 
 if __name__ == "__main__":
 
-    async def main():
+    async def main() -> Any:
+        """Otomatik eklendi."""
         server = await start_grpc_server()
         if server:
             await server.wait_for_termination()

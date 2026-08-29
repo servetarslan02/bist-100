@@ -18,6 +18,7 @@ logger = structlog.get_logger()
 
 
 class ActionType(StrEnum):
+    """Otomatik eklendi."""
     DIVIDEND = "DIVIDEND"  # Temettü
     STOCK_SPLIT = "STOCK_SPLIT"  # Bölünme
     BONUS_SHARE = "BONUS_SHARE"  # Bedelsiz sermaye artırımı
@@ -62,10 +63,11 @@ class CorporateActionsHandler:
     """Şirket olaylarını yönetir ve fiyat/portföy düzeltmeleri yapar."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._actions: dict[str, list[CorporateAction]] = {}  # ticker -> actions
         self._applied: set = set()  # action_id'leri
 
-    def add_action(self, action: CorporateAction):
+    def add_action(self, action: CorporateAction) -> Any:
         """Şirket olayı ekle."""
         if not action.ticker or not action.ticker.strip():
             logger.warning("Corporate action rejected: empty ticker", action_id=action.action_id)
@@ -235,7 +237,7 @@ class CorporateActionsHandler:
             return (price + action.rights_price * action.rights_ratio) / (1 + action.rights_ratio)
         return price
 
-    def load_from_kap(self, kap_events: list[dict[str, Any]]):
+    def load_from_kap(self, kap_events: list[dict[str, Any]]) -> Any:
         """KAP'tan gelen şirket olaylarını yükle."""
         if not kap_events:
             return

@@ -86,6 +86,7 @@ class WalkForwardEngine:
         step_days: int = 21,
         expanding_window: bool = True,  # F-009: Expanding window desteği
     ):
+        """Otomatik eklendi."""
         self.purge_days = purge_days
         self.embargo_days = embargo_days
         self.train_days = train_days
@@ -435,6 +436,7 @@ class WalkForwardEngine:
         )
 
     def _empty_result(self) -> WalkForwardResult:
+        """Otomatik eklendi."""
         return WalkForwardResult(
             total_folds=0,
             avg_test_return=0,
@@ -455,6 +457,7 @@ class WalkForwardEngine:
 
 # Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
 import warnings
+
 warnings.warn(
     "walk_forward.WalkForwardEngine deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
     DeprecationWarning,

@@ -54,6 +54,7 @@ class StackingEnsemble:
     """
 
     def __init__(self, config: StackingConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or StackingConfig()
         self._base_models: dict[str, Any] = {}
         self._meta_learner = None
@@ -64,7 +65,7 @@ class StackingEnsemble:
         self._training_history: list[dict[str, Any]] = []
         self._diversity_scores: dict[str, float] = {}
 
-    def add_model(self, name: str, model: Any, weight: float = 1.0):
+    def add_model(self, name: str, model: Any, weight: float = 1.0) -> Any:
         """Base model ekle."""
         self._base_models[name] = model
         self._model_weights[name] = weight
@@ -361,7 +362,7 @@ class StackingEnsemble:
 
         return meta_features
 
-    def _create_meta_learner(self):
+    def _create_meta_learner(self) -> Any:
         """Meta-learner oluştur."""
         from sklearn.linear_model import ElasticNet, LinearRegression, LogisticRegression, Ridge
 
@@ -379,7 +380,7 @@ class StackingEnsemble:
         meta_features: np.ndarray,
         y: np.ndarray,
         regimes: np.ndarray,
-    ):
+    ) -> Any:
         """Her rejim için ayrı meta-learner eğit."""
         unique_regimes = np.unique(regimes)
         for regime in unique_regimes:
@@ -395,7 +396,7 @@ class StackingEnsemble:
             except Exception as e:
                 logger.warning("regime_meta_learner_failed", regime=regime, error=str(e))
 
-    def _compute_diversity(self, X: np.ndarray):
+    def _compute_diversity(self, X: np.ndarray) -> Any:
         """Model diversity hesapla — farklı modeller farklı tahminler yapmalı."""
         all_preds = []
         for name, model in self._base_models.items():
@@ -432,7 +433,7 @@ class StackingEnsemble:
         X: np.ndarray,
         y: np.ndarray,
         regimes: np.ndarray,
-    ):
+    ) -> Any:
         """Her rejim için optimal ağırlıkları hesapla."""
         unique_regimes = np.unique(regimes)
 
@@ -495,6 +496,7 @@ class StackingEnsemble:
         # Rank IC (Spearman)
         try:
             from scipy.stats import spearmanr
+
             rank_ic, _ = spearmanr(val_pred, y_val)
             rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
         except Exception:
@@ -527,16 +529,16 @@ class StackingEnsemble:
     ) -> np.ndarray:
         """Rejim geçişlerinde ağırlık smoothing.
 
-        Ani rejim değişimlerinde ağırlıkları kademeli olarak değiştirir.
+                Ani rejim değişimlerinde ağırlıkları kademeli olarak değiştirir.
 
-        Args:
-            X: Feature matrix
-n            current_regime: Mevcut rejim
-            previous_regime: Önceki rejim (None = ilk tahmin)
-            smoothing_factor: Smoothing hızı (0 = tam smoothing, 1 = anlık geçiş)
+                Args:
+                    X: Feature matrix
+        n            current_regime: Mevcut rejim
+                    previous_regime: Önceki rejim (None = ilk tahmin)
+                    smoothing_factor: Smoothing hızı (0 = tam smoothing, 1 = anlık geçiş)
 
-        Returns:
-            Smoothed predictions
+                Returns:
+                    Smoothed predictions
         """
         if previous_regime is None or previous_regime == current_regime:
             return self.predict(X, regime=current_regime)
@@ -598,6 +600,7 @@ n            current_regime: Mevcut rejim
             # Rank IC
             try:
                 from scipy.stats import spearmanr
+
                 rank_ic, _ = spearmanr(preds[finite_mask], y_regime[finite_mask])
                 rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
             except Exception:
@@ -622,8 +625,10 @@ n            current_regime: Mevcut rejim
 
     @property
     def is_fitted(self) -> bool:
+        """Otomatik eklendi."""
         return self._is_fitted
 
     @property
     def base_model_names(self) -> list[str]:
+        """Otomatik eklendi."""
         return list(self._base_models.keys())

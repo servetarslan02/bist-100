@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — FAZ 4.5 Test Suite
 
@@ -14,7 +17,8 @@ import numpy as np
 import polars as pl
 
 
-def _make_ohlcv(n_days, start_price=100.0, seed=42):
+def _make_ohlcv(n_days, start_price=100.0, seed=42) -> Any:
+    """Otomatik eklendi."""
     rng = np.random.RandomState(seed)
     dates = pl.date_range(
         date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days * 2), timedelta(days=1), eager=True
@@ -33,7 +37,7 @@ def _make_ohlcv(n_days, start_price=100.0, seed=42):
 # ────────────────────────────────────────────────────────────
 
 
-def test_canonical_feature_registry():
+def test_canonical_feature_registry() -> Any:
     """Feature registry regex yerine statik listeden türetilmeli."""
     from services.core.canonical_scoring import CANONICAL_FEATURE_REGISTRY, get_canonical_features
 
@@ -67,7 +71,7 @@ def test_canonical_feature_registry():
     # CANONICAL_FEATURE_REGISTRY ile aynı
     assert features == list(CANONICAL_FEATURE_REGISTRY)
 
-    print(f"  ✓ Registry: {len(features)} features, no regex, all critical present")
+    logger.info(f"  ✓ Registry: {len(features)} features, no regex, all critical present")
     passed += 1
 
     return passed, failed
@@ -78,7 +82,7 @@ def test_canonical_feature_registry():
 # ────────────────────────────────────────────────────────────
 
 
-def test_walk_forward_uses_registry():
+def test_walk_forward_uses_registry() -> Any:
     """Walk-forward runner _get_canonical_feature_names registry kullanmalı."""
     from services.core.canonical_scoring import get_canonical_features
 
@@ -96,7 +100,7 @@ def test_walk_forward_uses_registry():
 
     assert wf_features == features, f"Feature mismatch: WF has {len(wf_features)}, registry has {len(features)}"
 
-    print(f"  ✓ Walk-forward uses registry: {len(wf_features)} features match")
+    logger.info(f"  ✓ Walk-forward uses registry: {len(wf_features)} features match")
     passed += 1
 
     return passed, failed
@@ -107,7 +111,7 @@ def test_walk_forward_uses_registry():
 # ────────────────────────────────────────────────────────────
 
 
-def test_multi_horizon_model():
+def test_multi_horizon_model() -> Any:
     """MultiHorizonModel birden fazla horizon modeli tutmalı."""
     from services.ml.lightgbm_trainer import (
         LightGBMTrainer,
@@ -159,7 +163,7 @@ def test_multi_horizon_model():
         multi.horizon_models[5] = model_5d
 
     if not multi.horizon_models:
-        print("  ⚠ No models trained, skip")
+        logger.info("  ⚠ No models trained, skip")
         return 0, 0
 
     # Primary prediction
@@ -181,7 +185,7 @@ def test_multi_horizon_model():
     # Available horizons
     assert multi.available_horizons == sorted(multi.horizon_models.keys())
 
-    print(f"  ✓ Multi-horizon: {multi.available_horizons}, primary={multi.primary_horizon}, predictions={all_preds}")
+    logger.info(f"  ✓ Multi-horizon: {multi.available_horizons}, primary={multi.primary_horizon}, predictions={all_preds}")
     passed += 1
 
     return passed, failed
@@ -192,7 +196,7 @@ def test_multi_horizon_model():
 # ────────────────────────────────────────────────────────────
 
 
-def test_horizon_aware_purge():
+def test_horizon_aware_purge() -> Any:
     """Her horizon kendi purge gap'ini kullanmalı (purge >= horizon)."""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
 
@@ -226,10 +230,10 @@ def test_horizon_aware_purge():
 
     if model_1d is not None:
         # 1d purge 5 gün
-        print(f"  ✓ 1d: train={model_1d.train_samples}, train_end={model_1d.train_date_range[1]}")
+        logger.info(f"  ✓ 1d: train={model_1d.train_samples}, train_end={model_1d.train_date_range[1]}")
         passed += 1
     else:
-        print("  ⚠ 1d model None")
+        logger.info("  ⚠ 1d model None")
         passed += 1
 
     if model_20d is not None:
@@ -237,11 +241,11 @@ def test_horizon_aware_purge():
         assert model_20d.train_samples <= (model_1d.train_samples if model_1d else 999), (
             "20d should have fewer train samples (larger purge)"
         )
-        print(f"  ✓ 20d: train={model_20d.train_samples} (≤ 1d={model_1d.train_samples if model_1d else 'N/A'})")
+        logger.info(f"  ✓ 20d: train={model_20d.train_samples} (≤ 1d={model_1d.train_samples if model_1d else 'N/A'})")
         passed += 1
     else:
         # 20d yeterli veri olmayabilir — bu da geçerli
-        print("  ✓ 20d: None (insufficient data for 20d horizon — expected)")
+        logger.info("  ✓ 20d: None (insufficient data for 20d horizon — expected)")
         passed += 1
 
     return passed, failed
@@ -252,7 +256,7 @@ def test_horizon_aware_purge():
 # ────────────────────────────────────────────────────────────
 
 
-def test_feature_parity():
+def test_feature_parity() -> Any:
     """Model hangi feature'ları bekliyorsa inference aynı sırada üretmeli."""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, validate_feature_contract
 
@@ -281,7 +285,7 @@ def test_feature_parity():
     )
 
     if model is None:
-        print("  ⚠ Model None, skip")
+        logger.info("  ⚠ Model None, skip")
         return 0, 0
 
     # Model feature_names ile inference feature_names aynı olmalı
@@ -303,7 +307,7 @@ def test_feature_parity():
     pred_partial = model.predict(partial_sample)
     assert np.isfinite(pred_partial), f"Partial prediction not finite: {pred_partial}"
 
-    print(
+    logger.info(
         f"  ✓ Feature parity: {len(feature_names)} features match, contract valid, "
         f"prediction works with full and partial features"
     )
@@ -317,7 +321,7 @@ def test_feature_parity():
 # ────────────────────────────────────────────────────────────
 
 
-def test_multi_horizon_backward_compat():
+def test_multi_horizon_backward_compat() -> Any:
     """MultiHorizonModel canonical_scoring.predict() ile uyumlu olmalı."""
     from services.core.canonical_scoring import CanonicalScore, canonical_scoring
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, MultiHorizonModel
@@ -347,7 +351,7 @@ def test_multi_horizon_backward_compat():
     )
 
     if model is None:
-        print("  ⚠ Model None, skip")
+        logger.info("  ⚠ Model None, skip")
         return 0, 0
 
     # MultiHorizonModel ile canonical_scoring
@@ -361,7 +365,7 @@ def test_multi_horizon_backward_compat():
     assert score.ml_score is not None, "ML score should not be None"
     assert np.isfinite(score.ml_score), f"ML score not finite: {score.ml_score}"
 
-    print(f"  ✓ Backward compat: canonical_scoring works with MultiHorizonModel, ml_score={score.ml_score:.2f}")
+    logger.info(f"  ✓ Backward compat: canonical_scoring works with MultiHorizonModel, ml_score={score.ml_score:.2f}")
     passed += 1
 
     return passed, failed
@@ -372,7 +376,7 @@ def test_multi_horizon_backward_compat():
 # ────────────────────────────────────────────────────────────
 
 
-def test_horizon_fallback():
+def test_horizon_fallback() -> Any:
     """Yetersiz veride o horizon modeli üretilmemeli."""
     from services.ml.lightgbm_trainer import MultiHorizonModel
 
@@ -399,7 +403,7 @@ def test_horizon_fallback():
     assert 60 not in multi.available_horizons
     assert multi.predict({}) == 0.0  # model=None → 0.0
 
-    print(f"  ✓ Fallback: available={multi.available_horizons}, 60d skipped (insufficient)")
+    logger.info(f"  ✓ Fallback: available={multi.available_horizons}, 60d skipped (insufficient)")
     passed += 1
 
     return passed, failed
@@ -410,7 +414,7 @@ def test_horizon_fallback():
 # ────────────────────────────────────────────────────────────
 
 
-def test_cs_normalizer_parity():
+def test_cs_normalizer_parity() -> Any:
     """CS normalizer training ve inference'da aynı sonucu vermeli."""
     from services.ml.training_validator import CrossSectionalNormalizer
 
@@ -449,7 +453,7 @@ def test_cs_normalizer_parity():
     assert z_c > 0, f"C should be positive: {z_c}"
     assert abs(z_a + z_c) < 0.01, f"Symmetric: {z_a} + {z_c} should be ~0"
 
-    print(f"  ✓ CS parity: training=inference, z_A={z_a:.4f}, z_C={z_c:.4f}")
+    logger.info(f"  ✓ CS parity: training=inference, z_A={z_a:.4f}, z_C={z_c:.4f}")
     passed += 1
 
     return passed, failed
@@ -460,7 +464,8 @@ def test_cs_normalizer_parity():
 # ────────────────────────────────────────────────────────────
 
 
-def run_all():
+def run_all() -> Any:
+    """Otomatik eklendi."""
     tests = [
         ("Canonical feature registry (no regex)", test_canonical_feature_registry),
         ("Walk-forward uses registry", test_walk_forward_uses_registry),
@@ -475,28 +480,28 @@ def run_all():
     total_passed = 0
     total_failed = 0
 
-    print("=" * 70)
-    print("FAZ 4.5 — ML Production Parity Testleri")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("FAZ 4.5 — ML Production Parity Testleri")
+    logger.info("=" * 70)
 
     for name, test_fn in tests:
-        print(f"\n▸ {name}")
+        logger.info(f"\n▸ {name}")
         try:
             p, f = test_fn()
             total_passed += p
             total_failed += f
             if f > 0:
-                print(f"  ⚠ {f} FAILED")
+                logger.info(f"  ⚠ {f} FAILED")
         except Exception as e:
             import traceback
 
-            print(f"  ✗ EXCEPTION: {e}")
+            logger.info(f"  ✗ EXCEPTION: {e}")
             traceback.print_exc()
             total_failed += 1
 
-    print("\n" + "=" * 70)
-    print(f"SONUÇ: {total_passed} passed, {total_failed} failed")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info(f"SONUÇ: {total_passed} passed, {total_failed} failed")
+    logger.info("=" * 70)
 
     return total_failed == 0
 

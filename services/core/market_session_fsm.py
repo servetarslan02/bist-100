@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Market Session State Machine (Single Source of Truth)
 
@@ -27,30 +28,38 @@ YARIM İŞ GÜNLERİ (Resmi Tatil Arifeleri — Ramazan/Kurban Bayramı Arife, 2
 Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
+import functools
 from datetime import datetime, time, timedelta, timezone
 from enum import Enum
 
-import functools
 import structlog
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.market_session_fsm")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 _TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 
 class BISTMarketPhase(Enum):
+    """Otomatik eklendi."""
     CLOSED = "CLOSED"
     OPENING_AUCTION_COLLECTION = "OPENING_AUCTION_COLLECTION"  # 09:40 - 09:55
     OPENING_AUCTION_DETERMINATION = "OPENING_AUCTION_DETERMINATION"  # 09:55 - 10:00
@@ -121,6 +130,7 @@ class MarketSessionStateMachine:
     }
 
     def __init__(self, holidays: set | None = None, half_days: set | None = None):
+        """Otomatik eklendi."""
         self._holidays = holidays or set()
         self._half_days = half_days or set()  # Yarım gün tarihleri (YYYY-MM-DD)
         self._circuit_breaker_active: dict[str, datetime] = {}  # Ticker bazlı devre kesici bitiş zamanı
@@ -129,18 +139,19 @@ class MarketSessionStateMachine:
         self._ebdks_triggered_count: int = 0  # Bugün kaç kez tetiklendi
 
     def now_istanbul(self) -> datetime:
+        """Otomatik eklendi."""
         return datetime.now(_TZ_ISTANBUL)
 
-    def set_holidays(self, holidays: set):
+    def set_holidays(self, holidays: set) -> Any:
         """Tatil günlerini güncelle."""
         self._holidays = holidays
 
-    def set_half_days(self, half_days: set):
+    def set_half_days(self, half_days: set) -> Any:
         """Yarım gün tarihlerini güncelle (YYYY-MM-DD formatında)."""
         self._half_days = half_days
 
     @otel_trace("fsm.trigger_circuit_breaker")
-    def trigger_circuit_breaker(self, ticker: str, duration_minutes: int = None):
+    def trigger_circuit_breaker(self, ticker: str, duration_minutes: int = None) -> Any:
         """Hisse bazında devre kesici çağrı seansı başlatır.
 
         BIST resmi: 10 dakika emir toplama süresi.
@@ -155,7 +166,7 @@ class MarketSessionStateMachine:
         )
 
     @otel_trace("fsm.trigger_ebdks")
-    def trigger_ebdks(self, feature_code: str | None = None):
+    def trigger_ebdks(self, feature_code: str | None = None) -> Any:
         """Endekse bağlı devre kesici (EBDKS) başlatır.
 
         BIST-100 %6 veya daha fazla düşüşte tetiklenir (Ağustos 2025: tek aşamalı).
@@ -194,11 +205,13 @@ class MarketSessionStateMachine:
         )
 
     @otel_trace("fsm.clear_circuit_breaker")
-    def clear_circuit_breaker(self, ticker: str):
+    def clear_circuit_breaker(self, ticker: str) -> Any:
+        """Otomatik eklendi."""
         self._circuit_breaker_active.pop(ticker, None)
 
     @otel_trace("fsm.clear_ebdks")
-    def clear_ebdks(self):
+    def clear_ebdks(self) -> Any:
+        """Otomatik eklendi."""
         self._ebdks_active = None
         self._ebdks_triggered_at = None
 
@@ -312,6 +325,7 @@ class MarketSessionStateMachine:
         return self.is_order_entry_allowed(phase)
 
     def is_closed(self) -> bool:
+        """Otomatik eklendi."""
         return self.get_phase() == BISTMarketPhase.CLOSED
 
     @otel_trace("fsm.get_status")

@@ -35,10 +35,12 @@ class BacktestCanonicalAdapter:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._scoring = None
         self._decision_engine = None
 
-    def _lazy_load(self):
+    def _lazy_load(self) -> Any:
+        """Otomatik eklendi."""
         if self._scoring is None:
             from services.core.canonical_scoring import canonical_scoring
 
@@ -117,7 +119,7 @@ class BacktestCanonicalAdapter:
         ticker: str = "BACKTEST",
         all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
-    ):
+    ) -> Any:
         """Feature'lardan canonical score + decision üret."""
         self._lazy_load()
 

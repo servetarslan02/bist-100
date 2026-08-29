@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Learning Loop v2.0 (SQLite Persistence)
 
@@ -49,13 +50,14 @@ class LearningLoop:
     """Otonom öğrenme döngüsü — SQLite persistence ile."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._state = LearningState()
         self._prediction_history: deque = deque(maxlen=5000)
         self._outcome_history: deque = deque(maxlen=5000)
         self._accuracy_window: deque = deque(maxlen=100)  # Son 100 tahmin
         self._restore_from_db()
 
-    def _restore_from_db(self):
+    def _restore_from_db(self) -> Any:
         """Restart sonrası state'i SQLite'dan geri yükle."""
         try:
             saved = state_store.load_learning_state()
@@ -100,7 +102,7 @@ class LearningLoop:
         except Exception as e:
             logger.warning("Failed to restore learning state", error=str(e))
 
-    def _persist_state(self):
+    def _persist_state(self) -> Any:
         """State'i SQLite'a kaydet (SSD dostu — batched)."""
         try:
             state_dict = {
@@ -127,7 +129,7 @@ class LearningLoop:
         confidence: float,
         features: dict,
         regime: str,
-    ):
+    ) -> Any:
         """Tahmin kaydet."""
         self._prediction_history.append(
             {
@@ -147,7 +149,7 @@ class LearningLoop:
         # SQLite'a kaydet
         state_store.save_prediction(ticker, predicted_direction, predicted_return, confidence, regime, features)
 
-    def record_outcome(self, ticker: str, actual_return: float, actual_direction: str, timestamp: str):
+    def record_outcome(self, ticker: str, actual_return: float, actual_direction: str, timestamp: str) -> Any:
         """Sonuç kaydet ve öğren."""
         # Eşleşen tahmini bul
         matching = None
@@ -209,7 +211,7 @@ class LearningLoop:
             recent_accuracy=self._state.recent_accuracy,
         )
 
-    def _check_model_decay(self):
+    def _check_model_decay(self) -> Any:
         """Model bozulması kontrolü."""
         cfg = learning_settings.retrain
         if len(self._accuracy_window) < 50:

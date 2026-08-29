@@ -1,22 +1,28 @@
+import functools
 from typing import Any
 
 import numpy as np
 import polars as pl
 import structlog
-import functools
 from opentelemetry import trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.risk_manager")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -26,6 +32,7 @@ class RiskManager:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         # Risk parametreleri
         self.max_position_pct = 0.10  # Tek hisse max %10
         self.max_sector_pct = 0.25  # Tek sektör max %25

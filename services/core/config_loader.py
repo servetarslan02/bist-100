@@ -26,15 +26,22 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.config_loader")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 
@@ -78,7 +85,7 @@ class ConfigLoader:
         return instance
 
     @classmethod
-    def reset(cls):
+    def reset(cls) -> Any:
         """Singleton reset (test için)."""
         cls._instance = None
         cls._config = {}
@@ -113,35 +120,43 @@ class ConfigLoader:
         return value
 
     def get_int(self, key: str, default: int = 0) -> int:
+        """Otomatik eklendi."""
         return int(self.get(key, default))
 
     def get_float(self, key: str, default: float = 0.0) -> float:
+        """Otomatik eklendi."""
         return float(self.get(key, default))
 
     def get_bool(self, key: str, default: bool = False) -> bool:
+        """Otomatik eklendi."""
         val = self.get(key, default)
         if isinstance(val, str):
             return val.lower() in ("true", "1", "yes")
         return bool(val)
 
     def get_list(self, key: str, default: list = None) -> list:
+        """Otomatik eklendi."""
         val = self.get(key, default or [])
         return val if isinstance(val, list) else [val]
 
     @property
     def environment(self) -> str:
+        """Otomatik eklendi."""
         return self._environment
 
     @property
     def is_production(self) -> bool:
+        """Otomatik eklendi."""
         return self._environment in ("production", "prod")
 
     @property
     def is_development(self) -> bool:
+        """Otomatik eklendi."""
         return self._environment in ("development", "dev")
 
     @property
     def is_test(self) -> bool:
+        """Otomatik eklendi."""
         return self._environment == "test"
 
     def to_dict(self) -> dict[str, Any]:
@@ -149,7 +164,7 @@ class ConfigLoader:
         return dict(self._config)
 
     @otel_trace("config_loader._apply_env_overrides")
-    def _apply_env_overrides(self):
+    def _apply_env_overrides(self) -> Any:
         """ALPHA_ prefix ile gelen env değişkenlerini config'e uygula.
 
         Örnek:
@@ -189,7 +204,7 @@ class ConfigLoader:
                 logger.warning("JSON parse error in _convert_value", exc_info=True)
         return value
 
-    def _set_nested(self, key: str, value: Any):
+    def _set_nested(self, key: str, value: Any) -> Any:
         """Dot notation ile nested config ayarla."""
         keys = key.split(".")
         config = self._config
@@ -200,7 +215,7 @@ class ConfigLoader:
         config[keys[-1]] = value
 
     @staticmethod
-    def _deep_merge(base: dict, override: dict):
+    def _deep_merge(base: dict, override: dict) -> Any:
         """Deep merge: override değerleri base'e uygula."""
         for key, value in override.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
@@ -211,4 +226,5 @@ class ConfigLoader:
 
 # Convenience function
 def load_config(path: str = None, environment: str = None) -> ConfigLoader:
+    """Otomatik eklendi."""
     return ConfigLoader.load(path, environment)

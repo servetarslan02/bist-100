@@ -13,12 +13,12 @@ Kullanım:
     feature_store.set(ticker, date, features, ttl=3600)
 """
 
+import functools
 import hashlib
 import time
 from collections import OrderedDict
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -28,14 +28,20 @@ from . import redis_helper
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.feature_store")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -48,6 +54,7 @@ class FeatureStore:
         default_ttl: int = 3600,
         redis_url: str | None = None,
     ):
+        """Otomatik eklendi."""
         self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._max_size = max_size
         self._default_ttl = default_ttl
@@ -113,7 +120,7 @@ class FeatureStore:
         features: dict[str, float],
         ttl: int | None = None,
         feature_names: list[str] | None = None,
-    ):
+    ) -> Any:
         """Cache'e feature kaydet."""
         if feature_names is None:
             feature_names = list(features.keys())
@@ -139,7 +146,7 @@ class FeatureStore:
                 logger.debug("feature_store_redis_set_failed", key=key, error=str(e))
 
     @otel_trace("feature_store.invalidate")
-    def invalidate(self, ticker: str, date: str | None = None):
+    def invalidate(self, ticker: str, date: str | None = None) -> Any:
         """Cache'i temizle."""
         prefix = f"feat:{ticker}:"
         keys_to_remove = [k for k in self._cache if k.startswith(prefix)]

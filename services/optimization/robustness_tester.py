@@ -41,6 +41,7 @@ class RobustnessTester:
     """Parametre platosu ve maliyet stres testlerini icra eden motor."""
 
     def __init__(self, optimizer: BayesianMetricOptimizer):
+        """Otomatik eklendi."""
         self.optimizer = optimizer
 
     def test_parameter_perturbations(self, base_params: StrategyParameters) -> tuple[list[dict[str, Any]], bool, float]:

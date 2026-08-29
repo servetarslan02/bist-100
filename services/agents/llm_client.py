@@ -56,7 +56,7 @@ class LLMConfig:
     max_retries: int = 3
     retry_delay: float = 1.0
 
-    def __repr__(self):
+    def __repr__(self) -> Any:
         """API key'i gizle."""
         masked_key = "***" if self.api_key else None
         return (
@@ -70,6 +70,7 @@ class BaseLLMClient(ABC):
     """Abstract LLM client interface."""
 
     def __init__(self, config: LLMConfig):
+        """Otomatik eklendi."""
         self.config = config
 
     @abstractmethod
@@ -142,6 +143,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
+        """Otomatik eklendi."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -217,6 +219,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
+        """Otomatik eklendi."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -300,6 +303,7 @@ class AnthropicLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
+        """Otomatik eklendi."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -423,7 +427,7 @@ class LLMClientFactory:
         return cls.create(config)
 
     @classmethod
-    def register_provider(cls, name: str, client_class):
+    def register_provider(cls, name: str, client_class) -> Any:
         """Yeni provider kaydet."""
         cls._providers[name.lower()] = client_class
 
@@ -446,7 +450,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
     try:
         return orjson.loads(content)
     except orjson.JSONDecodeError:
-        pass  # Normal durum — LLM her zaman düzgün JSON üretmez
+        logger.error("Exception caught", exc_info=True)
 
     # 2. ```json ... ``` bloğu
     json_block = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
@@ -454,7 +458,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         try:
             return orjson.loads(json_block.group(1))
         except orjson.JSONDecodeError:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     # 3. İlk { ... }
     json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, re.DOTALL)
@@ -462,7 +466,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         try:
             return orjson.loads(json_match.group())
         except orjson.JSONDecodeError:
-            pass
+            logger.error("Exception caught", exc_info=True)
 
     # 4. Metinden fallback extraction
     return _extract_from_text(content)

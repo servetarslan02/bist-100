@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Tam Sistem Tatil Entegrasyonu E2E Testi
 =====================================================
@@ -28,17 +31,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class _EmptyModule:
-    def __getattr__(self, name):
-        return type('Fake', (), {'__init__': lambda s, *a, **k: None})()
+    """Otomatik eklendi."""
+    def __getattr__(self, name) -> Any:
+        """Otomatik eklendi."""
+        return type("Fake", (), {"__init__": lambda s, *a, **k: None})()
 
 
-if 'services' not in sys.modules:
-    sys.modules['services'] = _EmptyModule()
-if 'services.core' not in sys.modules:
-    sys.modules['services.core'] = _EmptyModule()
+if "services" not in sys.modules:
+    sys.modules["services"] = _EmptyModule()
+if "services.core" not in sys.modules:
+    sys.modules["services.core"] = _EmptyModule()
 
 
-def _load_module_direct(name, path):
+def _load_module_direct(name, path) -> Any:
+    """Otomatik eklendi."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -58,65 +64,72 @@ IST = timezone(timedelta(hours=3))
 
 
 class TestResult:
+    """Otomatik eklendi."""
     def __init__(self):
+        """Otomatik eklendi."""
         self.passed = 0
         self.failed = 0
         self.warnings = 0
         self.details = []
 
-    def ok(self, msg):
+    def ok(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.passed += 1
         self.details.append(f"  ✅ {msg}")
-        print(f"  ✅ {msg}")
+        logger.info(f"  ✅ {msg}")
 
-    def fail(self, msg):
+    def fail(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.failed += 1
         self.details.append(f"  ❌ {msg}")
-        print(f"  ❌ {msg}")
+        logger.info(f"  ❌ {msg}")
 
-    def warn(self, msg):
+    def warn(self, msg) -> Any:
+        """Otomatik eklendi."""
         self.warnings += 1
         self.details.append(f"  ⚠️  {msg}")
-        print(f"  ⚠️  {msg}")
+        logger.info(f"  ⚠️  {msg}")
 
-    def summary(self):
+    def summary(self) -> Any:
+        """Otomatik eklendi."""
         total = self.passed + self.failed
-        return f"\n{'='*60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'='*60}"
+        return f"\n{'=' * 60}\nSONUÇ: {self.passed}/{total} geçti, {self.failed} başarısız, {self.warnings} uyarı\n{'=' * 60}"
 
 
 # =====================================================
 # BİLEŞEN 1: HolidayManager
 # =====================================================
 
-def test_holiday_manager(result: TestResult):
+
+def test_holiday_manager(result: TestResult) -> Any:
     """HolidayManager tatil hesaplama, kara liste, cache."""
-    print("\n📦 BİLEŞEN 1: HolidayManager")
-    print("-" * 50)
+    logger.info("\n📦 BİLEŞEN 1: HolidayManager")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_hm"
     hm = HolidayManager(data_dir=test_dir)
 
     # Milli bayramlar
-    for d in [date(2026,1,1), date(2026,4,23), date(2026,5,1), date(2026,10,29)]:
+    for d in [date(2026, 1, 1), date(2026, 4, 23), date(2026, 5, 1), date(2026, 10, 29)]:
         if hm.is_holiday(d):
             result.ok(f"Milli bayram: {d} ✓")
         else:
             result.fail(f"Milli bayram eksik: {d}")
 
     # Dini bayramlar
-    ramazan = sorted([d for d in hm.get_holidays(2026) if d < date(2026,4,1)])
+    ramazan = sorted([d for d in hm.get_holidays(2026) if d < date(2026, 4, 1)])
     if len(ramazan) == 3:
         result.ok(f"Ramazan 2026: 3 gün ({ramazan[0]}) ✓")
 
     # Kara liste
-    hm.add_manual_holiday(date(2026,12,31), "Test")
-    hm.remove_holiday(date(2026,12,31), "Kaldırıldı")
-    if not hm.is_holiday(date(2026,12,31)):
+    hm.add_manual_holiday(date(2026, 12, 31), "Test")
+    hm.remove_holiday(date(2026, 12, 31), "Kaldırıldı")
+    if not hm.is_holiday(date(2026, 12, 31)):
         result.ok("Kara liste: kaldırılmış tatil tekrar eklenmiyor ✓")
 
     # Cache
     hm2 = HolidayManager(data_dir=test_dir)
-    if hm2.is_holiday(date(2026,1,1)):
+    if hm2.is_holiday(date(2026, 1, 1)):
         result.ok("Cache: restart sonrası tatil korunuyor ✓")
 
     # Audit trail
@@ -129,10 +142,11 @@ def test_holiday_manager(result: TestResult):
 # BİLEŞEN 2: MarketCalendar
 # =====================================================
 
-def test_market_calendar(result: TestResult):
+
+def test_market_calendar(result: TestResult) -> Any:
     """MarketCalendar is_trading_day, is_market_open, session."""
-    print("\n📅 BİLEŞEN 2: MarketCalendar")
-    print("-" * 50)
+    logger.info("\n📅 BİLEŞEN 2: MarketCalendar")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_mc"
     hm = HolidayManager(data_dir=test_dir)
@@ -162,11 +176,11 @@ def test_market_calendar(result: TestResult):
     info_closed = cal.get_info(dt_closed)
     info_holiday = cal.get_info(dt_holiday)
 
-    if info_open['session'] == 'CONTINUOUS':
+    if info_open["session"] == "CONTINUOUS":
         result.ok("Piyasa açık (10:30): CONTINUOUS ✓")
-    if info_closed['session'] == 'CLOSED':
+    if info_closed["session"] == "CLOSED":
         result.ok("Piyasa kapalı (09:00): CLOSED ✓")
-    if info_holiday['session'] == 'CLOSED':
+    if info_holiday["session"] == "CLOSED":
         result.ok("Tatil günü (10:30): CLOSED ✓")
 
     # Anlık tatil ekleme
@@ -186,10 +200,11 @@ def test_market_calendar(result: TestResult):
 # BİLEŞEN 3: UnifiedScheduler (Mock)
 # =====================================================
 
-def test_scheduler_integration(result: TestResult):
+
+def test_scheduler_integration(result: TestResult) -> Any:
     """UnifiedScheduler tatil gününde job durduruyor mu?"""
-    print("\n⏰ BİLEŞEN 3: UnifiedScheduler")
-    print("-" * 50)
+    logger.info("\n⏰ BİLEŞEN 3: UnifiedScheduler")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_sched"
     hm = HolidayManager(data_dir=test_dir)
@@ -203,7 +218,7 @@ def test_scheduler_integration(result: TestResult):
     if not cal.is_trading_day(today_holiday):
         result.ok(f"Scheduler: tatil günü ({today_holiday}) job DURUR ✓")
     else:
-        result.fail(f"Scheduler: tatil günü job çalışıyor!")
+        result.fail("Scheduler: tatil günü job çalışıyor!")
 
     # Normal gün — scheduler job çalıştırmalı
     if cal.is_trading_day(today_normal):
@@ -221,10 +236,11 @@ def test_scheduler_integration(result: TestResult):
 # BİLEŞEN 4: CacheWarmer (Mock)
 # =====================================================
 
-def test_cache_warmer_integration(result: TestResult):
+
+def test_cache_warmer_integration(result: TestResult) -> Any:
     """CacheWarmer KAP izleme ve radar kontrolü."""
-    print("\n🔥 BİLEŞEN 4: CacheWarmer")
-    print("-" * 50)
+    logger.info("\n🔥 BİLEŞEN 4: CacheWarmer")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_cw"
     hm = HolidayManager(data_dir=test_dir)
@@ -255,24 +271,17 @@ def test_cache_warmer_integration(result: TestResult):
 # BİLEŞEN 5: DailyWorkflow (Mock)
 # =====================================================
 
-def test_daily_workflow_integration(result: TestResult):
+
+def test_daily_workflow_integration(result: TestResult) -> Any:
     """DailyWorkflow tatil gününde faz yönetimi."""
-    print("\n📋 BİLEŞEN 5: DailyWorkflow")
-    print("-" * 50)
+    logger.info("\n📋 BİLEŞEN 5: DailyWorkflow")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_dw"
     hm = HolidayManager(data_dir=test_dir)
     cal = MarketCalendar(holidays=list(hm.get_holidays(2026)))
 
     # Workflow fazlarını kontrol et
-    phases = {
-        "pre_market": ("09:40", "10:00"),
-        "active": ("10:00", "18:00"),
-        "closing": ("18:01", "18:10"),
-        "post_market": ("18:10", "18:30"),
-        "after_hours": ("18:30", "23:00"),
-        "night": ("23:00", "09:40"),
-    }
 
     # Tatil günü — tüm fazlar durmalı
     holiday = date(2026, 1, 1)
@@ -294,10 +303,11 @@ def test_daily_workflow_integration(result: TestResult):
 # BİLEŞEN 6: SuddenHolidayDetector
 # =====================================================
 
-def test_sudden_detector_integration(result: TestResult):
+
+def test_sudden_detector_integration(result: TestResult) -> Any:
     """SuddenHolidayDetector tüm tetikleme yolları."""
-    print("\n⚡ BİLEŞEN 6: SuddenHolidayDetector")
-    print("-" * 50)
+    logger.info("\n⚡ BİLEŞEN 6: SuddenHolidayDetector")
+    logger.info("-" * 50)
 
     detector = SuddenHolidayDetector()
 
@@ -325,10 +335,11 @@ def test_sudden_detector_integration(result: TestResult):
 # BİLEŞEN 7: API Endpoints (Doğrulama)
 # =====================================================
 
-def test_api_integration(result: TestResult):
+
+def test_api_integration(result: TestResult) -> Any:
     """API endpoint'lerinin varlığını ve yapısını doğrula."""
-    print("\n🔌 BİLEŞEN 7: API Endpoints")
-    print("-" * 50)
+    logger.info("\n🔌 BİLEŞEN 7: API Endpoints")
+    logger.info("-" * 50)
 
     api_path = Path(__file__).parent.parent / "services" / "api" / "v1" / "holidays.py"
     if not api_path.exists():
@@ -366,10 +377,11 @@ def test_api_integration(result: TestResult):
 # BİLEŞEN 8: Pipeline Uyumu (E2E)
 # =====================================================
 
-def test_pipeline_e2e(result: TestResult):
+
+def test_pipeline_e2e(result: TestResult) -> Any:
     """Tüm bileşenlerin uyumlu çalıştığını doğrula."""
-    print("\n🔗 BİLEŞEN 8: Pipeline Uyumu (E2E)")
-    print("-" * 50)
+    logger.info("\n🔗 BİLEŞEN 8: Pipeline Uyumu (E2E)")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_pipeline"
     hm = HolidayManager(data_dir=test_dir)
@@ -382,8 +394,10 @@ def test_pipeline_e2e(result: TestResult):
         ("HolidayManager.is_holiday", not hm.is_holiday(normal)),
         ("HolidayManager.is_trading_day", hm.is_trading_day(normal)),
         ("MarketCalendar.is_trading_day", cal.is_trading_day(normal)),
-        ("MarketCalendar.session != CLOSED",
-         cal.get_info(datetime(2026, 6, 15, 10, 30, tzinfo=IST))['session'] != 'CLOSED'),
+        (
+            "MarketCalendar.session != CLOSED",
+            cal.get_info(datetime(2026, 6, 15, 10, 30, tzinfo=IST))["session"] != "CLOSED",
+        ),
     ]
 
     for name, expected in checks:
@@ -399,8 +413,10 @@ def test_pipeline_e2e(result: TestResult):
         ("HolidayManager.is_holiday", hm.is_holiday(holiday)),
         ("HolidayManager.is_trading_day", not hm.is_trading_day(holiday)),
         ("MarketCalendar.is_trading_day", not cal.is_trading_day(holiday)),
-        ("MarketCalendar.session == CLOSED",
-         cal.get_info(datetime(2026, 1, 1, 10, 30, tzinfo=IST))['session'] == 'CLOSED'),
+        (
+            "MarketCalendar.session == CLOSED",
+            cal.get_info(datetime(2026, 1, 1, 10, 30, tzinfo=IST))["session"] == "CLOSED",
+        ),
     ]
 
     for name, expected in checks:
@@ -418,8 +434,10 @@ def test_pipeline_e2e(result: TestResult):
         ("HolidayManager.is_holiday", hm.is_holiday(sudden)),
         ("HolidayManager.is_trading_day", not hm.is_trading_day(sudden)),
         ("MarketCalendar.is_trading_day", not cal2.is_trading_day(sudden)),
-        ("MarketCalendar.session == CLOSED",
-         cal2.get_info(datetime(2026, 8, 28, 10, 30, tzinfo=IST))['session'] == 'CLOSED'),
+        (
+            "MarketCalendar.session == CLOSED",
+            cal2.get_info(datetime(2026, 8, 28, 10, 30, tzinfo=IST))["session"] == "CLOSED",
+        ),
     ]
 
     for name, expected in checks:
@@ -466,10 +484,11 @@ def test_pipeline_e2e(result: TestResult):
 # BİLEŞEN 9: Cache & Restart Tutarlılığı
 # =====================================================
 
-def test_cache_restart(result: TestResult):
+
+def test_cache_restart(result: TestResult) -> Any:
     """Restart sonrası tüm bileşenlerin tutarlılığını doğrula."""
-    print("\n💾 BİLEŞEN 9: Cache & Restart")
-    print("-" * 50)
+    logger.info("\n💾 BİLEŞEN 9: Cache & Restart")
+    logger.info("-" * 50)
 
     test_dir = "/tmp/bist_e2e_restart"
     cache_file = Path(test_dir) / "holiday_cache.json"
@@ -514,10 +533,11 @@ def test_cache_restart(result: TestResult):
 # BİLEŞEN 10: Gerçek Zamanlı Durum
 # =====================================================
 
-def test_realtime_status(result: TestResult):
+
+def test_realtime_status(result: TestResult) -> Any:
     """Bugünün gerçek zamanlı durumunu kontrol et."""
-    print("\n🕐 BİLEŞEN 10: Gerçek Zamanlı Durum")
-    print("-" * 50)
+    logger.info("\n🕐 BİLEŞEN 10: Gerçek Zamanlı Durum")
+    logger.info("-" * 50)
 
     today = date.today()
     hm = HolidayManager()
@@ -529,13 +549,13 @@ def test_realtime_status(result: TestResult):
     is_weekend = today.weekday() >= 5
     info = cal.get_info()
 
-    print(f"      📅 Tarih: {today} ({today.strftime('%A')})")
-    print(f"      🏖️  Tatil: {is_holiday}")
-    print(f"      ⏰ Yarım gün: {is_half}")
-    print(f"      📆 Hafta sonu: {is_weekend}")
-    print(f"      🔔 İşlem günü: {is_trading}")
-    print(f"      📊 Seans: {info['session']}")
-    print(f"      🎯 Durum: {'TATİL' if is_holiday else 'HAFTA SONU' if is_weekend else 'İŞLEM GÜNÜ'}")
+    logger.info(f"      📅 Tarih: {today} ({today.strftime('%A')})")
+    logger.info(f"      🏖️  Tatil: {is_holiday}")
+    logger.info(f"      ⏰ Yarım gün: {is_half}")
+    logger.info(f"      📆 Hafta sonu: {is_weekend}")
+    logger.info(f"      🔔 İşlem günü: {is_trading}")
+    logger.info(f"      📊 Seans: {info['session']}")
+    logger.info(f"      🎯 Durum: {'TATİL' if is_holiday else 'HAFTA SONU' if is_weekend else 'İŞLEM GÜNÜ'}")
 
     result.ok(f"Bugünkü durum: {'TATİL' if is_holiday else 'HAFTA SONU' if is_weekend else 'İŞLEM GÜNÜ'}")
 
@@ -544,11 +564,13 @@ def test_realtime_status(result: TestResult):
 # ANA TEST RUNNER
 # =====================================================
 
-async def main():
-    print("=" * 60)
-    print("🧪 ALPHA BIST — Tam Sistem Tatil Entegrasyonu E2E Testi")
-    print(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+
+async def main() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("🧪 ALPHA BIST — Tam Sistem Tatil Entegrasyonu E2E Testi")
+    logger.info(f"📅 Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("=" * 60)
 
     result = TestResult()
 
@@ -563,7 +585,7 @@ async def main():
     test_cache_restart(result)
     test_realtime_status(result)
 
-    print(result.summary())
+    logger.info(result.summary())
 
     report_path = Path(__file__).parent.parent / "reports" / "full_system_holiday_e2e.json"
     report_path.parent.mkdir(exist_ok=True)
@@ -576,7 +598,7 @@ async def main():
     }
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
-    print(f"\n📄 Rapor: {report_path}")
+    logger.info(f"\n📄 Rapor: {report_path}")
 
     return 0 if result.failed == 0 else 1
 

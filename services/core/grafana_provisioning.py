@@ -14,12 +14,12 @@ Kullanım:
     await provisioner.provision_all()
 """
 
+import functools
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import functools
 import orjson
 import structlog
 from opentelemetry import trace
@@ -27,15 +27,22 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.grafana_provisioning")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 DASHBOARD_DIR = Path(__file__).parent.parent.parent / "monitoring"
 
@@ -62,6 +69,7 @@ class DatasourceConfig:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_grafana_payload(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         payload = {
             "name": self.name,
             "type": self.type,
@@ -88,6 +96,7 @@ class GrafanaProvisioner:
     """Grafana dashboard ve datasource provisioning."""
 
     def __init__(self, config: GrafanaConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or GrafanaConfig()
         self._versions: list[DashboardVersion] = []
         self._provisioned_dashboards: dict[str, int] = {}  # uid → version

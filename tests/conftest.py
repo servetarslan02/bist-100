@@ -1,3 +1,4 @@
+from typing import Any
 """Test configuration and shared fixtures."""
 
 import logging
@@ -18,7 +19,7 @@ TEST_TABLES = [
 ]
 
 
-async def safe_cleanup_tables(dev_db):
+async def safe_cleanup_tables(dev_db) -> Any:
     """Test DB tablolarını temizle — tablo yoksa sessizce geç, diğer hataları raporla.
 
     except Exception: pass yerine kullanılır.
@@ -37,7 +38,7 @@ async def safe_cleanup_tables(dev_db):
 
 
 @pytest.fixture(autouse=True)
-def clean_env():
+def clean_env() -> Any:
     """Her test sonrası env değişkenlerini temizle."""
     original = os.environ.copy()
     yield
@@ -49,7 +50,7 @@ def clean_env():
 
 
 @pytest.fixture
-def tmp_data_path(tmp_path):
+def tmp_data_path(tmp_path) -> Any:
     """Geçici veri dizini."""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
@@ -57,7 +58,7 @@ def tmp_data_path(tmp_path):
 
 
 @pytest.fixture
-def sample_ohlcv():
+def sample_ohlcv() -> Any:
     """Örnek OHLCV verisi."""
     import numpy as np
 

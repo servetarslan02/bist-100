@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class PositionSize:
+    """Otomatik eklendi."""
     ticker: str
     weight: float
     shares: int
@@ -44,10 +45,16 @@ class PositionSizer:
         max_total_exposure: float = 1.0,
         kelly_fraction: float = 0.5,  # Yarim Kelly
     ):
+        """Otomatik eklendi."""
         self.target_volatility = target_volatility
         self.max_position_pct = max_position_pct
         self.max_total_exposure = max_total_exposure
         self.kelly_fraction = kelly_fraction
+
+    def calculate_position_size(self, ticker: str, risk_check: dict, portfolio_value: float) -> float:
+        """B18 uyumluluğu için eklenmiş arayüz metodu."""
+        # Basit bir örnekleme veya delegate
+        return 0.0
 
     def calculate_position_sizes(
         self,

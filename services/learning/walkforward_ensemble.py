@@ -93,6 +93,7 @@ class WalkForwardEnsemble:
         diversity_threshold: float = 0.85,
         benefit_tolerance: float = 0.95,
     ):
+        """Otomatik eklendi."""
         self.n_splits = n_splits
         self.embargo_days = embargo_days
         self.min_train_size = min_train_size
@@ -160,6 +161,7 @@ class WalkForwardEnsemble:
             for name, model in base_models.items():
                 try:
                     import copy
+
                     fold_model = copy.deepcopy(model)
                     fold_model.fit(X_train, y_train)
                     trained_models[name] = fold_model
@@ -171,15 +173,17 @@ class WalkForwardEnsemble:
                 continue
 
             # 2. Stacking ensemble eğit
-            stacking = StackingEnsemble(StackingConfig(
-                cv_folds=3,  # WF fold içindeki CV
-                regime_aware=regimes_train is not None,
-                regime_meta_learners=regimes_train is not None,
-            ))
+            stacking = StackingEnsemble(
+                StackingConfig(
+                    cv_folds=3,  # WF fold içindeki CV
+                    regime_aware=regimes_train is not None,
+                    regime_meta_learners=regimes_train is not None,
+                )
+            )
             for name, model in trained_models.items():
                 stacking.add_model(name, model)
 
-            stacking_result = stacking.fit(X_train, y_train, X_val, y_val, regimes_train, regimes_val)
+            stacking.fit(X_train, y_train, X_val, y_val, regimes_train, regimes_val)
 
             # 3. EnsembleModel ile diversity + benefit analizi
             ensemble_model = EnsembleModel()
@@ -203,7 +207,9 @@ class WalkForwardEnsemble:
             diversity_report = ensemble_model.analyze_diversity(individual_preds, self.diversity_threshold)
 
             # Benefit analizi
-            benefit_report = ensemble_model.check_benefit(ensemble_preds, individual_preds, y_val, self.benefit_tolerance)
+            benefit_report = ensemble_model.check_benefit(
+                ensemble_preds, individual_preds, y_val, self.benefit_tolerance
+            )
 
             # Model IC'leri
             model_ics: dict[str, float] = {}
@@ -227,6 +233,7 @@ class WalkForwardEnsemble:
             # Rank IC
             try:
                 from scipy.stats import spearmanr
+
                 rank_ic, _ = spearmanr(ensemble_preds[mask], y_val[mask])
                 rank_ic = float(rank_ic) if np.isfinite(rank_ic) else 0.0
             except Exception:

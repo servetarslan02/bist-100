@@ -135,7 +135,7 @@ class MarketRegime:
         }
     )
 
-    def update_weights(self, regime: str):
+    def update_weights(self, regime: str) -> Any:
         """Rejime göre ağırlıkları güncelle."""
         self.regime = regime
 
@@ -205,17 +205,18 @@ class TieredScanner:
     """Katmanlı tarama motoru."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._assets: dict[str, AssetTierState] = {}
         self._regime = MarketRegime()
         self._scan_count = 0
         self._tier_counts = {i: 0 for i in range(6)}
 
-    def register_asset(self, ticker: str, instrument_id: int = 0):
+    def register_asset(self, ticker: str, instrument_id: int = 0) -> Any:
         """Hisse kaydet."""
         if ticker not in self._assets:
             self._assets[ticker] = AssetTierState(ticker=ticker, instrument_id=instrument_id)
 
-    def register_assets(self, tickers: list[str]):
+    def register_assets(self, tickers: list[str]) -> Any:
         """Birden fazla hisse kaydet."""
         for i, ticker in enumerate(tickers):
             self.register_asset(ticker, instrument_id=i + 1)
@@ -226,7 +227,7 @@ class TieredScanner:
 
     def process_tick(
         self, ticker: str, price: float, volume: int, bid: float = 0, ask: float = 0, timestamp: datetime | None = None
-    ):
+    ) -> Any:
         """
         Yeni tick → sadece state güncelle.
         800 hissenin geçmişini baştan okumaz.
@@ -255,7 +256,7 @@ class TieredScanner:
     # Tier 1: Quant Scan (Matematiksel Filtreler)
     # =====================================================
 
-    def run_quant_scan(self, features_map: dict[str, dict[str, float]]):
+    def run_quant_scan(self, features_map: dict[str, dict[str, float]]) -> Any:
         """
         800 hisse için quant skorları hesapla.
         Her hisse için sadece feature'lardan skor üret.
@@ -445,7 +446,7 @@ class TieredScanner:
     # Event Escalation (Haber/KAP → Tier atla)
     # =====================================================
 
-    def escalate_by_event(self, ticker: str, reason: str, importance: float):
+    def escalate_by_event(self, ticker: str, reason: str, importance: float) -> Any:
         """
         Haber/KAP geldiğinde hisseyi normal sırasını atlayarak
         doğrudan derin analize sok.
@@ -480,7 +481,7 @@ class TieredScanner:
     # Rejim Değişikliği
     # =====================================================
 
-    def update_regime(self, new_regime: str, confidence: float = 0.5):
+    def update_regime(self, new_regime: str, confidence: float = 0.5) -> Any:
         """
         Piyasa rejimi değişti → tarama kriterleri değişir.
         """

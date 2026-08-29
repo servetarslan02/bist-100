@@ -45,6 +45,7 @@ logger = structlog.get_logger()
 
 
 class AgentRole(StrEnum):
+    """Otomatik eklendi."""
     RESEARCH = "RESEARCH"
     NEWS = "NEWS"
     MACRO = "MACRO"
@@ -160,6 +161,7 @@ class AgentToolRegistry:
 
     @classmethod
     def can_access(cls, role: AgentRole, tool: str) -> bool:
+        """Otomatik eklendi."""
         return tool in cls.ALLOWED_TOOLS.get(role, [])
 
 
@@ -342,6 +344,7 @@ class BaseAgent:
         model_version: str = "auto",
         prompt_version: str = PROMPT_VERSION,
     ):
+        """Otomatik eklendi."""
         self.role = role
         self.llm_client = llm_client
         self.model_version = model_version
@@ -517,15 +520,16 @@ class AgentOrchestrator:
     """Agent'ları yöneten üst katman v2.0."""
 
     def __init__(self, llm_client: BaseLLMClient | None = None):
+        """Otomatik eklendi."""
         self._agents: dict[AgentRole, BaseAgent] = {}
         self._results: list[AgentResult] = []
         self.llm_client = llm_client
 
-    def register_agent(self, agent: BaseAgent):
+    def register_agent(self, agent: BaseAgent) -> Any:
         """Agent kaydet."""
         self._agents[agent.role] = agent
 
-    def set_llm_client(self, client: BaseLLMClient):
+    def set_llm_client(self, client: BaseLLMClient) -> Any:
         """LLM client ayarla."""
         self.llm_client = client
 
@@ -554,7 +558,8 @@ class AgentOrchestrator:
             AgentRole.MACRO: "macro",
         }
 
-        async def _run_agent(role):
+        async def _run_agent(role) -> Any:
+            """Otomatik eklendi."""
             agent = self._agents.get(role) or BaseAgent(role, llm_client=client)
             task = AgentTask(
                 task_id=f"{ticker}-{role.value}-{datetime.now(UTC).strftime('%H%M%S')}",

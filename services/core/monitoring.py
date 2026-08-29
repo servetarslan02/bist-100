@@ -21,13 +21,11 @@ Metrics:
   portfolio_invariant_failures â€” Counter
 """
 
+import functools
 import time
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
-
-import functools
 import structlog
 from opentelemetry import trace
 
@@ -38,14 +36,20 @@ from .observability import health_checker, prometheus_metrics
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.monitoring")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -53,13 +57,14 @@ class PortfolioMonitor:
     """Portfolio ve lock monitoring â€” Prometheus + API integration."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._portfolio_service = None
         self._last_sync_time: float | None = None
         self._sync_interval_s = 5.0  # 5 saniyede bir metrik gÃ¼ncelle
         self._invariant_failure_count = 0
 
     @otel_trace("monitoring.bind")
-    def bind(self, portfolio_service):
+    def bind(self, portfolio_service) -> Any:
         """PortfolioService'i monitor'a bağla."""
         self._portfolio_service = portfolio_service
         health_checker.register("portfolio_locks")
@@ -67,7 +72,7 @@ class PortfolioMonitor:
         logger.info("Portfolio monitor bound to service")
 
     @otel_trace("monitoring.sync_metrics")
-    async def sync_metrics(self):
+    async def sync_metrics(self) -> Any:
         """Portfolio metriklerini Prometheus gauge'larÄ±na yaz."""
         now = time.time()
         if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
@@ -238,4 +243,3 @@ class PortfolioMonitor:
 
 # Singleton
 portfolio_monitor = PortfolioMonitor()
-

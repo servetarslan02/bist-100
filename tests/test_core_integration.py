@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Core Module Integration Test Suite
 
@@ -24,7 +25,7 @@ import pytest
 class TestEventBusDLQ:
     """Event handler crash → DLQ'ya düşmeli."""
 
-    def test_dlq_push_and_stats(self):
+    def test_dlq_push_and_stats(self) -> Any:
         """DLQ push ve istatistikler çalışmalı."""
         from services.core.dead_letter_queue import DeadLetterQueue
 
@@ -46,14 +47,15 @@ class TestEventBusDLQ:
         stats = asyncio.get_event_loop().run_until_complete(dlq.get_stats())
         assert stats["total_entries"] == 1
 
-    def test_dlq_retry_with_handler(self):
+    def test_dlq_retry_with_handler(self) -> Any:
         """DLQ retry handler ile çalışmalı."""
         from services.core.dead_letter_queue import DeadLetterQueue
 
         dlq = DeadLetterQueue()
         call_count = 0
 
-        def retry_handler(payload):
+        def retry_handler(payload) -> Any:
+            """Otomatik eklendi."""
             nonlocal call_count
             call_count += 1
 
@@ -68,7 +70,7 @@ class TestEventBusDLQ:
         assert retried == 1
         assert call_count == 1
 
-    def test_dlq_max_retries_exhaustion(self):
+    def test_dlq_max_retries_exhaustion(self) -> Any:
         """Max retry aşıldığında EXHAUSTED olmalı."""
         from services.core.dead_letter_queue import DeadLetterQueue
 
@@ -95,7 +97,7 @@ class TestEventBusDLQ:
 class TestSecurityJWT:
     """Security servisi JWT Manager kullanmalı."""
 
-    def test_authenticate_returns_jwt(self):
+    def test_authenticate_returns_jwt(self) -> Any:
         """Authenticate JWT token döndürmeli."""
         from services.core.security import AuthenticationService, Role
 
@@ -106,7 +108,7 @@ class TestSecurityJWT:
         assert token is not None
         assert len(token) > 20
 
-    def test_validate_token_with_jwt(self):
+    def test_validate_token_with_jwt(self) -> Any:
         """JWT token doğrulanmalı."""
         from services.core.security import AuthenticationService, Role
 
@@ -120,7 +122,7 @@ class TestSecurityJWT:
         assert validated_user.username == "testuser2"
         assert validated_user.role == Role.OPERATOR
 
-    def test_invalid_token_rejected(self):
+    def test_invalid_token_rejected(self) -> Any:
         """Geçersiz token reddedilmeli."""
         from services.core.security import AuthenticationService
 
@@ -128,7 +130,7 @@ class TestSecurityJWT:
         result = auth.validate_token("invalid.token.here")
         assert result is None
 
-    def test_jwt_generate_and_validate(self):
+    def test_jwt_generate_and_validate(self) -> Any:
         """JWT Manager token üretme ve doğrulama."""
         from services.core.jwt_manager import JWTManager
 
@@ -140,7 +142,7 @@ class TestSecurityJWT:
         assert claims.role == "ADMIN"
         assert "READ" in claims.permissions
 
-    def test_jwt_refresh(self):
+    def test_jwt_refresh(self) -> Any:
         """Refresh token ile yeni access token alınmalı."""
         from services.core.jwt_manager import JWTManager, TokenType
 
@@ -151,7 +153,7 @@ class TestSecurityJWT:
         claims = mgr.validate_token(new_access)
         assert claims.token_type == TokenType.ACCESS
 
-    def test_jwt_revocation(self):
+    def test_jwt_revocation(self) -> Any:
         """Revoked token reddedilmeli."""
         from services.core.jwt_manager import JWTError, JWTManager
 
@@ -172,7 +174,7 @@ class TestSecurityJWT:
 class TestCircuitBreaker:
     """Circuit breaker durum geçişleri ve metrikleri."""
 
-    def test_state_transitions(self):
+    def test_state_transitions(self) -> Any:
         """CLOSED → OPEN → HALF_OPEN → CLOSED geçişleri."""
         from services.core.circuit_breaker import CircuitBreaker, CircuitState
 
@@ -197,7 +199,7 @@ class TestCircuitBreaker:
         cb.record_success()
         assert cb.state == CircuitState.CLOSED
 
-    def test_circuit_breaker_metrics_export(self):
+    def test_circuit_breaker_metrics_export(self) -> Any:
         """Circuit breaker metrics export edilebilmeli."""
         from services.core.circuit_breaker_metrics import CircuitBreakerMetricsCollector
 
@@ -214,7 +216,7 @@ class TestCircuitBreaker:
 class TestTransactionHelper:
     """Transaction helper testleri."""
 
-    def test_metrics_tracking(self):
+    def test_metrics_tracking(self) -> Any:
         """Transaction metrikleri izlenmeli."""
         from services.core.transaction_helper import TransactionHelper
 
@@ -225,7 +227,7 @@ class TestTransactionHelper:
         assert "committed" in metrics
         assert "rolled_back" in metrics
 
-    def test_execute_batch_requires_pool(self):
+    def test_execute_batch_requires_pool(self) -> Any:
         """Pool yoksa hata vermeli."""
         from services.core.transaction_helper import TransactionHelper
 
@@ -242,7 +244,7 @@ class TestTransactionHelper:
 class TestConfigHotReload:
     """Config hot-reload testleri."""
 
-    def test_load_and_change_detection(self):
+    def test_load_and_change_detection(self) -> Any:
         """Config yükleme ve değişiklik algılama."""
         import tempfile
 
@@ -267,7 +269,7 @@ class TestConfigHotReload:
 
         os.unlink(path)
 
-    def test_force_reload(self):
+    def test_force_reload(self) -> Any:
         """Force reload çalışmalı."""
         import tempfile
 
@@ -296,7 +298,7 @@ class TestConfigHotReload:
 class TestImmutableAudit:
     """Immutable audit log testleri."""
 
-    def test_hash_chain_integrity(self):
+    def test_hash_chain_integrity(self) -> Any:
         """Hash chain bütünlüğü korunmalı."""
         from services.core.immutable_audit import ImmutableAuditLog
 
@@ -308,7 +310,7 @@ class TestImmutableAudit:
         is_valid = audit.verify_integrity()
         assert is_valid
 
-    def test_tamper_detection(self):
+    def test_tamper_detection(self) -> Any:
         """Veri değişikliği tespit edilmeli."""
         from services.core.immutable_audit import ImmutableAuditLog
 
@@ -332,7 +334,7 @@ class TestImmutableAudit:
 class TestSystemGovernor:
     """Graceful degradation testleri."""
 
-    def test_state_transitions(self):
+    def test_state_transitions(self) -> Any:
         """Durum geçişleri çalışmalı."""
         from services.core.system_governor import SystemState, SystemStateGovernor
 
@@ -345,7 +347,7 @@ class TestSystemGovernor:
         governor.transition(SystemState.DEGRADED, "test")
         assert governor.state == SystemState.DEGRADED
 
-    def test_feature_flags(self):
+    def test_feature_flags(self) -> Any:
         """Feature flag'ler çalışmalı."""
         from services.core.system_governor import FeatureFlag, SystemState, SystemStateGovernor
 
@@ -369,7 +371,7 @@ class TestSystemGovernor:
 class TestDistributedTracing:
     """Distributed tracing testleri."""
 
-    def test_correlation_id_generation(self):
+    def test_correlation_id_generation(self) -> Any:
         """Correlation ID üretilebilmeli."""
         from services.core.distributed_tracing import DistributedTracer
 
@@ -381,7 +383,7 @@ class TestDistributedTracing:
         trace = tracer.start_trace("test_operation")
         assert trace is not None
 
-    def test_span_hierarchy(self):
+    def test_span_hierarchy(self) -> Any:
         """Span hiyerarşisi doğru olmalı."""
         from services.core.distributed_tracing import DistributedTracer
 
@@ -403,7 +405,7 @@ class TestDistributedTracing:
 class TestRBAC:
     """Role-based access control testleri."""
 
-    def test_role_permissions(self):
+    def test_role_permissions(self) -> Any:
         """Rol izinleri doğru atanmalı."""
         from services.core.security import ROLE_PERMISSIONS, Permission, Role
 
@@ -417,7 +419,7 @@ class TestRBAC:
         assert Permission.LIVE_EXECUTION in admin_perms
         assert Permission.MANAGE_USERS in admin_perms
 
-    def test_authorization_check(self):
+    def test_authorization_check(self) -> Any:
         """İzin kontrolü çalışmalı."""
         from services.core.security import AuthorizationService, Permission, Role, User
 
@@ -438,7 +440,7 @@ class TestRBAC:
 class TestSecretRedaction:
     """Loglarda hassas bilgi gizleme."""
 
-    def test_api_key_redaction(self):
+    def test_api_key_redaction(self) -> Any:
         """API key'ler gizlenmeli."""
         from services.core.security import SecretRedaction
 
@@ -446,7 +448,7 @@ class TestSecretRedaction:
         redacted = SecretRedaction.redact(text)
         assert "sk-abc123456789012345678901" not in redacted
 
-    def test_bearer_token_redaction(self):
+    def test_bearer_token_redaction(self) -> Any:
         """Bearer token gizlenmeli."""
         from services.core.security import SecretRedaction
 

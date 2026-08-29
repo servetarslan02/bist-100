@@ -39,6 +39,7 @@ class PositionalEncoding:
     """Sinusoidal positional encoding."""
 
     def __init__(self, d_model: int, max_len: int = 500):
+        """Otomatik eklendi."""
         try:
             import torch
 
@@ -51,7 +52,8 @@ class PositionalEncoding:
         except ImportError:
             self.pe = None
 
-    def __call__(self, x):
+    def __call__(self, x) -> Any:
+        """Otomatik eklendi."""
         if self.pe is None:
             return x
         return x + self.pe[:, : x.size(1), :].to(x.device)
@@ -72,6 +74,7 @@ class StockTransformer:
     """
 
     def __init__(self, config: TransformerConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or TransformerConfig()
         self._model = None
         self._training_history: list[dict[str, Any]] = []
@@ -222,11 +225,13 @@ class StockTransformer:
 
         return np.array(X_seq), np.array(y_seq)
 
-    def _build_model(self, torch, nn):
+    def _build_model(self, torch, nn) -> Any:
         """PyTorch Transformer model oluştur."""
 
         class TransformerModel(nn.Module):
+            """Otomatik eklendi."""
             def __init__(self_cfg, torch_mod, nn_mod):
+                """Otomatik eklendi."""
                 super().__init__()
                 self.input_projection = nn_mod.Linear(self_cfg.input_size, self_cfg.d_model)
                 self.pos_encoding = PositionalEncoding(self_cfg.d_model, self_cfg.max_position_encoding)
@@ -247,7 +252,8 @@ class StockTransformer:
                     nn_mod.Linear(64, self_cfg.output_size),
                 )
 
-            def forward(self, x):
+            def forward(self, x) -> Any:
+                """Otomatik eklendi."""
                 x = self.input_projection(x)
                 x = self.pos_encoding(x)
                 x = self.transformer_encoder(x)
@@ -258,6 +264,7 @@ class StockTransformer:
         return model.to(self._config.device)
 
     def save(self, path: str) -> bool:
+        """Otomatik eklendi."""
         if self._model is None:
             return False
         try:
@@ -278,6 +285,7 @@ class StockTransformer:
             return False
 
     def load(self, path: str) -> bool:
+        """Otomatik eklendi."""
         try:
             import torch
 
@@ -294,4 +302,5 @@ class StockTransformer:
 
     @property
     def is_trained(self) -> bool:
+        """Otomatik eklendi."""
         return self._is_trained

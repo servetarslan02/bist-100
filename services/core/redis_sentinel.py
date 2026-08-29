@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Redis Sentinel Client (High Availability)
 
 Redis Sentinel desteği: master otomatik failover.
@@ -12,15 +13,15 @@ Kullanım:
 """
 
 import asyncio
+import functools
 import os
 
 import structlog
-import functools
 from opentelemetry import trace
 
 try:
     import redis.asyncio as aioredis
-    from redis.sentinel import Sentinel
+    from redis.asyncio.sentinel import Sentinel
 
     HAS_REDIS = True
 except ImportError:
@@ -29,14 +30,20 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.redis_sentinel")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -67,6 +74,7 @@ def _get_sentinel_master() -> str:
 
 
 def _get_redis_password() -> str:
+    """Otomatik eklendi."""
     return os.environ.get("REDIS_PASSWORD", "")
 
 
@@ -79,7 +87,7 @@ _ha_loop = None
 
 
 @otel_trace("redis_sentinel.get_ha_redis")
-async def get_ha_redis():
+async def get_ha_redis() -> Any:
     """High-Availability Redis client döndür.
 
     Öncelik:
@@ -142,7 +150,7 @@ async def get_ha_redis():
 
 
 @otel_trace("redis_sentinel.close_ha_redis")
-async def close_ha_redis():
+async def close_ha_redis() -> Any:
     """HA Redis bağlantısını kapat."""
     global _ha_redis, _ha_loop
     if _ha_redis:

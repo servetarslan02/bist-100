@@ -22,17 +22,20 @@ Referanslar:
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import orjson
+
 try:
     import polars as pl
 except ImportError:
     pl = None
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from datetime import datetime
 
 logger = structlog.get_logger()
 
@@ -51,6 +54,7 @@ class SystemState:
     config_hash: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "cash": self.cash,
@@ -75,6 +79,7 @@ class ReplayDecision:
     reasoning: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -130,12 +135,13 @@ class EnhancedReplayEngine:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._handlers: dict[str, Callable] = {}
         self._audit_trail: list[AuditRecord] = []
         self._state_snapshots: list[SystemState] = []
         self._current_hash: str = "genesis"
 
-    def register_handler(self, event_type: str, handler: Callable):
+    def register_handler(self, event_type: str, handler: Callable) -> Any:
         """Event handler kaydet."""
         self._handlers[event_type] = handler
         return self
@@ -422,7 +428,7 @@ class EnhancedReplayEngine:
         timestamp: datetime,
         event_type: str,
         data: dict[str, Any],
-    ):
+    ) -> Any:
         """Audit event kaydet."""
         record = AuditRecord(
             event_id=f"evt_{len(self._audit_trail):06d}",

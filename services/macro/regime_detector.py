@@ -85,6 +85,7 @@ class MacroRegimeDetector:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._current_regime: str | None = None
         self._regime_history: list[RegimeResult] = []
         self._transitions: list[RegimeTransition] = []

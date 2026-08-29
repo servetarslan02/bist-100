@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Insider Trading Detector v2.0 (İstatistiksel Anlamlılık).
 
 Geliştirmeler:
@@ -7,9 +8,9 @@ Geliştirmeler:
 - Bayes yaklaşımı: prior (sektör ortalaması) + posterior
 """
 
+import functools
 from dataclasses import dataclass
 
-import functools
 import numpy as np
 import structlog
 from opentelemetry import trace
@@ -17,19 +18,26 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.insider_detector")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 @dataclass
 class InsiderAlert:
+    """Otomatik eklendi."""
     ticker: str
     alert_type: str  # PRE_KAP_TRADE, UNUSUAL_VOLUME, PRICE_MOVE_BEFORE_KAP
     severity: str

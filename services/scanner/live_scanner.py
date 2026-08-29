@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Live Scanner v1.0
 
@@ -24,6 +25,7 @@ class LiveScanner:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._states: dict[str, dict] = {}  # ticker -> state
         self._scan_count: int = 0
         self._candidates: dict[str, float] = {}  # ticker -> score
@@ -142,7 +144,7 @@ class LiveScanner:
         """Aktif adayları döndür."""
         return self._candidates.copy()
 
-    def clear_candidate(self, ticker: str):
+    def clear_candidate(self, ticker: str) -> Any:
         """Adayı temizle."""
         self._candidates.pop(ticker, None)
 

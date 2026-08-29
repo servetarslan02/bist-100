@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 Centralized Operations Testleri
 
@@ -28,7 +31,7 @@ from services.core.monitoring_security import JWTProvider
 # =====================================================
 
 
-async def test_policy_update_via_api():
+async def test_policy_update_via_api() -> Any:
     """Policy API üzerinden güncellenebilmeli."""
     issues = []
 
@@ -56,7 +59,7 @@ async def test_policy_update_via_api():
     return "Policy Update Via API", len(issues) == 0, issues
 
 
-async def test_policy_versioning():
+async def test_policy_versioning() -> Any:
     """Policy versiyonlama doğru çalışmalı."""
     issues = []
 
@@ -77,7 +80,7 @@ async def test_policy_versioning():
     return "Policy Versioning", len(issues) == 0, issues
 
 
-async def test_policy_rollback():
+async def test_policy_rollback() -> Any:
     """Policy rollback çalışmalı."""
     issues = []
 
@@ -102,7 +105,7 @@ async def test_policy_rollback():
     return "Policy Rollback", len(issues) == 0, issues
 
 
-async def test_policy_rollback_to_previous():
+async def test_policy_rollback_to_previous() -> Any:
     """Bir önceki versiyona rollback."""
     issues = []
 
@@ -123,7 +126,7 @@ async def test_policy_rollback_to_previous():
     return "Policy Rollback Previous", len(issues) == 0, issues
 
 
-async def test_policy_validation_on_update():
+async def test_policy_validation_on_update() -> Any:
     """Geçersiz config update reddedilmeli."""
     issues = []
 
@@ -142,7 +145,7 @@ async def test_policy_validation_on_update():
     return "Policy Validation On Update", len(issues) == 0, issues
 
 
-async def test_policy_audit_log():
+async def test_policy_audit_log() -> Any:
     """Audit log doğru kaydedilmeli."""
     issues = []
 
@@ -173,7 +176,7 @@ async def test_policy_audit_log():
     return "Policy Audit Log", len(issues) == 0, issues
 
 
-async def test_policy_history_limit():
+async def test_policy_history_limit() -> Any:
     """History limiti doğru çalışmalı."""
     issues = []
 
@@ -188,7 +191,7 @@ async def test_policy_history_limit():
     return "Policy History Limit", len(issues) == 0, issues
 
 
-async def test_policy_persist_to_file():
+async def test_policy_persist_to_file() -> Any:
     """Policy dosyaya kaydedilmeli."""
     issues = []
 
@@ -215,7 +218,7 @@ async def test_policy_persist_to_file():
 # =====================================================
 
 
-async def test_silence_db_persist():
+async def test_silence_db_persist() -> Any:
     """Silence DB'ye persist edilmeli."""
     issues = []
 
@@ -252,7 +255,7 @@ async def test_silence_db_persist():
     return "Silence DB Persist", len(issues) == 0, issues
 
 
-async def test_silence_db_load():
+async def test_silence_db_load() -> Any:
     """Silence DB'den yüklenmeli."""
     issues = []
 
@@ -289,7 +292,7 @@ async def test_silence_db_load():
     return "Silence DB Load", len(issues) == 0, issues
 
 
-async def test_silence_db_remove():
+async def test_silence_db_remove() -> Any:
     """Silence DB'den silinmeli."""
     issues = []
 
@@ -323,7 +326,7 @@ async def test_silence_db_remove():
     return "Silence DB Remove", len(issues) == 0, issues
 
 
-async def test_silence_db_load_only_active():
+async def test_silence_db_load_only_active() -> Any:
     """Sadece aktif silence'lar yüklenmeli."""
     issues = []
 
@@ -363,7 +366,7 @@ async def test_silence_db_load_only_active():
     return "Silence DB Load Active Only", len(issues) == 0, issues
 
 
-async def test_silence_audit_trail():
+async def test_silence_audit_trail() -> Any:
     """Silence audit trail doğru olmalı."""
     issues = []
 
@@ -393,7 +396,7 @@ async def test_silence_audit_trail():
 # =====================================================
 
 
-async def test_jwks_key_rotation():
+async def test_jwks_key_rotation() -> Any:
     """Key rotation durumunda eski key ile token reddedilmeli."""
     issues = []
 
@@ -434,7 +437,7 @@ async def test_jwks_key_rotation():
     return "JWKS Key Rotation", len(issues) == 0, issues
 
 
-async def test_jwks_cache_invalidation():
+async def test_jwks_cache_invalidation() -> Any:
     """Key rotation cache TTL doğru çalışmalı."""
     issues = []
 
@@ -462,7 +465,7 @@ async def test_jwks_cache_invalidation():
     return "JWKS Cache Invalidation", len(issues) == 0, issues
 
 
-async def test_jwks_provider_without_url():
+async def test_jwks_provider_without_url() -> Any:
     """JWKS URL yoksa secret kullanmalı."""
     issues = []
 
@@ -488,7 +491,7 @@ async def test_jwks_provider_without_url():
     return "JWKS Without URL", len(issues) == 0, issues
 
 
-async def test_jwt_token_with_expired_signature():
+async def test_jwt_token_with_expired_signature() -> Any:
     """Expired signature reddedilmeli."""
     issues = []
 
@@ -524,7 +527,7 @@ async def test_jwt_token_with_expired_signature():
 # =====================================================
 
 
-async def test_alerting_with_policy_and_silence():
+async def test_alerting_with_policy_and_silence() -> Any:
     """Alerting + policy + silence entegrasyonu."""
     issues = []
 
@@ -585,10 +588,11 @@ async def test_alerting_with_policy_and_silence():
 # =====================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("CENTRALIZED OPERATIONS TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("CENTRALIZED OPERATIONS TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         # Policy management
@@ -628,27 +632,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

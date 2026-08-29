@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """Seed initial realistic prediction and outcome history for ALPHA BIST learning pipeline."""
 
 import numpy as np
@@ -6,7 +9,8 @@ from services.learning.learning_pipeline import LearningPipeline
 from services.learning.model_memory_store import ModelMemoryStore
 
 
-def seed_history():
+def seed_history() -> Any:
+    """Otomatik eklendi."""
     store = ModelMemoryStore()
     pipeline = LearningPipeline(memory_store=store)
 
@@ -36,7 +40,7 @@ def seed_history():
     ]
     regimes = ["BULL_MOMENTUM", "BEAR_CORRECTION", "RANGE_BOUND", "HIGH_VOLATILITY"]
 
-    print("Populating initial 40 historical evaluations per model...")
+    logger.info("Populating initial 40 historical evaluations per model...")
     for m in models_config:
         m_id = m["id"]
         true_acc = m["acc"]
@@ -65,11 +69,11 @@ def seed_history():
 
     # Run learning cycle to compute live trust and adaptive weights
     res = pipeline.run_learning_cycle(current_regime="BULL_MOMENTUM")
-    print("Initial learning cycle successfully executed!")
-    print(f"Models Evaluated: {res['models_evaluated']}")
-    print("Updated Adaptive Fusion Weights:")
+    logger.info("Initial learning cycle successfully executed!")
+    logger.info(f"Models Evaluated: {res['models_evaluated']}")
+    logger.info("Updated Adaptive Fusion Weights:")
     for k, v in res["fusion_weights"].items():
-        print(f"  - {k}: %{v * 100:.1f}")
+        logger.info(f"  - {k}: %{v * 100:.1f}")
 
 
 if __name__ == "__main__":

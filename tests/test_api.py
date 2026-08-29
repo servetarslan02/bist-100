@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — API Test Suite v1.0
 
@@ -27,13 +28,15 @@ from services.api.rate_limiter import InMemoryRateLimiter
 class TestJWT:
     """JWT handler test'leri."""
 
-    def test_create_token(self):
+    def test_create_token(self) -> Any:
+        """Otomatik eklendi."""
         handler = JWTHandler(secret_key="test-secret")
         token = handler.create_token("user1", "testuser", Role.VIEWER)
         assert isinstance(token, str)
         assert token.count(".") == 2
 
-    def test_verify_token(self):
+    def test_verify_token(self) -> Any:
+        """Otomatik eklendi."""
         handler = JWTHandler(secret_key="test-secret")
         token = handler.create_token("user1", "testuser", Role.ANALYST)
         payload = handler.verify_token(token)
@@ -42,12 +45,14 @@ class TestJWT:
         assert payload.username == "testuser"
         assert payload.role == "ANALYST"
 
-    def test_verify_invalid_token(self):
+    def test_verify_invalid_token(self) -> Any:
+        """Otomatik eklendi."""
         handler = JWTHandler(secret_key="test-secret")
         payload = handler.verify_token("invalid.token.here")
         assert payload is None
 
-    def test_verify_expired_token(self):
+    def test_verify_expired_token(self) -> Any:
+        """Otomatik eklendi."""
         handler = JWTHandler(secret_key="test-secret")
         # 0 saat = hemen expire
         token = handler.create_token("user1", "testuser", Role.VIEWER, expires_hours=0)
@@ -55,14 +60,16 @@ class TestJWT:
         payload = handler.verify_token(token)
         assert payload is None
 
-    def test_verify_wrong_secret(self):
+    def test_verify_wrong_secret(self) -> Any:
+        """Otomatik eklendi."""
         handler1 = JWTHandler(secret_key="secret1")
         handler2 = JWTHandler(secret_key="secret2")
         token = handler1.create_token("user1", "testuser", Role.VIEWER)
         payload = handler2.verify_token(token)
         assert payload is None
 
-    def test_roles(self):
+    def test_roles(self) -> Any:
+        """Otomatik eklendi."""
         handler = JWTHandler(secret_key="test-secret")
         for role in Role:
             token = handler.create_token("user1", "testuser", role)
@@ -73,19 +80,22 @@ class TestJWT:
 class TestAPIKeyManager:
     """API key manager test'leri."""
 
-    def test_register_and_verify(self):
+    def test_register_and_verify(self) -> Any:
+        """Otomatik eklendi."""
         manager = APIKeyManager()
         manager.register_key("test-key", "test-service", ["GET", "POST"])
         info = manager.verify_key("test-key")
         assert info is not None
         assert info["service"] == "test-service"
 
-    def test_verify_unknown_key(self):
+    def test_verify_unknown_key(self) -> Any:
+        """Otomatik eklendi."""
         manager = APIKeyManager()
         info = manager.verify_key("unknown-key")
         assert info is None
 
-    def test_revoke_key(self):
+    def test_revoke_key(self) -> Any:
+        """Otomatik eklendi."""
         manager = APIKeyManager()
         manager.register_key("test-key", "test-service", ["GET"])
         manager.revoke_key("test-key")
@@ -96,40 +106,50 @@ class TestAPIKeyManager:
 class TestRBACChecker:
     """RBAC checker test'leri."""
 
-    def test_viewer_can_get(self):
+    def test_viewer_can_get(self) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_permission(Role.VIEWER, "GET")
 
-    def test_viewer_cannot_post(self):
+    def test_viewer_cannot_post(self) -> Any:
+        """Otomatik eklendi."""
         assert not rbac_checker.check_permission(Role.VIEWER, "POST")
 
-    def test_analyst_can_post(self):
+    def test_analyst_can_post(self) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_permission(Role.ANALYST, "POST")
 
-    def test_analyst_cannot_delete(self):
+    def test_analyst_cannot_delete(self) -> Any:
+        """Otomatik eklendi."""
         assert not rbac_checker.check_permission(Role.ANALYST, "DELETE")
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
-    def test_admin_can_all(self, method):
+    def test_admin_can_all(self, method) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_permission(Role.ADMIN, method)
 
     @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
-    def test_system_can_all(self, method):
+    def test_system_can_all(self, method) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_permission(Role.SYSTEM, method)
 
-    def test_operator_can_put(self):
+    def test_operator_can_put(self) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_permission(Role.OPERATOR, "PUT")
 
-    def test_operator_cannot_delete(self):
+    def test_operator_cannot_delete(self) -> Any:
+        """Otomatik eklendi."""
         assert not rbac_checker.check_permission(Role.OPERATOR, "DELETE")
 
-    def test_admin_endpoint_admin_only(self):
+    def test_admin_endpoint_admin_only(self) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_endpoint_access(Role.ADMIN, "/admin/policy")
         assert rbac_checker.check_endpoint_access(Role.SYSTEM, "/admin/policy")
         assert not rbac_checker.check_endpoint_access(Role.VIEWER, "/admin/policy")
         assert not rbac_checker.check_endpoint_access(Role.ANALYST, "/admin/policy")
 
     @pytest.mark.parametrize("role", list(Role))
-    def test_normal_endpoint_all_roles(self, role):
+    def test_normal_endpoint_all_roles(self, role) -> Any:
+        """Otomatik eklendi."""
         assert rbac_checker.check_endpoint_access(role, "/api/v1/market/state")
 
 
@@ -142,14 +162,16 @@ class TestRateLimiter:
     """Rate limiter test'leri."""
 
     @pytest.mark.asyncio
-    async def test_allows_within_limit(self):
+    async def test_allows_within_limit(self) -> Any:
+        """Otomatik eklendi."""
         limiter = InMemoryRateLimiter()
         allowed, info = await limiter.check("client1", "default")
         assert allowed
         assert info["remaining"] >= 0
 
     @pytest.mark.asyncio
-    async def test_blocks_over_limit(self):
+    async def test_blocks_over_limit(self) -> Any:
+        """Otomatik eklendi."""
         limiter = InMemoryRateLimiter()
         # 100 istek gönder (default limit)
         for _ in range(100):
@@ -159,7 +181,8 @@ class TestRateLimiter:
         assert not allowed or info["remaining"] == 0
 
     @pytest.mark.asyncio
-    async def test_different_clients(self):
+    async def test_different_clients(self) -> Any:
+        """Otomatik eklendi."""
         limiter = InMemoryRateLimiter()
         for _ in range(100):
             await limiter.check("client1", "default")
@@ -168,7 +191,8 @@ class TestRateLimiter:
         assert allowed
 
     @pytest.mark.asyncio
-    async def test_different_groups(self):
+    async def test_different_groups(self) -> Any:
+        """Otomatik eklendi."""
         limiter = InMemoryRateLimiter()
         for _ in range(100):
             await limiter.check("client1", "default")
@@ -176,7 +200,8 @@ class TestRateLimiter:
         allowed, info = await limiter.check("client1", "analysis")
         assert allowed
 
-    def test_endpoint_group_detection(self):
+    def test_endpoint_group_detection(self) -> Any:
+        """Otomatik eklendi."""
         limiter = InMemoryRateLimiter()
         assert limiter.get_endpoint_group("/api/v1/market/state", "GET") == "default"
         assert limiter.get_endpoint_group("/api/v1/backtests", "POST") == "backtest"
@@ -194,14 +219,16 @@ class TestRateLimiter:
 class TestApp:
     """FastAPI uygulama test'leri."""
 
-    def test_create_app(self):
+    def test_create_app(self) -> Any:
+        """Otomatik eklendi."""
         from services.api.app import create_app
 
         app = create_app()
         assert app.title == "ALPHA BIST API"
         assert app.version == "2.0.0"
 
-    def test_routes_count(self):
+    def test_routes_count(self) -> Any:
+        """Otomatik eklendi."""
         from services.api.app import create_app
 
         app = create_app()
@@ -209,12 +236,13 @@ class TestApp:
         # Root + health + OpenAPI + docs endpoint'leri
         assert len(routes) >= 2
 
-    def test_v1_router_prefix(self):
+    def test_v1_router_prefix(self) -> Any:
+        """Otomatik eklendi."""
         from services.api.v1 import v1_router
 
         assert v1_router.prefix == "/api/v1"
 
-    def test_openapi_available(self):
+    def test_openapi_available(self) -> Any:
         """OpenAPI/Swagger endpoint'leri erişilebilir olmalı."""
         from services.api.app import create_app
 
@@ -223,7 +251,7 @@ class TestApp:
         assert app.redoc_url == "/redoc"
         assert app.openapi_url == "/openapi.json"
 
-    def test_v1_route_count(self):
+    def test_v1_route_count(self) -> Any:
         """v1 router'ları spec'deki92+ endpoint sayısını karşılamalı."""
         import os
         import re
@@ -233,7 +261,7 @@ class TestApp:
         for f in os.listdir(v1_dir):
             if not f.endswith(".py") or f == "__init__.py":
                 continue
-            with open(os.path.join(v1_dir, f)) as fh:
+            with open(os.path.join(v1_dir, f), encoding="utf-8") as fh:
                 content = fh.read()
             endpoint_count += len(re.findall(r"@router\.(get|post|put|delete|patch|websocket)", content, re.IGNORECASE))
         # Spec: 92 endpoint hedefi, mevcut: 126+
@@ -243,7 +271,7 @@ class TestApp:
 class TestSecurity:
     """Güvenlik test'leri."""
 
-    def test_rbac_roles_match_spec(self):
+    def test_rbac_roles_match_spec(self) -> Any:
         """RBAC rolleri spec ile uyumlu olmalı."""
         from services.api.auth import Role
 
@@ -254,7 +282,7 @@ class TestSecurity:
         assert "ADMIN" in roles
         assert "SYSTEM" in roles
 
-    def test_rate_limit_groups_match_spec(self):
+    def test_rate_limit_groups_match_spec(self) -> Any:
         """Rate limit grupları spec ile uyumlu olmalı."""
         from services.api.rate_limiter import RATE_LIMITS
 
@@ -264,7 +292,7 @@ class TestSecurity:
         assert "scanner" in RATE_LIMITS
         assert "websocket" in RATE_LIMITS
 
-    def test_rate_limit_values_match_spec(self):
+    def test_rate_limit_values_match_spec(self) -> Any:
         """Rate limit değerleri spec ile uyumlu olmalı."""
         from services.api.rate_limiter import RATE_LIMITS
 
@@ -274,14 +302,14 @@ class TestSecurity:
         assert RATE_LIMITS["scanner"].max_requests == 300
         assert RATE_LIMITS["websocket"].max_requests == 1000
 
-    def test_jwt_algorithm(self):
+    def test_jwt_algorithm(self) -> Any:
         """JWT HS256 kullanmalı."""
         from services.api.auth import JWTHandler
 
         handler = JWTHandler()
         assert handler.algorithm == "HS256"
 
-    def test_endpoint_group_recognition(self):
+    def test_endpoint_group_recognition(self) -> Any:
         """Tüm v1 endpoint grupları tanınmalı."""
         from services.api.rate_limiter import InMemoryRateLimiter
 

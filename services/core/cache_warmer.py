@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Cache Warming (Sıcak Veri Önyükleme)
 
 Servis başlarken sık kullanılan verileri Redis'e önceden yükler.
@@ -18,14 +19,20 @@ from opentelemetry import trace
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.cache_warmer")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        def wrapper(self, *args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -33,11 +40,12 @@ class CacheWarmer:
     """Redis cache warming — sıcak veriyi önceden yükle."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._warmed = False
         self._warm_tasks: list[asyncio.Task] = []
 
     @otel_trace("cache_warmer.warm_all")
-    async def warm_all(self):
+    async def warm_all(self) -> Any:
         """Tüm sıcak verileri paralel olarak yükle."""
         if self._warmed:
             logger.debug("Cache already warmed, skipping")
@@ -173,7 +181,7 @@ class CacheWarmer:
         return False
 
     @otel_trace("cache_warmer.refresh_hot_keys")
-    async def refresh_hot_keys(self):
+    async def refresh_hot_keys(self) -> Any:
         """Sıcak anahtarları periyodik olarak tazele (background task).
 
         v2.0: KAP anlık duyuru izleme eklendi.

@@ -42,6 +42,7 @@ class EnsembleResult:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "regime": self.regime,
             "confidence": round(self.confidence, 4),
@@ -74,6 +75,7 @@ class EnsembleRegimeDetector:
         gmm_weight: float = 0.20,
         rolling_window: int = 63,
     ):
+        """Otomatik eklendi."""
         self._score_weight = score_weight
         self._hmm_weight = hmm_weight
         self._gmm_weight = gmm_weight
@@ -85,7 +87,7 @@ class EnsembleRegimeDetector:
         self._gmm_detector = None
         self._init_failed = False
 
-    def _ensure_engines(self):
+    def _ensure_engines(self) -> Any:
         """Engine'leri lazy init et."""
         if self._init_failed:
             return
@@ -354,7 +356,7 @@ class EnsembleRegimeDetector:
         score_weight: float = None,
         hmm_weight: float = None,
         gmm_weight: float = None,
-    ):
+    ) -> Any:
         """Ağırlıkları güncelle (backtest optimizasyonu sonrası)."""
         if score_weight is not None:
             self._score_weight = score_weight

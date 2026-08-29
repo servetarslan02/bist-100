@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST - Feature Engine Service (Main Entry Point)"""
 
 import asyncio
@@ -30,13 +31,14 @@ class FeatureEngineService:
     """Computes and stores features for all instruments."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._consumer: EventConsumer = None
         self._price_cache: dict[str, list[dict]] = {}  # ticker -> recent prices
         # Pipeline — drift detection, BIST features, store entegrasyonu
         self._pipeline = feature_pipeline
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the feature engine service."""
         setup_logging()
         logger.info("Starting Feature Engine Service")
@@ -57,7 +59,7 @@ class FeatureEngineService:
         logger.info("Feature Engine Service started")
         await self._consumer.consume_loop()
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the feature engine service."""
         self._running = False
         if self._consumer:
@@ -65,7 +67,7 @@ class FeatureEngineService:
         await close_databases()
         logger.info("Feature Engine Service stopped")
 
-    async def _on_tick(self, event: CanonicalEvent):
+    async def _on_tick(self, event: CanonicalEvent) -> Any:
         """Handle incoming tick events — her tick'te feature güncelle."""
         try:
             ticker = event.data.get("ticker")
@@ -179,7 +181,7 @@ class FeatureEngineService:
             logger.warning("Feature computation failed", ticker=ticker, error=str(e))
             return {}
 
-    async def _run_pipeline_async(self, ticker: str, features: dict[str, float], df):
+    async def _run_pipeline_async(self, ticker: str, features: dict[str, float], df) -> Any:
         """Pipeline'ı async olarak çalıştır (store, drift detection)."""
         try:
             result = await self._pipeline.run(
@@ -196,7 +198,7 @@ class FeatureEngineService:
         except Exception as e:
             logger.debug("Pipeline run failed", ticker=ticker, error=str(e))
 
-    def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]):
+    def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]) -> Any:
         """Store features in ClickHouse."""
         try:
             now = datetime.now(UTC)
@@ -238,11 +240,12 @@ class FeatureEngineService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "features"})
 
     app = web.Application()
@@ -259,7 +262,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the feature engine service."""
     await _health_server()
     service = FeatureEngineService()

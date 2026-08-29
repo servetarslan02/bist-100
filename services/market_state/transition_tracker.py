@@ -50,6 +50,7 @@ class TransitionStats:
     confidence_trend: str = "STABLE"  # INCREASING / DECREASING / STABLE
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {
             "total_observations": self.total_observations,
             "total_transitions": self.total_transitions,
@@ -73,6 +74,7 @@ class RegimeTransitionTracker:
     """
 
     def __init__(self, max_history: int = 1000, stability_window: int = 20):
+        """Otomatik eklendi."""
         self._max_history = max_history
         self._stability_window = stability_window
 
@@ -93,7 +95,7 @@ class RegimeTransitionTracker:
         regime: str,
         confidence: float,
         timestamp: datetime | None = None,
-    ):
+    ) -> Any:
         """Rejim kaydet, geçiş tespit et.
 
         Args:
@@ -413,7 +415,7 @@ class RegimeTransitionTracker:
 
         return alerts
 
-    def reset(self):
+    def reset(self) -> Any:
         """Tüm state sıfırla (backtest için)."""
         self._history = []
         self._transitions = []

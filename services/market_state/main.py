@@ -1,3 +1,4 @@
+from typing import Any
 """ALPHA BIST — Market State Engine v2.0 (Main Entry Point)
 
 Tüm bileşenleri orkestre eden ana servis:
@@ -70,6 +71,7 @@ class MarketStateService:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._consumer: EventConsumer = None
 
@@ -121,7 +123,7 @@ class MarketStateService:
         self._news_sentiment: float = 0.0
         self._social_sentiment: float = 0.0
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the market state service."""
         setup_logging()
         logger.info("Starting Market State Engine v2.0")
@@ -157,7 +159,7 @@ class MarketStateService:
         )
         await self._consumer.consume_loop()
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the market state service."""
         self._running = False
         if self._consumer:
@@ -206,7 +208,7 @@ class MarketStateService:
         daily_data = {"instruments": states, "features": features}
         return self._multi_tf.compute_all_timeframes({"daily": daily_data})
 
-    async def _load_instruments(self):
+    async def _load_instruments(self) -> Any:
         """Load instrument mapping — BIST universe."""
         try:
             from ..ingestion.bist_universe import bist_universe
@@ -234,7 +236,7 @@ class MarketStateService:
 
         logger.info("Instruments loaded", count=len(self._ticker_map))
 
-    async def _on_tick(self, event: CanonicalEvent):
+    async def _on_tick(self, event: CanonicalEvent) -> Any:
         """Handle tick events."""
         try:
             ticker = event.data.get("ticker")
@@ -270,7 +272,7 @@ class MarketStateService:
         except Exception as e:
             logger.error("Tick processing error", error=str(e))
 
-    async def _on_feature_update(self, event: CanonicalEvent):
+    async def _on_feature_update(self, event: CanonicalEvent) -> Any:
         """Handle feature updates."""
         try:
             ticker = event.data.get("ticker")
@@ -311,11 +313,11 @@ class MarketStateService:
         except Exception as e:
             logger.error("Feature update processing error", error=str(e))
 
-    async def _on_world_state(self, event: CanonicalEvent):
+    async def _on_world_state(self, event: CanonicalEvent) -> Any:
         """Handle world state changes."""
         self._world_state = event.data.get("world_state", {})
 
-    async def _on_news(self, event: CanonicalEvent):
+    async def _on_news(self, event: CanonicalEvent) -> Any:
         """Handle news events for sentiment."""
         sentiment = event.data.get("sentiment", 0)
         if sentiment:
@@ -323,7 +325,7 @@ class MarketStateService:
             alpha = 0.3
             self._news_sentiment = alpha * sentiment + (1 - alpha) * self._news_sentiment
 
-    async def _compute_market_state(self):
+    async def _compute_market_state(self) -> Any:
         """Ana hesaplama pipeline — tüm bileşenler."""
         if not self._instrument_states:
             return
@@ -537,7 +539,7 @@ class MarketStateService:
         breadth: BreadthResult,
         components: ComponentStates,
         transition,
-    ):
+    ) -> Any:
         """Event bus'a event publish et."""
         # Regime change
         if ensemble.regime != self._current_regime:
@@ -642,11 +644,12 @@ class MarketStateService:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "market_state"})
 
     app = web.Application()
@@ -663,7 +666,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the market state service."""
     await _health_server()
     service = MarketStateService()

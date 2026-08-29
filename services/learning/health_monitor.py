@@ -47,17 +47,21 @@ class HealthReport:
 
     @property
     def status(self) -> str:
+        """Otomatik eklendi."""
         return "OK" if self.overall_status in ["HEALTHY", "WARNING", "OK"] else self.overall_status
 
     @property
     def uptime_hours(self) -> float:
+        """Otomatik eklendi."""
         return 24.0
 
     @property
     def total_errors(self) -> int:
+        """Otomatik eklendi."""
         return self.error_count
 
     def __getitem__(self, key: str) -> Any:
+        """Otomatik eklendi."""
         if key == "status":
             return self.status
         if key in ["error_count", "total_errors"]:
@@ -71,11 +75,13 @@ class HealthReport:
         raise KeyError(key)
 
     def __contains__(self, key: str) -> bool:
+        """Otomatik eklendi."""
         return key in ["status", "uptime_hours", "error_count", "total_errors", "pending_restarts"] or hasattr(
             self, key
         )
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Otomatik eklendi."""
         try:
             return self[key]
         except KeyError:
@@ -86,6 +92,7 @@ class LearningHealthMonitor:
     """Learning system sağlık izleme."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._module_status: dict[str, ModuleHealth] = {}
         self._error_history: deque = deque(maxlen=1000)
         self._restart_requests: deque = deque(maxlen=100)
@@ -134,7 +141,7 @@ class LearningHealthMonitor:
 
         return report
 
-    def request_restart(self, module: str):
+    def request_restart(self, module: str) -> Any:
         """Modül restart isteği."""
         if module not in self._restart_requests:
             self._restart_requests.append(module)
@@ -148,7 +155,7 @@ class LearningHealthMonitor:
         self._restart_requests.clear()
         return requests
 
-    def record_error(self, module: str, error: str):
+    def record_error(self, module: str, error: str) -> Any:
         """Hata kaydet."""
         self._error_history.append(
             {
@@ -315,7 +322,7 @@ class LearningHealthMonitor:
             uptime_hours=0,
         )
 
-    def auto_heal(self, health_report: dict[str, Any] = None):
+    def auto_heal(self, health_report: dict[str, Any] = None) -> Any:
         """Otomatik onarım — hatalı modülleri onarmaya çalış.
 
         Args:
@@ -354,7 +361,7 @@ class LearningHealthMonitor:
         }
         return action_map.get(module, "restart")
 
-    def _execute_healing(self, module: str, action: str):
+    def _execute_healing(self, module: str, action: str) -> Any:
         """Onarım aksiyonunu yürüt."""
         logger.info("Executing healing action", module=module, action=action)
 

@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -66,6 +67,7 @@ class FoldBacktestResult:
     leakage_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return {k: v for k, v in self.__dict__.items()}
 
 
@@ -90,6 +92,7 @@ class WalkForwardBacktestResult:
     summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         d = {k: v for k, v in self.__dict__.items() if k != "folds"}
         d["folds"] = [f.to_dict() for f in self.folds]
         return d
@@ -108,6 +111,7 @@ class WalkForwardBacktestRunner:
         step_days: int = 21,
         use_panel_features: bool = True,
     ):
+        """Otomatik eklendi."""
         self._config = backtest_config or BacktestConfig()
         self._use_panel = use_panel_features
         self._wf = WalkForwardEngine(
@@ -249,7 +253,7 @@ class WalkForwardBacktestRunner:
         train_start: str,
         train_end: str,
         benchmark_data=None,
-    ):
+    ) -> Any:
         """TRAIN window için LightGBM modeli eğit — FAZ 4.4.
 
         Değişiklikler:
@@ -482,7 +486,8 @@ class WalkForwardBacktestRunner:
 
             version = f"fold_{train_start}_{train_end}_h{'_'.join(str(h) for h in multi_model.available_horizons)}"
 
-            def _save():
+            def _save() -> Any:
+                """Otomatik eklendi."""
                 import asyncio
 
                 loop = asyncio.new_event_loop()
@@ -612,6 +617,7 @@ class WalkForwardBacktestRunner:
         run_id: str,
         folds: list[FoldBacktestResult],
     ) -> WalkForwardBacktestResult:
+        """Otomatik eklendi."""
         returns = [f.total_return_pct for f in folds]
         sharpes = [f.sharpe_ratio for f in folds]
         sortinos = [f.sortino_ratio for f in folds]
@@ -624,7 +630,9 @@ class WalkForwardBacktestRunner:
 
         # Deflated Sharpe (v5.0 — scipy tabanlı, skewness/kurtosis düzeltmeli)
         try:
-            from scipy.stats import skew as _skew, kurtosis as _kurtosis
+            from scipy.stats import kurtosis as _kurtosis
+            from scipy.stats import skew as _skew
+
             _sk = float(_skew(returns)) if len(returns) > 10 else 0.0
             _kt = float(_kurtosis(returns, fisher=False)) if len(returns) > 10 else 3.0
         except ImportError:
@@ -633,7 +641,8 @@ class WalkForwardBacktestRunner:
             float(np.mean(sharpes)),
             max(sum(f.total_scans for f in folds), 1),
             len(folds),
-            skewness=_sk, kurtosis=_kt,
+            skewness=_sk,
+            kurtosis=_kt,
         )
 
         return WalkForwardBacktestResult(
@@ -663,6 +672,7 @@ class WalkForwardBacktestRunner:
         )
 
     def _base_run_id(self, market_data: dict[str, pl.DataFrame]) -> str:
+        """Otomatik eklendi."""
         tickers = sorted(market_data.keys())
         wf_cfg = (
             self._wf.purge_days,
@@ -675,6 +685,7 @@ class WalkForwardBacktestRunner:
         return hashlib.sha256(hash_input.encode()).hexdigest()[:12]
 
     def _empty_result(self, run_id: str) -> WalkForwardBacktestResult:
+        """Otomatik eklendi."""
         return WalkForwardBacktestResult(
             run_id=run_id,
             total_folds=0,

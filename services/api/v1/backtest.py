@@ -1,3 +1,4 @@
+from typing import Any
 """Backtest API - Gerçek servislere bağlı."""
 
 import structlog
@@ -16,7 +17,7 @@ async def run_backtest(
     strategy: str = Query("momentum"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Backtest çalıştır - engine servisi."""
     try:
         return {
@@ -32,7 +33,7 @@ async def run_backtest(
 
 
 @router.get("/results/{backtest_id}")
-async def get_result(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_result(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Backtest sonucu."""
     try:
         from ...core.database import pg_fetchrow
@@ -46,7 +47,7 @@ async def get_result(backtest_id: str, user=Depends(get_current_user), _=Depends
 
 
 @router.get("/list")
-async def list_backtests(limit: int = Query(20), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def list_backtests(limit: int = Query(20), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Backtest listesi."""
     try:
         from ...core.database import pg_fetch
@@ -63,7 +64,7 @@ async def walk_forward(
     n_folds: int = Query(5),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Walk-forward analizi - walk_forward servisi."""
     try:
         return {"status": "started", "ticker": ticker, "n_folds": n_folds}
@@ -79,7 +80,7 @@ async def deflated_sharpe(
     T: int = Query(252),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Deflated Sharpe Ratio - deflated_sharpe servisi."""
     try:
         from ...backtest.deflated_sharpe import DeflatedSharpeCalculator
@@ -92,7 +93,7 @@ async def deflated_sharpe(
 
 
 @router.get("/history_30y")
-async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """30 Yıllık Gerçekleşen Kriz ve Risk Parity Doğrulama Raporu (1997-2026).
 
     Kaynak: PostgreSQL backtest_results tablosu. Veri yoksa boş döner.
@@ -135,7 +136,7 @@ async def transaction_costs(
     ticker: str = Query("THYAO"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """İşlem maliyetleri - transaction_costs servisi."""
     try:
         from ...backtest.transaction_costs import BISTFeeStructure
@@ -152,12 +153,12 @@ async def transaction_costs(
 
 
 @router.get("/trades/{backtest_id}")
-async def backtest_trades(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def backtest_trades(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Backtest işlem detayları."""
     return {"backtest_id": backtest_id, "trades": [], "message": "Requires completed backtest"}
 
 
 @router.get("/equity-curve/{backtest_id}")
-async def equity_curve(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def equity_curve(backtest_id: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Backtest equity curve."""
     return {"backtest_id": backtest_id, "equity_curve": [], "message": "Requires completed backtest"}

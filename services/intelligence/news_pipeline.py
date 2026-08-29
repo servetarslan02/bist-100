@@ -113,6 +113,7 @@ class NewsPipeline:
         )
 
     def _build_empty(self, raw_news: dict) -> ProcessedNews:
+        """Otomatik eklendi."""
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
             timestamp=datetime.now(UTC),

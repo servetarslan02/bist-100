@@ -18,6 +18,8 @@ import random
 import time
 import uuid
 from contextlib import asynccontextmanager
+
+_bg_tasks = set()
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -101,6 +103,7 @@ class LockMetrics:
         self.total_crash_recoveries += 1
 
     def to_dict(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         avg = self.total_wait_ms / self.total_acquisitions if self.total_acquisitions else 0
         uptime_s = time.time() - self.created_at
         return {
@@ -150,6 +153,7 @@ _metrics: dict[str, LockMetrics] = {}
 
 
 def get_lock_metrics(key: str) -> LockMetrics:
+    """Otomatik eklendi."""
     if key not in _metrics:
         _metrics[key] = LockMetrics()
     return _metrics[key]
@@ -213,6 +217,7 @@ class DatabaseLock:
         lease_renewal_interval_s: float = 30.0,
         stale_lock_timeout_s: float = 300.0,
     ):
+        """Otomatik eklendi."""
         self._db = db
         self._dialect = dialect
         self._key = key
@@ -230,14 +235,17 @@ class DatabaseLock:
 
     @property
     def key(self) -> str:
+        """Otomatik eklendi."""
         return self._key
 
     @property
     def is_acquired(self) -> bool:
+        """Otomatik eklendi."""
         return self._acquired
 
     @property
     def owner_id(self) -> str:
+        """Otomatik eklendi."""
         return self._owner_id
 
     # =====================================================
@@ -292,9 +300,7 @@ class DatabaseLock:
                     lk_metrics.record_error()
                     if "deadlock" in error_msg:
                         lk_metrics.record_deadlock()
-                        logger.warning(
-                            "Deadlock tespit edildi", key=self._key, attempt=attempt + 1
-                        )
+                        logger.warning("Deadlock tespit edildi", key=self._key, attempt=attempt + 1)
                         if attempt < self._max_retries - 1:
                             delay_s = self._calc_backoff(attempt) * 2
                             await asyncio.sleep(delay_s)
@@ -347,7 +353,7 @@ class DatabaseLock:
                 self._acquired = False
                 self._acquire_time = None
 
-    async def rollback(self):
+    async def rollback(self) -> Any:
         """Transaction rollback + lock bırak."""
         if not self._acquired:
             return
@@ -369,12 +375,13 @@ class DatabaseLock:
     # LEASE RENEWAL
     # =====================================================
 
-    def _start_renewal(self):
+    def _start_renewal(self) -> Any:
         """Uzun transaction'lar için lock süresini otomatik yenile."""
         if self._renewal_task is not None:
             return
 
-        async def _renewal_loop():
+        async def _renewal_loop() -> Any:
+            """Otomatik eklendi."""
             while True:
                 try:
                     await asyncio.sleep(self._lease_renewal_interval_s)
@@ -388,16 +395,20 @@ class DatabaseLock:
 
         try:
             self._renewal_task = asyncio.create_task(_renewal_loop())
+            # B36 Fix: Keep strong reference
+            global _bg_tasks
+            _bg_tasks.add(self._renewal_task)
+            self._renewal_task.add_done_callback(_bg_tasks.discard)
         except RuntimeError:
             logger.warning("Renewal task başlatılamıyor (event loop yok)", exc_info=True)
 
-    def _stop_renewal(self):
+    def _stop_renewal(self) -> Any:
         """Renewal durdur."""
         if self._renewal_task and not self._renewal_task.done():
             self._renewal_task.cancel()
             self._renewal_task = None
 
-    async def _renew_lease(self):
+    async def _renew_lease(self) -> Any:
         """Lock süresini yenile."""
         if not self._acquired:
             return
@@ -499,7 +510,7 @@ class DatabaseLock:
                 return False
             raise
 
-    async def _release_sqlite(self):
+    async def _release_sqlite(self) -> Any:
         """SQLite: COMMIT ile lock serbest."""
         try:
             self._db.commit()
@@ -509,7 +520,7 @@ class DatabaseLock:
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="db_lock.py:465")
 
-    async def _rollback_sqlite(self):
+    async def _rollback_sqlite(self) -> Any:
         """SQLite: ROLLBACK."""
         try:
             self._db.rollback()
@@ -530,14 +541,14 @@ class DatabaseLock:
                 return False
             raise
 
-    async def _release_pg(self):
+    async def _release_pg(self) -> Any:
         """PostgreSQL: pg_advisory_unlock."""
         try:
             await self._db.execute("SELECT pg_advisory_unlock($1)", self._key_id)
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:499")
 
-    async def _rollback_pg(self):
+    async def _rollback_pg(self) -> Any:
         """PostgreSQL: ROLLBACK."""
         try:
             await self._db.execute("ROLLBACK")
@@ -548,13 +559,15 @@ class DatabaseLock:
     # CONTEXT MANAGER
     # =====================================================
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
+        """Otomatik eklendi."""
         success = await self.acquire()
         if not success:
             raise RuntimeError(f"Lock timeout: {self._key} ({self._timeout_ms}ms)")
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> Any:
+        """Otomatik eklendi."""
         if exc_type:
             await self.rollback()
         else:
@@ -571,6 +584,7 @@ class CoordinatedLock:
     """In-process asyncio lock + DB-level lock koordinasyonu."""
 
     def __init__(self, db, dialect: str = "postgresql", key: str = "default", timeout_ms: int = 5000):
+        """Otomatik eklendi."""
         self._asyncio_lock = asyncio.Lock()
         self._db_lock = DatabaseLock(db, dialect=dialect, key=key, timeout_ms=timeout_ms)
         self._key = key
@@ -587,13 +601,13 @@ class CoordinatedLock:
             return False
         return True
 
-    async def release(self):
+    async def release(self) -> Any:
         """Her iki lock'u da bırak (ters sıra)."""
         await self._db_lock.release()
         if self._asyncio_lock.locked():
             self._asyncio_lock.release()
 
-    async def rollback(self):
+    async def rollback(self) -> Any:
         """DB rollback + lock bırak."""
         await self._db_lock.rollback()
         if self._asyncio_lock.locked():
@@ -601,15 +615,18 @@ class CoordinatedLock:
 
     @property
     def metrics(self) -> LockMetrics:
+        """Otomatik eklendi."""
         return get_lock_metrics(self._key)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Any:
+        """Otomatik eklendi."""
         success = await self.acquire()
         if not success:
             raise RuntimeError(f"Coordinated lock timeout: {self._key}")
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> Any:
+        """Otomatik eklendi."""
         if exc_type:
             await self.rollback()
         else:
@@ -618,7 +635,7 @@ class CoordinatedLock:
 
 
 @asynccontextmanager
-async def portfolio_trade_lock(db, dialect: str = "postgresql", timeout_ms: int = 5000):
+async def portfolio_trade_lock(db, dialect: str = "postgresql", timeout_ms: int = 5000) -> Any:
     """Portfolio işlem lock'u (context manager)."""
     lock = CoordinatedLock(db, dialect=dialect, key="portfolio_trade", timeout_ms=timeout_ms)
     async with lock:

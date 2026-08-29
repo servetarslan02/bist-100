@@ -71,6 +71,7 @@ class TCMBProvider:
     }
 
     def __init__(self, api_key: str | None = None):
+        """Otomatik eklendi."""
         import os
 
         self.api_key = api_key or os.getenv("TCMB_API_KEY") or os.getenv("EVDS_API_KEY")

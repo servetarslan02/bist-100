@@ -15,8 +15,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import defaultdict
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import orjson
 import structlog
@@ -25,6 +24,9 @@ from opentelemetry.propagate import extract, inject
 
 from .config import settings
 from .event_schema import CanonicalEvent, EventType  # noqa: F401 — backward compatibility
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.event_bus")
@@ -70,7 +72,7 @@ DEFAULT_SUBJECTS = [
 ]
 
 
-def ensure_topics(subjects: list[str] | None = None):
+def ensure_topics(subjects: list[str] | None = None) -> Any:
     """Ensure NATS subjects are registered.
 
     NATS otomatik subject oluşturma destekler, bu fonksiyon
@@ -81,7 +83,7 @@ def ensure_topics(subjects: list[str] | None = None):
     return True
 
 
-async def flush_producer():
+async def flush_producer() -> Any:
     """Flush pending events to NATS/Redis.
 
     Çıkış sırasında buffer'daki tüm mesajları gönder.
@@ -106,12 +108,14 @@ class InternalEventBus:
     """
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._redis = None
         self._redis_loop = None
         self._subscribers: dict[str, list[Callable]] = {}
         self._running = False
 
-    async def _get_redis(self):
+    async def _get_redis(self) -> Any:
+        """Otomatik eklendi."""
         try:
             current_loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -128,7 +132,7 @@ class InternalEventBus:
                 self._redis_loop = current_loop
         return self._redis
 
-    async def publish(self, channel: str, event: CanonicalEvent):
+    async def publish(self, channel: str, event: CanonicalEvent) -> Any:
         """Event'i publish et — tüm subscriber'lara anında gider."""
         r = await self._get_redis()
         try:
@@ -156,14 +160,14 @@ class InternalEventBus:
             if hasattr(r, "publish_local"):
                 r.publish_local(channel, event)
 
-    async def subscribe(self, channel: str, handler: Callable):
+    async def subscribe(self, channel: str, handler: Callable) -> Any:
         """Kanalı dinle — veri geldiğinde handler çalışır."""
         if channel not in self._subscribers:
             self._subscribers[channel] = []
         self._subscribers[channel].append(handler)
         logger.debug("Subscribed", channel=channel)
 
-    async def start_listening(self):
+    async def start_listening(self) -> Any:
         """Tüm subscriber'ları dinle — blocking loop."""
         self._running = True
         r = await self._get_redis()
@@ -224,7 +228,7 @@ class InternalEventBus:
                 logger.warning("PubSub listen error", error=str(e))
                 await asyncio.sleep(0.1)
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Dinlemeyi durdur."""
         self._running = False
         if self._redis:
@@ -238,25 +242,29 @@ class InMemoryRedis:
     """In-memory Redis fallback (Docker yokken veya test ortamında)."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._data = {}
         self._pubsub_handlers = {}
         self._streams = defaultdict(list)
 
     async def set(self, key: str, value: Any, ex: int | None = None, nx: bool = False) -> bool:
+        """Otomatik eklendi."""
         if nx and key in self._data:
             return False
         self._data[key] = value
         return True
 
     async def get(self, key: str) -> Any | None:
+        """Otomatik eklendi."""
         return self._data.get(key)
 
     async def xadd(self, stream_key: str, fields: dict[str, Any]) -> str:
+        """Otomatik eklendi."""
         msg_id = f"{int(time.time() * 1000)}-0"
         self._streams[stream_key].append({"id": msg_id, "fields": fields})
         return msg_id
 
-    async def publish(self, channel: str, message: str):
+    async def publish(self, channel: str, message: str) -> Any:
         """Event yayinla."""
         handlers = self._pubsub_handlers.get(channel, [])
         for h in handlers:
@@ -268,28 +276,28 @@ class InMemoryRedis:
             except Exception as e:
                 logger.debug("InMemoryRedis handler error", channel=channel, error=str(e))
 
-    def pubsub(self):
+    def pubsub(self) -> Any:
         """Pubsub instance dondur."""
         return self
 
-    async def subscribe(self, *channels):
+    async def subscribe(self, *channels) -> Any:
         """Kanala abone ol."""
         for ch in channels:
             if ch not in self._pubsub_handlers:
                 self._pubsub_handlers[ch] = []
 
-    async def get_message(self, timeout=1.0):
+    async def get_message(self, timeout=1.0) -> Any:
         """Mesaj al (blocking)."""
         await asyncio.sleep(timeout)
         return None
 
-    async def close(self):
+    async def close(self) -> Any:
         """Baglantilari kapat ve temizle."""
         self._pubsub_handlers.clear()
         self._streams.clear()
         logger.debug("InMemoryRedis closed and cleaned up")
 
-    def publish_local(self, channel, event):
+    def publish_local(self, channel, event) -> Any:
         """In-memory publish with loop safety."""
         try:
             loop = asyncio.get_running_loop()
@@ -305,6 +313,7 @@ class InMemoryRedis:
 # Singleton
 # =====================================================
 
+# Singleton event bus instance
 event_bus = InternalEventBus()
 
 
@@ -314,7 +323,7 @@ event_bus = InternalEventBus()
 # =====================================================
 
 
-def publish_event(event: CanonicalEvent):
+def publish_event(event: CanonicalEvent) -> Any:
     """Publish to NATS (primary) + Redis Pub/Sub (push) + Redis Stream (durable).
 
     v2.0: Kafka/Redpanda kaldırıldı. NATS ana mesajlaşma, Redis Pub/Sub yardımcı.
@@ -354,7 +363,7 @@ def publish_event(event: CanonicalEvent):
         logger.debug("Redis publish handled", event_type=event.event_type, error=str(e))
 
 
-async def _publish_to_nats(event: CanonicalEvent):
+async def _publish_to_nats(event: CanonicalEvent) -> Any:
     """NATS'a publish et — kritik event'ler için JetStream, diğerleri için normal publish."""
     try:
         from ..nats.client import nats_client
@@ -380,7 +389,7 @@ async def _publish_to_nats(event: CanonicalEvent):
         logger.debug("NATS publish skipped", error=str(e))
 
 
-async def subscribe_nats(subject: str, handler: Callable):
+async def subscribe_nats(subject: str, handler: Callable) -> Any:
     """NATS konusuna abone ol."""
     try:
         from ..nats.client import nats_client
@@ -391,7 +400,7 @@ async def subscribe_nats(subject: str, handler: Callable):
         logger.debug("NATS subscribe skipped", error=str(e))
 
 
-async def _publish_with_idempotency(event: CanonicalEvent):
+async def _publish_with_idempotency(event: CanonicalEvent) -> Any:
     """Idempotent publish to Redis Pub/Sub + Stream + NATS."""
     # Idempotency check
     is_new = await _check_and_mark_published(event.event_id)
@@ -413,7 +422,7 @@ _redis_conn = None
 _redis_loop = None
 
 
-async def _get_redis():
+async def _get_redis() -> Any:
     """Reuse module-level Redis connection or create new if loop changed/closed."""
     global _redis_conn, _redis_loop
     try:
@@ -478,7 +487,7 @@ async def _check_and_mark_published(event_id: str, critical: bool = False) -> bo
     return True  # Fail-open: kritik olmayan olay
 
 
-async def _publish_to_stream(event: CanonicalEvent):
+async def _publish_to_stream(event: CanonicalEvent) -> Any:
     """Durable event ledger'a yaz.
     Öncelik: Redis Stream > PostgreSQL > Log
     """
@@ -524,25 +533,26 @@ class EventConsumer:
     """Push-based consumer — Redis Pub/Sub ile çalışır."""
 
     def __init__(self, group_id: str, topics: list[str], auto_offset_reset: str = "latest"):
+        """Otomatik eklendi."""
         self.group_id = group_id
         self.topics = topics
         self._handlers: dict[str, Callable[..., Any]] = {}
         self._running = False
         self._processed_ids: set[str] = set()
 
-    def on(self, event_type: str, handler: Callable):
+    def on(self, event_type: str, handler: Callable) -> Any:
         """Event handler kaydet."""
         self._handlers[event_type] = handler
         return self
 
-    async def start(self):
+    async def start(self) -> Any:
         """Redis Pub/Sub'a subscribe ol — push-based."""
         self._running = True
         for topic in self.topics:
             await event_bus.subscribe(topic, self._handle_event)
         logger.info("Consumer started (push-based)", group_id=self.group_id, topics=self.topics)
 
-    async def _handle_event(self, event: CanonicalEvent):
+    async def _handle_event(self, event: CanonicalEvent) -> Any:
         """Event geldiğinde çalışır — polling yok."""
         if event.event_id in self._processed_ids:
             return
@@ -576,11 +586,11 @@ class EventConsumer:
                 except Exception as dlq_exc:
                     logger.warning("DLQ push başarısız", error=str(dlq_exc))
 
-    async def consume_loop(self):
+    async def consume_loop(self) -> Any:
         """Start listening — push-based, blocking."""
         await self.start()
         await event_bus.start_listening()
 
-    def stop(self):
+    def stop(self) -> Any:
         """Dinlemeyi durdur."""
         self._running = False

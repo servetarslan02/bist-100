@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST - Metrics Math Library
 
@@ -6,19 +7,26 @@ Avoids DRY violations and ensures consistency across the platform.
 """
 
 import functools
+
 import numpy as np
 from opentelemetry import trace
 
 tracer = trace.get_tracer("alpha-bist.metrics_math")
 
-def otel_trace(span_name: str):
+
+def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
-    def decorator(func):
+
+    def decorator(func) -> Any:
+        """Otomatik eklendi."""
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:
+            """Otomatik eklendi."""
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

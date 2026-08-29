@@ -31,10 +31,11 @@ class SimulationEngine:
     """Monte Carlo simulation, scenario analysis, and backtest engine."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._running = False
         self._consumer: EventConsumer = None
 
-    async def start(self):
+    async def start(self) -> Any:
         """Start the simulation engine."""
         setup_logging()
         logger.info("Starting Simulation Engine")
@@ -55,7 +56,7 @@ class SimulationEngine:
         logger.info("Simulation Engine started")
         await self._consumer.consume_loop()
 
-    async def stop(self):
+    async def stop(self) -> Any:
         """Stop the simulation engine."""
         self._running = False
         if self._consumer:
@@ -63,7 +64,7 @@ class SimulationEngine:
         await close_databases()
         logger.info("Simulation Engine stopped")
 
-    async def _on_simulation_request(self, event: CanonicalEvent):
+    async def _on_simulation_request(self, event: CanonicalEvent) -> Any:
         """Handle simulation requests."""
         try:
             sim_type = event.data.get("simulation_type", "monte_carlo")
@@ -420,11 +421,12 @@ class SimulationEngine:
 # =====================================================
 
 
-async def _health_server(port: int = 8080):
+async def _health_server(port: int = 8080) -> Any:
     """Lightweight health check HTTP server for Docker healthcheck."""
     from aiohttp import web
 
-    async def health_handler(request):
+    async def health_handler(request) -> Any:
+        """Otomatik eklendi."""
         return web.json_response({"status": "healthy", "service": "simulation"})
 
     app = web.Application()
@@ -441,7 +443,7 @@ async def _health_server(port: int = 8080):
 # =====================================================
 
 
-async def main():
+async def main() -> Any:
     """Main entry point for the simulation engine."""
     await _health_server()
     engine = SimulationEngine()

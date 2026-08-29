@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Any
 """
 Concurrency & Lock Testleri
 
@@ -25,12 +26,13 @@ from services.portfolio.main import PortfolioService
 logger = structlog.get_logger(__name__)
 
 
-def fresh_db():
+def fresh_db() -> Any:
+    """Otomatik eklendi."""
     db = duckdb.connect(":memory:")
     return db
 
 
-async def test_migration_lock_basic():
+async def test_migration_lock_basic() -> Any:
     """Temel lock alma/bırakma."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -58,7 +60,7 @@ async def test_migration_lock_basic():
     return "Migration Lock Basic", len(issues) == 0, issues
 
 
-async def test_migration_lock_timeout():
+async def test_migration_lock_timeout() -> Any:
     """Stale lock recovery (timeout aşmış lock)."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -81,7 +83,7 @@ async def test_migration_lock_timeout():
     return "Migration Lock Timeout", len(issues) == 0, issues
 
 
-async def test_migration_lock_with_run():
+async def test_migration_lock_with_run() -> Any:
     """run_pending lock kullanmalı."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -104,7 +106,7 @@ async def test_migration_lock_with_run():
     return "Migration Lock With Run", len(issues) == 0, issues
 
 
-async def test_migration_dependency_validation():
+async def test_migration_dependency_validation() -> Any:
     """Sıra bozulursa hata vermeli."""
     db = fresh_db()
     runner = MigrationRunner(db, dialect="sqlite")
@@ -152,7 +154,7 @@ async def test_migration_dependency_validation():
     return "Dependency Validation", len(issues) == 0, issues
 
 
-async def test_portfolio_trade_lock():
+async def test_portfolio_trade_lock() -> Any:
     """Paralel alım/satım işlemleri lock ile korunmalı."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
@@ -176,7 +178,8 @@ async def test_portfolio_trade_lock():
     issues = []
 
     # Paralel alım — lock sayesinde sıralı çalışmalı
-    async def buy(i):
+    async def buy(i) -> Any:
+        """Otomatik eklendi."""
         return await svc.execute_buy("X", 10, 100.0, instrument_id=xid)
 
     results = await asyncio.gather(*[buy(i) for i in range(5)])
@@ -197,7 +200,7 @@ async def test_portfolio_trade_lock():
     return "Portfolio Trade Lock", len(issues) == 0, issues
 
 
-async def test_portfolio_invariant_check():
+async def test_portfolio_invariant_check() -> Any:
     """Invariant ihlali tespit edilmeli."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
@@ -239,7 +242,7 @@ async def test_portfolio_invariant_check():
     return "Portfolio Invariant Check", len(issues) == 0, issues
 
 
-async def test_oversell_prevention():
+async def test_oversell_prevention() -> Any:
     """Oversell engeli — mevcut pozisyondan fazla satılamamalı."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
@@ -284,10 +287,11 @@ async def test_oversell_prevention():
 # ============================================================
 
 
-async def run_all():
-    print("=" * 60)
-    print("CONCURRENCY & LOCK TESTLERİ")
-    print("=" * 60)
+async def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("CONCURRENCY & LOCK TESTLERİ")
+    logger.info("=" * 60)
 
     tests = [
         test_migration_lock_basic,
@@ -312,27 +316,28 @@ async def run_all():
             issues = [f"Exception: {e}"]
 
         icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
+        logger.info(f"\n{icon} {name}")
         if ok:
             passed += 1
-            print("   PASSED")
+            logger.info("   PASSED")
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\nTÜM HATALAR:")
+        logger.info("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"  {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"  {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 
-def main():
+def main() -> Any:
+    """Otomatik eklendi."""
     ok = asyncio.run(run_all())
     sys.exit(0 if ok else 1)
 

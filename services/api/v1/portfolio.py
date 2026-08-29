@@ -37,14 +37,14 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-def _get_pm():
+def _get_pm() -> Any:
     """Tekil gerceklik kaynagi: paper_orchestrator VirtualPortfolio."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
 
     return paper_orchestrator.portfolio
 
 
-def _get_service():
+def _get_service() -> Any:
     """PaperTradingOrchestrator singleton'i al."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
 
@@ -60,7 +60,7 @@ def _get_service():
 @router.get("/")
 @router.get("/summary")
 @router.get("/state")
-async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföy özeti — cash, invested, total value, positions count."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -75,7 +75,7 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
 
 
 @router.get("/positions")
-async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Açık pozisyonlar — ticker, quantity, entry/current price, P&L."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -97,7 +97,7 @@ async def trades(
     limit: int = Query(50, ge=1, le=500),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """İşlem geçmişi — entry/exit, P&L, holding days."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -113,7 +113,7 @@ async def trades(
 
 
 @router.get("/pnl")
-async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """K/Z durumu — unrealized + realized + commission."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -137,7 +137,7 @@ async def equity_curve(
     limit: int = Query(252, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Equity curve — günlük equity snapshot'ları."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -161,7 +161,7 @@ async def equity_curve(
 
 
 @router.get("/risk-metrics")
-async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföy risk metrikleri — VaR/CVaR + HHI + drawdown."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -181,7 +181,7 @@ async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limi
 
 
 @router.get("/drawdown")
-async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföy drawdown durumu."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -202,7 +202,7 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
 
 @router.get("/metrics")
-async def performance_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def performance_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Performans metrikleri — CAGR, Sharpe, Sortino, win rate, profit factor."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -246,7 +246,7 @@ async def performance_metrics(user=Depends(get_current_user), _=Depends(check_ra
 
 
 @router.get("/accounting")
-async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Muhasebe özeti — invariant doğrulama dahil."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -270,7 +270,7 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
 
 
 @router.post("/reset")
-async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföydeki tüm pozisyonları kapatır ve nakite çeker."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -299,7 +299,7 @@ async def cash_ledger(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Nakit hareket geçmişi."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -321,7 +321,7 @@ async def portfolio_orders_and_trades(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Portföy emir ve işlem geçmişi."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -344,7 +344,7 @@ async def position_history(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Pozisyon değişiklik geçmişi — audit trail.
 
     Args:
@@ -369,7 +369,7 @@ async def equity_snapshots(
     limit: int = Query(252, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Günlük equity snapshot'ları.
 
     Returns:
@@ -395,7 +395,7 @@ async def attribution(
     portfolio_id: int = Query(1),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Performans attribüsyonu — factor + sector.
 
     Returns:
@@ -428,7 +428,7 @@ async def attribution(
 
 
 @router.get("/tax")
-async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Vergi analizi — holding period, stopaj, BSMV.
 
     Returns:
@@ -440,7 +440,9 @@ async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limi
         pm = _get_pm()
 
         # Trade'lerden vergi hesapla
-        trades = [{"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)} for t in pm._trades]
+        trades = [
+            {"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)} for t in pm._trades
+        ]
 
         result = tax_model.compute_total_tax(
             trades=trades,
@@ -461,7 +463,7 @@ async def transaction_cost_analysis(
     volatility: float = Query(0.02, description="Günlük volatilite"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """İşlem maliyeti analizi — commission + spread + slippage + market impact.
 
     Args:
@@ -492,7 +494,7 @@ async def rebalance_analysis(
     threshold_pct: float = Query(5.0, description="Sapma eşiği (%)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Rebalance analizi — drift analizi.
 
     Args:
@@ -528,7 +530,7 @@ async def rebalance_orders(
     turnover_limit: float = Query(0.3, description="Maksimum turnover (0-1)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Rebalance emirleri oluştur.
 
     Args:
@@ -575,11 +577,10 @@ async def optimize_portfolio(
                 "model_scores": {"THYAO": 90.0, "ASELS": 85.0, "TUPRS": 80.0, "GARAN": 75.0, "BIMAS": 70.0},
             }
         ],
-
     ),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """BIST-100 portföy optimizasyonu (Risk Parity, HRP, Max Sharpe, Min Variance, Black-Litterman)."""
     try:
         from services.portfolio.portfolio_optimizer import (
@@ -678,7 +679,7 @@ async def optimize_portfolio(
 
 
 @router.get("/status")
-async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföy servis durumu — health + trading enabled + PaperTrading tekil defter özeti."""
     try:
         from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -705,7 +706,7 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
 
 
 @router.post("/trigger_eod_signals")
-async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     try:
         from ...pipeline.run_unified_daily import run_eod_signal_cycle
@@ -722,7 +723,7 @@ async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_ra
 
 
 @router.post("/trigger_morning_execution")
-async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """09:55 Sabah Acilisi: Bekleyen emirleri gercek T+1 acilis fiyatlari ve sentetik likiditeyle yurutur."""
     try:
         from ...pipeline.run_unified_daily import run_morning_execution_cycle
@@ -735,7 +736,7 @@ async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(ch
 
 
 @router.post("/trigger_phase18")
-async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """API icinde Phase 18 unified daily dongusunu tetikler."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
@@ -752,7 +753,7 @@ async def trigger_auto_rebalance(
     body: Any | None = Body(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Otonom portfoy yeniden dengeleme artik PaperTradingOrchestrator'a baglandi."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
@@ -769,7 +770,7 @@ async def deposit_funds(
     body: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Portföye nakit ekleme endpoint'i."""
     try:
         amount = float(body.get("amount", 10000000.0))
@@ -799,7 +800,7 @@ _ALPHA_SIGNALS_TIME = 0.0
 async def alpha_signals(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-):
+) -> Any:
     """Doğrulanmış Alpha Stratejisi canlı sinyalleri ve portföy dağılımı."""
     global _ALPHA_SIGNALS_CACHE, _ALPHA_SIGNALS_TIME
     import time
@@ -821,7 +822,8 @@ async def alpha_signals(
     except Exception as e:
         logger.debug("alpha_signals_cache_read_failed", error=str(e))
 
-    def _compute_alpha_live():
+    def _compute_alpha_live() -> Any:
+        """Otomatik eklendi."""
         try:
             from ...core.redis_helper import get_cached
 

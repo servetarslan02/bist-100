@@ -50,9 +50,10 @@ class CatBoostAdjustedLoss:
     """
 
     def __init__(self, penalty: float = 11.0):
+        """Otomatik eklendi."""
         self.penalty = penalty
 
-    def calc_ders_range(self, approxes, targets, weights):
+    def calc_ders_range(self, approxes, targets, weights) -> Any:
         """CatBoost custom loss interface — gradient + hessian."""
         der1 = []
         der2 = []
@@ -88,6 +89,7 @@ class CatBoostModel:
     """
 
     def __init__(self, config: CatBoostConfig | None = None):
+        """Otomatik eklendi."""
         self._config = config or CatBoostConfig()
         self._models: dict[int, Any] = {}  # horizon → model
         self._is_classifier = self._config.loss_function in ["Logloss", "CrossEntropy"]
@@ -345,7 +347,7 @@ class CatBoostModel:
             logger.warning("catboost_cat_feature_stats_failed", error=str(e))
             return None
 
-    def _create_model(self):
+    def _create_model(self) -> Any:
         """CatBoost model oluştur (classifier veya regressor)."""
         try:
             from catboost import CatBoostClassifier, CatBoostRegressor
@@ -447,7 +449,7 @@ class CatBoostModel:
 
         return metrics
 
-    def _compute_shap(self, model: Any, X: np.ndarray, feature_names: list[str] | None):
+    def _compute_shap(self, model: Any, X: np.ndarray, feature_names: list[str] | None) -> Any:
         """SHAP values hesapla."""
         try:
             import shap
@@ -464,7 +466,7 @@ class CatBoostModel:
         except Exception as e:
             logger.debug("shap_computation_failed", error=str(e))
 
-    def _compute_feature_interactions(self, model: Any, feature_names: list[str] | None):
+    def _compute_feature_interactions(self, model: Any, feature_names: list[str] | None) -> Any:
         """Feature interactions hesapla."""
         try:
             interactions = model.get_feature_importance(type="Interaction")
@@ -486,7 +488,7 @@ class CatBoostModel:
         except Exception as e:
             logger.warning("catboost_handled_exception", error=str(e), context="feature_interaction_compute")
 
-    def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
+    def _check_overfitting(self, metrics: dict[str, Any], horizon: int) -> Any:
         """Overfitting kontrolü — train-val gap."""
         if "val_auc" in metrics and "train_auc" in metrics:
             gap = metrics["train_auc"] - metrics["val_auc"]
@@ -542,12 +544,15 @@ class CatBoostModel:
 
     @property
     def is_trained(self) -> bool:
+        """Otomatik eklendi."""
         return len(self._models) > 0
 
     @property
     def trained_horizons(self) -> list[int]:
+        """Otomatik eklendi."""
         return sorted(self._models.keys())
 
     @property
     def metrics(self) -> dict[str, Any]:
+        """Otomatik eklendi."""
         return self._training_metrics

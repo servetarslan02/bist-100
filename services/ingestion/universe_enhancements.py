@@ -171,9 +171,10 @@ class SurvivorshipBiasProtection:
     """Survivorship bias koruması."""
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._delisted: dict[str, dict] = {}
 
-    def mark_delisted(self, ticker: str, delist_date: str, reason: str = ""):
+    def mark_delisted(self, ticker: str, delist_date: str, reason: str = "") -> Any:
         """Şirketi delisted olarak işaretle."""
         self._delisted[ticker] = {
             "delist_date": delist_date,

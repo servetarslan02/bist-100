@@ -132,6 +132,7 @@ class RegimeLimitsManager:
     }
 
     def __init__(self):
+        """Otomatik eklendi."""
         self._custom_limits: dict[str, RegimeRiskLimits] = {}
 
     def get_limits(self, regime: str) -> RegimeRiskLimits:

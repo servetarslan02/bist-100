@@ -1,9 +1,8 @@
+from typing import Any
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-
-import structlog
 
 import structlog
 from opentelemetry import trace
@@ -12,7 +11,7 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.background_tasks")
 
 
-async def radar_cache_refresher():
+async def radar_cache_refresher() -> Any:
     """BIST hisselerini TradingView'den çeker ve cache'i günceller.
 
     Seans saatlerinde her 2 saniyede bir gerçek veri çeker.
@@ -46,7 +45,7 @@ async def radar_cache_refresher():
             await asyncio.sleep(10)
 
 
-async def ml_learning_scheduler():
+async def ml_learning_scheduler() -> Any:
     """PC kapalı kaldığında kaçırılan eğitimleri tamamlar ve 4 saatte bir otonom öğrenir."""
     await asyncio.sleep(15)
 
@@ -77,7 +76,7 @@ async def ml_learning_scheduler():
             logger.warning(f"ml_scheduler periodic error: {e}")
 
 
-async def auto_storage_optimizer():
+async def auto_storage_optimizer() -> Any:
     """Arka planda otomatik ClickHouse ZSTD sıkıştırma ve önbellek temizliği yapar."""
     while True:
         await asyncio.sleep(12 * 3600)
@@ -91,7 +90,7 @@ async def auto_storage_optimizer():
             logger.warning(f"auto_storage_optimizer: {e}")
 
 
-async def paper_trading_scheduler():
+async def paper_trading_scheduler() -> Any:
     """BIST seans takvimine göre çalışır: 18:15 EOD sinyal üretimi & 09:55 sabah açılışı yürütme."""
     TR_TZ = timezone(timedelta(hours=3))
 

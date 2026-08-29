@@ -25,9 +25,9 @@ findings = {
     "risk_math_flaws": [],
 }
 
-print("=" * 80)
-print("ALPHA BIST — DERİNLEMESİNE ÇAPRAZ SİSTEM VE METODOLOJİ DENETİMİ")
-print("=" * 80)
+logger.info("=" * 80)
+logger.info("ALPHA BIST — DERİNLEMESİNE ÇAPRAZ SİSTEM VE METODOLOJİ DENETİMİ")
+logger.info("=" * 80)
 
 # 1. Dosyaları tara
 services_files = glob.glob("services/**/*.py", recursive=True)
@@ -75,24 +75,24 @@ for filepath in all_files:
         logger.warning("Caught Exception in module_level", exc_info=True)
 
 # Raporla
-print("\n1. 🔍 GELECEĞİ GÖRME & LOOK-AHEAD BİAS ŞÜPHELERİ:")
-print(f"Toplam Tespit: {len(findings['look_ahead_bias'])}")
+logger.info("\n1. 🔍 GELECEĞİ GÖRME & LOOK-AHEAD BİAS ŞÜPHELERİ:")
+logger.info(f"Toplam Tespit: {len(findings['look_ahead_bias'])}")
 for f, l, code in findings["look_ahead_bias"][:10]:
-    print(f"  - [{f}:{l}] -> {code}")
+    logger.info(f"  - [{f}:{l}] -> {code}")
 
-print("\n2. 🔍 GLOBAL NORMALİZASYON SIZINTISI (Veri Sızıntısı - Normalization Leakage):")
-print(f"Toplam Tespit: {len(findings['global_normalization_leakage'])}")
+logger.info("\n2. 🔍 GLOBAL NORMALİZASYON SIZINTISI (Veri Sızıntısı - Normalization Leakage):")
+logger.info(f"Toplam Tespit: {len(findings['global_normalization_leakage'])}")
 for f, l, code in findings["global_normalization_leakage"][:10]:
-    print(f"  - [{f}:{l}] -> {code}")
+    logger.info(f"  - [{f}:{l}] -> {code}")
 
-print("\n3. 🔍 SESSİZ HATA YUTMA & FAIL-OPEN ZAFİYETLERİ (except: pass):")
-print(f"Toplam Tespit: {len(findings['silent_error_swallowing'])}")
+logger.info("\n3. 🔍 SESSİZ HATA YUTMA & FAIL-OPEN ZAFİYETLERİ (except: pass):")
+logger.info(f"Toplam Tespit: {len(findings['silent_error_swallowing'])}")
 for f, l, code in findings["silent_error_swallowing"][:15]:
-    print(f"  - [{f}:{l}] -> {code}")
+    logger.info(f"  - [{f}:{l}] -> {code}")
 
-print("\n4. 🔍 ZAMAN DİLİMİ TUTARSIZLIKLARI (Naive datetime in Financial Paths):")
-print(f"Toplam Tespit: {len(findings['timezone_inconsistencies'])}")
+logger.info("\n4. 🔍 ZAMAN DİLİMİ TUTARSIZLIKLARI (Naive datetime in Financial Paths):")
+logger.info(f"Toplam Tespit: {len(findings['timezone_inconsistencies'])}")
 for f, l, code in findings["timezone_inconsistencies"][:10]:
-    print(f"  - [{f}:{l}] -> {code}")
+    logger.info(f"  - [{f}:{l}] -> {code}")
 
-print("=" * 80)
+logger.info("=" * 80)

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import structlog
+logger = structlog.get_logger(__name__)
+from typing import Any
 """
 ALPHA BIST — Walk-Forward Canonical Scoring Tests
 
@@ -11,6 +14,7 @@ import tempfile
 from datetime import datetime, timedelta
 
 import numpy as np
+
 try:
     import polars as pl
 except ImportError:
@@ -20,9 +24,8 @@ import pytest
 pytestmark = pytest.mark.skipif(pl is None, reason="polars library required")
 
 
-
-
-def _make_market_data(n_stocks=8, n_days=380, seed=42):
+def _make_market_data(n_stocks=8, n_days=380, seed=42) -> Any:
+    """Otomatik eklendi."""
     np.random.seed(seed)
     market = {}
     pl.date_range(datetime.now() - timedelta(days=n_days * 2), datetime.now(), timedelta(days=1), eager=True).tail(
@@ -47,7 +50,8 @@ def _make_market_data(n_stocks=8, n_days=380, seed=42):
     return market
 
 
-def _make_benchmark(market, seed=99):
+def _make_benchmark(market, seed=99) -> Any:
+    """Otomatik eklendi."""
     np.random.seed(seed)
     dates = sorted(set(d for df in market.values() for d in df.index))
     n = len(dates)
@@ -57,7 +61,7 @@ def _make_benchmark(market, seed=99):
     )
 
 
-def _make_historical_repo():
+def _make_historical_repo() -> Any:
     """Test için historical repository oluştur."""
     from services.data.historical_contracts import (
         CatalystSnapshot,
@@ -127,7 +131,7 @@ def _make_historical_repo():
 # =====================================================
 
 
-def test_wf_canonical_mode_works():
+def test_wf_canonical_mode_works() -> Any:
     """Walk-forward canonical modda çalışıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -171,7 +175,7 @@ def test_wf_canonical_mode_works():
 # =====================================================
 
 
-def test_wf_legacy_mode_unchanged():
+def test_wf_legacy_mode_unchanged() -> Any:
     """Walk-forward legacy mode hiç değişmemiş mi?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -207,7 +211,7 @@ def test_wf_legacy_mode_unchanged():
 # =====================================================
 
 
-def test_wf_with_historical_repo():
+def test_wf_with_historical_repo() -> Any:
     """Walk-forward historical repository ile çalışıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -255,7 +259,7 @@ def test_wf_with_historical_repo():
 # =====================================================
 
 
-def test_fold_data_pit_safe():
+def test_fold_data_pit_safe() -> Any:
     """Her fold'un verisi test_end'e kadar kesiliyor mu?"""
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
 
@@ -282,7 +286,7 @@ def test_fold_data_pit_safe():
 # =====================================================
 
 
-def test_train_test_leakage():
+def test_train_test_leakage() -> Any:
     """Train verisi test'e sızıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -324,7 +328,7 @@ def test_train_test_leakage():
 # =====================================================
 
 
-def test_canonical_score_deterministic_in_wf():
+def test_canonical_score_deterministic_in_wf() -> Any:
     """Walk-forward canonical skorlar deterministic mi?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -373,7 +377,7 @@ def test_canonical_score_deterministic_in_wf():
 # =====================================================
 
 
-def test_future_data_mutation_invariance():
+def test_future_data_mutation_invariance() -> Any:
     """Gelecek veri değişimi geçmiş fold sonuçlarını etkilememeli."""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -442,7 +446,7 @@ def test_future_data_mutation_invariance():
 # =====================================================
 
 
-def test_historical_data_used_in_fold():
+def test_historical_data_used_in_fold() -> Any:
     """Historical veri fold'larda gerçekten kullanılıyor mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -508,7 +512,7 @@ def test_historical_data_used_in_fold():
 # =====================================================
 
 
-def test_regime_in_walk_forward():
+def test_regime_in_walk_forward() -> Any:
     """Regime değişimi walk-forward'da doğru mu?"""
     from services.backtest.engine_v4 import BacktestConfig
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
@@ -549,7 +553,7 @@ def test_regime_in_walk_forward():
 # =====================================================
 
 
-def test_leakage_guards():
+def test_leakage_guards() -> Any:
     """Leakage guard'ları çalışıyor mu?"""
     from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
 
@@ -576,10 +580,11 @@ def test_leakage_guards():
 # =====================================================
 
 
-def run_all():
-    print("=" * 60)
-    print("  Walk-Forward Canonical Scoring Tests")
-    print("=" * 60)
+def run_all() -> Any:
+    """Otomatik eklendi."""
+    logger.info("=" * 60)
+    logger.info("  Walk-Forward Canonical Scoring Tests")
+    logger.info("=" * 60)
 
     tests = [
         test_wf_canonical_mode_works,
@@ -607,22 +612,22 @@ def run_all():
             traceback.print_exc()
 
         icon = "✅" if ok else "❌"
-        print(f"{icon} {name}")
+        logger.info(f"{icon} {name}")
         if ok:
             passed += 1
         else:
             failed += 1
             for i in issues:
-                print(f"   ❌ {i}")
+                logger.info(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
 
-    print(f"\n{'=' * 60}")
-    print(f"  SONUÇ: {passed}/{passed + failed} geçti")
+    logger.info(f"\n{'=' * 60}")
+    logger.info(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print("\n  HATALAR:")
+        logger.info("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
-            print(f"    {i}. {issue}")
-    print("=" * 60)
+            logger.info(f"    {i}. {issue}")
+    logger.info("=" * 60)
     return failed == 0
 
 

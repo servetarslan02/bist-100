@@ -60,6 +60,7 @@ class ContinuousLearningPipeline:
         performance_window: int | None = None,
         min_samples_for_retrain: int | None = None,
     ):
+        """Otomatik eklendi."""
         cfg = learning_settings
         self.retrain_interval_days = retrain_interval_days or cfg.retrain.max_interval_days
         self.drift_check_interval = drift_check_interval or cfg.drift.check_interval_days
@@ -347,7 +348,7 @@ class ContinuousLearningPipeline:
             "date": date,
         }
 
-    def _update_registry(self, date: str, results: dict):
+    def _update_registry(self, date: str, results: dict) -> Any:
         """Model kayıt defterini güncelle."""
         self._registry.performance_history.append(
             {
@@ -420,7 +421,7 @@ class ContinuousLearningPipeline:
             "drift_detected": self._drift_detected,
         }
 
-    def import_state(self, state: dict[str, Any]):
+    def import_state(self, state: dict[str, Any]) -> Any:
         """Pipeline durumunu içe aktar."""
         self._registry.versions = state.get("registry", {}).get("versions", [])
         self._registry.active_version = state.get("registry", {}).get("active_version", "")

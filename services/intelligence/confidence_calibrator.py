@@ -1,3 +1,4 @@
+from typing import Any
 """
 ALPHA BIST — Confidence Calibrator v1.0
 
@@ -69,6 +70,7 @@ class ConfidenceCalibrator:
     """
 
     def __init__(self, n_bins: int = 10, min_samples: int = 30):
+        """Otomatik eklendi."""
         self._observations: deque = deque(maxlen=10000)
         self._n_bins = n_bins
         self._min_samples = min_samples
@@ -79,7 +81,7 @@ class ConfidenceCalibrator:
         actual_outcome: bool,
         regime: str = "UNKNOWN",
         ticker: str = "",
-    ):
+    ) -> Any:
         """Gözlem ekle."""
         self._observations.append(
             Observation(
@@ -95,7 +97,7 @@ class ConfidenceCalibrator:
         predictions: list[float],
         outcomes: list[bool],
         regimes: list[str] | None = None,
-    ):
+    ) -> Any:
         """Toplu gözlem ekle."""
         if regimes is None:
             regimes = ["UNKNOWN"] * len(predictions)
@@ -222,7 +224,7 @@ class ConfidenceCalibrator:
             "overall_brier": self.calibrate().brier_score if len(self._observations) >= self._min_samples else None,
         }
 
-    def reset(self):
+    def reset(self) -> Any:
         """Sıfırla."""
         self._observations.clear()
 

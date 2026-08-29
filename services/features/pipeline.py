@@ -43,6 +43,7 @@ class FeaturePipeline:
     """End-to-end Feature Pipeline motoru."""
 
     def __init__(self, config: PipelineConfig | None = None):
+        """Otomatik eklendi."""
         self.config = config or PipelineConfig()
         self._reference_stats: dict[str, dict[str, float]] = {}
 
@@ -174,7 +175,8 @@ class FeaturePipeline:
             )
             bist["is_closing_auction"] = (
                 1.0
-                if phase in {
+                if phase
+                in {
                     BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
                     BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
                     BISTMarketPhase.CLOSING_PRICE_TRADING,
@@ -197,14 +199,10 @@ class FeaturePipeline:
             bist["uptick_rule_active"] = 1.0 if short_selling_monitor._uptick_rule_active else 0.0
 
             # Brüt takas
-            bist["is_gross_settlement"] = (
-                1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0
-            )
+            bist["is_gross_settlement"] = 1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0
 
             # Açığa satış uygunluk
-            bist["short_sale_eligible"] = (
-                1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0
-            )
+            bist["short_sale_eligible"] = 1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0
 
         except Exception as e:
             logger.debug("BIST feature computation failed", ticker=ticker, error=str(e))
