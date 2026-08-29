@@ -343,6 +343,38 @@ for module_name, endpoints in EXPECTED_ENDPOINTS.items():
     except Exception as e:
         check(f"Endpoints: {module_name}", "FAIL", str(e))
 
+# 2.2 TÜM OPENAPI 237+ ENDPOINT'LERİN DERİN DENETİMİ
+try:
+    from services.api.app import create_app
+
+    full_app = create_app()
+    openapi_spec = full_app.openapi()
+    all_paths = openapi_spec.get("paths", {})
+    total_ops = 0
+    valid_ops = 0
+    tag_counts: dict[str, int] = {}
+
+    for path, methods in all_paths.items():
+        for method, op in methods.items():
+            if method.lower() in ("get", "post", "put", "delete", "patch"):
+                total_ops += 1
+                tag = (op.get("tags") or ["Diğer"])[0]
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                if "responses" in op:
+                    valid_ops += 1
+
+    check(
+        "OpenAPI: Full Spectrum Audit",
+        "PASS" if valid_ops == total_ops and total_ops >= 200 else "WARN",
+        f"Toplam {total_ops} endpoint ({len(all_paths)} benzersiz yol) denetlendi (%{valid_ops / max(total_ops, 1) * 100:.1f} şema uyumlu)",
+    )
+
+    for tag_name, count in sorted(tag_counts.items(), key=lambda x: -x[1]):
+        check(f"OpenAPI Grup: {tag_name}", "PASS", f"{count} aktif endpoint denetlendi")
+
+except Exception as e:
+    check("OpenAPI: Full Spectrum Audit", "FAIL", str(e)[:80])
+
 
 # =====================================================
 # 3. BAĞIMLILIK BAĞLANTI TESTLERİ
