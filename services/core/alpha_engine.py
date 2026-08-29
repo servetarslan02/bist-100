@@ -95,41 +95,44 @@ class AlphaEngine:
         """Otomatik eklendi."""
         if tickers is None:
             tickers = (
-                bist_universe.BIST_100_TICKERS
-                if hasattr(bist_universe, "BIST_100_TICKERS") and bist_universe.BIST_100_TICKERS
-                else bist_universe.BIST_ALL_TICKERS[:100]
+                bist_universe.BIST_ALL_TICKERS
+                if hasattr(bist_universe, "BIST_ALL_TICKERS") and bist_universe.BIST_ALL_TICKERS
+                else (bist_universe.BIST_100_TICKERS if hasattr(bist_universe, "BIST_100_TICKERS") else [])
             )
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
 
         market_data: dict[str, pl.DataFrame] = {}
-        download_tickers = [f"{t}.IS" for t in tickers]
-        try:
-            raw = yf.download(
-                tickers=" ".join(download_tickers),
-                start=start_date,
-                end=end_date,
-                group_by="ticker",
-                auto_adjust=True,
-                progress=False,
-                threads=True,
-            )
-            if raw is not None and len(raw) > 0:
-                for t in tickers:
-                    tick_sym = f"{t}.IS"
-                    try:
-                        if isinstance(raw.columns, __import__("pandas").MultiIndex):
-                            if tick_sym in raw.columns.levels[0]:
-                                df_t = raw[tick_sym].dropna(how="all")
+        batch_size = 100
+        for i in range(0, len(tickers), batch_size):
+            chunk = tickers[i : i + batch_size]
+            chunk_symbols = [f"{t}.IS" for t in chunk]
+            try:
+                raw = yf.download(
+                    tickers=" ".join(chunk_symbols),
+                    start=start_date,
+                    end=end_date,
+                    group_by="ticker",
+                    auto_adjust=True,
+                    progress=False,
+                    threads=True,
+                )
+                if raw is not None and len(raw) > 0:
+                    for t in chunk:
+                        tick_sym = f"{t}.IS"
+                        try:
+                            if isinstance(raw.columns, __import__("pandas").MultiIndex):
+                                if tick_sym in raw.columns.levels[0]:
+                                    df_t = raw[tick_sym].dropna(how="all")
+                                    if len(df_t) >= 10:
+                                        market_data[t] = _yf_to_polars(df_t)
+                            else:
+                                df_t = raw.dropna(how="all")
                                 if len(df_t) >= 10:
                                     market_data[t] = _yf_to_polars(df_t)
-                        else:
-                            df_t = raw.dropna(how="all")
-                            if len(df_t) >= 10:
-                                market_data[t] = _yf_to_polars(df_t)
-                    except Exception:
-                        continue
-        except Exception as e:
-            logger.warning(f"AlphaEngine batch download warning: {e}")
+                        except Exception:
+                            continue
+            except Exception as e:
+                logger.warning(f"AlphaEngine batch download warning (chunk {i}): {e}")
 
         # Benchmark
         bm_df = pl.DataFrame()

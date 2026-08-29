@@ -22,8 +22,8 @@ from ..core.event_schema import CanonicalEvent
 from ..core.logging import setup_logging
 from .bist_universe import BIST_INDICES, bist_universe, get_sector
 
-# Dinamik hisse listesi — otomatik keşif aktif
-BIST_STOCKS = bist_universe.BIST_100_TICKERS
+# Dinamik hisse listesi — otomatik keşif aktif (tüm 600+ hisse)
+BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
 from .providers.kap_provider import kap_provider
 from .providers.news_provider import news_provider
@@ -85,9 +85,9 @@ class IngestionService:
         try:
             logger.info("Refreshing BIST universe...")
             bist_universe.refresh()
-            BIST_STOCKS = bist_universe.BIST_100_TICKERS
+            BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
             BIST_ALL = bist_universe.BIST_ALL_TICKERS
-            logger.info("BIST universe refreshed", bist_100=len(BIST_STOCKS), bist_all=len(BIST_ALL))
+            logger.info("BIST universe refreshed", total_stocks=len(BIST_STOCKS))
         except Exception as e:
             logger.warning("Universe refresh failed, using cached/static", error=str(e))
 

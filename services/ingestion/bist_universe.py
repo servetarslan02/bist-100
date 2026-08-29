@@ -89,7 +89,7 @@ class BISTUniverse:
 # Singleton instance
 bist_universe = BISTUniverse()
 
-BIST_STOCKS = bist_universe.BIST_100_TICKERS
+BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
 
 
