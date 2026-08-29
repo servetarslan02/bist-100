@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type PortfolioData, apiFetch } from "@/lib/api";
 import type { OrderData, PortfolioMetrics } from "@/types/api";
@@ -14,33 +14,54 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 function MetricCard({
   title,
+  label,
   value,
   subtitle,
+  subtext,
   icon: Icon,
   trend,
   color,
+  prefix,
+  suffix,
 }: {
-  title: string;
-  value: string;
+  title?: string;
+  label?: string;
+  value: string | number;
   subtitle?: string;
-  icon: React.ElementType;
+  subtext?: string;
+  icon?: React.ElementType;
   trend?: "up" | "down" | "neutral";
   color?: string;
+  prefix?: string;
+  suffix?: string;
 }) {
+  const displayTitle = title || label || "";
+  const displaySub = subtitle || subtext || "";
+  const formattedVal = typeof value === "number" ? value.toLocaleString("tr-TR") : String(value);
+  const displayVal = `${prefix || ""}${formattedVal}${suffix || ""}`;
+
+  let displayColor = color;
+  if (color === "auto") {
+    const num = parseFloat(String(value).replace(/[^0-9.-]/g, ""));
+    displayColor = num > 0 ? "#00e5a0" : num < 0 ? "#ff4466" : "var(--color-text-primary)";
+  }
+
   return (
     <div className="rounded-xl p-4 space-y-1.5 select-none transition-all hover:border-zinc-700" style={{
       background: "var(--color-bg-card)",
       border: "1px solid var(--color-border-subtle)",
     }}>
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>{title}</p>
-        <div className="p-1.5 rounded-lg" style={{ background: color ? `${color}15` : "var(--color-bg-secondary)" }}>
-          <Icon size={14} style={{ color: color || "var(--color-text-secondary)" }} />
-        </div>
+        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>{displayTitle}</p>
+        {Icon && (
+          <div className="p-1.5 rounded-lg" style={{ background: displayColor ? `${displayColor}15` : "var(--color-bg-secondary)" }}>
+            <Icon size={14} style={{ color: displayColor || "var(--color-text-secondary)" }} />
+          </div>
+        )}
       </div>
-      <p className="text-2xl font-bold font-data tracking-tight" style={{ color: color || "var(--color-text-primary)" }}>{value}</p>
-      {subtitle && (
-        <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>{subtitle}</p>
+      <p className="text-2xl font-bold font-data tracking-tight" style={{ color: displayColor || "var(--color-text-primary)" }}>{displayVal}</p>
+      {displaySub && (
+        <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>{displaySub}</p>
       )}
     </div>
   );
@@ -83,6 +104,7 @@ export default function PortfolioPage() {
   const totalPnl = rawP.total_pnl ?? rawP.unrealized_pnl ?? 0;
   const totalReturnPct = rawP.total_return_pct ?? 0;
   const positions = data?.positions ?? (rawP.positions as PortfolioData["positions"]) ?? [];
+  const orders = ordersData?.orders ?? [];
   const sectorWeights = rawP.sector_weights ?? {};
   const totalPnlPos = totalPnl >= 0;
 

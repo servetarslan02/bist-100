@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type MarketState, type Signal, type SystemStatus } from "@/lib/api";
 import type { SignalItem, SignalResponse } from "@/types/api";
+import { useIstanbulClock } from "@/lib/time";
 import {
   TrendingUp, TrendingDown, Minus,
   Activity, BarChart2, Target as TargetIcon, Shield,
-  Wifi, WifiOff, ChevronUp, ChevronDown, CheckCircle
+  Wifi, WifiOff, ChevronUp, ChevronDown, CheckCircle,
+  Clock, Radar as RadarIcon, ArrowRight, Search
 } from "lucide-react";
 import { SkeletonStat, SkeletonTable, SkeletonList } from "@/components/ui/Skeleton";
 
@@ -141,12 +143,32 @@ function ServiceRow({ name, health }: { name: string, health: string }) {
 // ---------------------------------------------
 export default function ClientPageRoot() {
   const router = useRouter();
+  const clock = useIstanbulClock();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Real-time polling
   const { data: market, loading: marketLoading } = usePolling<MarketState>("/market/state", 2000);
   const { data: rawSignals, loading: signalsLoading } = usePolling<Signal[] | SignalResponse>("/signals?limit=10", 2000);
+  const { data: radarData, loading: radarLoading } = usePolling<{
+    data: Array<{
+      symbol: string;
+      price: number;
+      change: number;
+      volume: number;
+      high: number;
+      low: number;
+      score: number;
+      isBist100: boolean;
+    }>;
+    count: number;
+  }>("/market/radar?limit=50", 2500);
   const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
+  const [stockSearch, setStockSearch] = useState("");
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
   const prevScoresRef = useRef<Record<string, number>>({});
 
@@ -174,21 +196,38 @@ export default function ClientPageRoot() {
     }
   }, [rawSignals]);
 
+  const marketStocks = radarData?.data ?? [];
+  const filteredStocks = marketStocks.filter((st) => {
+    if (!stockSearch) return true;
+    return st.symbol.toLowerCase().includes(stockSearch.toLowerCase());
+  }).slice(0, 15);
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
       
-      {/* ?? Header ???????????????????????????????????????????? */}
-      <div className="flex items-end justify-between">
+      {/* Header */}
+      <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight mb-1" style={{ color: "var(--color-text-primary)" }}>
             BIST Otonom Yönetim Paneli
           </h1>
           <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
-            Tüm veriler <strong style={{color:"var(--color-accent-green)"}}>Phase 18 Otonom Motoru</strong> zerinden canlı akmaktadır.
+            Tüm veriler <strong style={{color:"var(--color-accent-green)"}}>Phase 18 Otonom Motoru</strong> üzerinden canlı akmaktadır.
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {mounted && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 shadow-sm">
+              <Clock size={12} className="text-emerald-400" />
+              <span className="text-emerald-400 font-bold">{clock.time}</span>
+              <span className="text-[10px] text-zinc-400 font-sans">TSI</span>
+              <span className="text-zinc-700">|</span>
+              <span className={clock.isMarketOpen ? "text-emerald-400 font-semibold" : "text-zinc-400"}>
+                {clock.marketStatus}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium"
             style={{
               background: systemOk ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)",
@@ -321,6 +360,111 @@ export default function ClientPageRoot() {
                       </span>
                     </td>
                   </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Canlı BIST Piyasa Hisseleri */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+      >
+        <div className="flex items-center justify-between px-5 py-3 flex-wrap gap-2" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-sky-500/10 text-sky-400">
+              <RadarIcon size={13} />
+            </div>
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-100">
+                Canlı BİST Piyasa Takibi
+              </h2>
+              <span className="text-[10px] text-zinc-400">
+                Toplam {radarData?.count ?? marketStocks.length} hisse canlı taranıyor
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs">
+              <Search size={11} className="text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Hisse ara (örn: THYAO, ASELS)..."
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                className="bg-transparent text-[11px] text-zinc-200 placeholder-zinc-500 outline-none w-44"
+              />
+            </div>
+            <button
+              onClick={() => router.push("/radar")}
+              className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Tümünü Gör ({radarData?.count ?? 647}) <ArrowRight size={12} />
+            </button>
+          </div>
+        </div>
+
+        {radarLoading && marketStocks.length === 0 ? (
+          <div className="p-4">
+            <SkeletonTable rows={5} cols={5} />
+          </div>
+        ) : filteredStocks.length === 0 ? (
+          <div className="py-8 text-center text-zinc-500 text-xs">
+            Eşleşen hisse bulunamadı.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 border-b border-white/5">
+                  <th className="text-left py-2.5 px-5">Sembol</th>
+                  <th className="text-right py-2.5 px-4">Son Fiyat</th>
+                  <th className="text-right py-2.5 px-4">Günlük Değişim</th>
+                  <th className="text-right py-2.5 px-4">İşlem Hacmi</th>
+                  <th className="text-right py-2.5 px-5">Radar Skoru</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStocks.map((st) => {
+                  const isPos = st.change > 0;
+                  const isNeg = st.change < 0;
+                  return (
+                    <tr
+                      key={st.symbol}
+                      onClick={() => router.push(`/asset?ticker=${st.symbol}`)}
+                      className="cursor-pointer text-[12px] hover:bg-zinc-800/40 transition-colors border-b border-white/[0.02]"
+                    >
+                      <td className="py-2.5 px-5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-zinc-100 font-data">{st.symbol}</span>
+                          {st.isBist100 && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
+                              B100
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-data font-semibold text-zinc-200">
+                        ₺{st.price?.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-data font-semibold">
+                        <span className={`inline-flex items-center gap-0.5 ${
+                          isPos ? "text-emerald-400" : isNeg ? "text-rose-400" : "text-zinc-400"
+                        }`}>
+                          {isPos ? "+" : ""}{st.change?.toFixed(2)}%
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-data text-zinc-400 text-[11px]">
+                        {st.volume ? st.volume.toLocaleString("tr-TR") : "-"}
+                      </td>
+                      <td className="py-2.5 px-5 text-right">
+                        <ScoreBar score={Number(st.score ?? 50)} />
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>

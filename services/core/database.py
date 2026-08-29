@@ -221,6 +221,9 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
 
     replica_host: str | None = getattr(settings, "postgres_replica_host", None)
     replica_port: int = getattr(settings, "postgres_replica_port", 5433)
+    # Container içi ağda replica portu 5432'dir; host üzerinde 5433'e bind edilir.
+    if replica_host and replica_host not in ("localhost", "127.0.0.1") and replica_port == 5433:
+        replica_port = 5432
 
     if not replica_host:
         return await get_pg_pool()
@@ -251,7 +254,8 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             logger.info("PostgreSQL replica pool created", host=replica_host)
         except Exception as exc:
             logger.warning("Replica pool unavailable, using primary for reads", error=str(exc))
-            return await get_pg_pool()
+            _pg_replica_pool = await get_pg_pool()
+            return _pg_replica_pool
 
         return _pg_replica_pool
 
