@@ -220,7 +220,7 @@ class DataSourceManager:
             return None
 
         # TTL kontrolu
-        file_age = datetime.now(UTC) - datetime.fromtimestamp(cache_file.stat().st_mtime)
+        file_age = datetime.now(UTC) - datetime.fromtimestamp(cache_file.stat().st_mtime, tz=UTC)
         if file_age > timedelta(hours=self.cache_ttl_hours):
             logger.info("Cache expired", ticker=ticker)
             return None
@@ -593,7 +593,7 @@ class WarehouseSource:
 
         sym = ticker.upper().replace(".IS", "").strip()
         try:
-            conn = duckdb.connect(str(self.db_path))
+            conn = duckdb.connect(str(self.db_path), read_only=True)
             tbl = "benchmark_data" if sym in ["XU100", "^XU100", "BIST100"] else "stock_data"
 
             if tbl == "benchmark_data":

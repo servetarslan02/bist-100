@@ -76,8 +76,11 @@ class DowntimeTracker:
         """DuckDB tablolarını oluştur."""
         with self._connect() as conn:
             conn.execute("""
+                CREATE SEQUENCE IF NOT EXISTS shutdown_events_seq START 1
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS shutdown_events (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id BIGINT PRIMARY KEY DEFAULT nextval('shutdown_events_seq'),
                     shutdown_at TEXT NOT NULL,
                     shutdown_timestamp REAL NOT NULL,
                     startup_at TEXT,
@@ -145,6 +148,7 @@ class DowntimeTracker:
             """).fetchone()
 
             if row:
+                row_id = row[0] if isinstance(row, (tuple, list)) else row["id"]
                 conn.execute(
                     """
                     UPDATE shutdown_events
@@ -152,7 +156,7 @@ class DowntimeTracker:
                         downtime_seconds = ?, catchup_level = ?
                     WHERE id = ?
                 """,
-                    (now_iso, self._startup_time, self._downtime_seconds, catchup_level, row["id"]),
+                    (now_iso, self._startup_time, self._downtime_seconds, catchup_level, row_id),
                 )
             else:
                 # Shutdown kaydı yok — ilk çalıştırma veya crash
@@ -208,7 +212,8 @@ class DowntimeTracker:
             """).fetchone()
 
             if row:
-                return time.time() - row["shutdown_timestamp"]
+                ts_val = row[0] if isinstance(row, (tuple, list)) else row["shutdown_timestamp"]
+                return time.time() - float(ts_val)
 
         # 3. Dosya modification time'ını kullan (son çare)
         try:
@@ -233,7 +238,9 @@ class DowntimeTracker:
         """Config anahtarını oku."""
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM downtime_config WHERE key = ?", (key,)).fetchone()
-            return row["value"] if row else None
+            if not row:
+                return None
+            return row[0] if isinstance(row, (tuple, list)) else row["value"]
 
     def get_downtime(self) -> timedelta:
         """Downtime süresini döndür."""
@@ -279,15 +286,18 @@ class DowntimeTracker:
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Downtime geçmişini döndür."""
         with self._connect() as conn:
-            rows = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT * FROM shutdown_events
                 ORDER BY shutdown_timestamp DESC
                 LIMIT ?
             """,
                 (limit,),
-            ).fetchall()
-            return [dict(r) for r in rows]
+            )
+            rows = cur.fetchall()
+            cols = [d[0] for d in cur.description] if cur.description else []
+            return [dict(zip(cols, r)) for r in rows]
 
 
 # Singleton

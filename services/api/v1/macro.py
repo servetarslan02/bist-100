@@ -14,7 +14,7 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 _CACHE_TTL = 120
-_last_macro_fetch = time.time()
+_last_macro_fetch = 0.0
 _cached_macro_data: dict[str, Any] = {
     "dxy": 98.84,
     "dxy_change_pct": 0.09,
@@ -112,6 +112,12 @@ def _fetch_live_macro_data() -> dict[str, Any]:
         result["vix_level"] = vix_val
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
+        
+        # Frontend expects specific keys for change percentages
+        if "gold_ounce_change_pct" in result:
+            result["gold_change_pct"] = result["gold_ounce_change_pct"]
+        if "brent_crude_change_pct" in result:
+            result["brent_change_pct"] = result["brent_crude_change_pct"]
 
         # UI Mapping & Dynamic Regime Commentary
         result["usd_strength"] = round(max(0.0, min(1.0, (result.get("dxy", 100) - 90) / 20)), 2)

@@ -116,7 +116,15 @@ def compute_financial_sentiment(title: str, summary: str = "") -> float:
 
 
 def is_relevant_to_bist_and_macro(title: str, summary: str = "") -> bool:
-    """Borsa İstanbul ve Türkiye makroekonomisi ile sıfır ilgisi olan üçüncü dünya/yerel gürültü haberlerini eler."""
+    """Borsa İstanbul ve Türkiye makroekonomisi ile ilgili olmayan haberleri eler.
+
+    Pozitif kontrol: Başlıkta/özette Türkiye, BIST, TCMB veya bilinen bir
+    Türk şirket/marka referansı olmalı. Sadece 'yasaklı kelime yok' kontrolü
+    yeterli değil — 'dolar', 'şirket', 'tahmin' gibi genel kelimeler yanlış
+    pozitif üretiyordu.
+    """
+    import re
+
     text = f"{title} {summary}".lower()
 
     irrelevant_geos = [
@@ -132,7 +140,31 @@ def is_relevant_to_bist_and_macro(title: str, summary: str = "") -> bool:
         "yunanistan'da patriot",
         "starlink cihazı",
     ]
-    return not any(geo in text for geo in irrelevant_geos)
+    if any(geo in text for geo in irrelevant_geos):
+        return False
+
+    # Pozitif alaka kontrolü: Kelime sınırı ile (substring değil)
+    turkey_bist_keywords = [
+        r"türkiye", r"turkiye", r"türk\b", r"turk\b", r"bist\b", r"borsa istanbul",
+        r"tcmb", r"merkez bankası", r"kap\b", r"tüik", r"tuik", r"hazine",
+        r"istanbul", r"ankara", r"izmir", r"lira\b", r"try\b",
+    ]
+    if any(re.search(kw, text) for kw in turkey_bist_keywords):
+        return True
+
+    # Bilinen Türk şirket/marka isimleri (tam kelime eşleşmesi)
+    for alias in NewsProvider.COMPANY_NAME_MAP.values():
+        first_word = alias.split()[0].lower()
+        if len(first_word) >= 4 and re.search(r"\b" + re.escape(first_word) + r"\b", text):
+            return True
+
+    # Global makro terimler yalnızca TCMB/faiz/BIST konteğiyle birlikte anılıyorsa kabul et
+    global_macro_context = ["fed", "ecb", "powell", "jackson hole"]
+    tr_context = ["tcmb", "faiz", "enflasyon", "lira", "bist", "türkiye", "turkiye"]
+    if any(g in text for g in global_macro_context) and any(t in text for t in tr_context):
+        return True
+
+    return False
 
 
 class NewsProvider:

@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 import structlog
 
 from ..core.config import settings
-from ..core.event_bus import EventType, subscribe
+from ..core.event_bus import EventType, event_bus
 from ..core.questdb_client import questdb_client
 
 logger = structlog.get_logger()
@@ -53,7 +53,7 @@ class QuestDBTickConsumer:
         await questdb_client.ensure_tables()
 
         # NATS'tan tick olaylarını dinle
-        subscribe(EventType.MARKET_TICK, self._on_tick)
+        await event_bus.subscribe(EventType.MARKET_TICK, self._on_tick)
 
         # Buffer flush döngüsü
         asyncio.create_task(self._flush_loop())

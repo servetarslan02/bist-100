@@ -146,7 +146,7 @@ class PortfolioService:
         from ..portfolio.portfolio_manager import Position, Trade
 
         # 1. Portfolio bilgisi
-        pf = await pg_fetchrow("SELECT * FROM portfolios WHERE id = ?", self._portfolio_id)
+        pf = await pg_fetchrow("SELECT * FROM portfolios WHERE id = $1", self._portfolio_id)
         if pf:
             self._pm._cash = float(pf["cash_balance"])
             self._pm._initial_capital = float(pf["initial_capital"])
@@ -158,7 +158,7 @@ class PortfolioService:
             SELECT p.*, i.symbol as ticker
             FROM positions p
             JOIN instruments i ON p.instrument_id = i.id
-            WHERE p.portfolio_id = ? AND p.status = 'OPEN'
+            WHERE p.portfolio_id = $1 AND p.status = 'OPEN'
         """,
             self._portfolio_id,
         )
@@ -189,7 +189,7 @@ class PortfolioService:
 
         # 3. Commission total (position_history SUM'dan)
         comm_hist = await pg_fetch(
-            "SELECT SUM(commission) as total FROM position_history WHERE portfolio_id = ?", self._portfolio_id
+            "SELECT SUM(commission) as total FROM position_history WHERE portfolio_id = $1", self._portfolio_id
         )
         if comm_hist and comm_hist[0].get("total"):
             self._pm._commission_total = float(comm_hist[0]["total"])
@@ -200,7 +200,7 @@ class PortfolioService:
             SELECT ph.*, i.symbol as ticker
             FROM position_history ph
             LEFT JOIN instruments i ON i.symbol = ph.ticker
-            WHERE ph.portfolio_id = ? AND ph.action IN ('CLOSE', 'REDUCE')
+            WHERE ph.portfolio_id = $1 AND ph.action IN ('CLOSE', 'REDUCE')
             ORDER BY ph.id ASC
         """,
             self._portfolio_id,
@@ -223,7 +223,7 @@ class PortfolioService:
 
         # 5. High-water mark + equity snapshots
         all_snapshots = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id ASC", self._portfolio_id
+            "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id ASC", self._portfolio_id
         )
         for snap in all_snapshots:
             self._pm._equity_curve.append(
@@ -242,7 +242,7 @@ class PortfolioService:
         # 6. Daily P&L restore
         try:
             daily_rows = await pg_fetch(
-                "SELECT * FROM daily_pnl WHERE portfolio_id = ? ORDER BY pnl_date ASC", self._portfolio_id
+                "SELECT * FROM daily_pnl WHERE portfolio_id = $1 ORDER BY pnl_date ASC", self._portfolio_id
             )
             for dr in daily_rows:
                 self._pm._daily_pnl.append(
@@ -287,8 +287,8 @@ class PortfolioService:
         rows = await pg_fetch(
             """
             SELECT * FROM position_history
-            WHERE portfolio_id = ? AND action = 'CLOSE'
-            ORDER BY id DESC LIMIT ?
+            WHERE portfolio_id = $1 AND action = 'CLOSE'
+            ORDER BY id DESC LIMIT $2
         """,
             self._portfolio_id,
             limit,
@@ -299,7 +299,7 @@ class PortfolioService:
         """Günlük P&L geçmişi."""
         try:
             rows = await pg_fetch(
-                "SELECT * FROM daily_pnl WHERE portfolio_id = ? ORDER BY pnl_date DESC LIMIT ?",
+                "SELECT * FROM daily_pnl WHERE portfolio_id = $1 ORDER BY pnl_date DESC LIMIT $2",
                 self._portfolio_id,
                 limit,
             )
@@ -319,7 +319,7 @@ class PortfolioService:
 
             # Mevcut gün kaydı var mı?
             existing = await pg_fetchrow(
-                "SELECT id, realized_pnl, commission, net_pnl FROM daily_pnl WHERE portfolio_id = ? AND pnl_date = ?",
+                "SELECT id, realized_pnl, commission, net_pnl FROM daily_pnl WHERE portfolio_id = $1 AND pnl_date = $2",
                 self._portfolio_id,
                 today,
             )
@@ -330,7 +330,7 @@ class PortfolioService:
                 new_commission = float(existing["commission"]) + commission
                 new_net = new_realized - new_commission
                 await pg_execute(
-                    "UPDATE daily_pnl SET realized_pnl = ?, commission = ?, net_pnl = ?, equity_end = ? WHERE id = ?",
+                    "UPDATE daily_pnl SET realized_pnl = $1, commission = $2, net_pnl = $3, equity_end = $4 WHERE id = $5",
                     round(new_realized, 2),
                     round(new_commission, 2),
                     round(new_net, 2),
@@ -340,7 +340,7 @@ class PortfolioService:
             else:
                 # Yeni gün kaydı
                 await pg_execute(
-                    "INSERT INTO daily_pnl (portfolio_id, pnl_date, realized_pnl, unrealized_pnl, commission, net_pnl, equity_start, equity_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO daily_pnl (portfolio_id, pnl_date, realized_pnl, unrealized_pnl, commission, net_pnl, equity_start, equity_end) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     self._portfolio_id,
                     today,
                     round(realized_pnl, 2),
@@ -438,7 +438,7 @@ class PortfolioService:
             for ticker, price in prices.items():
                 if ticker in self._position_cache:
                     await pg_execute(
-                        "UPDATE positions SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        "UPDATE positions SET current_price = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
                         price,
                         self._position_cache[ticker]["id"],
                     )
@@ -476,7 +476,7 @@ class PortfolioService:
 
         # DB'den güncel cash oku (multi-instance tutarlılığı)
         try:
-            pf_row = await pg_fetchrow("SELECT cash_balance FROM portfolios WHERE id = ?", self._portfolio_id)
+            pf_row = await pg_fetchrow("SELECT cash_balance FROM portfolios WHERE id = $1", self._portfolio_id)
             db_cash = float(pf_row["cash_balance"]) if pf_row else self._pm._cash
             if db_cash < quantity * price + commission:
                 return {"success": False, "error": "Yetersiz nakit (DB)"}
@@ -515,7 +515,7 @@ class PortfolioService:
         # Atomik pozisyon azaltma (DB-level)
         if quantity >= pos.quantity:
             update_result = await pg_execute(
-                "UPDATE positions SET quantity = 0, status = 'CLOSED', entry_commission = 0, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN' AND quantity >= ?",
+                "UPDATE positions SET quantity = 0, status = 'CLOSED', entry_commission = 0, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN' AND quantity >= $1",
                 self._portfolio_id,
                 instrument_id,
                 quantity,
@@ -524,7 +524,7 @@ class PortfolioService:
                 return {"success": False, "error": "Oversell (DB atomic): yeterli pozisyon yok"}
         else:
             update_result = await pg_execute(
-                "UPDATE positions SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN' AND quantity >= ?",
+                "UPDATE positions SET quantity = quantity - $2, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = $3 AND instrument_id = $4 AND status = 'OPEN' AND quantity >= $1",
                 quantity,
                 self._portfolio_id,
                 instrument_id,
@@ -585,14 +585,14 @@ class PortfolioService:
 
         # Portfolio cash güncelle
         await pg_execute(
-            "UPDATE portfolios SET cash_balance = cash_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE portfolios SET cash_balance = cash_balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
             cost + commission,
             self._portfolio_id,
         )
 
         # Pozisyon güncelle/oluştur
         existing = await pg_fetchrow(
-            "SELECT id, quantity, avg_cost FROM positions WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN'",
+            "SELECT id, quantity, avg_cost FROM positions WHERE portfolio_id = $3 AND instrument_id = $4 AND status = 'OPEN'",
             self._portfolio_id,
             instrument_id,
         )
@@ -605,7 +605,7 @@ class PortfolioService:
             new_avg = (old_avg * old_qty + price * quantity) / new_qty
             new_comm = old_comm + commission
             await pg_execute(
-                "UPDATE positions SET quantity = ?, avg_cost = ?, entry_commission = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE positions SET quantity = $5, avg_cost = $6, entry_commission = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8",
                 new_qty,
                 round(new_avg, 4),
                 round(new_comm, 4),
@@ -614,7 +614,7 @@ class PortfolioService:
             pos_id = existing["id"]
         else:
             await pg_execute(
-                "INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, entry_commission, current_price, entry_date, status) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'OPEN')",
+                "INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, entry_commission, current_price, entry_date, status) VALUES ($9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP, 'OPEN')",
                 self._portfolio_id,
                 instrument_id,
                 quantity,
@@ -632,7 +632,7 @@ class PortfolioService:
         # Cash ledger kaydet
         balance = self._pm._cash
         await pg_execute(
-            "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES (?, ?, ?, 'BUY', ?, ?)",
+            "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES ($15, $16, $17, 'BUY', $18, $19)",
             self._portfolio_id,
             -(cost + commission),
             round(balance, 2),
@@ -643,7 +643,7 @@ class PortfolioService:
         # Position history kaydet
         pos = self._pm._positions.get(ticker)
         await pg_execute(
-            "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES (?, ?, 'OPEN', 'LONG', ?, ?, ?, 0, ?, 0, ?, 0)",
+            "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES ($20, $21, 'OPEN', 'LONG', $22, $23, $24, 0, $25, 0, $26, 0)",
             self._portfolio_id,
             ticker,
             quantity,
@@ -677,7 +677,7 @@ class PortfolioService:
         # Portfolio cash güncelle
         revenue = quantity * price - commission
         await pg_execute(
-            "UPDATE portfolios SET cash_balance = cash_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE portfolios SET cash_balance = cash_balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
             revenue,
             self._portfolio_id,
         )
@@ -687,7 +687,7 @@ class PortfolioService:
         if ticker in self._pm._positions:
             pos = self._pm._positions[ticker]
             await pg_execute(
-                "UPDATE positions SET entry_commission = ?, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = ? AND instrument_id = ? AND status = 'OPEN'",
+                "UPDATE positions SET entry_commission = $1, updated_at = CURRENT_TIMESTAMP WHERE portfolio_id = $2 AND instrument_id = $3 AND status = 'OPEN'",
                 round(pos.entry_commission, 4),
                 self._portfolio_id,
                 instrument_id,
@@ -699,7 +699,7 @@ class PortfolioService:
         # Cash ledger
         balance = self._pm._cash
         await pg_execute(
-            "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES (?, ?, ?, 'SELL', ?, ?)",
+            "INSERT INTO cash_ledger (portfolio_id, amount, balance_after, entry_type, description, ticker) VALUES ($1, $2, $3, 'SELL', $4, $5)",
             self._portfolio_id,
             revenue,
             round(balance, 2),
@@ -711,7 +711,7 @@ class PortfolioService:
         action = "CLOSE" if ticker not in self._pm._positions else "REDUCE"
         pos_before = self._pm._positions.get(ticker)
         await pg_execute(
-            "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES (?, ?, ?, 'LONG', ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO position_history (portfolio_id, ticker, action, direction, quantity, price, commission, avg_cost_before, avg_cost_after, quantity_before, quantity_after, realized_pnl) VALUES ($1, $2, $3, 'LONG', $4, $5, $6, $7, $8, $9, $10, $11)",
             self._portfolio_id,
             ticker,
             action,
@@ -727,7 +727,7 @@ class PortfolioService:
 
         # Toplam P&L güncelle
         await pg_execute(
-            "UPDATE portfolios SET total_pnl = total_pnl + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE portfolios SET total_pnl = total_pnl + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
             realized_pnl,
             self._portfolio_id,
         )
@@ -740,7 +740,7 @@ class PortfolioService:
         acc = self._pm.get_accounting_summary()
 
         await pg_execute(
-            "UPDATE portfolios SET cash_balance = ?, invested_value = ?, current_capital = ?, total_return_pct = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE portfolios SET cash_balance = $1, invested_value = $2, current_capital = $3, total_return_pct = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5",
             pf["cash"],
             pf["invested_value"],
             pf["total_value"],
@@ -762,7 +762,7 @@ class PortfolioService:
 
             # Equity snapshot
             await pg_execute(
-                "INSERT INTO equity_snapshots (portfolio_id, snapshot_date, total_equity, cash, invested, unrealized_pnl, realized_pnl_today, commission_today, positions_count, high_water_mark, drawdown_from_hwm) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO equity_snapshots (portfolio_id, snapshot_date, total_equity, cash, invested, unrealized_pnl, realized_pnl_today, commission_today, positions_count, high_water_mark, drawdown_from_hwm) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
                 self._portfolio_id,
                 today,
                 pf["total_value"],
@@ -811,7 +811,7 @@ class PortfolioService:
     async def get_cash_ledger(self, limit: int = 100) -> list[dict]:
         """DB'den nakit hareket geçmişi."""
         rows = await pg_fetch(
-            "SELECT * FROM cash_ledger WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?", self._portfolio_id, limit
+            "SELECT * FROM cash_ledger WHERE portfolio_id = $1 ORDER BY id DESC LIMIT $2", self._portfolio_id, limit
         )
         return rows
 
@@ -819,14 +819,14 @@ class PortfolioService:
         """DB'den pozisyon geçmişi."""
         if ticker:
             rows = await pg_fetch(
-                "SELECT * FROM position_history WHERE portfolio_id = ? AND ticker = ? ORDER BY id DESC LIMIT ?",
+                "SELECT * FROM position_history WHERE portfolio_id = $1 AND ticker = $2 ORDER BY id DESC LIMIT $3",
                 self._portfolio_id,
                 ticker,
                 limit,
             )
         else:
             rows = await pg_fetch(
-                "SELECT * FROM position_history WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
+                "SELECT * FROM position_history WHERE portfolio_id = $1 ORDER BY id DESC LIMIT $2",
                 self._portfolio_id,
                 limit,
             )
@@ -835,7 +835,7 @@ class PortfolioService:
     async def get_equity_snapshots(self, limit: int = 252) -> list[dict]:
         """DB'den equity snapshot'ları."""
         rows = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?", self._portfolio_id, limit
+            "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id DESC LIMIT $2", self._portfolio_id, limit
         )
         return rows
 

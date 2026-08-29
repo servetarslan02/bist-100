@@ -151,7 +151,8 @@ class CertificateManager:
             if result.returncode == 0:
                 # notAfter=Aug 25 12:00:00 2027 GMT
                 date_str = result.stdout.strip().split("=")[1]
-                return datetime.strptime(date_str, "%b %d %H:%M:%S %Y %Z")
+                dt = datetime.strptime(date_str, "%b %d %H:%M:%S %Y %Z")
+                return dt.replace(tzinfo=UTC)
         except Exception as e:
             logger.warning("Certificate expiry check failed", path=cert_path, error=str(e))
         return None

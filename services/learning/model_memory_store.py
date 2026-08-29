@@ -334,7 +334,8 @@ class ModelMemoryStore:
                 (model_id, limit),
             )
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, r)) for r in rows]
 
     def record_metrics_snapshot(
         self,
@@ -397,7 +398,9 @@ class ModelMemoryStore:
                 ORDER BY m.reliability_score DESC
                 """
             )
-            return [dict(r) for r in cursor.fetchall()]
+            rows = cursor.fetchall()
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, r)) for r in rows]
 
     def prune_old_records(self, max_records_per_model: int = 20000):
         """Ham geçmişi budayarak kontrolsüz büyümesini engeller."""

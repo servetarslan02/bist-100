@@ -23,7 +23,7 @@ WORKDIR /app
 
 # Sadece runtime ve healthcheck için gerekli hafif paketler (gcc yok)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl libpq5 && \
+    curl libpq5 libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 # Builder aşamasından derlenmiş Python paketlerini kopyala

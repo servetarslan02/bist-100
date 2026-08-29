@@ -209,7 +209,13 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
             # Belirlenmiş tip varsa öncelikli kullan
             event_type = item.get("type")
             if not event_type:
+                import re as _re
+
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
+
+                def _has_word(kw: str) -> bool:
+                    return bool(_re.search(r"\b" + _re.escape(kw) + r"\b", text_check))
+
                 macro_keywords = [
                     "tcmb",
                     "merkez bankası",
@@ -221,54 +227,42 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
                     "ppk",
                     "politika faizi",
                     "rezerv",
-                    "cari",
+                    "cari açık",
                     "hazine",
-                    "bütçe",
-                    "döviz",
-                    "dolar",
+                    "bütçe açığı",
+                    "döviz kuru",
                     "ihracat",
                     "ithalat",
                     "işsizlik",
                     "istihdam",
-                    "büyüme",
+                    "büyüme oranı",
                     "gdp",
-                    "makro",
+                    "makroekonomi",
                     "küresel piyasa",
                     "wall street",
-                    "almanya",
-                    "brezilya",
-                    "ab'den",
-                    "petrol",
-                    "hürmüz",
-                    "tahmin",
                     "para politikası",
-                    "tüketici",
-                    "üretici",
+                    "tüketici güveni",
+                    "üretici fiyat",
                 ]
                 kap_keywords = [
                     "kap",
+                    "kamuyu aydınlatma",
                     "bildirimi",
                     "pay alım",
                     "pay satım",
-                    "sermaye",
+                    "sermaye artırımı",
                     "temettü",
                     "genel kurul",
                     "finansal sonuç",
                     "bilanço",
-                    "özel durum",
-                    "ihale",
-                    "anlaşma",
-                    "sipariş",
-                    "şirket",
-                    "şirketler",
-                    "gong",
-                    "ortaklık",
-                    "satın alma",
+                    "özel durum açıklaması",
+                    "devre kesici",
+                    "borsa istanbul",
                 ]
 
-                if any(k in text_check for k in macro_keywords):
+                if any(_has_word(k) if " " not in k else k in text_check for k in macro_keywords):
                     event_type = "MACRO"
-                elif matched or any(k in text_check for k in kap_keywords):
+                elif matched or any(_has_word(k) if " " not in k else k in text_check for k in kap_keywords):
                     event_type = "KAP"
                 else:
                     event_type = "NEWS"

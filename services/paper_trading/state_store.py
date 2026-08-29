@@ -95,7 +95,7 @@ class PaperStateStore:
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
-                    entry_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    entry_id INTEGER PRIMARY KEY,
                     timestamp TEXT NOT NULL,
                     date TEXT NOT NULL,
                     entry_type TEXT NOT NULL,
@@ -208,7 +208,8 @@ class PaperStateStore:
         with self._connect() as conn:
             row = conn.execute("SELECT json_data FROM portfolio_state WHERE id = 1").fetchone()
             if row:
-                return orjson.loads(row["json_data"])
+                raw = row[0] if isinstance(row, (tuple, list)) else row["json_data"]
+                return orjson.loads(raw)
             return None
 
     # ===================== POSITIONS =====================
@@ -240,7 +241,7 @@ class PaperStateStore:
         """Pozisyonlari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM positions").fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     # ===================== TRADES =====================
 
@@ -275,7 +276,7 @@ class PaperStateStore:
             if limit:
                 sql += f" LIMIT {limit}"
             rows = conn.execute(sql).fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     # ===================== ORDERS =====================
 
@@ -313,7 +314,7 @@ class PaperStateStore:
                 ).fetchall()
             else:
                 rows = conn.execute("SELECT json_data FROM orders ORDER BY date DESC").fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     # ===================== AUDIT LOG =====================
 
@@ -353,7 +354,7 @@ class PaperStateStore:
             sql += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
             rows = conn.execute(sql, params).fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     # ===================== DAILY PERFORMANCE =====================
 
@@ -388,7 +389,7 @@ class PaperStateStore:
         """Gunluk performanslari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM daily_performance ORDER BY date ASC").fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     # ===================== EQUITY CURVE =====================
 
@@ -414,11 +415,11 @@ class PaperStateStore:
             ).fetchall()
             return [
                 {
-                    "date": r["date"],
-                    "equity": r["equity"],
-                    "cash": r["cash"],
-                    "invested": r["invested"],
-                    "benchmark_equity": r["benchmark_equity"],
+                    "date": r[0] if isinstance(r, (tuple, list)) else r["date"],
+                    "equity": r[1] if isinstance(r, (tuple, list)) else r["equity"],
+                    "cash": r[2] if isinstance(r, (tuple, list)) else r["cash"],
+                    "invested": r[3] if isinstance(r, (tuple, list)) else r["invested"],
+                    "benchmark_equity": r[4] if isinstance(r, (tuple, list)) else r["benchmark_equity"],
                 }
                 for r in rows
             ]
@@ -469,7 +470,7 @@ class PaperStateStore:
             rows = conn.execute(
                 "SELECT json_data FROM pending_signals WHERE expires_at > ? ORDER BY rank ASC", (now_iso,)
             ).fetchall()
-            return [orjson.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r[0] if isinstance(r, (tuple, list)) else r["json_data"]) for r in rows]
 
     def clear_stale_pending_signals(self, max_age_days: int = 1) -> int:
         """Süresi dolmuş bekleyen sinyalleri temizler. Temizlenen sayıyı döner."""
@@ -504,7 +505,9 @@ class PaperStateStore:
     def get_config(self, key: str, default: str | None = None) -> str | None:
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
-            return row["value"] if row else default
+            if not row:
+                return default
+            return row[0] if isinstance(row, (tuple, list)) else row["value"]
 
     # ===================== BACKUP / RESET =====================
 

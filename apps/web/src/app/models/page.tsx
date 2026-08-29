@@ -29,7 +29,7 @@ interface ModelRegistryItem {
 
 
 export default function ModelCenterPage() {
-  const { data: modelsData } = usePolling<{ models: ModelRegistryItem[] } | null>("/models/list", 10000);
+  const { data: modelsData, loading } = usePolling<{ models: ModelRegistryItem[] } | null>("/models/list", 10000);
 
   const models: ModelRegistryItem[] = useMemo(() => modelsData?.models || [], [modelsData]);
   return (
@@ -58,7 +58,14 @@ export default function ModelCenterPage() {
 
       {/* Model Cards Grid */}
       <div className="space-y-4">
-        {models.length === 0 && <SkeletonList count={4} />}
+        {loading && models.length === 0 && <SkeletonList count={4} />}
+        {!loading && models.length === 0 && (
+          <div className="rounded-xl p-12 text-center border border-zinc-800 bg-zinc-900/30">
+            <Cpu size={36} className="mx-auto mb-3 text-zinc-600" />
+            <p className="text-sm font-semibold text-zinc-300">Model Kaydı Bulunamadı</p>
+            <p className="text-xs text-zinc-500 mt-1">Eğitim döngüsü tetiklendiğinde modeller burada listelenecektir.</p>
+          </div>
+        )}
         {models.map((model) => {
           const isChamp = model.status === "CHAMPION";
           return (

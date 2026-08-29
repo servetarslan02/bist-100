@@ -64,6 +64,8 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=UTC)
                 hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:  # 1 saatten az geçtiyse skip
                     logger.info("Fundamental ingestion skipped (too recent)", hours_since=round(hours_since, 1))
@@ -127,6 +129,8 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=UTC)
                 hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:
                     logger.info("KAP ingestion skipped (too recent)", hours_since=round(hours_since, 1))
@@ -220,6 +224,8 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=UTC)
                 hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:
                     logger.info("News ingestion skipped (too recent)")

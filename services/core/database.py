@@ -556,8 +556,6 @@ def get_ch_client() -> Any:
             username=settings.clickhouse_user,
             password=settings.clickhouse_password,
             database=settings.clickhouse_db,
-            # Keep-alive ile tekrar bağlantı maliyeti sıfırlanır
-            settings={"keep_alive_timeout": 60},
         )
         _ch_healthy = True
         logger.info("ClickHouse client created", host=settings.clickhouse_host)

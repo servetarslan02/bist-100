@@ -74,9 +74,10 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
+            cursor.execute("CREATE SEQUENCE IF NOT EXISTS scan_results_seq START 1")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS scan_results (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id BIGINT PRIMARY KEY DEFAULT nextval('scan_results_seq'),
                     scan_id TEXT NOT NULL,
                     scan_type TEXT NOT NULL,
                     ticker TEXT NOT NULL,
@@ -221,7 +222,7 @@ class ScanPersistence:
         try:
             import duckdb
 
-            conn = duckdb.connect(self._db_path)
+            conn = duckdb.connect(self._db_path, read_only=True)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
@@ -237,9 +238,10 @@ class ScanPersistence:
             )
 
             rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
             conn.close()
 
-            return [dict(row) for row in rows]
+            return [dict(zip(columns, row)) for row in rows]
 
         except Exception as e:
             logger.error("Failed to get scan history", ticker=ticker, error=str(e))
@@ -264,7 +266,7 @@ class ScanPersistence:
         try:
             import duckdb
 
-            conn = duckdb.connect(self._db_path)
+            conn = duckdb.connect(self._db_path, read_only=True)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
@@ -334,7 +336,7 @@ class ScanPersistence:
         try:
             import duckdb
 
-            conn = duckdb.connect(self._db_path)
+            conn = duckdb.connect(self._db_path, read_only=True)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
@@ -408,7 +410,7 @@ class ScanPersistence:
         try:
             import duckdb
 
-            conn = duckdb.connect(self._db_path)
+            conn = duckdb.connect(self._db_path, read_only=True)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()

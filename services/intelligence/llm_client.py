@@ -43,8 +43,8 @@ class LLMClient:
     google-genai ve legacy SDK destekli.
     """
 
-    def __init__(self, model_name: str = "gemini-3.7-flash"):
-        self.model_name = model_name
+    def __init__(self, model_name: str = "gemini-2.5-flash"):
+        self.model_name = model_name or "gemini-2.5-flash"
         self.api_key = self._load_api_key()
         self._new_client = None
         self._legacy_model = None
@@ -165,7 +165,7 @@ class LLMClient:
                         }
                     )
 
-                models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
+                models_to_try = [self.model_name, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.7-flash"]
                 for mod in dict.fromkeys(models_to_try):
                     try:
                         resp = self._new_client.models.generate_content(
@@ -225,7 +225,7 @@ class LLMClient:
 
         # 1. Yeni google-genai SDK
         if self._new_client is not None:
-            models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
+            models_to_try = [self.model_name, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.7-flash"]
             for mod in dict.fromkeys(models_to_try):
                 try:
                     resp = self._new_client.models.generate_content(
@@ -295,7 +295,7 @@ METİN:
             return self._mock_structured_response()
 
         if self._new_client is not None:
-            models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
+            models_to_try = [self.model_name, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.7-flash"]
             for mod in dict.fromkeys(models_to_try):
                 try:
                     resp = self._new_client.models.generate_content(

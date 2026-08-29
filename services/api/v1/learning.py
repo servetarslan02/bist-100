@@ -45,10 +45,10 @@ async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rat
 
         if latest:
             models_list = []
-            for model_id, metrics in latest.items():
+            for metrics in latest:
                 models_list.append(
                     {
-                        "model_id": model_id,
+                        "model_id": metrics.get("model_id", "unknown"),
                         "model_version": metrics.get("version", "unknown"),
                         "evaluated_samples": metrics.get("evaluated_samples", 0),
                         "hit_rate_pct": metrics.get("hit_rate_pct", 0),
@@ -209,6 +209,8 @@ async def record_outcome(
         if not res:
             raise HTTPException(404, "Prediction ID not found")
         return {"success": True, "outcome": res}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
         raise HTTPException(500, "Internal server error") from e

@@ -86,8 +86,8 @@ class CircuitBreaker:
                 self.last_failure_time.isoformat() if self.last_failure_time else None,
                 self.last_success_time.isoformat() if self.last_success_time else None,
             )
-        except Exception:
-            pass  # State persist isteğe bağlı; log flood'u önleme
+        except Exception as exc:
+            logger.debug("Circuit breaker state persist edilemedi", name=self.name, error=str(exc))
 
     def record_success(self) -> None:
         """Başarılı çağrı kaydeder ve state machine'i günceller."""

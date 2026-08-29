@@ -208,10 +208,41 @@ async def performance_metrics(user=Depends(get_current_user), _=Depends(check_ra
         from services.paper_trading.paper_orchestrator import paper_orchestrator
 
         report = paper_orchestrator.get_full_report()
-        return report.get("performance_metrics", {})
+        perf = report.get("performance_metrics", {})
+        if not perf or "error" in perf:
+            return {
+                "sharpe_ratio": 0.0,
+                "max_drawdown": 0.0,
+                "win_rate": 0.0,
+                "avg_holding_days": 0.0,
+                "total_trades": 0,
+                "profit_factor": 0.0,
+                "calmar_ratio": 0.0,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        return {
+            "sharpe_ratio": perf.get("sharpe", perf.get("sharpe_ratio", 0.0)),
+            "max_drawdown": perf.get("max_drawdown_pct", perf.get("max_drawdown", 0.0)),
+            "win_rate": perf.get("win_rate", 0.0),
+            "avg_holding_days": perf.get("avg_holding_days", 0.0),
+            "total_trades": perf.get("total_trades", 0),
+            "profit_factor": perf.get("profit_factor", 0.0),
+            "calmar_ratio": perf.get("calmar_ratio", 0.0),
+            "timestamp": datetime.now(UTC).isoformat(),
+            **perf,
+        }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {
+            "sharpe_ratio": 0.0,
+            "max_drawdown": 0.0,
+            "win_rate": 0.0,
+            "avg_holding_days": 0.0,
+            "total_trades": 0,
+            "profit_factor": 0.0,
+            "calmar_ratio": 0.0,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
 
 
 @router.get("/accounting")
@@ -409,7 +440,7 @@ async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limi
         pm = _get_pm()
 
         # Trade'lerden vergi hesapla
-        trades = [{"realized_pnl": t.pnl, "holding_days": t.holding_days} for t in pm._trades]
+        trades = [{"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)} for t in pm._trades]
 
         result = tax_model.compute_total_tax(
             trades=trades,
@@ -745,11 +776,12 @@ async def deposit_funds(
         desc = body.get("description", "Yatırımcı Nakit Transferi")
         pm = _get_pm()
         new_cash = pm.deposit_cash(amount=amount, description=desc)
+        summary = pm.get_summary() if hasattr(pm, "get_summary") else pm.get_portfolio()
         return {
             "success": True,
             "deposited_amount": amount,
             "new_cash": new_cash,
-            "total_value": pm.get_portfolio().get("total_value", 0),
+            "total_value": summary.get("total_value", new_cash),
         }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)

@@ -8,7 +8,7 @@ Kullanım:
     from services.core.event_schema import CanonicalEvent, EventType
 
     event = CanonicalEvent(
-        type=EventType.TICK,
+        event_type=EventType.TICK,
         ticker="THYAO",
         data={"price": 245.50, "volume": 1000000}
     )
@@ -60,13 +60,39 @@ class EventType(IntEnum):
     LEARNING = 9
     MACRO = 10
     DATA_REFRESH = 11
+    ANOMALY_DETECTED = 12
+    ANOMALY_CLUSTER = 13
+    AGENT_ANALYSIS_COMPLETED = 14
+    BREADTH_ALERT = 15
+    DECISION_CREATED = 16
+    FEATURE_UPDATED = 17
+    KAP_EVENT = 18
+    KILL_SWITCH_TRIGGERED = 19
+    LIQUIDITY_ALERT = 20
+    MACRO_EVENT = 21
+    MARKET_STATE_CHANGED = 22
+    MARKET_TICK = 23
+    MULTI_TF_DIVERGENCE = 24
+    NEWS_EVENT = 25
+    NEWS_RAW = 26
+    ORDER_FILLED = 27
+    OUTCOME_CREATED = 28
+    PREDICTION_CREATED = 29
+    REGIME_TRANSITION = 30
+    RISK_ALERT = 31
+    SENTIMENT_SHIFT = 32
+    SIGNAL_GENERATED = 33
+    SIMULATION_COMPLETED = 34
+    SIMULATION_REQUESTED = 35
+    SOCIAL_EVENT = 36
+    WORLD_STATE_CHANGED = 37
 
 
 @dataclass
 class CanonicalEvent:
     """Standart olay formatı — tüm servisler bunu kullanır."""
 
-    type: EventType
+    event_type: EventType
     ticker: str = ""
     data: dict[str, Any] = field(default_factory=dict)
     timestamp: int = 0
@@ -75,16 +101,21 @@ class CanonicalEvent:
     sequence: int = 0
     version: int = 1  # Event Schema Versiyonu (v1/v2)
     correlation_id: str = ""
+    event_id: str = ""
 
     def __post_init__(self):
         if self.timestamp == 0:
             self.timestamp = int(time.time() * 1000)
+        if not self.event_id:
+            import uuid
+
+            self.event_id = str(uuid.uuid4())
 
     @otel_trace("event_schema.validate")
     def validate(self) -> tuple[bool, str]:
         """Event şeması ve zorunlu alan doğrulaması."""
-        if not isinstance(self.type, (EventType, int)):
-            return False, f"Geçersiz event type: {self.type}"
+        if not isinstance(self.event_type, (EventType, int)):
+            return False, f"Geçersiz event type: {self.event_type}"
         if self.timestamp <= 0:
             return False, "Geçersiz timestamp: <= 0"
         if self.version < 1:
@@ -96,7 +127,7 @@ class CanonicalEvent:
         """JSON formatına çevir."""
         return orjson.dumps(
             {
-                "type": self.type.value if hasattr(self.type, "value") else int(self.type),
+                "type": self.event_type.value if hasattr(self.event_type, "value") else int(self.event_type),
                 "ticker": self.ticker,
                 "data": self.data,
                 "timestamp": self.timestamp,
@@ -113,7 +144,7 @@ class CanonicalEvent:
     def to_dict(self) -> dict[str, Any]:
         """Dict formatına çevir."""
         return {
-            "type": self.type.value if hasattr(self.type, "value") else int(self.type),
+            "type": self.event_type.value if hasattr(self.event_type, "value") else int(self.event_type),
             "ticker": self.ticker,
             "data": self.data,
             "timestamp": self.timestamp,
@@ -136,7 +167,7 @@ class CanonicalEvent:
         source_len = len(source_bytes)
 
         header = struct.pack(
-            "!B10sdfBB", self.type.value, ticker_bytes, self.timestamp, self.confidence, source_len, data_len
+            "!B10sdfBB", self.event_type.value, ticker_bytes, self.timestamp, self.confidence, source_len, data_len
         )
 
         return header + source_bytes + data_json
@@ -153,7 +184,7 @@ class CanonicalEvent:
     def from_dict(cls, data: dict[str, Any]) -> "CanonicalEvent":
         """Dict'ten oluştur."""
         return cls(
-            type=EventType(data.get("type", 0)),
+            event_type=EventType(data.get("type", 0)),
             ticker=data.get("ticker", ""),
             data=data.get("data", {}),
             timestamp=data.get("timestamp", 0),
@@ -169,7 +200,7 @@ class CanonicalEvent:
     def from_binary(cls, binary: bytes) -> "CanonicalEvent":
         """Binary'den oluştur."""
         if len(binary) < 26:
-            return cls(type=EventType.HEARTBEAT)
+            return cls(event_type=EventType.HEARTBEAT)
 
         try:
             type_val, ticker_bytes, timestamp, confidence, source_len, data_len = struct.unpack(
@@ -182,7 +213,7 @@ class CanonicalEvent:
             data = orjson.loads(data_json) if data_json else {}
 
             return cls(
-                type=EventType(type_val),
+                event_type=EventType(type_val),
                 ticker=ticker,
                 data=data,
                 timestamp=timestamp,
@@ -191,7 +222,7 @@ class CanonicalEvent:
             )
         except Exception as e:
             logger.error("Binary decode failed", error=str(e))
-            return cls(type=EventType.HEARTBEAT)
+            return cls(event_type=EventType.HEARTBEAT)
 
 
 # =====================================================
@@ -204,7 +235,7 @@ def create_tick_event(
 ) -> CanonicalEvent:
     """Fiyat olayı oluştur."""
     return CanonicalEvent(
-        type=EventType.TICK,
+        event_type=EventType.TICK,
         ticker=ticker,
         data={"price": price, "change": change, "volume": volume},
         source=source,
@@ -216,7 +247,7 @@ def create_signal_event(
 ) -> CanonicalEvent:
     """Sinyal olayı oluştur."""
     return CanonicalEvent(
-        type=EventType.SIGNAL,
+        event_type=EventType.SIGNAL,
         ticker=ticker,
         data={"direction": direction, "target": target, "stop_loss": stop_loss, "reason": reason},
         confidence=confidence,
@@ -229,7 +260,7 @@ def create_alert_event(
 ) -> CanonicalEvent:
     """Alarm olayı oluştur."""
     return CanonicalEvent(
-        type=EventType.ALERT,
+        event_type=EventType.ALERT,
         ticker=ticker,
         data={
             "alert_type": alert_type,
@@ -245,7 +276,7 @@ def create_alert_event(
 def create_regime_event(regime: str, confidence: float, vix: float = 0, breadth: float = 0) -> CanonicalEvent:
     """Piyasa rejimi olayı oluştur."""
     return CanonicalEvent(
-        type=EventType.REGIME,
+        event_type=EventType.REGIME,
         data={"regime": regime, "vix": vix, "breadth": breadth},
         confidence=confidence,
         source="market_state",

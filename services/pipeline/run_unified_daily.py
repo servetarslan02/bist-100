@@ -58,7 +58,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
-    today_dt = pl.Series(today_str).date()
+    today_dt = date.fromisoformat(today_str)
     logger.info("EOD Signal Cycle Started", date=today_str)
 
     current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
@@ -73,24 +73,32 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
             logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
 
     engine = AlphaEngine()
-    start_date = (today_dt - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
+    start_date = (today_dt - timedelta(days=400)).strftime("%Y-%m-%d")
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
 
-    if bm_df.empty or not market_data:
+    is_bm_empty = (hasattr(bm_df, "is_empty") and bm_df.is_empty()) or len(bm_df) == 0
+    if is_bm_empty or not market_data:
         logger.error("Market data fetch failed! EOD cycle aborted", date=today_str)
         return {"status": "ERROR", "reason": "EMPTY_MARKET_DATA", "date": today_str}
 
     current_prices = {}
     for ticker, df in market_data.items():
-        if not df.empty:
-            current_prices[ticker] = float(df["Close"][-1])
+        if len(df) > 0:
+            valid_closes = df["Close"].drop_nulls().to_list()
+            if valid_closes:
+                current_prices[ticker] = float(valid_closes[-1])
 
     # 1. Mevcut portföy Mark-to-Market değerlemesi
     mtm_summary = paper_orchestrator.mark_to_market_cycle(current_prices, today_str)
 
     queued_signals = []
     if needs_rebalance:
-        common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
+        if isinstance(bm_df, pl.DataFrame):
+            common_dates = [d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10] for d in bm_df["Date"].to_list()]
+        elif hasattr(bm_df, "index"):
+            common_dates = [d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)[:10] for d in bm_df.index]
+        else:
+            common_dates = []
         if len(common_dates) >= 2:
             train_start = common_dates[0]
             train_end = common_dates[-2]
@@ -189,7 +197,7 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
     """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
-    today_dt = pl.Series(today_str).date()
+    today_dt = date.fromisoformat(today_str)
     logger.info("Morning Execution Cycle Started", date=today_str)
 
     # Eger bekleyen sinyal yoksa ve portfoy bossa, aninda sinyal uretimini bootstrap et
@@ -199,12 +207,18 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
         await run_eod_signal_cycle(target_date=today_str, force_rebalance=True)
 
     engine = AlphaEngine()
-    start_date = (today_dt - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
+    start_date = (today_dt - timedelta(days=400)).strftime("%Y-%m-%d")
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
 
     bm_ret = 0.0
-    if not bm_df.empty and len(bm_df) >= 2:
-        bm_ret = float((bm_df["Close"][-1] / bm_df["Close"][-2] - 1.0) * 100)
+    bm_valid = len(bm_df) >= 2 if bm_df is not None else False
+    if bm_valid:
+        last_close = bm_df["Close"][-1]
+        prev_close = bm_df["Close"][-2]
+        if last_close is not None and prev_close is not None and prev_close != 0:
+            bm_ret = float((last_close / prev_close - 1.0) * 100)
+        else:
+            bm_ret = 0.0
 
     # Bekleyen sinyalleri T+1 açılış fiyatları, KAP kısıtları ve sentetik derinlikle yürüt
     report = paper_orchestrator.execute_pending_signals(
@@ -212,7 +226,7 @@ async def run_morning_execution_cycle(target_date: str | None = None) -> dict[st
         market_data=market_data,
         sector_map=sector_map,
         benchmark_return_pct=bm_ret,
-        data_quality_ok=(not bm_df.empty),
+        data_quality_ok=bm_valid,
     )
 
     logger.info("Morning Execution Cycle Completed", report=report)

@@ -523,8 +523,8 @@ class NotificationRouter:
         for provider in self._providers:
             try:
                 await provider.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Provider kapatılamadı", provider=getattr(provider, 'name', lambda: str(provider))(), error=str(exc))
 
 
 # ─── Retry Konfigürasyonu ─────────────────────────────────────────────────────
@@ -669,8 +669,8 @@ class AlertingSystem:
                     try:
                         loop = asyncio.get_running_loop()
                         loop.create_task(self._notify_all(alert))
-                    except RuntimeError:
-                        pass
+                    except RuntimeError as exc:
+                        logger.warning("Alert bildirim döngüsü bulunamadı, bildirim atlandı", error=str(exc))
 
     # ─── Provider Yönetimi ────────────────────────────────────────────────────
 

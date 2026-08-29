@@ -988,8 +988,8 @@ def _get_historical_returns():
 
         wh = HistoricalDataWarehouse()
         bm_df, _ = wh.load_30y_data()
-        if bm_df is not None and not bm_df.empty:
-            closes = bm_df["Close"].values
+        if bm_df is not None and len(bm_df) > 1:
+            closes = bm_df["Close"].to_numpy() if hasattr(bm_df["Close"], "to_numpy") else np.array(bm_df["Close"])
             _cached_daily_returns = np.diff(closes) / closes[:-1]
             return _cached_daily_returns
     except Exception:

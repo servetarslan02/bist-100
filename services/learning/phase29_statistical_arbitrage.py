@@ -1,4 +1,4 @@
-﻿"""FAZ 29 v2 - Duzeltilmis PnL hesabi (getiri bazli)"""
+"""FAZ 29 v2 - Duzeltilmis PnL hesabi (getiri bazli)"""
 import sys, numpy as np, pandas as pd, warnings
 from scipy import stats
 warnings.filterwarnings("ignore")

@@ -128,8 +128,16 @@ class FinGPTSentiment:
 
         # Son N saat
         now = datetime.now(UTC)
+
+        def _parse_ts(ts_str):
+            try:
+                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+            except Exception:
+                return now
+
         recent = (
-            [r for r in history if (now - datetime.fromisoformat(r.timestamp)).total_seconds() < window_hours * 3600]
+            [r for r in history if (now - _parse_ts(r.timestamp)).total_seconds() < window_hours * 3600]
             if history[0].timestamp
             else history
         )

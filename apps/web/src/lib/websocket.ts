@@ -112,7 +112,7 @@ class WebSocketManager {
 
 export function useWebSocket() {
   const [connected, setConnected] = useState(false);
-  const managerRef = useRef<WebSocketManager>();
+  const managerRef = useRef<WebSocketManager | null>(null);
 
   useEffect(() => {
     const manager = WebSocketManager.getInstance();
@@ -140,7 +140,7 @@ export function useWSChannel<T = any>(channel: string) {
     manager.connect();
 
     const unsub = manager.subscribe(channel, (msg) => {
-      setData(msg);
+      setData(msg as T);
       setLastUpdate(new Date());
     });
 
@@ -159,7 +159,7 @@ export function useLivePrice(ticker: string) {
     const manager = WebSocketManager.getInstance();
     manager.connect();
 
-    const unsub = manager.subscribe("market.tick", (data) => {
+    const unsub = manager.subscribe("market.tick", (data: any) => {
       if (data.ticker === ticker) {
         setPrice(data.price);
         setChange(data.change_pct || 0);

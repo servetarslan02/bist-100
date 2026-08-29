@@ -39,8 +39,6 @@ providers:
     directory: /etc/traefik/dynamic
     watch: true
 
-ping:
-  entryPoint: web
 
 # Access log — buffering ile performans
 accessLog:
@@ -68,7 +66,6 @@ metrics:
 # Health check
 ping:
   entryPoint: web
-  interval: "10s"
 
 # Global settings
 global:

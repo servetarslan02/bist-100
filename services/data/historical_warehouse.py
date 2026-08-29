@@ -79,7 +79,7 @@ class HistoricalDataWarehouse:
         if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) < 10000:
             return False
         try:
-            with duckdb.connect(DB_FILE) as conn:
+            with duckdb.connect(DB_FILE, read_only=True) as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main'")
                 count = cur.fetchone()[0]
@@ -142,7 +142,7 @@ class HistoricalDataWarehouse:
         if not self.is_cached():
             self.download_and_save_warehouse()
 
-        with duckdb.connect(DB_FILE) as conn:
+        with duckdb.connect(DB_FILE, read_only=True) as conn:
             # DuckDB → Polars (native, pandas dönüşümü gereksiz)
             bm_df = conn.execute("SELECT * FROM benchmark_xu100").pl()
             comb_df = conn.execute("SELECT * FROM stock_candles").pl()

@@ -572,3 +572,4 @@ benchmark_engine = BenchmarkEngine()
 performance_attribution = PerformanceAttribution()
 multi_currency = MultiCurrencyHandler()
 tca = TransactionCostAnalyzer()
+tca_analyzer = tca  # Alias for API compatibility

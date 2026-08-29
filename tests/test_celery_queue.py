@@ -115,4 +115,4 @@ class TestTaskStatusAndDLQ:
                 einfo=None,
             )
             # Check if failure was routed to DLQ
-            assert mock_dlq_push.called or True
+            assert mock_dlq_push.called, "Görev başarısız olduğunda DLQ'ya push yapılmalıydı"

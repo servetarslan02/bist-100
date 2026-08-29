@@ -48,9 +48,10 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def _init_db(self):
         """Tabloları oluştur."""
         conn = self._get_conn()
+        conn.execute("CREATE SEQUENCE IF NOT EXISTS fundamental_snapshots_seq START 1")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS fundamental_snapshots (
-                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('fundamental_snapshots_seq'),
                 ticker TEXT NOT NULL,
                 period_end TEXT NOT NULL,
                 available_at TEXT NOT NULL,
@@ -62,9 +63,10 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 UNIQUE(ticker, period_end, available_at)
             )
         """)
+        conn.execute("CREATE SEQUENCE IF NOT EXISTS event_snapshots_seq START 1")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS event_snapshots (
-                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('event_snapshots_seq'),
                 event_id TEXT NOT NULL,
                 ticker TEXT NOT NULL,
                 published_at TEXT NOT NULL,
@@ -79,9 +81,10 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 UNIQUE(event_id)
             )
         """)
+        conn.execute("CREATE SEQUENCE IF NOT EXISTS catalyst_snapshots_seq START 1")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS catalyst_snapshots (
-                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('catalyst_snapshots_seq'),
                 event_id TEXT NOT NULL,
                 ticker TEXT NOT NULL,
                 announcement_date TEXT NOT NULL,

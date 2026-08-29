@@ -223,7 +223,7 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
   useEffect(() => {
     // 1. Listen for background global telemetry pushes
     const unsubscribe = subscribeToCache(path, (freshData) => {
-      setData(freshData);
+      setData(freshData as T);
       setLoading(false);
       setError(null);
       setLastUpdated(new Date());

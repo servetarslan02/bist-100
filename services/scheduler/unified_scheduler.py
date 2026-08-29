@@ -1283,13 +1283,21 @@ class UnifiedScheduler:
         try:
             if not Path(self._state_db_path).exists():
                 return
-            conn = duckdb.connect(self._state_db_path)
+            conn = duckdb.connect(self._state_db_path, read_only=True)
             # Job run'ları yükle
             rows = conn.execute("SELECT job_type, last_run_ts FROM job_runs").fetchall()
-            self._last_run = {row["job_type"]: row["last_run_ts"] for row in rows}
+            self._last_run = {
+                (row[0] if isinstance(row, (tuple, list)) else row["job_type"]): (
+                    row[1] if isinstance(row, (tuple, list)) else row["last_run_ts"]
+                )
+                for row in rows
+            }
             # Saved_at bilgisini al
             saved_row = conn.execute("SELECT value FROM scheduler_state WHERE key = 'saved_at'").fetchone()
-            saved_at = saved_row["value"] if saved_row else "unknown"
+            if saved_row:
+                saved_at = saved_row[0] if isinstance(saved_row, (tuple, list)) else saved_row["value"]
+            else:
+                saved_at = "unknown"
             conn.close()
             logger.info("Scheduler state loaded (SQLite)", last_runs=len(self._last_run), saved_at=saved_at)
         except Exception as e:

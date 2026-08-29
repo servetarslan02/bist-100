@@ -54,8 +54,8 @@ def _detect_gpu_cuda():
 
         if torch.cuda.is_available():
             return True, torch.cuda.get_device_name(0)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("GPU/CUDA algılanamadı, CPU kullanılacak", error=str(exc))
     return False, "CPU"
 
 

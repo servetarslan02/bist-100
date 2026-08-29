@@ -38,7 +38,7 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:8080/ping
+      - http://localhost:80/ping
       interval: 10s
       timeout: 5s
       retries: 5
@@ -139,7 +139,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 384m
+    mem_limit: 1024m
     cpus: 0.75
     storage_opt:
       size: 512M
@@ -202,7 +202,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 384m
+    mem_limit: 1024m
     cpus: 0.75
     storage_opt:
       size: 512M
@@ -844,7 +844,7 @@ services:
       - CMD-SHELL
       - celery -A services.tasks.queue inspect ping --timeout 5 || exit 1
       interval: 30s
-      timeout: 10s
+      timeout: 20s
       retries: 3
       start_period: 60s
     depends_on:
@@ -881,7 +881,7 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:3000
+      - http://127.0.0.1:3000
       interval: 15s
       timeout: 5s
       retries: 5
@@ -986,7 +986,7 @@ services:
     - grafana_data:/var/lib/grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    mem_limit: 64m
+    mem_limit: 256m
     cpus: 0.15
     healthcheck:
       test:
@@ -1012,27 +1012,27 @@ services:
     - 5000:5000
     volumes:
     - mlflow_data:/mlflow
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alpha_bist} --default-artifact-root
-      /mlflow/artifacts --workers 1
+    command: >
+      sh -c "pip install -q psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/alpha_mlflow --default-artifact-root /mlflow/artifacts --allowed-hosts '*' --workers 1"
     environment:
-      MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alpha_bist}
+      MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/alpha_mlflow
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
+      MLFLOW_ALLOWED_HOSTS: "*"
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 128m
-    cpus: 0.15
+    mem_limit: 2048m
+    cpus: 0.5
     healthcheck:
       test:
       - CMD
-      - wget
-      - --no-verbose
-      - --tries=1
-      - --spider
-      - http://localhost:5000/health
+      - python3
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 60s
   pgbouncer:
     restart: unless-stopped
     stop_grace_period: 10s

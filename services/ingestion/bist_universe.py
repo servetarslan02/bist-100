@@ -91,6 +91,10 @@ BIST_STOCKS = bist_universe.BIST_100_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
 
 
+def get_bist_universe() -> list[str]:
+    return bist_universe.get_tickers()
+
+
 def get_sector(ticker: str) -> str:
     return bist_universe.get_ticker_sector(ticker)
 

@@ -179,7 +179,7 @@ function LiveChartInner({ ticker, height = 300 }: LiveChartProps) {
   }, [ticker]);
 
   // Tick handler — updates refs only, no setState
-  const handleTick = useCallback((data: { price: number; timestamp: number; change_pct?: number; volume?: number }) => {
+  const handleTick = useCallback((data: { price: number; timestamp: number; change_pct?: number; volume?: number; open?: number; high?: number; low?: number }) => {
     if (!seriesRef.current) return;
 
     const price = data.price;

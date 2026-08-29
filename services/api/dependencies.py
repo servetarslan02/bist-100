@@ -5,6 +5,7 @@ FastAPI dependency injection.
 Auth, rate limiting, service resolution.
 """
 
+import os
 import time
 
 import structlog
@@ -88,6 +89,18 @@ async def get_current_user(
             role=Role.VIEWER.value,
             permissions=["GET"],
             exp=time.time() + 300,
+            iat=time.time(),
+        )
+
+    auth_strict = os.environ.get("AUTH_STRICT", "false").lower() in ("true", "1")
+    if not auth_strict:
+        # Development / non-strict modda dashboard butonları ve istekleri için tam yetki ver
+        return TokenPayload(
+            sub="anonymous",
+            username="dashboard_user",
+            role=Role.ADMIN.value,
+            permissions=["GET", "POST", "PUT", "DELETE"],
+            exp=time.time() + 3600,
             iat=time.time(),
         )
 

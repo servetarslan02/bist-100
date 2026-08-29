@@ -47,6 +47,7 @@ class VirtualPortfolio:
         self._state_store = state_store
         self._max_equity = initial_capital
         self._current_date = ""
+        self._commission_total = 0.0
 
         logger.info(
             "VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital, strict_t2=strict_t2
@@ -203,6 +204,7 @@ class VirtualPortfolio:
             self.gross_settlement_intraday[ticker] += quantity
 
         self._deduct_cash_hierarchical(total_cost)
+        self._commission_total += commission
         self._current_date = date
         return {"success": True, "ticker": ticker, "quantity": quantity, "cash_remaining": self.cash}
 
@@ -236,6 +238,7 @@ class VirtualPortfolio:
         # Net gelir (satış tutarı - satış komisyonu) -> BIST T+2 Takas havuzuna aktarılır
         revenue = sold_quantity * price - commission
         self.unsettled_cash_t2 += revenue
+        self._commission_total += commission
 
         # Realized P&L
         realized_pnl = (price - pos["avg_cost"]) * sold_quantity - commission
@@ -622,6 +625,33 @@ class VirtualPortfolio:
             except Exception:
                 logger.warning("Caught Exception in get_equity_curve", exc_info=True)
         return []
+
+    def get_position_history(self, ticker: str = "", limit: int | None = None) -> list[dict[str, Any]]:
+        """Kapanmış veya devam eden tüm pozisyon değişikliklerini liste olarak döner."""
+        trades = self.get_trades(limit=None)
+        if ticker:
+            trades = [t for t in trades if t.get("ticker") == ticker]
+        if limit:
+            trades = trades[:limit]
+        return trades
+
+    def get_equity_snapshots(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Zaman serisi olarak bakiye geçmişini döner."""
+        curve = self.get_equity_curve()
+        if limit:
+            return curve[-limit:]
+        return curve
+
+    def deposit_cash(self, amount: float, description: str = "") -> float:
+        """Portföye nakit ekler ve toplam bakiye/özsermayeyi günceller."""
+        self.settled_cash += amount
+        self.save_to_store(self._current_date or datetime.now(UTC).strftime("%Y-%m-%d"))
+        logger.info("Cash deposited to portfolio", amount=amount, new_cash=self.cash, desc=description)
+        return self.cash
+
+    def get_portfolio(self) -> dict[str, Any]:
+        """Geriye dönük uyumluluk için portföy özetini döner."""
+        return self.get_summary()
 
     def get_max_drawdown(self) -> float:
         """Maksimum drawdown yüzdesi (0.0 - 100.0)."""

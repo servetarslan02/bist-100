@@ -240,17 +240,22 @@ class CentralStateStore:
         """Circuit breaker durumunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute("SELECT * FROM circuit_breakers WHERE name = ?", (name,)).fetchone()
+            cursor = conn.execute("SELECT * FROM circuit_breakers WHERE name = ?", (name,))
+            row = cursor.fetchone()
             if row:
-                return dict(row)
+                cols = [d[0] for d in cursor.description]
+                return dict(zip(cols, row))
         return None
 
     def load_all_circuit_states(self) -> dict[str, dict]:
         """TÃ¼m circuit breaker durumlarÄ±nÄ± yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM circuit_breakers").fetchall()
-            return {row["name"]: dict(row) for row in rows}
+            cursor = conn.execute("SELECT * FROM circuit_breakers")
+            rows = cursor.fetchall()
+            cols = [d[0] for d in cursor.description]
+            name_idx = cols.index("name")
+            return {row[name_idx]: dict(zip(cols, row)) for row in rows}
 
     # ===================== PROVIDER RELIABILITY =====================
 
@@ -271,9 +276,11 @@ class CentralStateStore:
         """Provider reliability skorunu yÃ¼kle."""
         self._flush_buffer()
         with self._connect() as conn:
-            row = conn.execute("SELECT * FROM provider_reliability WHERE name = ?", (name,)).fetchone()
+            cursor = conn.execute("SELECT * FROM provider_reliability WHERE name = ?", (name,))
+            row = cursor.fetchone()
             if row:
-                result = dict(row)
+                cols = [d[0] for d in cursor.description]
+                result = dict(zip(cols, row))
                 result["recent_results"] = orjson.loads(result["recent_results"])
                 return result
         return None
@@ -296,7 +303,7 @@ class CentralStateStore:
         self._flush_buffer()
         with self._connect() as conn:
             row = conn.execute("SELECT tokens FROM rate_limiters WHERE name = ?", (name,)).fetchone()
-            return row["tokens"] if row else None
+            return row[0] if row else None
 
     # ===================== LEARNING LOOP =====================
 
@@ -325,9 +332,9 @@ class CentralStateStore:
             state = {}
             for row in rows:
                 try:
-                    state[row["key"]] = orjson.loads(row["value"])
+                    state[row[0]] = orjson.loads(row[1])
                 except Exception:
-                    state[row["key"]] = row["value"]
+                    state[row[0]] = row[1]
             return state
 
     def save_prediction(
@@ -425,7 +432,7 @@ class CentralStateStore:
         with self._connect() as conn:
             row = conn.execute("SELECT weights FROM fusion_weights WHERE key = 'adaptive'").fetchone()
             if row:
-                return orjson.loads(row["weights"])
+                return orjson.loads(row[0])
         return None
 
     # ===================== CORRELATION TRACKER =====================

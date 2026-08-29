@@ -57,7 +57,6 @@ def otel_trace(span_name: str):
     return decorator
 
 
-@asynccontextmanager
 async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
     await init_databases()
@@ -270,37 +269,6 @@ def create_app() -> FastAPI:
 
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
-
-        # JSON response body'ye otomatik request_id enjekte et
-        if (
-            response.headers.get("content-type", "").startswith("application/json")
-            and request.url.path not in ("/health", "/docs", "/redoc", "/openapi.json")
-        ):
-            try:
-                import orjson
-
-                body = b""
-                async for chunk in response.body_iterator:
-                    if isinstance(chunk, str):
-                        body += chunk.encode()
-                    else:
-                        body += chunk
-
-                data = orjson.loads(body)
-                if isinstance(data, dict) and "request_id" not in data:
-                    data["request_id"] = request_id
-                    new_body = orjson.dumps(data)
-                    from starlette.responses import Response as StarletteResponse
-
-                    return StarletteResponse(
-                        content=new_body,
-                        status_code=response.status_code,
-                        headers=dict(response.headers),
-                        media_type="application/json",
-                    )
-            except Exception:
-                pass  # Response body okunamazsa header ile devam et
-
         return response
 
     # Request timeout middleware — uzun süren istekleri kes
