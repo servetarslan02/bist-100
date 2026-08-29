@@ -125,6 +125,12 @@ async def _retry_async(
         except Exception as exc:
             last_error = exc
             if attempt < max_retries:
+                # DNS çözümleme hatası varsa (host bulunamıyorsa) beklemeden çık
+                err_msg = str(exc)
+                if "getaddrinfo failed" in err_msg or "NameResolutionError" in err_msg or "Failed to resolve" in err_msg:
+                    logger.warning("DB host unresolvable, skipping retries", operation=name, error=err_msg)
+                    break
+
                 # Jitter: tam backoff yerine rastgele dağılım (herd effect önleme)
                 base = _RETRY_BASE_DELAY * (2**attempt)
                 jitter = random.uniform(0, base * 0.3)
@@ -786,32 +792,40 @@ async def check_db_health() -> dict[str, Any]:
 
     with tracer.start_as_current_span("db.health_check"):
         # PostgreSQL
-        try:
-            pool = await get_pg_pool()
-            async with pool.acquire() as conn:
-                result = await conn.fetchval("SELECT 1")
-                health["postgres"] = "healthy" if result == 1 else "degraded"
-                # Pool stats
-                health["postgres_pool_size"] = pool.get_size()
-                health["postgres_pool_free"] = pool.get_idle_size()
-        except Exception as exc:
-            health["postgres"] = f"error: {str(exc)[:100]}"
+        if _pg_healthy and _pg_pool is not None:
+            try:
+                pool = await get_pg_pool()
+                async with pool.acquire() as conn:
+                    result = await conn.fetchval("SELECT 1")
+                    health["postgres"] = "healthy" if result == 1 else "degraded"
+                    health["postgres_pool_size"] = pool.get_size()
+                    health["postgres_pool_free"] = pool.get_idle_size()
+            except Exception as exc:
+                health["postgres"] = f"error: {str(exc)[:100]}"
+        else:
+            health["postgres"] = "offline"
 
         # ClickHouse
-        try:
-            client = get_ch_client()
-            result = client.query("SELECT 1")
-            health["clickhouse"] = "healthy" if result.result_rows and result.result_rows[0][0] == 1 else "degraded"
-        except Exception as exc:
-            health["clickhouse"] = f"error: {str(exc)[:100]}"
+        if _ch_healthy and _ch_client is not None:
+            try:
+                client = get_ch_client()
+                result = client.query("SELECT 1")
+                health["clickhouse"] = "healthy" if result.result_rows and result.result_rows[0][0] == 1 else "degraded"
+            except Exception as exc:
+                health["clickhouse"] = f"error: {str(exc)[:100]}"
+        else:
+            health["clickhouse"] = "offline"
 
         # Redis
-        try:
-            r = await get_redis()
-            pong = await r.ping()
-            health["redis"] = "healthy" if pong else "degraded"
-        except Exception as exc:
-            health["redis"] = f"error: {str(exc)[:100]}"
+        if _redis_healthy and _redis is not None:
+            try:
+                r = await get_redis()
+                pong = await r.ping()
+                health["redis"] = "healthy" if pong else "degraded"
+            except Exception as exc:
+                health["redis"] = f"error: {str(exc)[:100]}"
+        else:
+            health["redis"] = "offline"
 
         # QuestDB
         try:
@@ -824,13 +838,20 @@ async def check_db_health() -> dict[str, Any]:
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 
+_databases_initialized: bool = False
 
-async def init_databases() -> None:
+
+async def init_databases(force: bool = False) -> None:
     """Tüm veritabanı bağlantılarını başlatır.
 
     Herhangi bir servis başlatılamazsa diğerlerine devam eder (graceful).
+    Daha önce çalıştırılmışsa ve DB'ler çevrimdışıysa gereksiz yeniden denemeyi atlar.
     """
-    global _pg_healthy, _ch_healthy, _redis_healthy
+    global _pg_healthy, _ch_healthy, _redis_healthy, _databases_initialized
+
+    if _databases_initialized and not force:
+        return
+    _databases_initialized = True
 
     try:
         await get_pg_pool()

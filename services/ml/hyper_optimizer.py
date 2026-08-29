@@ -37,7 +37,7 @@ class HyperOptimizer:
     def __init__(
         self,
         n_trials: int = 50,
-        objective: str = "lambdarank",
+        objective: str = "regression",
         n_splits: int = 3,
         timeout: int | None = 600,
     ):
@@ -109,9 +109,9 @@ class HyperOptimizer:
                     y_rank_t = self._compute_rank_labels(y_t)
                     y_rank_v = self._compute_rank_labels(y_v)
 
-                    # Group sizes (fold için)
-                    train_groups = self._compute_fold_groups(groups, train_idx) if groups else None
-                    val_groups = self._compute_fold_groups(groups, val_idx) if groups else None
+                    # Group sizes (fold için - lambdarank için zorunlu)
+                    train_groups = self._compute_fold_groups(groups, train_idx) if groups else [len(X_t)]
+                    val_groups = self._compute_fold_groups(groups, val_idx) if groups else [len(X_v)]
 
                     ds_train = lgb.Dataset(X_t, label=y_rank_t, group=train_groups, feature_name=feature_names)
                     ds_val = lgb.Dataset(
@@ -121,10 +121,20 @@ class HyperOptimizer:
                     ds_train = lgb.Dataset(X_t, label=y_t, feature_name=feature_names)
                     ds_val = lgb.Dataset(X_v, label=y_v, feature_name=feature_names, reference=ds_train)
 
-                # Pruning callback
-                pruning_callback = optuna.integration.LightGBMPruningCallback(
-                    trial, "ndcg" if self.objective == "lambdarank" else "rmse"
-                )
+                # Pruning callback (optuna-integration kuruluysa kullan)
+                callbacks = [
+                    lgb.early_stopping(stopping_rounds=15, verbose=False),
+                    lgb.log_evaluation(period=0),
+                ]
+                try:
+                    import optuna.integration
+
+                    pruning_callback = optuna.integration.LightGBMPruningCallback(
+                        trial, "ndcg" if self.objective == "lambdarank" else "rmse"
+                    )
+                    callbacks.append(pruning_callback)
+                except Exception as e:
+                    logger.debug("LightGBMPruningCallback not available", error=str(e))
 
                 try:
                     gbm = lgb.train(
@@ -132,11 +142,7 @@ class HyperOptimizer:
                         ds_train,
                         num_boost_round=200,
                         valid_sets=[ds_val],
-                        callbacks=[
-                            lgb.early_stopping(stopping_rounds=15, verbose=False),
-                            lgb.log_evaluation(period=0),
-                            pruning_callback,
-                        ],
+                        callbacks=callbacks,
                     )
 
                     preds = gbm.predict(X_v)

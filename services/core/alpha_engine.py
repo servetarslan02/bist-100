@@ -245,15 +245,18 @@ class AlphaEngine:
         if optimize:
             from services.ml.hyper_optimizer import HyperOptimizer
 
-            optimizer = HyperOptimizer(n_trials=20)
+            optimizer = HyperOptimizer(n_trials=20, objective=self.params.get("objective", "regression"))
             best_params = optimizer.optimize(X, y, feature_names)
             self.params.update(best_params)
             logger.info(
                 f"Optuna params: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}"
             )
 
-        train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         train_params = dict(self.params)
+        if train_params.get("objective") == "lambdarank":
+            train_data = lgb.Dataset(X, label=y, feature_name=feature_names, group=[len(X)])
+        else:
+            train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         if self.has_gpu:
             train_params["device"] = "gpu"
         try:

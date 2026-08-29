@@ -247,7 +247,8 @@ class PaperExecutionEngine:
 
             order_event = CanonicalEvent(
                 event_type=EventType.ORDER_FILLED,
-                payload={
+                ticker=ticker,
+                data={
                     "ticker": ticker,
                     "side": side,
                     "quantity": quantity,

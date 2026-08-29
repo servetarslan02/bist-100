@@ -118,12 +118,27 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                     tick = p["ticker"]
                     if tick in market_data:
                         df = market_data[tick]
-                        df_past = df[df.index <= signal_date]
+                        if isinstance(df, pl.DataFrame):
+                            try:
+                                df_past = (
+                                    df.filter(pl.col("Date").cast(pl.Utf8).str.slice(0, 10) <= str(signal_date)[:10])
+                                    if "Date" in df.columns
+                                    else df
+                                )
+                            except Exception:
+                                df_past = df
+                        elif hasattr(df, "index"):
+                            try:
+                                df_past = df[df.index <= signal_date]
+                            except Exception:
+                                df_past = df
+                        else:
+                            df_past = df
                         if len(df_past) >= 10:
-                            avg_vol = (
+                            avg_vol = float(
                                 df_past["Volume"].tail(20).mean() if len(df_past) >= 20 else df_past["Volume"].mean()
                             )
-                            avg_close = (
+                            avg_close = float(
                                 df_past["Close"].tail(20).mean() if len(df_past) >= 20 else df_past["Close"].mean()
                             )
                             if (avg_vol * avg_close) >= MIN_LIQUIDITY_TL:

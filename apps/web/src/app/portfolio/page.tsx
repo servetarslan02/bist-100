@@ -12,32 +12,35 @@ import {
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
-function MetricCard({ label, value, prefix = "", suffix = "", color, subtext }: {
-  label: string; value?: number; prefix?: string; suffix?: string; color?: string; subtext?: string;
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
+  color,
+}: {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: React.ElementType;
+  trend?: "up" | "down" | "neutral";
+  color?: string;
 }) {
-  const isPos = (value ?? 0) >= 0;
-  const accent = color === "auto" ? (isPos ? "#00e5a0" : "#ff4466") : color ?? "#00c8ff";
   return (
-    <div
-      className="rounded-xl p-4 space-y-1.5 select-none transition-all hover:border-zinc-700"
-      style={{
-        background: "var(--color-bg-card)",
-        border: "1px solid var(--color-border-subtle)",
-        borderTop: `2px solid ${accent}`,
-      }}
-    >
+    <div className="rounded-xl p-4 space-y-1.5 select-none transition-all hover:border-zinc-700" style={{
+      background: "var(--color-bg-card)",
+      border: "1px solid var(--color-border-subtle)",
+    }}>
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>
-          {label}
-        </p>
+        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>{title}</p>
+        <div className="p-1.5 rounded-lg" style={{ background: color ? `${color}15` : "var(--color-bg-secondary)" }}>
+          <Icon size={14} style={{ color: color || "var(--color-text-secondary)" }} />
+        </div>
       </div>
-      <p className="text-2xl font-bold font-data tracking-tight" style={{ color: value === undefined ? "var(--color-text-muted)" : accent }}>
-        {prefix}{value !== undefined ? value.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "—"}{suffix}
-      </p>
-      {subtext && (
-        <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>
-          {subtext}
-        </p>
+      <p className="text-2xl font-bold font-data tracking-tight" style={{ color: color || "var(--color-text-primary)" }}>{value}</p>
+      {subtitle && (
+        <p className="text-[10px] truncate" style={{ color: "var(--color-text-muted)" }}>{subtitle}</p>
       )}
     </div>
   );
@@ -49,12 +52,16 @@ export default function PortfolioPage() {
   const { data: ordersData, refetch: refetchOrders } = usePolling<{ orders: OrderData[] } | null>("/portfolio/orders", 3000);
   const { data: metricsData } = usePolling<PortfolioMetrics | null>("/portfolio/metrics", 5000);
   
+  const [mounted, setMounted] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
-  const prevPricesRef = useState<Record<string, number>>({})[0];
+  const prevPricesRef = useRef<Record<string, number>>({});
 
-  // BIST Seans Kontrolü (10:00 - 18:00 İstanbul)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isBistOpen = () => {
     const now = new Date();
     const istanbul = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Istanbul" }));
@@ -63,7 +70,7 @@ export default function PortfolioPage() {
     const minutes = istanbul.getHours() * 60 + istanbul.getMinutes();
     return minutes >= 600 && minutes < 1080;
   };
-  const marketOpen = isBistOpen();
+  const marketOpen = mounted ? isBistOpen() : false;
 
   const rawP = (data?.portfolio ?? ((data as unknown) as Record<string, any>) ?? {}) as Record<string, any>;
   const currentCapital = rawP.total_value ?? rawP.current_capital ?? 1000000;
@@ -77,10 +84,8 @@ export default function PortfolioPage() {
   const totalReturnPct = rawP.total_return_pct ?? 0;
   const positions = data?.positions ?? (rawP.positions as PortfolioData["positions"]) ?? [];
   const sectorWeights = rawP.sector_weights ?? {};
-  const orders = ordersData?.orders ?? [];
   const totalPnlPos = totalPnl >= 0;
 
-  // Canlı fiyat adımı yanıp sönme kontrolü (Green / Red Flash)
   useEffect(() => {
     if (!positions || positions.length === 0) return;
     const nextFlash: Record<string, "up" | "down"> = {};
@@ -88,12 +93,12 @@ export default function PortfolioPage() {
       const sym = pos.ticker || pos.symbol || "";
       if (!sym) continue;
       const price = Number(pos.current_price ?? pos.avg_cost ?? 0);
-      const prev = prevPricesRef[sym];
+      const prev = prevPricesRef.current[sym];
       if (prev !== undefined && price > 0) {
         if (price > prev) nextFlash[sym] = "up";
         else if (price < prev) nextFlash[sym] = "down";
       }
-      prevPricesRef[sym] = price;
+      prevPricesRef.current[sym] = price;
     }
     if (Object.keys(nextFlash).length > 0) {
       setFlashMap(nextFlash);
@@ -106,7 +111,7 @@ export default function PortfolioPage() {
     setTriggering(true);
     setActionMsg(null);
     try {
-      const res = await apiFetch("/scanner/trigger?scan_type=manual", { method: "POST" });
+      await apiFetch("/portfolio/trigger", { method: "POST" });
       setActionMsg({ 
         type: "success", 
         text: "Günlük seans sinyal ve portföy emir yürütme döngüsü başarıyla tetiklendi. Veriler güncelleniyor..." 
@@ -114,9 +119,17 @@ export default function PortfolioPage() {
       setTimeout(() => {
         refetch();
         refetchOrders();
-      }, 2500);
-    } catch (e: unknown) {
-      setActionMsg({ type: "error", text: `İşlem tetiklenirken hata oluştu: ${e instanceof Error ? e.message : String(e)}` });
+      }, 3000);
+    } catch {
+      try {
+        await apiFetch("/scanner/trigger?scan_type=manual", { method: "POST" });
+        setActionMsg({ 
+          type: "success", 
+          text: "Tarama ve sinyal döngüsü tetiklendi. Veriler güncelleniyor..." 
+        });
+      } catch (err: unknown) {
+        setActionMsg({ type: "error", text: `İşlem tetiklenirken hata oluştu: ${err instanceof Error ? err.message : String(err)}` });
+      }
     } finally {
       setTriggering(false);
     }

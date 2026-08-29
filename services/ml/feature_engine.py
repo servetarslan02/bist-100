@@ -280,8 +280,11 @@ class FeatureEngine:
                 logger.warning("Caught Exception in _relative_strength_vs_bm", exc_info=True)
 
         # RS trend
-        if len(stock_ret) > 25:
-            rs_series = stock_ret - bm_ret
+        min_len = min(len(stock_ret), len(bm_ret))
+        if min_len > 25:
+            s_aligned = stock_ret.tail(min_len)
+            b_aligned = bm_ret.tail(min_len)
+            rs_series = s_aligned - b_aligned
             rs_5d = rs_series.rolling_sum(5)
             f["rs_trend_5d"] = _safe_float(rs_5d.diff(5)[-1] if len(rs_5d) > 5 else np.nan)
 
@@ -427,7 +430,11 @@ class FeatureEngine:
 
         # ATR %
         if n >= 14 and len(high) > 0 and len(low) > 0:
-            tr = pl.max_horizontal(high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs())
+            tr = pl.DataFrame({
+                "a": high - low,
+                "b": (high - close.shift(1)).abs(),
+                "c": (low - close.shift(1)).abs(),
+            }).max_horizontal()
             atr_pct = (tr.rolling_mean(14) / close)[-1]
             f["atr_pct"] = float(atr_pct)
 

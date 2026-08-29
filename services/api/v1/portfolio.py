@@ -559,6 +559,29 @@ async def rebalance_orders(
         raise HTTPException(500, "Internal server error") from e
 
 
+_background_tasks: set[asyncio.Task] = set()
+
+
+@router.post("/trigger")
+@router.post("/rebalance/trigger")
+async def trigger_portfolio_cycle(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
+    """Tüm BIST evreni için günlük sinyal üretimi ve portföy seans emri yürütme döngüsünü tetikler."""
+    try:
+        from services.pipeline.run_unified_daily import run_unified_daily_cycle
+
+        task = asyncio.create_task(run_unified_daily_cycle())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+        return {
+            "status": "TRIGGERED",
+            "message": "Günlük portföy ve seans yürütme döngüsü arka planda başlatıldı.",
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+    except Exception as e:
+        logger.error("portfolio_trigger_error", error=str(e), exc_info=True)
+        raise HTTPException(500, f"Trigger failed: {str(e)}") from e
+
+
 # =====================================================
 # QUANTITATIVE PORTFOLIO OPTIMIZATION
 # =====================================================

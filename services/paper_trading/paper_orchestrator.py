@@ -408,6 +408,47 @@ class PaperTradingOrchestrator:
                         }
                     except Exception:
                         continue
+                elif isinstance(df, pl.DataFrame) and len(df) > 0:
+                    try:
+                        valid_c = df["Close"].drop_nulls() if "Close" in df.columns else pl.Series()
+                        if len(valid_c) == 0:
+                            continue
+                        close_p = float(valid_c[-1])
+                        valid_o = df["Open"].drop_nulls() if "Open" in df.columns else pl.Series()
+                        open_p = float(valid_o[-1]) if len(valid_o) > 0 else close_p
+                        valid_v = df["Volume"].drop_nulls() if "Volume" in df.columns else pl.Series()
+                        vol_v = int(valid_v[-1]) if len(valid_v) > 0 else 1_000_000
+
+                        price_dict[ticker] = open_p if is_morning_execution else close_p
+                        next_open_dict[ticker] = open_p
+                        vol_dict[ticker] = vol_v
+
+                        # 20 gunluk gecmis
+                        valid_h = df["High"].drop_nulls() if "High" in df.columns else valid_c
+                        valid_l = df["Low"].drop_nulls() if "Low" in df.columns else valid_c
+                        highs_list = [float(x) for x in valid_h.tail(20).to_list()] or [close_p]
+                        lows_list = [float(x) for x in valid_l.tail(20).to_list()] or [close_p]
+                        vols_list = [float(x) for x in (valid_v.tail(20).to_list() if len(valid_v) > 0 else [1_000_000.0])] or [1_000_000.0]
+
+                        high_c = highs_list[-1]
+                        low_c = lows_list[-1]
+                        high_p = highs_list[-2] if len(highs_list) >= 2 else high_c
+                        low_p = lows_list[-2] if len(lows_list) >= 2 else low_c
+
+                        if not hasattr(self, "_history_cache"):
+                            self._history_cache = {}
+                        self._history_cache[ticker] = {
+                            "high_curr": high_c,
+                            "low_curr": low_c,
+                            "high_prev": high_p,
+                            "low_prev": low_p,
+                            "highs": highs_list,
+                            "lows": lows_list,
+                            "volumes": vols_list,
+                        }
+                    except Exception as e:
+                        logger.warning("Polars row extraction failed", ticker=ticker, error=str(e))
+                        continue
 
         return self.process_daily_cycle(
             date=date,
