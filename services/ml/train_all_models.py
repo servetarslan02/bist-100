@@ -48,14 +48,14 @@ def _get_or_tune_hyperparameters(
     n_trials: int = 35,
 ) -> dict[str, Any]:
     """Optuna Bayesian Optimization ile 70+ feature uzayına duyarlı en iyi hiperparametreleri bulur/yükler."""
-    import json
+    import orjson
     from pathlib import Path
 
     cache_file = Path("models/optimal_hyperparams.json")
     if not use_optuna and cache_file.exists():
         try:
-            with open(cache_file, "r", encoding="utf-8") as f:
-                params = json.load(f)
+            with open(cache_file, "rb") as f:
+                params = orjson.loads(f.read())
                 logger.info("optimal_hyperparameters_loaded_from_cache", file=str(cache_file))
                 return params
         except Exception as e:
@@ -117,8 +117,8 @@ def _get_or_tune_hyperparameters(
 
     try:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache_file, "w", encoding="utf-8") as f:
-            json.dump(optimal_params, f, indent=2)
+        with open(cache_file, "wb") as f:
+            f.write(orjson.dumps(optimal_params, option=orjson.OPT_INDENT_2))
         logger.info("optimal_hyperparameters_saved", file=str(cache_file))
     except Exception as e:
         logger.warning("failed_to_save_optimal_hyperparams", error=str(e))
