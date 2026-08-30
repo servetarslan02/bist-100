@@ -79,8 +79,17 @@ def setup_telemetry(
         if endpoint:
             exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True)
         else:
-            # Development: console exporter
-            exporter = ConsoleSpanExporter()
+            # SSD write reduction: console exporter yerine no-op
+            # Her span stdout'a yazılıyordu → Docker JSON log
+            from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+            class _NoopExporter(SpanExporter):
+                def export(self, spans):
+                    return SpanExportResult.SUCCESS
+                def shutdown(self):
+                    pass
+                def force_flush(self, timeout_millis=30000):
+                    return True
+            exporter = _NoopExporter()
 
         # Span processor
         span_processor = BatchSpanProcessor(exporter)

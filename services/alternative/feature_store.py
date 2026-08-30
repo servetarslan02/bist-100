@@ -189,9 +189,12 @@ class FeatureStore:
         }
 
     def save(self, path: str | None = None) -> Any:
-        """Feature store'u dosyaya kaydet."""
+        """Feature store'u dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
         save_path = path or self._store_path
         if not save_path:
+            return
+        if not should_save("feature_store", 60):
             return
 
         data = {

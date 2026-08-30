@@ -689,10 +689,10 @@ class AlertingSystem:
         await self._router.close_all()
 
     async def _escalation_loop(self) -> None:
-        """Her 10 saniyede aktif alert'leri escalation açısından kontrol eder."""
+        """Her 30 saniyede aktif alert'leri escalation açısından kontrol eder."""
         while True:
             try:
-                await asyncio.sleep(10)
+                await asyncio.sleep(30)  # SSD write reduction: 10s → 30s
                 await self._check_escalations()
             except asyncio.CancelledError:
                 # Görev iptal edildi — temiz çıkış

@@ -77,7 +77,10 @@ class VectorMemoryStore:
             logger.error("Failed to load vector fallback", error=str(e))
 
     def _save_fallback(self) -> Any:
-        """Yerel fallback verisini diske kaydeder (Fail-safe)."""
+        """Yerel fallback verisini diske kaydeder (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("vector_memory_fallback", 120):
+            return
         try:
             self.fallback_path.parent.mkdir(parents=True, exist_ok=True)
             temp_path = self.fallback_path.with_suffix(".tmp")

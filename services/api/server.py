@@ -725,5 +725,6 @@ if __name__ == "__main__":
         port=8000,
         reload=False,
         workers=1,
-        log_level="info",
+        log_level="warning",  # SSD write reduction
+        access_log=False,     # SSD write reduction: her istek log'u kapatıldı
     )

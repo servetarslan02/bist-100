@@ -26,11 +26,12 @@ def setup_logging(log_level: str = "WARNING") -> Any:
         cache_logger_on_first_use=True,
     )
 
-    # Suppress noisy libraries
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    # Suppress noisy libraries — SSD write reduction
+    for noisy in ["httpx", "httpcore", "urllib3", "asyncio", "aiohttp",
+                  "websockets", "grpc", "opentelemetry", "uvicorn.access",
+                  "uvicorn.error", "fastapi", "starlette", "clickhouse_connect",
+                  "redis", "celery", "kombu", "billiard", "watchfiles"]:
+        logging.getLogger(noisy).setLevel(logging.ERROR)
 
 
 # Setup on import

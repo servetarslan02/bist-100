@@ -229,7 +229,10 @@ class MacroHistoricalStore:
                 self._data = {}
 
     def _save(self) -> Any:
-        """Veriyi dosyaya kaydet."""
+        """Veriyi dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("historical_store", 120):
+            return
         try:
             os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)
             with open(self._storage_path, "w") as f:

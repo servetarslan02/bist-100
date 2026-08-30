@@ -80,7 +80,7 @@ class ConfigWatcher:
         config_path: str,
         reload_fn: Callable,
         validate_fn: Callable | None = None,
-        watch_interval_s: float = 5.0,
+        watch_interval_s: float = 30.0,  # SSD write reduction: 5s → 30s
         on_change: Callable | None = None,
     ):
         """Otomatik eklendi."""

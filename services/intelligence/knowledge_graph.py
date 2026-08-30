@@ -233,7 +233,10 @@ class KnowledgeGraph:
         logger.info("BIST defaults loaded", entities=len(self._entities), relations=len(self._relations))
 
     def save(self, path: str = "data/knowledge_graph.json") -> Any:
-        """Graph'u dosyaya kaydet."""
+        """Graph'u dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("knowledge_graph", 120):
+            return
         data = {
             "entities": [
                 {

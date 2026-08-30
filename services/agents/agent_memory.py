@@ -425,9 +425,12 @@ class AgentMemory:
         }
 
     def save(self, path: str | None = None) -> Any:
-        """Memory'yi dosyaya kaydet."""
+        """Memory'yi dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
         save_path = path or self._persistence_path
         if not save_path:
+            return
+        if not should_save(f"agent_memory_{self.agent_role}", 60):
             return
 
         data = {

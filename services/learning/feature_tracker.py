@@ -352,10 +352,14 @@ class FeatureImportanceTracker:
         }
 
     def save_history(self, path: str) -> None:
-        """Feature importance geçmişini dosyaya kaydet (orjson)."""
+        """Feature importance geçmişini dosyaya kaydet (debounced — SSD dostu)."""
         from pathlib import Path
 
         import orjson
+
+        from services.core.debounce import should_save
+        if not should_save("feature_tracker_history", 120):
+            return
 
         data = []
         for h in self._history:

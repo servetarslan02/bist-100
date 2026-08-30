@@ -80,7 +80,7 @@ class ConnectivityMonitor:
 
     def __init__(
         self,
-        check_interval_seconds: float = 30.0,
+        check_interval_seconds: float = 60.0,  # SSD write reduction: 30s → 60s
         timeout_seconds: float = 5.0,
         failure_threshold: int = 3,
         recovery_threshold: int = 1,

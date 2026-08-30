@@ -394,7 +394,10 @@ class IntegratedLearningSystem:
         return drift.get("drift_detected", False)
 
     def save(self, path: str = "data/integrated_learning.json") -> Any:
-        """Learning state'i dosyaya kaydet."""
+        """Learning state'i dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("integrated_learning", 120):
+            return
         data = {
             "predictions": [
                 {

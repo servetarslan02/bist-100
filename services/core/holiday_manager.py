@@ -893,7 +893,12 @@ class HolidayManager:
             logger.warning("Holiday cache load failed", error=str(e))
 
     def _save_cache(self) -> None:
-        """Tatilleri cache dosyasına kaydet."""
+        """Debounce: sadece son yazmadan 60 saniye geçtiyse yaz (SSD dostu)."""
+        import time as _time
+        now = _time.time()
+        if hasattr(self, '_last_cache_save') and now - self._last_cache_save < 60:
+            return  # 60 saniye debounce
+        self._last_cache_save = now
         data = {
             "holidays": {str(y): [d.isoformat() for d in sorted(dates)] for y, dates in self._holidays.items()},
             "half_days": {str(y): [d.isoformat() for d in sorted(dates)] for y, dates in self._half_days.items()},

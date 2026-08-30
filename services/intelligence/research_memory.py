@@ -148,7 +148,10 @@ class ResearchMemory:
         return record
 
     def save(self, path: str = "data/research_memory.json") -> Any:
-        """Memory'yi dosyaya kaydet."""
+        """Memory'yi dosyaya kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("research_memory", 120):
+            return
         data = {
             "records": [
                 {

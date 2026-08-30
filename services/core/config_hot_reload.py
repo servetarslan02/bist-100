@@ -76,7 +76,7 @@ class ConfigHotReload:
     def __init__(
         self,
         config_path: str,
-        watch_interval_seconds: float = 5.0,
+        watch_interval_seconds: float = 30.0,  # SSD write reduction: 5s → 30s
         auto_apply: bool = True,
         validate_before_apply: bool = True,
     ):

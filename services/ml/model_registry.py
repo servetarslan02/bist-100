@@ -384,7 +384,10 @@ class ModelRegistry:
         return None
 
     def _save_registry(self) -> Any:
-        """Registry metadata'sını diske kaydet."""
+        """Registry metadata'sını diske kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("model_registry", 120):
+            return
         try:
             data = {k: asdict(v) for k, v in self._entries.items()}
             path = os.path.join(self._registry_path, "registry.json")

@@ -885,9 +885,13 @@ class AlertPolicy:
             self._audit_log = self._audit_log[-500:]
 
     def _save_to_file(self) -> Any:
-        """Otomatik eklendi."""
+        """Debounce: sadece son yazmadan 30 saniye geçtiyse yaz (SSD dostu)."""
         if not self._config_path:
             return
+        now = time.time()
+        if hasattr(self, '_last_file_save') and now - self._last_file_save < 30:
+            return  # 30 saniye debounce
+        self._last_file_save = now
         try:
             os.makedirs(os.path.dirname(self._config_path), exist_ok=True)
             with open(self._config_path, "w") as f:

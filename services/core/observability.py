@@ -261,7 +261,7 @@ class ResourceMonitor:
         self._thread = None
 
     @otel_trace("observability.ResourceMonitor.start_background_monitoring")
-    def start_background_monitoring(self, interval_seconds: int = 15) -> Any:
+    def start_background_monitoring(self, interval_seconds: int = 60) -> Any:  # SSD write reduction: 15s → 60s
         """Otomatik eklendi."""
         if self._running:
             return
