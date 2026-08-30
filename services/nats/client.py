@@ -220,10 +220,15 @@ class NatsClient:
                     """Otomatik eklendi."""
                     self._total_received += 1
                     try:
+                        raw_data = msg.data
+                        if isinstance(raw_data, (bytes, bytearray)) and raw_data.startswith(b"GZ:"):
+                            import gzip
+                            raw_data = gzip.decompress(raw_data[3:])
+
                         data = (
-                            orjson.loads(msg.data)
-                            if isinstance(msg.data, (bytes, bytearray))
-                            else orjson.loads(str(msg.data).encode("utf-8"))
+                            orjson.loads(raw_data)
+                            if isinstance(raw_data, (bytes, bytearray))
+                            else orjson.loads(str(raw_data).encode("utf-8"))
                         )
                         self._propagate_correlation(data)
                         if asyncio.iscoroutinefunction(handler):
@@ -407,13 +412,19 @@ class NatsClient:
                         data = {**data, "_correlation_id": cid}
                 except (ImportError, LookupError):
                     logger.error("Exception caught", exc_info=True)
-            return orjson.dumps(data, default=str)
+            raw = orjson.dumps(data, default=str)
         elif isinstance(data, bytes):
-            return data
+            raw = data
         elif isinstance(data, str):
-            return data.encode("utf-8")
+            raw = data.encode("utf-8")
         else:
-            return orjson.dumps(data, default=str)
+            raw = orjson.dumps(data, default=str)
+
+        # Koşullu Sıkıştırma: Yalnızca 4 KB üzerindeki büyük payload'lar sıkıştırılır
+        if len(raw) > 4096:
+            import gzip
+            return b"GZ:" + gzip.compress(raw)
+        return raw
 
     def _propagate_correlation(self, data: dict[str, Any]) -> None:
         """Gelen mesajdaki Correlation ID'yi async tracing context'e aktarır."""

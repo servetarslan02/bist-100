@@ -134,6 +134,65 @@ def delete_cached(key: str) -> bool:
         return False
 
 
+@otel_trace("redis_helper.mget_cached")
+def mget_cached(keys: list[str]) -> dict[str, Any]:
+    """Çoklu anahtarı pipeline ile tek seferde çeker (Roundtrip tasarrufu)."""
+    if not keys:
+        return {}
+    r = get_client()
+    if r is None:
+        cache = _load_cache()
+        res = {}
+        for k in keys:
+            if k in cache:
+                try:
+                    res[k] = orjson.loads(cache[k])
+                except Exception:
+                    pass
+        return res
+    try:
+        pipe = r.pipeline(transaction=False)
+        for k in keys:
+            pipe.get(k)
+        results = pipe.execute()
+        res = {}
+        for k, v in zip(keys, results):
+            if v is not None:
+                try:
+                    res[k] = orjson.loads(v)
+                except Exception:
+                    pass
+        return res
+    except Exception as e:
+        logger.warning("mget_cached_failed", error=str(e))
+        return {}
+
+
+@otel_trace("redis_helper.mset_cached")
+def mset_cached(mapping: dict[str, Any], ttl: int = 300) -> bool:
+    """Çoklu anahtarı pipeline ile tek seferde yazar."""
+    if not mapping:
+        return True
+    r = get_client()
+    if r is None:
+        cache = _load_cache()
+        for k, v in mapping.items():
+            cache[k] = orjson.dumps(v, default=str).decode()
+        _save_cache(cache)
+        return True
+    try:
+        pipe = r.pipeline(transaction=False)
+        for k, v in mapping.items():
+            payload = orjson.dumps(v, default=str).decode()
+            pipe.setex(k, ttl, payload)
+        pipe.execute()
+        return True
+    except Exception as e:
+        logger.warning("mset_cached_failed", error=str(e))
+        return False
+
+
 def is_available() -> bool:
     """Otomatik eklendi."""
-    return True
+    return get_client() is not None
+

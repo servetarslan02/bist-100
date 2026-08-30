@@ -139,6 +139,29 @@ class DuckDBResearchEngine:
             logger.error("Parquet query failed", path=parquet_path, error=str(e))
             raise
 
+    @otel_trace("duckdb_research.query_parquet_columns")
+    def query_parquet_columns(
+        self, parquet_path: str, columns: list[str], where_clause: str | None = None
+    ) -> "pl.DataFrame":
+        """Projection & Predicate pushdown ile yalnızca istenen kolonları bellek dostu çeker."""
+        if pl is None:
+            raise RuntimeError("polars not installed")
+        if not columns:
+            cols_str = "*"
+        else:
+            cols_str = ", ".join(f'"{c}"' if not c.startswith('"') else c for c in columns)
+
+        query = f"SELECT {cols_str} FROM read_parquet('{parquet_path}')"
+        if where_clause:
+            query += f" WHERE {where_clause}"
+
+        conn = self._get_conn()
+        try:
+            return conn.execute(query).pl()
+        except Exception as e:
+            logger.error("query_parquet_columns_failed", path=parquet_path, error=str(e))
+            raise
+
     @otel_trace("duckdb_research.register_parquet")
     def register_parquet(self, name: str, parquet_path: str) -> Any:
         """Parquet dosyasını sanal tablo olarak kaydet.

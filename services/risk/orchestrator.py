@@ -49,6 +49,7 @@ class PreTradeOrderRequest:
     adv_tl: float | None = None
     spread_bps: float | None = None
     is_gross_settlement: bool = False
+    data_timestamp: float | None = None
 
 
 class RiskOrchestrator:
@@ -126,6 +127,19 @@ class RiskOrchestrator:
         checks_failed = 0
         details = {}
         reasons = []
+
+        # 0. Veri Tazeliği SLA Kontrolü (Data Freshness SLA)
+        if hasattr(order, "data_timestamp") and order.data_timestamp:
+            from services.risk.freshness_sla import DataType, data_freshness_monitor
+
+            f_res = data_freshness_monitor.evaluate_freshness(DataType.TICK, order.data_timestamp)
+            if not f_res.is_fresh:
+                if f_res.action_required == "TRIGGER_DEFENSIVE_CASH" and not is_risk_reducing_sell:
+                    checks_failed += 1
+                    reasons.append(f"Kritik Bayat Veri: Yaş {f_res.age_seconds:.1f}s > SLA {f_res.max_allowed_seconds:.1f}s")
+                    details["data_freshness_error"] = f_res.action_required
+                else:
+                    details["data_freshness_warning"] = f"Tazelik uyarısı ({f_res.age_seconds:.1f}s)"
 
         # 1. BIST Mikroyapı ve Seans Doğrulaması (PreTradeRiskEngine)
         ref_price = order.reference_price if order.reference_price else order.price
