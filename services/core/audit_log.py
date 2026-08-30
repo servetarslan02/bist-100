@@ -65,7 +65,8 @@ class AuditLog:
 
     def __init__(self):
         """Otomatik eklendi."""
-        self._entries: list[AuditEntry] = []
+        from collections import deque
+        self._entries: deque = deque(maxlen=5000)
         self._index: dict[str, list[int]] = {}  # entity_id → [entry indices]
 
     @otel_trace("audit_log.log")

@@ -99,7 +99,8 @@ class ConnectivityMonitor:
         self._offline_since: float | None = None
         self._total_offline_seconds: float = 0
 
-        self._event_log: list[ConnectivityEvent] = []
+        from collections import deque
+        self._event_log: deque = deque(maxlen=500)
         self._max_event_log = 500
 
         # Callbacks

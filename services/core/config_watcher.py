@@ -91,7 +91,8 @@ class ConfigWatcher:
         self._on_change = on_change
         self._last_mtime: float = 0
         self._last_config: dict | None = None
-        self._audit_log: list[ConfigAuditEntry] = []
+        from collections import deque
+        self._audit_log: deque = deque(maxlen=500)
         self._task: asyncio.Task | None = None
         self._running = False
         self._reload_count = 0

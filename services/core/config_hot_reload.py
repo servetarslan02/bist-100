@@ -92,7 +92,8 @@ class ConfigHotReload:
         self._last_hash: str = ""
         self._current_config: dict[str, Any] = {}
         self._running = False
-        self._change_history: list[ConfigChange] = []
+        from collections import deque
+        self._change_history: deque = deque(maxlen=500)
         self._max_history = 100
 
     def on_change(self, callback: Callable) -> Any:
@@ -422,7 +423,7 @@ class SettingsBridge:
         """Otomatik eklendi."""
         self._reloader = reloader or config_hot_reload
         self._watching = False
-        self._settings_history: list[tuple[datetime, dict[str, Any]]] = []
+        self._settings_history: deque = deque(maxlen=100)
         self._max_history = 50
 
     def start_watching(self) -> Any:

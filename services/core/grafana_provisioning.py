@@ -98,7 +98,8 @@ class GrafanaProvisioner:
     def __init__(self, config: GrafanaConfig | None = None):
         """Otomatik eklendi."""
         self._config = config or GrafanaConfig()
-        self._versions: list[DashboardVersion] = []
+        from collections import deque
+        self._versions: deque = deque(maxlen=100)
         self._provisioned_dashboards: dict[str, int] = {}  # uid → version
         self._provisioned_datasources: list[str] = []
 

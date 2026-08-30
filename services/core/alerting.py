@@ -652,8 +652,9 @@ class AlertingSystem:
         self._dedup_lock: asyncio.Lock = asyncio.Lock()
         self._router = NotificationRouter()
         self._retry_config = RetryConfig()
-        self._notification_log: list[NotificationResult] = []
-        self._failed_notifications: list[NotificationResult] = []
+        from collections import deque
+        self._notification_log: deque = deque(maxlen=1000)
+        self._failed_notifications: deque = deque(maxlen=500)
         self._db = db
         self._dialect = dialect
         self._policy = policy or AlertPolicy()

@@ -68,7 +68,8 @@ class AgentCommunicationBus:
     def __init__(self, max_queue_per_role: int = 100, max_log: int = 1000):
         """Otomatik eklendi."""
         self._message_queue: dict[AgentRole, list[AgentMessage]] = {role: [] for role in AgentRole}
-        self._message_log: list[AgentMessage] = []
+        from collections import deque
+        self._message_log: deque = deque(maxlen=1000)
         self._max_queue = max_queue_per_role
         self._max_log = max_log
 

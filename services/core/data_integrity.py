@@ -63,7 +63,8 @@ class DataIntegrityValidator:
     def __init__(self):
         """Otomatik eklendi."""
         self._last_validation: float | None = None
-        self._validation_history: list[dict] = []
+        from collections import deque
+        self._validation_history: deque = deque(maxlen=500)
 
     @otel_trace("data_integrity.validate_on_startup")
     async def validate_on_startup(

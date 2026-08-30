@@ -82,7 +82,8 @@ class AutoCircuitBreakerEngine:
 
     def __init__(self):
         """Otomatik eklendi."""
-        self._events: list[CircuitBreakerEvent] = []
+        from collections import deque
+        self._events: deque = deque(maxlen=1000)
         self._triggered_today: dict[str, list[float]] = {}  # ticker → [threshold_pct, ...]
         self._bist100_reference: float = 0.0  # Önceki kapanış
         self._bist100_current: float = 0.0

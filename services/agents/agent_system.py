@@ -522,7 +522,8 @@ class AgentOrchestrator:
     def __init__(self, llm_client: BaseLLMClient | None = None):
         """Otomatik eklendi."""
         self._agents: dict[AgentRole, BaseAgent] = {}
-        self._results: list[AgentResult] = []
+        from collections import deque
+        self._results: deque = deque(maxlen=1000)
         self.llm_client = llm_client
 
     def register_agent(self, agent: BaseAgent) -> Any:

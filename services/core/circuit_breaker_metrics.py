@@ -81,7 +81,8 @@ class CircuitBreakerMetricsCollector:
     def __init__(self):
         """Otomatik eklendi."""
         self._tracked_breakers: dict[str, Any] = {}  # name → CircuitBreaker
-        self._history: list[dict[str, Any]] = []
+        from collections import deque
+        self._history: deque = deque(maxlen=1000)
         self._max_history = 1000
 
     @otel_trace("circuit_breaker_metrics.track")
