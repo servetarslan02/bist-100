@@ -15,6 +15,7 @@ services:
     image: traefik:v3.7
     restart: unless-stopped
     container_name: alpha-traefik
+    logging: *id003
     ports:
     - 80:80
     - 443:443
@@ -214,7 +215,7 @@ services:
     - 6379:6379
     volumes:
     - redis_data:/data
-    command: "redis-server\n  --appendonly yes\n  --appendfsync everysec\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
+    command: "redis-server\n  --appendonly no\n  --save 900 1\n  --save 300 10\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
       \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 10\n  --dynamic-hz yes\n\
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
       \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
@@ -800,7 +801,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-celery-worker
-    command: celery -A services.tasks.queue worker --loglevel=info --concurrency=2
+    command: celery -A services.tasks.queue worker --loglevel=info --concurrency=2 --without-gossip --without-mingle --without-heartbeat
     volumes:
     - ./services:/app/services:ro
     - ./ml:/app/ml:ro

@@ -710,7 +710,7 @@ def main() -> Any:
     logger.info("\n[ADIM 3/7] Mikro-servisler Docker Compose ile ayağa kaldırılıyor...")
     try:
         subprocess.run(
-            ["docker", "compose", "up", "-d", "--build"],
+            ["docker", "compose", "up", "-d"],
             cwd=str(PROJECT_ROOT),
             check=True,
             capture_output=True,

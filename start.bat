@@ -65,8 +65,8 @@ if %ERRORLEVEL% NEQ 0 (
 
 :: 3. SERVISLERI AYAĞA KALDIR
 echo.
-echo [3/5] Mikro-servisler baslatiliyor (Docker Compose --build)...
-docker compose up -d --build
+echo [3/5] Mikro-servisler baslatiliyor (Docker Compose)...
+docker compose up -d
 
 if %ERRORLEVEL% NEQ 0 (
     echo [HATA] Docker servisleri baslatilirken bir hata olustu.
