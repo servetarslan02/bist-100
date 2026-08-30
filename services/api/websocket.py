@@ -226,6 +226,17 @@ class WebSocketServer:
             },
         )
 
+    async def broadcast_delta(self, channel: str, changes: dict[str, Any]) -> Any:
+        """Delta (yalnızca değişen alanlar) yayını."""
+        await self.broadcast(
+            channel,
+            {
+                "type": "delta_update",
+                "changes": changes,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
     async def broadcast_system(self, component: str, status: str, details: str = "") -> Any:
         """Sistem durumu yayını."""
         await self.broadcast(

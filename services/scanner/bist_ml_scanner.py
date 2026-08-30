@@ -126,7 +126,14 @@ class BistMLScanner:
 
     def scan_all_opportunities(self, limit: int = 50, force_warehouse: bool = False) -> list[dict[str, Any]]:
         """Tüm BIST evrenini (647 hisse) ML ensemble ile tarar ve en yüksek skorlu fırsatları döner."""
+        from services.features.cache_manager import feature_cache_manager
         from services.ml.ranking_model import RankingModel
+
+        # 0. Hızlı Önbellek Denetimi (Zero Redundant Computation)
+        if not force_warehouse and feature_cache_manager.is_valid():
+            cached_res = feature_cache_manager.get_all_features()
+            if cached_res and "_final_candidates" in cached_res:
+                return cached_res["_final_candidates"][:limit]
 
         feat_names = list(RankingModel()._feature_names)
         candidates = []
@@ -510,12 +517,15 @@ class BistMLScanner:
         # Sıralama: En yüksek güven (score) ve en yüksek beklenen getiri (expected_return_pct)
         candidates.sort(key=lambda x: (x.get("score", 0), x.get("expected_return_pct", 0)), reverse=True)
 
-        # Redis Cache Güncellemesi (Tüm sistem ve API'nin yararlanması için)
+        # Redis & Memory Cache Güncellemesi (Tüm sistem ve API'nin yararlanması için)
         try:
             from services.core.redis_helper import set_cached
+            from services.features.cache_manager import feature_cache_manager
+
             if candidates:
                 set_cached("phase18:predictions", candidates, ttl=3600)
                 set_cached("radar:data", candidates, ttl=3600)
+                feature_cache_manager.set_all_features({"_final_candidates": candidates})
         except Exception:
             pass
 

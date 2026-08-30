@@ -110,6 +110,35 @@ class PrometheusMetrics:
             return hist.labels(**labels).time()
         return hist.time()
 
+    def record_api_call(self, endpoint: str, duration_seconds: float, success: bool = True) -> None:
+        """API istek süresi ve durumunu kaydet."""
+        status = "success" if success else "failure"
+        self.observe("api_latency_seconds", duration_seconds, labels={"endpoint": endpoint, "status": status})
+        self.inc("api_requests_total", 1, labels={"endpoint": endpoint, "status": status})
+
+    def record_db_query(self, db_type: str, operation: str, duration_seconds: float) -> None:
+        """Veritabanı sorgu süresini kaydet."""
+        self.observe("db_query_duration_seconds", duration_seconds, labels={"db_type": db_type, "operation": operation})
+
+    def record_feature_computation(self, feature_set: str, duration_seconds: float, num_tickers: int = 1) -> None:
+        """Özellik hesaplama süresini kaydet."""
+        self.observe("feature_computation_duration_seconds", duration_seconds, labels={"feature_set": feature_set})
+        self.inc("feature_ticks_processed_total", num_tickers, labels={"feature_set": feature_set})
+
+    def record_ml_inference(self, model_name: str, duration_seconds: float, num_samples: int = 1) -> None:
+        """ML model tahmin süresini kaydet."""
+        self.observe("ml_inference_duration_seconds", duration_seconds, labels={"model_name": model_name})
+        self.inc("ml_predictions_total", num_samples, labels={"model_name": model_name})
+
+    def record_cache_access(self, cache_name: str, hit: bool) -> None:
+        """Önbellek isabet ve ıskalama durumunu kaydet."""
+        res = "hit" if hit else "miss"
+        self.inc("cache_access_total", 1, labels={"cache_name": cache_name, "result": res})
+
+    def record_error(self, component: str, error_type: str) -> None:
+        """Hata sayacını artır."""
+        self.inc("system_errors_total", 1, labels={"component": component, "error_type": error_type})
+
     def get_metrics(self) -> dict[str, Any]:
         """Geriye dönük uyumluluk için dict formatında metrikler."""
         histograms_dict = {}

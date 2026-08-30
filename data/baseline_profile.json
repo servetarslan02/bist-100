@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-08-30 12:43:26 UTC",
+  "resources_start": {
+    "process_ram_mb": 433.46,
+    "system_cpu_pct": 8.7,
+    "total_ram_available_mb": 5349.73
+  },
+  "resources_end": {
+    "process_ram_mb": 479.55,
+    "system_cpu_pct": 2.1,
+    "total_ram_available_mb": 5194.67
+  },
+  "feature_and_market_data": {
+    "num_stocks_fetched": 647,
+    "data_fetch_seconds": 0.5731,
+    "full_scan_70_features_seconds": 2.2018,
+    "avg_feature_calc_per_stock_ms": 3.4,
+    "opportunities_generated": 50
+  },
+  "ml_inference": {
+    "lightgbm_batch_647_ms": 479.89,
+    "catboost_batch_647_ms": 99.8,
+    "xgboost_batch_647_ms": 40.71
+  },
+  "portfolio_engine": {
+    "portfolio_allocation_duration_ms": 0.16,
+    "selected_positions": 12,
+    "cash_weight_pct": 32.56
+  },
+  "cache_and_storage": {
+    "redis_roundtrip_ms": 1.856
+  }
+}
