@@ -67,6 +67,8 @@ def scan_container_logs(minutes: int = 5) -> Dict[str, List[str]]:
         re.compile(r"FastAPIDeprecationWarning", re.IGNORECASE),
         re.compile(r"level=info", re.IGNORECASE),
         re.compile(r"level=warn", re.IGNORECASE),
+        re.compile(r"the database system is starting up", re.IGNORECASE),
+        re.compile(r"could not connect to the primary server.*the database system is starting up", re.IGNORECASE),
         re.compile(r'"level":\s*"info"', re.IGNORECASE),
         re.compile(r'"level":\s*"warning"', re.IGNORECASE),
     ]
