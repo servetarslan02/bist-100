@@ -263,10 +263,11 @@ class LearningLoop:
         """Yeniden eğitim sebebi."""
         return self._state.retrain_reason
 
-    def trigger_autonomous_retrain(self, force: bool = False) -> dict[str, Any]:
+    def trigger_autonomous_retrain(self, force: bool = False, tune_hyperparameters: bool = False) -> dict[str, Any]:
         """Model performansı düştüğünde veya periyodik olarak otonom yeniden eğitim döngüsünü çalıştırır.
 
         1. train_all_models() ile 70-feature modellerini baştan eğitir.
+           - Rejim kayması veya 30 gün aşımında Optuna Bayesian aramasını otomatik devreye sokar.
         2. Modellerin kalibrasyonunu ve asimetrik ceza ağırlıklarını uygular.
         3. Yeni modelleri diskten hot-reload ile canlı tahmin hafızasına yükler.
         4. retrain_needed bayrağını sıfırlar ve last_retrain zaman damgasını günceller.
@@ -277,10 +278,16 @@ class LearningLoop:
         reason = self._state.retrain_reason or ("Forced retrain" if force else "Model decay")
         logger.info("autonomous_retrain_started", reason=reason)
 
+        # Rejim değişimi veya büyük drift durumunda Optuna otomatik etkinleşsin
+        should_tune = tune_hyperparameters
+        lower_reason = reason.lower()
+        if any(keyword in lower_reason for keyword in ["regime", "rejim", "drift", "optuna", "bayesian"]):
+            should_tune = True
+
         try:
             from services.ml.train_all_models import train_all_models
 
-            train_all_models()
+            train_all_models(use_optuna=should_tune)
 
             # Modelleri canlı tarayıcıda sıcak olarak yenile (hot-reload)
             try:

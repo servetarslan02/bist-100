@@ -56,8 +56,25 @@ def _get_or_tune_hyperparameters(
         try:
             with open(cache_file, "rb") as f:
                 params = orjson.loads(f.read())
-                logger.info("optimal_hyperparameters_loaded_from_cache", file=str(cache_file))
-                return params
+                updated_at_str = params.get("updated_at")
+                is_stale = False
+                if updated_at_str:
+                    try:
+                        updated_dt = datetime.fromisoformat(updated_at_str)
+                        age_days = (datetime.now(UTC) - updated_dt).total_seconds() / 86400.0
+                        if age_days > 30.0:  # 30 günden eskiyse otomatik olarak yeniden Bayesian tuning yap
+                            logger.info(
+                                "optimal_hyperparameters_stale_refreshing",
+                                age_days=round(age_days, 1),
+                                max_days=30,
+                            )
+                            is_stale = True
+                    except Exception:
+                        pass
+
+                if not is_stale:
+                    logger.info("optimal_hyperparameters_loaded_from_cache", file=str(cache_file))
+                    return params
         except Exception as e:
             logger.warning("failed_to_load_hyperparam_cache", error=str(e))
 
@@ -135,14 +152,20 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     os.makedirs("models", exist_ok=True)
     np.random.seed(42)
 
-    # 1. BIST EVRENİNİ DİNAMİK YÜKLE (Tüm Hisseler - Sınırlandırmasız)
+    # 1. BIST EVRENİNİ DİNAMİK YÜKLE (BIST-100 Eksiksiz Evreni)
     tickers: list[str] = []
     try:
-        from services.ingestion.providers.universe_provider import get_all_tickers
-        discovered = get_all_tickers()
-        if discovered and len(discovered) > 50:
-            tickers = sorted(list(set(discovered)))[:75]
-            logger.info("Dinamik BIST evreni yuklendi", total_tickers=len(tickers))
+        from services.ingestion.providers.universe_provider import get_all_tickers, get_bist_100
+
+        b100 = get_bist_100()
+        if b100 and len(b100) >= 80:
+            tickers = sorted(list(set(b100)))
+            logger.info("Dinamik BIST-100 resmi endeks evreni yuklendi", total_tickers=len(tickers))
+        else:
+            discovered = get_all_tickers()
+            if discovered and len(discovered) > 50:
+                tickers = sorted(list(set(discovered)))[:100]
+                logger.info("Dinamik BIST evreni yuklendi", total_tickers=len(tickers))
     except Exception as e:
         logger.warning("Dinamik evren yukleme uyarisi, fallback kullaniliyor", error=str(e))
 
@@ -153,7 +176,7 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
             "SAHOL", "ISCTR", "YKBNK", "KOZAL", "ASTOR", "EUPWR", "KONTR", "CANTE"
         ]
 
-    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Temsili Çapraz Kesit)")
+    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Eksiksiz BIST-100 Çapraz Kesiti)")
 
     # 2. 70 CANONICAL QUANT, FUNDAMENTAL, SENTIMENT VE MUM ALPHA FEATURE SETİ
     from services.ml.ranking_model import RankingModel
