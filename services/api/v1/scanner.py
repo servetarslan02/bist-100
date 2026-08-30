@@ -360,7 +360,9 @@ async def trigger_scan(
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
-        _ = asyncio.create_task(run_unified_daily_cycle())
+        # FIX: Task referansı saklandı, GC tarafından yok edilmesi önlendi
+        _task = asyncio.create_task(run_unified_daily_cycle())
+        _task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
         return {"status": "triggered", "scan_type": scan_type, "message": "Unified daily scan & trade cycle queued."}
     except Exception as e:
         return {"status": "error", "error": str(e)}

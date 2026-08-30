@@ -148,7 +148,7 @@ function AssetIntelContent() {
     }
 
     fetchAssetData();
-    const intervalTimer = setInterval(fetchAssetData, 1500);
+    const intervalTimer = setInterval(fetchAssetData, 5000); // SSD write reduction: 1.5s → 5s
 
     return () => {
       isMounted = false;

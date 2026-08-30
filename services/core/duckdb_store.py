@@ -74,8 +74,8 @@ class DuckDBStore:
         """DuckDB bağlantısını başlat."""
         self._conn = duckdb.connect(str(self._db_path))
         # WAL mode + performans ayarları
-        self._conn.execute("SET wal_autocheckpoint = '10MB'")
-        self._conn.execute("SET checkpoint_threshold = '16MB'")
+        self._conn.execute("SET wal_autocheckpoint = '2MB'")  # SSD write reduction: 10MB → 2MB
+        self._conn.execute("SET checkpoint_threshold = '4MB'")  # SSD write reduction: 16MB → 4MB
 
     @contextmanager
     def _get_conn(self) -> Any:

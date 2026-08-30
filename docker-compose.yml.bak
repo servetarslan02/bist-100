@@ -8,7 +8,7 @@ x-common:
   logging: &id003
     driver: json-file
     options:
-      max-size: 100k
+      max-size: 1m
       max-file: '1'
 services:
   traefik:
@@ -49,7 +49,7 @@ services:
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=off\n  -c full_page_writes=off\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=minimal\n  -c max_wal_size=256MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=0\n  -c max_replication_slots=0\n  -c hot_standby=off\n  -c checkpoint_completion_target=0.9\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=60\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
+    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=replica\n  -c max_wal_size=512MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c checkpoint_completion_target=0.9\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=60\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
@@ -62,9 +62,7 @@ services:
       timeout: 5s
       retries: 15
       start_period: 15s
-  # DISABLED: SSD write reduction - replica gereksiz
-  postgres-replica-disabled:
-    profiles: ["disabled"]
+  postgres-replica:
     restart: unless-stopped
     stop_grace_period: 30s
     env_file: *id001
@@ -205,7 +203,7 @@ services:
     - 6379:6379
     volumes:
     - redis_data:/data
-    command: "redis-server\n  --appendonly no\n  --save 3600 1\n  --save 900 10\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
+    command: "redis-server\n  --appendonly no\n  --save 900 1\n  --save 300 10\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
       \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 10\n  --dynamic-hz yes\n\
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
       \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
@@ -984,8 +982,8 @@ services:
       SERVER_CONNECT_TIMEOUT: 15
       QUERY_TIMEOUT: 120
       QUERY_WAIT_TIMEOUT: 120
-      LOG_CONNECTIONS: 0
-      LOG_DISCONNECTIONS: 0
+      LOG_CONNECTIONS: 1
+      LOG_DISCONNECTIONS: 1
       LOG_POOLER_ERRORS: 1
       STATS_PERIOD: 60
     healthcheck:
@@ -1034,7 +1032,7 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock
     environment:
     - AUTOHEAL_CONTAINER_LABEL=autoheal
-    - AUTOHEAL_INTERVAL=300
+    - AUTOHEAL_INTERVAL=60
     - AUTOHEAL_START_PERIOD=300
 volumes:
   postgres_data: null

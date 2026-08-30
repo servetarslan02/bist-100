@@ -2358,7 +2358,9 @@ class WalkForwardEngineV5:
 
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                asyncio.ensure_future(_save())
+                # FIX: Task referansı saklandı
+                _save_task = asyncio.ensure_future(_save())
+                _save_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
             else:
                 loop.run_until_complete(_save())
         except Exception:

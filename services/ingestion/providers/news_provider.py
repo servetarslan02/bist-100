@@ -433,7 +433,7 @@ class NewsProvider:
                 logger.debug(f"RSS fetch note: {feed_url} - {e}")
             return items
 
-        connector = aiohttp.TCPConnector(ssl=False)
+        connector = aiohttp.TCPConnector(ssl=True)
         async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
             tasks = [_fetch_single_feed(session, url) for url in self._rss_feeds]
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -455,7 +455,7 @@ class NewsProvider:
         }
         items = []
         try:
-            connector = aiohttp.TCPConnector(ssl=False)
+            connector = aiohttp.TCPConnector(ssl=True)
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.5)) as resp:
                     if resp.status == 200:
@@ -505,7 +505,7 @@ class NewsProvider:
         }
         items = []
         try:
-            connector = aiohttp.TCPConnector(ssl=False)
+            connector = aiohttp.TCPConnector(ssl=True)
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=3.5)) as resp:
                     if resp.status == 200:
@@ -561,7 +561,7 @@ class NewsProvider:
         }
 
         try:
-            connector = aiohttp.TCPConnector(ssl=False)
+            connector = aiohttp.TCPConnector(ssl=True)
             async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=4.0)) as resp:
                     if resp.status == 200:

@@ -163,7 +163,9 @@ class HardwareOrchestrator:
         self._gpu_name = "N/A"
         self._vram_gb = 0.0
         self._cuda_version = None
-        self.ssd_writer = SSDThrottledWriter(flush_interval_sec=3.0, max_buffer_size=10000)
+        # DISABLED: SSDThrottledWriter ölü kod — enqueue_write() hiçbir yerden çağrılmıyor
+        # Thread her 3 saniyede boş kuyruğu kontrol ediyordu (boşuna CPU)
+        self.ssd_writer = None
 
         self._detect_and_configure_hardware()
 

@@ -357,8 +357,17 @@ SSD_WRITE_LIMIT_BYTES = SSD_WRITE_LIMIT_MBPS * 1024 * 1024
 
 
 def apply_ssd_write_limit() -> Any:
-    """Tüm donanım kısıtlamaları kaldırıldı; serbest mod aktif."""
-    logger.info("\n[*] Donanım kısıtlamaları kaldırıldı (RAM, CPU, GPU ve SSD serbest modda).")
+    """SSD yazma azaltma: I/O öncelik ayarı + Docker seviyesinde koruma."""
+    import subprocess
+    try:
+        # Mevcut process'in I/O önceliğini "idle" yap (sadece başka process I/O yapmazken yaz)
+        subprocess.run(["ionice", "-c", "3", "-p", str(os.getpid())],
+                       capture_output=True, timeout=5, check=False)
+        logger.info("\n[*] SSD koruması: I/O önceliği 'idle' olarak ayarlandı.")
+    except Exception:
+        logger.info("\n[*] SSD koruması: ionice mevcut değil, Docker seviyesinde koruma aktif.")
+    # Docker seviyesinde: PostgreSQL wal_level=minimal, log max-size=100k, Redis snapshot 1s
+    # Bu ayarlar docker-compose.yml'de yapılandırılmıştır.
     return True
 
 

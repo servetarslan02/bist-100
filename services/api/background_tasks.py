@@ -39,9 +39,9 @@ async def radar_cache_refresher() -> Any:
         # Seans açıkken sık, kapalıyken seyrek güncelle
         try:
             if current_phase != BISTMarketPhase.CLOSED:
-                await asyncio.sleep(2)
+                await asyncio.sleep(5)  # SSD write reduction: 2s → 5s
             else:
-                await asyncio.sleep(60)
+                await asyncio.sleep(120)  # SSD write reduction: 60s → 120s
         except Exception:
             await asyncio.sleep(10)
 

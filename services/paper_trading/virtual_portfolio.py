@@ -464,7 +464,9 @@ class VirtualPortfolio:
                                 self._positions[ticker]["market_value"] = self._positions[ticker]["quantity"] * price
                                 updated[ticker] = price
 
-                    asyncio.ensure_future(_fetch_missing())
+                    # FIX: Task referansı saklandı
+                    _fetch_task = asyncio.ensure_future(_fetch_missing())
+                    _fetch_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
                 else:
                     for ticker in missing:
                         rows = asyncio.run(

@@ -79,6 +79,18 @@ def _get_bg_loop() -> Any:
     return _bg_loop
 
 
+def shutdown_bg_loop() -> None:
+    """Arka plan event loop'u düzgün kapat (resource leak önleme)."""
+    global _bg_loop, _bg_thread
+    if _bg_loop is not None and not _bg_loop.is_closed():
+        _bg_loop.call_soon_threadsafe(_bg_loop.stop)
+        if _bg_thread is not None:
+            _bg_thread.join(timeout=5)
+        _bg_loop.close()
+    _bg_loop = None
+    _bg_thread = None
+
+
 def _publish_event_async(event: Any, key: str = "default") -> None:
     """Event'i synchronous bağlamdan publish eder (arka plan loop ile)."""
     try:

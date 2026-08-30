@@ -1,3 +1,4 @@
+import os
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -6,7 +7,8 @@ from datetime import datetime
 
 import redis
 
-r = redis.Redis(host="redis", port=6379, db=0, password="alpha_secure_pass_123")
+# FIX: Hardcoded şifre kaldırıldı — env var kullan
+r = redis.Redis(host="redis", port=6379, db=0, password=os.environ.get("REDIS_PASSWORD", ""))
 
 base_stocks = [
     {"ticker": "THYAO", "score": 92.5},

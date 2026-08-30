@@ -10,22 +10,23 @@ import { api } from "@/lib/api";
 // (ozellikle 30s'de LCM nedeniyle 6 endpoint birden) hepsi es zamanli ates alip
 // ana thread'i (fetch sonrasi JSON parse + React state update yagmuru) donduruyordu.
 const GLOBAL_TELEMETRY_ENDPOINTS = [
-  { path: "/market/state", interval: 10000, offset: 0 },
-  { path: "/system/status", interval: 10000, offset: 400 },
-  { path: "/portfolio", interval: 10000, offset: 800 },
+  // SSD write reduction: interval'lar 2-3x artırıldı
+  { path: "/market/state", interval: 20000, offset: 0 },
+  { path: "/system/status", interval: 20000, offset: 800 },
+  { path: "/portfolio", interval: 20000, offset: 1600 },
   // Radar erken oncelikli: /radar sayfasi ziyaret edildiginde cache aninda dolu olsun diye
-  { path: "/market/radar?limit=1000", interval: 25000, offset: 1200 },
-  { path: "/portfolio/alpha-signals", interval: 15000, offset: 2200 },
-  { path: "/scanner/signals?limit=25", interval: 15000, offset: 2900 },
-  { path: "/event-study/events", interval: 15000, offset: 3600 },
-  { path: "/system/alerts", interval: 15000, offset: 4300 },
-  { path: "/models/list", interval: 30000, offset: 5000 },
-  { path: "/learning/performance-matrix", interval: 30000, offset: 5700 },
-  { path: "/learning/report", interval: 30000, offset: 6400 },
-  { path: "/system/databases", interval: 30000, offset: 7200 },
+  { path: "/market/radar?limit=1000", interval: 60000, offset: 2400 },
+  { path: "/portfolio/alpha-signals", interval: 30000, offset: 4400 },
+  { path: "/scanner/signals?limit=25", interval: 30000, offset: 5800 },
+  { path: "/event-study/events", interval: 30000, offset: 7200 },
+  { path: "/system/alerts", interval: 30000, offset: 8600 },
+  { path: "/models/list", interval: 60000, offset: 10000 },
+  { path: "/learning/performance-matrix", interval: 60000, offset: 11400 },
+  { path: "/learning/report", interval: 60000, offset: 12800 },
+  { path: "/system/databases", interval: 60000, offset: 14400 },
   // En agir/yavas iki endpoint (network-bound, saniyeler surebilir) en sona alindi
-  { path: "/macro/world", interval: 30000, offset: 9500 },
-  { path: "/market/heatmap", interval: 30000, offset: 12500 },
+  { path: "/macro/world", interval: 60000, offset: 19000 },
+  { path: "/market/heatmap", interval: 60000, offset: 25000 },
 ];
 
 export function GlobalTelemetrySync() {

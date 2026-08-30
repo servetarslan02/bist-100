@@ -3,8 +3,8 @@
 # =============================================================
 
 global:
-  scrape_interval: 30s        # Kişisel PC sakin disk yazma modu
-  evaluation_interval: 30s
+  scrape_interval: 60s        # SSD write reduction
+  evaluation_interval: 60s
   scrape_timeout: 10s
 
 # Alert rules
@@ -17,7 +17,7 @@ scrape_configs:
     static_configs:
       - targets: ['api:8000']
     metrics_path: '/metrics'
-    scrape_interval: 5s       # API daha sık kontrol
+    scrape_interval: 15s      # SSD write reduction
     scrape_timeout: 3s
 
   - job_name: 'alpha-services'
@@ -32,30 +32,30 @@ scrape_configs:
           - 'portfolio:8000'
           - 'learning:8000'
     metrics_path: '/metrics'
-    scrape_interval: 15s
+    scrape_interval: 30s
 
   # === Data Stores (via Exporters) ===
   - job_name: 'postgres'
     static_configs:
       - targets: ['postgres-exporter:9187']
-    scrape_interval: 15s
+    scrape_interval: 30s
 
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
-    scrape_interval: 10s
+    scrape_interval: 30s
 
   - job_name: 'clickhouse'
     static_configs:
       - targets: ['clickhouse:8123']
     metrics_path: '/metrics'
-    scrape_interval: 15s
+    scrape_interval: 30s
 
   - job_name: 'clickhouse-2'
     static_configs:
       - targets: ['clickhouse-2:8123']
     metrics_path: '/metrics'
-    scrape_interval: 15s
+    scrape_interval: 30s
 
   # === Infrastructure ===
   # NATS varz returns JSON; uncomment when nats-prometheus-exporter is active
@@ -69,7 +69,7 @@ scrape_configs:
     static_configs:
       - targets: ['traefik:8080']
     metrics_path: '/metrics'
-    scrape_interval: 10s
+    scrape_interval: 30s
 
   - job_name: 'grafana'
     static_configs:

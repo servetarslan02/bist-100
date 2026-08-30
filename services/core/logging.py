@@ -8,7 +8,7 @@ import sys
 import structlog
 
 
-def setup_logging(log_level: str = "INFO") -> Any:
+def setup_logging(log_level: str = "WARNING") -> Any:
     """Configure structured logging for ALPHA BIST."""
 
     structlog.configure(

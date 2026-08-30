@@ -118,7 +118,7 @@ class MarketService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -149,7 +149,7 @@ class MarketService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -180,7 +180,7 @@ class MarketService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -274,7 +274,7 @@ class SignalService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -305,7 +305,7 @@ class SignalService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -399,7 +399,7 @@ class PortfolioService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -430,7 +430,7 @@ class PortfolioService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -524,7 +524,7 @@ class RiskService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""
@@ -555,7 +555,7 @@ class RiskService:
         insecure=False,
         compression=None,
         wait_for_ready=None,
-        timeout=None,
+        timeout=30,
         metadata=None,
     ) -> Any:
         """Otomatik eklendi."""

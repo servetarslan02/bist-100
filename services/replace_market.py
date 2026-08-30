@@ -1,4 +1,16 @@
 import re
+import sys
+
+# GÜVENLİK: Bu dosya market.py'yi yeniden yazar. Yanlışlıkla çalıştırılmamalı.
+if not sys.warnoptions:
+    import warnings
+    warnings.warn("replace_market.py çalıştırılıyor! Bu dosya market.py'yi yeniden yazar.", stacklevel=1)
+
+print("⚠️  UYARI: Bu script services/api/v1/market.py dosyasını yeniden yazacak!")
+print("Devam etmek için 'YES' yazın:")
+if input().strip() != "YES":
+    print("İptal edildi.")
+    sys.exit(0)
 
 with open("services/api/v1/market.py", encoding="utf-8") as f:
     content = f.read()
