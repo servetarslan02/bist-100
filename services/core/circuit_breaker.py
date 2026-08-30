@@ -292,7 +292,7 @@ class ProviderReliability:
         """Otomatik eklendi."""
         self.name = name
         self.window_size = window_size
-        self._results: list = []  # (success: bool, latency_ms: float, timestamp: datetime)
+        self._results = __import__('collections').deque(maxlen=500)  # (success: bool, latency_ms: float, timestamp: datetime)
         self._total_calls: int = 0
         self._total_failures: int = 0
 

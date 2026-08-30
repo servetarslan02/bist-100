@@ -643,7 +643,8 @@ class AlertingSystem:
         policy: AlertPolicy | None = None,
     ) -> None:
         """Otomatik eklendi."""
-        self._alerts: list[Alert] = []
+        from collections import deque
+        self._alerts: deque = deque(maxlen=2000)
         self._max_alerts = max_alerts
         self._dedup_window_s = dedup_window_s
         # asyncio.Lock ile dedup_cache race condition önleme

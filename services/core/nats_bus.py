@@ -16,6 +16,11 @@ import hashlib
 import json
 import time
 from collections import defaultdict, deque
+
+try:
+    import orjson
+except ImportError:
+    orjson = None
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Callable, Coroutine
@@ -94,7 +99,7 @@ class NATSJetStreamBus:
         msg = EventMessage(
             subject=subject,
             data=data,
-            msg_id=msg_id or hashlib.sha256(f"{subject}:{json.dumps(data, sort_keys=True)}".encode()).hexdigest()[:16],
+            msg_id=msg_id or hashlib.sha256(f"{subject}:{orjson.dumps(data, option=orjson.OPT_SORT_KEYS).decode() if orjson else json.dumps(data, sort_keys=True)}".encode()).hexdigest()[:16],
             correlation_id=correlation_id,
         )
 

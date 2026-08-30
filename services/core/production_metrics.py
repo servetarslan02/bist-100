@@ -62,6 +62,8 @@ class ProductionMetrics:
     def observe(self, name: str, value: float, labels: dict | None = None) -> Any:
         """Histogram gözlem."""
         key = self._key(name, labels)
+        if key not in self._histograms:
+            self._histograms[key] = __import__('collections').deque(maxlen=1000)
         self._histograms[key].append(value)
 
     @otel_trace("production_metrics.timer")
