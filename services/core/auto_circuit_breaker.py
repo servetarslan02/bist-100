@@ -1,13 +1,13 @@
 """
-ALPHA BIST â€” Automatic Circuit Breaker Trigger Engine
+ALPHA BIST — Automatic Circuit Breaker Trigger Engine
 
 Otomatik devre kesici tetikleme:
-- Fiyat deÄŸiÅŸimini izler
-- EÅŸik aÅŸÄ±ldÄ±ÄŸÄ±nda otomatik tetikler
-- EBDKS iÃ§in BIST-100 endeks deÄŸiÅŸimini izler
-- Tetikleme geÃ§miÅŸini kaydeder
+- Fiyat değişimini izler
+- Eşik aşıldığında otomatik tetikler
+- EBDKS için BIST-100 endeks değişimini izler
+- Tetikleme geçmişini kaydeder
 
-Kaynak: Borsa Ä°stanbul, AÄŸustos 2025 duyurularÄ±
+Kaynak: Borsa İstanbul, Ağustos 2025 duyuruları
 """
 
 import functools
@@ -42,7 +42,7 @@ def otel_trace(span_name: str) -> Any:
 
 @dataclass
 class CircuitBreakerEvent:
-    """Devre kesici tetikleme olayÄ±."""
+    """Devre kesici tetikleme olayı."""
 
     ticker: str
     event_type: str  # "PAY_BAZINDA" | "EBDKS"
@@ -74,30 +74,30 @@ class CircuitBreakerEvent:
 class AutoCircuitBreakerEngine:
     """Otomatik devre kesici tetikleme motoru.
 
-    Her fiyat gÃ¼ncellemesinde:
-    1. Pay bazÄ±nda devre kesici eÅŸiklerini kontrol eder
-    2. BIST-100 endeks deÄŸiÅŸimini izler (EBDKS)
-    3. EÅŸik aÅŸÄ±ldÄ±ÄŸÄ±nda otomatik tetikler
+    Her fiyat güncellemesinde:
+    1. Pay bazında devre kesici eşiklerini kontrol eder
+    2. BIST-100 endeks değişimini izler (EBDKS)
+    3. Eşik aşıldığında otomatik tetikler
     """
 
     def __init__(self):
         """Otomatik eklendi."""
         self._events: list[CircuitBreakerEvent] = []
-        self._triggered_today: dict[str, list[float]] = {}  # ticker â†’ [threshold_pct, ...]
-        self._bist100_reference: float = 0.0  # Ã–nceki kapanÄ±ÅŸ
+        self._triggered_today: dict[str, list[float]] = {}  # ticker → [threshold_pct, ...]
+        self._bist100_reference: float = 0.0  # Önceki kapanış
         self._bist100_current: float = 0.0
         self._ebdks_triggered_today: int = 0
 
     def set_bist100_reference(self, reference_price: float) -> Any:
-        """BIST-100 referans fiyatÄ±nÄ± (Ã¶nceki kapanÄ±ÅŸ) ayarla."""
+        """BIST-100 referans fiyatını (önceki kapanış) ayarla."""
         self._bist100_reference = reference_price
 
     @otel_trace("auto_circuit_breaker.update_bist100_price")
     def update_bist100_price(self, current_price: float) -> CircuitBreakerEvent | None:
-        """BIST-100 gÃ¼ncel fiyatÄ±nÄ± gÃ¼ncelle ve EBDKS kontrolÃ¼ yap.
+        """BIST-100 güncel fiyatını güncelle ve EBDKS kontrolü yap.
 
         Args:
-            current_price: BIST-100 gÃ¼ncel endeks deÄŸeri
+            current_price: BIST-100 güncel endeks değeri
 
         Returns:
             Tetiklenirse CircuitBreakerEvent, yoksa None
@@ -107,23 +107,23 @@ class AutoCircuitBreakerEngine:
         if self._bist100_reference <= 0:
             return None
 
-        # Piyasa aÃ§Ä±k deÄŸilse kontrol etme
+        # Piyasa açık değilse kontrol etme
         phase = bist_session_fsm.get_phase()
         if phase == BISTMarketPhase.CLOSED:
             return None
 
         change_pct = ((current_price / self._bist100_reference) - 1) * 100
 
-        # EBDKS: BIST-100 %6 veya daha fazla dÃ¼ÅŸÃ¼ÅŸ
+        # EBDKS: BIST-100 %6 veya daha fazla düşüş
         if change_pct <= -bist_session_fsm.EBDKS_THRESHOLD_PCT:
-            # BugÃ¼n zaten tetiklendi mi kontrol et (aynÄ± eÅŸik seviyesinde tekrar tetiklenmemeli)
+            # Bugün zaten tetiklendi mi kontrol et (aynı eşik seviyesinde tekrar tetiklenmemeli)
             if self._ebdks_triggered_today == 0 or (
                 self._ebdks_triggered_today > 0 and change_pct <= -(bist_session_fsm.EBDKS_THRESHOLD_PCT + 2)
             ):
-                # Ä°lk tetikleme veya ek %2 dÃ¼ÅŸÃ¼ÅŸ daha
+                # İlk tetikleme veya ek %2 düşüş daha
 
-                # Ã–zellik kodu belirle (ÅŸimdilik varsayÄ±lan)
-                feature_code = None  # GerÃ§ek sistemde hisse Ã¶zellik kodundan alÄ±nÄ±r
+                # Özellik kodu belirle (şimdilik varsayılan)
+                feature_code = None  # Gerçek sistemde hisse özellik kodundan alınır
 
                 bist_session_fsm.trigger_ebdks(feature_code=feature_code)
 
@@ -143,7 +143,7 @@ class AutoCircuitBreakerEngine:
                 self._ebdks_triggered_today += 1
 
                 logger.warning(
-                    "EBDKS OTOMATÄ°K TETÄ°KLENDÄ°",
+                    "EBDKS OTOMATİK TETİKLENDİ",
                     change_pct=f"{change_pct:.2f}%",
                     threshold=f"%{bist_session_fsm.EBDKS_THRESHOLD_PCT}",
                     current=current_price,
@@ -163,12 +163,12 @@ class AutoCircuitBreakerEngine:
         reference_price: float,
         market_type: str = "ana",
     ) -> CircuitBreakerEvent | None:
-        """Pay bazÄ±nda devre kesici kontrolÃ¼.
+        """Pay bazında devre kesici kontrolü.
 
         Args:
             ticker: Hisse kodu
-            current_price: GÃ¼ncel fiyat
-            reference_price: Ã–nceki kapanÄ±ÅŸ / baz fiyat
+            current_price: Güncel fiyat
+            reference_price: Önceki kapanış / baz fiyat
             market_type: Pazar tipi (yildiz, ana, alt)
 
         Returns:
@@ -177,19 +177,19 @@ class AutoCircuitBreakerEngine:
         if reference_price <= 0 or current_price <= 0:
             return None
 
-        # Piyasa aÃ§Ä±k deÄŸilse kontrol etme
+        # Piyasa açık değilse kontrol etme
         phase = bist_session_fsm.get_phase()
         if phase == BISTMarketPhase.CLOSED:
             return None
 
         change_pct = ((current_price / reference_price) - 1) * 100
 
-        # Pazar bazÄ±nda eÅŸikleri al
+        # Pazar bazında eşikleri al
         thresholds = bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS.get(
             market_type, bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
         )
 
-        # BugÃ¼n bu hisse iÃ§in hangi eÅŸikler tetiklendi?
+        # Bugün bu hisse için hangi eşikler tetiklendi?
         triggered_thresholds = self._triggered_today.get(ticker, [])
 
         for threshold in thresholds:
@@ -215,7 +215,7 @@ class AutoCircuitBreakerEngine:
                 self._triggered_today[ticker].append(threshold)
 
                 logger.warning(
-                    "PAY BAZINDA DEVRE KESICI TETÄ°KLENDÄ°",
+                    "PAY BAZINDA DEVRE KESICI TETİKLENDİ",
                     ticker=ticker,
                     change_pct=f"{change_pct:.2f}%",
                     threshold=f"%{threshold}",
@@ -228,14 +228,14 @@ class AutoCircuitBreakerEngine:
         return None
 
     def reset_daily(self) -> Any:
-        """GÃ¼nlÃ¼k sayaÃ§larÄ± sÄ±fÄ±rla (seans sonunda Ã§aÄŸrÄ±lÄ±r)."""
+        """Günlük sayaçları sıfırla (seans sonunda çağrılır)."""
         self._triggered_today.clear()
         self._ebdks_triggered_today = 0
         bist_session_fsm.clear_ebdks()
-        logger.info("Devre kesici gÃ¼nlÃ¼k sayaÃ§larÄ± sÄ±fÄ±rlandÄ±")
+        logger.info("Devre kesici günlük sayaçları sıfırlandı")
 
     def get_events_today(self) -> list[dict[str, Any]]:
-        """BugÃ¼nkÃ¼ tÃ¼m devre kesici olaylarÄ±nÄ± dÃ¶ndÃ¼r."""
+        """Bugünkü tüm devre kesici olaylarını döndür."""
         return [e.to_dict() for e in self._events]
 
     def get_status(self) -> dict[str, Any]:

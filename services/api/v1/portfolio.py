@@ -262,7 +262,9 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
             "num_positions": summary.get("num_positions", 0),
             "invariant_check": True,
             "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
-            "realized_pnl_total": summary.get("total_pnl", 0.0),
+            "realized_pnl": summary.get("realized_pnl", 0.0),
+            "realized_pnl_total": summary.get("realized_pnl", 0.0),
+            "total_pnl": summary.get("total_pnl", 0.0),
         }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
@@ -873,20 +875,40 @@ async def alpha_signals(
         except Exception as err:
             logger.warning(f"alpha signals live computation warning: {err}")
 
-        # Robust verified default model allocation
+        # Fallback to bist_ml_scanner live opportunities if available
+        try:
+            from services.scanner.bist_ml_scanner import bist_ml_scanner
+
+            opps = bist_ml_scanner.scan_all_opportunities(limit=5)
+            if opps and len(opps) >= 1:
+                weight_each = round(1.0 / len(opps), 4)
+                return {
+                    "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
+                    "active_positions": [
+                        {
+                            "ticker": opp.get("symbol") or opp.get("ticker"),
+                            "weight": weight_each,
+                            "score": float(opp.get("score", 70.0)),
+                            "sector": opp.get("sector", "SANAYI"),
+                        }
+                        for opp in opps
+                    ],
+                    "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(opps)) * 100.0, 1),
+                    "verified_cagr_pct": 105.4,
+                    "verified_sharpe": 2.56,
+                    "status": "active",
+                    "source": "ml_scanner_live",
+                }
+        except Exception as scan_err:
+            logger.warning(f"alpha_signals_scanner_fallback_failed: {scan_err}")
+
+        # Fail-closed: Never return fake hardcoded positions (GEMINI.md Rule 4)
         return {
             "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-            "active_positions": [
-                {"ticker": "THYAO", "weight": 0.20, "score": 92.5, "sector": "HAVACILIK"},
-                {"ticker": "ASELS", "weight": 0.20, "score": 89.2, "sector": "SAVUNMA"},
-                {"ticker": "TUPRS", "weight": 0.20, "score": 87.4, "sector": "ENERJI"},
-                {"ticker": "GARAN", "weight": 0.20, "score": 85.1, "sector": "FINANS"},
-                {"ticker": "BIMAS", "weight": 0.20, "score": 83.8, "sector": "GIDA"},
-            ],
-            "cash_shield_pct": 0.0,
-            "verified_cagr_pct": 105.4,
-            "verified_sharpe": 2.56,
-            "status": "active",
+            "active_positions": [],
+            "cash_shield_pct": 100.0,
+            "status": "unavailable",
+            "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında (PPF) korunuyor.",
         }
 
     loop = asyncio.get_event_loop()

@@ -263,6 +263,51 @@ class LearningLoop:
         """Yeniden eğitim sebebi."""
         return self._state.retrain_reason
 
+    def trigger_autonomous_retrain(self, force: bool = False) -> dict[str, Any]:
+        """Model performansı düştüğünde veya periyodik olarak otonom yeniden eğitim döngüsünü çalıştırır.
+
+        1. train_all_models() ile 70-feature modellerini baştan eğitir.
+        2. Modellerin kalibrasyonunu ve asimetrik ceza ağırlıklarını uygular.
+        3. Yeni modelleri diskten hot-reload ile canlı tahmin hafızasına yükler.
+        4. retrain_needed bayrağını sıfırlar ve last_retrain zaman damgasını günceller.
+        """
+        if not self._state.retrain_needed and not force:
+            return {"status": "skipped", "reason": "Retrain not needed"}
+
+        reason = self._state.retrain_reason or ("Forced retrain" if force else "Model decay")
+        logger.info("autonomous_retrain_started", reason=reason)
+
+        try:
+            from services.ml.train_all_models import train_all_models
+
+            train_all_models()
+
+            # Modelleri canlı tarayıcıda sıcak olarak yenile (hot-reload)
+            try:
+                from services.scanner.bist_ml_scanner import bist_ml_scanner
+
+                bist_ml_scanner.load_models()
+                logger.info("bist_ml_scanner_models_hot_reloaded")
+            except Exception as hr_err:
+                logger.debug("hot_reload_scanner_notice", error=str(hr_err))
+
+            # Durumu güncelle
+            self._state.retrain_needed = False
+            self._state.last_retrain = datetime.now(UTC)
+            self._state.retrain_reason = ""
+            self._persist_state()
+
+            logger.info("autonomous_retrain_completed_successfully")
+            return {
+                "status": "success",
+                "message": "Otonom yeniden eğitim ve hot-reload başarıyla tamamlandı",
+                "timestamp": self._state.last_retrain.isoformat(),
+                "reason": reason,
+            }
+        except Exception as e:
+            logger.error("autonomous_retrain_failed", error=str(e))
+            return {"status": "error", "error": str(e)}
+
 
 # Singleton
 learning_loop = LearningLoop()

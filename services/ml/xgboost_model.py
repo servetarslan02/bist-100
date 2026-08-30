@@ -267,14 +267,39 @@ class XGBoostModel:
                         horizon=horizon,
                     )
                     return np.zeros(len(X))
-                return preds
+                raw_prob = preds
             else:
                 if hasattr(model, "predict_proba"):
-                    return model.predict_proba(X)[:, 1]
-                return model.predict(X)
+                    raw_prob = model.predict_proba(X)[:, 1]
+                else:
+                    raw_prob = model.predict(X)
+
+            calibrator = getattr(self, "_calibrators", {}).get(horizon)
+            if calibrator is not None:
+                return calibrator.calibrate(raw_prob)
+            return raw_prob
         except Exception as e:
             logger.warning("xgboost_predict_failed", horizon=horizon, error=str(e))
             return np.zeros(len(X))
+
+    def calibrate(
+        self,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        horizon: int = 5,
+        method: str = "sigmoid",
+    ) -> dict[str, float]:
+        """Model olasılıklarını kalibre et (Platt scaling / Isotonic)."""
+        from .probability_calibrator import ProbabilityCalibrator
+
+        if not hasattr(self, "_calibrators"):
+            self._calibrators = {}
+
+        raw_prob = self.predict(X_val, horizon=horizon)
+        calibrator = ProbabilityCalibrator(method=method)
+        calibrator.fit(raw_prob, y_val)
+        self._calibrators[horizon] = calibrator
+        return calibrator.get_metrics()
 
     def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
         """Tüm horizon'lar için tahmin."""

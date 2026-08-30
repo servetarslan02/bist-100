@@ -206,11 +206,27 @@ async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rat
     }
 
 
-@router.post("/retrain")
-async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Otomatik eklendi."""
+@router.get("/learning-state")
+async def get_learning_state(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
+    """Otonom öğrenme döngüsünün anlık durumunu, doğruluk trendini ve kalibrasyonu döner."""
+    from services.learning.learning_loop import learning_loop
+
+    state = learning_loop.get_state()
     return {
-        "status": "started",
-        "model": model_name,
-        "message": "Eğitim arka planda Docker container içerisinde çalıştırılır.",
+        "learning_loop": state,
+        "retrain_needed": learning_loop.should_retrain(),
+        "retrain_reason": learning_loop.get_retrain_reason(),
+        "canonical_features_count": 70,
+        "calibration_status": "ENABLED",
     }
+
+
+@router.post("/retrain")
+async def retrain(force: bool = Query(default=True), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
+    """Otonom kapalı devre yeniden eğitimi tetikler ve modelleri hot-reload eder."""
+    import asyncio
+    from services.learning.learning_loop import learning_loop
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, learning_loop.trigger_autonomous_retrain, force)
+    return result

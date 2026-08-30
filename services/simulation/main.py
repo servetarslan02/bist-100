@@ -218,33 +218,43 @@ class SimulationEngine:
         ticker = params.get("ticker")
         portfolio_id = params.get("portfolio_id")
 
-        # Senaryolar: piyasa etkisi + sektör rotasyonu + makro
+        # Senaryolar: piyasa etkisi + sektör rotasyonu + makro (Rejime Duyarlı Dinamik Olasılıklar)
+        regime = (params.get("regime") or params.get("market_regime") or "SIDEWAYS").upper()
+        if regime in ["BULL", "STRONG_BULL"]:
+            probs = {"Bull": 0.45, "Base": 0.35, "Bear": 0.15, "Crash": 0.05}
+        elif regime in ["BEAR", "CRISIS", "PANIC"]:
+            probs = {"Bull": 0.10, "Base": 0.30, "Bear": 0.40, "Crash": 0.20}
+        elif regime in ["HIGH_VOL"]:
+            probs = {"Bull": 0.25, "Base": 0.30, "Bear": 0.30, "Crash": 0.15}
+        else:  # SIDEWAYS
+            probs = {"Bull": 0.25, "Base": 0.50, "Bear": 0.20, "Crash": 0.05}
+
         scenarios = [
             {
                 "name": "Bull",
                 "market_change": 5,
-                "probability": 0.25,
+                "probability": probs["Bull"],
                 "sector_rotation": {"TECHNOLOGY": 1.2, "BANKING": 0.9, "INDUSTRY": 1.0},
                 "usd_change": -0.05,
             },
             {
                 "name": "Base",
                 "market_change": 0,
-                "probability": 0.50,
+                "probability": probs["Base"],
                 "sector_rotation": {},
                 "usd_change": 0,
             },
             {
                 "name": "Bear",
                 "market_change": -5,
-                "probability": 0.20,
+                "probability": probs["Bear"],
                 "sector_rotation": {"TECHNOLOGY": 0.8, "BANKING": 1.1, "INDUSTRY": 0.95},
                 "usd_change": 0.08,
             },
             {
                 "name": "Crash",
                 "market_change": -15,
-                "probability": 0.05,
+                "probability": probs["Crash"],
                 "sector_rotation": {"TECHNOLOGY": 0.7, "BANKING": 1.3, "INDUSTRY": 0.85},
                 "usd_change": 0.20,
             },

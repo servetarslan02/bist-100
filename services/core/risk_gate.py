@@ -1,6 +1,6 @@
-"""ALPHA BIST â€” Risk Gate v1.0
+"""ALPHA BIST — Risk Gate v1.0
 
-Merkezi risk kontrolÃ¼ â€” order gÃ¶nderilmeden Ã¶nce.
+Merkezi risk kontrolü — order gönderilmeden önce.
 Fail-safe, fail-closed.
 """
 
@@ -47,7 +47,7 @@ class RiskDecision:
 
 
 class RiskGate:
-    """Merkezi risk gate â€” order Ã¼retiminden Ã¶nce."""
+    """Merkezi risk gate — order üretiminden önce."""
 
     def __init__(
         self,
@@ -86,8 +86,8 @@ class RiskGate:
         mc_var_95: float = 0.0,
         mc_cvar_95: float = 0.0,
     ) -> RiskDecision:
-        """Order risk kontrolÃ¼."""
-        # Otomatik gÃ¼nlÃ¼k P&L senkronizasyonu
+        """Order risk kontrolü."""
+        # Otomatik günlük P&L senkronizasyonu
         self.sync_daily_pnl()
         # 1. Devre kesici ve temel kontroller
         early_exit = self._check_circuit_breakers(circuit_open, ticker, details={})
@@ -118,7 +118,7 @@ class RiskGate:
         details.update(det)
         reasons.extend(rea)
 
-        # 3. GÃ¼nlÃ¼k zarar limiti
+        # 3. Günlük zarar limiti
         daily_loss_pct = abs(self._daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0
         if self._daily_pnl < 0 and daily_loss_pct > self.daily_loss_limit_pct:
             checks_failed += 1
@@ -126,7 +126,7 @@ class RiskGate:
         else:
             checks_passed += 1
 
-        # 4. BIST kurallarÄ±
+        # 4. BIST kuralları
         cp, cf, det = self._check_bist_rules(ticker, side, price, order_value, portfolio_value, current_positions)
         checks_passed += cp
         checks_failed += cf
@@ -149,7 +149,7 @@ class RiskGate:
             if worst_impact < self.macro_stress_threshold_pct:
                 checks_failed += 1
                 reasons.append(
-                    f"Macro stress test: %{abs(worst_impact):.1f} kayÄ±p riski (eÅŸik: %{abs(self.macro_stress_threshold_pct):.0f})"
+                    f"Macro stress test: %{abs(worst_impact):.1f} kayıp riski (eşik: %{abs(self.macro_stress_threshold_pct):.0f})"
                 )
             else:
                 checks_passed += 1
@@ -167,7 +167,7 @@ class RiskGate:
             from services.core.auto_circuit_breaker import auto_circuit_breaker
 
             if auto_circuit_breaker.get_status().get("ebdks_active", False):
-                return RiskDecision(False, "EBDKS aktif â€” tÃ¼m iÅŸlemler durduruldu", 0, 1, {"ebdks": "active"})
+                return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
         except Exception:
             logger.warning("Circuit breaker check failed", exc_info=True)
         try:
@@ -225,7 +225,7 @@ class RiskGate:
         return passed, failed, details, reasons
 
     def _check_bist_rules(self, ticker, side, price, order_value, portfolio_value, current_positions) -> Any:
-        """BIST kurallarÄ±: aÃ§Ä±ÄŸa satÄ±ÅŸ, halt, SPK uyumluluk."""
+        """BIST kuralları: açığa satış, halt, SPK uyumluluk."""
         passed = failed = 0
         details = {}
         reasons = []
@@ -260,14 +260,14 @@ class RiskGate:
             if failed == 0:
                 passed += 1
         except Exception as e:
-            logger.error("BIST compliance check FAILED â€” blocking order (fail-closed)", error=str(e))
+            logger.error("BIST compliance check FAILED — blocking order (fail-closed)", error=str(e))
             failed += 1
             reasons.append(f"BIST compliance check error: {e}")
 
         return passed, failed, details
 
     def _check_monte_carlo_var(self, mc_var_95, mc_cvar_95) -> Any:
-        """Monte Carlo VaR/CVaR kontrolÃ¼."""
+        """Monte Carlo VaR/CVaR kontrolü."""
         passed = failed = 0
         reasons = []
         threshold = 15.0
@@ -275,7 +275,7 @@ class RiskGate:
         if mc_var_95 != 0:
             var_abs = abs(mc_var_95)
             if var_abs > threshold:
-                reasons.append(f"MC VaR %{var_abs:.1f} > %{threshold:.0f} eÅŸik (risk yÃ¼ksek)")
+                reasons.append(f"MC VaR %{var_abs:.1f} > %{threshold:.0f} eşik (risk yüksek)")
                 failed += 1
             else:
                 passed += 1
@@ -292,7 +292,7 @@ class RiskGate:
         self,
         portfolio: dict[str, Any],
     ) -> dict[str, Any]:
-        """Macro stres testi Ã§alÄ±ÅŸtÄ±r ve sonucu kaydet."""
+        """Macro stres testi çalıştır ve sonucu kaydet."""
         try:
             from services.macro.stress_test import macro_stress_test
 
@@ -309,7 +309,7 @@ class RiskGate:
 
     @otel_trace("risk_gate.sync_daily_pnl")
     def sync_daily_pnl(self) -> Any:
-        """PortfolioManager'dan gÃ¼nlÃ¼k P&L otomatik Ã§ek."""
+        """PortfolioManager'dan günlük P&L otomatik çek."""
         try:
             from services.portfolio.portfolio_manager import portfolio_manager
 

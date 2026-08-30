@@ -107,10 +107,11 @@ class TradePlanner:
             entry_price, target1, stop_loss, action
         )
 
-        # Senaryolar
-        scenario_bull = self._scenario_bull(price, features, target2)
-        scenario_base = self._scenario_base(price, features, target1)
-        scenario_bear = self._scenario_bear(price, features, stop_loss)
+        # Dinamik Senaryo Olasılıkları
+        p_bull, p_base, p_bear = self._calculate_scenario_probabilities(spec_score, features, market_regime)
+        scenario_bull = self._scenario_bull(price, features, target2, prob=p_bull)
+        scenario_base = self._scenario_base(price, features, target1, prob=p_base)
+        scenario_bear = self._scenario_bear(price, features, stop_loss, prob=p_bear)
 
         # Pozisyon büyüklüğü
         position_pct, max_loss = self._calculate_position_size(
@@ -152,6 +153,43 @@ class TradePlanner:
             horizon=horizon,
             entry_window=entry_window,
         )
+
+    def _calculate_scenario_probabilities(
+        self, spec_score: float, features: dict, regime: str
+    ) -> tuple[float, float, float]:
+        """Piyasa rejimi, model güveni (spec_score) ve volatiliteye göre dinamik senaryo olasılıkları hesaplar."""
+        regime_upper = (regime or "SIDEWAYS").upper()
+        if regime_upper in ["BULL", "STRONG_BULL"]:
+            p_bull, p_base, p_bear = 45.0, 40.0, 15.0
+        elif regime_upper in ["BEAR", "CRISIS", "PANIC"]:
+            p_bull, p_base, p_bear = 15.0, 40.0, 45.0
+        elif regime_upper in ["HIGH_VOL"]:
+            p_bull, p_base, p_bear = 30.0, 30.0, 40.0
+        else:
+            p_bull, p_base, p_bear = 30.0, 50.0, 20.0
+
+        score_shift = (spec_score - 50.0) * 0.4
+        p_bull += score_shift
+        p_bear -= score_shift
+
+        mom = features.get("momentum_20d", 0.0)
+        if mom > 10:
+            p_bull += 5.0
+            p_bear -= 5.0
+        elif mom < -10:
+            p_bear += 5.0
+            p_bull -= 5.0
+
+        p_bull = max(5.0, min(80.0, p_bull))
+        p_base = max(10.0, min(70.0, p_base))
+        p_bear = max(5.0, min(80.0, p_bear))
+
+        total = p_bull + p_base + p_bear
+        p_bull = round((p_bull / total) * 100.0, 1)
+        p_base = round((p_base / total) * 100.0, 1)
+        p_bear = round(100.0 - p_bull - p_base, 1)
+
+        return p_bull, p_base, p_bear
 
     def _determine_action(
         self, spec_score: float, spec_category: str, features: dict, regime: str
@@ -304,33 +342,33 @@ class TradePlanner:
 
         return round(expected_return, 2), round(expected_loss, 2), round(risk_reward, 2)
 
-    def _scenario_bull(self, price: float, features: dict, target: float) -> dict:
+    def _scenario_bull(self, price: float, features: dict, target: float, prob: float = 30.0) -> dict:
         """Boğa senaryosu."""
         return {
             "name": "BULL",
-            "probability": 30,
+            "probability": prob,
             "price_target": round(target, 2),
             "return_pct": round((target / price - 1) * 100, 2),
             "description": "Piyasa pozitif, momentum devam ediyor",
             "triggers": ["Sektör güçlenmesi", "KAP pozitif", "Hacim artışı"],
         }
 
-    def _scenario_base(self, price: float, features: dict, target: float) -> dict:
+    def _scenario_base(self, price: float, features: dict, target: float, prob: float = 50.0) -> dict:
         """Baz senaryo."""
         return {
             "name": "BASE",
-            "probability": 50,
+            "probability": prob,
             "price_target": round(price * 1.02, 2),
             "return_pct": 2.0,
             "description": "Piyasa yatay, sınırlı hareket",
             "triggers": ["Normal hacim", "Sektör nötr"],
         }
 
-    def _scenario_bear(self, price: float, features: dict, stop: float) -> dict:
+    def _scenario_bear(self, price: float, features: dict, stop: float, prob: float = 20.0) -> dict:
         """Ayı senaryosu."""
         return {
             "name": "BEAR",
-            "probability": 20,
+            "probability": prob,
             "price_target": round(stop, 2),
             "return_pct": round((stop / price - 1) * 100, 2),
             "description": "Piyasa negatif, stop loss tetiklenir",

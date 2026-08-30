@@ -1,10 +1,10 @@
 """
-ALPHA BIST â€” Data Quality & Tradability Mask v3.0 (Great Expectations Style)
+ALPHA BIST — Data Quality & Tradability Mask v3.0 (Great Expectations Style)
 
 ROADMAP v3.0: Enterprise Grade Data Contracts
-- Polars-native Expectations Suite yapÄ±sÄ±
-- OpenTelemetry metrik ihracÄ±
-- Devre kesici, tavan/taban, halt edilmiÅŸ fiyatlar kesin kontratlara tabidir
+- Polars-native Expectations Suite yapısı
+- OpenTelemetry metrik ihracı
+- Devre kesici, tavan/taban, halt edilmiş fiyatlar kesin kontratlara tabidir
 - KURAL: Execute edilemeyen fiyat kullanma!
 """
 
@@ -59,7 +59,7 @@ QUALITY_SCORE_GAUGE = meter.create_gauge(
 
 @dataclass
 class TradabilityMask:
-    """Hisse baÅŸÄ±na tradability durumu."""
+    """Hisse başına tradability durumu."""
 
     ticker: str
     timestamp: datetime
@@ -82,7 +82,7 @@ class TradabilityMask:
 
 @dataclass
 class ExpectationResult:
-    """Tek bir kuralÄ±n sonucunu tutar."""
+    """Tek bir kuralın sonucunu tutar."""
 
     expectation_name: str
     passed: bool
@@ -92,7 +92,7 @@ class ExpectationResult:
 
 
 class Expectation(ABC):
-    """Base Expectation sÄ±nÄ±fÄ±."""
+    """Base Expectation sınıfı."""
 
     @abstractmethod
     def get_name(self) -> str:
@@ -101,12 +101,12 @@ class Expectation(ABC):
 
     @abstractmethod
     def validate_row(self, data: dict[str, Any]) -> ExpectationResult:
-        """GerÃ§ek zamanlÄ± stream/row verisi iÃ§in."""
+        """Gerçek zamanlı stream/row verisi için."""
         pass
 
     @abstractmethod
     def validate_df(self, df: Any) -> ExpectationResult:
-        """Toplu DataFrame iÃ§in (Polars)."""
+        """Toplu DataFrame için (Polars)."""
         pass
 
 
@@ -166,7 +166,7 @@ class ExpectOHLCGeometry(Expectation):
 
         if h < l or o > h or o < l or c > h or c < l:
             return ExpectationResult(
-                self.get_name(), False, "Anormal fiyat yapÄ±sÄ± (H<L veya O/C dÄ±ÅŸarÄ±da)", "CRITICAL"
+                self.get_name(), False, "Anormal fiyat yapısı (H<L veya O/C dışarıda)", "CRITICAL"
             )
 
         return ExpectationResult(self.get_name(), True, "OK")
@@ -205,7 +205,7 @@ class ExpectCircuitBreakerLimits(Expectation):
             change = abs(c / p - 1) * 100
             if change >= self.limit_pct:
                 return ExpectationResult(
-                    self.get_name(), False, f"Tavan/taban sÄ±nÄ±rÄ± aÅŸÄ±ldÄ±: %{change:.1f}", "CRITICAL"
+                    self.get_name(), False, f"Tavan/taban sınırı aşıldı: %{change:.1f}", "CRITICAL"
                 )
         return ExpectationResult(self.get_name(), True, "OK")
 
@@ -238,10 +238,10 @@ class ExpectVolumeLiquidityProfile(Expectation):
                     data.get("open_price", data.get("open")),
                 )
                 if c == o and c == h and c == l:
-                    return ExpectationResult(self.get_name(), False, "SÄ±fÄ±r hacim ve Halt edilmiÅŸ", "CRITICAL")
-                return ExpectationResult(self.get_name(), False, "SÄ±fÄ±r hacim", "ERROR")
+                    return ExpectationResult(self.get_name(), False, "Sıfır hacim ve Halt edilmiş", "CRITICAL")
+                return ExpectationResult(self.get_name(), False, "Sıfır hacim", "ERROR")
             if 0 < vol < self.min_volume:
-                return ExpectationResult(self.get_name(), False, "DÃ¼ÅŸÃ¼k likidite", "WARNING")
+                return ExpectationResult(self.get_name(), False, "Düşük likidite", "WARNING")
         return ExpectationResult(self.get_name(), True, "OK")
 
     def validate_df(self, df: Any) -> ExpectationResult:
@@ -267,7 +267,7 @@ class ExpectVolumeLiquidityProfile(Expectation):
 
 
 class ExpectationsSuite:
-    """Kural setini yÃ¶neten ve Ã§alÄ±ÅŸtÄ±ran Suit."""
+    """Kural setini yöneten ve çalıştıran Suit."""
 
     def __init__(self, name: str):
         """Otomatik eklendi."""
@@ -316,7 +316,7 @@ def _build_financial_suite() -> ExpectationsSuite:
 
 
 class DataQualityEngine:
-    """Veri kalitesi ve tradability kontrol motoru (Expectations tabanlÄ±)."""
+    """Veri kalitesi ve tradability kontrol motoru (Expectations tabanlı)."""
 
     def __init__(self):
         """Otomatik eklendi."""
@@ -360,23 +360,23 @@ class DataQualityEngine:
                 if res.severity == "CRITICAL":
                     is_tradable = False
                     price_mask = 0.0
-                    if "SÄ±fÄ±r hacim" in res.details:
+                    if "Sıfır hacim" in res.details:
                         volume_mask = 0.0
                 elif res.severity == "ERROR":
                     is_tradable = False
-                    if "SÄ±fÄ±r hacim" in res.details:
+                    if "Sıfır hacim" in res.details:
                         volume_mask = 0.0
                     else:
                         price_mask = 0.0
                 elif res.severity == "WARNING":
-                    if "DÃ¼ÅŸÃ¼k likidite" in res.details:
+                    if "Düşük likidite" in res.details:
                         volume_mask = 0.5
 
         # Ekstrem volatilite check
         if prev_close > 0:
             intraday_range = (high - low) / prev_close * 100
             if intraday_range > 15:
-                reasons.append(f"AÅŸÄ±rÄ± volatilite: %{intraday_range:.1f}")
+                reasons.append(f"Aşırı volatilite: %{intraday_range:.1f}")
                 if price_mask > 0.3:
                     price_mask = 0.3
 
@@ -488,7 +488,7 @@ class QualityReport:
 
 
 class DataQualityChecker:
-    """Polars DataFrame bazlÄ± veri kalitesi kontrolÃ¼ (Expectations kullanan)."""
+    """Polars DataFrame bazlı veri kalitesi kontrolü (Expectations kullanan)."""
 
     def __init__(self):
         """Otomatik eklendi."""
@@ -510,7 +510,7 @@ class DataQualityChecker:
                 )
 
         if pl is not None and isinstance(df, pl.DataFrame):
-            # Date/Timestamp sÃ¼tunu kontrolÃ¼
+            # Date/Timestamp sütunu kontrolü
             date_col = None
             for col_name in ["Date", "date", "timestamp", "Timestamp"]:
                 if col_name in df.columns:
@@ -518,7 +518,7 @@ class DataQualityChecker:
                     break
 
             if date_col is not None:
-                # Duplicate kontrolÃ¼
+                # Duplicate kontrolü
                 dup_count = df[date_col].is_duplicated().sum()
                 if dup_count > 0:
                     issues.append(
@@ -529,16 +529,16 @@ class DataQualityChecker:
                             affected_rows=int(dup_count),
                         )
                     )
-                # SÄ±ralama kontrolÃ¼
+                # Sıralama kontrolü
                 if not df[date_col].is_sorted():
                     issues.append(
                         QualityIssue(
                             "unsorted_timestamps",
                             "WARNING",
-                            "Timestamp sÄ±ralÄ± deÄŸil",
+                            "Timestamp sıralı değil",
                         )
                     )
-                # Gap kontrolÃ¼ (> 5 gÃ¼n)
+                # Gap kontrolü (> 5 gün)
                 if total_rows > 1:
                     try:
                         date_diffs = df[date_col].diff().dt.total_days()
@@ -548,13 +548,13 @@ class DataQualityChecker:
                                 QualityIssue(
                                     "large_gaps",
                                     "WARNING",
-                                    f"{large_gaps} bÃ¼yÃ¼k zaman aralÄ±ÄŸÄ± (>5 gÃ¼n)",
+                                    f"{large_gaps} büyük zaman aralığı (>5 gün)",
                                 )
                             )
                     except Exception:
                         logger.error("Exception caught", exc_info=True)
 
-            # Eksik deÄŸer kontrolÃ¼
+            # Eksik değer kontrolü
             for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low", "volume", "Volume"]:
                 if col_name in df.columns:
                     missing = df[col_name].null_count()

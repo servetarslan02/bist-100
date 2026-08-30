@@ -65,9 +65,21 @@ async def ml_learning_scheduler() -> Any:
         await asyncio.sleep(4 * 3600)
         try:
             from ..learning.learning_pipeline import LearningPipeline
+            from ..learning.learning_loop import learning_loop
 
-            pipeline = LearningPipeline()
             loop = asyncio.get_event_loop()
+
+            # 1. Model Degradation & Otonom Kapalı Devre Yeniden Eğitim Kontrolü
+            if learning_loop.should_retrain():
+                logger.info(
+                    "ml_scheduler: Model bozulması saptandı, otonom yeniden eğitim tetikleniyor...",
+                    reason=learning_loop.get_retrain_reason(),
+                )
+                with tracer.start_as_current_span("background.ml_learning_scheduler.autonomous_retrain"):
+                    await loop.run_in_executor(None, learning_loop.trigger_autonomous_retrain)
+
+            # 2. Periyodik Model Güven & Performans Güncellemesi
+            pipeline = LearningPipeline()
             logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
             with tracer.start_as_current_span("background.ml_learning_scheduler.cycle"):
                 await loop.run_in_executor(None, pipeline.run_learning_cycle)

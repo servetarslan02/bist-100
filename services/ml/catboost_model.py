@@ -98,6 +98,7 @@ class CatBoostModel:
         self._shap_values = None
         self._feature_interactions = None
         self._cat_features_detected: list[int] = []
+        self._calibrators: dict[int, Any] = {}
 
     def train(
         self,
@@ -261,12 +262,40 @@ class CatBoostModel:
 
         try:
             if self._is_classifier:
-                return model.predict_proba(X)[:, 1]
+                raw_prob = model.predict_proba(X)[:, 1]
+                calibrator = getattr(self, "_calibrators", {}).get(horizon)
+                if calibrator is not None:
+                    return calibrator.calibrate(raw_prob)
+                return raw_prob
             else:
                 return model.predict(X)
         except Exception as e:
             logger.warning("catboost_predict_failed", horizon=horizon, error=str(e))
             return np.zeros(len(X))
+
+    def calibrate(
+        self,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        horizon: int = 5,
+        method: str = "sigmoid",
+    ) -> dict[str, float]:
+        """Model olasılıklarını kalibre et (Platt scaling / Isotonic)."""
+        from .probability_calibrator import ProbabilityCalibrator
+
+        if not hasattr(self, "_calibrators"):
+            self._calibrators = {}
+
+        # Kalibrasyon öncesi ham olasılıkları al
+        model = self._models.get(horizon)
+        if model is None:
+            return {"error": f"Model for horizon {horizon} not found"}
+
+        raw_prob = model.predict_proba(X_val)[:, 1] if self._is_classifier else model.predict(X_val)
+        calibrator = ProbabilityCalibrator(method=method)
+        calibrator.fit(raw_prob, y_val)
+        self._calibrators[horizon] = calibrator
+        return calibrator.get_metrics()
 
     def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
         """Tüm horizon'lar için tahmin."""

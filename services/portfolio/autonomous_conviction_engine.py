@@ -45,13 +45,15 @@ class CandidateAsset:
 
     ticker: str
     confidence_score: float  # Model güven skoru (0.00 - 1.00)
-    expected_return: float  # Beklenen yıllıklandırılmış getiri (0.15 = %15)
+    expected_return: float  # Beklenen getiri (Yıllık alfa veya vade getirisi, örn 0.15 = %15)
     volatility: float  # Yıllıklandırılmış volatilite (0.25 = %25)
     sector: str = "OTHER"
     momentum_score: float = 50.0  # 0-100
     rsi: float = 50.0
     volume_flow_score: float = 50.0  # Para girişi (0-100)
     current_price: float = 0.0
+    horizon_days: int = 20  # İşlem vadesi (gün)
+    is_excess_alpha: bool = True  # Model getirisi benchmark üzeri net alfa mı?
 
 
 @dataclass
@@ -139,21 +141,41 @@ class AutonomousConvictionEngine:
         market_regime: str = "SIDEWAYS",
         macro_risk_free_rate: float | None = None,
         estimated_friction: float = 0.005,  # %0.5 komisyon + kayma
+        is_excess_alpha: bool = True,
+        horizon_days: int | None = None,
     ) -> float:
-        """Piyasa rejimine ve faiz oranına göre dinamik alfa barajı hesaplar."""
-        rf = macro_risk_free_rate if macro_risk_free_rate is not None else self.base_hurdle_rate
+        """Piyasa rejimine, alfa hedefine ve vadeye göre dinamik eşik hesaplar.
 
-        # Rejime göre risk primi
-        regime_premium = {
-            "BULL": 0.05,  # Boğada fırsat maliyeti düşük, iştah yüksek
-            "SIDEWAYS": 0.10,  # Yatayda seçici ol
-            "BEAR": 0.25,  # Ayıda hisseye girmek için çok ciddi getiri vaadi lazım
-            "CRISIS": 0.40,  # Krizde hisse almak için devasa iskontolu getiri şart
-            "HIGH_VOL": 0.20,
-        }.get(market_regime.upper(), 0.10)
+        - is_excess_alpha=True ise: BIST-100 üzeri excess getiri barajı (documentation/01 %10-%20 hedefi).
+        - is_excess_alpha=False ise: Nominal getiri barajı (politika faizi/mevduat + rejim primi + friction).
+        - horizon_days belirtilmişse yıllık oran tutma vadesine indirgenir.
+        """
+        if is_excess_alpha:
+            # BIST-100 üzeri Excess Alpha Hedefi (documentation/01 §1.7.2: %10-20 yıllık alfa)
+            regime_alpha_hurdle = {
+                "BULL": 0.08,      # Boğada %8 yıllık alfa yeterli
+                "SIDEWAYS": 0.12,  # Yatayda %12 yıllık alfa
+                "BEAR": 0.18,      # Ayıda %18 yıllık alfa
+                "CRISIS": 0.25,    # Krizde %25 yıllık alfa
+                "HIGH_VOL": 0.15,
+            }.get(market_regime.upper(), 0.12)
+            base_annual = regime_alpha_hurdle + estimated_friction
+        else:
+            rf = macro_risk_free_rate if macro_risk_free_rate is not None else self.base_hurdle_rate
+            regime_premium = {
+                "BULL": 0.05,  # Boğada fırsat maliyeti düşük, iştah yüksek
+                "SIDEWAYS": 0.10,  # Yatayda seçici ol
+                "BEAR": 0.25,  # Ayıda hisseye girmek için çok ciddi getiri vaadi lazım
+                "CRISIS": 0.40,  # Krizde hisse almak için devasa iskontolu getiri şart
+                "HIGH_VOL": 0.20,
+            }.get(market_regime.upper(), 0.10)
+            base_annual = rf + regime_premium + estimated_friction
 
-        total_hurdle = rf + regime_premium + estimated_friction
-        return round(float(total_hurdle), 4)
+        if horizon_days is not None and 0 < horizon_days < 252:
+            horizon_hurdle = ((1.0 + base_annual) ** (horizon_days / 252.0)) - 1.0
+            return round(float(horizon_hurdle), 4)
+
+        return round(float(base_annual), 4)
 
     def evaluate_universe(
         self,
@@ -162,7 +184,6 @@ class AutonomousConvictionEngine:
         macro_risk_free_rate: float | None = None,
     ) -> tuple[list[CandidateAsset], dict[str, str]]:
         """Evrendeki hisseleri otonom süzer. Kazanacağına inanmadığını eler."""
-        hurdle_rate = self.compute_dynamic_hurdle_rate(market_regime, macro_risk_free_rate)
         accepted: list[CandidateAsset] = []
         rejections: dict[str, str] = {}
 
@@ -175,6 +196,13 @@ class AutonomousConvictionEngine:
                 continue
 
             # 2. Beklenen Getiri vs Hurdle Rate
+            # Adayın getiri ölçeğine göre (vade bazlı < %30 veya yıllıklandırılmış) dinamik hurdle uygula
+            hurdle_rate = self.compute_dynamic_hurdle_rate(
+                market_regime=market_regime,
+                macro_risk_free_rate=macro_risk_free_rate,
+                is_excess_alpha=c.is_excess_alpha,
+                horizon_days=c.horizon_days if c.expected_return < 0.30 else None,
+            )
             if c.expected_return <= hurdle_rate:
                 rejections[c.ticker] = (
                     f"Getiri Alfa Barajını Geçemedi ({c.expected_return:.1%} <= {hurdle_rate:.1%})"
@@ -193,7 +221,6 @@ class AutonomousConvictionEngine:
             total_candidates=len(candidates),
             accepted_count=len(accepted),
             rejected_count=len(rejections),
-            hurdle_rate=hurdle_rate,
             regime=market_regime,
         )
         return accepted, rejections
@@ -333,12 +360,16 @@ class AutonomousConvictionEngine:
             pnl_pct = (curr_p - pos.entry_price) / pos.entry_price if pos.entry_price > 0 else 0.0
 
             # 1. Karar: Trailing Stop Seviyesi Vuruldu mu? (Kâr Kilitleme / Koruma)
-            if curr_p <= active_ts_price and pnl_pct > 0.02:
+            # Trailing stop mantığı: Fiyat daha önce kâr bölgesine girmişse (new_hwm >= entry * 1.02)
+            # veya trailing stop maliyetin üstüne taşınmışsa, fiyat active_ts_price'ın altına düştüğü an
+            # çıkış yapılır. "pnl_pct > 0.02" tuzak şartı kaldırılarak ölüm bölgesi kapatılmıştır.
+            has_reached_profit = (new_hwm >= pos.entry_price * 1.02) or (active_ts_price >= pos.entry_price)
+            if curr_p <= active_ts_price and has_reached_profit:
                 decisions.append(
                     ExitDecision(
                         ticker=ticker,
                         action=ExitAction.FULL_EXIT,
-                        reason=f"Trailing Stop Vuruldu (Tepeden %{ts_pct*100:.1f} çekilme, Kilitlenen Kâr: %{pnl_pct*100:.1f})",
+                        reason=f"Trailing Stop Vuruldu (Zirveden %{ts_pct*100:.1f} çekilme, Stop: ₺{active_ts_price:.2f}, Kâr/Zarar: %{pnl_pct*100:.1f})",
                         unrealized_pnl_pct=round(pnl_pct, 4),
                         current_confidence=curr_conf,
                         current_price=curr_p,

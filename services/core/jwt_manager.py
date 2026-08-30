@@ -1,9 +1,9 @@
 """
-ALPHA BIST â€” JWT Token Manager
+ALPHA BIST — JWT Token Manager
 
-JWT tabanlÄ± kimlik doÄŸrulama ve yetkilendirme.
+JWT tabanlı kimlik doğrulama ve yetkilendirme.
 
-Ã–zellikler:
+Özellikler:
 1. JWT token generation (HS256)
 2. Token validation ve decoding
 3. Token refresh
@@ -101,16 +101,16 @@ class JWTClaims:
 
 
 class JWTError(Exception):
-    """JWT hatalarÄ±."""
+    """JWT hataları."""
 
 
 class JWTManager:
     """
-    JWT token yÃ¶neticisi.
+    JWT token yöneticisi.
 
-    HMAC-SHA256 ile token imzalama ve doÄŸrulama.
+    HMAC-SHA256 ile token imzalama ve doğrulama.
 
-    KullanÄ±m:
+    Kullanım:
         jwt_mgr = JWTManager("my-secret-key")
         token = jwt_mgr.generate_token("user123", "ADMIN", ["READ", "WRITE"])
         claims = jwt_mgr.validate_token(token)
@@ -140,12 +140,12 @@ class JWTManager:
         custom_claims: dict[str, Any] | None = None,
     ) -> str:
         """
-        JWT token oluÅŸtur.
+        JWT token oluştur.
 
         Args:
-            user_id: KullanÄ±cÄ± ID
-            role: KullanÄ±cÄ± rolÃ¼
-            permissions: Ä°zin listesi
+            user_id: Kullanıcı ID
+            role: Kullanıcı rolü
+            permissions: İzin listesi
             token_type: Token tipi (access/refresh)
             custom_claims: Ek claims
 
@@ -188,7 +188,7 @@ class JWTManager:
     @otel_trace("jwt_manager.validate_token")
     def validate_token(self, token: str) -> JWTClaims:
         """
-        Token'Ä± doÄŸrula ve claims dÃ¶ndÃ¼r.
+        Token'ı doğrula ve claims döndür.
 
         Args:
             token: JWT token string
@@ -197,7 +197,7 @@ class JWTManager:
             JWTClaims
 
         Raises:
-            JWTError: Token geÃ§ersiz veya sÃ¼resi dolmuÅŸ
+            JWTError: Token geçersiz veya süresi dolmuş
         """
         try:
             parts = token.split(".")
@@ -238,7 +238,7 @@ class JWTManager:
     @otel_trace("jwt_manager.refresh_token")
     def refresh_token(self, token: str) -> str:
         """
-        Refresh token ile yeni access token oluÅŸtur.
+        Refresh token ile yeni access token oluştur.
 
         Args:
             token: Refresh token
@@ -247,7 +247,7 @@ class JWTManager:
             Yeni access token
 
         Raises:
-            JWTError: Refresh token geÃ§ersiz
+            JWTError: Refresh token geçersiz
         """
         claims = self.validate_token(token)
 
@@ -264,7 +264,7 @@ class JWTManager:
 
     @otel_trace("jwt_manager.revoke_token")
     def revoke_token(self, token: str) -> bool:
-        """Token'Ä± iptal et."""
+        """Token'ı iptal et."""
         try:
             claims = self.validate_token(token)
             self._revoked_tokens.add(claims.jti)
@@ -282,13 +282,13 @@ class JWTManager:
         name: str = "default",
     ) -> str:
         """
-        API key oluÅŸtur (sÄ±nÄ±rsÄ±z sÃ¼reli).
+        API key oluştur (sınırsız süreli).
 
         Args:
-            user_id: KullanÄ±cÄ± ID
+            user_id: Kullanıcı ID
             role: Rol
-            permissions: Ä°zinler
-            key name: Key adÄ±
+            permissions: İzinler
+            key name: Key adı
 
         Returns:
             API key string
@@ -298,7 +298,7 @@ class JWTManager:
             role=role,
             permissions=permissions,
             token_type=TokenType.API_KEY,
-            expires_at=time.time() + 365 * 24 * 3600,  # 1 yÄ±l
+            expires_at=time.time() + 365 * 24 * 3600,  # 1 yıl
         )
 
         header = {"alg": self._algorithm, "typ": "JWT"}
@@ -318,9 +318,9 @@ class JWTManager:
     @otel_trace("jwt_manager.rotate_secret")
     def rotate_secret(self, new_secret: str) -> Any:
         """
-        Secret key'i deÄŸiÅŸtir.
+        Secret key'i değiştir.
 
-        Not: Mevcut token'lar geÃ§ersiz olur.
+        Not: Mevcut token'lar geçersiz olur.
         """
         old_secret_preview = self._secret[:8] + "..."
         self._secret = new_secret

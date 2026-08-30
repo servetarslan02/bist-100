@@ -549,32 +549,42 @@ class LightGBMTrainer:
             X_train_scaled = X_train_raw
             X_val_scaled = X_val_raw
 
-        # LambdaRank rank labels (sadece train için)
-        y_rank = np.zeros(len(y), dtype=int)
-        for d in unique_dates:
-            indices = [i for i, t in enumerate(tickers) if date_groups.get(t) == d]
-            if len(indices) > 1:
-                group_returns = [y[i] for i in indices]
-                sorted_indices = sorted(range(len(group_returns)), key=lambda k: -group_returns[k])
-                for rank, idx in enumerate(sorted_indices):
-                    y_rank[indices[idx]] = rank
-
-        y[train_indices]
+        y_train = y[train_indices]
         y_val = y[val_indices]
-        y_rank_train = y_rank[train_indices]
-        y_rank_val = y_rank[val_indices]
 
-        # Group sizes
-        train_groups = self._compute_groups_from_indices(date_groups, tickers, train_indices)
-        val_groups = self._compute_groups_from_indices(date_groups, tickers, val_indices)
+        is_ranking = self._config.objective == "lambdarank"
+
+        if is_ranking:
+            y_rank = np.zeros(len(y), dtype=int)
+            date_to_indices: dict[str, list[int]] = {}
+            for i, t in enumerate(tickers):
+                d = date_groups.get(t)
+                if d:
+                    date_to_indices.setdefault(d, []).append(i)
+            for d, indices in date_to_indices.items():
+                if len(indices) > 1:
+                    group_returns = [y[i] for i in indices]
+                    sorted_indices = sorted(range(len(group_returns)), key=lambda k: -group_returns[k])
+                    for rank, idx in enumerate(sorted_indices):
+                        y_rank[indices[idx]] = rank
+            train_label = y_rank[train_indices]
+            val_label = y_rank[val_indices]
+            # Group counts for ranking queries
+            train_groups = [len([i for i in indices if i in train_indices]) for d, indices in date_to_indices.items() if any(i in train_indices for i in indices)]
+            val_groups = [len([i for i in indices if i in val_indices]) for d, indices in date_to_indices.items() if any(i in val_indices for i in indices)]
+        else:
+            train_label = y[train_indices]
+            val_label = y[val_indices]
+            train_groups = None
+            val_groups = None
 
         # LightGBM Dataset
         train_data = lgb.Dataset(
-            X_train_scaled, label=y_rank_train, group=train_groups, feature_name=feature_names, free_raw_data=False
+            X_train_scaled, label=train_label, group=train_groups, feature_name=feature_names, free_raw_data=False
         )
         val_data = lgb.Dataset(
             X_val_scaled,
-            label=y_rank_val,
+            label=val_label,
             group=val_groups,
             feature_name=feature_names,
             free_raw_data=False,
@@ -584,21 +594,23 @@ class LightGBMTrainer:
         params = {
             "objective": self._config.objective,
             "metric": self._config.metric,
-            "ndcg_eval_at": self._config.ndcg_eval_at,
             "learning_rate": self._config.learning_rate,
             "num_leaves": self._config.num_leaves,
             "min_data_in_leaf": self._config.min_data_in_leaf,
             "feature_fraction": self._config.feature_fraction,
             "bagging_fraction": self._config.bagging_fraction,
             "bagging_freq": self._config.bagging_freq,
-            "verbose": self._config.verbose,
+            "num_threads": 2,
+            "verbose": -1,
             "seed": 42,
             "deterministic": True,
         }
+        if is_ranking:
+            params["ndcg_eval_at"] = self._config.ndcg_eval_at
 
         callbacks = []
         if self._config.early_stopping_rounds > 0:
-            callbacks.append(lgb.early_stopping(self._config.early_stopping_rounds))
+            callbacks.append(lgb.early_stopping(self._config.early_stopping_rounds, verbose=False))
         callbacks.append(lgb.log_evaluation(period=0))
 
         try:
@@ -628,7 +640,7 @@ class LightGBMTrainer:
 
         # Confidence
         confidence, confidence_details = compute_model_confidence(
-            validation_metrics, len(train_indices), len(feature_names), regime
+            validation_metrics, len(train_indices), len(feature_names), train_regime="UNKNOWN"
         )
 
         trained = TrainedModel(
@@ -758,9 +770,9 @@ class LightGBMTrainer:
             groups.append(current_count)
         return groups
 
-    def _compute_ndcg(self, y_true: np.ndarray, y_pred: np.ndarray, groups: list[int]) -> float:
+    def _compute_ndcg(self, y_true: np.ndarray, y_pred: np.ndarray, groups: list[int] | None) -> float:
         """Otomatik eklendi."""
-        if len(groups) == 0:
+        if not groups:
             if np.std(y_true) > 0 and np.std(y_pred) > 0:
                 return float(np.corrcoef(y_true, y_pred)[0, 1])
             return 0.0

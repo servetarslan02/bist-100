@@ -192,145 +192,47 @@ async def scanner_signals(
     except Exception as e:
         logger.warning(f"redis_signals_read_note: {e}")
 
-    # 2. Default Rich Opportunities Fallback
-    default_signals = [
-        {
-            "ticker": "THYAO",
-            "symbol": "THYAO",
-            "name": "Türk Hava Yolları",
-            "company_name": "Türk Hava Yolları",
-            "price": 318.5,
-            "change_pct": 2.1,
-            "score": 94,
-            "confidence_score": 94,
-            "direction": "LONG",
-            "signal": "GÜÇLÜ AL",
-            "signal_type": "VOLUME_BREAKOUT",
-            "risk_level": "Düşük",
-            "horizon": "Kısa Vade",
-            "expected_return_pct": 14.5,
-            "target_price": 364.5,
-            "target_price_2": 395.0,
-            "stop_loss": 298.0,
-            "risk_reward_ratio": 2.2,
-            "rsi": 58.4,
-            "volume_ratio": 2.4,
-            "momentum_1m": 12.5,
-            "momentum_3m": 28.0,
-            "spec_category": "HIGH_CONVICTION",
-            "spec_reason": "20G Direnç Kırılımı ve Kurumsal Para Girişi",
-            "timestamp": "Şimdi",
-        },
-        {
-            "ticker": "ASELS",
-            "symbol": "ASELS",
-            "name": "Aselsan Elektronik",
-            "company_name": "Aselsan",
-            "price": 64.2,
-            "change_pct": 1.8,
-            "score": 91,
-            "confidence_score": 91,
-            "direction": "LONG",
-            "signal": "GÜÇLÜ AL",
-            "signal_type": "MOMENTUM_LEADER",
-            "risk_level": "Düşük",
-            "horizon": "Orta Vade",
-            "expected_return_pct": 12.8,
-            "target_price": 72.5,
-            "target_price_2": 78.0,
-            "stop_loss": 60.5,
-            "risk_reward_ratio": 2.2,
-            "rsi": 61.2,
-            "volume_ratio": 1.9,
-            "momentum_1m": 9.8,
-            "momentum_3m": 34.0,
-            "spec_category": "MOMENTUM_LEADER",
-            "spec_reason": "Savunma Sanayi Yeni İhracat ve Büyüme Trendi",
-            "timestamp": "Şimdi",
-        },
-        {
-            "ticker": "TUPRS",
-            "symbol": "TUPRS",
-            "name": "Tüpraş Rafineri",
-            "company_name": "Tüpraş",
-            "price": 156.4,
-            "change_pct": -0.8,
-            "score": 87,
-            "confidence_score": 87,
-            "direction": "LONG",
-            "signal": "AL",
-            "signal_type": "PULLBACK_BOUNCE",
-            "risk_level": "Orta",
-            "horizon": "Kısa Vade",
-            "expected_return_pct": 11.2,
-            "target_price": 174.0,
-            "target_price_2": 188.0,
-            "stop_loss": 147.0,
-            "risk_reward_ratio": 1.9,
-            "rsi": 36.5,
-            "volume_ratio": 1.5,
-            "momentum_1m": 6.4,
-            "momentum_3m": 18.2,
-            "spec_category": "PULLBACK_BOUNCE",
-            "spec_reason": "50 Günlük Ortalama Destek Testi ve Dip Dönüşü",
-            "timestamp": "Şimdi",
-        },
-        {
-            "ticker": "GARAN",
-            "symbol": "GARAN",
-            "name": "Garanti BBVA",
-            "company_name": "Garanti BBVA",
-            "price": 118.2,
-            "change_pct": 3.4,
-            "score": 89,
-            "confidence_score": 89,
-            "direction": "LONG",
-            "signal": "GÜÇLÜ AL",
-            "signal_type": "VOLUME_BREAKOUT",
-            "risk_level": "Düşük",
-            "horizon": "Kısa Vade",
-            "expected_return_pct": 10.4,
-            "target_price": 130.5,
-            "target_price_2": 142.0,
-            "stop_loss": 111.0,
-            "risk_reward_ratio": 1.7,
-            "rsi": 64.0,
-            "volume_ratio": 2.8,
-            "momentum_1m": 15.2,
-            "momentum_3m": 42.0,
-            "spec_category": "VOLUME_BREAKOUT",
-            "spec_reason": "Bankacılık Rallisi ve Yabancı Takas Artışı",
-            "timestamp": "Şimdi",
-        },
-        {
-            "ticker": "BIMAS",
-            "symbol": "BIMAS",
-            "name": "BİM Mağazalar",
-            "company_name": "BİM",
-            "price": 485.0,
-            "change_pct": 0.5,
-            "score": 84,
-            "confidence_score": 84,
-            "direction": "LONG",
-            "signal": "AL",
-            "signal_type": "MOMENTUM_LEADER",
-            "risk_level": "Düşük",
-            "horizon": "Uzun Vade",
-            "expected_return_pct": 9.8,
-            "target_price": 532.0,
-            "target_price_2": 570.0,
-            "stop_loss": 458.0,
-            "risk_reward_ratio": 1.7,
-            "rsi": 52.0,
-            "volume_ratio": 1.2,
-            "momentum_1m": 4.5,
-            "momentum_3m": 22.0,
-            "spec_category": "MOMENTUM_LEADER",
-            "spec_reason": "Defansif Nakit Akışı ve İstikrarlı Büyüme",
-            "timestamp": "Şimdi",
-        },
-    ]
-    return {"signals": default_signals[:limit], "count": min(len(default_signals), limit)}
+    # Fallback to direct ML Scanner if available, otherwise fail-closed empty (NO HARDCODED FAKE SIGNALS)
+    try:
+        from services.scanner.bist_ml_scanner import bist_ml_scanner
+
+        live_opps = bist_ml_scanner.scan_all_opportunities(limit=limit)
+        if live_opps:
+            result_signals = live_opps
+            if category and category != "ALL":
+                result_signals = [
+                    s
+                    for s in result_signals
+                    if s.get("spec_category") == category
+                    or s.get("signal_type") == category
+                    or s.get("strategy_type") == category
+                    or category in s.get("tags", [])
+                    or (category == "HIGH_CONVICTION" and (s.get("is_high_conviction") or s.get("score", 0) >= 80))
+                ]
+            if search:
+                q = search.lower().strip()
+                result_signals = [
+                    s
+                    for s in result_signals
+                    if q in s.get("symbol", "").lower()
+                    or q in s.get("name", "").lower()
+                    or q in s.get("spec_reason", "").lower()
+                ]
+            return {
+                "signals": result_signals[:limit],
+                "count": len(result_signals[:limit]),
+                "source": "ml_scanner_live",
+            }
+    except Exception as scan_err:
+        logger.warning(f"live_scanner_fallback_failed: {scan_err}")
+
+    # Fail-closed: Never return fake hardcoded signals (GEMINI.md Rule 4)
+    return {
+        "signals": [],
+        "count": 0,
+        "status": "unavailable",
+        "message": "Canlı sinyal verisi bulunamadı veya altyapı güncelleniyor",
+    }
 
 
 # =====================================================

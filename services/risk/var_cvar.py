@@ -328,6 +328,10 @@ class VaRCalculator:
             import torch
 
             if torch.cuda.is_available():
+                if seed is not None:
+                    torch.manual_seed(seed)
+                    torch.cuda.manual_seed_all(seed)
+
                 if sigma <= 0:
                     simulated_returns = np.full(n_simulations, mu * holding_period_days)
                 else:

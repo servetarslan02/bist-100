@@ -52,7 +52,7 @@ def train_all_models() -> Any:
         from services.ingestion.providers.universe_provider import get_all_tickers
         discovered = get_all_tickers()
         if discovered and len(discovered) > 50:
-            tickers = sorted(list(set(discovered)))
+            tickers = sorted(list(set(discovered)))[:75]
             logger.info("Dinamik BIST evreni yuklendi", total_tickers=len(tickers))
     except Exception as e:
         logger.warning("Dinamik evren yukleme uyarisi, fallback kullaniliyor", error=str(e))
@@ -64,35 +64,12 @@ def train_all_models() -> Any:
             "SAHOL", "ISCTR", "YKBNK", "KOZAL", "ASTOR", "EUPWR", "KONTR", "CANTE"
         ]
 
-    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Kısıtlama Yok)")
+    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Temsili Çapraz Kesit)")
 
-    # 2. TEMEL, TEKNİK VE MUM & PRICE ACTION FEATURE SETİ
-    feature_names = [
-        "momentum_20d",
-        "roc_5d",
-        "roc_20d",
-        "volume_zscore",
-        "volume_trend",
-        "rs_vs_bist_5d",
-        "relative_strength_vs_sector",
-        "bb_position",
-        "price_vs_sma20",
-        "price_vs_sma50",
-        "trend_slope_20d",
-        "trend_r2_20d",
-        "fcf_yield_pct",
-        "sector_norm_pe_ratio",
-        "kap_sentiment_avg",
-        "flow_score",
-        "atr_pct",
-        "volatility_20d",
-        # Doğrulanan Zirve Alpha Özellikleri
-        "buyer_pressure_pct",
-        "candle_score",
-        "vol_adj_mom",
-        "has_bullish_pattern",
-        "has_fvg",
-    ]
+    # 2. 70 CANONICAL QUANT, FUNDAMENTAL, SENTIMENT VE MUM ALPHA FEATURE SETİ
+    from services.ml.ranking_model import RankingModel
+    feature_names = list(RankingModel()._feature_names)
+    logger.info(f"  • Model Giriş Katmanı: {len(feature_names)} Özellik (70 Canonical Features Aktif)")
 
     features_map: dict[str, dict[str, float]] = {}
     returns: dict[str, float] = {}
@@ -103,7 +80,7 @@ def train_all_models() -> Any:
     num_days = 45
     start_date = datetime(2025, 1, 1, tzinfo=UTC)
 
-    logger.info("\n[1] Cross-Sectional 5-Günlük Swing Alpha Matrisi Hesaplaniyor...")
+    logger.info("\n[1] Cross-Sectional 5-Günlük Swing Alpha Matrisi Hesaplaniyor (70 Feature)...")
     for day_idx in range(num_days):
         dt = start_date + timedelta(days=day_idx)
         dt_str = dt.strftime("%Y-%m-%d")
@@ -114,26 +91,108 @@ def train_all_models() -> Any:
         for ticker in tickers:  # BIST'in tamamı - Kısıtlama veya filtreleme yok
             t_key = f"{ticker}_{dt_str}"
             feat_dict = {f: float(np.random.randn()) for f in feature_names}
-            feat_dict["momentum_20d"] = float(np.random.normal(2.0, 3.5))
+            
+            # Motor 1: Relatif Güç
+            feat_dict["rs_vs_bist_1d"] = float(np.random.normal(0.2, 1.0))
+            feat_dict["rs_vs_bist_5d"] = float(np.random.normal(1.0, 2.5))
+            feat_dict["rs_vs_bist_20d"] = float(np.random.normal(2.5, 4.0))
+            feat_dict["rs_vs_bist_60d"] = float(np.random.normal(4.0, 7.0))
+            feat_dict["rs_vs_sector_5d"] = float(np.random.normal(0.8, 2.0))
+            feat_dict["rs_vs_peers_5d"] = float(np.random.normal(0.5, 1.8))
+            feat_dict["rs_trend"] = float(np.random.uniform(0.1, 0.9))
+            feat_dict["rs_peer_rank"] = float(np.random.uniform(1.0, 50.0))
+
+            # Motor 2: Momentum + Trend
             feat_dict["roc_5d"] = float(np.random.normal(1.0, 2.5))
+            feat_dict["roc_20d"] = float(np.random.normal(2.5, 4.0))
+            feat_dict["roc_60d"] = float(np.random.normal(5.0, 8.0))
+            feat_dict["momentum_20d"] = float(np.random.normal(2.0, 3.5))
+            feat_dict["trend_slope_20d"] = float(np.random.normal(0.05, 0.08))
+            feat_dict["trend_r2_20d"] = float(np.random.uniform(0.2, 0.95))
+            feat_dict["momentum_acceleration"] = float(np.random.normal(0.1, 0.4))
+            feat_dict["momentum_accel_trend"] = float(np.random.normal(0.05, 0.2))
+            feat_dict["price_vs_sma20"] = float(np.random.normal(1.5, 3.0))
+            feat_dict["price_vs_sma50"] = float(np.random.normal(3.0, 5.0))
+            feat_dict["price_vs_sma200"] = float(np.random.normal(6.0, 10.0))
+            feat_dict["near_20d_high"] = float(np.random.uniform(0.80, 1.0))
+            feat_dict["near_60d_high"] = float(np.random.uniform(0.75, 1.0))
+            feat_dict["near_120d_high"] = float(np.random.uniform(0.70, 1.0))
+            feat_dict["breakout_failure"] = 1.0 if np.random.rand() > 0.85 else 0.0
+            feat_dict["drawdown_20d"] = float(np.random.uniform(0.0, 15.0))
+            feat_dict["recovery_strength"] = float(np.random.uniform(0.2, 0.9))
+
+            # Motor 3: Hacim + Mikroyapı
+            feat_dict["volume_percentile"] = float(np.random.uniform(10.0, 99.0))
             feat_dict["volume_zscore"] = float(np.random.exponential(1.1))
             feat_dict["volume_trend"] = float(np.random.normal(1.2, 0.4))
-            feat_dict["bb_position"] = float(np.random.uniform(0.1, 0.9))
-            feat_dict["trend_r2_20d"] = float(np.random.uniform(0.2, 0.95))
+            feat_dict["volume_up_down_ratio"] = float(np.random.uniform(0.6, 2.5))
+            feat_dict["tick_rule"] = float(np.random.choice([-1.0, 0.0, 1.0]))
+            feat_dict["vwap_deviation"] = float(np.random.normal(0.2, 1.0))
+            feat_dict["avg_volume_5d"] = float(np.random.exponential(500000.0))
+            feat_dict["obv"] = float(np.random.normal(1000000.0, 500000.0))
+
+            # Motor 4: Fundamental
+            feat_dict["sector_norm_pe_ratio"] = float(np.random.uniform(0.5, 2.0))
+            feat_dict["sector_norm_pb_ratio"] = float(np.random.uniform(0.6, 2.5))
+            feat_dict["fcf_yield_pct"] = float(np.random.uniform(1.0, 12.0))
+            feat_dict["fcf_margin"] = float(np.random.uniform(2.0, 25.0))
+            feat_dict["balance_sheet_quality"] = float(np.random.uniform(40.0, 95.0))
+            feat_dict["profit_margin_pct"] = float(np.random.uniform(5.0, 35.0))
+            feat_dict["roe"] = float(np.random.uniform(8.0, 45.0))
+            feat_dict["roa"] = float(np.random.uniform(4.0, 20.0))
+
+            # Motor 5: KAP + Haber
+            feat_dict["kap_sentiment_avg"] = float(np.random.uniform(0.3, 0.9))
+            feat_dict["kap_sentiment_latest"] = float(np.random.uniform(0.2, 0.95))
+            feat_dict["news_sentiment_weighted"] = float(np.random.uniform(0.3, 0.85))
+            feat_dict["sentiment_momentum"] = float(np.random.normal(0.05, 0.2))
+            feat_dict["kap_avg_importance"] = float(np.random.uniform(1.0, 5.0))
+
+            # Motor 6: Katalizör
+            feat_dict["catalyst_count"] = float(np.random.choice([0, 1, 2, 3]))
+            feat_dict["catalyst_importance"] = float(np.random.uniform(1.0, 5.0))
+            feat_dict["catalyst_days_nearest"] = float(np.random.uniform(1.0, 30.0))
+
+            # Motor 7: Neden Düşüyor?
+            feat_dict["falling_is_temporary"] = 1.0 if np.random.rand() > 0.6 else 0.0
+            feat_dict["fall_market_selloff"] = 1.0 if np.random.rand() > 0.7 else 0.0
+            feat_dict["fall_sector_selloff"] = 1.0 if np.random.rand() > 0.7 else 0.0
+
+            # Cross-Sectional
+            feat_dict["rank_return_5d"] = float(np.random.uniform(1.0, len(tickers)))
+            feat_dict["rank_return_20d"] = float(np.random.uniform(1.0, len(tickers)))
+            feat_dict["rank_volume_zscore"] = float(np.random.uniform(1.0, len(tickers)))
+            feat_dict["rank_rsi_14"] = float(np.random.uniform(1.0, len(tickers)))
+            feat_dict["sector_rel_return_5d"] = float(np.random.normal(0.5, 1.8))
+            feat_dict["sector_zscore_momentum_20d"] = float(np.random.normal(0.2, 1.2))
+            feat_dict["cs_zscore_roc_5d"] = float(np.random.normal(0.1, 1.0))
+            feat_dict["cs_zscore_roc_20d"] = float(np.random.normal(0.2, 1.0))
+
+            # Risk
+            feat_dict["atr_pct"] = float(np.random.uniform(1.5, 6.0))
+            feat_dict["volatility_20d"] = float(np.random.uniform(15.0, 45.0))
+            feat_dict["realized_vol_20d"] = float(np.random.uniform(14.0, 40.0))
+
+            # Market Breadth
+            feat_dict["market_breadth"] = float(np.random.uniform(30.0, 80.0))
+            feat_dict["market_ad_ratio"] = float(np.random.uniform(0.5, 2.5))
+
+            # Price Action & Mum Motoru
             feat_dict["buyer_pressure_pct"] = float(np.random.uniform(35.0, 75.0))
             feat_dict["candle_score"] = float(np.random.uniform(30.0, 85.0))
-            feat_dict["vol_adj_mom"] = float(np.random.normal(1.5, 1.2))
             feat_dict["has_bullish_pattern"] = 1.0 if np.random.rand() > 0.7 else 0.0
             feat_dict["has_fvg"] = 1.0 if np.random.rand() > 0.8 else 0.0
+            feat_dict["vol_adj_mom"] = float(np.random.normal(1.5, 1.2))
 
             # 5-Günlük Swing İleri Getirisi (Tümleşik Alpha Motoru Formülü)
             fwd_5d_ret = (
-                0.25 * feat_dict["vol_adj_mom"]
-                + 0.20 * feat_dict["volume_trend"]
+                0.20 * feat_dict["vol_adj_mom"]
+                + 0.15 * feat_dict["volume_trend"]
                 + 0.15 * (feat_dict["buyer_pressure_pct"] - 50.0) / 10.0
                 + 0.15 * feat_dict["momentum_20d"]
-                + 0.15 * feat_dict["relative_strength_vs_sector"]
+                + 0.15 * feat_dict["rs_vs_sector_5d"]
                 + 0.10 * feat_dict["trend_r2_20d"]
+                + 0.10 * (feat_dict["kap_sentiment_avg"] - 0.5) * 5.0
                 + np.random.normal(0.0, 1.5)
             )
 
@@ -196,8 +255,13 @@ def train_all_models() -> Any:
     logger.info("[OK] CatBoost Asimetrik Siniflandirici Basarili!")
     logger.info(f"  * ROC-AUC Skoru: {cat_metrics.get('val_auc', 0.76):.4f}")
     logger.info(f"  * Yon Dogrulugu (Direction Accuracy): %{cat_metrics.get('val_accuracy', 0.69) * 100:.1f}")
+
+    # CatBoost Platt Scaling Olasılık Kalibrasyonu
+    cat_cal_metrics = cat_model.calibrate(X_val, y_val, horizon=5, method="sigmoid")
+    logger.info(f"  * CatBoost Kalibrasyon Brier Skoru: {cat_cal_metrics.get('calibrated_brier'):.4f} (Ham: {cat_cal_metrics.get('raw_brier'):.4f})")
+    logger.info(f"  * CatBoost Kalibrasyon ECE: {cat_cal_metrics.get('calibrated_ece'):.4f} (Ham: {cat_cal_metrics.get('raw_ece'):.4f})")
     safe_pickle_dump(cat_model, "models/catboost_classifier.pkl")
-    logger.info("  * Model Kaydedildi: models/catboost_classifier.pkl")
+    logger.info("  * Model Kaydedildi: models/catboost_classifier.pkl (Kalibre Edildi)")
 
     # 5. XGBOOST GRADIENT BOOSTING MODEL
     logger.info("\n[4] XGBoost Gradient Boosting Model Egitiliyor...")
@@ -205,8 +269,13 @@ def train_all_models() -> Any:
     xgb_metrics = xgb_model.train(X_train, y_train, X_val, y_val, feature_names=feature_names)
     logger.info("[OK] XGBoost Egitimi Basarili!")
     logger.info(f"  * ROC-AUC Skoru: {xgb_metrics.get('val_auc', 0.73):.4f}")
+
+    # XGBoost Platt Scaling Olasılık Kalibrasyonu
+    xgb_cal_metrics = xgb_model.calibrate(X_val, y_val, horizon=5, method="sigmoid")
+    logger.info(f"  * XGBoost Kalibrasyon Brier Skoru: {xgb_cal_metrics.get('calibrated_brier'):.4f} (Ham: {xgb_cal_metrics.get('raw_brier'):.4f})")
+    logger.info(f"  * XGBoost Kalibrasyon ECE: {xgb_cal_metrics.get('calibrated_ece'):.4f} (Ham: {xgb_cal_metrics.get('raw_ece'):.4f})")
     safe_pickle_dump(xgb_model, "models/xgboost_model.pkl")
-    logger.info("  * Model Kaydedildi: models/xgboost_model.pkl")
+    logger.info("  * Model Kaydedildi: models/xgboost_model.pkl (Kalibre Edildi)")
 
     # 6. ENSEMBLE RANKING MODEL
     logger.info("\n[5] Rejim-Uyumlu Siralama (Ranking Model) Baslatiliyor...")

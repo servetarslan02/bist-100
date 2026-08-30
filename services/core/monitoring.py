@@ -1,24 +1,24 @@
 """
-ALPHA BIST â€” Portfolio & Lock Monitoring Integration
+ALPHA BIST — Portfolio & Lock Monitoring Integration
 
 Prometheus metrics + FastAPI endpoints for production observability.
 
 Endpoints:
-  GET /health/detailed     â€” Full system health (portfolio + locks)
-  GET /metrics             â€” Prometheus format metrics
-  GET /admin/lock-metrics  â€” Lock performance metrics
-  GET /admin/portfolio     â€” Portfolio health + accounting
+  GET /health/detailed     — Full system health (portfolio + locks)
+  GET /metrics             — Prometheus format metrics
+  GET /admin/lock-metrics  — Lock performance metrics
+  GET /admin/portfolio     — Portfolio health + accounting
 
 Metrics:
-  lock_acquisition_total      â€” Counter
-  lock_timeout_total          â€” Counter
-  lock_deadlock_total         â€” Counter
-  lock_renewal_total          â€” Counter
-  lock_wait_seconds           â€” Histogram
-  portfolio_equity            â€” Gauge
-  portfolio_cash              â€” Gauge
-  portfolio_positions_count   â€” Gauge
-  portfolio_invariant_failures â€” Counter
+  lock_acquisition_total      — Counter
+  lock_timeout_total          — Counter
+  lock_deadlock_total         — Counter
+  lock_renewal_total          — Counter
+  lock_wait_seconds           — Histogram
+  portfolio_equity            — Gauge
+  portfolio_cash              — Gauge
+  portfolio_positions_count   — Gauge
+  portfolio_invariant_failures — Counter
 """
 
 import functools
@@ -54,13 +54,13 @@ def otel_trace(span_name: str) -> Any:
 
 
 class PortfolioMonitor:
-    """Portfolio ve lock monitoring â€” Prometheus + API integration."""
+    """Portfolio ve lock monitoring — Prometheus + API integration."""
 
     def __init__(self):
         """Otomatik eklendi."""
         self._portfolio_service = None
         self._last_sync_time: float | None = None
-        self._sync_interval_s = 5.0  # 5 saniyede bir metrik gÃ¼ncelle
+        self._sync_interval_s = 5.0  # 5 saniyede bir metrik güncelle
         self._invariant_failure_count = 0
 
     @otel_trace("monitoring.bind")
@@ -73,7 +73,7 @@ class PortfolioMonitor:
 
     @otel_trace("monitoring.sync_metrics")
     async def sync_metrics(self) -> Any:
-        """Portfolio metriklerini Prometheus gauge'larÄ±na yaz."""
+        """Portfolio metriklerini Prometheus gauge'larına yaz."""
         now = time.time()
         if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
             return
@@ -148,7 +148,7 @@ class PortfolioMonitor:
         else:
             overall = "HEALTHY"
 
-        # Health checker bileÅŸenlerini gÃ¼ncelle
+        # Health checker bileşenlerini güncelle
         lock_status = lock_health.get("overall_status", "UNKNOWN")
         health_checker.update_status("portfolio_locks", lock_status, f"Lock status: {lock_status}")
 
@@ -160,7 +160,7 @@ class PortfolioMonitor:
             "portfolio_accounting", acc_status, f"Invariant: {'OK' if acc_status == 'HEALTHY' else 'FAILED'}"
         )
 
-        # Alert kontrolÃ¼
+        # Alert kontrolü
         alerting.check_health({"status": overall, "issues": []})
 
         return {

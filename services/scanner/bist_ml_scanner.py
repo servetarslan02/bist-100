@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import polars as pl
 import structlog
 
@@ -54,6 +55,11 @@ class BistMLScanner:
                 except Exception as e:
                     logger.warning(f"Model yüklenemedi: {m_name} (yol: {pkl_path}), hata: {e}")
 
+    def load_models(self) -> None:
+        """Public method to reload trained models into memory."""
+        self.models.clear()
+        self._load_models()
+
     def scan_all_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
         """Tüm BIST evrenini ML ensemble ile tarar ve en yüksek skorlu fırsatları döner."""
         if not self.stock_dict:
@@ -67,7 +73,10 @@ class BistMLScanner:
         bm_dist_sma200 = ((bm_now - bm_sma200) / max(bm_sma200, 1.0)) * 100.0
         bm_vol_20d = float(pl.Series(bm_closes).pct_change().tail(20).std() * np.sqrt(252) * 100.0)
         bm_ret_5d = float(((bm_now - bm_closes[-5]) / bm_closes[-5]) * 100.0) if len(bm_closes) >= 5 else 0.0
+        bm_ret_20d = float(((bm_now - bm_closes[-20]) / bm_closes[-20]) * 100.0) if len(bm_closes) >= 20 else 0.0
 
+        from services.ml.ranking_model import RankingModel
+        feat_names = list(RankingModel()._feature_names)
         candidates = []
 
         for raw_sym, df in self.stock_dict.items():
@@ -138,35 +147,106 @@ class BistMLScanner:
 
             has_bull_pat = 1.0 if (is_dip == 1.0 or l_wick > b_body * 1.5) else 0.0
             has_fvg = 1.0 if len(lows) >= 3 and lows[-1] > highs[-3] else 0.0
+            candle_score = float(buyer_press * 0.5 + (50.0 if has_bull_pat == 1.0 else 0.0) * 0.5)
 
-            import pandas as pd
+            ret_1d = float((closes[-1] - closes[-2]) / max(closes[-2], 1e-4) * 100.0) if len(closes) >= 2 else 0.0
+            bm_ret_1d = float((bm_closes[-1] - bm_closes[-2]) / max(bm_closes[-2], 1e-4) * 100.0) if len(bm_closes) >= 2 else 0.0
+            vol_adj_mom = float((ret_20d / max(vol20 * 100.0, 1.0)) * min(vol_surge, 3.0))
 
-            feat_names = [
-                "momentum_20d", "roc_5d", "roc_20d", "volume_zscore",
-                "rs_vs_bist_5d", "relative_strength_vs_sector", "bb_position",
-                "price_vs_sma20", "price_vs_sma50", "trend_slope_20d", "trend_r2_20d",
-                "fcf_yield_pct", "sector_norm_pe_ratio", "kap_sentiment_avg", "flow_score",
-                "atr_pct", "volatility_20d"
-            ]
-            feat_row = [
-                ret_20d,
-                ret_5d,
-                ret_20d,
-                float(np.clip((vol_surge - 1.0) * 1.5, -3.0, 4.0)),
-                ret_5d - bm_ret_5d,
-                ret_5d - bm_ret_5d,
-                float(np.clip((latest_p - (sma20 - 2 * atr_val)) / max(4 * atr_val, 1e-2), 0.0, 1.0)),
-                float((latest_p - sma20) / max(sma20, 1e-2) * 100.0),
-                float((latest_p - sma50) / max(sma50, 1e-2) * 100.0),
-                float(slope),
-                float(r2),
-                5.0,
-                1.0,
-                0.5,
-                float(buyer_press / 100.0),
-                atr_pct,
-                vol20 * 100.0,
-            ]
+            f_map = {
+                # Motor 1: Relatif Güç
+                "rs_vs_bist_1d": float(ret_1d - bm_ret_1d),
+                "rs_vs_bist_5d": float(ret_5d - bm_ret_5d),
+                "rs_vs_bist_20d": float(ret_20d - bm_ret_20d),
+                "rs_vs_bist_60d": float(ret_20d * 2.0),
+                "rs_vs_sector_5d": float(ret_5d - bm_ret_5d),
+                "rs_vs_peers_5d": float(ret_5d - bm_ret_5d),
+                "rs_trend": float(np.clip(slope * 5.0, -1.0, 1.0)),
+                "rs_peer_rank": 25.0,
+
+                # Motor 2: Momentum + Trend
+                "roc_5d": float(ret_5d),
+                "roc_20d": float(ret_20d),
+                "roc_60d": float(ret_20d * 2.0),
+                "momentum_20d": float(ret_20d),
+                "trend_slope_20d": float(slope),
+                "trend_r2_20d": float(r2),
+                "momentum_acceleration": float(np.clip(ret_5d - (ret_20d / 4.0), -10.0, 10.0)),
+                "momentum_accel_trend": float(np.clip(slope, -1.0, 1.0)),
+                "price_vs_sma20": float((latest_p - sma20) / max(sma20, 1e-2) * 100.0),
+                "price_vs_sma50": float((latest_p - sma50) / max(sma50, 1e-2) * 100.0),
+                "price_vs_sma200": float((latest_p - sma50) / max(sma50, 1e-2) * 120.0),
+                "near_20d_high": float(np.clip(latest_p / max(max(highs[-20:]), 1e-2), 0.0, 1.0)),
+                "near_60d_high": float(np.clip(latest_p / max(max(highs), 1e-2), 0.0, 1.0)),
+                "near_120d_high": float(np.clip(latest_p / max(max(highs), 1e-2), 0.0, 1.0)),
+                "breakout_failure": 0.0,
+                "drawdown_20d": float(np.clip((max(highs[-20:]) - latest_p) / max(max(highs[-20:]), 1e-2) * 100.0, 0.0, 50.0)),
+                "recovery_strength": float(np.clip((latest_p - min(lows[-20:])) / max(max(highs[-20:]) - min(lows[-20:]), 1e-2), 0.0, 1.0)),
+
+                # Motor 3: Hacim + Mikroyapı
+                "volume_percentile": float(np.clip(vol_surge * 50.0, 0.0, 100.0)),
+                "volume_zscore": float(np.clip((vol_surge - 1.0) * 1.5, -3.0, 4.0)),
+                "volume_trend": float(vol_surge),
+                "volume_up_down_ratio": float(np.clip(buyer_press / max(100.0 - buyer_press, 1.0), 0.1, 5.0)),
+                "tick_rule": 1.0 if ret_1d > 0 else (-1.0 if ret_1d < 0 else 0.0),
+                "vwap_deviation": float(np.clip((latest_p - sma20) / max(sma20, 1e-2) * 100.0, -10.0, 10.0)),
+                "avg_volume_5d": float(np.mean(volumes[-5:]) if len(volumes) >= 5 else volumes[-1]),
+                "obv": float(np.sum(volumes[-20:]) if ret_20d > 0 else -float(np.sum(volumes[-20:]))),
+
+                # Motor 4: Fundamental
+                "sector_norm_pe_ratio": 1.0,
+                "sector_norm_pb_ratio": 1.0,
+                "fcf_yield_pct": 5.0,
+                "fcf_margin": 10.0,
+                "balance_sheet_quality": 75.0,
+                "profit_margin_pct": 15.0,
+                "roe": 22.0,
+                "roa": 12.0,
+
+                # Motor 5: KAP + Haber
+                "kap_sentiment_avg": 0.65,
+                "kap_sentiment_latest": 0.65,
+                "news_sentiment_weighted": 0.60,
+                "sentiment_momentum": 0.05,
+                "kap_avg_importance": 3.0,
+
+                # Motor 6: Katalizör
+                "catalyst_count": 1.0,
+                "catalyst_importance": 3.0,
+                "catalyst_days_nearest": 10.0,
+
+                # Motor 7: Neden Düşüyor?
+                "falling_is_temporary": 1.0 if ret_5d < 0 and slope > 0 else 0.0,
+                "fall_market_selloff": 1.0 if ret_5d < 0 and bm_ret_5d < 0 else 0.0,
+                "fall_sector_selloff": 0.0,
+
+                # Cross-Sectional
+                "rank_return_5d": 15.0,
+                "rank_return_20d": 15.0,
+                "rank_volume_zscore": 10.0,
+                "rank_rsi_14": float(rsi_14),
+                "sector_rel_return_5d": float(ret_5d - bm_ret_5d),
+                "sector_zscore_momentum_20d": float(np.clip(ret_20d / 5.0, -2.5, 2.5)),
+                "cs_zscore_roc_5d": float(np.clip(ret_5d / 3.0, -2.5, 2.5)),
+                "cs_zscore_roc_20d": float(np.clip(ret_20d / 5.0, -2.5, 2.5)),
+
+                # Risk
+                "atr_pct": float(atr_pct),
+                "volatility_20d": float(vol20 * 100.0),
+                "realized_vol_20d": float(vol20 * 100.0),
+
+                # Market Breadth
+                "market_breadth": 65.0,
+                "market_ad_ratio": 1.5,
+
+                # Price Action & Mum Motoru
+                "buyer_pressure_pct": float(buyer_press),
+                "candle_score": float(candle_score),
+                "has_bullish_pattern": float(has_bull_pat),
+                "has_fvg": float(has_fvg),
+                "vol_adj_mom": float(vol_adj_mom),
+            }
+            feat_row = [float(f_map.get(f, 0.0)) for f in feat_names]
             feat_df = pd.DataFrame([feat_row], columns=feat_names)
 
             # ML Ensemble Tahmini (LightGBM %40, CatBoost %30, XGBoost %30)

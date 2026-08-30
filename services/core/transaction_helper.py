@@ -1,9 +1,9 @@
 """
-ALPHA BIST â€” Database Transaction Helper
+ALPHA BIST — Database Transaction Helper
 
-Atomic operations iÃ§in transaction yardÄ±mcÄ±sÄ±.
+Atomic operations için transaction yardımcısı.
 
-Ã–zellikler:
+Özellikler:
 1. Atomic multi-operation transactions
 2. Retry with exponential backoff
 3. Nested transaction support (savepoints)
@@ -82,11 +82,11 @@ class QueryMetrics:
 
 class TransactionHelper:
     """
-    Database transaction yardÄ±mcÄ±sÄ±.
+    Database transaction yardımcısı.
 
-    Atomic operations, retry, timeout ve metrik takibi saÄŸlar.
+    Atomic operations, retry, timeout ve metrik takibi sağlar.
 
-    KullanÄ±m:
+    Kullanım:
         helper = TransactionHelper(pg_pool)
 
         # Simple atomic
@@ -128,7 +128,7 @@ class TransactionHelper:
         Atomic transaction context manager.
 
         Args:
-            timeout_seconds: Zaman aÅŸÄ±mÄ±
+            timeout_seconds: Zaman aşımı
             read_only: Salt okunur transaction
 
         Yields:
@@ -200,11 +200,11 @@ class TransactionHelper:
         """
         Retry ile atomic transaction.
 
-        Deadlock veya geÃ§ici hatalarda otomatik retry.
+        Deadlock veya geçici hatalarda otomatik retry.
 
         Args:
-            max_retries: Maksimum deneme sayÄ±sÄ±
-            timeout_seconds: Zaman aÅŸÄ±mÄ±
+            max_retries: Maksimum deneme sayısı
+            timeout_seconds: Zaman aşımı
             read_only: Salt okunur
         """
         retries = max_retries or self._max_retries
@@ -235,7 +235,7 @@ class TransactionHelper:
         """
         Nested transaction (savepoint).
 
-        Inner transaction baÅŸarÄ±sÄ±z olursa sadece savepoint rollback olur.
+        Inner transaction başarısız olursa sadece savepoint rollback olur.
         """
         sp_name = f"sp_{name}_{int(time.monotonic() * 1000)}"
         await conn.execute(f"SAVEPOINT {sp_name}")
@@ -254,17 +254,17 @@ class TransactionHelper:
         timeout_seconds: float | None = None,
     ) -> list[Any]:
         """
-        Toplu atomic iÅŸlem.
+        Toplu atomic işlem.
 
-        TÃ¼m operasyonlar tek transaction'da Ã§alÄ±ÅŸÄ±r.
-        Birisi baÅŸarÄ±sÄ±zsa hepsi rollback olur.
+        Tüm operasyonlar tek transaction'da çalışır.
+        Birisi başarısızsa hepsi rollback olur.
 
         Args:
             operations: Callable listesi (conn parametreli)
-            timeout_seconds: Zaman aÅŸÄ±mÄ±
+            timeout_seconds: Zaman aşımı
 
         Returns:
-            Her operasyonun dÃ¶nÃ¼ÅŸ deÄŸeri
+            Her operasyonun dönüş değeri
         """
         results = []
 
@@ -283,7 +283,7 @@ class TransactionHelper:
         return self._metrics.to_dict()
 
     def get_slow_queries(self, threshold_ms: float = 1000) -> list[dict[str, Any]]:
-        """YavaÅŸ sorgularÄ± listele."""
+        """Yavaş sorguları listele."""
         slow = [q for q in self._query_log if q.duration_ms > threshold_ms]
         return [
             {
@@ -296,7 +296,7 @@ class TransactionHelper:
         ]
 
     def reset_metrics(self) -> Any:
-        """Metrikleri sÄ±fÄ±rla."""
+        """Metrikleri sıfırla."""
         self._metrics = TransactionMetrics()
         self._query_log.clear()
 
@@ -315,7 +315,7 @@ class TransactionConnection:
 
     @otel_trace("transaction_connection.execute")
     async def execute(self, query: str, *args) -> Any:
-        """Sorgu Ã§alÄ±ÅŸtÄ±r (metrics ile)."""
+        """Sorgu çalıştır (metrics ile)."""
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
@@ -380,7 +380,7 @@ class TransactionConnection:
 
     @otel_trace("transaction_connection.fetchval")
     async def fetchval(self, query: str, *args) -> Any:
-        """Tek deÄŸer fetch."""
+        """Tek değer fetch."""
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
