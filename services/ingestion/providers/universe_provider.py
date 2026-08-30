@@ -439,7 +439,10 @@ class UniverseAutoUpdater:
             logger.debug("Cache load failed", error=str(e))
 
     def _save_to_cache(self) -> Any:
-        """Cache'e kaydet."""
+        """Cache'e kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("universe_cache", 300):
+            return
         try:
             self.CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
             data = {

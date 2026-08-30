@@ -913,13 +913,23 @@ class HolidayManager:
             logger.warning("Holiday cache save failed", error=str(e))
 
     def _log_audit(self, action: str, d: date, reason: str = "") -> None:
-        """Tatil değişiklik logu (audit trail)."""
+        """Tatil değişiklik logu (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "action": action,
             "date": d.isoformat(),
             "reason": reason,
         }
+
+        # RAM'de biriktir
+        if not hasattr(self, '_pending_audit_entries'):
+            self._pending_audit_entries = []
+        self._pending_audit_entries.append(entry)
+
+        # 60 saniyede bir veya 10 entry'de bir flush
+        if not should_save("holiday_audit", 60) and len(self._pending_audit_entries) < 10:
+            return
 
         try:
             if self._audit_file.exists():
@@ -928,7 +938,8 @@ class HolidayManager:
             else:
                 data = {"entries": []}
 
-            data["entries"].append(entry)
+            data["entries"].extend(self._pending_audit_entries)
+            self._pending_audit_entries.clear()
 
             # Son 1000 kaydı tut
             if len(data["entries"]) > 1000:

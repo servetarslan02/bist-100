@@ -15,6 +15,7 @@ services:
     image: traefik:v3.7
     restart: unless-stopped
     container_name: alpha-traefik
+    mem_limit: 128m
     logging: *id003
     ports:
     - 80:80
@@ -44,12 +45,13 @@ services:
     logging: *id003
     image: timescale/timescaledb:latest-pg17
     container_name: alpha-postgres
+    mem_limit: 512m
     ports:
     - 5432:5432
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=off\n  -c full_page_writes=off\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=minimal\n  -c max_wal_size=256MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=0\n  -c max_replication_slots=0\n  -c hot_standby=off\n  -c checkpoint_completion_target=0.9\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=60\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
+    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=off\n  -c full_page_writes=off\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=minimal\n  -c max_wal_size=256MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=0\n  -c max_replication_slots=0\n  -c hot_standby=off\n  -c checkpoint_completion_target=0.5\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=300\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
@@ -71,7 +73,8 @@ services:
     networks: *id002
     logging: *id003
     image: timescale/timescaledb:latest-pg17
-    container_name: alpha-postgres-replica
+    container_name: alpha-postgres
+    mem_limit: 512m-replica
     ports:
     - 5433:5432
     volumes:
@@ -107,6 +110,7 @@ services:
     logging: *id003
     image: clickhouse/clickhouse-server:26.3-alpine
     container_name: alpha-clickhouse
+    mem_limit: 1g
     ports:
       - 8123:8123
       - 9002:9000
@@ -145,6 +149,7 @@ services:
     logging: *id003
     image: zookeeper:3.9.5
     container_name: alpha-zookeeper
+    mem_limit: 256m
     ports:
     - 2181:2181
     volumes:
@@ -164,7 +169,8 @@ services:
     networks: *id002
     logging: *id003
     image: clickhouse/clickhouse-server:26.3-alpine
-    container_name: alpha-clickhouse-2
+    container_name: alpha-clickhouse
+    mem_limit: 1g-2
     ports:
     - 8124:8123
     - 9001:9000
@@ -201,12 +207,13 @@ services:
     logging: *id003
     image: redis:8.8-alpine
     container_name: alpha-redis
+    mem_limit: 256m
     ports:
     - 6379:6379
     volumes:
     - redis_data:/data
     command: "redis-server\n  --appendonly no\n  --save 3600 1\n  --save 900 10\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
-      \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 10\n  --dynamic-hz yes\n\
+      \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 5\n  --dynamic-hz yes\n\
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
       \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
       \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
@@ -229,6 +236,7 @@ services:
     logging: *id003
     image: redis:8.8-alpine
     container_name: alpha-sentinel-1
+    mem_limit: 64m
     entrypoint:
     - /bin/sh
     - /etc/sentinel/entrypoint.sh
@@ -258,6 +266,7 @@ services:
     logging: *id003
     image: redis:8.8-alpine
     container_name: alpha-sentinel-2
+    mem_limit: 64m
     entrypoint:
     - /bin/sh
     - /etc/sentinel/entrypoint.sh
@@ -287,6 +296,7 @@ services:
     logging: *id003
     image: redis:8.8-alpine
     container_name: alpha-sentinel-3
+    mem_limit: 64m
     entrypoint:
     - /bin/sh
     - /etc/sentinel/entrypoint.sh
@@ -316,10 +326,11 @@ services:
     logging: *id003
     image: nats:2.14-alpine
     container_name: alpha-nats
+    mem_limit: 128m
     ports:
     - 4222:4222
     - 8222:8222
-    command: ["nats-server", "-js", "-sd", "/data", "-m", "8222"]
+    command: ["nats-server", "-js", "-sd", "/data", "-m", "8222", "--sync_interval", "10s"]
     volumes:
     - nats_data:/data
     storage_opt:
@@ -347,6 +358,7 @@ services:
       dockerfile: infrastructure/Dockerfile.api
     image: alpha-bist-base:latest
     container_name: alpha-api
+    mem_limit: 2g
     ports:
     - 8000:8000
     - 50051:50051
@@ -416,6 +428,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-ingestion
+    mem_limit: 512m
     command: python -m services.ingestion.main
     volumes:
     - ./services:/app/services:ro
@@ -455,6 +468,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-feature-engine
+    mem_limit: 1g
     command: python -m services.features.main
     volumes:
     - ./services:/app/services:ro
@@ -504,6 +518,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-market-state
+    mem_limit: 512m
     command: python -m services.market_state.main
     volumes:
     - ./services:/app/services:ro
@@ -542,6 +557,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-intelligence
+    mem_limit: 2g
     command: python -m services.intelligence.main
     volumes:
     - ./services:/app/services:ro
@@ -592,6 +608,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-simulation
+    mem_limit: 1g
     command: python -m services.simulation.main
     volumes:
     - ./services:/app/services:ro
@@ -641,6 +658,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-risk
+    mem_limit: 512m
     command: python -m services.risk.main
     volumes:
     - ./services:/app/services:ro
@@ -677,6 +695,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-portfolio
+    mem_limit: 512m
     command: python -m services.portfolio.main
     volumes:
     - ./services:/app/services:ro
@@ -714,6 +733,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-learning
+    mem_limit: 2g
     command: python -m services.learning.main
     volumes:
     - ./services:/app/services:ro
@@ -763,6 +783,7 @@ services:
     logging: *id003
     image: alpha-bist-base:latest
     container_name: alpha-celery-worker
+    mem_limit: 1g
     command: celery -A services.tasks.queue worker --loglevel=info --concurrency=2 --without-gossip --without-mingle --without-heartbeat
     volumes:
     - ./services:/app/services:ro
@@ -800,6 +821,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
     container_name: alpha-dashboard
+    mem_limit: 256m
     ports:
     - 3000:3000
     environment:
@@ -831,7 +853,8 @@ services:
     networks: *id002
     logging: *id003
     image: prometheuscommunity/postgres-exporter:v0.17.1
-    container_name: alpha-postgres-exporter
+    container_name: alpha-postgres
+    mem_limit: 512m-exporter
     ports:
     - 9187:9187
     environment:
@@ -857,7 +880,8 @@ services:
     networks: *id002
     logging: *id003
     image: oliver006/redis_exporter:v1.73.0-alpine
-    container_name: alpha-redis-exporter
+    container_name: alpha-redis
+    mem_limit: 256m-exporter
     ports:
     - 9121:9121
     environment:
@@ -886,6 +910,7 @@ services:
     logging: *id003
     image: prom/prometheus:v3.14.0
     container_name: alpha-prometheus
+    mem_limit: 512m
     ports:
     - 9090:9090
     command:
@@ -918,6 +943,7 @@ services:
     logging: *id003
     image: grafana/grafana:13.0.7
     container_name: alpha-grafana
+    mem_limit: 256m
     ports:
     - 3001:3000
     volumes:
@@ -950,6 +976,7 @@ services:
     logging: *id003
     image: ghcr.io/mlflow/mlflow:v3.15.2
     container_name: alpha-mlflow
+    mem_limit: 512m
     ports:
     - 5000:5000
     volumes:
@@ -980,6 +1007,7 @@ services:
     logging: *id003
     image: edoburu/pgbouncer:latest
     container_name: alpha-pgbouncer
+    mem_limit: 64m
     ports:
     - 6432:5432
     environment:
@@ -1017,6 +1045,7 @@ services:
     logging: *id003
     image: questdb/questdb:10.0.1
     container_name: alpha-questdb
+    mem_limit: 512m
     ports:
     - 9009:9009
     - 8812:8812

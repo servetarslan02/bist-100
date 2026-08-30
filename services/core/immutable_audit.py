@@ -309,10 +309,20 @@ class ImmutableAuditLog:
         }
 
     def _persist_entry(self, entry: AuditEntry) -> Any:
-        """Kaydı dosyaya yaz (append-only)."""
+        """Kaydı dosyaya yaz (batched append — SSD dostu)."""
         try:
-            with open(self._storage_path, "a") as f:
-                f.write(orjson.dumps(entry.to_dict()) + "\n")
+            # RAM'de biriktir, periyodik olarak flush et
+            if not hasattr(self, '_pending_entries'):
+                self._pending_entries = []
+            self._pending_entries.append(orjson.dumps(entry.to_dict()) + "\n")
+            # Her 10 entry'de veya 60 saniyede bir flush
+            if len(self._pending_entries) >= 10 or (
+                hasattr(self, '_last_flush') and time.time() - self._last_flush > 60
+            ):
+                with open(self._storage_path, "a") as f:
+                    f.write("".join(self._pending_entries))
+                self._pending_entries.clear()
+                self._last_flush = time.time()
         except Exception as e:
             logger.error("Audit log persist error", error=str(e))
 

@@ -329,7 +329,7 @@ class IngestionService:
                 logger.info("Market data fetch cycle completed")
 
                 # Optimum bekleme: Seans içi 4 saniye, Seans dışı / Gece 60 saniye
-                sleep_interval = 4 if is_bist_session_active() else 60
+                sleep_interval = 10 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
             except Exception as e:
@@ -410,7 +410,7 @@ class IngestionService:
                 logger.info("KAP fetch cycle completed", count=len(disclosures) if disclosures else 0)
 
                 # Optimum bekleme: Seans içi 20 saniye, Seans dışı 60 saniye
-                sleep_interval = 20 if is_bist_session_active() else 60
+                sleep_interval = 30 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
             except Exception as e:
@@ -471,7 +471,7 @@ class IngestionService:
                 logger.info("Macro data fetch cycle completed")
 
                 # Optimum bekleme: Küresel makro varlıklar için seans içi 30s, seans dışı 60s
-                sleep_interval = 30 if is_bist_session_active() else 60
+                sleep_interval = 60 if is_bist_session_active() else 120
                 await asyncio.sleep(sleep_interval)
 
             except Exception as e:
@@ -521,7 +521,7 @@ class IngestionService:
                 logger.info("News fetch cycle completed", count=len(rss_articles) if rss_articles else 0)
 
                 # Optimum bekleme: Finansal haberler için seans içi 60s, seans dışı 180s (3 dk)
-                sleep_interval = 60 if is_bist_session_active() else 180
+                sleep_interval = 120 if is_bist_session_active() else 300
                 await asyncio.sleep(sleep_interval)
 
             except Exception as e:
@@ -562,7 +562,7 @@ class IngestionService:
                 logger.info("Social media fetch cycle completed")
 
                 # Optimum bekleme: Sosyal medya NLP için seans içi 60s, seans dışı 180s (3 dk)
-                sleep_interval = 60 if is_bist_session_active() else 180
+                sleep_interval = 120 if is_bist_session_active() else 300
                 await asyncio.sleep(sleep_interval)
 
             except Exception as e:
