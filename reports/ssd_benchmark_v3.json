@@ -1,0 +1,78 @@
+{
+  "benchmark_time": "2026-08-31 05:59:30",
+  "num_operations": 500,
+  "batch_size": 20,
+  "results": [
+    {
+      "test": "DuckDB",
+      "old_commits": 2001,
+      "new_commits": 26,
+      "commit_reduction": 98.7,
+      "old_time": 5.6883,
+      "new_time": 5.8733,
+      "time_reduction": -3.3
+    },
+    {
+      "test": "JSON",
+      "old_writes": 500,
+      "new_writes": 1,
+      "write_reduction": 99.8,
+      "old_time": 0.3391,
+      "new_time": 0.0005,
+      "time_reduction": 99.8
+    },
+    {
+      "test": "Debounce 60s",
+      "calls": 100,
+      "writes": 1,
+      "reduction": 99.0
+    },
+    {
+      "test": "Debounce 30s",
+      "calls": 100,
+      "writes": 1,
+      "reduction": 99.0
+    },
+    {
+      "test": "Debounce 120s",
+      "calls": 100,
+      "writes": 1,
+      "reduction": 99.0
+    },
+    {
+      "test": "Batch size 1",
+      "commits": 501,
+      "time": 22.3964,
+      "size_kb": 4364.0
+    },
+    {
+      "test": "Batch size 5",
+      "commits": 101,
+      "time": 8.9456,
+      "size_kb": 4364.0
+    },
+    {
+      "test": "Batch size 10",
+      "commits": 51,
+      "time": 7.4308,
+      "size_kb": 4364.0
+    },
+    {
+      "test": "Batch size 20",
+      "commits": 26,
+      "time": 6.6204,
+      "size_kb": 4108.0
+    },
+    {
+      "test": "Batch size 50",
+      "commits": 11,
+      "time": 5.6319,
+      "size_kb": 4364.0
+    }
+  ],
+  "summary": {
+    "duckdb_commit_reduction_pct": 98.7,
+    "json_write_reduction_pct": 99.8,
+    "debounce_60s_reduction_pct": 99.0
+  }
+}
