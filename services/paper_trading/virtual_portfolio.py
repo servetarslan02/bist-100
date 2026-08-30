@@ -136,8 +136,11 @@ class VirtualPortfolio:
             logger.warning("VirtualPortfolio could not load state from store", error=str(e))
 
     def save_to_store(self, date: str) -> Any:
-        """State store'a kaydet."""
+        """State store'a kaydet (debounced — SSD dostu)."""
         if not self._state_store:
+            return
+        from services.core.debounce import should_save
+        if not should_save("virtual_portfolio_save", 30):
             return
         snapshot = {
             "date": date,

@@ -362,7 +362,10 @@ class ModelRegistry:
         return f"v{max(versions) + 1}"
 
     def _save_model(self, key: str, model: Any) -> Any:
-        """Model'i diske kaydet (SHA256 hash ile)."""
+        """Model'i diske kaydet (SHA256 hash ile, debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save(f"model_save_{key}", 120):
+            return
         try:
             from services.core.safe_pickle import safe_pickle_dump
 

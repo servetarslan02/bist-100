@@ -69,8 +69,7 @@ class MacroHistoricalStore:
         }
 
         self._data[indicator][date].append(entry)
-        self._save()
-
+        # _save() zaten debounce ile çağrılıyor, burada gereksiz
         logger.debug("Macro data saved", indicator=indicator, date=date, value=value)
 
     def get(

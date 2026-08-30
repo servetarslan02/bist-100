@@ -1,1 +1,0 @@
-trade_id,ticker,side,signal_timestamp,execution_timestamp,signal_price,execution_price,quantity,gross_value,slippage,commission,other_cost,cash_before,cash_after,equity_before,equity_after,fold_id,reason,exit_reason

@@ -1227,12 +1227,12 @@ class UnifiedScheduler:
 
         Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
         conn = duckdb.connect(self._state_db_path)
-            # SSD write reduction: DuckDB WAL ayarları
-            try:
-                from services.core.debounce import configure_duckdb_wal
-                configure_duckdb_wal(conn)
-            except Exception:
-                pass
+        # SSD write reduction: DuckDB WAL ayarları
+        try:
+            from services.core.debounce import configure_duckdb_wal
+            configure_duckdb_wal(conn)
+        except Exception:
+            pass
         conn.execute("""
             CREATE TABLE IF NOT EXISTS scheduler_state (
                 key TEXT PRIMARY KEY,
@@ -1251,7 +1251,10 @@ class UnifiedScheduler:
         conn.close()
 
     def save_state(self) -> Any:
-        """Scheduler durumunu SQLite'a kaydet."""
+        """Scheduler durumunu SQLite'a kaydet (debounced — SSD dostu)."""
+        from services.core.debounce import should_save
+        if not should_save("scheduler_state", 60):
+            return
         import duckdb
 
         now_iso = datetime.now(UTC).isoformat()

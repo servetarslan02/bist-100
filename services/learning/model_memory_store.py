@@ -70,6 +70,10 @@ class ModelMemoryStore:
         """Otomatik eklendi."""
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+        self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_size = 20
+        self._last_flush = 0.0
+        self._flush_interval = 30.0
         if HAS_DUCKDB:
             self._init_tables()
 
@@ -85,6 +89,38 @@ class ModelMemoryStore:
         except Exception:
             pass
         return conn
+
+    def _buffered_write(self, query: str, params: tuple) -> None:
+        """Buffered write — toplu yaz (SSD dostu)."""
+        self._write_buffer.append((query, params))
+        if len(self._write_buffer) >= self._buffer_size:
+            self._flush_buffer()
+
+    def _flush_buffer(self) -> None:
+        """Write buffer'ı flush et (batched write — SSD dostu)."""
+        if not self._write_buffer:
+            return
+        try:
+            with self._get_conn() as conn:
+                for query, params in self._write_buffer:
+                    conn.execute(query, params)
+                if hasattr(conn, 'commit'):
+                    conn.commit()
+            self._write_buffer.clear()
+            import time as _time
+            self._last_flush = _time.time()
+        except Exception as e:
+            logger.error("Model memory buffer flush error", error=str(e))
+
+    def flush(self) -> None:
+        """Manuel flush."""
+        self._flush_buffer()
+
+    def periodic_flush(self) -> None:
+        """Periyodik flush."""
+        import time as _time
+        if _time.time() - self._last_flush > self._flush_interval:
+            self._flush_buffer()
 
     def _init_tables(self) -> Any:
         """Otomatik eklendi."""
@@ -163,31 +199,30 @@ class ModelMemoryStore:
         entry_price: float,
         features: dict[str, Any] | None = None,
     ) -> Any:
-        """Yeni tahmin kaydeder."""
+        """Yeni tahmin kaydeder (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
-        with self._get_conn() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO predictions (
-                    prediction_id, model_id, model_version, ticker, timestamp,
-                    predicted_direction, confidence, market_regime, prediction_horizon,
-                    entry_price, features_json, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
-                """,
-                (
-                    prediction_id,
-                    model_id,
-                    model_version,
-                    ticker,
-                    now,
-                    predicted_direction,
-                    confidence,
-                    market_regime,
-                    prediction_horizon,
-                    entry_price,
-                    orjson.dumps(features or {}).decode(),
-                ),
-            )
+        self._buffered_write(
+            """
+            INSERT OR REPLACE INTO predictions (
+                prediction_id, model_id, model_version, ticker, timestamp,
+                predicted_direction, confidence, market_regime, prediction_horizon,
+                entry_price, features_json, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            """,
+            (
+                prediction_id,
+                model_id,
+                model_version,
+                ticker,
+                now,
+                predicted_direction,
+                confidence,
+                market_regime,
+                prediction_horizon,
+                entry_price,
+                orjson.dumps(features or {}).decode(),
+            ),
+        )
 
     def save_batch_records(self, records: list[dict[str, Any]]) -> Any:
         """Büyük hacimli tahmin ve outcome kayıtlarını tek atomik işlemde toplu kaydeder."""
@@ -247,9 +282,9 @@ class ModelMemoryStore:
                     )
                 )
 
-        with self._get_conn() as conn:
-            conn.execute("BEGIN TRANSACTION;")
-            conn.executemany(
+        # Buffered write — batch olarak ekle (SSD dostu)
+        for t in pred_tuples:
+            self._buffered_write(
                 """
                 INSERT OR REPLACE INTO predictions (
                     prediction_id, model_id, model_version, ticker, timestamp,
@@ -257,9 +292,10 @@ class ModelMemoryStore:
                     entry_price, features_json, status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                pred_tuples,
+                t,
             )
-            conn.executemany(
+        for t in outcome_tuples:
+            self._buffered_write(
                 """
                 INSERT OR REPLACE INTO outcomes (
                     prediction_id, model_id, model_version, ticker, evaluated_at,
@@ -267,9 +303,8 @@ class ModelMemoryStore:
                     is_correct, gross_pnl, net_pnl, transaction_cost
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                outcome_tuples,
+                t,
             )
-            conn.commit()
 
     def save_outcome(
         self,
@@ -306,7 +341,7 @@ class ModelMemoryStore:
             cost = pos_val * (cost_pct / 100.0)
             net_pnl = gross_pnl - cost
 
-            conn.execute(
+            self._buffered_write(
                 """
                 INSERT OR REPLACE INTO outcomes (
                     prediction_id, model_id, model_version, ticker, evaluated_at,
@@ -331,7 +366,7 @@ class ModelMemoryStore:
                 ),
             )
 
-            conn.execute("UPDATE predictions SET status = 'EVALUATED' WHERE prediction_id = ?", (prediction_id,))
+            self._buffered_write("UPDATE predictions SET status = 'EVALUATED' WHERE prediction_id = ?", (prediction_id,))
 
             return {
                 "prediction_id": prediction_id,
@@ -375,44 +410,42 @@ class ModelMemoryStore:
         reliability_score: float,
         fusion_weight: float,
     ) -> Any:
-        """Modelin anlık metrik ve güvenilirlik kaydını ekler."""
+        """Modelin anlık metrik ve güvenilirlik kaydını ekler (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
-        with self._get_conn() as conn:
-            conn.execute(
-                """
-                INSERT INTO model_metrics_history (
-                    model_id, model_version, evaluated_at, sample_size,
-                    direction_accuracy, hit_rate_pct, net_pnl, annualized_sharpe,
-                    max_drawdown_pct, brier_score, rank_ic, reliability_score,
-                    fusion_weight, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    model_id,
-                    model_version,
-                    now,
-                    metrics.get("evaluated_samples", 0),
-                    metrics.get("direction_accuracy", 0.5),
-                    metrics.get("hit_rate_pct", 50.0),
-                    metrics.get("net_pnl", 0.0),
-                    metrics.get("annualized_sharpe", 0.0),
-                    metrics.get("max_drawdown_pct", 0.0),
-                    metrics.get("brier_score", 0.25),
-                    metrics.get("rank_ic", 0.0),
-                    reliability_score,
-                    fusion_weight,
-                    orjson.dumps(metrics).decode(),
-                ),
-            )
+        self._buffered_write(
+            """
+            INSERT INTO model_metrics_history (
+                model_id, model_version, evaluated_at, sample_size,
+                direction_accuracy, hit_rate_pct, net_pnl, annualized_sharpe,
+                max_drawdown_pct, brier_score, rank_ic, reliability_score,
+                fusion_weight, metrics_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                model_id,
+                model_version,
+                now,
+                metrics.get("evaluated_samples", 0),
+                metrics.get("direction_accuracy", 0.5),
+                metrics.get("hit_rate_pct", 50.0),
+                metrics.get("net_pnl", 0.0),
+                metrics.get("annualized_sharpe", 0.0),
+                metrics.get("max_drawdown_pct", 0.0),
+                metrics.get("brier_score", 0.25),
+                metrics.get("rank_ic", 0.0),
+                reliability_score,
+                fusion_weight,
+                orjson.dumps(metrics).decode(),
+            ),
+        )
 
     def record_fusion_weights(self, weights: dict[str, float], market_regime: str) -> Any:
-        """Güncel sinyal ağırlıklarını geçmişe kaydeder."""
+        """Güncel sinyal ağırlıklarını geçmişe kaydeder (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
-        with self._get_conn() as conn:
-            conn.execute(
-                "INSERT INTO fusion_weights_history (timestamp, market_regime, weights_json) VALUES (?, ?, ?)",
-                (now, market_regime, orjson.dumps(weights).decode()),
-            )
+        self._buffered_write(
+            "INSERT INTO fusion_weights_history (timestamp, market_regime, weights_json) VALUES (?, ?, ?)",
+            (now, market_regime, orjson.dumps(weights).decode()),
+        )
 
     def get_latest_metrics_all_models(self) -> list[dict[str, Any]]:
         """Tüm modellerin en son metrik kayıtlarını getirir."""
@@ -447,3 +480,30 @@ class ModelMemoryStore:
                 """,
                 (max_records_per_model,),
             )
+
+
+# Singleton
+model_memory_store = ModelMemoryStore()
+
+# Graceful shutdown: buffer'ı flush et
+import atexit
+import signal as _signal
+
+def _flush_model_memory_on_exit() -> None:
+    try:
+        model_memory_store.flush()
+    except Exception:
+        pass
+
+def _flush_model_memory_on_signal(signum, frame) -> None:
+    try:
+        model_memory_store.flush()
+    except Exception:
+        pass
+
+atexit.register(_flush_model_memory_on_exit)
+try:
+    _signal.signal(_signal.SIGTERM, _flush_model_memory_on_signal)
+    _signal.signal(_signal.SIGINT, _flush_model_memory_on_signal)
+except (ValueError, OSError):
+    pass

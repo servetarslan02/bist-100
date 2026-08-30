@@ -355,19 +355,17 @@ class CentralStateStore:
 
     @otel_trace("state_store.save_learning_state")
     def save_learning_state(self, state: dict[str, Any]) -> Any:
-        """Learning loop durumunu kaydet."""
+        """Learning loop durumunu kaydet (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
-        with self._connect() as conn:
-            for key, value in state.items():
-                value = orjson.dumps(value, default=str).decode() if isinstance(value, (dict, list)) else str(value)
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO learning_state (key, value, updated_at)
-                    VALUES (?, ?, ?)
-                """,
-                    (key, value, now),
-                )
-            conn.commit()
+        for key, value in state.items():
+            value = orjson.dumps(value, default=str).decode() if isinstance(value, (dict, list)) else str(value)
+            self._buffered_write(
+                """
+                INSERT OR REPLACE INTO learning_state (key, value, updated_at)
+                VALUES (?, ?, ?)
+            """,
+                (key, value, now),
+            )
 
     @otel_trace("state_store.load_learning_state")
     def load_learning_state(self) -> dict[str, Any]:
@@ -392,36 +390,32 @@ class CentralStateStore:
         regime: str,
         features: dict,
     ) -> Any:
-        """Tahmin kaydet."""
+        """Tahmin kaydet (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
         features_json = orjson.dumps(features, default=str).decode()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO learning_predictions
-                (ticker, predicted_direction, predicted_return, confidence,
-                 regime, features, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (ticker, predicted_direction, predicted_return, confidence, regime, features_json, now),
-            )
-            conn.commit()
+        self._buffered_write(
+            """
+            INSERT INTO learning_predictions
+            (ticker, predicted_direction, predicted_return, confidence,
+             regime, features, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (ticker, predicted_direction, predicted_return, confidence, regime, features_json, now),
+        )
 
     def update_prediction_outcome(self, ticker: str, outcome: dict) -> Any:
-        """Tahmin sonucunu güncelle."""
+        """Tahmin sonucunu güncelle (buffered — SSD dostu)."""
         outcome_json = orjson.dumps(outcome, default=str).decode()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                UPDATE learning_predictions SET outcome = ?
-                WHERE ticker = ? AND outcome IS NULL
-                AND id = (SELECT id FROM learning_predictions
-                          WHERE ticker = ? AND outcome IS NULL
-                          ORDER BY created_at DESC LIMIT 1)
-            """,
-                (outcome_json, ticker, ticker),
-            )
-            conn.commit()
+        self._buffered_write(
+            """
+            UPDATE learning_predictions SET outcome = ?
+            WHERE ticker = ? AND outcome IS NULL
+            AND id = (SELECT id FROM learning_predictions
+                      WHERE ticker = ? AND outcome IS NULL
+                      ORDER BY created_at DESC LIMIT 1)
+        """,
+            (outcome_json, ticker, ticker),
+        )
 
     def load_recent_predictions(self, limit: int = 100) -> list[dict]:
         """Son tahminleri yükle."""
@@ -459,18 +453,16 @@ class CentralStateStore:
     # ===================== SIGNAL FUSION =====================
 
     def save_fusion_weights(self, weights: dict[str, float]) -> Any:
-        """Signal fusion ağırlıklarını kaydet."""
+        """Signal fusion ağırlıklarını kaydet (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
         weights_json = orjson.dumps(weights).decode()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO fusion_weights (key, weights, updated_at)
-                VALUES ('adaptive', ?, ?)
-            """,
-                (weights_json, now),
-            )
-            conn.commit()
+        self._buffered_write(
+            """
+            INSERT OR REPLACE INTO fusion_weights (key, weights, updated_at)
+            VALUES ('adaptive', ?, ?)
+        """,
+            (weights_json, now),
+        )
 
     def load_fusion_weights(self) -> dict[str, float] | None:
         """Signal fusion ağırlıklarını yükle."""
@@ -515,18 +507,16 @@ class CentralStateStore:
     # ===================== CHAMPION CHALLENGER =====================
 
     def save_champion_entry(self, data: dict) -> Any:
-        """Champion challenger kaydı ekle."""
+        """Champion challenger kaydı ekle (buffered — SSD dostu)."""
         now = datetime.now(UTC).isoformat()
         data_json = orjson.dumps(data, default=str).decode()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO champion_history (data, created_at)
-                VALUES (?, ?)
-            """,
-                (data_json, now),
-            )
-            conn.commit()
+        self._buffered_write(
+            """
+            INSERT INTO champion_history (data, created_at)
+            VALUES (?, ?)
+        """,
+            (data_json, now),
+        )
 
     def load_champion_history(self, limit: int = 100) -> list[dict]:
         """Champion challenger geçmişini yükle."""

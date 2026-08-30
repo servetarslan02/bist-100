@@ -64,6 +64,10 @@ class ScanPersistence:
         """Otomatik eklendi."""
         self._db_path = db_path
         self._initialized = False
+        self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_size = 20
+        self._last_flush = 0.0
+        self._flush_interval = 30.0
 
     def _ensure_table(self) -> Any:
         """Tabloyu oluştur (yoksa)."""
@@ -129,55 +133,68 @@ class ScanPersistence:
         except Exception as e:
             logger.error("Failed to initialize scan persistence", error=str(e))
 
-    def save_scan_result(self, record: ScanResultRecord) -> Any:
-        """Tek tarama sonucu kaydet.
+    def _buffered_write(self, query: str, params: tuple) -> None:
+        """Buffered write — toplu yaz (SSD dostu)."""
+        self._write_buffer.append((query, params))
+        if len(self._write_buffer) >= self._buffer_size:
+            self._flush_buffer()
 
-        Args:
-            record: Tarama sonucu kaydı
-        """
-        self._ensure_table()
-
+    def _flush_buffer(self) -> None:
+        """Write buffer'ı flush et (batched write — SSD dostu)."""
+        if not self._write_buffer:
+            return
         try:
             import duckdb
-
             conn = duckdb.connect(self._db_path)
-            # SSD write reduction: DuckDB WAL ayarları
             try:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
                 pass
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                INSERT INTO scan_results
-                (scan_id, scan_type, ticker, score, signal, direction,
-                 confidence, tier, regime, price, volume, features_json, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    record.scan_id,
-                    record.scan_type,
-                    record.ticker,
-                    record.score,
-                    record.signal,
-                    record.direction,
-                    record.confidence,
-                    record.tier,
-                    record.regime,
-                    record.price,
-                    record.volume,
-                    orjson.dumps(record.features or {}).decode(),
-                    record.timestamp,
-                ),
-            )
-
+            for query, params in self._write_buffer:
+                conn.execute(query, params)
             conn.commit()
             conn.close()
-
+            self._write_buffer.clear()
+            self._last_flush = time.time()
         except Exception as e:
-            logger.error("Failed to save scan result", ticker=record.ticker, error=str(e))
+            logger.error("Scan persistence buffer flush error", error=str(e))
+
+    def flush(self) -> None:
+        """Manuel flush."""
+        self._flush_buffer()
+
+    def periodic_flush(self) -> None:
+        """Periyodik flush."""
+        if time.time() - self._last_flush > self._flush_interval:
+            self._flush_buffer()
+
+    def save_scan_result(self, record: ScanResultRecord) -> Any:
+        """Tek tarama sonucu kaydet (buffered — SSD dostu)."""
+        self._ensure_table()
+        self._buffered_write(
+            """
+            INSERT INTO scan_results
+            (scan_id, scan_type, ticker, score, signal, direction,
+             confidence, tier, regime, price, volume, features_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                record.scan_id,
+                record.scan_type,
+                record.ticker,
+                record.score,
+                record.signal,
+                record.direction,
+                record.confidence,
+                record.tier,
+                record.regime,
+                record.price,
+                record.volume,
+                orjson.dumps(record.features or {}).decode(),
+                record.timestamp,
+            ),
+        )
 
     def save_batch_results(
         self,
@@ -499,3 +516,26 @@ class ScanPersistence:
 
 # Singleton
 scan_persistence = ScanPersistence()
+
+# Graceful shutdown: buffer'ı flush et
+import atexit
+import signal as _signal
+
+def _flush_scan_on_exit() -> None:
+    try:
+        scan_persistence.flush()
+    except Exception:
+        pass
+
+def _flush_scan_on_signal(signum, frame) -> None:
+    try:
+        scan_persistence.flush()
+    except Exception:
+        pass
+
+atexit.register(_flush_scan_on_exit)
+try:
+    _signal.signal(_signal.SIGTERM, _flush_scan_on_signal)
+    _signal.signal(_signal.SIGINT, _flush_scan_on_signal)
+except (ValueError, OSError):
+    pass
