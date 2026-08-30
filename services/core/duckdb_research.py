@@ -84,7 +84,11 @@ class DuckDBResearchEngine:
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
         """DuckDB bağlantısı al (lazy init)."""
         if self._conn is None:
-            self._conn = duckdb.connect(str(self._db_path))
+            try:
+                self._conn = duckdb.connect(str(self._db_path))
+            except Exception as lock_err:
+                logger.debug("duckdb_rw_connect_failed_trying_readonly", error=str(lock_err))
+                self._conn = duckdb.connect(str(self._db_path), read_only=True)
             # Performans ayarları
             self._conn.execute("SET memory_limit = '2GB'")
             self._conn.execute("SET threads = 4")

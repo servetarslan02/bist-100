@@ -309,11 +309,11 @@ class BistMLScanner:
 
             # Vektörize Toplu ML Modeli Tahmini (Tüm 647 hisse tek seferde)
             if meta_list and all_feat_rows:
-                all_feat_df = pd.DataFrame(all_feat_rows, columns=feat_names)
+                feat_matrix = np.array(all_feat_rows, dtype=np.float32)
                 lgbm_preds = np.zeros(len(meta_list))
                 if "lightgbm" in self.models:
                     try:
-                        p = self.models["lightgbm"].predict(all_feat_df)
+                        p = self.models["lightgbm"].predict(feat_matrix)
                         lgbm_preds = np.array(p)
                     except Exception:
                         pass
@@ -321,7 +321,7 @@ class BistMLScanner:
                 cb_preds = np.zeros(len(meta_list))
                 if "catboost" in self.models:
                     try:
-                        p = self.models["catboost"].predict(all_feat_df)
+                        p = self.models["catboost"].predict(feat_matrix)
                         cb_preds = np.array(p)
                     except Exception:
                         pass
@@ -329,7 +329,7 @@ class BistMLScanner:
                 xgb_preds = np.zeros(len(meta_list))
                 if "xgboost" in self.models:
                     try:
-                        p = self.models["xgboost"].predict(all_feat_df)
+                        p = self.models["xgboost"].predict(feat_matrix)
                         xgb_preds = np.array(p)
                     except Exception:
                         pass
