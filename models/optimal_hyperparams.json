@@ -1,0 +1,28 @@
+{
+  "updated_at": "2026-08-30T11:23:33.196943+00:00",
+  "n_trials": 20,
+  "lightgbm": {
+    "learning_rate": 0.03091160321749858,
+    "num_leaves": 22,
+    "min_data_in_leaf": 10,
+    "feature_fraction": 0.8363896204445141,
+    "bagging_fraction": 0.7492072557238123,
+    "num_boost_round": 115,
+    "best_ic": 0.3559
+  },
+  "catboost": {
+    "learning_rate": 0.040276529955237526,
+    "depth": 5,
+    "iterations": 154,
+    "l2_leaf_reg": 1.6467086454606024,
+    "best_auc": 0.6418
+  },
+  "xgboost": {
+    "learning_rate": 0.024962761154914057,
+    "max_depth": 3,
+    "n_estimators": 164,
+    "colsample_bytree": 0.8483146645142742,
+    "subsample": 0.556606982414521,
+    "best_ic": 0.3763
+  }
+}

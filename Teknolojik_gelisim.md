@@ -432,7 +432,7 @@ LightGBM LambdaRank sizin ranking problemine çok uygun.
 
 | # | Geliştirme | Öncelik | Durum |
 |---|---|---|---|
-| 1 | Hyperparameter optimization | 🔴 | ⚠️ Optuna var ama düzenli kullanılmıyor |
+| 1 | Hyperparameter optimization | 🔴 | ✅ Yapıldı — Optuna Bayesian Optimization (`services/ml/hyperparameter_tuner.py`, 70+ feature space colsample/feature_fraction, IC/AUC objectives, `models/optimal_hyperparams.json` cache) |
 | 2 | Feature stability analysis | 🔴 | ✅ Yapıldı — `services/ml/feature_stability.py` (PSI + KS test + correlation stability + scoring) |
 | 3 | Feature importance drift | 🟠 | ✅ Yapıldı — `services/ml/feature_drift.py` (SHAP history + trend + strengthening/weakening + per-ticker) |
 | 4 | Calibration (Platt/Isotonic) | 🔴 | ⚠️ Partial mevcut |

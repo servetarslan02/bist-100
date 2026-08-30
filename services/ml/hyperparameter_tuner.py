@@ -86,15 +86,16 @@ class HyperparameterTuner:
         def objective(trial) -> Any:
             """Otomatik eklendi."""
             params = {
-                "n_estimators": trial.suggest_int("n_estimators", 100, 1000),
-                "max_depth": trial.suggest_int("max_depth", 3, 10),
-                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-                "num_leaves": trial.suggest_int("num_leaves", 20, 100),
-                "min_child_samples": trial.suggest_int("min_child_samples", 5, 50),
-                "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-                "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-                "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+                "n_estimators": trial.suggest_int("n_estimators", 80, 220),
+                "max_depth": trial.suggest_int("max_depth", 3, 7),
+                "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.15, log=True),
+                "num_leaves": trial.suggest_int("num_leaves", 15, 63),
+                "min_child_samples": trial.suggest_int("min_child_samples", 10, 50),
+                "subsample": trial.suggest_float("subsample", 0.55, 0.95),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.45, 0.85),
+                "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 10.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 10.0, log=True),
+                "n_jobs": 2,
                 "verbose": -1,
             }
 
@@ -167,14 +168,15 @@ class HyperparameterTuner:
         def objective(trial) -> Any:
             """Otomatik eklendi."""
             params = {
-                "max_depth": trial.suggest_int("max_depth", 3, 10),
-                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-                "n_estimators": trial.suggest_int("n_estimators", 100, 1000),
-                "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-                "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-                "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
-                "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+                "max_depth": trial.suggest_int("max_depth", 3, 7),
+                "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.15, log=True),
+                "n_estimators": trial.suggest_int("n_estimators", 80, 220),
+                "subsample": trial.suggest_float("subsample", 0.55, 0.95),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.45, 0.85),
+                "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 10.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 10.0, log=True),
+                "min_child_weight": trial.suggest_int("min_child_weight", 2, 10),
+                "n_jobs": 2,
                 "verbosity": 0,
             }
 
@@ -233,10 +235,11 @@ class HyperparameterTuner:
         def objective(trial) -> Any:
             """Otomatik eklendi."""
             params = {
-                "iterations": trial.suggest_int("iterations", 100, 1000),
-                "depth": trial.suggest_int("depth", 4, 10),
-                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
-                "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-8, 10.0, log=True),
+                "iterations": trial.suggest_int("iterations", 80, 200),
+                "depth": trial.suggest_int("depth", 4, 7),
+                "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.15, log=True),
+                "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1e-3, 10.0, log=True),
+                "thread_count": 2,
                 "random_seed": 42,
                 "verbose": 0,
             }

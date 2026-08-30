@@ -37,7 +37,96 @@ from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 logger = structlog.get_logger()
 
 
-def train_all_models() -> Any:
+def _get_or_tune_hyperparameters(
+    X_train: np.ndarray,
+    y_train_cont: np.ndarray,
+    X_val: np.ndarray,
+    y_val_cont: np.ndarray,
+    y_train_bin: np.ndarray,
+    y_val_bin: np.ndarray,
+    use_optuna: bool = False,
+    n_trials: int = 35,
+) -> dict[str, Any]:
+    """Optuna Bayesian Optimization ile 70+ feature uzayına duyarlı en iyi hiperparametreleri bulur/yükler."""
+    import json
+    from pathlib import Path
+
+    cache_file = Path("models/optimal_hyperparams.json")
+    if not use_optuna and cache_file.exists():
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                params = json.load(f)
+                logger.info("optimal_hyperparameters_loaded_from_cache", file=str(cache_file))
+                return params
+        except Exception as e:
+            logger.warning("failed_to_load_hyperparam_cache", error=str(e))
+
+    # Optuna Bayesian Optimizasyon Turu
+    logger.info("\n" + "=" * 70)
+    logger.info(f"🚀 OPTUNA BAYESIAN HYPERPARAMETER OPTIMIZATION (Trials: {n_trials})")
+    logger.info("  • 70+ Feature Duyarlı: colsample_bytree, feature_fraction ve L1/L2 kısıtları aranıyor...")
+    logger.info("=" * 70)
+
+    from services.ml.hyperparameter_tuner import HyperparameterTuner
+
+    tuner = HyperparameterTuner(n_trials=n_trials, timeout_seconds=120, cv_folds=1, pruning=True)
+
+    # 1. LightGBM Tuning (IC Objective)
+    logger.info("  [Optuna] LightGBM Bayesian Tuning Başlatıldı...")
+    lgb_res = tuner.tune_lightgbm(X_train, y_train_cont, X_val, y_val_cont, objective_type="ic")
+    best_lgb = lgb_res.best_params or {}
+
+    # 2. CatBoost Tuning (AUC Objective)
+    logger.info("  [Optuna] CatBoost Bayesian Tuning Başlatıldı...")
+    cat_res = tuner.tune_catboost(X_train, y_train_bin, X_val, y_val_bin, objective_type="auc")
+    best_cat = cat_res.best_params or {}
+
+    # 3. XGBoost Tuning (IC Objective)
+    logger.info("  [Optuna] XGBoost Bayesian Tuning Başlatıldı...")
+    xgb_res = tuner.tune_xgboost(X_train, y_train_cont, X_val, y_val_cont, objective_type="ic")
+    best_xgb = xgb_res.best_params or {}
+
+    optimal_params = {
+        "updated_at": datetime.now(UTC).isoformat(),
+        "n_trials": n_trials,
+        "lightgbm": {
+            "learning_rate": float(best_lgb.get("learning_rate", 0.03)),
+            "num_leaves": int(best_lgb.get("num_leaves", 31)),
+            "min_data_in_leaf": int(best_lgb.get("min_child_samples", 20)),
+            "feature_fraction": float(best_lgb.get("colsample_bytree", 0.7)),
+            "bagging_fraction": float(best_lgb.get("subsample", 0.8)),
+            "num_boost_round": int(min(best_lgb.get("n_estimators", 150), 200)),
+            "best_ic": float(lgb_res.best_value),
+        },
+        "catboost": {
+            "learning_rate": float(best_cat.get("learning_rate", 0.04)),
+            "depth": int(best_cat.get("depth", 5)),
+            "iterations": int(min(best_cat.get("iterations", 150), 200)),
+            "l2_leaf_reg": float(best_cat.get("l2_leaf_reg", 3.0)),
+            "best_auc": float(cat_res.best_value),
+        },
+        "xgboost": {
+            "learning_rate": float(best_xgb.get("learning_rate", 0.04)),
+            "max_depth": int(best_xgb.get("max_depth", 5)),
+            "n_estimators": int(min(best_xgb.get("n_estimators", 150), 200)),
+            "colsample_bytree": float(best_xgb.get("colsample_bytree", 0.7)),
+            "subsample": float(best_xgb.get("subsample", 0.8)),
+            "best_ic": float(xgb_res.best_value),
+        },
+    }
+
+    try:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(optimal_params, f, indent=2)
+        logger.info("optimal_hyperparameters_saved", file=str(cache_file))
+    except Exception as e:
+        logger.warning("failed_to_save_optimal_hyperparams", error=str(e))
+
+    return optimal_params
+
+
+def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     """Tüm BIST hisselerini kapsayan 4 direkli Quant-ML eğitim hattı."""
     logger.info("=================================================================")
     logger.info("ALPHA BIST - TUM HISSELER ICIN 4 DIREKLI SWING RANKING EGITIM HATTI")
@@ -212,13 +301,49 @@ def train_all_models() -> Any:
     logger.info(f"  • Toplam Eğitim Örneklemi: {len(features_map):,} satır")
     logger.info("  • Hedef Vade: 5 Günlük Cross-Sectional Swing Alpha (Market-Neutral)")
 
+    # Feature matrisi ve hedef değişkenler
+    X_mat = np.array([[features_map[k][f] for f in feature_names] for k in features_map])
+    y_continuous = np.array([returns[k] for k in features_map])
+    y_binary = np.array([1 if returns[k] > 0 else 0 for k in features_map])
+    sample_weights = np.array([3.0 if returns[k] <= 0 else 1.0 for k in features_map])
+
+    # 5-Günlük Purge & Embargo Walk-Forward Ayrımı
+    split_idx = int(len(X_mat) * 0.75)
+    purge_size = int(len(tickers) * 5)  # 5 günlük hisse tamponu
+    train_end = max(0, split_idx - purge_size)
+
+    X_train, y_train_cont = X_mat[:train_end], y_continuous[:train_end]
+    X_val, y_val_cont = X_mat[split_idx:], y_continuous[split_idx:]
+    y_train_bin, y_val_bin = y_binary[:train_end], y_binary[split_idx:]
+    w_train = sample_weights[:train_end]
+
+    # 2.5 OPTUNA HYPERPARAMETER TUNING (70+ Feature Duyarlı Bayesian Optimizasyon)
+    opt_params = _get_or_tune_hyperparameters(
+        X_train=X_train,
+        y_train_cont=y_train_cont,
+        X_val=X_val,
+        y_val_cont=y_val_cont,
+        y_train_bin=y_train_bin,
+        y_val_bin=y_val_bin,
+        use_optuna=use_optuna,
+        n_trials=n_trials,
+    )
+
+    lgb_hp = opt_params.get("lightgbm", {})
+    cat_hp = opt_params.get("catboost", {})
+    xgb_hp = opt_params.get("xgboost", {})
+
     # 3. LIGHTGBM LAMBDARANK (Hisse Sıralama Motoru)
     logger.info("\n[2] LightGBM LambdaRank (Tüm Hisseleri Sıralama) Eğitiliyor...")
     lgb_config = MLModelConfig(
         objective="regression",
         metric="rmse",
-        num_boost_round=150,
-        learning_rate=0.03,
+        num_boost_round=int(lgb_hp.get("num_boost_round", 150)),
+        learning_rate=float(lgb_hp.get("learning_rate", 0.03)),
+        num_leaves=int(lgb_hp.get("num_leaves", 31)),
+        min_data_in_leaf=int(lgb_hp.get("min_data_in_leaf", 20)),
+        feature_fraction=float(lgb_hp.get("feature_fraction", 0.8)),
+        bagging_fraction=float(lgb_hp.get("bagging_fraction", 0.8)),
         purge_gap_days=5,
         target_horizon=5,
         early_stopping_rounds=15,
@@ -236,28 +361,21 @@ def train_all_models() -> Any:
 
     # 4. CATBOOST ASİMETRİK KAYIP SINIFLANDIRICI (Adjusted Penalty)
     logger.info("\n[3] CatBoost Asimetrik Kayip Siniflandirici (Dusus Hatasina 3x Ceza) Egitiliyor...")
-    X_mat = np.array([[features_map[k][f] for f in feature_names] for k in features_map])
-    y_binary = np.array([1 if returns[k] > 0 else 0 for k in features_map])
-    # Asimetrik Ceza Ağırlıkları: Negatif getiriye (zarara) 3 kat ceza
-    sample_weights = np.array([3.0 if returns[k] <= 0 else 1.0 for k in features_map])
-
-    # 5-Günlük Purge & Embargo Walk-Forward Ayrımı
-    split_idx = int(len(X_mat) * 0.75)
-    purge_size = int(len(tickers) * 5)  # 5 günlük hisse tamponu
-    train_end = max(0, split_idx - purge_size)
-
-    X_train, y_train = X_mat[:train_end], y_binary[:train_end]
-    X_val, y_val = X_mat[split_idx:], y_binary[split_idx:]
-    w_train = sample_weights[:train_end]
-
-    cat_model = CatBoostModel(CatBoostConfig(iterations=120, depth=5, learning_rate=0.04))
-    cat_metrics = cat_model.train(X_train, y_train, X_val, y_val, feature_names=feature_names, sample_weights=w_train)
+    cat_model = CatBoostModel(
+        CatBoostConfig(
+            iterations=int(cat_hp.get("iterations", 120)),
+            depth=int(cat_hp.get("depth", 5)),
+            learning_rate=float(cat_hp.get("learning_rate", 0.04)),
+            l2_leaf_reg=float(cat_hp.get("l2_leaf_reg", 3.0)),
+        )
+    )
+    cat_metrics = cat_model.train(X_train, y_train_bin, X_val, y_val_bin, feature_names=feature_names, sample_weights=w_train)
     logger.info("[OK] CatBoost Asimetrik Siniflandirici Basarili!")
     logger.info(f"  * ROC-AUC Skoru: {cat_metrics.get('val_auc', 0.76):.4f}")
     logger.info(f"  * Yon Dogrulugu (Direction Accuracy): %{cat_metrics.get('val_accuracy', 0.69) * 100:.1f}")
 
     # CatBoost Platt Scaling Olasılık Kalibrasyonu
-    cat_cal_metrics = cat_model.calibrate(X_val, y_val, horizon=5, method="sigmoid")
+    cat_cal_metrics = cat_model.calibrate(X_val, y_val_bin, horizon=5, method="sigmoid")
     logger.info(f"  * CatBoost Kalibrasyon Brier Skoru: {cat_cal_metrics.get('calibrated_brier'):.4f} (Ham: {cat_cal_metrics.get('raw_brier'):.4f})")
     logger.info(f"  * CatBoost Kalibrasyon ECE: {cat_cal_metrics.get('calibrated_ece'):.4f} (Ham: {cat_cal_metrics.get('raw_ece'):.4f})")
     safe_pickle_dump(cat_model, "models/catboost_classifier.pkl")
@@ -265,13 +383,21 @@ def train_all_models() -> Any:
 
     # 5. XGBOOST GRADIENT BOOSTING MODEL
     logger.info("\n[4] XGBoost Gradient Boosting Model Egitiliyor...")
-    xgb_model = XGBoostModel(XGBoostConfig(n_estimators=120, max_depth=5, learning_rate=0.04))
-    xgb_metrics = xgb_model.train(X_train, y_train, X_val, y_val, feature_names=feature_names)
+    xgb_model = XGBoostModel(
+        XGBoostConfig(
+            n_estimators=int(xgb_hp.get("n_estimators", 120)),
+            max_depth=int(xgb_hp.get("max_depth", 5)),
+            learning_rate=float(xgb_hp.get("learning_rate", 0.04)),
+            colsample_bytree=float(xgb_hp.get("colsample_bytree", 0.7)),
+            subsample=float(xgb_hp.get("subsample", 0.8)),
+        )
+    )
+    xgb_metrics = xgb_model.train(X_train, y_train_bin, X_val, y_val_bin, feature_names=feature_names)
     logger.info("[OK] XGBoost Egitimi Basarili!")
     logger.info(f"  * ROC-AUC Skoru: {xgb_metrics.get('val_auc', 0.73):.4f}")
 
     # XGBoost Platt Scaling Olasılık Kalibrasyonu
-    xgb_cal_metrics = xgb_model.calibrate(X_val, y_val, horizon=5, method="sigmoid")
+    xgb_cal_metrics = xgb_model.calibrate(X_val, y_val_bin, horizon=5, method="sigmoid")
     logger.info(f"  * XGBoost Kalibrasyon Brier Skoru: {xgb_cal_metrics.get('calibrated_brier'):.4f} (Ham: {xgb_cal_metrics.get('raw_brier'):.4f})")
     logger.info(f"  * XGBoost Kalibrasyon ECE: {xgb_cal_metrics.get('calibrated_ece'):.4f} (Ham: {xgb_cal_metrics.get('raw_ece'):.4f})")
     safe_pickle_dump(xgb_model, "models/xgboost_model.pkl")
@@ -289,11 +415,17 @@ def train_all_models() -> Any:
     logger.info("=================================================================")
 
 
-def train_all(model_type: str = "lightgbm") -> Any:
+def train_all(model_type: str = "lightgbm", use_optuna: bool = False, n_trials: int = 35) -> Any:
     """Backward-compatible wrapper — queue.py bu metodu çağırır."""
-    train_all_models()
+    train_all_models(use_optuna=use_optuna, n_trials=n_trials)
     return {"model_type": model_type, "status": "completed"}
 
 
 if __name__ == "__main__":
-    train_all_models()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="ALPHA BIST Master Model Training Pipeline")
+    parser.add_argument("--tune", action="store_true", help="Run Optuna Bayesian Hyperparameter Optimization")
+    parser.add_argument("--trials", type=int, default=35, help="Number of Optuna trials (default: 35)")
+    args = parser.parse_args()
+    train_all_models(use_optuna=args.tune, n_trials=args.trials)
