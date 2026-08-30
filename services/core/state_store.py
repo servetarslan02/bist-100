@@ -154,9 +154,10 @@ class CentralStateStore:
                         updated_at TEXT NOT NULL
                     )
                 """)
+                conn.execute("CREATE SEQUENCE IF NOT EXISTS learning_pred_seq START 1")
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS learning_predictions (
-                        id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY DEFAULT nextval('learning_pred_seq'),
                         ticker TEXT NOT NULL,
                         predicted_direction TEXT,
                         predicted_return REAL,
@@ -183,9 +184,10 @@ class CentralStateStore:
                         PRIMARY KEY (var1, var2)
                     )
                 """)
+                conn.execute("CREATE SEQUENCE IF NOT EXISTS champion_history_seq START 1")
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS champion_history (
-                        id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY DEFAULT nextval('champion_history_seq'),
                         data TEXT NOT NULL,
                         created_at TEXT NOT NULL
                     )
@@ -421,20 +423,28 @@ class CentralStateStore:
         """Son tahminleri yükle."""
         self._flush_buffer()
         with self._connect() as conn:
-            rows = conn.execute(
+            cursor = conn.execute(
                 """
                 SELECT * FROM learning_predictions
                 ORDER BY created_at DESC LIMIT ?
             """,
                 (limit,),
-            ).fetchall()
+            )
+            rows = cursor.fetchall()
+            cols = [d[0] for d in cursor.description] if cursor.description else []
             results = []
             for row in rows:
-                d = dict(row)
+                d = dict(zip(cols, row, strict=False))
                 if d.get("features"):
-                    d["features"] = orjson.loads(d["features"])
+                    try:
+                        d["features"] = orjson.loads(d["features"])
+                    except Exception:
+                        pass
                 if d.get("outcome"):
-                    d["outcome"] = orjson.loads(d["outcome"])
+                    try:
+                        d["outcome"] = orjson.loads(d["outcome"])
+                    except Exception:
+                        pass
                 results.append(d)
             return results
 

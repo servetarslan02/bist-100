@@ -211,12 +211,13 @@ class PaperStateStore:
         if not self._write_buffer:
             return
         try:
+            import time as _time
             with self._connect() as conn:
                 for query, params in self._write_buffer:
                     conn.execute(query, params)
                 conn.commit()
             self._write_buffer.clear()
-            self._last_flush = time.time()
+            self._last_flush = _time.time()
         except Exception as e:
             logger.error("Paper state buffer flush error", error=str(e))
 
