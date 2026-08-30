@@ -77,94 +77,27 @@ async def scanner_signals(
         if _SCAN_SIGNALS_CACHE and (now - _SCAN_SIGNALS_TIME < 60) and not category and not search:
             signals = list(_SCAN_SIGNALS_CACHE)
         else:
-            radar_data = get_cached("radar:data") or []
-            radar_by_sym = {x.get("symbol"): x for x in radar_data if x.get("symbol")}
-
             preds = get_cached("phase18:predictions")
-            if not preds or len(preds) == 0:
+            if not preds or len(preds) == 0 or not preds[0].get("target_price"):
                 try:
-                    from services.scanner.bist_ml_scanner import BistMLScanner
-                    scanner = BistMLScanner()
-                    preds = scanner.scan_all_opportunities(limit=50)
+                    from services.scanner.bist_ml_scanner import bist_ml_scanner
+                    preds = bist_ml_scanner.scan_all_opportunities(limit=50)
                     if preds:
                         set_cached("phase18:predictions", preds, ttl=3600)
+                        set_cached("radar:data", preds, ttl=3600)
                 except Exception as scan_err:
                     logger.warning("Dynamic scanner fallback note", error=str(scan_err))
-
-            names = getattr(bist_universe, "COMPANY_NAMES", {})
 
             signals = []
             if preds and len(preds) > 0:
                 for p in preds:
-                    # Eğer zaten BistMLScanner tarafından zenginleştirilmiş tam sinyal ise direkt kullan
-                    if p.get("target_price") and p.get("price", 0) > 0:
-                        item = dict(p)
-                        # Frontend kategori filtreleri ile tam uyum garantisi
-                        if not item.get("signal_type") or item.get("signal_type") in ["GÜÇLÜ AL", "AL", "TUT"]:
-                            item["signal_type"] = item.get("spec_category", "MOMENTUM_LEADER")
-                        signals.append(item)
-                        continue
+                    item = dict(p)
+                    # Frontend kategori filtreleri ile tam uyum garantisi
+                    if not item.get("signal_type") or item.get("signal_type") in ["GÜÇLÜ AL", "AL", "TUT"]:
+                        item["signal_type"] = item.get("spec_category", item.get("strategy_type", "MOMENTUM_LEADER"))
+                    signals.append(item)
 
-                    ticker = p.get("ticker", "")
-                    score = float(p.get("score", 0.0))
-                    ui_score = min(99, max(45, int((score + 0.05) * 1000))) if score < 1 else int(score)
-
-                    live_item = radar_by_sym.get(ticker, {})
-                    price = float(live_item.get("price", 0))
-                    chg = float(live_item.get("change", 0))
-                    rsi_val = float(live_item.get("rsi", 0)) if live_item.get("rsi") else 0
-
-                    # Sinyal kategorisi ve tipi
-                    if ui_score >= 82:
-                        spec_cat = "HIGH_CONVICTION"
-                        spec_rsn = f"Phase 18 Otonom Model Sinyali · Yüksek Alıcı Baskısı (%{ui_score} Güven)"
-                    elif rsi_val < 40 and rsi_val > 0:
-                        spec_cat = "PULLBACK_BOUNCE"
-                        spec_rsn = f"RSI Aşırı Satım Dip Dönüşü (RSI: {rsi_val:.1f}) · Yukarı Tepki Potansiyeli"
-                    elif chg > 2.5:
-                        spec_cat = "VOLUME_BREAKOUT"
-                        spec_rsn = "20 Günlük Hacim ve Fiyat Kırılımı · Pozitif Alıcı Dominansı"
-                    else:
-                        spec_cat = "MOMENTUM_LEADER"
-                        spec_rsn = "Sektörel Trend Liderliği · Pozitif Fiyat İvmesi"
-
-                    vol_factor = max(1.15, min(1.30, 1.15 + (chg / 100.0) * 1.5))
-                    target_1 = round(price * vol_factor, 2)
-                    target_2 = round(price * (vol_factor + 0.20), 2)
-                    stop_l = round(price * 0.94, 2)
-                    rr_ratio = round((target_1 - price) / max(price - stop_l, 0.01), 1)
-
-                    signals.append(
-                        {
-                            "ticker": ticker,
-                            "symbol": ticker,
-                            "name": names.get(ticker, f"{ticker} Sanayi"),
-                            "company_name": names.get(ticker, f"{ticker} Sanayi"),
-                            "price": price,
-                            "change_pct": chg,
-                            "score": ui_score,
-                            "confidence_score": ui_score,
-                            "direction": "LONG",
-                            "signal": "GÜÇLÜ AL" if ui_score >= 80 else "AL",
-                            "signal_type": spec_cat,
-                            "spec_category": spec_cat,
-                            "spec_reason": spec_rsn,
-                            "risk_level": "Düşük" if ui_score >= 80 else "Orta",
-                            "horizon": "5-10 Gün",
-                            "expected_return_pct": round(max(5.0, (target_1 - price) / max(price, 0.01) * 100), 1),
-                            "target_price": target_1,
-                            "target_price_2": target_2,
-                            "stop_loss": stop_l,
-                            "risk_reward_ratio": rr_ratio,
-                            "rsi": round(rsi_val, 1),
-                            "volume_ratio": 2.1,
-                            "momentum_1m": round(chg * 4.2, 1),
-                            "momentum_3m": round(chg * 11.5, 1),
-                            "timestamp": "Şimdi",
-                        }
-                    )
-
-            # 4. KURAL: Sıralama en çok güven (score) ve en yüksek getiri (expected_return_pct) olmalı
+            # Sıralama en çok güven (score) ve en yüksek getiri (expected_return_pct)
             signals.sort(key=lambda x: (x.get("score", 0), x.get("expected_return_pct", 0)), reverse=True)
             _SCAN_SIGNALS_CACHE = list(signals)
             _SCAN_SIGNALS_TIME = now
