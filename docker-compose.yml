@@ -26,8 +26,6 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
     - traefik.enable=false
-    mem_limit: 256m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD-SHELL
@@ -56,8 +54,6 @@ services:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    mem_limit: 768m
-    cpus: 1.0
     healthcheck:
       test:
       - CMD-SHELL
@@ -90,8 +86,6 @@ services:
       PRIMARY_HOST: alpha-postgres
       PRIMARY_PORT: '5432'
       REPL_USER: replicator
-    mem_limit: 768m
-    cpus: 1.0
     healthcheck:
       test:
       - CMD-SHELL
@@ -124,8 +118,6 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 1280m
-    cpus: 1.0
     ulimits:
       nofile:
         soft: 262144
@@ -155,8 +147,6 @@ services:
     - 2181:2181
     volumes:
     - zookeeper_data:/data
-    mem_limit: 128m
-    cpus: 0.15
     healthcheck:
       test:
       - CMD-SHELL
@@ -186,8 +176,6 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 1280m
-    cpus: 1.0
     ulimits:
       nofile:
         soft: 262144
@@ -220,8 +208,6 @@ services:
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
       \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
       \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
-    mem_limit: 384m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -251,8 +237,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    mem_limit: 32m
-    cpus: 0.1
     healthcheck:
       test:
       - CMD
@@ -282,8 +266,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    mem_limit: 32m
-    cpus: 0.1
     healthcheck:
       test:
       - CMD
@@ -313,8 +295,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    mem_limit: 32m
-    cpus: 0.1
     healthcheck:
       test:
       - CMD
@@ -340,8 +320,6 @@ services:
     command: ["nats-server", "-js", "-sd", "/data", "-m", "8222"]
     volumes:
     - nats_data:/data
-    mem_limit: 256m
-    cpus: 0.5
     storage_opt:
       size: 256M
     healthcheck:
@@ -386,7 +364,7 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
+            count: all
             capabilities:
             - gpu
     environment:
@@ -409,8 +387,6 @@ services:
     - traefik.http.routers.api.entrypoints=web
     - traefik.http.services.api.loadbalancer.server.port=8000
     - traefik.http.routers.api.middlewares=rate-limit@file,compress@file
-    mem_limit: 512m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -453,8 +429,6 @@ services:
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
     - NATS_URL=nats://nats:4222
-    mem_limit: 256m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -493,7 +467,7 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
+            count: all
             capabilities:
             - gpu
     environment:
@@ -504,8 +478,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -544,8 +516,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 128m
-    cpus: 0.15
     healthcheck:
       test:
       - CMD-SHELL
@@ -585,7 +555,7 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
+            count: all
             capabilities:
             - gpu
     environment:
@@ -596,8 +566,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD-SHELL
@@ -636,7 +604,7 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
+            count: all
             capabilities:
             - gpu
     environment:
@@ -647,8 +615,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -687,8 +653,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 128m
-    cpus: 0.15
     healthcheck:
       test:
       - CMD-SHELL
@@ -725,8 +689,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 128m
-    cpus: 0.15
     healthcheck:
       test:
       - CMD-SHELL
@@ -764,7 +726,7 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
+            count: all
             capabilities:
             - gpu
     environment:
@@ -775,8 +737,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -818,8 +778,6 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 256m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -851,8 +809,6 @@ services:
     - traefik.http.services.dashboard.loadbalancer.server.port=3000
     tmpfs:
     - /tmp:size=16M,mode=1777
-    mem_limit: 128m
-    cpus: 0.25
     depends_on:
     - api
     healthcheck:
@@ -878,8 +834,6 @@ services:
     - 9187:9187
     environment:
       DATA_SOURCE_NAME: postgresql://alpha:${POSTGRES_PASSWORD}@postgres:5432/alpha_bist?sslmode=disable
-    mem_limit: 32m
-    cpus: 0.1
     depends_on:
       postgres:
         condition: service_healthy
@@ -907,8 +861,6 @@ services:
     environment:
       REDIS_ADDR: redis://redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-    mem_limit: 32m
-    cpus: 0.1
     depends_on:
       redis:
         condition: service_healthy
@@ -937,8 +889,6 @@ services:
     volumes:
     - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_data:/prometheus
-    mem_limit: 256m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -967,8 +917,6 @@ services:
     - grafana_data:/var/lib/grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    mem_limit: 512m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -1002,8 +950,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 512m
-    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -1040,8 +986,6 @@ services:
       LOG_DISCONNECTIONS: 1
       LOG_POOLER_ERRORS: 1
       STATS_PERIOD: 60
-    mem_limit: 64m
-    cpus: 0.25
     healthcheck:
       test:
       - CMD-SHELL
@@ -1071,8 +1015,6 @@ services:
       QDB_HTTP_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_LINE_TCP_NET_BIND_TO: "0.0.0.0:9009"
-    mem_limit: 1g
-    cpus: 0.5
     healthcheck:
       test:
       - CMD-SHELL
@@ -1092,8 +1034,6 @@ services:
     - AUTOHEAL_CONTAINER_LABEL=autoheal
     - AUTOHEAL_INTERVAL=60
     - AUTOHEAL_START_PERIOD=300
-    mem_limit: 32m
-    cpus: 0.1
 volumes:
   postgres_data: null
   postgres_replica_data: null

@@ -357,51 +357,8 @@ SSD_WRITE_LIMIT_BYTES = SSD_WRITE_LIMIT_MBPS * 1024 * 1024
 
 
 def apply_ssd_write_limit() -> Any:
-    """Tüm data container'larına ve WSL2 diskine sakin yazma limiti (30 MB/s) uygula."""
-    logger.info(f"\n[*] SSD yazma hızı limiti düzenleniyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
-
-    # Windows WSL2 üzerinde çalışırken kernel I/O ayarlarına müdahale etme (varsayılan kernel dengesini koru)
-    if platform.system() == "Windows":
-        return True
-
-
-    device_id = get_block_device_id()
-    applied = 0
-    skipped = 0
-    failed = 0
-
-    for name in DATA_CONTAINERS:
-        pid = get_container_pid(name)
-        if not pid:
-            skipped += 1
-            continue
-
-        io_max_path = find_cgroup_v2_path(pid)
-        if not io_max_path:
-            skipped += 1
-            continue
-
-        try:
-            with open(io_max_path, "w") as f:
-                f.write(f"{device_id} wbps={SSD_WRITE_LIMIT_BYTES}")
-
-            with open(io_max_path) as f:
-                verify = f.read().strip()
-
-            if str(SSD_WRITE_LIMIT_BYTES) in verify:
-                logger.info(f"  ✅ {name} → {SSD_WRITE_LIMIT_MBPS} MB/s")
-                applied += 1
-            else:
-                failed += 1
-
-        except PermissionError:
-            logger.info(f"  ⚠️  {name} → izin hatası (sudo ile çalıştırın veya atlanıyor)")
-            skipped += 1
-        except Exception as e:
-            logger.info(f"  ⚠️  {name} → {e}")
-            skipped += 1
-
-    logger.info(f"[*] SSD limit: {applied} uygulandı, {skipped} atlandı, {failed} başarısız")
+    """Tüm donanım kısıtlamaları kaldırıldı; serbest mod aktif."""
+    logger.info("\n[*] Donanım kısıtlamaları kaldırıldı (RAM, CPU, GPU ve SSD serbest modda).")
     return True
 
 
