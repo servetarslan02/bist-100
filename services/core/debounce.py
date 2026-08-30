@@ -1,4 +1,4 @@
-"""SSD Write Debounce Utility — Dosya yazma sıklığını sınırlar."""
+"""SSD Write Debounce & DuckDB WAL Utility — Dosya yazma sıklığını sınırlar."""
 
 import time
 from collections.abc import Callable
@@ -48,3 +48,17 @@ def should_save(key: str, min_interval_sec: float = 30.0) -> bool:
         return False
     _last_writes[key] = now
     return True
+
+
+def configure_duckdb_wal(conn, wal_size: str = "2MB", checkpoint: str = "4MB") -> None:
+    """DuckDB bağlantısına SSD-dostu WAL ayarları uygula.
+
+    Kullanım:
+        conn = duckdb.connect(path)
+        configure_duckdb_wal(conn)
+    """
+    try:
+        conn.execute(f"SET wal_autocheckpoint = '{wal_size}'")
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint}'")
+    except Exception:
+        pass  # Read-only bağlantılarda hata verir, sorun değil

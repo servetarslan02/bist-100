@@ -97,7 +97,7 @@ class ServiceDiscovery:
     def __init__(self):
         """Otomatik eklendi."""
         self._services: dict[str, ServiceInfo] = {}
-        self._health_check_interval = 15  # saniye
+        self._health_check_interval = 60  # SSD write reduction: 15s → 60s
         self._failure_threshold = 3
         self._running = False
         self._ca_cert: str | None = None

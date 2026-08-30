@@ -30,7 +30,7 @@ services:
       test:
       - CMD-SHELL
       - traefik version || exit 0
-      interval: 15s
+      interval: 60s
       timeout: 10s
       retries: 3
       start_period: 10s
@@ -58,7 +58,7 @@ services:
       test:
       - CMD-SHELL
       - pg_isready -U alpha -d alpha_bist
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 15
       start_period: 15s
@@ -92,7 +92,7 @@ services:
       test:
       - CMD-SHELL
       - pg_isready -U alpha -d alpha_bist
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 15
       start_period: 60s
@@ -128,7 +128,7 @@ services:
       test:
       - CMD-SHELL
       - clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query 'SELECT 1'
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 15
       start_period: 15s
@@ -153,7 +153,7 @@ services:
       test:
       - CMD-SHELL
       - echo ruok | nc -w 2 127.0.0.1 2181 | grep imok
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -186,7 +186,7 @@ services:
       test:
       - CMD-SHELL
       - clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query 'SELECT 1'
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 15
       start_period: 15s
@@ -217,7 +217,7 @@ services:
       - -a
       - ${REDIS_PASSWORD}
       - ping
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 5s
@@ -246,7 +246,7 @@ services:
       - -p
       - '26379'
       - ping
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -275,7 +275,7 @@ services:
       - -p
       - '26379'
       - ping
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -304,7 +304,7 @@ services:
       - -p
       - '26379'
       - ping
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -332,7 +332,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:8222/healthz
-      interval: 5s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 5s
@@ -395,7 +395,7 @@ services:
       - curl
       - -f
       - http://127.0.0.1:8000/health
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 60s
@@ -435,7 +435,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -484,7 +484,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -522,7 +522,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -572,7 +572,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -621,7 +621,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -659,7 +659,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -695,7 +695,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -743,7 +743,7 @@ services:
       test:
       - CMD-SHELL
       - kill -0 1 || exit 1
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 60s
@@ -784,7 +784,7 @@ services:
       test:
       - CMD-SHELL
       - celery -A services.tasks.queue inspect ping --timeout 5 || exit 1
-      interval: 30s
+      interval: 120s
       timeout: 20s
       retries: 3
       start_period: 60s
@@ -821,7 +821,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:3000
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 30s
@@ -847,7 +847,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:9187/metrics
-      interval: 30s
+      interval: 120s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -874,7 +874,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:9121/metrics
-      interval: 30s
+      interval: 120s
       timeout: 5s
       retries: 3
       start_period: 10s
@@ -888,6 +888,13 @@ services:
     container_name: alpha-prometheus
     ports:
     - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=512MB'
+      - '--storage.tsdb.wal-compression'
+      - '--web.enable-lifecycle'
     volumes:
     - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_data:/prometheus
@@ -899,7 +906,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:9090/-/healthy
-      interval: 30s
+      interval: 120s
       timeout: 10s
       retries: 5
       start_period: 180s
@@ -919,6 +926,10 @@ services:
     - grafana_data:/var/lib/grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_LOG_LEVEL: error
+      GF_DATABASE_WAL: "false"
+      GF_EXPLORE_ENABLED: "false"
+      GF_ALERTING_ENABLED: "false"
     healthcheck:
       test:
       - CMD
@@ -927,7 +938,7 @@ services:
       - --tries=1
       - --spider
       - http://127.0.0.1:3000/api/health
-      interval: 30s
+      interval: 120s
       timeout: 10s
       retries: 5
       start_period: 240s
@@ -958,7 +969,7 @@ services:
       - python3
       - -c
       - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')
-      interval: 30s
+      interval: 120s
       timeout: 10s
       retries: 5
       start_period: 120s
@@ -992,7 +1003,7 @@ services:
       test:
       - CMD-SHELL
       - pg_isready -h 127.0.0.1 -p 5432 -U alpha
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -1021,7 +1032,7 @@ services:
       test:
       - CMD-SHELL
       - curl -f http://127.0.0.1:9000/ping || exit 1
-      interval: 10s
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 15s

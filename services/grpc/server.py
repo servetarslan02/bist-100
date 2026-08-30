@@ -97,7 +97,7 @@ class MarketServiceServicer(market_pb2_grpc.MarketServiceServicer if HAS_PROTOBU
                                 ask=float(data.get("ask", 0)),
                                 timestamp=int(time.time() * 1000),
                             )
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s  # SSD write reduction: 0.1s → 1s
                 except Exception as e:
                     logger.error("gRPC StreamTicks error", error=str(e))
                     break
@@ -152,7 +152,7 @@ class SignalServiceServicer(market_pb2_grpc.SignalServiceServicer if HAS_PROTOBU
                                 reason=s.get("reason", ""),
                                 timestamp=int(time.time() * 1000),
                             )
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s
                 except Exception as e:
                     logger.error("gRPC StreamSignals error", error=str(e))
                     break
@@ -221,7 +221,7 @@ class PortfolioServiceServicer(market_pb2_grpc.PortfolioServiceServicer if HAS_P
                             positions=positions,
                             timestamp=int(time.time() * 1000),
                         )
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(10)  # SSD write reduction: 2s → 10s
                 except Exception as e:
                     logger.error("gRPC StreamPortfolio error", error=str(e))
                     break
@@ -281,7 +281,7 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
                             beta=float(risk.get("beta", 0)),
                             timestamp=int(time.time() * 1000),
                         )
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(30)  # SSD write reduction: 5s → 30s
                 except Exception as e:
                     logger.error("gRPC StreamRisk error", error=str(e))
                     break

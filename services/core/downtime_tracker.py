@@ -110,6 +110,12 @@ class DowntimeTracker:
     def _connect(self) -> Any:
         """Otomatik eklendi."""
         conn = duckdb.connect(str(self._db_path))
+        # SSD write reduction: DuckDB WAL ayarları
+        try:
+            from services.core.debounce import configure_duckdb_wal
+            configure_duckdb_wal(conn)
+        except Exception:
+            pass
         try:
             yield conn
         finally:

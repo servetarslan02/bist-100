@@ -74,6 +74,12 @@ class ScanPersistence:
             import duckdb
 
             conn = duckdb.connect(self._db_path)
+            # SSD write reduction: DuckDB WAL ayarları
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(conn)
+            except Exception:
+                pass
             cursor = conn.cursor()
 
             cursor.execute("CREATE SEQUENCE IF NOT EXISTS scan_results_seq START 1")
@@ -135,6 +141,12 @@ class ScanPersistence:
             import duckdb
 
             conn = duckdb.connect(self._db_path)
+            # SSD write reduction: DuckDB WAL ayarları
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(conn)
+            except Exception:
+                pass
             cursor = conn.cursor()
 
             cursor.execute(
@@ -463,6 +475,12 @@ class ScanPersistence:
             import duckdb
 
             conn = duckdb.connect(self._db_path)
+            # SSD write reduction: DuckDB WAL ayarları
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(conn)
+            except Exception:
+                pass
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()

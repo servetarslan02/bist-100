@@ -213,6 +213,14 @@ class CentralStateStore:
             except Exception:
                 conn = _DummyDuckDBConn()
 
+        # SSD write reduction: DuckDB WAL ayarları
+        if not read_only and hasattr(conn, "execute"):
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(conn)
+            except Exception:
+                pass
+
         try:
             yield conn
         finally:

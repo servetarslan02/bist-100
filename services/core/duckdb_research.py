@@ -86,6 +86,12 @@ class DuckDBResearchEngine:
         if self._conn is None:
             try:
                 self._conn = duckdb.connect(str(self._db_path))
+                # SSD write reduction: DuckDB WAL ayarları
+                try:
+                    from services.core.debounce import configure_duckdb_wal
+                    configure_duckdb_wal(self._conn)
+                except Exception:
+                    pass
             except Exception as lock_err:
                 logger.debug("duckdb_rw_connect_failed_trying_readonly", error=str(lock_err))
                 self._conn = duckdb.connect(str(self._db_path), read_only=True)

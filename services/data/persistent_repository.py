@@ -45,6 +45,12 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 logger.warning("Could not open persistent duckdb file, using fallback", error=str(e))
                 self._conn = duckdb.connect(":memory:")
             self._conn.execute("SET enable_progress_bar = false")
+            # SSD write reduction: DuckDB WAL ayarları
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(self._conn)
+            except Exception:
+                pass
         return self._conn
 
     def _fetchall_dicts(self, conn, query: str, params: tuple = ()) -> list[dict]:

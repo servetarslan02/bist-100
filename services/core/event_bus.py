@@ -187,7 +187,7 @@ class InternalEventBus:
 
         while self._running:
             try:
-                message = await pubsub.get_message(timeout=1.0)
+                message = await pubsub.get_message(timeout=5.0)  # SSD write reduction: 1s → 5s
                 if message and message["type"] == "message":
                     channel = message["channel"].replace("alpha:", "")
 

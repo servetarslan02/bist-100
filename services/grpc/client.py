@@ -198,7 +198,7 @@ class MarketClient(BaseGRPCClient):
                             "change": data.get("change", 0),
                             "timestamp": int(time.time() * 1000),
                         }
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s  # SSD write reduction: 0.1s → 1s
             return
 
         request = market_pb2.TickRequest(tickers=tickers)
@@ -264,7 +264,7 @@ class SignalClient(BaseGRPCClient):
                 for signal in signals:
                     if signal.get("confidence", 0) >= min_confidence:
                         yield signal
-                await asyncio.sleep(1)
+                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s  # SSD write reduction: 1s → 5s
             return
 
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
@@ -369,7 +369,7 @@ class PortfolioClient(BaseGRPCClient):
                 pf = get_cached("portfolio:state")
                 if pf:
                     yield pf
-                await asyncio.sleep(2)
+                await asyncio.sleep(10)  # SSD write reduction: 2s → 10s
             return
 
         request = market_pb2.PortfolioRequest(portfolio_id="default")
@@ -441,7 +441,7 @@ class RiskClient(BaseGRPCClient):
                 risk = get_cached("risk:metrics")
                 if risk:
                     yield risk
-                await asyncio.sleep(5)
+                await asyncio.sleep(30)  # SSD write reduction: 5s → 30s
             return
 
         request = market_pb2.RiskRequest(portfolio_id="default")

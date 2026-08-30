@@ -187,7 +187,7 @@ manager = ConnectionManager()
 async def broadcast_updates() -> Any:
     """Periyodik olarak tüm client'lara güncelleme gönder."""
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(30)  # SSD write reduction: 5s → 30s
         if manager.active_connections:
             await manager.broadcast(
                 {

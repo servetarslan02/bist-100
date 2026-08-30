@@ -23,38 +23,38 @@
     <max_bytes_in_distinct>104857600</max_bytes_in_distinct>
     <max_rows_in_distinct>1000000</max_rows_in_distinct>
 
-    <!-- MergeTree optimizasyonları -->
+    <!-- MergeTree optimizasyonları — SSD write reduction -->
     <merge_tree>
         <max_suspicious_broken_parts>50</max_suspicious_broken_parts>
-        <parts_to_delay_insert>300</parts_to_delay_insert>
-        <parts_to_throw_insert>600</parts_to_throw_insert>
-        <max_part_loading_threads>8</max_part_loading_threads>
-        <max_part_removal_threads>8</max_part_removal_threads>
-        <number_of_free_entries_in_pool_to_execute_mutation>3</number_of_free_entries_in_pool_to_execute_mutation>
-        <max_delay_to_insert>1</max_delay_to_insert>
-        <number_of_mutations_to_delay>50</number_of_mutations_to_delay>
-        <number_of_mutations_to_throw>200</number_of_mutations_to_throw>
+        <parts_to_delay_insert>500</parts_to_delay_insert>
+        <parts_to_throw_insert>1000</parts_to_throw_insert>
+        <max_part_loading_threads>4</max_part_loading_threads>
+        <max_part_removal_threads>4</max_part_removal_threads>
+        <number_of_free_entries_in_pool_to_execute_mutation>1</number_of_free_entries_in_pool_to_execute_mutation>
+        <max_delay_to_insert>5</max_delay_to_insert>
+        <number_of_mutations_to_delay>100</number_of_mutations_to_delay>
+        <number_of_mutations_to_throw>500</number_of_mutations_to_throw>
     </merge_tree>
 
-    <!-- Background thread pool -->
-    <background_pool_size>16</background_pool_size>
-    <background_merges_mutations_concurrency_ratio>2</background_merges_mutations_concurrency_ratio>
-    <background_schedule_pool_size>16</background_schedule_pool_size>
-    <background_fetches_pool_size>8</background_fetches_pool_size>
-    <background_common_pool_size>8</background_common_pool_size>
-    <background_buffer_flush_schedule_pool_size>4</background_buffer_flush_schedule_pool_size>
-    <background_move_pool_size>4</background_move_pool_size>
+    <!-- Background thread pool — SSD write reduction -->
+    <background_pool_size>4</background_pool_size>
+    <background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>
+    <background_schedule_pool_size>4</background_schedule_pool_size>
+    <background_fetches_pool_size>2</background_fetches_pool_size>
+    <background_common_pool_size>2</background_common_pool_size>
+    <background_buffer_flush_schedule_pool_size>2</background_buffer_flush_schedule_pool_size>
+    <background_move_pool_size>2</background_move_pool_size>
 
     <!-- Network optimizasyonları -->
     <max_replicated_fetches_network_bandwidth_for_server>104857600</max_replicated_fetches_network_bandwidth_for_server>  <!-- 100MB/s -->
     <max_replicated_sends_network_bandwidth_for_server>104857600</max_replicated_sends_network_bandwidth_for_server>
 
-    <!-- Log ayarları -->
-    <send_logs_level>warning</send_logs_level>
-    <log_queries>1</log_queries>
+    <!-- Log ayarları — SSD write reduction -->
+    <send_logs_level>error</send_logs_level>
+    <log_queries>0</log_queries>
     <log_queries_min_type>QUERY_FINISH</log_queries_min_type>
-    <log_queries_min_query_duration_ms>500</log_queries_min_query_duration_ms>
-    <log_query_threads>1</log_query_threads>
+    <log_queries_min_query_duration_ms>5000</log_queries_min_query_duration_ms>
+    <log_query_threads>0</log_query_threads>
 
     <!-- Cache ayarları -->
     <mark_cache_size>5368709120</mark_cache_size>  <!-- 5GB -->

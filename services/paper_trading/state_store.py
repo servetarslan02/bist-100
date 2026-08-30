@@ -182,6 +182,14 @@ class PaperStateStore:
                 else:
                     raise
 
+        # SSD write reduction: DuckDB WAL ayarları
+        if conn is not None and hasattr(conn, "execute"):
+            try:
+                from services.core.debounce import configure_duckdb_wal
+                configure_duckdb_wal(conn)
+            except Exception:
+                pass
+
         try:
             yield conn
         finally:

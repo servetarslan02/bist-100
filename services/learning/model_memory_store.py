@@ -78,6 +78,12 @@ class ModelMemoryStore:
         if not HAS_DUCKDB or duckdb is None:
             return _DummyDuckDBConn()
         conn = duckdb.connect(self.db_path)
+        # SSD write reduction: DuckDB WAL ayarları
+        try:
+            from services.core.debounce import configure_duckdb_wal
+            configure_duckdb_wal(conn)
+        except Exception:
+            pass
         return conn
 
     def _init_tables(self) -> Any:
