@@ -1048,7 +1048,8 @@ class AlertingSystem:
                     time.time(),
                 ),
             )
-            self._db.commit()
+            # SSD write reduction: commit deferred, periodic flush handles it
+            # self._db.commit()
         except Exception as exc:
             logger.warning("Alert persist başarısız", error=str(exc))
 

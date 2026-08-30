@@ -161,7 +161,8 @@ class OfflineQueue:
                     expires_at.isoformat(),
                 ),
             )
-            conn.commit()
+            # SSD write reduction: enqueue'da commit yok, flush'ta toplu commit
+            # conn.commit()
 
         self._total_enqueued += 1
         logger.info("Event queued for offline delivery", entry_id=entry_id, event_type=event_type, priority=priority)

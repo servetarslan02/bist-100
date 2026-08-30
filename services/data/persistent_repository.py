@@ -256,7 +256,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                     checksum,
                 ),
             )
-            conn.commit()
+            # SSD write reduction: commit deferred to batch
+            # conn.commit()
             return True
         except Exception as e:
             logger.error("Failed to add fundamental snapshot", ticker=snapshot.ticker, error=str(e))
@@ -289,7 +290,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                     checksum,
                 ),
             )
-            conn.commit()
+            # SSD write reduction: commit deferred to batch
+            # conn.commit()
             return True
         except Exception as e:
             logger.error("Failed to add event snapshot", event_id=snapshot.event_id, error=str(e))
@@ -320,7 +322,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                     checksum,
                 ),
             )
-            conn.commit()
+            # SSD write reduction: commit deferred to batch
+            # conn.commit()
             return True
         except Exception as e:
             logger.error("Failed to add catalyst snapshot", event_id=snapshot.event_id, error=str(e))
@@ -343,7 +346,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                VALUES (?, ?, ?)""",
             (key, timestamp, now),
         )
-        conn.commit()
+        # SSD write reduction: commit deferred
+        # conn.commit()
 
     # === STATISTICS ===
 
@@ -364,6 +368,12 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
             "fundamental_tickers": fund_tickers,
             "event_tickers": event_tickers,
         }
+
+    def flush(self) -> Any:
+        """Buffered write'ları flush et (SSD dostu)."""
+        conn = self._get_conn()
+        if hasattr(conn, 'commit'):
+            conn.commit()
 
     def close(self) -> Any:
         """Otomatik eklendi."""

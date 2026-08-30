@@ -246,7 +246,8 @@ class DowntimeTracker:
             """,
                 (key, value, datetime.now(UTC).isoformat()),
             )
-            conn.commit()
+            # SSD write reduction: commit deferred
+            # conn.commit()
 
     def _get_config(self, key: str) -> str | None:
         """Config anahtarını oku."""

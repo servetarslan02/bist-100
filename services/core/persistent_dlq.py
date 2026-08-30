@@ -235,7 +235,6 @@ class PersistentDeadLetterQueue:
                         conn.execute(
                             "UPDATE dlq_entries SET status = 'RETRYING' WHERE entry_id = ?", (entry["entry_id"],)
                         )
-                        conn.commit()
 
                         if asyncio.iscoroutinefunction(handler):
                             await handler(entry["payload"])
@@ -250,7 +249,6 @@ class PersistentDeadLetterQueue:
                         """,
                             (datetime.now(UTC).isoformat(), entry["entry_id"]),
                         )
-                        conn.commit()
 
                         self._total_resolved += 1
                         self._total_retried += 1
@@ -280,7 +278,6 @@ class PersistentDeadLetterQueue:
                             """,
                                 (new_count, str(e), next_retry, entry["entry_id"]),
                             )
-                        conn.commit()
                 else:
                     # Handler yok
                     conn.execute(
@@ -289,8 +286,10 @@ class PersistentDeadLetterQueue:
                     """,
                         (entry["entry_id"],),
                     )
-                    conn.commit()
                     self._total_exhausted += 1
+
+            # Batch commit — tüm update'leri tek seferde yaz (SSD dostu)
+            conn.commit()
 
         # Eski resolved kayıtları temizle
         self._cleanup_resolved()
