@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST - WALK-FORWARD PARAMETRE OPTIMIZASYON MOTORU v1.0
 =============================================================
 17 parametreyi ayni anda optimize eder. Sistem kendi kendine
@@ -22,9 +22,14 @@ YONTEM:
 SKOR = 0.40*Sharpe + 0.35*Calmar + 0.25*Tutarlilik
 """
 from __future__ import annotations
-import sys, warnings, random, time
+
+import random
+import sys
+import time
+import warnings
 from pathlib import Path
 from typing import Any
+
 warnings.filterwarnings("ignore")
 _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
@@ -33,8 +38,8 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
 import structlog
@@ -86,12 +91,16 @@ COMM = 0.0015; SLIP = 0.0010; COST1W = COMM + SLIP
 # YARDIMCILAR
 # ---------------------------------------------------------------------------
 def _f(v: Any) -> float:
-    if hasattr(v,"values"): v = v.values
-    if hasattr(v,"item"):
-        try: return float(v.item())
-        except: pass
+    if hasattr(v, "values"):
+        v = v.values
+    if hasattr(v, "item"):
+        try:
+            return float(v.item())
+        except (ValueError, TypeError, AttributeError):
+            a = np.ravel(v)
+            return float(a[0]) if len(a) > 0 else 0.0
     a = np.ravel(v)
-    return float(a[0]) if len(a)>0 else 0.0
+    return float(a[0]) if len(a) > 0 else 0.0
 
 def _r2(c: np.ndarray) -> float:
     if len(c)<10: return 0.0
@@ -520,7 +529,8 @@ def run_optimizer() -> None:
             if hasattr(sr.columns,"levels") and t in sr.columns.get_level_values(0):
                 df=sr[t][["Open","High","Low","Close","Volume"]].dropna()
                 if len(df)>250: sd[t]=df
-        except: continue
+        except Exception:
+            continue
     logger.info(f"  [OK] {len(sd)} hisse hazir.\n")
 
     bmc=bm_df["Close"]
@@ -539,7 +549,6 @@ def run_optimizer() -> None:
         if prev and (not mends or mends[-1]!=prev): mends.append(prev)
         return mends
 
-    from datetime import datetime, timedelta
     import pandas as pd
     wf_windows = []
     train_start = pd.Timestamp("2016-01-01")
@@ -589,7 +598,7 @@ def run_optimizer() -> None:
         top_idx = sorted(range(len(scores_all)), key=lambda x: scores_all[x], reverse=True)[:3]
         logger.info(f"\n  Pencere {wi+1}: Egitim {tr_s.date()} -> {tr_e.date()}  Test -> {te_e.date()}")
         logger.info(f"    En iyi skor: {best_sc:.3f}  (400 kombinasyondan)")
-        logger.info(f"    Optimal params:")
+        logger.info("    Optimal params:")
         bp=best_p
         logger.info(f"      sma={bp['sma_fast']}/{bp['sma_slow']}  atr={bp['atr_mult']}x  "
                     f"stop={bp['time_stop']}d  slots={bp['bull_slots']}/{bp['neutral_slots']}/{bp['bear_slots']}")
@@ -629,7 +638,7 @@ def run_optimizer() -> None:
     logger.info(S)
 
     beat=0
-    logger.info(f"\n  YIL YIL KARSILASTIRMA:")
+    logger.info("\n  YIL YIL KARSILASTIRMA:")
     logger.info(f"  {'YIL':<6}|{'WF-OPT':>10}|{'BIST':>10}|{'ALFA':>10}|{'SONUC':>10}")
     logger.info("-"*53)
     for yr in sorted(yearly):
@@ -640,9 +649,9 @@ def run_optimizer() -> None:
     logger.info("-"*53)
     logger.info(f"  Toplam: {beat}/{len(yearly)} yil BIST'i gecti")
     logger.info(S)
-    logger.info(f"  [OK] POINT-IN-TIME: Gelecek sizintisi YOK")
-    logger.info(f"  [OK] Her pencere icin 400 kombinasyon test edildi")
-    logger.info(f"  [OK] Max pozisyon limiti: Optimize edilen max_pos_pct uygulandı")
+    logger.info("  [OK] POINT-IN-TIME: Gelecek sizintisi YOK")
+    logger.info("  [OK] Her pencere icin 400 kombinasyon test edildi")
+    logger.info("  [OK] Max pozisyon limiti: Optimize edilen max_pos_pct uygulandı")
     logger.info(f"  Toplam sure: {time.time()-t0:.0f} saniye")
     logger.info(S)
 

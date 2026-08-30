@@ -14,10 +14,9 @@ INPUT → VALIDATION → PROCESSING → OUTPUT → ERROR HANDLING → METRICS
 """
 
 import asyncio
-import functools
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 import structlog
 
@@ -55,11 +54,11 @@ class BaseAlphaService(ABC):
         self.is_ready = True
         self._is_shutting_down = False
 
-        self._circuit_breaker: Optional[CircuitBreaker] = (
+        self._circuit_breaker: CircuitBreaker | None = (
             CircuitBreaker(name=service_name) if enable_circuit_breaker else None
         )
         self._dlq: DeadLetterQueue = dead_letter_queue
-        self._processed_idempotency_keys: Dict[str, float] = {}
+        self._processed_idempotency_keys: dict[str, float] = {}
 
     @abstractmethod
     async def process_payload(self, validated_input: Any) -> Any:
@@ -75,8 +74,8 @@ class BaseAlphaService(ABC):
     async def execute(
         self,
         payload: Any,
-        idempotency_key: Optional[str] = None,
-        correlation_id: Optional[str] = None,
+        idempotency_key: str | None = None,
+        correlation_id: str | None = None,
     ) -> Any:
         """Standart 6 Aşamalı Servis Yürütme Hattı:
 
@@ -96,10 +95,10 @@ class BaseAlphaService(ABC):
         # 1. Idempotency Check
         if idempotency_key:
             now = time.time()
-            # 1 saatten eski anahtarları temizle
-            self._processed_idempotency_keys = {
-                k: v for k, v in self._processed_idempotency_keys.items() if now - v < 3600
-            }
+            if len(self._processed_idempotency_keys) > 5000:
+                self._processed_idempotency_keys = {
+                    k: v for k, v in self._processed_idempotency_keys.items() if now - v < 3600
+                }
             if idempotency_key in self._processed_idempotency_keys:
                 logger.info(
                     "idempotent_request_skipped",
@@ -109,7 +108,12 @@ class BaseAlphaService(ABC):
                 )
                 return {"status": "SKIPPED_IDEMPOTENT", "idempotency_key": idempotency_key}
 
-        # 2. Validation
+        # 2. Pre-Execution Circuit Breaker Check (Fail-Fast)
+        if self._circuit_breaker and not self._circuit_breaker.can_execute():
+            prometheus_metrics.record_error(self.service_name, "circuit_breaker_open")
+            raise ServiceExecutionError(f"[{self.service_name}] Circuit Breaker AÇIK! İstek reddedildi.")
+
+        # 3. Validation
         try:
             validated_input = self.validate_input(payload)
         except Exception as val_err:
@@ -117,8 +121,8 @@ class BaseAlphaService(ABC):
             logger.error("service_validation_failed", service=self.service_name, error=str(val_err), correlation_id=corr_id)
             raise ServiceExecutionError(f"Validation failed: {val_err}") from val_err
 
-        # 3. Processing with Retry, Timeout and Circuit Breaker
-        last_exception: Optional[Exception] = None
+        # 4. Processing with Retry, Timeout and Circuit Breaker
+        last_exception: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
                 # Circuit Breaker kontrolü
@@ -144,7 +148,7 @@ class BaseAlphaService(ABC):
 
                 return output
 
-            except asyncio.TimeoutError as te:
+            except TimeoutError as te:
                 last_exception = te
                 if self._circuit_breaker:
                     self._circuit_breaker.record_failure()
@@ -170,6 +174,10 @@ class BaseAlphaService(ABC):
                     correlation_id=corr_id,
                 )
 
+            # Eğer devre açıldıysa döngüde daha fazla bekleyip retry yapma, anında sonlandır
+            if self._circuit_breaker and not self._circuit_breaker.can_execute():
+                break
+
             # Exponential Backoff with Jitter
             if attempt < self.max_retries:
                 backoff_time = self.backoff_factor * (2 ** (attempt - 1))
@@ -185,8 +193,8 @@ class BaseAlphaService(ABC):
                 payload={"input": str(payload), "error": str(last_exception)},
                 reason=f"Max retries exceeded: {last_exception}",
             )
-        except Exception:
-            pass
+        except Exception as dlq_err:
+            logger.warning("dlq_push_fallback_failed", service=self.service_name, error=str(dlq_err))
 
         self.is_healthy = False
         raise ServiceExecutionError(
@@ -202,7 +210,7 @@ class BaseAlphaService(ABC):
         await asyncio.sleep(0.1)
         logger.info("service_graceful_shutdown_completed", service=self.service_name)
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Servis sağlık ve hazırlık raporu."""
         cb_state = self._circuit_breaker.state if self._circuit_breaker else "N/A"
         return {

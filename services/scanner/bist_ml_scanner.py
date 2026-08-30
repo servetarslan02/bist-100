@@ -11,7 +11,6 @@ from typing import Any
 
 import httpx
 import numpy as np
-import pandas as pd
 import structlog
 
 logger = structlog.get_logger()
@@ -315,24 +314,24 @@ class BistMLScanner:
                     try:
                         p = self.models["lightgbm"].predict(feat_matrix)
                         lgbm_preds = np.array(p)
-                    except Exception:
-                        pass
+                    except Exception as lgb_err:
+                        logger.debug("lightgbm_batch_pred_failed", error=str(lgb_err))
 
                 cb_preds = np.zeros(len(meta_list))
                 if "catboost" in self.models:
                     try:
                         p = self.models["catboost"].predict(feat_matrix)
                         cb_preds = np.array(p)
-                    except Exception:
-                        pass
+                    except Exception as cb_err:
+                        logger.debug("catboost_batch_pred_failed", error=str(cb_err))
 
                 xgb_preds = np.zeros(len(meta_list))
                 if "xgboost" in self.models:
                     try:
                         p = self.models["xgboost"].predict(feat_matrix)
                         xgb_preds = np.array(p)
-                    except Exception:
-                        pass
+                    except Exception as xgb_err:
+                        logger.debug("xgboost_batch_pred_failed", error=str(xgb_err))
 
                 # Model Ensemble Normalizasyonu (Her modelin kendi varyansına göre adil ağırlık)
                 l_std = np.std(lgbm_preds) if np.std(lgbm_preds) > 1e-4 else 1.0
@@ -526,8 +525,8 @@ class BistMLScanner:
                 set_cached("phase18:predictions", candidates, ttl=3600)
                 set_cached("radar:data", candidates, ttl=3600)
                 feature_cache_manager.set_all_features({"_final_candidates": candidates})
-        except Exception:
-            pass
+        except Exception as cache_err:
+            logger.debug("scanner_cache_update_failed", error=str(cache_err))
 
         return candidates[:limit]
 

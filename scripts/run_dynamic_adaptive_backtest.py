@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama Simülasyonu
 =================================================================================

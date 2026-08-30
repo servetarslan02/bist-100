@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Insider Trading Detector v2.0 (İstatistiksel Anlamlılık).
 
 Geliştirmeler:

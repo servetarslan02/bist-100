@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST - DINAMIK UYARLAMALI STRATEJI v3.0 (2016-2026)
 ==========================================================
 4 Katmanli Motor:
@@ -16,9 +16,12 @@ OGRENMEME MEKANIZMASI (Point-in-Time):
 NAKIT POLITIKASI: Hicbir zaman %100 nakit tutulmaz.
 """
 from __future__ import annotations
-import sys, warnings
+
+import sys
+import warnings
 from pathlib import Path
 from typing import Any
+
 warnings.filterwarnings("ignore")
 _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
@@ -27,11 +30,12 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 import numpy as np
 import structlog
 import yfinance as yf
+
 logger = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
@@ -83,8 +87,8 @@ def _f(val: Any) -> float:
     if hasattr(val, "item"):
         try:
             return float(val.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(val)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -372,7 +376,7 @@ def run_v3() -> None:
     logger.info("="*80)
     logger.info(f"  Baslangic: {INITIAL:,.0f} TL  |  Maliyet: %{COST1W*100:.2f} tek yon")
     logger.info(f"  ATR stop: {ATR_MULT}x  |  Zaman stopu: {TIME_STOP} gun")
-    logger.info(f"  Ogrenme: Her ceyrek (63 gun) son 80 islem analiz edilir")
+    logger.info("  Ogrenme: Her ceyrek (63 gun) son 80 islem analiz edilir")
     logger.info("-"*80)
 
     bm_close = bm_df["Close"]
@@ -580,12 +584,12 @@ def run_v3() -> None:
     for rg, cnt in regime_cnt.items():
         logger.info(f"    {rg:<8}: {cnt:,} gun ({cnt/total_days*100:.0f}%)")
 
-    logger.info(f"\n  SON FAKTOR AGIRLIKLARI (v3 Ogrendikleri):")
+    logger.info("\n  SON FAKTOR AGIRLIKLARI (v3 Ogrendikleri):")
     for f, w in sorted(adaptor.weights.items(), key=lambda x: x[1], reverse=True):
         bar = "#" * int(w * 40)
         logger.info(f"    {f:<18}: {w:.3f}  {bar}")
 
-    logger.info(f"\n  YIL YIL KARSILASTIRMA:")
+    logger.info("\n  YIL YIL KARSILASTIRMA:")
     logger.info(f"  {'YIL':<6}|{'PORTFOY':>10}|{'BIST':>10}|{'ALFA':>10}|{'SONUC':>10}")
     logger.info("-"*52)
     beat = 0

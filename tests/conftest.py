@@ -1,4 +1,5 @@
 from typing import Any
+
 """Test configuration and shared fixtures."""
 
 import logging

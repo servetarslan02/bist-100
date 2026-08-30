@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Advanced Monte Carlo Engine v1.0
 

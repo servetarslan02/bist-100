@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Yapısal ve Matematiksel Düzeltmeleri Kanıtlama Testi

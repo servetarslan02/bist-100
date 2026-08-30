@@ -13,7 +13,6 @@ Bilgisayar kapalı kaldığında (1 gün, 3 gün, 1 hafta fark etmeksizin) siste
 5. Portföyü ve Fırsatlar sayfasını anlık bugüne eşitler.
 """
 
-import asyncio
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -135,8 +134,13 @@ class MasterStartupCatchup:
             logger.info("4/4: Guncel portfoy ve sinyaller Redis'e senkronize ediliyor...")
             fresh_signals = bist_ml_scanner.scan_all_opportunities(limit=50)
             import json
+
+            import os
             import redis
-            r_conn = redis.Redis(host="localhost", port=6379, password="alpha_secure_prod_2026_redis", decode_responses=True)
+            r_host = os.environ.get("REDIS_HOST", "redis")
+            r_port = int(os.environ.get("REDIS_PORT", 6379))
+            r_pass = os.environ.get("REDIS_PASSWORD", "alpha_secure_prod_2026_redis")
+            r_conn = redis.Redis(host=r_host, port=r_port, password=r_pass, decode_responses=True)
             r_conn.set("phase18:predictions", json.dumps(fresh_signals))
             logger.info(f"Canli Firsatlar tablosu guncellendi ({len(fresh_signals)} hisse).")
         except Exception as sync_err:

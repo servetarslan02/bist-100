@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — pgvector & Vector Memory Test Suite
 Doğrulanan Özellikler:

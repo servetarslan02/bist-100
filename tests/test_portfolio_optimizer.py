@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Portfolio Optimizer Test Suite
 Doğrulanan Özellikler:

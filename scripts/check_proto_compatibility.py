@@ -2,6 +2,7 @@ from __future__ import annotations
 
 #!/usr/bin/env python3
 from typing import Any
+
 """
 ALPHA BIST — Protobuf Backward Compatibility Checker
 
@@ -16,6 +17,7 @@ Kullanım:
 """
 
 import structlog
+
 logger = structlog.get_logger(__name__)
 
 import hashlib

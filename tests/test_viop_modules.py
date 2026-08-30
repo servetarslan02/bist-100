@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — VIOP Test Suite v3.0
 

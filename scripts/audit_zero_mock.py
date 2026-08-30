@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Zero Mock / Real Data Verification Suite
 Tüm API uç noktalarını tarar ve hiçbir sahte/mock/dummy veri olmadığını doğrular.

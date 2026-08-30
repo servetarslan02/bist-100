@@ -50,7 +50,7 @@ except ImportError:
 
 # BIST'e özgü gerçekçi transaction cost modeli
 try:
-    from .transaction_costs import TransactionCostEngine, bist_transaction_cost
+    from .transaction_costs import bist_transaction_cost
 
     _has_detailed_costs = True
 except ImportError:

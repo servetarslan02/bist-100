@@ -10,7 +10,6 @@ Bu betik hiçbir şeyi değiştirmeden, mevcut sistemin gerçek performans metri
 7. Çıktıyı 'data/baseline_profile.json' dosyasına kaydetme
 """
 
-import asyncio
 import json
 import os
 import time
@@ -63,10 +62,22 @@ def profile_feature_and_market_data():
 def profile_ml_inference_latency():
     print("  [2/4] ML Modelleri Çıkarım (Inference) Gecikmeleri Ölçülüyor...")
     bist_ml_scanner.load_models()
-    
+
     # 647 hisse için 70 feature sentetik matris
-    n_stocks = 647
-    feat_names = list(bist_ml_scanner.models.get("lightgbm", None).feature_name()) if "lightgbm" in bist_ml_scanner.models else [f"f_{i}" for i in range(70)]
+    def _get_model_features(model):
+        if model is None:
+            return [f"f_{i}" for i in range(70)]
+        if hasattr(model, "feature_name_"):
+            return list(model.feature_name_)
+        if hasattr(model, "booster_") and hasattr(model.booster_, "feature_name"):
+            return list(model.booster_.feature_name())
+        if hasattr(model, "feature_names_in_"):
+            return list(model.feature_names_in_)
+        if hasattr(model, "feature_name") and callable(model.feature_name):
+            return list(model.feature_name())
+        return [f"f_{i}" for i in range(70)]
+
+    feat_names = _get_model_features(bist_ml_scanner.models.get("lightgbm", None))
     sample_df = pd.DataFrame(np.random.randn(n_stocks, len(feat_names)), columns=feat_names)
 
     timings = {}

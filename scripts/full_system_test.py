@@ -13,6 +13,7 @@ import traceback
 import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
 import numpy as np
 
 ROOT = Path(__file__).parent.parent
@@ -103,7 +104,7 @@ def daily_cycle(orch, day, signals, prices, **kw):
 # ─── BÖLÜM 1: RİSK GATE (8 Senaryo) ───
 print(f"\n{'='*72}")
 print(f"  {B}{C}ALPHA BIST — EKSİKSİZ SİSTEM TESTİ v2.3{Z}")
-print(f"  10 Katman | 84 Senaryo | Gerçek Bileşenler | Sahte Veri YOK")
+print("  10 Katman | 84 Senaryo | Gerçek Bileşenler | Sahte Veri YOK")
 print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S TSI')}")
 print(f"{'='*72}")
 print(f"\n{B}  == BÖLÜM 1: RİSK GATE TESTLERİ (8 senaryo) =={Z}")
@@ -727,7 +728,7 @@ def t_bt02(r):
 run("BT-02", "Purge + Embargo Aralıkları Uygulanıyor mu?", t_bt02)
 
 def t_bt03(r):
-    from services.backtest.transaction_costs import MarketImpactModel, SlippageModel, BISTFeeStructure
+    from services.backtest.transaction_costs import BISTFeeStructure, MarketImpactModel
     mim = MarketImpactModel()
     it, ip = mim.estimate_impact(10_000, 200_000, 0.02, 50.0)
     fee = BISTFeeStructure()
@@ -735,7 +736,7 @@ def t_bt03(r):
 run("BT-03", "Backtest İşlem Maliyetleri Dahil mi?", t_bt03)
 
 def t_bt04(r):
-    from services.backtest.survivorship import SurvivorshipBiasHandler, DelistingEvent
+    from services.backtest.survivorship import DelistingEvent, SurvivorshipBiasHandler
     sbh = SurvivorshipBiasHandler()
     sbh.set_active_universe({"GARAN", "AKBNK", "THYAO", "EREGL"})
     sbh.register_delisting(DelistingEvent(ticker="DEGISTI", delisting_date=datetime(2023, 6, 15), reason="SPK Kararı", final_price=12.50, recovery_rate=0.0))
@@ -767,8 +768,9 @@ def t_bt07(r):
 run("BT-07", "Fold Sınır Doğrulaması (Purge Yeterliliği)", t_bt07)
 
 def t_bt08(r):
-    from services.backtest.bias_detector import LookAheadBiasDetector
     import polars as pl
+
+    from services.backtest.bias_detector import LookAheadBiasDetector
     ld = LookAheadBiasDetector()
     df = pl.DataFrame({"timestamp": [datetime(2023, 1, 1) + timedelta(days=i) for i in range(30)], "close": [100.0 + i for i in range(30)], "ma_20": [100.0 + i*0.5 for i in range(30)]})
     res = ld.validate_rolling_window(data=df, window_size=20, feature_name="ma_20")
@@ -851,8 +853,8 @@ run("PM-08", "Deflated Sharpe: Çoklu Test Cezalandırması", t_pm08)
 # ─── AYLIK P&L SİMÜLASYONU ───
 print(f"\n{B}{C}  == AYLIK P&L SİMÜLASYONU (Ocak-Haziran 2025) =={Z}")
 try:
-    from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
     from services.core.market_calendar import MarketCalendar
+    from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 
     _db = tmp_db()
     _orch = PaperTradingOrchestrator(champion_version=CHAMP, initial_capital=CAPITAL, db_path=_db)

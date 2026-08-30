@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Market Session State Machine (Single Source of Truth)
 

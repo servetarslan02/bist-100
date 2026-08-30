@@ -98,6 +98,7 @@ class HistoricalDataWarehouse:
 
         # 1. BIST-100 Endeksi
         from datetime import date
+
         import yfinance as yf
 
         end_date = date.today().isoformat()

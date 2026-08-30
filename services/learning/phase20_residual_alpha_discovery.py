@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY"""
 
 import warnings

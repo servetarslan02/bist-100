@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — PORTFÖY LİMİTLERİ, TAVAN/TABAN YÖNETİMİ, NAKİT DİNAMİĞİ VE ÇIKIŞ STRATEJİSİ KANITI
 1. Tavan / Taban ve Devre Kesici Likidite Koruması

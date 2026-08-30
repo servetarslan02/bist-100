@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — QuestDB Tick Data Consumer
 
 NATS event bus'tan MARKET_TICK olaylarını dinler ve QuestDB'ye yazar.

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Risk Parity & Volatiliteye Dayalı Dinamik Pozisyon Boyutlandırma Testi
 ===================================================================================
@@ -13,17 +14,18 @@ import sys
 
 import polars as pl
 
+import structlog
+logger = structlog.get_logger(__name__)
+
 # Windows UTF-8 Terminal desteği
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        logger.error("Exception caught", exc_info=True)
+        pass
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import structlog
 
 from services.data.historical_warehouse import HistoricalDataWarehouse
 from services.risk.risk_parity_engine import RiskParityEngine, RiskParityParameters

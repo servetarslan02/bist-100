@@ -23,7 +23,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import orjson
-import polars as pl
 import structlog
 
 from services.core.alpha_engine import AlphaEngine
@@ -111,8 +110,8 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
     if needs_rebalance:
         # TEK BEYİN İLKESİ (SINGLE SOURCE OF TRUTH):
         # Portföy alımları ve Otonom Fırsatlar sayfası aynı ortak Şampiyon Modelden (BistMLScanner) beslenir.
-        from services.scanner.bist_ml_scanner import bist_ml_scanner
         from services.core.redis_helper import set_cached
+        from services.scanner.bist_ml_scanner import bist_ml_scanner
 
         logger.info("Generating signals via Champion BistMLScanner (Single Source of Truth)...")
         preds = bist_ml_scanner.scan_all_opportunities(limit=50)
@@ -155,7 +154,6 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
             if not qualified_candidates:
                 qualified_candidates = valid_preds[:min(10, max_slots)]
 
-            top_set = {item["ticker"] for item in qualified_candidates}
             top_rank_map = {item["ticker"]: idx + 1 for idx, item in enumerate(qualified_candidates)}
 
             # 2. Münferit Satış Mantığı (Individual Degradation Exit):
@@ -211,7 +209,7 @@ async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: 
                 max_pos_cap = min(0.20, limits.max_position_pct)  # KULLANICI KURALI: En fazla %20
                 min_pos_floor = 0.00  # KULLANICI KURALI: En az için kriter yoktur
 
-                for idx, (p, raw_f) in enumerate(zip(new_entries, raw_weights)):
+                for idx, (p, raw_f) in enumerate(zip(new_entries, raw_weights, strict=False)):
                     ideal_weight = (raw_f / tot_factor) * investable_pool
                     bounded_weight = round(min(max_pos_cap, max(min_pos_floor, ideal_weight)), 4)
 

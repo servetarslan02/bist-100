@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Incremental Fetcher v1.0
 

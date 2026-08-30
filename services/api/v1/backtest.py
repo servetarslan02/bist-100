@@ -1,4 +1,5 @@
 from typing import Any
+
 """Backtest API - Gerçek servislere bağlı."""
 
 import structlog

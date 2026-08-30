@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Holiday Management API v1
 
@@ -207,7 +208,7 @@ async def add_holiday(
     try:
         d = date.fromisoformat(req.date)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Geçersiz tarih formatı. YYYY-MM-DD kullanın.")
+        raise HTTPException(status_code=400, detail="Geçersiz tarih formatı. YYYY-MM-DD kullanın.") from None
 
     if holiday_manager.is_holiday(d):
         raise HTTPException(status_code=409, detail=f"{req.date} zaten tatil olarak kayıtlı.")
@@ -235,7 +236,7 @@ async def remove_holiday(
     try:
         d = date.fromisoformat(date_str)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Geçersiz tarih formatı. YYYY-MM-DD kullanın.")
+        raise HTTPException(status_code=400, detail="Geçersiz tarih formatı. YYYY-MM-DD kullanın.") from None
 
     if not holiday_manager.is_holiday(d):
         raise HTTPException(status_code=404, detail=f"{date_str} tatil olarak kayıtlı değil.")

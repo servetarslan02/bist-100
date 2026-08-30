@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Paper Trading Unit + Integration Tests v1.0
 

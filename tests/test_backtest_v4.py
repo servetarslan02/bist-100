@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Backtest v4.0 Comprehensive Test Suite
 

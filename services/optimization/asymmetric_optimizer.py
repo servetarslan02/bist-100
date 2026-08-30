@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Asimetrik Rejim & Tavan Serisi (Ralli Kilidi) Bayesian Optimizasyon Motoru
 ======================================================================================

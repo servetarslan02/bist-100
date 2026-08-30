@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — BIST Universe v5.0 (Full Dynamic Auto-Discovery)
 Borsa İstanbul'daki TÜM hisseleri (600+ hisse) canlı kaynaklardan dinamik olarak yönetir.

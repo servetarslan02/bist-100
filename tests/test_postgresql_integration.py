@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — PostgreSQL Integration Tests
 
 PostgreSQL madde 1 değişikliklerinin doğrulanması:

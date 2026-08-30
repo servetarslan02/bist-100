@@ -1,4 +1,5 @@
 from typing import Any
+
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
 import asyncio
@@ -64,8 +65,8 @@ async def ml_learning_scheduler() -> Any:
     while True:
         await asyncio.sleep(4 * 3600)
         try:
-            from ..learning.learning_pipeline import LearningPipeline
             from ..learning.learning_loop import learning_loop
+            from ..learning.learning_pipeline import LearningPipeline
 
             loop = asyncio.get_event_loop()
 

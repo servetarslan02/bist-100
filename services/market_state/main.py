@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Market State Engine v2.0 (Main Entry Point)
 
 Tüm bileşenleri orkestre eden ana servis:

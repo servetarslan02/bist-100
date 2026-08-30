@@ -1,4 +1,5 @@
 from typing import Any
+
 """Bölüm 23 — BIST Piyasa Kuralları Testleri."""
 
 import pytest

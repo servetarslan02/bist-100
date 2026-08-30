@@ -5,9 +5,8 @@ Bu script, GPU (RTX 4080) donanımını, Docker GPU geçişini (NVIDIA Container
 ve Python modellerinin GPU/CPU/RAM/SSD orkestrasyonunu doğrular.
 """
 
-import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +35,7 @@ def run_gpu_verification():
         print(f"   ✅ GPU Donanımı       : {gpu_name}")
         print(f"   ✅ Toplam VRAM        : {vram_mb / 1024:.2f} GB (12 GB GDDR6X)")
         print(f"   ✅ NVIDIA Sürücüsü    : {driver_ver} (CUDA 13.4 / 12.x Uyumlu)")
-        print(f"   ✅ Donanım Durumu     : FİZİKSEL EKRAN KARTI AKTİF & HAZIR")
+        print("   ✅ Donanım Durumu     : FİZİKSEL EKRAN KARTI AKTİF & HAZIR")
     except Exception as e:
         print(f"   ❌ GPU Okuma Hatası   : {e}")
 
@@ -45,17 +44,17 @@ def run_gpu_verification():
     compose_path = ROOT_DIR / "docker-compose.yml"
     gpu_containers = []
     if compose_path.exists():
-        with open(compose_path, "r", encoding="utf-8") as f:
+        with open(compose_path, encoding="utf-8") as f:
             content = f.read()
             services = ["api", "feature-engine", "intelligence", "simulation"]
             for s in services:
                 if f"container_name: alpha-{s}" in content and "driver: nvidia" in content:
                     gpu_containers.append(f"alpha-{s}")
 
-    print(f"   ✅ NVIDIA Container Toolkit : docker-compose.yml içinde 'driver: nvidia' rezerve edildi.")
+    print("   ✅ NVIDIA Container Toolkit : docker-compose.yml içinde 'driver: nvidia' rezerve edildi.")
     print(f"   ✅ GPU Ayrılan Container'lar: {', '.join(gpu_containers)}")
-    print(f"   ✅ Ortam Değişkenleri       : TORCH_DEVICE=cuda, NVIDIA_VISIBLE_DEVICES=all")
-    print(f"   ✅ Docker İzolasyonu        : Host ortamı kirletilmeden GPU container içine aktarılıyor.")
+    print("   ✅ Ortam Değişkenleri       : TORCH_DEVICE=cuda, NVIDIA_VISIBLE_DEVICES=all")
+    print("   ✅ Docker İzolasyonu        : Host ortamı kirletilmeden GPU container içine aktarılıyor.")
 
     # 3. Model Katmanı GPU Yapılandırması (CatBoost, XGBoost, PyTorch)
     print("\n🧠 [3. MODEL KATMANI GPU YÖNLENDİRMESİ]")
@@ -64,12 +63,12 @@ def run_gpu_verification():
     print(f"   ✅ HardwareOrchestrator : {hardware_orchestrator.device.upper()} cihaz yönlendiricisi devrede.")
     print(f"   ✅ CatBoost GPU Param   : {catboost_params}")
     print(f"   ✅ XGBoost GPU Param    : {xgboost_params}")
-    print(f"   ✅ Transformer / LSTM   : CUDA otomatik algılama (device='cuda') devrede.")
+    print("   ✅ Transformer / LSTM   : CUDA otomatik algılama (device='cuda') devrede.")
 
     # 4. SSD Koruma & RAM Hız Testi
     print("\n💾 [4. SSD YAZMA SINIRI & RAM KORUMASI]")
     stats = hardware_orchestrator.ssd_writer.get_stats()
-    print(f"   ✅ SSD Rate-Limited Flusher: AKTİF (Tick verileri RAM tamponunda tutulup blok halinde yazılır)")
+    print("   ✅ SSD Rate-Limited Flusher: AKTİF (Tick verileri RAM tamponunda tutulup blok halinde yazılır)")
     print(f"   ✅ Tampon İstatistikleri   : Bekleyen={stats['pending_queue_size']}, Blok Flush Sayısı={stats['total_flushes']}")
 
     print("\n" + "=" * 80)

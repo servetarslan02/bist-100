@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Server-Sent Events (SSE) Router v2.0
 

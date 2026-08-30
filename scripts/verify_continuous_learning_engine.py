@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Sürekli Öğrenme ve Otonom Büyüme Motoru Canlı Doğrulama Testi
 Kod tabanındaki otonom öğrenme, güvenilirlik ağırlıklandırması ve telafi sistemini doğrudan test eder.

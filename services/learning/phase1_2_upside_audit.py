@@ -1,4 +1,5 @@
 from typing import Any
+
 """Phase 1 & 2: Baseline and Upside/BULL_TREND Loss Audit
 Bu betik, Train/Validation (Holdout ÖNCESİ) dönemdeki işlemleri derinlemesine analiz eder.
 Amacı: BULL_TREND rejimindeki kayıpların ve kaçırılan rallilerin (V-dip) KÖK NEDENİNİ bulmaktır.

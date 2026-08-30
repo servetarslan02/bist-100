@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — 30-YILLIK KURUMSAL GERÇEK PİYASA BACKTEST MOTORU (1997 - 2026)
 ===========================================================================

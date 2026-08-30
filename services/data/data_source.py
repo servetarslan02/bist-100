@@ -18,9 +18,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
 import orjson
 import polars as pl
-import httpx
 import structlog
 
 logger = structlog.get_logger()
@@ -245,7 +245,7 @@ class DataSourceManager:
         parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
         try:
-            df.write_parquet(parquet_file, engine="pyarrow")
+            df.write_parquet(parquet_file)
             logger.info("Cache saved", ticker=ticker, rows=len(df))
         except Exception as e:
             logger.warning("Cache save failed", ticker=ticker, error=str(e))

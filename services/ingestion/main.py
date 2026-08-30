@@ -202,6 +202,11 @@ class IngestionService:
         """Periodically fetch market data from yfinance."""
         while self._running:
             try:
+                if not is_bist_session_active():
+                    logger.debug("Market closed, skipping market data fetch cycle")
+                    await asyncio.sleep(300)
+                    continue
+
                 # İnternet kontrolü — offline ise bekle
                 if not connectivity_monitor.is_online:
                     logger.info("Offline mode, waiting 60s before retry...")

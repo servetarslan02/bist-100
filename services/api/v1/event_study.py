@@ -213,9 +213,9 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
 
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
 
-                def _has_word(kw: str) -> bool:
+                def _has_word(kw: str, text: str = text_check) -> bool:
                     """Otomatik eklendi."""
-                    return bool(_re.search(r"\b" + _re.escape(kw) + r"\b", text_check))
+                    return bool(_re.search(r"\b" + _re.escape(kw) + r"\b", text))
 
                 macro_keywords = [
                     "tcmb",

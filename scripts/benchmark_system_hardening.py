@@ -10,16 +10,16 @@ Bu betik 10 katmanlı hardening ve performans geliştirmelerini doğrular:
 
 import asyncio
 import time
+
 import numpy as np
-import pandas as pd
 import orjson
+import pandas as pd
 import structlog
 
 from services.core.base_service import BaseAlphaService, ServiceExecutionError
-from services.features.cache_manager import feature_cache_manager
 from services.core.observability import prometheus_metrics
+from services.features.cache_manager import feature_cache_manager
 from services.scanner.bist_ml_scanner import bist_ml_scanner
-from services.api.websocket import ws_server
 
 logger = structlog.get_logger(__name__)
 
@@ -51,7 +51,7 @@ async def run_benchmark():
     # --------------------------------------------------------------------------
     print("\n>>> [1. ADIM] BaseAlphaService Contract & Idempotency Testi...")
     service = SampleTradingService()
-    
+
     # Geçerli çağrı
     res1 = await service.execute({"symbol": "THYAO"}, idempotency_key="idemp_001")
     print(f"  * İlk İstek Sonucu: {res1.get('order_status')} (Sembol: {res1.get('symbol')})")
@@ -105,7 +105,7 @@ async def run_benchmark():
     # --------------------------------------------------------------------------
     print("\n>>> [3. ADIM] Vektörize Toplu ML Model Çıkarım Hızı...")
     feat_names = list(bist_ml_scanner.models.get("lightgbm", None).feature_name()) if "lightgbm" in bist_ml_scanner.models else [f"f_{i}" for i in range(70)]
-    
+
     # 647 hisse için sentetik 70 feature matrisi
     sample_matrix = np.random.randn(647, len(feat_names))
     sample_df = pd.DataFrame(sample_matrix, columns=feat_names)

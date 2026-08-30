@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 import pandas as pd
 

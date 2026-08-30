@@ -1,8 +1,9 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, "/app")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

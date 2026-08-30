@@ -9,7 +9,9 @@ BIST Gercekleri:
 """
 
 from typing import Any
+
 import structlog
+
 logger = structlog.get_logger()
 
 import time

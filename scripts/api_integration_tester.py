@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST - API and Integration Testing Suite
 Fetches OpenAPI schema from the running FastAPI instance,

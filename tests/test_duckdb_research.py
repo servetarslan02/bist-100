@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — DuckDB Research Engine Tests
 
 Gerçek fonksiyonel testler:
@@ -211,13 +212,13 @@ class TestErrorHandling:
 
     def test_invalid_parquet_path(self, research_engine) -> Any:
         """Geçersiz Parquet yolu hata vermeli."""
-        with pytest.raises(Exception):
+        with pytest.raises((RuntimeError, ValueError, Exception)):
             research_engine.query_parquet("/nonexistent/path.parquet")
 
     def test_invalid_sql(self, research_engine, sample_parquet) -> Any:
         """Geçersiz SQL hata vermeli."""
         research_engine.register_parquet("data", sample_parquet)
-        with pytest.raises(Exception):
+        with pytest.raises((RuntimeError, ValueError, Exception)):
             research_engine.query_research("INVALID SQL QUERY")
 
     def test_close_and_reopen(self, sample_parquet) -> Any:

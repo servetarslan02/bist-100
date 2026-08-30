@@ -1,5 +1,5 @@
+
 import httpx
-import json
 
 client = httpx.Client(base_url="http://localhost:8000", timeout=30.0)
 

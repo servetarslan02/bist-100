@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Expected Return (Multi-Factor Model).
 
 Market Model (OLS) ve Fama-French 3/5-Factor modeli destekler.

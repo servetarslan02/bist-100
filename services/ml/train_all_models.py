@@ -8,8 +8,8 @@ Tüm BIST hisse evreninde (600+ hisse, 100/200 kısıtlaması olmadan):
 """
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Workspace root import desteği
 _ROOT = str(Path(__file__).resolve().parents[2])
@@ -23,10 +23,11 @@ if sys.platform == "win32":
     except Exception as exc:
         sys.stderr.write(f"Encoding warning: {exc}\n")
 
-import numpy as np
-import structlog
 from datetime import UTC, datetime, timedelta
 from typing import Any
+
+import numpy as np
+import structlog
 
 from services.core.safe_pickle import safe_pickle_dump
 from services.ml.catboost_model import CatBoostConfig, CatBoostModel
@@ -48,8 +49,9 @@ def _get_or_tune_hyperparameters(
     n_trials: int = 35,
 ) -> dict[str, Any]:
     """Optuna Bayesian Optimization ile 70+ feature uzayına duyarlı en iyi hiperparametreleri bulur/yükler."""
-    import orjson
     from pathlib import Path
+
+    import orjson
 
     cache_file = Path("models/optimal_hyperparams.json")
     if not use_optuna and cache_file.exists():
@@ -69,8 +71,9 @@ def _get_or_tune_hyperparameters(
                                 max_days=30,
                             )
                             is_stale = True
-                    except Exception:
-                        pass
+                    except Exception as dt_err:
+                        logger.debug("hyperparam_cache_date_parse_failed", error=str(dt_err))
+                        is_stale = True
 
                 if not is_stale:
                     logger.info("optimal_hyperparameters_loaded_from_cache", file=str(cache_file))
@@ -179,7 +182,6 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Eksiksiz BIST-100 Çapraz Kesiti)")
 
     # 2. 70 CANONICAL QUANT, FUNDAMENTAL, SENTIMENT VE MUM ALPHA FEATURE SETİ
-    from services.ml.ranking_model import RankingModel
     feature_names = list(RankingModel()._feature_names)
     logger.info(f"  • Model Giriş Katmanı: {len(feature_names)} Özellik (70 Canonical Features Aktif)")
 
@@ -203,7 +205,7 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
         for ticker in tickers:  # BIST'in tamamı - Kısıtlama veya filtreleme yok
             t_key = f"{ticker}_{dt_str}"
             feat_dict = {f: float(np.random.randn()) for f in feature_names}
-            
+
             # Motor 1: Relatif Güç
             feat_dict["rs_vs_bist_1d"] = float(np.random.normal(0.2, 1.0))
             feat_dict["rs_vs_bist_5d"] = float(np.random.normal(1.0, 2.5))

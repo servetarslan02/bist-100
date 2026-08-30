@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Attribution Engine v1.0
 

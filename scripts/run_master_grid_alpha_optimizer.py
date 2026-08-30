@@ -23,7 +23,6 @@ from __future__ import annotations
 import sys
 import time
 import warnings
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,8 +36,8 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
 import structlog
@@ -79,8 +78,8 @@ def _to_float(v: Any) -> float:
     if hasattr(v, "item"):
         try:
             return float(v.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(v)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -597,7 +596,7 @@ def run_hyper_optimizer() -> None:
     logger.info(f"        - Trend Kalitesi (R²)           : {best_params['w_r2']:.2f}")
     logger.info(f"        - Hacim Akümülasyon Trendi      : {best_params['w_vol_trend']:.2f}")
 
-    logger.info(f"\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
+    logger.info("\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
     logger.info(f"  {'YIL':<6} | {'PORTFÖY':>10} | {'BIST-100':>10} | {'ALFA':>10} | {'DURUM':>12}")
     logger.info("-" * 60)
     years_beat = 0

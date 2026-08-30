@@ -1,4 +1,5 @@
 from typing import Any
+
 import numpy as np
 
 from services.learning.drift_monitor import DataDriftMonitor

@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 16: PORTFOLIO-RELEVANT ALPHA FORENSICS"""
 
 import random

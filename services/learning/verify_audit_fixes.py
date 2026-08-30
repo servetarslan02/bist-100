@@ -1,22 +1,26 @@
+import structlog
+
+logger = structlog.get_logger(__name__)
 """Verification script for the 7 audit fixes and encoding repairs."""
 
 import sys
+
 sys.stdout.reconfigure(line_buffering=True)
 import numpy as np
 
-print("=" * 80)
-print("ALPHA BIST — 7 BULGU VE ENCODING DÜZELTMELERİNİN DOĞRULAMA TESTİ")
-print("=" * 80)
+logger.info("=" * 80)
+logger.info("ALPHA BIST — 7 BULGU VE ENCODING DÜZELTMELERİNİN DOĞRULAMA TESTİ")
+logger.info("=" * 80)
 
 # ----------------------------------------------------------------------
 # 1. TEST: autonomous_conviction_engine (Hurdle Rate & Trailing Stop)
 # ----------------------------------------------------------------------
-print("\n>>> [1. TEST] AutonomousConvictionEngine Hurdle Rate & Trailing Stop...")
+logger.info("\n>>> [1. TEST] AutonomousConvictionEngine Hurdle Rate & Trailing Stop...")
 from services.portfolio.autonomous_conviction_engine import (
     AutonomousConvictionEngine,
     CandidateAsset,
-    OpenPositionState,
     ExitAction,
+    OpenPositionState,
 )
 
 engine = AutonomousConvictionEngine()
@@ -33,11 +37,11 @@ candidate = CandidateAsset(
     is_excess_alpha=True,
 )
 accepted, rejections = engine.evaluate_universe([candidate], market_regime="SIDEWAYS")
-print(f"  * Aday Değerlendirmesi: {candidate.ticker} -> {'KABUL EDİLDİ' if accepted else 'REDDEDİLDİ'}")
+logger.info(f"  * Aday Değerlendirmesi: {candidate.ticker} -> {'KABUL EDİLDİ' if accepted else 'REDDEDİLDİ'}")
 if rejections:
-    print(f"    Red Nedeni: {rejections.get(candidate.ticker)}")
+    logger.info(f"    Red Nedeni: {rejections.get(candidate.ticker)}")
 assert len(accepted) == 1, f"Candidate should be accepted, but was rejected: {rejections}"
-print("  ✅ TEST 1a BAŞARILI: Hurdle rate zaman ufkuna ve net alfaya doğru bağlandı (hisseler artık haksız elenmiyor).")
+logger.info("  ✅ TEST 1a BAŞARILI: Hurdle rate zaman ufkuna ve net alfaya doğru bağlandı (hisseler artık haksız elenmiyor).")
 
 # Test 1b: Trailing Stop Death Zone Fix
 # Pozisyon 100 TL'den alındı, 105 TL zirve gördü (TS = 98.7 TL), şimdi 98.7 TL'ye düştü (pnl = -%1.3)
@@ -61,13 +65,13 @@ decisions = engine.evaluate_position_exits(
 )
 assert len(decisions) == 1, "Exit decision must be generated when trailing stop is hit!"
 assert decisions[0].action == ExitAction.FULL_EXIT, f"Expected FULL_EXIT, got {decisions[0].action}"
-print(f"  * Trailing Stop Çıkış Kararı: {decisions[0].action} | Neden: {decisions[0].reason}")
-print("  ✅ TEST 1b BAŞARILI: Trailing stop ölüm bölgesi kapatıldı, kâr görmüş pozisyon stop vurulunca derhal çıktı.")
+logger.info(f"  * Trailing Stop Çıkış Kararı: {decisions[0].action} | Neden: {decisions[0].reason}")
+logger.info("  ✅ TEST 1b BAŞARILI: Trailing stop ölüm bölgesi kapatıldı, kâr görmüş pozisyon stop vurulunca derhal çıktı.")
 
 # ----------------------------------------------------------------------
 # 2. TEST: risk/var_cvar.py (GPU Monte Carlo Seed Determinizmi)
 # ----------------------------------------------------------------------
-print("\n>>> [2. TEST] VaR/CVaR GPU Monte Carlo Seed Determinizmi...")
+logger.info("\n>>> [2. TEST] VaR/CVaR GPU Monte Carlo Seed Determinizmi...")
 from services.risk.var_cvar import VaRCalculator
 
 var_calc = VaRCalculator()
@@ -76,15 +80,15 @@ dummy_returns = np.array([0.01, -0.02, 0.015, -0.01, 0.005, -0.025, 0.03, -0.005
 res1 = var_calc.calculate_monte_carlo_var(dummy_returns, confidence=0.95, n_simulations=5000, seed=42)
 res2 = var_calc.calculate_monte_carlo_var(dummy_returns, confidence=0.95, n_simulations=5000, seed=42)
 
-print(f"  * Simülasyon 1 (Seed 42) VaR 95: {res1.var_95:.4f}, CVaR 95: {res1.cvar_95:.4f}")
-print(f"  * Simülasyon 2 (Seed 42) VaR 95: {res2.var_95:.4f}, CVaR 95: {res2.cvar_95:.4f}")
+logger.info(f"  * Simülasyon 1 (Seed 42) VaR 95: {res1.var_95:.4f}, CVaR 95: {res1.cvar_95:.4f}")
+logger.info(f"  * Simülasyon 2 (Seed 42) VaR 95: {res2.var_95:.4f}, CVaR 95: {res2.cvar_95:.4f}")
 assert np.isclose(res1.var_95, res2.var_95, atol=1e-5), "Monte Carlo VaR results must be deterministic with same seed!"
-print("  ✅ TEST 2 BAŞARILI: Monte Carlo simülasyonu GPU ve CPU'da %100 tekrarlanabilir ve deterministik.")
+logger.info("  ✅ TEST 2 BAŞARILI: Monte Carlo simülasyonu GPU ve CPU'da %100 tekrarlanabilir ve deterministik.")
 
 # ----------------------------------------------------------------------
 # 3. TEST: trade_planner.py (Dinamik Senaryo Olasılıkları)
 # ----------------------------------------------------------------------
-print("\n>>> [3. TEST] TradePlanner Dinamik Senaryo Olasılıkları...")
+logger.info("\n>>> [3. TEST] TradePlanner Dinamik Senaryo Olasılıkları...")
 from services.intelligence.trade_planner import TradePlanner
 
 planner = TradePlanner()
@@ -106,42 +110,44 @@ plan_bear = planner.create_plan(
     market_regime="BEAR",
 )
 
-print(f"  * Boğa Rejimi Plan Olasılıkları (SPEC 85): Bull=%{plan_bull.scenario_bull['probability']}, Base=%{plan_bull.scenario_base['probability']}, Bear=%{plan_bull.scenario_bear['probability']}")
-print(f"  * Ayı Rejimi Plan Olasılıkları (SPEC 40): Bull=%{plan_bear.scenario_bull['probability']}, Base=%{plan_bear.scenario_base['probability']}, Bear=%{plan_bear.scenario_bear['probability']}")
+logger.info(f"  * Boğa Rejimi Plan Olasılıkları (SPEC 85): Bull=%{plan_bull.scenario_bull['probability']}, Base=%{plan_bull.scenario_base['probability']}, Bear=%{plan_bull.scenario_bear['probability']}")
+logger.info(f"  * Ayı Rejimi Plan Olasılıkları (SPEC 40): Bull=%{plan_bear.scenario_bull['probability']}, Base=%{plan_bear.scenario_base['probability']}, Bear=%{plan_bear.scenario_bear['probability']}")
 
 assert plan_bull.scenario_bull['probability'] > plan_bear.scenario_bull['probability'], "Bull probability must be higher in bull plan!"
 assert plan_bear.scenario_bear['probability'] > plan_bull.scenario_bear['probability'], "Bear probability must be higher in bear plan!"
-print("  ✅ TEST 3 BAŞARILI: Senaryo olasılıkları sabit şablon olmaktan çıkarılıp dinamik piyasa ve model girdilerine bağlandı.")
+logger.info("  ✅ TEST 3 BAŞARILI: Senaryo olasılıkları sabit şablon olmaktan çıkarılıp dinamik piyasa ve model girdilerine bağlandı.")
 
 # ----------------------------------------------------------------------
 # 4. TEST: api/v1/scanner.py ve portfolio.py (Sahte Veri Yasağı)
 # ----------------------------------------------------------------------
-print("\n>>> [4. TEST] API Sahte / Mock Fallback Veri Yasağı...")
+logger.info("\n>>> [4. TEST] API Sahte / Mock Fallback Veri Yasağı...")
 import inspect
+
 from services.api.v1 import scanner as scanner_module
 
 scanner_source = inspect.getsource(scanner_module)
 assert "default_signals = [" not in scanner_source, "Hardcoded fake default_signals must be completely removed from scanner.py!"
-print("  ✅ TEST 4 BAŞARILI: scanner.py içerisindeki 140 satırlık sabit sahte hisse verisi tamamen silindi.")
+logger.info("  ✅ TEST 4 BAŞARILI: scanner.py içerisindeki 140 satırlık sabit sahte hisse verisi tamamen silindi.")
 
 # ----------------------------------------------------------------------
 # 5. TEST: services/core/ Mojibake Temizliği
 # ----------------------------------------------------------------------
-print("\n>>> [5. TEST] services/core/ Mojibake Karakter Doğrulaması...")
+logger.info("\n>>> [5. TEST] services/core/ Mojibake Karakter Doğrulaması...")
 import glob
+
 files = glob.glob('services/core/**/*.py', recursive=True)
 mangled = 0
 for f in files:
-    with open(f, 'r', encoding='utf-8', errors='ignore') as fp:
+    with open(f, encoding='utf-8', errors='ignore') as fp:
         text = fp.read()
     for bad in ['Ã§', 'Ã¼', 'Ã¶', 'Ä±', 'ÅŸ', 'ÄŸ']:
         if bad in text:
             mangled += 1
-            print(f"    Mangled found in {f}: {bad}")
+            logger.info(f"    Mangled found in {f}: {bad}")
             break
 assert mangled == 0, f"Found {mangled} files with remaining mojibake in services/core!"
-print("  ✅ TEST 5 BAŞARILI: services/core altındaki tüm 10 dosya temizlendi, sıfır bozuk karakter.")
+logger.info("  ✅ TEST 5 BAŞARILI: services/core altındaki tüm 10 dosya temizlendi, sıfır bozuk karakter.")
 
-print("\n" + "=" * 80)
-print("TEBRİKLER! 7 BULGU VE ENCODING DÜZELTMESİNİN TÜMÜ BAŞARIYLA DOĞRULANDI!")
-print("=" * 80)
+logger.info("\n" + "=" * 80)
+logger.info("TEBRİKLER! 7 BULGU VE ENCODING DÜZELTMESİNİN TÜMÜ BAŞARIYLA DOĞRULANDI!")
+logger.info("=" * 80)

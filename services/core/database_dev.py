@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Database Dev Compatibility Shim
 
 DEPRECATED: This module exists only for backward compatibility with tests.

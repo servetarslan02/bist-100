@@ -549,7 +549,6 @@ class LightGBMTrainer:
             X_train_scaled = X_train_raw
             X_val_scaled = X_val_raw
 
-        y_train = y[train_indices]
         y_val = y[val_indices]
 
         is_ranking = self._config.objective == "lambdarank"

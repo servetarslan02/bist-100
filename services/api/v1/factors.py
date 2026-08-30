@@ -1,4 +1,5 @@
 from typing import Any
+
 """Factors API — Gerçek BIST Faktör Analiz ve Exposure Motoru."""
 
 from fastapi import APIRouter, Depends, Query

@@ -170,7 +170,7 @@ class PaperStateStore:
         import time
         if duckdb is None:
             raise RuntimeError("DuckDB module is not installed in the environment.")
-        
+
         conn = None
         for attempt in range(5):
             try:

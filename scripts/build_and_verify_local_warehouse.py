@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — 30-Yıllık Yerel Veri Deposu Oluşturucu ve Hız Testi
 ===============================================================

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Quantitative Portfolio Optimizer Engine v2.0
 

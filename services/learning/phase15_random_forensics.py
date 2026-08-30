@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 15: RANDOM FILTER FORENSICS & TRADE TIMING AUDIT"""
 
 import random

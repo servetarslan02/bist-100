@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Event-Driven Scanner v1.0
 

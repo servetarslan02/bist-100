@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Kilitli Tek Seferlik Kör Validasyon ve 30-Yıllık Denetim
 ====================================================================

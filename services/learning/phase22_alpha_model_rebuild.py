@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 22: PRODUCTION-GRADE ALPHA MODEL REBUILD"""
 
 import warnings

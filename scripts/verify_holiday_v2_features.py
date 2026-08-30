@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Holiday Manager v2.0 Özellik Doğrulama Testi
 ==========================================================
@@ -433,7 +435,7 @@ async def test_bist_web_fetch_real(result: TestResult) -> Any:
 
     holidays = await fetch_bist_holidays_from_web()
     if holidays:
-        result.ok(f"BIST web sitesinden {len(holiday)} tatil çekildi")
+        result.ok(f"BIST web sitesinden {len(holidays)} tatil çekildi")
         for h in sorted(holidays)[:5]:
             logger.info(f"      📅 {h}")
     else:

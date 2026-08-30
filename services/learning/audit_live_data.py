@@ -1,17 +1,22 @@
+import structlog
+
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Canlı Piyasa ve Model Denetim Kanıtı
 """
 from services.scanner.bist_ml_scanner import BistMLScanner
 
-def audit():
+
+def audit() -> None:
+    """Otomatik dokumantasyon."""
     s = BistMLScanner()
     items = s._fetch_live_scanner_data()
     item_map = {it['name']: it for it in items}
 
     check_tickers = ['KLGYO', 'YKBNK', 'GLRYH', 'ETYAT', 'HKTM', 'KGYO', 'THYAO', 'TUPRS', 'TRENJ']
-    print('=== GERÇEK PİYASA VERİSİ DENETİM KANITI (CANLI API ÇIKTISI) ===')
-    print(f"{'HİSSE':<7} | {'FİYAT':<8} | {'DEĞİŞİM':<8} | {'RVOL':<6} | {'ATR (%)':<8} | {'F/K':<7} | {'PD/DD':<7} | {'ROE (%)':<8} | {'NET MARJ (%)':<12}")
-    print('-' * 95)
+    logger.info('=== GERÇEK PİYASA VERİSİ DENETİM KANITI (CANLI API ÇIKTISI) ===')
+    logger.info(f"{'HİSSE':<7} | {'FİYAT':<8} | {'DEĞİŞİM':<8} | {'RVOL':<6} | {'ATR (%)':<8} | {'F/K':<7} | {'PD/DD':<7} | {'ROE (%)':<8} | {'NET MARJ (%)':<12}")
+    logger.info('-' * 95)
     for sym in check_tickers:
         d = item_map.get(sym)
         if d:
@@ -27,7 +32,7 @@ def audit():
             pb_s = f"{pb:.2f}" if pb is not None else "N/A"
             roe_s = f"%{roe:.1f}" if roe is not None else "N/A"
             mar_s = f"%{margin:.1f}" if margin is not None else "N/A"
-            print(f"{sym:<7} | {p:>7.2f} TL | %{chg:>+6.2f} | {rvol:>5.2f}x | %{atr_pct:>6.2f} | {pe_s:>7} | {pb_s:>7} | {roe_s:>8} | {mar_s:>12}")
+            logger.info(f"{sym:<7} | {p:>7.2f} TL | %{chg:>+6.2f} | {rvol:>5.2f}x | %{atr_pct:>6.2f} | {pe_s:>7} | {pb_s:>7} | {roe_s:>8} | {mar_s:>12}")
 
 if __name__ == '__main__':
     audit()

@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 logger.info("=========================================================")
 logger.info("ALPHA BIST — KURUMSAL MOTORLAR DENETİM & DOĞRULAMA")

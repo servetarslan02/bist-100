@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Dead Letter Queue (Başarısız Event'ler İçin Kalıcı Kuyruk)
 
 v2.0: Artık PersistentDeadLetterQueue kullanılıyor — restart sonrası kaybolmaz.

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Live Scanner v1.0
 

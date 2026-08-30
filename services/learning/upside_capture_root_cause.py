@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Upside Capture & Return Gap Root-Cause Diagnostic
 
 Bu modül:

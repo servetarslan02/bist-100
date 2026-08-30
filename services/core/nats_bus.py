@@ -12,7 +12,6 @@ Yüksek Hızlı, Güvenilir ve Asenkron Finansal Olay Akışı:
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import time
@@ -145,7 +144,7 @@ class NATSJetStreamBus:
         s_parts = subject.split(".")
         if len(p_parts) != len(s_parts) and not pattern.endswith(">"):
             return False
-        for p, s in zip(p_parts, s_parts):
+        for p, s in zip(p_parts, s_parts, strict=False):
             if p == ">":
                 return True
             if p != "*" and p != s:

@@ -1,8 +1,8 @@
 """Macro API — Gerçek canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
 
 import asyncio
-from datetime import datetime, UTC
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog

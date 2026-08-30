@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 """ALPHA BIST - Configuration Management v3.0 (Enterprise-Grade)
 
 Kurumsal Standartlar:

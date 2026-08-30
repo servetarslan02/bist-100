@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Market Calendar v2.0
 

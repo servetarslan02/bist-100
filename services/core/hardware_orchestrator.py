@@ -26,14 +26,14 @@ Sistemdeki tüm donanım katmanlarının rollerini optimal şekilde dağıtır:
 """
 
 import os
-import sys
-import time
 import queue
 import shutil
-import psutil
 import threading
-from typing import Any, Callable
+import time
 from dataclasses import dataclass
+from typing import Any
+
+import psutil
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -69,7 +69,7 @@ class SSDThrottledWriter:
         self._total_bytes_written = 0
         self._total_flushes = 0
         self._lock = threading.Lock()
-        
+
         # Arka plan flush thread'i
         self._worker_thread = threading.Thread(target=self._flusher_loop, daemon=True, name="SSDThrottledWriter")
         self._worker_thread.start()
@@ -164,7 +164,7 @@ class HardwareOrchestrator:
         self._vram_gb = 0.0
         self._cuda_version = None
         self.ssd_writer = SSDThrottledWriter(flush_interval_sec=3.0, max_buffer_size=10000)
-        
+
         self._detect_and_configure_hardware()
 
     def _detect_and_configure_hardware(self) -> None:
@@ -176,12 +176,12 @@ class HardwareOrchestrator:
                 self._gpu_name = torch.cuda.get_device_name(0)
                 self._vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2)
                 self._cuda_version = torch.version.cuda
-                
+
                 # RTX 4080 Donanım Hızlandırma Ayarları
                 torch.backends.cuda.matmul.allow_tf32 = True  # Ampere/Ada Lovelace TF32 Matmul Hızlandırması
                 torch.backends.cudnn.allow_tf32 = True
                 torch.backends.cudnn.benchmark = True         # Otomatik en hızlı convolution kernel seçici
-                
+
                 logger.info(
                     "GPU Accelerated Hardware Initialized",
                     gpu=self._gpu_name,

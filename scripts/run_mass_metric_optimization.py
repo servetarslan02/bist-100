@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Asimetrik Rejim & Ralli Kilidi 30-Yıllık Kitlesel Optimizasyon Scripti
 ===================================================================================

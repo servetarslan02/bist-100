@@ -1,6 +1,6 @@
-import duckdb
-
 import json
+
+import duckdb
 
 con = duckdb.connect("data/paper_trading_state.db", read_only=True)
 p_state = con.execute("SELECT cash, json_data FROM portfolio_state").fetchone()
@@ -10,8 +10,8 @@ if p_state and p_state[1]:
     try:
         jd = json.loads(p_state[1])
         tot = jd.get("total_value", tot)
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 rows = con.execute("SELECT ticker, quantity, avg_cost, (quantity * current_price) as market_value, sector FROM positions ORDER BY market_value DESC").fetchall()
 
 print("========================================================================================")

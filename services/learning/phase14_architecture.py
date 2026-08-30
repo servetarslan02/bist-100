@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 14: ABSOLUTE + RELATIVE ALPHA ARCHITECTURE"""
 
 import random

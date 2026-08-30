@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 11: ALPHA MODEL RE-DESIGN RESEARCH & OFFLINE VALIDATION"""
 
 import warnings
@@ -253,7 +254,7 @@ if __name__ == "__main__":
     logger.info("3. LABEL CANDIDATES ANALYSIS (Overall Correlation w/ Fwd5d)")
     logger.info("=" * 50)
     for label in ["L0_raw", "L1_excess", "L2_cs_rank", "L3_excess_rank", "L4_vol_adj_excess"]:
-        ic = df.groupby("date").apply(lambda x: spearmanr(x[label], x["fwd_5d"])[0] if len(x) > 5 else np.nan).mean()
+        ic = df.groupby("date").apply(lambda x, lbl=label: spearmanr(x[lbl], x["fwd_5d"])[0] if len(x) > 5 else np.nan).mean()
         logger.info(f"{label:<20} -> True Fwd5d Spearman IC: {ic:.4f}")
 
     res_df = walk_forward_offline(df, val_dates, f_cols)

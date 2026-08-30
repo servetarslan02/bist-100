@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 27: VOLATILITY REGIME PORTFOLIO INTEGRATION TEST"""
 
 import warnings

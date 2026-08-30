@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Streaming Anomaly Detector v1.0
 

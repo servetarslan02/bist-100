@@ -1,4 +1,5 @@
 from typing import Any
+
 """VIOP API — Gerçek veriyle çalışan endpoint'ler."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query

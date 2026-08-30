@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Tax Calculator (Güncel Vergi Oranları)
 
 BIST vergi oranları (2025-2026):

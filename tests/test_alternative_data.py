@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Alternative Data Test Suite v1.0
 

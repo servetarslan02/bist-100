@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — TAM OTONOM ÇALIŞMA VE OTOMATİK EĞİTİM DÖNGÜSÜ KANITI
 Kullanıcı müdahalesine gerek kalmadan sistemin tüm seans ve gece döngülerini otonom yönettiğini kanıtlar.

@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 19: ECONOMIC ALPHA VALIDATION"""
 
 import warnings

@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Estimation Window Manager (MacKinlay, 1997).
 
 Estimation window, event öncesi veriyi kullanarak expected return modelinin

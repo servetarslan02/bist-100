@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Settlement Rules (T+2)
 

@@ -1,4 +1,5 @@
 from typing import Any
+
 """Models API - 30-Yıllık BIST Makine Öğrenimi Ensemble Kayıt Defteri."""
 
 import os
@@ -88,11 +89,9 @@ PROD_MODELS = [
 @router.get("/registry")
 async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Model kayıt defteri — diskteki gerçek modelleri ve registry'i okur."""
+    from datetime import UTC, datetime
     from pathlib import Path
-    from datetime import datetime, UTC
 
-    live_models = []
-    
     # 1. Diskteki aktif modellerin kontrolü
     lgb_path = Path("models/lightgbm_lambdarank.pkl")
     cat_path = Path("models/catboost_classifier.pkl")
@@ -225,6 +224,7 @@ async def get_learning_state(user=Depends(get_current_user), _=Depends(check_rat
 async def retrain(force: bool = Query(default=True), user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Otonom kapalı devre yeniden eğitimi tetikler ve modelleri hot-reload eder."""
     import asyncio
+
     from services.learning.learning_loop import learning_loop
 
     loop = asyncio.get_event_loop()

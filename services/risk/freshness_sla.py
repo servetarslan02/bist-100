@@ -13,7 +13,6 @@ Kritik veri bayatladığında risk seviyesini otomatik DEFENSIVE moda çeker.
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Dict, Optional
 
 import structlog
 
@@ -27,7 +26,7 @@ class DataType(StrEnum):
     MACRO = "MACRO"
 
 
-FRESHNESS_SLA_SECONDS: Dict[DataType, float] = {
+FRESHNESS_SLA_SECONDS: dict[DataType, float] = {
     DataType.TICK: 5.0,
     DataType.INTRADAY: 300.0,
     DataType.DAILY: 86400.0,
@@ -47,14 +46,14 @@ class FreshnessResult:
 class DataFreshnessSLAMonitor:
     """Veri türüne göre tazelik denetleyicisi."""
 
-    def __init__(self, custom_slas: Optional[Dict[DataType, float]] = None) -> None:
+    def __init__(self, custom_slas: dict[DataType, float] | None = None) -> None:
         self.slas = custom_slas or FRESHNESS_SLA_SECONDS
 
     def evaluate_freshness(
         self,
         data_type: DataType,
         last_updated: datetime | float | str,
-        current_time: Optional[datetime] = None,
+        current_time: datetime | None = None,
     ) -> FreshnessResult:
         """Verinin tazeliğini SLA sınırlarına göre değerlendirir."""
         now = current_time or datetime.now(UTC)

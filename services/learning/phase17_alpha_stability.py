@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 17: ALPHA STABILITY & INDEPENDENCE AUDIT"""
 
 import random

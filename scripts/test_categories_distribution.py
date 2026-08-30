@@ -1,5 +1,6 @@
-from services.scanner.bist_ml_scanner import bist_ml_scanner
 from collections import Counter
+
+from services.scanner.bist_ml_scanner import bist_ml_scanner
 
 sigs = bist_ml_scanner.scan_all_opportunities(limit=50)
 cats = Counter(s.get('signal_type') for s in sigs)

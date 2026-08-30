@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Ingestion Faz 3-6 Tests
 

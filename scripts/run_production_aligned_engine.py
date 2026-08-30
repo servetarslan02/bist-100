@@ -31,7 +31,6 @@ from __future__ import annotations
 import sys
 import time
 import warnings
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -45,8 +44,8 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
 import structlog
@@ -110,8 +109,8 @@ def _to_float(v: Any) -> float:
     if hasattr(v, "item"):
         try:
             return float(v.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(v)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -209,7 +208,7 @@ def run_production_aligned_backtest() -> None:
                     f"Toplam Maruziyet: %{lim.max_total_exposure * 100:.0f} | "
                     f"Sektör Tavanı: %{lim.max_sector_concentration * 100:.0f} | {lim.description}")
     logger.info(f"  • Genel Tavan: MAX_POSITIONS = {MAX_POSITIONS} hisse")
-    logger.info(f"  • Halka Arz Kuralı: Bir hisse sadece listelenme tarihinden sonra taranabilir.")
+    logger.info("  • Halka Arz Kuralı: Bir hisse sadece listelenme tarihinden sonra taranabilir.")
     logger.info("-" * 88)
 
     capital = INITIAL_CAPITAL
@@ -500,12 +499,12 @@ def run_production_aligned_backtest() -> None:
     logger.info(f"  {'Üretilen Toplam Net Alfa':<38} {total_return_pct - bm_total_ret:>14.1f}%")
     logger.info(sep)
 
-    logger.info(f"\n  REJİM DAĞILIMI (10 YIL):")
+    logger.info("\n  REJİM DAĞILIMI (10 YIL):")
     total_days = sum(regime_counter.values())
     for r, cnt in regime_counter.items():
         logger.info(f"    • {r:<9}: {cnt:,} seans (%{cnt / total_days * 100:.1f})")
 
-    logger.info(f"\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
+    logger.info("\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
     logger.info(f"  {'YIL':<6} | {'GERÇEK MOTOR':>13} | {'BIST-100':>10} | {'ALFA':>10} | {'DURUM':>12}")
     logger.info("-" * 65)
     years_beat = 0

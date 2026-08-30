@@ -11,15 +11,16 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+
 import numpy as np
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from services.features.feature_store_feast import BISTFeatureStore, Entity, FeatureSpec, FeatureView
-from services.core.nats_bus import NATSJetStreamBus, StreamConfig
-from services.ml.vector_regime import MarketRegimeEmbeddingEngine
+from services.core.nats_bus import NATSJetStreamBus
 from services.data.evidently_monitor import EvidentlyDataMonitor
+from services.features.feature_store_feast import BISTFeatureStore
+from services.ml.vector_regime import MarketRegimeEmbeddingEngine
 
 
 def test_feast_feature_store_basics():

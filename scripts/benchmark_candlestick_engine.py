@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — 10/10 Candlestick & Price Action Engine vs Baseline Benchmark
 ==========================================================================

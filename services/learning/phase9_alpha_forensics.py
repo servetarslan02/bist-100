@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 9: ALPHA MODEL FORENSICS & REGIME-CONDITIONAL ALPHA"""
 
 import warnings

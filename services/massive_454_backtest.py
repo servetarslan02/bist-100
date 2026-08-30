@@ -1,7 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import gc
+from typing import Any
 
 from services.core.alpha_engine import AlphaEngine
 

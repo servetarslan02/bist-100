@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Tüm 16 Sayfa ve 5 Temel İlke Denetim Testi
 """

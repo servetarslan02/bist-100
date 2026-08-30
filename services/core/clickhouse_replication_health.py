@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — ClickHouse Replication Health Monitor
 
 ReplicatedMergeTree tablolarının replikasyon durumunu kontrol eder.

@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST - HIBRIT UYARLAMALI STRATEJI v4.0 (2016-2026)
 =========================================================
 v2'nin kazanan ozellikleri + adaptif sektor rotasyonu + haftalik rebalance
@@ -17,9 +17,12 @@ Yeni eklemeler (v4):
   - Ceyreklik adaptasyon: Hangi faktor bu ceyrek calisıyor?
 """
 from __future__ import annotations
-import sys, warnings
+
+import sys
+import warnings
 from pathlib import Path
 from typing import Any
+
 warnings.filterwarnings("ignore")
 _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
@@ -28,11 +31,12 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 import numpy as np
 import structlog
 import yfinance as yf
+
 logger = structlog.get_logger()
 
 SECTORS: dict[str, list[str]] = {
@@ -51,12 +55,16 @@ TICKER_SEC = {t: s for s, ts in SECTORS.items() for t in ts}
 DEF_TICKERS = set(SECTORS["tuketim"] + SECTORS["teletek"])
 
 def _f(v: Any) -> float:
-    if hasattr(v,"values"): v = v.values
-    if hasattr(v,"item"):
-        try: return float(v.item())
-        except: pass
+    if hasattr(v, "values"):
+        v = v.values
+    if hasattr(v, "item"):
+        try:
+            return float(v.item())
+        except (ValueError, TypeError, AttributeError):
+            a = np.ravel(v)
+            return float(a[0]) if len(a) > 0 else 0.0
     a = np.ravel(v)
-    return float(a[0]) if len(a)>0 else 0.0
+    return float(a[0]) if len(a) > 0 else 0.0
 
 def _rank_corr(x: np.ndarray, y: np.ndarray) -> float:
     n = len(x)
@@ -226,7 +234,8 @@ def run_v4() -> None:
             if hasattr(sr.columns,"levels") and t in sr.columns.get_level_values(0):
                 df=sr[t][["Open","High","Low","Close","Volume"]].dropna()
                 if len(df)>250: sd[t]=df
-        except: continue
+        except Exception:
+            continue
     logger.info(f"  [OK] {len(sd)} hisse hazir ({len(UNIVERSE)} istendi).\n")
 
     logger.info("="*80)
@@ -234,7 +243,7 @@ def run_v4() -> None:
     logger.info("="*80)
     logger.info(f"  Baslangic: {INIT:,.0f} TL  |  ATR:{ATR}x  |  Maliyet:%{COST1W*100:.2f}")
     logger.info(f"  Sektor limit: max %{MAX_SEC_WEIGHT*100:.0f} tek sektor")
-    logger.info(f"  Rebalance: HAFTALIK  |  Adaptasyon: Her ceyrek")
+    logger.info("  Rebalance: HAFTALIK  |  Adaptasyon: Her ceyrek")
     logger.info("-"*80)
 
     bmc=bm_df["Close"]
@@ -362,7 +371,7 @@ def run_v4() -> None:
     for f,w in sorted(adapt.w.items(),key=lambda x:x[1],reverse=True):
         bar="#"*int(w*50)
         logger.info(f"    {f:<18}: {w:.3f}  {bar}")
-    logger.info(f"\n  YIL YIL KARSILASTIRMA:")
+    logger.info("\n  YIL YIL KARSILASTIRMA:")
     logger.info(f"  {'YIL':<6}|{'PORTFOY':>10}|{'BIST':>10}|{'ALFA':>10}|{'SONUC':>10}")
     logger.info("-"*52); bt=0
     for yr in sorted(yearly):
@@ -378,7 +387,7 @@ def run_v4() -> None:
     logger.info(f"  [OK] Sektor limit: max %{MAX_SEC_WEIGHT*100:.0f} tek sektor")
     logger.info(S)
     if tlog:
-        by={};
+        by={}
         for x in tlog: by[x["t"]]=by.get(x["t"],0)+x["pnl"]
         b5=sorted(by.items(),key=lambda x:x[1],reverse=True)[:5]
         w5=sorted(by.items(),key=lambda x:x[1])[:5]

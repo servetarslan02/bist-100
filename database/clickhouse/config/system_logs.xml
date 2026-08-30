@@ -1,0 +1,18 @@
+<clickhouse>
+    <!-- ============================================================= -->
+    <!-- ALPHA BIST — ClickHouse System Logs Optimization              -->
+    <!-- Disables bloat and memory-heavy trace/metric logs in local env -->
+    <!-- ============================================================= -->
+
+    <!-- Disable heavy debug trace and metric logs that thrash memory/disk -->
+    <trace_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <crash_log remove="1"/>
+
+    <!-- Set minimal retention and warning level for query and text logs -->
+    <text_log>
+        <level>warning</level>
+    </text_log>
+</clickhouse>

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — API Rate Limiter v1.0
 

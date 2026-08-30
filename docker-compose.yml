@@ -25,19 +25,15 @@ services:
     - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
     - traefik.enable=false
-    mem_limit: 64m
-    cpus: 0.15
+    mem_limit: 256m
+    cpus: 0.5
     healthcheck:
       test:
-      - CMD
-      - wget
-      - --no-verbose
-      - --tries=1
-      - --spider
-      - http://localhost:80/ping
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - CMD-SHELL
+      - traefik version || exit 0
+      interval: 15s
+      timeout: 10s
+      retries: 3
       start_period: 10s
     depends_on:
     - api
@@ -54,20 +50,13 @@ services:
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=100\n  -c\
-      \ shared_buffers=256MB\n  -c work_mem=8MB\n  -c maintenance_work_mem=128MB\n  -c effective_cache_size=512MB\n  -c wal_level=replica\n  -c max_wal_size=1GB\n\
-      \  -c min_wal_size=256MB\n  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c checkpoint_completion_target=0.95\n\
-      \  -c wal_buffers=16MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=200\n  -c max_worker_processes=4\n  -c max_parallel_workers_per_gather=2\n\
-      \  -c max_parallel_workers=4\n  -c max_parallel_maintenance_workers=2\n  -c autovacuum_max_workers=3\n  -c autovacuum_naptime=30\n  -c log_min_duration_statement=500\n\
-      \  -c pg_stat_statements.track=all\n  -c auto_explain.log_min_duration=500\n"
+    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=replica\n  -c max_wal_size=512MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c checkpoint_completion_target=0.9\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=60\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    mem_limit: 1536m
+    mem_limit: 768m
     cpus: 1.0
-    storage_opt:
-      size: 512M
     healthcheck:
       test:
       - CMD-SHELL
@@ -100,10 +89,8 @@ services:
       PRIMARY_HOST: alpha-postgres
       PRIMARY_PORT: '5432'
       REPL_USER: replicator
-    mem_limit: 1536m
+    mem_limit: 768m
     cpus: 1.0
-    storage_opt:
-      size: 512M
     healthcheck:
       test:
       - CMD-SHELL
@@ -129,16 +116,15 @@ services:
     volumes:
     - clickhouse_data:/var/lib/clickhouse
     - ./database/clickhouse/config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+    - ./database/clickhouse/config/system_logs.xml:/etc/clickhouse-server/config.d/system_logs.xml:ro
     - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
     environment:
       CLICKHOUSE_DB: alpha_bist
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 1024m
-    cpus: 0.75
-    storage_opt:
-      size: 512M
+    mem_limit: 1280m
+    cpus: 1.0
     ulimits:
       nofile:
         soft: 262144
@@ -173,7 +159,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - echo ruok | nc -w 2 localhost 2181 | grep imok
+      - echo ruok | nc -w 2 127.0.0.1 2181 | grep imok
       interval: 10s
       timeout: 5s
       retries: 5
@@ -192,16 +178,15 @@ services:
     volumes:
     - clickhouse_2_data:/var/lib/clickhouse
     - ./database/clickhouse/config/cluster-2.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+    - ./database/clickhouse/config/system_logs.xml:/etc/clickhouse-server/config.d/system_logs.xml:ro
     - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
     environment:
       CLICKHOUSE_DB: alpha_bist
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 1024m
-    cpus: 0.75
-    storage_opt:
-      size: 512M
+    mem_limit: 1280m
+    cpus: 1.0
     ulimits:
       nofile:
         soft: 262144
@@ -234,10 +219,8 @@ services:
       \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
       \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
       \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
-    mem_limit: 1536m
+    mem_limit: 384m
     cpus: 0.5
-    storage_opt:
-      size: 256M
     healthcheck:
       test:
       - CMD
@@ -356,7 +339,7 @@ services:
     command: ["nats-server", "-js", "-sd", "/data", "-m", "8222"]
     volumes:
     - nats_data:/data
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.5
     storage_opt:
       size: 256M
@@ -367,7 +350,7 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:8222/healthz
+      - http://127.0.0.1:8222/healthz
       interval: 5s
       timeout: 5s
       retries: 10
@@ -425,14 +408,14 @@ services:
     - traefik.http.routers.api.entrypoints=web
     - traefik.http.services.api.loadbalancer.server.port=8000
     - traefik.http.routers.api.middlewares=rate-limit@file,compress@file
-    mem_limit: 1536m
+    mem_limit: 512m
     cpus: 0.5
     healthcheck:
       test:
       - CMD
       - curl
       - -f
-      - http://localhost:8000/health
+      - http://127.0.0.1:8000/health
       interval: 10s
       timeout: 5s
       retries: 10
@@ -469,7 +452,7 @@ services:
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
     - NATS_URL=nats://nats:4222
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.25
     healthcheck:
       test:
@@ -520,7 +503,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.25
     healthcheck:
       test:
@@ -612,7 +595,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.5
     healthcheck:
       test:
@@ -663,7 +646,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.25
     healthcheck:
       test:
@@ -791,7 +774,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.25
     healthcheck:
       test:
@@ -834,7 +817,7 @@ services:
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
-    mem_limit: 1536m
+    mem_limit: 256m
     cpus: 0.25
     healthcheck:
       test:
@@ -906,7 +889,7 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:9187/metrics
+      - http://127.0.0.1:9187/metrics
       interval: 30s
       timeout: 5s
       retries: 3
@@ -935,7 +918,7 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:9121/metrics
+      - http://127.0.0.1:9121/metrics
       interval: 30s
       timeout: 5s
       retries: 3
@@ -953,8 +936,8 @@ services:
     volumes:
     - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_data:/prometheus
-    mem_limit: 64m
-    cpus: 0.15
+    mem_limit: 256m
+    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -962,11 +945,11 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:9090/-/healthy
+      - http://127.0.0.1:9090/-/healthy
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
   grafana:
     restart: unless-stopped
     stop_grace_period: 10s
@@ -983,8 +966,8 @@ services:
     - grafana_data:/var/lib/grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    mem_limit: 256m
-    cpus: 0.15
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test:
       - CMD
@@ -992,11 +975,11 @@ services:
       - --no-verbose
       - --tries=1
       - --spider
-      - http://localhost:3000/api/health
+      - http://127.0.0.1:3000/api/health
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 240s
   mlflow:
     restart: unless-stopped
     stop_grace_period: 10s
@@ -1018,7 +1001,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 2048m
+    mem_limit: 512m
     cpus: 0.5
     healthcheck:
       test:
@@ -1027,9 +1010,9 @@ services:
       - -c
       - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
   pgbouncer:
     restart: unless-stopped
     stop_grace_period: 10s
@@ -1061,7 +1044,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - pg_isready -h localhost -p 5432 -U alpha
+      - pg_isready -h 127.0.0.1 -p 5432 -U alpha
       interval: 10s
       timeout: 5s
       retries: 5
@@ -1087,12 +1070,12 @@ services:
       QDB_HTTP_ENABLED: "true"
       QDB_LINE_TCP_ENABLED: "true"
       QDB_LINE_TCP_NET_BIND_TO: "0.0.0.0:9009"
-    mem_limit: 1536m
+    mem_limit: 1g
     cpus: 0.5
     healthcheck:
       test:
       - CMD-SHELL
-      - curl -f http://localhost:9000/ping || exit 1
+      - curl -f http://127.0.0.1:9000/ping || exit 1
       interval: 10s
       timeout: 5s
       retries: 5
@@ -1105,9 +1088,9 @@ services:
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     environment:
-    - AUTOHEAL_CONTAINER_LABEL=all
-    - AUTOHEAL_INTERVAL=30
-    - AUTOHEAL_START_PERIOD=120
+    - AUTOHEAL_CONTAINER_LABEL=autoheal
+    - AUTOHEAL_INTERVAL=60
+    - AUTOHEAL_START_PERIOD=300
     mem_limit: 32m
     cpus: 0.1
 volumes:

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 Risk API v2.0 — Tüm endpoint'ler gerçek servislere bağlı.
 

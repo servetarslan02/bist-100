@@ -1,4 +1,4 @@
-﻿"""
+"""
 ALPHA BIST - QUASI-INDEX ALPHA TILT v5.0 (2016-2026)
 ======================================================
 Temel Fikir: BIST'i geçmek icin genis tabanli rallilerde endekse yakin kal,
@@ -19,9 +19,12 @@ v5'in yeni özellikleri:
   - vol_adj_mom + sec_rank agirlikli scoring (v3/v4'ten ogrenildi)
 """
 from __future__ import annotations
-import sys, warnings
+
+import sys
+import warnings
 from pathlib import Path
 from typing import Any
+
 warnings.filterwarnings("ignore")
 _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
@@ -30,12 +33,13 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
 import structlog
 import yfinance as yf
+
 logger = structlog.get_logger()
 
 SECTORS: dict[str, list[str]] = {
@@ -65,12 +69,16 @@ FACTOR_W = {
 }
 
 def _f(v: Any) -> float:
-    if hasattr(v,"values"): v = v.values
-    if hasattr(v,"item"):
-        try: return float(v.item())
-        except: pass
+    if hasattr(v, "values"):
+        v = v.values
+    if hasattr(v, "item"):
+        try:
+            return float(v.item())
+        except (ValueError, TypeError, AttributeError):
+            a = np.ravel(v)
+            return float(a[0]) if len(a) > 0 else 0.0
     a = np.ravel(v)
-    return float(a[0]) if len(a)>0 else 0.0
+    return float(a[0]) if len(a) > 0 else 0.0
 
 def _r2(c: np.ndarray) -> float:
     if len(c)<10: return 0.0
@@ -207,7 +215,8 @@ def run_v5() -> None:
             if hasattr(sr.columns,"levels") and t in sr.columns.get_level_values(0):
                 df=sr[t][["Open","High","Low","Close","Volume"]].dropna()
                 if len(df)>250: sd[t]=df
-        except: continue
+        except Exception:
+            continue
     logger.info(f"  [OK] {len(sd)} hisse hazir.\n")
 
     logger.info("="*80)
@@ -362,7 +371,7 @@ def run_v5() -> None:
     logger.info(f"  {'BIST-100':<22} {bm_ret:>11.1f}% {bm_cagr*100:>7.1f}%")
     logger.info(S)
 
-    logger.info(f"\n  YIL YIL KARSILASTIRMA:")
+    logger.info("\n  YIL YIL KARSILASTIRMA:")
     logger.info(f"  {'YIL':<6}|{'PORTFOY':>10}|{'BIST':>10}|{'ALFA':>10}|{'SONUC':>10}")
     logger.info("-"*53)
     beat_yrs=[]
@@ -378,7 +387,7 @@ def run_v5() -> None:
     logger.info(S)
 
     if tlog:
-        by={};
+        by={}
         for x in tlog: by[x["t"]]=by.get(x["t"],0)+x["pnl"]
         b5=sorted(by.items(),key=lambda x:x[1],reverse=True)[:5]
         w5=sorted(by.items(),key=lambda x:x[1])[:5]

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Cross-Platform Startup Script v2.0 (Resilience-Enhanced)
 
@@ -351,19 +352,18 @@ def get_block_device_id() -> str:
     return "8:0"
 
 
+SSD_WRITE_LIMIT_MBPS = 30  # MB/s — Kişisel PC için sakin ve kontrollü yazma tavanı
+SSD_WRITE_LIMIT_BYTES = SSD_WRITE_LIMIT_MBPS * 1024 * 1024
+
+
 def apply_ssd_write_limit() -> Any:
-    """Tüm data container'larına cgroup v2 ile 512 MB/s yazma limiti uygula."""
-    # Linux değilse atla
-    if platform.system() != "Linux":
-        logger.info("[*] SSD limit: Sadece Linux'ta uygulanır, atlanıyor.")
+    """Tüm data container'larına ve WSL2 diskine sakin yazma limiti (30 MB/s) uygula."""
+    logger.info(f"\n[*] SSD yazma hızı limiti düzenleniyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
+
+    # Windows WSL2 üzerinde çalışırken kernel I/O ayarlarına müdahale etme (varsayılan kernel dengesini koru)
+    if platform.system() == "Windows":
         return True
 
-    # cgroup v2 kontrolü
-    if not os.path.exists("/sys/fs/cgroup/io.max"):
-        logger.info("[*] SSD limit: cgroup v2 io.max mevcut değil, atlanıyor.")
-        return True
-
-    logger.info(f"\n[*] SSD yazma hızı limiti uygulanıyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
 
     device_id = get_block_device_id()
     applied = 0
@@ -669,6 +669,19 @@ def main() -> Any:
     logger.info(f"  Data Servisleri: {len(DATA_CONTAINERS)}")
     logger.info(f"  Uygulama Servisleri: {len(APP_CONTAINERS)}")
     logger.info("=" * 72)
+
+    # 0. Kişisel PC Donanım ve Kaynak Limitlerini Uygula
+    try:
+        from services.core.hardware_profile import hardware_manager
+        hw_res = hardware_manager.apply_profile()
+        logger.info(
+            "[KİŞİSEL PC KORUMA PROFİLİ] Donanım sınırları devrede",
+            cpu_threads=hw_res.get("cpu_threads_set"),
+            priority=hw_res.get("process_priority"),
+            gpu_note=hw_res.get("cuda_note"),
+        )
+    except Exception as hw_err:
+        logger.debug("Hardware profile apply note", error=str(hw_err))
 
     # 1. .env dosyası kontrolü
     logger.info("\n[ADIM 1/7] Ortam değişkenleri kontrol ediliyor...")

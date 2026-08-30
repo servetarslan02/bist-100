@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Ingestion Service v2.0
 

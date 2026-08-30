@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 Production Operations Testleri
 

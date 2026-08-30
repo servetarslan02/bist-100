@@ -1,4 +1,5 @@
-from typing import Any, Optional
+from typing import Any
+
 """
 Scanner API v2.0 — Tüm endpoint'ler gerçek servislere bağlı ve optimize.
 
@@ -20,19 +21,22 @@ Endpoints:
 """
 
 import asyncio
+import hashlib
 import time
 
+import orjson
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
 
-# Memory cache for signals
+# Memory cache for signals (SWR)
 _SCAN_SIGNALS_CACHE = []
 _SCAN_SIGNALS_TIME = 0.0
+_SCAN_SIGNALS_ETAG = ""
 
 
 def _get_scan_api() -> Any:
@@ -57,21 +61,29 @@ def _get_engine() -> Any:
 @router.get("/signals")
 @router.get("/opportunities")
 async def scanner_signals(
+    request: Request,
+    response: Response,
     limit: int = Query(50, ge=1, le=100),
-    category: Optional[str] = Query(None),
-    sort_by: Optional[str] = Query("confidence"),
-    search: Optional[str] = Query(None),
+    category: str | None = Query(None),
+    sort_by: str | None = Query("confidence"),
+    search: str | None = Query(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """Canlı model sinyalleri ve piyasa fırsatları (Filtreli, Güven & Getiri Sıralı ve Kararlı)."""
-    global _SCAN_SIGNALS_CACHE, _SCAN_SIGNALS_TIME
+    """Canlı model sinyalleri ve piyasa fırsatları (Filtreli, Güven & Getiri Sıralı ve ETag/SWR Korumalı)."""
+    global _SCAN_SIGNALS_CACHE, _SCAN_SIGNALS_TIME, _SCAN_SIGNALS_ETAG
     now = time.time()
+
+    # ETag / If-None-Match Kontrolü (Client tarafı 304 Not Modified)
+    client_etag = request.headers.get("if-none-match")
+    if client_etag and _SCAN_SIGNALS_ETAG and client_etag.strip('"') == _SCAN_SIGNALS_ETAG.strip('"'):
+        if (now - _SCAN_SIGNALS_TIME < 60) and not category and not search:
+            response.status_code = 304
+            return response
 
     # 1. Redis Cache Kontrolü
     try:
         from ...core.redis_helper import get_cached, set_cached
-        from ...ingestion.bist_universe import bist_universe
 
         # Stabilizasyon: Eğer hafızada taze sinyaller varsa (60 sn) ve filtre uygulanmamışsa hızlı dön
         if _SCAN_SIGNALS_CACHE and (now - _SCAN_SIGNALS_TIME < 60) and not category and not search:
@@ -101,6 +113,7 @@ async def scanner_signals(
             signals.sort(key=lambda x: (x.get("score", 0), x.get("expected_return_pct", 0)), reverse=True)
             _SCAN_SIGNALS_CACHE = list(signals)
             _SCAN_SIGNALS_TIME = now
+            _SCAN_SIGNALS_ETAG = hashlib.md5(orjson.dumps(signals)).hexdigest()[:16]
 
         # Filtreleme (Kategori ve Arama)
         result_signals = signals
@@ -120,6 +133,10 @@ async def scanner_signals(
                 s for s in result_signals
                 if q in s.get("symbol", "").lower() or q in s.get("name", "").lower() or q in s.get("spec_reason", "").lower()
             ]
+
+        if _SCAN_SIGNALS_ETAG:
+            response.headers["ETag"] = f'"{_SCAN_SIGNALS_ETAG}"'
+            response.headers["Cache-Control"] = "public, max-age=15, stale-while-revalidate=45"
 
         return {"signals": result_signals[:limit], "count": len(result_signals[:limit])}
     except Exception as e:
@@ -343,7 +360,7 @@ async def trigger_scan(
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
-        task = asyncio.create_task(run_unified_daily_cycle())
+        _ = asyncio.create_task(run_unified_daily_cycle())
         return {"status": "triggered", "scan_type": scan_type, "message": "Unified daily scan & trade cycle queued."}
     except Exception as e:
         return {"status": "error", "error": str(e)}

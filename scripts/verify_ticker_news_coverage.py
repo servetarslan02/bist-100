@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — 629 HİSSE İÇİN CANLI HABER VE KAP KAPSAMI DOĞRULAMA TESTİ
 Farklı sektör ve büyüklükteki hisseler için canlı haber ve KAP akışının çalıştığını kanıtlar.

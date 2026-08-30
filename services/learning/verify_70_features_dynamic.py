@@ -1,18 +1,24 @@
+import structlog
+
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — 70 Özellik Canlı Varyans ve Dinamiklik Testi (Doğrudan Scanner Motorundan)
 """
 import pandas as pd
-from services.scanner.bist_ml_scanner import BistMLScanner
-from services.ml.ranking_model import RankingModel
 
-def verify_from_scanner():
+from services.ml.ranking_model import RankingModel
+from services.scanner.bist_ml_scanner import BistMLScanner
+
+
+def verify_from_scanner() -> None:
+    """Otomatik dokumantasyon."""
     scanner = BistMLScanner()
     live_rows = scanner._fetch_live_scanner_data()
     feat_names = list(RankingModel()._feature_names)
 
-    print(f"Toplam Çekilen Canlı Hisse Sayısı: {len(live_rows)}")
-    print(f"Modeldeki Toplam Özellik Sayısı    : {len(feat_names)}")
-    print("=" * 95)
+    logger.info(f"Toplam Çekilen Canlı Hisse Sayısı: {len(live_rows)}")
+    logger.info(f"Modeldeki Toplam Özellik Sayısı    : {len(feat_names)}")
+    logger.info("=" * 95)
 
     # BistMLScanner içindeki mantığı çalıştırıp all_feat_rows alalım
     adv_count = sum(1 for it in live_rows if float(it.get("change") or 0.0) > 0)
@@ -150,12 +156,12 @@ def verify_from_scanner():
                 "vol_adj_mom": float(vol_adj_mom),
             }
             all_feat_rows.append([float(f_map.get(f, 0.0)) for f in feat_names])
-        except Exception:
-            pass
+        except Exception as f_err:
+            logger.debug("feature_row_calc_failed", symbol=item.get("name", item.get("symbol", "")), error=str(f_err))
 
     df = pd.DataFrame(all_feat_rows, columns=feat_names)
-    print(f"{'ÖZELLİK ADI':<30} | {'MİN':<10} | {'ORTALAMA':<10} | {'MAKS':<10} | {'STANDART SAPMA (STD)':<20} | {'DURUM'}")
-    print("-" * 95)
+    logger.info(f"{'ÖZELLİK ADI':<30} | {'MİN':<10} | {'ORTALAMA':<10} | {'MAKS':<10} | {'STANDART SAPMA (STD)':<20} | {'DURUM'}")
+    logger.info("-" * 95)
 
     stock_level_dynamic = 0
     macro_dynamic = 0
@@ -173,13 +179,13 @@ def verify_from_scanner():
             stock_level_dynamic += 1
         else:
             status = "⚠️ SABİT"
-        print(f"{col:<30} | {c_min:>10.2f} | {c_mean:>10.2f} | {c_max:>10.2f} | {c_std:>20.4f} | {status}")
+        logger.info(f"{col:<30} | {c_min:>10.2f} | {c_mean:>10.2f} | {c_max:>10.2f} | {c_std:>20.4f} | {status}")
 
-    print("=" * 95)
-    print(f"Toplam 70 Özellik:")
-    print(f"  -> Hisse Bazında Farklılaşan Dinamik Özellikler: {stock_level_dynamic} adet")
-    print(f"  -> BİST Geneli Canlı Makro Genişlik Özellikleri : {macro_dynamic} adet")
-    print(f"  -> SABİT KALAN ÖZELLİK SAYISI                  : 0 ADET (%100 DİNAMİK)")
+    logger.info("=" * 95)
+    logger.info("Toplam 70 Özellik:")
+    logger.info(f"  -> Hisse Bazında Farklılaşan Dinamik Özellikler: {stock_level_dynamic} adet")
+    logger.info(f"  -> BİST Geneli Canlı Makro Genişlik Özellikleri : {macro_dynamic} adet")
+    logger.info("  -> SABİT KALAN ÖZELLİK SAYISI                  : 0 ADET (%100 DİNAMİK)")
 
 if __name__ == '__main__':
     verify_from_scanner()

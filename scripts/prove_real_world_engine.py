@@ -1,9 +1,10 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import os
 import urllib.request
 from datetime import datetime
+from typing import Any
 
 import duckdb
 import orjson

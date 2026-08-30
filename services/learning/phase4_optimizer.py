@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 4: INDEPENDENT CANDIDATE OPTIMIZATION
 Bu script A, B, C ve D stratejilerini V3'e karşı birbirinden bağımsız olarak test eder.
 """

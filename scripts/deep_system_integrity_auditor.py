@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 ALPHA BIST — DERİN SİSTEM BÜTÜNLÜK DENETÇİSİ (FULL SPECTRUM ENGINE) v4.0
 ==========================================================================
@@ -63,7 +62,6 @@ import sys
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
 if sys.platform == "win32":
     try:
@@ -374,7 +372,7 @@ class FileAuditor(ast.NodeVisitor):
                 self.rel.endswith("polars_utils.py") or "learning" in self.rel or "research" in self.rel or "market.py" in self.rel
             ):
                 self._a(5, "PANDAS_IN_PROD", "HIGH", lineno,
-                    f"'pandas' import — proje standardı Polars zorunludur!")
+                    "'pandas' import — proje standardı Polars zorunludur!")
             if mod == "requests":
                 self._a(5, "SYNC_REQUESTS_IN_PROD", "HIGH", lineno,
                     "'requests' import — async servislerde httpx.AsyncClient kullanılmalı")
@@ -872,7 +870,7 @@ def b12_env_check() -> list[Finding]:
         return [F(12, "MISSING_DOTENV", "CRITICAL", ".env", 1,
             ".env dosyası yok — servisler başlatılamaz")]
     env_vars: dict[str, str] = {}
-    with open(env_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(env_path, encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
@@ -894,7 +892,7 @@ def b12_env_check() -> list[Finding]:
     example = PROJECT_ROOT / ".env.example"
     if example.exists():
         example_keys: set[str] = set()
-        with open(example, "r", encoding="utf-8", errors="replace") as f:
+        with open(example, encoding="utf-8", errors="replace") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
@@ -1577,8 +1575,8 @@ def run():
         w("# ALPHA BIST — Derin Sistem Bütünlük Denetim Raporu")
         w()
         w(f"> **Tarih:** {time.strftime('%Y-%m-%d %H:%M:%S')}  ")
-        w(f"> **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  ")
-        w(f"> **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  ")
+        w("> **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  ")
+        w("> **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  ")
         w(f"> **Taranan:** {len(py_files):,} dosya, {total_lines:,} satır  ")
         w(f"> **Süre:** {elapsed:.2f} saniye  ")
         w(f"> **Sistem Sağlık Puanı:** **{health} / 100**")

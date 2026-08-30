@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — gRPC & Protobuf Services Test Suite
 Doğrulanan Özellikler:

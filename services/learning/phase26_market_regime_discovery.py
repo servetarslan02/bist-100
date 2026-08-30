@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 26: MARKET REGIME & TIMING ALPHA DISCOVERY"""
 
 import warnings

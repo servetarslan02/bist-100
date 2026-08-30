@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 2: UPSIDE LOSS DECOMPOSITION
 V3 Frozen Baseline'ın Train/Validation döneminde kârından ne kadarını, HANGİ MEKANİZMA yüzünden kaybettiğini ölçer.
 """

@@ -26,7 +26,9 @@ BOYUT 16: Dökümantasyon Bütünlüğü (docstring eksikliği)
 """
 
 from __future__ import annotations
+
 import structlog
+
 logger = structlog.get_logger(__name__)
 
 import ast

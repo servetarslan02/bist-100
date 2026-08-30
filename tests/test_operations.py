@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 Monitoring Operations Testleri
 
@@ -16,7 +18,6 @@ Kapsam:
 import asyncio
 import os
 import sys
-import time
 
 import orjson
 

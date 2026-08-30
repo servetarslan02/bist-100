@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from typing import Any
+
 """ALPHA BIST — Historical Data Backfill
 
 DB'ye historical market data yükler.

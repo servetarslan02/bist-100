@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — TÜM 629+ BIST HİSSESİ HABER & KAP EŞLEŞTİRME KANITI

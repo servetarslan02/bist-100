@@ -2,6 +2,7 @@ from __future__ import annotations
 
 #!/usr/bin/env python3
 from typing import Any
+
 """
 ALPHA BIST — OpenAPI Contract Testing (TestClient & In-Memory Verification)
 

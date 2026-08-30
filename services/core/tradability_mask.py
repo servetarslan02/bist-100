@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Tradability Mask v1.0
 

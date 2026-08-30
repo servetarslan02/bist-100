@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Market State API Endpoints v2.0
 
 REST API endpoint'leri:

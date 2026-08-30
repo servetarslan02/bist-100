@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Event Window Manager (MacKinlay, 1997).
 
 Event window, event etkisinin hisse fiyatına yansıdığı dönemdir.

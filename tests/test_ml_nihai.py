@@ -1,4 +1,5 @@
 from typing import Any
+
 """ML Nihai Sistem Testleri — 6 Faz, 65+ Test."""
 
 import numpy as np

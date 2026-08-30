@@ -1,7 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import sys
+from typing import Any
 
 import requests
 

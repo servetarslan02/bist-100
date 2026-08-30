@@ -1,4 +1,5 @@
 from typing import Any
+
 """Factors Nihai Sistem Testleri — 10 Modül, 60+ Test."""
 
 import numpy as np

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 """ALPHA BIST — Tüm Enhancement Testleri
 
 Test edilen modüller:

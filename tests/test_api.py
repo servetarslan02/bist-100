@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — API Test Suite v1.0
 

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ⚠️  DEPRECATED — Bu dosya production DEĞİLDİR ve artık canonical değildir.
 

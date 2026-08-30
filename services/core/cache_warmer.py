@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Cache Warming (Sıcak Veri Önyükleme)
 
 Servis başlarken sık kullanılan verileri Redis'e önceden yükler.

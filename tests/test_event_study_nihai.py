@@ -1,4 +1,5 @@
 from typing import Any
+
 """Event Study Nihai Sistem Testleri — 14 Modül, 50+ Test."""
 
 from datetime import datetime, timedelta

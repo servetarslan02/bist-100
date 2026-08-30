@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Likidite Kısıtı ve Gap Risk Testleri
 

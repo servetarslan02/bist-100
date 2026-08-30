@@ -168,9 +168,9 @@ def get_health_report() -> dict[str, Any]:
     """Tüm lock'ların sağlık raporu."""
     report = {}
     overall_healthy = True
-    for key, metrics in _metrics.items():
-        health = metrics.health_status()
-        report[key] = {**metrics.to_dict(), **health}
+    for key, m in _metrics.items():
+        health = m.health_status()
+        report[key] = {**m.to_dict(), **health}
         if health["status"] != "HEALTHY":
             overall_healthy = False
     return {

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Celery Async Task Queue Test Suite
 Doğrulanan Özellikler:

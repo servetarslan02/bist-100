@@ -1,7 +1,7 @@
-from typing import Any
 import argparse
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 

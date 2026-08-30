@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Risk Modules Test Suite v1.0
 

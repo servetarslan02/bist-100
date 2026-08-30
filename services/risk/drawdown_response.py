@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Drawdown Response System v1.0
 

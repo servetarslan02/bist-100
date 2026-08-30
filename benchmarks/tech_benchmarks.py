@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Teknoloji Benchmark'ları
 Her teknolojinin değerini kanıtlamak için gerçek benchmark'lar.

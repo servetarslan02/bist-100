@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Çok Çekirdekli (Multi-Core) Yüksek Hızlı Bayesian Optimizasyon Motoru
 ==================================================================================

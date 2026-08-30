@@ -1,4 +1,5 @@
 from typing import Any
+
 """Phase 3 & 4: Alternative Strategies Optimizer (Maximum Sustainable Alpha)
 Test edilecek hipotezler:
 A) Dynamic Trailing (Kar > %8 ise ATR çarpanı 2.5 -> 1.5)

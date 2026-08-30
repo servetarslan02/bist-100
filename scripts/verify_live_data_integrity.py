@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — CANLI VERİ VE DİNAMİKLİK DENETİMİ (0 SAHTE VERİ KONTROLÜ)
 Tüm API uç noktalarını ve veri sağlayıcılarını sorgulayarak gelen verilerin gerçekliğini kanıtlar.

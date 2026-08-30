@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Model Eğitimi & Kilitli Validasyon Çalıştırıcısı
 ============================================================
@@ -12,17 +13,18 @@ import os
 import sys
 import time
 
+import structlog
+logger = structlog.get_logger(__name__)
+
 # Windows UTF-8 Terminal desteği
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        logger.error("Exception caught", exc_info=True)
+        pass
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import structlog
 
 from ml.dataset_builder_30y import DatasetBuilder30Y
 from ml.ensemble_trainer import BistEnsembleTrainer

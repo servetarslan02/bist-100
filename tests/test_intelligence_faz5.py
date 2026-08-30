@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Intelligence Faz 2+5 Tests
 

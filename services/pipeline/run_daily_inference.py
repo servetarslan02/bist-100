@@ -1,5 +1,5 @@
-from typing import Any
 from datetime import UTC
+from typing import Any
 
 
 def run_alpha_engine_sync() -> Any:

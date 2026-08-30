@@ -3,9 +3,9 @@
 # =============================================================
 
 global:
-  scrape_interval: 10s        # 15s → 10s (daha güncel veri)
-  evaluation_interval: 10s
-  scrape_timeout: 8s          # Timeout ekle
+  scrape_interval: 30s        # Kişisel PC sakin disk yazma modu
+  evaluation_interval: 30s
+  scrape_timeout: 10s
 
 # Alert rules
 rule_files:

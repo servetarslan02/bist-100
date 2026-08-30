@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — TÜM VERİ KAYNAKLARI (KAP, HABERLER, SOSYAL MEDYA, TEMEL ANALİZ, MAKRO) DOĞRULAMA KANITI
 Sisteme akan alternatif, temel, haber, sosyal medya ve makroekonomik verilerin canlı akışını kanıtlar.

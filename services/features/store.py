@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Real Feature Store
 Redis ve bellek üzerinden anlık canlı öznitelikleri depolar ve sorgular.

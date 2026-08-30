@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — PostgreSQL Replication Health Monitor
 
 Streaming replication durumunu kontrol eder.

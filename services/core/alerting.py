@@ -581,9 +581,8 @@ class NotificationRouter:
             try:
                 await provider.close()
             except Exception as exc:
-                logger.warning(
-                    "Provider kapatılamadı", provider=getattr(provider, "name", lambda: str(provider))(), error=str(exc)
-                )
+                p_name = provider.name() if hasattr(provider, "name") and callable(provider.name) else str(provider)
+                logger.warning("Provider kapatılamadı", provider=p_name, error=str(exc))
 
 
 # ─── Retry Konfigürasyonu ─────────────────────────────────────────────────────

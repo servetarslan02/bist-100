@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Learning Loop v2.0 (SQLite Persistence)
 

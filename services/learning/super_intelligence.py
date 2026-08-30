@@ -633,7 +633,7 @@ class SuperIntelligenceEngine:
         logger.info("Retrain triggered by self-healing")
         try:
             from services.core.event_bus import event_bus
-            
+
             event_bus.publish(
                 "learning.retrain_needed",
                 {"source": "super_intelligence_self_healing", "reason": "drift_detected"},

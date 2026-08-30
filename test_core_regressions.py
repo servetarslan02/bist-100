@@ -1,7 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import logging
+from typing import Any
 
 logging.basicConfig(level=logging.ERROR)
 

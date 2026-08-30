@@ -1,4 +1,5 @@
 from typing import Any
+
 """FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT"""
 
 import warnings

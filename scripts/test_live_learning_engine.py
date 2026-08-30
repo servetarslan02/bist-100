@@ -11,28 +11,22 @@ canlı olarak test eder:
 6. Adaptif Sinyal Füzyon Ağırlıklarının Güncellenmesi
 """
 
-import os
-import sys
-import time
 import shutil
-import psutil
-import numpy as np
-import structlog
-from datetime import datetime, UTC
+import sys
 from pathlib import Path
+
+import numpy as np
+import psutil
+import structlog
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 # System components
-from services.learning.learning_pipeline import LearningPipeline
-from services.learning.continuous_learning import ContinuousLearningPipeline
-from services.learning.retrain_engine import RetrainEngine
-from services.learning.model_degradation_monitor import ModelDegradationMonitor
 from services.learning.champion_challenger import ChampionChallengerEngine
-from services.learning.model_trust_engine import ModelTrustEngine
-from services.intelligence.signal_fusion import SignalFusionEngine
+from services.learning.continuous_learning import ContinuousLearningPipeline
+from services.learning.learning_pipeline import LearningPipeline
 
 logger = structlog.get_logger()
 
@@ -45,7 +39,7 @@ def print_section(title: str):
 
 def inspect_hardware_and_execution_layer():
     print_section("1. DONANIM & ÇALIŞMA KATMANI ANALİZİ (GPU vs RAM/SSD/CPU)")
-    
+
     # 1. GPU Check
     gpu_name = "Tespit Edilemedi"
     vram_total = 0
@@ -86,13 +80,13 @@ def inspect_hardware_and_execution_layer():
     cpu_count = psutil.cpu_count(logical=True)
     cpu_freq = psutil.cpu_freq().current if psutil.cpu_freq() else 0
 
-    print(f"   [Fiziksel Donanım]")
+    print("   [Fiziksel Donanım]")
     print(f"   • GPU Kartı        : {gpu_name} (VRAM: {vram_total:.1f} GB)")
     print(f"   • PyTorch CUDA     : {'AKTİF (GPU)' if cuda_available else 'DEVRE DIŞI / CPU Build (PyTorch CPU modunda)'}")
     print(f"   • Sistem RAM       : {total_ram_gb:.2f} GB Toplam | {used_ram_gb:.2f} GB Kullanımda | {avail_ram_gb:.2f} GB Boşta")
     print(f"   • SSD / Disk Alanı : {disk_free_gb:.2f} GB Boş | {disk_used_gb:.2f} GB Kullanımda")
     print(f"   • İşlemci (CPU)    : {cpu_count} Mantıksal Çekirdek | {cpu_freq:.0f} MHz")
-    
+
     print("\n   [Eğitim Yeri ve Mimari Raporu]:")
     if not cuda_available:
         print("   ⚠️  DİKKAT: Fiziksel RTX 4080 ekran kartınız bulunuyor ANCAK mevcut Python ortamında")
@@ -105,9 +99,9 @@ def inspect_hardware_and_execution_layer():
 
 def test_closed_loop_learning():
     print_section("2. STRATEJİ 1: KAPALI ÇEVRİM GERİ BESLEME & GÜVEN SKORU ÖĞRENİMİ")
-    
+
     pipeline = LearningPipeline()
-    
+
     # 1. Tahminleri Kaydet
     print("   [Canlı Akış] Modeller sabah BIST açılışında tahmin üretiyor...")
     pred_thyao = pipeline.record_model_prediction(
@@ -134,9 +128,9 @@ def test_closed_loop_learning():
         entry_price=28.0,
         market_regime="BULL_MOMENTUM",
     )
-    
+
     print(f"   • Kaydedilen Tahminler: THYAO ({pred_thyao}), GARAN ({pred_garan}), KRDMD ({pred_krdmd})")
-    
+
     # 2. Akşam Kapanışında Gerçekleşen Fiyatları Kaydet (Outcome Feedback)
     print("   [Canlı Akış] Akşam seans kapandı, piyasa gerçekleşmeleri kaydediliyor...")
     # THYAO %4 prim yaptı (LightGBM Haklı çıktı)
@@ -145,15 +139,15 @@ def test_closed_loop_learning():
     pipeline.record_market_outcome(pred_garan, actual_price=112.2)
     # KRDMD %-3 düştü (LSTM Yanıldı)
     pipeline.record_market_outcome(pred_krdmd, actual_price=27.16)
-    
+
     # 3. Öğrenme Döngüsünü Çalıştır (Performans, Güven ve Füzyon Ağırlığı Güncelleme)
     print("   [Öğrenme Döngüsü] Model performansları ölçülüyor ve güven skorları güncelleniyor...")
     cycle_report = pipeline.run_learning_cycle(current_regime="BULL_MOMENTUM")
-    
+
     weights = cycle_report.get("fusion_weights", {})
     trust_scores = cycle_report.get("trust_scores", {})
-    
-    print(f"   • Güncellenen Model Güven Skorları:")
+
+    print("   • Güncellenen Model Güven Skorları:")
     if isinstance(trust_scores, list):
         for score in trust_scores:
             if isinstance(score, dict):
@@ -169,25 +163,25 @@ def test_closed_loop_learning():
     elif isinstance(trust_scores, dict):
         for mid, score in trust_scores.items():
             print(f"     - {mid:25s}: Güven Skoru = {score.get('trust_score', 0):.3f}")
-        
-    print(f"   • Sonraki Tahminler İçin Adaptif Model Ağırlıkları:")
+
+    print("   • Sonraki Tahminler İçin Adaptif Model Ağırlıkları:")
     for mid, w in weights.items():
         print(f"     - {mid:25s}: Payı = %{w*100:.2f}")
 
 
 def test_drift_and_retrain_trigger():
     print_section("3. STRATEJİ 2 & 3: DRIFT TESPİTİ VE WALK-FORWARD ONAYLI YENİDEN EĞİTİM")
-    
+
     cl_pipeline = ContinuousLearningPipeline(
         retrain_interval_days=7,
         drift_check_interval=1,
         min_samples_for_retrain=10,
     )
-    
+
     # Simüle edilmiş feature haritası (Dün vs Bugün Drift Yaşandı)
     np.random.seed(42)
     tickers = ["THYAO", "GARAN", "AKBNK", "EREGL", "TUPRS", "BIMAS", "SAHOL", "KCHOL"]
-    
+
     # Driftli feature'lar (örneğin volatilite ve hacim rejimi aniden kaydı)
     drifted_features = {
         ticker: {
@@ -197,10 +191,10 @@ def test_drift_and_retrain_trigger():
         }
         for ticker in tickers
     }
-    
+
     predictions = [{"ticker": t, "prediction": 1, "score": 0.75} for t in tickers]
     actual_returns = {t: float(np.random.uniform(-0.02, 0.05)) for t in tickers}
-    
+
     print("   [Canlı Akış] Günlük sürekli öğrenme denetimi çalıştırılıyor (Tarih: 2026-08-29)...")
     daily_res = cl_pipeline.run_daily_pipeline(
         date="2026-08-29",
@@ -209,7 +203,7 @@ def test_drift_and_retrain_trigger():
         actual_returns=actual_returns,
         regime="HIGH_VOLATILITY",
     )
-    
+
     print(f"   • Günlük Metrikler   : Win Rate = %{daily_res.get('daily_metrics', {}).get('win_rate', 0)*100:.1f} | Ortalama Getiri = %{daily_res.get('daily_metrics', {}).get('return', 0)*100:.2f}")
     print(f"   • Drift Kontrolü     : {daily_res.get('drift_check', {})}")
     print(f"   • Retrain Kararı     : {'YENİDEN EĞİTİM GEREKLİ (Tetiklendi)' if daily_res.get('should_retrain') else 'Eğitim Gerekmiyor'}")
@@ -217,9 +211,9 @@ def test_drift_and_retrain_trigger():
 
 def test_champion_challenger_promotion():
     print_section("4. STRATEJİ 4: GÖLGE MODEL (CHALLENGER) & ŞAMPİYON TERFİSİ")
-    
+
     cc_engine = ChampionChallengerEngine()
-    
+
     # 1. Başlangıç Şampiyonunu Ata
     cc_engine.promote(
         challenger_id="LambdaRank_v3.2_LOCKED",
@@ -227,16 +221,16 @@ def test_champion_challenger_promotion():
         metrics={"avg_ic": 0.045, "sharpe": 1.45, "improvement_pct": 0.0},
         regime="BULL_MOMENTUM",
     )
-    
+
     print("   [Durum] Mevcut Şampiyon: LambdaRank_v3.2_LOCKED (IC: 0.045, Sharpe: 1.45)")
     print("   [Durum] Yeni Eğitilen Aday (Challenger): LambdaRank_v4.0_SHADOW (IC: 0.082, Sharpe: 2.15) değerlendiriliyor...")
-    
+
     challenger_metrics = {
         "avg_ic": 0.082,
         "sharpe": 2.15,
         "improvement_pct": 48.3,
     }
-    
+
     # Yeni model şampiyonu yendi → Terfi et
     cc_engine.promote(
         challenger_id="LambdaRank_v4.0_SHADOW",
@@ -244,25 +238,25 @@ def test_champion_challenger_promotion():
         metrics=challenger_metrics,
         regime="BULL_MOMENTUM",
     )
-    
+
     current_champ = cc_engine.get_champion()
     print(f"   • Yeni Aktif Şampiyon: {current_champ.model_id} (Versiyon: {current_champ.version})")
     print(f"   • Önceki Şampiyon    : {current_champ.promoted_from}")
     print(f"   • İyileşme Oranı     : +%{current_champ.metrics_at_promotion.get('improvement_pct'):.1f}")
     print(f"   • Terfi Zamanı       : {current_champ.promoted_at}")
-    print(f"   • Terfi Durumu       : 🏆 YENİ ŞAMPİYON İLAN EDİLDİ (Canlı İcraya Alındı)")
+    print("   • Terfi Durumu       : 🏆 YENİ ŞAMPİYON İLAN EDİLDİ (Canlı İcraya Alındı)")
 
 
 def main():
     print("=" * 80)
     print("🚀 ALPHA BIST — CANLI ÖĞRENME & DONANIM İCRA MOTORU TESTİ")
     print("=" * 80)
-    
+
     inspect_hardware_and_execution_layer()
     test_closed_loop_learning()
     test_drift_and_retrain_trigger()
     test_champion_challenger_promotion()
-    
+
     print("\n" + "=" * 80)
     print("✅ TÜM ÖĞRENME STRATEJİLERİ CANLI MODDA %100 BAŞARIYLA DOĞRULANDI!")
     print("=" * 80)

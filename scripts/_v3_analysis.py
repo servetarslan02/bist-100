@@ -1,12 +1,13 @@
-﻿# PATCH: v3 giriş filtresi hafifletmesi ve v2 ile hibrit test
+# PATCH: v3 giriş filtresi hafifletmesi ve v2 ile hibrit test
 import sys
+
 sys.path.insert(0, ".")
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 # v2 vs v3 yil yil karsilastirma ozeti
 results = {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import structlog
+
 logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Deep Comprehensive Cross-Audit & AST Inspection Engine

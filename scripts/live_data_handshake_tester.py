@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Canli Veri ve Servis Handshake Testi
 PostgreSQL, ClickHouse, Redis, NATS servislerine gercek veri gonderip yanıt alir.

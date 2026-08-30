@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from typing import Any
+
 """
 ALPHA BIST — FULL SYSTEM FORENSIC AUDIT
 İnceleme-test dosyasına göre 23 modülün kapsamlı denetimi.

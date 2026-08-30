@@ -10,10 +10,8 @@ ALPHA BIST — 10-YILLIK GERÇEK VERİ KURUMSAL BACKTEST (2016 - 2026)
 5. Risk Yönetimi: %5 Stop-Loss, %6 Trailing Stop, Max %16 Tek Hisse Ağırlığı.
 """
 
-import os
 import sys
 import warnings
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,11 +25,10 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
-import polars as pl
 import structlog
 import yfinance as yf
 
@@ -115,8 +112,8 @@ def _to_float(val: Any) -> float:
     if hasattr(val, "item"):
         try:
             return float(val.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(val)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -140,8 +137,8 @@ def run_10y_simulation() -> None:
     logger.info(f"  • Tek Yön Sürtünme         : %{TOTAL_ONE_WAY_COST * 100:.2f} (Komisyon + Slippage)")
     logger.info(f"  • Gidiş-Dönüş Sürtünme     : %{TOTAL_ONE_WAY_COST * 200:.2f}")
     logger.info(f"  • Max Pozisyon Sayısı      : {MAX_POSITIONS} Hisse (%20 eşit ağırlık)")
-    logger.info(f"  • Çıkış Modeli             : 3.0 x ATR Dinamik Kâr Sürücü (Noise-Resistant Trend Rider)")
-    logger.info(f"  • Rejim Kalkanı            : BIST-100 200-SMA Altında Ayı Koruması (%100 Nakit)")
+    logger.info("  • Çıkış Modeli             : 3.0 x ATR Dinamik Kâr Sürücü (Noise-Resistant Trend Rider)")
+    logger.info("  • Rejim Kalkanı            : BIST-100 200-SMA Altında Ayı Koruması (%100 Nakit)")
     logger.info("--------------------------------------------------------------------------")
 
     # BIST-100 200 günlük hareketli ortalama (Rejim tespiti)
@@ -171,7 +168,7 @@ def run_10y_simulation() -> None:
             year_ret = ((port_val - year_start_capital) / year_start_capital) * 100
             bm_curr = _to_float(bm_close.loc[current_date])
             bm_ret = ((bm_curr - year_start_bm) / year_start_bm) * 100
-            
+
             yearly_stats[current_year] = {
                 "port_return": year_ret,
                 "bm_return": bm_ret,

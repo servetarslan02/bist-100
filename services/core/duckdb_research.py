@@ -89,10 +89,18 @@ class DuckDBResearchEngine:
             except Exception as lock_err:
                 logger.debug("duckdb_rw_connect_failed_trying_readonly", error=str(lock_err))
                 self._conn = duckdb.connect(str(self._db_path), read_only=True)
-            # Performans ayarları
-            self._conn.execute("SET memory_limit = '2GB'")
-            self._conn.execute("SET threads = 4")
-            logger.info("DuckDB research engine connected", path=str(self._db_path))
+            # Kişisel PC Adaptif Performans ve Bellek Sınırları
+            try:
+                from services.core.hardware_profile import hardware_manager
+                max_mem = f"{hardware_manager.limits.max_duckdb_memory_mb}MB"
+                max_threads = hardware_manager.limits.max_cpu_threads
+            except Exception:
+                max_mem = "1GB"
+                max_threads = 2
+
+            self._conn.execute(f"SET memory_limit = '{max_mem}'")
+            self._conn.execute(f"SET threads = {max_threads}")
+            logger.info("DuckDB research engine connected", path=str(self._db_path), memory_limit=max_mem, threads=max_threads)
         return self._conn
 
     def close(self) -> Any:

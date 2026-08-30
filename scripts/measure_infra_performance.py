@@ -1,5 +1,5 @@
 import time
-import sys
+
 import numpy as np
 
 # 1. SERİLEŞTİRME TESTİ: orjson vs standart json
@@ -23,6 +23,7 @@ market_payload = [
 ]
 
 import json
+
 import orjson
 
 # Standart json benchmark
@@ -51,6 +52,7 @@ print("2. VERİTABANI ANALİTİK TESTİ: DuckDB vs SQLite (100,000 Satır Agrega
 print("=" * 80)
 
 import sqlite3
+
 import duckdb
 
 # Bellek içi SQLite

@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — QuestDB Gerçek Integration Tests
 
 Gerçek fonksiyonel testler:

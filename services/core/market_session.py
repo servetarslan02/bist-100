@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Market Session Manager (Wrapper)
 

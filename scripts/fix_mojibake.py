@@ -40,7 +40,7 @@ charmap = {
 
 total_replaces = 0
 for path in files:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         content = f.read()
 
     file_count = 0

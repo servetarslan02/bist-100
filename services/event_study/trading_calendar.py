@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Trading Calendar (BIST İş Günleri Takvimi).
 
 Event study'de calendar day yerine trading day kullanmak kritiktir çünkü:

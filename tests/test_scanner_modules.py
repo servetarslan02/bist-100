@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Scanner Modules Test Suite v1.0
 

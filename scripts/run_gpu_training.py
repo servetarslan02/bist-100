@@ -1,6 +1,7 @@
 import time
+
 import torch
-import numpy as np
+
 
 def main():
     print("=" * 70)
@@ -65,7 +66,7 @@ def main():
     total_time = t_end - t_start
 
     print("\n" + "=" * 70)
-    print(f"🏆 EĞİTİM TAMAMLANDI!")
+    print("🏆 EĞİTİM TAMAMLANDI!")
     print(f"⏱️ 500 Epoch Toplam Süre: {total_time:.2f} saniye ({total_time/500*1000:.2f} ms/epoch)")
     print(f"⚡ GPU Verimi: {n_samples * 500 / total_time:,.0f} örnek/saniye")
     print(f"💾 Tepe VRAM Kullanımı: {torch.cuda.max_memory_allocated(0)/(1024**2):.2f} MB")

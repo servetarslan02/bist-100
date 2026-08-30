@@ -44,11 +44,10 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
-import polars as pl
 import structlog
 import yfinance as yf
 
@@ -226,8 +225,8 @@ def _to_float(v: Any) -> float:
     if hasattr(v, "item"):
         try:
             return float(v.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(v)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -496,9 +495,9 @@ def run_ultimate_simulation() -> None:
     logger.info("=" * 85)
     logger.info(f"  Başlangıç Sermayesi  : {INITIAL_CAPITAL:,.0f} TL")
     logger.info(f"  Max Tek Pozisyon     : %{MAX_POSITION_PCT * 100:.0f} (Portföy Limiti)")
-    logger.info(f"  Mum Motoru           : 12 Japon Formasyonu + Alıcı/Satıcı Gücü + FVG Onayı")
-    logger.info(f"  Sektör Takibi        : 7 Sektör Bağıl Gücü & Sektör İçi Liderlik")
-    logger.info(f"  Akıllı Stop          : Min(Son Mum Fitil Tabanı, 3.5x ATR Trailing)")
+    logger.info("  Mum Motoru           : 12 Japon Formasyonu + Alıcı/Satıcı Gücü + FVG Onayı")
+    logger.info("  Sektör Takibi        : 7 Sektör Bağıl Gücü & Sektör İçi Liderlik")
+    logger.info("  Akıllı Stop          : Min(Son Mum Fitil Tabanı, 3.5x ATR Trailing)")
     logger.info(f"  İşlem Maliyeti       : %{COST_ONE_WAY * 100:.2f} tek yön")
     logger.info("-" * 85)
 
@@ -763,7 +762,7 @@ def run_ultimate_simulation() -> None:
     logger.info(f"  {'Üretilen Toplam Alfa':<38} {total_return_pct - bm_total_return_pct:>14.1f}%")
     logger.info(sep)
 
-    logger.info(f"\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
+    logger.info("\n  YIL YIL PERFORMANS VE ALFA TABLOSU:")
     logger.info(f"  {'YIL':<6} | {'PORTFÖY':>10} | {'BIST-100':>10} | {'ALFA':>10} | {'DURUM':>12}")
     logger.info("-" * 60)
     years_beat = 0

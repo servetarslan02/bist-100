@@ -1,6 +1,8 @@
 import uuid
+
 import duckdb
 import orjson
+
 
 def populate():
     conn = duckdb.connect("data/paper_trading_state.db")

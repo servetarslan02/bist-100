@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — gRPC Server v2.0 (Protobuf Native)
 

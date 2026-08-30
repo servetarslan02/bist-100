@@ -5,11 +5,10 @@
 3. Kanıt: Olasılık Kalibrasyonu (Probability Calibration - Platt Scaling / Isotonic)
 """
 
-import sys
 import os
+import sys
+
 import numpy as np
-import pandas as pd
-from pathlib import Path
 
 # Proje kök dizini
 sys.path.insert(0, os.getcwd())
@@ -78,6 +77,7 @@ assert len(lgb_feats) == 70, f"HATA: LightGBM feature sayısı 70 olmalı, bulun
 # bist_ml_scanner içinde 70 feature ile tahmin üretme testi
 print("\n  * Canlı Tarayıcı (BistMLScanner) 70-Feature Entegrasyon Testi Koşturuluyor...")
 from services.scanner.bist_ml_scanner import bist_ml_scanner
+
 bist_ml_scanner.load_models()
 
 opps = bist_ml_scanner.scan_all_opportunities(limit=5)
@@ -110,13 +110,13 @@ assert 5 in xgb_calibrators, "HATA: XGBoost 5-günlük kalibratörü bulunamadı
 cb_metrics = cb_calibrators[5].get_metrics()
 xgb_metrics = xgb_calibrators[5].get_metrics()
 
-print(f"\n  [CatBoost Platt Scaling Sonuçları]:")
+print("\n  [CatBoost Platt Scaling Sonuçları]:")
 print(f"    - Ham Brier Skoru (Hata)      : {cb_metrics['raw_brier']:.4f}")
 print(f"    - Kalibre Brier Skoru (Hata)  : {cb_metrics['calibrated_brier']:.4f}")
 print(f"    - Ham ECE (Olasılık Sapması)  : {cb_metrics['raw_ece']:.4f}")
 print(f"    - Kalibre ECE (Olasılık Sapması): {cb_metrics['calibrated_ece']:.4f}")
 
-print(f"\n  [XGBoost Platt Scaling Sonuçları]:")
+print("\n  [XGBoost Platt Scaling Sonuçları]:")
 print(f"    - Ham Brier Skoru (Hata)      : {xgb_metrics['raw_brier']:.4f}")
 print(f"    - Kalibre Brier Skoru (Hata)  : {xgb_metrics['calibrated_brier']:.4f}")
 print(f"    - Ham ECE (Olasılık Sapması)  : {xgb_metrics['raw_ece']:.4f}")

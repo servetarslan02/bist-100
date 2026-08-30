@@ -571,6 +571,9 @@ class RankingModel:
         elif buyer_pressure <= 40.0:
             score -= (50.0 - buyer_pressure) * 0.15  # Satıcı baskısı cezası
 
+        if candle_score >= 60.0:
+            score += (candle_score - 50.0) * 0.10  # Mum formasyonu skoru katkısı
+
         if has_bull_pat:
             score += 4.0  # Çekiç/Engulfing dip dönüş onayı
         if has_fvg:

@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Timestamped KAP Market Restriction & VBTS Registry
 

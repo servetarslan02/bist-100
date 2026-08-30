@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — June 2026 V-Dip Audit Script (Read-Only Deep Inspection)
 
 Bu script 2026 Mayıs ve Haziran aylarındaki:

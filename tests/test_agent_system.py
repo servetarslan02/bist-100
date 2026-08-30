@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Agent System Test Suite v1.0
 

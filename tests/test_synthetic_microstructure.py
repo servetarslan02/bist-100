@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Synthetic Microstructure & Multi-Scenario Liquidity Tests
 """

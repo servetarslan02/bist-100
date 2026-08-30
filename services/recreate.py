@@ -1,7 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import asyncio
+from typing import Any
 
 from services.core.database import init_databases, pg_execute
 

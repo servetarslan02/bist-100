@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Ingestion Metrics v1.0
 

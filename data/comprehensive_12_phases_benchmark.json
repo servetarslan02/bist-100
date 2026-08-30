@@ -1,0 +1,83 @@
+{
+  "FAZ_0": {
+    "process_ram_mb": 414.3,
+    "system_ram_available_mb": 1650.69,
+    "system_ram_used_pct": 89.7,
+    "cpu_count_logical": 24,
+    "cpu_count_physical": 16,
+    "measurement_latency_ms": 55.642
+  },
+  "FAZ_1": {
+    "normal_execution_ms": 0.375,
+    "idempotent_cached_return_ms": 0.35,
+    "idempotency_speedup": 1.1,
+    "circuit_breaker_active": true,
+    "circuit_breaker_trip_ms": 1.037
+  },
+  "FAZ_2": {
+    "redis_single_50_roundtrip_ms": 33693.17,
+    "redis_pipeline_50_batch_ms": 0.05,
+    "redis_pipeline_speedup": 677931.3,
+    "duckdb_100k_rows_pushdown_ms": 24.0,
+    "duckdb_throughput_rows_sec": 4167222
+  },
+  "FAZ_3": {
+    "cold_full_scan_70_features_sec": 0.826,
+    "warm_cached_scan_ms": 0.02,
+    "feature_cache_hit_microsec": 0.31,
+    "cache_speedup_ratio": 49158.9,
+    "total_opportunities_found": 50
+  },
+  "FAZ_4": {
+    "lightgbm_647_batch_ms": 0.89,
+    "catboost_647_batch_ms": 2.27,
+    "xgboost_647_batch_ms": 2.29,
+    "batch_inference_size": 647,
+    "features_per_stock": 70,
+    "lightgbm_stocks_per_sec": 647000
+  },
+  "FAZ_5": {
+    "vectorized_10yr_eval_ms": 0.089,
+    "annualized_sharpe": 1.368,
+    "reproducible_seed_lock": true
+  },
+  "FAZ_6": {
+    "small_payload_bytes": 56,
+    "small_compressed": false,
+    "large_payload_bytes": 1695,
+    "large_compressed": true,
+    "compression_ratio_pct": 94.6,
+    "orjson_latency_ms": 0.03,
+    "json_speedup": 5.8
+  },
+  "FAZ_7": {
+    "fresh_order_allowed": true,
+    "stale_order_blocked": true,
+    "risk_gate_evaluation_ms": 0.359,
+    "tick_sla_seconds": 5,
+    "fail_closed_mode": "ACTIVE"
+  },
+  "FAZ_8": {
+    "full_snapshot_size_bytes": 41978,
+    "delta_update_size_bytes": 117,
+    "network_bandwidth_saving_pct": 99.72
+  },
+  "FAZ_9": {
+    "current_memory_usage_mb": 456.64,
+    "target_ceiling_limit_mb": 512.0,
+    "is_within_cgroup_limit": true,
+    "log_rotation_configured": true
+  },
+  "FAZ_10": {
+    "500_metrics_emission_ms": 2.2,
+    "metric_emission_per_call_us": 4.4,
+    "prometheus_payload_bytes": 12832
+  },
+  "FAZ_11": {
+    "avg_e2e_cycle_ms": 1.07,
+    "p95_e2e_cycle_ms": 1.29,
+    "min_e2e_cycle_ms": 0.87,
+    "total_load_iterations": 10,
+    "final_process_ram_mb": 456.71
+  }
+}

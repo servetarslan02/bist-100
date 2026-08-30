@@ -5,7 +5,9 @@ Yil yil performans + kombinasyon analizi
 """
 
 from typing import Any
+
 import structlog
+
 logger = structlog.get_logger()
 
 import warnings

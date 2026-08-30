@@ -1,8 +1,9 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
-from typing import Any
 import asyncio
 import time
+from typing import Any
 
 
 async def run_all_checks() -> Any:

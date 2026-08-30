@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — MODEL VE MOTOR EĞİTİM KALİTESİ, VERİ YETERLİLİĞİ VE ENTEGRASYON KANITI

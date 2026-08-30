@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Core Module Integration Test Suite
 

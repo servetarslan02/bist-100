@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Learning System Faz 5 Test Suite (Shadow Mode + Champion-Challenger)
 

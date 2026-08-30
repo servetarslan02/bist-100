@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+
 """ALPHA BIST — Integration Bridge v2.0 Tests
 
 Kapsamlı test suite:

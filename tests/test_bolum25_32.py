@@ -1,4 +1,5 @@
 from typing import Any
+
 """Bölüm 25-32 — ML, Alternative, Macro, Factors, Event Study, VIOP Testleri."""
 
 import numpy as np

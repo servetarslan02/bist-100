@@ -1,8 +1,8 @@
-from typing import Any
 import asyncio
 import time
 from collections import defaultdict
 from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import structlog

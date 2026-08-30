@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """ALPHA BIST — High-Performance Large Scale Model Training & Evaluation Simulator
 
 1,000+ Historical Predictions per Model (Total 6,000+ transactions) across 5 Market Regimes:

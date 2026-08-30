@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Kurumsal Düzey Kapsamlı Kantitatif Denetim ve Doğrulama Motoru
 ===========================================================================

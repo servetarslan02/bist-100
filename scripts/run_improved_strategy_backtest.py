@@ -42,8 +42,8 @@ if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+    except Exception as err:
+        sys.stderr.write(f"[Handled Error] {err}\n")
 
 import numpy as np
 import structlog
@@ -84,8 +84,8 @@ def _to_float(val: Any) -> float:
     if hasattr(val, "item"):
         try:
             return float(val.item())
-        except Exception:
-            pass
+        except Exception as err:
+            sys.stderr.write(f"[Handled Error] {err}\n")
     arr = np.ravel(val)
     return float(arr[0]) if len(arr) > 0 else 0.0
 
@@ -253,8 +253,8 @@ def run_improved_simulation() -> None:
     logger.info("=" * 80)
     logger.info(f"  Baslangic Sermayesi  : {INITIAL_CAPITAL:,.0f} TL")
     logger.info(f"  ATR Carpani          : {ATR_TRAIL_MULT}x (Genis, Gurultuden Korunaklı)")
-    logger.info(f"  Rejim Sistemi        : SMA50/SMA200 - 3 Kademe (BULL/NEUTRAL/BEAR)")
-    logger.info(f"  Nakit Politikasi     : BEAR'da bile min 3 poz (Hicbir zaman %100 nakit YOK)")
+    logger.info("  Rejim Sistemi        : SMA50/SMA200 - 3 Kademe (BULL/NEUTRAL/BEAR)")
+    logger.info("  Nakit Politikasi     : BEAR'da bile min 3 poz (Hicbir zaman %100 nakit YOK)")
     logger.info(f"  Evren                : {len(stock_dict)} likit BIST hissesi")
     logger.info(f"  İslem Maliyeti       : %{TOTAL_ONE_WAY_COST * 100:.2f} tek yon")
     logger.info("-" * 80)
@@ -482,9 +482,9 @@ def run_improved_simulation() -> None:
     logger.info(f"    BULL    : {regime_days['BULL']:,} gun  ({regime_days['BULL'] / total_days * 100:.0f}%)  -> 5 pozisyon, %100 yatirim")
     logger.info(f"    NEUTRAL : {regime_days['NEUTRAL']:,} gun  ({regime_days['NEUTRAL'] / total_days * 100:.0f}%)  -> 4 pozisyon, %80 yatirim")
     logger.info(f"    BEAR    : {regime_days['BEAR']:,} gun  ({regime_days['BEAR'] / total_days * 100:.0f}%)  -> 3 pozisyon, %60 yatirim (savunma)")
-    logger.info(f"    NOT: Hicbir gunde %100 nakit tutulmadi (Onceki stratejinin kritik hatasi duzeltildi!)")
+    logger.info("    NOT: Hicbir gunde %100 nakit tutulmadi (Onceki stratejinin kritik hatasi duzeltildi!)")
 
-    logger.info(f"\n  YIL YIL KARSILASTIRMA (PORTFOY vs BIST-100):")
+    logger.info("\n  YIL YIL KARSILASTIRMA (PORTFOY vs BIST-100):")
     logger.info(f"  {'YIL':<6} | {'PORTFOY':>10} | {'BIST-100':>10} | {'ALFA':>10} | {'SONUC':>12}")
     logger.info("-" * 60)
     years_beat = 0

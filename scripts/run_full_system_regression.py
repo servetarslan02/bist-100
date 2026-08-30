@@ -18,12 +18,9 @@ import time
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import psutil
 import structlog
 
-from services.core.observability import prometheus_metrics
-from services.features.cache_manager import feature_cache_manager
 from services.portfolio.autonomous_conviction_engine import (
     AutonomousConvictionEngine,
     CandidateAsset,
@@ -52,7 +49,7 @@ async def run_e2e_regression_suite():
     baseline_file = Path("data/baseline_profile.json")
     baseline_data = {}
     if baseline_file.exists():
-        with open(baseline_file, "r", encoding="utf-8") as f:
+        with open(baseline_file, encoding="utf-8") as f:
             baseline_data = json.load(f)
 
     res_start = measure_system_resources()

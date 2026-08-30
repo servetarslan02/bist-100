@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """Seed initial realistic prediction and outcome history for ALPHA BIST learning pipeline."""
 
 import numpy as np

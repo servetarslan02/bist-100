@@ -1,4 +1,5 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Çoklu Veri Akışının (KAP, Haber, Sosyal, Bilanço, Makro)

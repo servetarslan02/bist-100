@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Financial Data Quality & Data Contracts Test Suite
 Doğrulanan Özellikler:

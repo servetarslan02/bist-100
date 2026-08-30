@@ -1,6 +1,8 @@
 import structlog
+
 logger = structlog.get_logger(__name__)
 from typing import Any
+
 """
 ALPHA BIST — Canlı & Gerçek Veri Kaynakları Doğrulama Denetimi
 Sistemdeki tüm veri sağlayıcılarının gerçek ve canlı kaynaklara bağlı olduğunu doğrular.

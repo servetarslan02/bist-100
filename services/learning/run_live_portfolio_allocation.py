@@ -1,3 +1,6 @@
+import structlog
+
+logger = structlog.get_logger(__name__)
 """
 ALPHA BIST — Canlı Piyasa Portföy Tahsis Raporu
 """
@@ -12,7 +15,8 @@ from services.portfolio.autonomous_conviction_engine import (
 from services.scanner.bist_ml_scanner import BistMLScanner
 
 
-def run_live_allocation(total_capital: float = 1_000_000.0, regime: str = "SIDEWAYS"):
+def run_live_allocation(total_capital: float = 1_000_000.0, regime: str = "SIDEWAYS") -> None:
+    """Otomatik dokumantasyon."""
     t0 = time.time()
     scanner = BistMLScanner()
     opportunities = scanner.scan_all_opportunities(limit=100)
@@ -41,18 +45,18 @@ def run_live_allocation(total_capital: float = 1_000_000.0, regime: str = "SIDEW
 
     op_map = {op["ticker"]: op for op in opportunities}
 
-    print("=========================================================================================")
-    print(f"CANLI PİYASA PORTFÖY ALIM VE TAHSİS PLANI (BIST 647 HİSSE - {dur:.2f} sn)")
-    print("=========================================================================================")
-    print(f"Piyasa Rejimi          : {plan.market_regime}")
-    print(f"Toplam Sermaye         : {total_capital:,.0f} TL")
-    print(f"Hisselere Ayrılan Pay  : %{plan.total_exposure * 100:.1f} ({total_capital * plan.total_exposure:,.0f} TL)")
-    print(f"Nakit Tamponu          : %{plan.cash_weight * 100:.1f} ({total_capital * plan.cash_weight:,.0f} TL)")
-    print(f"Portföye Alınan Hisse  : {plan.num_positions} adet")
-    print(f"Elenme Nedeni Olanlar  : {len(plan.rejected_tickers)} adet (Alfa barajı veya güven skoru yetersiz)")
-    print("-----------------------------------------------------------------------------------------")
-    print(f"{'HİSSE':<7} | {'STRATEJİ':<15} | {'PAY (%)':<8} | {'TUTAR (TL)':<12} | {'LOT':<8} | {'FİYAT':<8} | {'STOP-LOSS':<10} | {'HEDEF':<10} | {'BEKLENEN'}")
-    print("-----------------------------------------------------------------------------------------")
+    logger.info("=========================================================================================")
+    logger.info(f"CANLI PİYASA PORTFÖY ALIM VE TAHSİS PLANI (BIST 647 HİSSE - {dur:.2f} sn)")
+    logger.info("=========================================================================================")
+    logger.info(f"Piyasa Rejimi          : {plan.market_regime}")
+    logger.info(f"Toplam Sermaye         : {total_capital:,.0f} TL")
+    logger.info(f"Hisselere Ayrılan Pay  : %{plan.total_exposure * 100:.1f} ({total_capital * plan.total_exposure:,.0f} TL)")
+    logger.info(f"Nakit Tamponu          : %{plan.cash_weight * 100:.1f} ({total_capital * plan.cash_weight:,.0f} TL)")
+    logger.info(f"Portföye Alınan Hisse  : {plan.num_positions} adet")
+    logger.info(f"Elenme Nedeni Olanlar  : {len(plan.rejected_tickers)} adet (Alfa barajı veya güven skoru yetersiz)")
+    logger.info("-----------------------------------------------------------------------------------------")
+    logger.info(f"{'HİSSE':<7} | {'STRATEJİ':<15} | {'PAY (%)':<8} | {'TUTAR (TL)':<12} | {'LOT':<8} | {'FİYAT':<8} | {'STOP-LOSS':<10} | {'HEDEF':<10} | {'BEKLENEN'}")
+    logger.info("-----------------------------------------------------------------------------------------")
 
     sorted_weights = sorted(plan.weights.items(), key=lambda x: x[1], reverse=True)
     for ticker, weight in sorted_weights:
@@ -70,9 +74,9 @@ def run_live_allocation(total_capital: float = 1_000_000.0, regime: str = "SIDEW
             f"{price:>7.2f} TL | {stop_p:>8.2f} TL | {target_p:>8.2f} TL | +%{exp_ret:.1f}"
         )
 
-    print("-----------------------------------------------------------------------------------------")
-    print(f"NAKİT   | {'CASH_BUFFER':<15} | %{plan.cash_weight*100:>6.2f} | {total_capital*plan.cash_weight:>10,.0f} TL | -        | -        | -          | -          | Savunma")
-    print("=========================================================================================\n")
+    logger.info("-----------------------------------------------------------------------------------------")
+    logger.info(f"NAKİT   | {'CASH_BUFFER':<15} | %{plan.cash_weight*100:>6.2f} | {total_capital*plan.cash_weight:>10,.0f} TL | -        | -        | -          | -          | Savunma")
+    logger.info("=========================================================================================\n")
 
 if __name__ == "__main__":
     run_live_allocation()

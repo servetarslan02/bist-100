@@ -11,17 +11,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from services.portfolio.autonomous_conviction_engine import (
-    AllocationPlan,
     AutonomousConvictionEngine,
     CandidateAsset,
     ExitAction,
-    ExitDecision,
     OpenPositionState,
 )
 from services.portfolio.portfolio_optimizer import (
     OptimizationMethod,
     PortfolioOptimizer,
-    PortfolioOptimizerConstraints,
 )
 
 

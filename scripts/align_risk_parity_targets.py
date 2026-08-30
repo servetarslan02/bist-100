@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Kurumsal Hedefleri Yakalayan Risk Parity Optimizasyonu
 ===================================================================

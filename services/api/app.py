@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — API Application v2.0 (CANONICAL PRODUCTION SERVER)
 

@@ -6,10 +6,11 @@ Brier Skoru ve ECE (Expected Calibration Error) hesaplayarak güvenilirliği do�
 """
 
 from typing import Any
+
 import numpy as np
 import structlog
-from sklearn.linear_model import LogisticRegression
 from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
 
 logger = structlog.get_logger()
@@ -17,7 +18,7 @@ logger = structlog.get_logger()
 
 def compute_ece(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10) -> float:
     """Expected Calibration Error (ECE) hesapla.
-    
+
     Olasılıkları [0, 1] aralığında n_bins parçaya böler ve
     tahmin edilen güven ile gerçek doğruluk arasındaki farkın ağırlıklı ortalamasını alır.
     """

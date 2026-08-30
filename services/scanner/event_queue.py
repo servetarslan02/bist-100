@@ -1,4 +1,5 @@
 from typing import Any
+
 """
 ALPHA BIST — Event Priority Queue v1.0
 

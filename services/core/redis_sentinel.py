@@ -1,4 +1,5 @@
 from typing import Any
+
 """ALPHA BIST — Redis Sentinel Client (High Availability)
 
 Redis Sentinel desteği: master otomatik failover.
