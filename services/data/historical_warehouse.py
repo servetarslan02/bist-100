@@ -11,7 +11,6 @@ import os
 import duckdb
 import polars as pl
 import structlog
-import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -99,6 +98,7 @@ class HistoricalDataWarehouse:
 
         # 1. BIST-100 Endeksi
         from datetime import date
+        import yfinance as yf
 
         end_date = date.today().isoformat()
         bm_raw = yf.download(BENCHMARK_TICKER, start="1997-01-01", end=end_date, progress=False)

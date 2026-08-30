@@ -22,9 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
 
-import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -54,6 +52,7 @@ class CandidateAsset:
     current_price: float = 0.0
     horizon_days: int = 20  # İşlem vadesi (gün)
     is_excess_alpha: bool = True  # Model getirisi benchmark üzeri net alfa mı?
+    strategy_type: str = "SWING"  # SWING, ALPHA_RUNNER, BREAKOUT
 
 
 @dataclass
@@ -71,6 +70,7 @@ class OpenPositionState:
     quantity: int = 0
     trailing_stop_price: float = 0.0
     unrealized_pnl_pct: float = 0.0
+    strategy_type: str = "SWING"
 
 
 @dataclass
@@ -251,10 +251,17 @@ class AutonomousConvictionEngine:
                 rationale="Piyasada pozitif alfa üretecek güvenli hisse bulunamadı, portföy nakitte korunuyor.",
             )
 
-        # 1. Ham Güven Ağırlıkları (Conviction Power Law + Inverse Volatility)
+        # 1. Portföy Odaklanması (Maksimum 15 hisse): En yüksek model güvenine sahip adayları filtrele
+        best_candidates = sorted(
+            accepted,
+            key=lambda x: x.confidence_score,
+            reverse=True,
+        )[:15]
+
+        # 2. Ham Güven Ağırlıkları (Conviction Power Law + Inverse Volatility)
         # RawWeight = (Confidence^gamma) / (Volatility^2)
         raw_weights: dict[str, float] = {}
-        for c in accepted:
+        for c in best_candidates:
             vol = max(c.volatility, 0.10)  # Aşırı düşük volatiliteye sıfıra bölme koruması
             conviction_term = c.confidence_score**self.conviction_gamma
             risk_term = 1.0 / (vol**2)
@@ -266,7 +273,7 @@ class AutonomousConvictionEngine:
 
         normalized_weights = {t: w / total_raw for t, w in raw_weights.items()}
 
-        # 2. Rejime Göre Maksimum Toplam Maruziyet (Exposure)
+        # 3. Rejime Göre Maksimum Toplam Maruziyet (Exposure)
         max_regime_exposure = {
             "BULL": 0.98,  # Boğada neredeyse full hisse (%2 nakit)
             "SIDEWAYS": 0.80,  # Yatayda %20 nakit tamponu
@@ -275,13 +282,13 @@ class AutonomousConvictionEngine:
             "HIGH_VOL": 0.50,
         }.get(market_regime.upper(), 0.80)
 
-        # 3. Kısıtların Uygulanması (Tek hisse tavanı ve sektör tavanı)
+        # 4. Kısıtların Uygulanması (Tek hisse tavanı ve sektör tavanı)
         # Güven skoru 0.90+ olan hisseye %25'e kadar izin ver, düşük olana %8 tavan koy
         final_weights: dict[str, float] = {}
         sector_totals: dict[str, float] = {}
 
         # Güven skoruna göre sırala (en güçlüler önce limit alsın)
-        sorted_candidates = sorted(accepted, key=lambda x: x.confidence_score, reverse=True)
+        sorted_candidates = sorted(best_candidates, key=lambda x: x.confidence_score, reverse=True)
 
         for c in sorted_candidates:
             target_w = normalized_weights[c.ticker] * max_regime_exposure
@@ -290,6 +297,7 @@ class AutonomousConvictionEngine:
             dynamic_stock_cap = self.min_single_stock_cap + (
                 self.max_single_stock_cap - self.min_single_stock_cap
             ) * (c.confidence_score**1.5)
+
             w = min(target_w, dynamic_stock_cap)
 
             # Sektör Konsantrasyon Tavanı
@@ -378,13 +386,14 @@ class AutonomousConvictionEngine:
                 )
                 continue
 
-            # 2. Karar: Sert Zarar Kes (Stop-Loss — Örn %7 altı)
-            if pnl_pct <= -0.07:
+            # 2. Karar: Sert Zarar Kes (Stop-Loss — standart hisse için -%7)
+            sl_threshold = -0.07
+            if pnl_pct <= sl_threshold:
                 decisions.append(
                     ExitDecision(
                         ticker=ticker,
                         action=ExitAction.STOP_LOSS,
-                        reason=f"Katı Zarar Kes Tetiklendi (Zarar: %{pnl_pct*100:.1f})",
+                        reason=f"Katı Zarar Kes Tetiklendi (Zarar: %{pnl_pct*100:.1f}, Eşik: %{sl_threshold*100:.1f})",
                         unrealized_pnl_pct=round(pnl_pct, 4),
                         current_confidence=curr_conf,
                         current_price=curr_p,
