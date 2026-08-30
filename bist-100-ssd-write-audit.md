@@ -705,3 +705,124 @@ with open("services/api/v1/market.py", "w", encoding="utf-8") as f:
 | 15 | Model kaydetme (pickle/pt) | ml/**/*.py | Düşük | 🟢 |
 | 16 | Audit log append | immutable_audit.py | Düşük | 🟢 |
 | 17 | replace_market.py tehlikeli | services/replace_market.py | Güvenlik | 🔴 |
+| 18 | SSL devre dışı (4 yer) | news_provider.py | Güvenlik | 🔴 |
+| 19 | gRPC timeout=None (6 yer) | market_pb2_grpc.py | Hata | 🟡 |
+| 20 | Fire-and-forget task (3 yer) | scanner.py, virtual_portfolio.py, walk_forward_engine.py | Hata | 🟡 |
+| 21 | CORS wildcard | app.py, server.py | Güvenlik | 🟡 |
+| 22 | Pickle deserialization | safe_pickle.py, model_loader.py, models.py | Güvenlik | 🟡 |
+| 23 | DuckDB WAL autocheckpoint 10MB | duckdb_store.py | SSD | 🟡 |
+| 24 | 8 ayrı DuckDB dosyası | services/**/*.py | SSD | 🟡 |
+
+---
+
+## 11. EK DERİN ANALİZ BULGULARI
+
+### 11.1 SSL Doğrulaması Devre Dışı (4 yer)
+**Dosya:** `services/ingestion/providers/news_provider.py:436,458,508,564`
+```python
+connector = aiohttp.TCPConnector(ssl=False)
+```
+**Risk:** Man-in-the-middle saldırısı. Haber verileri manipüle edilebilir.
+**Çözüm:** `ssl=True` yap veya özel SSL context kullan.
+
+### 11.2 gRPC Timeout Yok (6 yer)
+**Dosya:** `services/grpc/generated/market_pb2_grpc.py:121,152,183,277,308,402`
+```python
+timeout=None
+```
+**Risk:** gRPC çağrıları sonsuza kadar bekleyebilir. Thread/event loop bloklanabilir.
+**Çözüm:** Makul timeout değerleri ekle (örn: 30 saniye).
+
+### 11.3 Fire-and-Forget Task'lar (3 yer)
+**Dosyalar:**
+- `services/api/v1/scanner.py:363` — `_ = asyncio.create_task(run_unified_daily_cycle())`
+- `services/paper_trading/virtual_portfolio.py:467` — `asyncio.ensure_future(_fetch_missing())`
+- `services/backtest/walk_forward_engine.py:2361` — `asyncio.ensure_future(_save())`
+
+**Risk:** Task referansı saklanmazsa GC tarafından yok edilebilir. Exception'lar yutulur.
+**Çözüm:** Task referansını sakla ve `add_done_callback` ekle.
+
+### 11.4 CORS Wildcard
+**Dosyalar:** `services/api/app.py:249-250`, `services/api/server.py:117`
+```python
+allow_methods=["*"],
+allow_headers=["*"],
+```
+**Risk:** Tüm HTTP method'ları ve header'lar kabul ediliyor. CSRF saldırısı mümkün.
+**Çözüm:** Sadece gerekli method'ları ve header'ları izin ver.
+
+### 11.5 Pickle Deserialization (3 yer)
+**Dosyalar:**
+- `services/core/safe_pickle.py:115` — `pickle.loads(data)` (hash doğrulamalı)
+- `ml/model_loader.py:59` — `pickle.load(f)` (hash doğrulamasız)
+- `ml/models.py:262` — `pickle.load(f)` (hash doğrulamasız)
+
+**Risk:** Pickle deserialization arbitrary code execution. `safe_pickle.py` hash doğruluyor ama diğerleri doğrulamıyor.
+**Çözüm:** Tüm pickle yüklemelerinde `safe_pickle_load()` kullan.
+
+### 11.6 DuckDB WAL Autocheckpoint 10MB
+**Dosya:** `services/core/duckdb_store.py:78`
+```python
+self._conn.execute("SET wal_autocheckpoint = '10MB'")
+self._conn.execute("SET checkpoint_threshold = '16MB'")
+```
+**Risk:** WAL dosyası 10MB'a ulaştığında otomatik checkpoint yapılıyor. 8 ayrı DuckDB dosyası = 8×10MB = 80MB potansiyel WAL.
+**Çözüm:** Checkpoint threshold'u düşür veya dosya sayısını azalt.
+
+### 11.7 8 Ayrı DuckDB Dosyası
+**Tespit edilen dosyalar:**
+1. `data/model_memory.duckdb` — ModelMemoryStore
+2. `data/paper_trading_state.db` — PaperTradingStateStore
+3. `data/downtime.db` — DowntimeTracker
+4. `data/offline_queue.db` — OfflineQueue
+5. `data/central_state.db` — DuckDBStore
+6. `data/backtest_runs.db` — BacktestPersistence
+7. `data/scan_results.db` — ScanPersistence
+8. `data/persistent_repository.db` — PersistentRepository
+
+**Risk:** Her dosya kendi WAL'ını yönetiyor. 8 dosya × sürekli yazma = ciddi SSD yükü.
+**Çözüm:** Tek merkezi DuckDB dosyası kullan veya dosya sayısını 2-3'e düşür.
+
+### 11.8 `replace_market.py` Tehlikeli
+**Dosya:** `services/replace_market.py:68`
+```python
+with open("services/api/v1/market.py", "w", encoding="utf-8") as f:
+    f.write(content)
+```
+**Risk:** `market.py` dosyasını yeniden yazıyor. Yanlışlıkla çalıştırılırsa API bozulur.
+**Çözüm:** Bu dosyayı kaldır veya sadece manuel çalıştır.
+
+### 11.9 `check_pending.py` Connection Leak
+**Dosya:** `services/check_pending.py:5`
+```python
+conn = duckdb.connect("data/paper_trading_state.db")
+# conn.close() YOK
+```
+**Risk:** Modül seviyesinde DuckDB bağlantısı açılıyor ve asla kapatılmıyor. Her import'ta yeni bağlantı.
+**Çözüm:** `with duckdb.connect(...) as conn:` kullan.
+
+### 11.10 `mock_redis.py` Hardcoded Şifre
+**Dosya:** `mock_redis.py:9`
+```python
+r = redis.Redis(host="redis", port=6379, db=0, password="alpha_secure_pass_123")
+```
+**Risk:** Şifre plaintext olarak kodda. GitHub'a push edilmiş.
+**Çözüm:** `os.environ.get("REDIS_PASSWORD")` kullan.
+
+---
+
+## 12. SSD YAZMA TAHMİNİ (Saatlik)
+
+| Kaynak | Yazma Hızı (tahmini) | Saatlik Toplam |
+|---|---|---|
+| Docker JSON log (20+ container) | ~100 KB/s | ~360 MB/saat |
+| PostgreSQL WAL | ~50 KB/s | ~180 MB/saat |
+| ClickHouse merge | ~200 KB/s (burst) | ~100 MB/saat |
+| Redis RDB snapshot | ~5 MB/15dk | ~20 MB/saat |
+| NATS JetStream | ~10 KB/s | ~36 MB/saat |
+| Prometheus TSDB | ~30 KB/s | ~108 MB/saat |
+| DuckDB (8 dosya) | ~20 KB/s | ~72 MB/saat |
+| JSON dosyaları (10+ dosya) | ~5 KB/s | ~18 MB/saat |
+| **TOPLAM** | | **~794 MB/saat** |
+
+**Not:** Bu tahminler seans saatleri içindir. Seans dışı önemli ölçüde azalır.
