@@ -826,3 +826,79 @@ r = redis.Redis(host="redis", port=6379, db=0, password="alpha_secure_pass_123")
 | **TOPLAM** | | **~794 MB/saat** |
 
 **Not:** Bu tahminler seans saatleri içindir. Seans dışı önemli ölçüde azalır.
+
+---
+
+## 13. THREAD & CONCURRENCY BULGULARI
+
+### 13.1 Background Event Loop Kapatılmıyor
+**Dosya:** `services/core/orchestrator.py:72-79`
+```python
+def _get_bg_loop():
+    global _bg_loop, _bg_thread
+    if _bg_loop is None or _bg_loop.is_closed():
+        _bg_loop = asyncio.new_event_loop()
+        _bg_thread = threading.Thread(target=_bg_loop.run_forever, daemon=True)
+        _bg_thread.start()
+    return _bg_loop
+```
+**Risk:** `_bg_loop` ve `_bg_thread` asla kapatılmıyor. Shutdown'da resource leak.
+**Çözüm:** `shutdown()` metodu ekle: `_bg_loop.call_soon_threadsafe(_bg_loop.stop)` + `_bg_thread.join()`.
+
+### 13.2 Daemon Thread Join Edilmiyor
+**Dosya:** `services/backtest/walk_forward_runner.py:511`
+```python
+t = threading.Thread(target=_save, daemon=True)
+t.start()
+# t.join() YOK
+```
+**Risk:** Thread referansı saklanmazsa GC tarafından yok edilebilir. Shutdown'da veri kaybı.
+**Çözüm:** Thread referansını sakla ve `t.join(timeout=10)` ekle.
+
+### 13.3 SSDThrottledWriter Thread Boşuna Çalışıyor
+**Dosya:** `services/core/hardware_orchestrator.py:74`
+```python
+self._worker_thread = threading.Thread(target=self._flusher_loop, daemon=True, name="SSDThrottledWriter")
+self._worker_thread.start()
+```
+**Risk:** `enqueue_write()` hiçbir yerden çağrılmıyor ama thread her 3 saniyede boş kuyruğu kontrol ediyor.
+**Çözüm:** Ya `enqueue_write()`'ı aktif kullan ya da thread'i başlatma.
+
+### 13.4 4 Daemon Thread Tespit Edildi
+1. `services/backtest/walk_forward_runner.py:511` — Walk-forward save thread
+2. `services/core/hardware_orchestrator.py:74` — SSDThrottledWriter thread (ölü kod)
+3. `services/core/observability.py:269` — Resource monitor thread
+4. `services/core/orchestrator.py:77` — Background event loop thread
+
+**Risk:** Daemon thread'ler shutdown'da aniden kesilir. Açık dosya/veritabanı bağlantıları düzgün kapatılmayabilir.
+**Çözüm:** Tüm thread'ler için `stop()` + `join()` mekanizması ekle.
+
+---
+
+## 14. SONUÇ VE ÖNERİLER
+
+### En Kritik 5 Sorun (Hemen Çözülmeli)
+1. **Hardcoded şifre** (`mock_redis.py`) — Güvenlik açığı
+2. **Connection leak** (`check_pending.py`) — DuckDB bağlantısı kapatılmıyor
+3. **apply_ssd_write_limit() boş** (`start.py`) — SSD koruması yok
+4. **Docker memory limitleri yok** (`docker-compose.yml`) — Swap riski
+5. **SSL devre dışı** (`news_provider.py`) — Güvenlik açığı
+
+### SSD Yazma Azaltma Öncelikleri
+1. Docker log driver'ını `none` yap veya `max-size: 100k` düşür
+2. PostgreSQL WAL ayarlarını gevşet (`fsync=off`, `synchronous_commit=off`)
+3. DuckDB dosya sayısını 8'den 2-3'e düşür
+4. Frontend polling interval'larını 2-3x artır
+5. JSON dosya yazma sıklığını azalt (debounce)
+6. `SSDThrottledWriter`'ı aktif kullan veya kaldır
+
+### Güvenlik Düzeltmeleri
+1. Hardcoded şifreleri kaldır
+2. SSL doğrulamasını aktif et
+3. CORS'u daralt
+4. Pickle yüklemelerinde hash doğrulama kullan
+5. `replace_market.py` dosyasını kaldır
+
+---
+
+**Rapor Sonu — 27 bulgu, 14 kategori, 35+ dosya**
