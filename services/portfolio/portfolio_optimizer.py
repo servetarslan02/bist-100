@@ -189,7 +189,10 @@ class PortfolioOptimizer:
         if invested_weight > 1e-6:
             port_vol = float(np.sqrt(w_vec.T @ cov_matrix @ w_vec) * np.sqrt(252.0))
             port_ret = float(np.dot(w_vec, expected_returns))
-            sharpe = (port_ret - 0.40) / port_vol if port_vol > 1e-4 else 0.0  # 40% risksiz faiz
+            # Model skorlarından (excess alpha) türetildiyse rf=0, nominal getiriyse rf=0.40
+            is_excess_alpha = (model_scores is not None) or (np.mean(expected_returns) < 0.35)
+            rf_rate = 0.0 if is_excess_alpha else 0.40
+            sharpe = (port_ret - rf_rate) / port_vol if port_vol > 1e-4 else 0.0
             weighted_vols = w_vec * np.sqrt(np.diag(cov_matrix)) * np.sqrt(252.0)
             div_ratio = float(np.sum(weighted_vols) / port_vol) if port_vol > 1e-4 else 1.0
         else:

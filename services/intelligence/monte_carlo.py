@@ -99,8 +99,7 @@ class MonteCarloEngine:
             horizon_days: Simülasyon süresi (iş günü)
             num_simulations: Simülasyon sayısı
         """
-        if seed is not None:
-            np.random.seed(seed)
+        rng = np.random.default_rng(seed)
 
         # Günlük parametreler
         dt = 1 / 252  # 1 iş günü
@@ -112,8 +111,8 @@ class MonteCarloEngine:
         drift = (expected_return_annual - 0.5 * volatility_annual**2) * dt
         diffusion = sigma_daily
 
-        # Rastgele sayılar
-        Z = np.random.standard_normal((num_simulations, horizon_days))
+        # Rastgele sayılar (izole ve thread-safe)
+        Z = rng.standard_normal((num_simulations, horizon_days))
 
         # Fiyat yolları
         log_returns = drift + diffusion * Z
@@ -199,8 +198,7 @@ class MonteCarloEngine:
             positions: [{"ticker": "THYAO", "value": 10000, "return": 0.15, "vol": 0.25}, ...]
             correlation_matrix: NxN korelasyon matrisi
         """
-        if seed is not None:
-            np.random.seed(seed)
+        rng = np.random.default_rng(seed)
 
         n = len(positions)
         if n == 0:
@@ -240,8 +238,8 @@ class MonteCarloEngine:
             # Pozitif tanımlı değilse, diyagonal kullan
             L = np.diag(daily_vols)
 
-        # Simülasyon
-        Z = np.random.standard_normal((num_simulations, horizon_days, n))
+        # Simülasyon (izole ve thread-safe)
+        Z = rng.standard_normal((num_simulations, horizon_days, n))
         correlated_Z = Z @ L.T  # (n_sims, horizon_days, n_assets) @ (n_assets, n_assets)
 
         # Her gün için portföy getirisi (vektörize)

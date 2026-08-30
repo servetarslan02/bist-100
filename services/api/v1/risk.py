@@ -99,6 +99,50 @@ def _get_position_sizer() -> Any:
     return position_sizer
 
 
+def _get_live_portfolio_for_risk(requested_value: float | None = None) -> dict[str, Any]:
+    """Canlı portföy pozisyonlarını VirtualPortfolio'dan çeker; boşsa fail-closed döner."""
+    try:
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+
+        vp = paper_orchestrator.portfolio
+        raw_positions = getattr(vp, "_positions", {})
+        if raw_positions:
+            total_val = float(getattr(vp, "total_value", 0.0))
+            if total_val <= 0:
+                total_val = sum(float(p.get("market_value", 0.0)) for p in raw_positions.values())
+            effective_val = requested_value if (requested_value is not None and requested_value > 0) else total_val
+
+            positions = []
+            weights = {}
+            for t, p in raw_positions.items():
+                mval = float(p.get("market_value", 0.0))
+                w = mval / total_val if total_val > 0 else 0.0
+                weights[t] = round(w, 4)
+                positions.append(
+                    {
+                        "ticker": t,
+                        "value": round(w * effective_val, 2),
+                        "sector": p.get("sector", "OTHER"),
+                        "shares": p.get("quantity", 0),
+                        "adv_tl": 1_000_000_000,
+                        "spread_bps": 6.0,
+                    }
+                )
+            return {
+                "total_value": effective_val,
+                "weights": weights,
+                "positions": positions,
+            }
+    except Exception as err:
+        logger.warning("failed_to_fetch_live_portfolio_for_risk", error=str(err))
+
+    return {
+        "total_value": requested_value or 0.0,
+        "weights": {},
+        "positions": [],
+    }
+
+
 # =====================================================
 # OVERVIEW & DASHBOARD
 # =====================================================
@@ -179,19 +223,10 @@ async def risk_dashboard(
         # Overview
         overview = await risk_overview(regime=regime, user=user, _=_)
 
-        # Stress test (demo portfolio)
+        # Stress test (canlı portföy)
         stress = _get_stress_engine()
-        demo_portfolio = {
-            "total_value": portfolio_value,
-            "positions": [
-                {"ticker": "THYAO", "value": portfolio_value * 0.3, "sector": "INDUSTRY"},
-                {"ticker": "GARAN", "value": portfolio_value * 0.25, "sector": "BANKING"},
-                {"ticker": "ASELS", "value": portfolio_value * 0.2, "sector": "TECHNOLOGY"},
-                {"ticker": "BIMAS", "value": portfolio_value * 0.15, "sector": "CONSUMER"},
-                {"ticker": "TUPRS", "value": portfolio_value * 0.1, "sector": "ENERGY"},
-            ],
-        }
-        stress_report = stress.run_all_scenarios(demo_portfolio)
+        live_portfolio = _get_live_portfolio_for_risk(portfolio_value)
+        stress_report = stress.run_all_scenarios(live_portfolio) if live_portfolio.get("positions") else None
 
         # Tail hedge
         hedger = _get_tail_hedger()
@@ -201,17 +236,27 @@ async def risk_dashboard(
         cal = _get_calibrator()
         cal_quality = cal.get_calibration_quality()
 
-        return {
-            **overview,
-            "stress_test": {
+        stress_out = {}
+        if stress_report:
+            stress_out = {
                 "risk_score": stress_report.risk_score,
                 "worst_scenario": stress_report.worst_scenario.scenario_name if stress_report.worst_scenario else "N/A",
                 "worst_impact_pct": stress_report.worst_scenario.total_impact_pct
                 if stress_report.worst_scenario
-                else 0,
-                "avg_impact_pct": stress_report.avg_impact_pct,
-                "recommendations": stress_report.recommendations,
-            },
+                else 0.0,
+                "status": "active",
+            }
+        else:
+            stress_out = {
+                "risk_score": 0.0,
+                "worst_scenario": "N/A",
+                "worst_impact_pct": 0.0,
+                "status": "no_open_positions",
+            }
+
+        return {
+            **overview,
+            "stress_test": stress_out,
             "tail_hedge": {
                 "strategy": hedge.strategy,
                 "hedge_ratio": hedge.hedge_ratio,
@@ -288,30 +333,24 @@ async def portfolio_risk(
     try:
         from ...risk.orchestrator import risk_orchestrator
 
-        # Örnek portföy yapısı (canlı DB verisi bağlandığında dinamikleşir)
-        portfolio = {
-            "total_value": portfolio_value,
-            "weights": {"THYAO": 0.25, "GARAN": 0.25, "ASELS": 0.20, "BIMAS": 0.15, "TUPRS": 0.15},
-            "positions": [
-                {"ticker": "THYAO", "value": portfolio_value * 0.25, "adv_tl": 2_500_000_000, "spread_bps": 5.0},
-                {"ticker": "GARAN", "value": portfolio_value * 0.25, "adv_tl": 1_800_000_000, "spread_bps": 6.0},
-                {"ticker": "ASELS", "value": portfolio_value * 0.20, "adv_tl": 1_200_000_000, "spread_bps": 8.0},
-                {"ticker": "BIMAS", "value": portfolio_value * 0.15, "adv_tl": 900_000_000, "spread_bps": 7.0},
-                {"ticker": "TUPRS", "value": portfolio_value * 0.15, "adv_tl": 1_400_000_000, "spread_bps": 6.0},
-            ],
-        }
-        np.random.seed(42)
-        demo_returns = np.random.normal(0.0006, 0.014, 252)
+        # Canlı portföy yapısı
+        portfolio = _get_live_portfolio_for_risk(portfolio_value)
+        if not portfolio.get("positions"):
+            return {
+                "status": "unavailable",
+                "message": "Aktif portföyde açık pozisyon bulunamadı.",
+                "portfolio_risk": {},
+            }
 
         report = risk_orchestrator.assess_portfolio_risk(
             portfolio=portfolio,
-            returns_history=demo_returns,
+            returns_history=None,
             regime=regime,
         )
         return {
             "status": "success",
             "portfolio_risk": report,
-            "source": "risk_orchestrator",
+            "source": "risk_orchestrator_live",
         }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
@@ -518,18 +557,12 @@ async def run_stress_test(
     """
     try:
         engine = _get_stress_engine()
-
-        # Demo portfolio
-        portfolio = {
-            "total_value": portfolio_value,
-            "positions": [
-                {"ticker": "THYAO", "value": portfolio_value * 0.3, "sector": "INDUSTRY"},
-                {"ticker": "GARAN", "value": portfolio_value * 0.25, "sector": "BANKING"},
-                {"ticker": "ASELS", "value": portfolio_value * 0.2, "sector": "TECHNOLOGY"},
-                {"ticker": "BIMAS", "value": portfolio_value * 0.15, "sector": "CONSUMER"},
-                {"ticker": "TUPRS", "value": portfolio_value * 0.1, "sector": "ENERGY"},
-            ],
-        }
+        portfolio = _get_live_portfolio_for_risk(portfolio_value)
+        if not portfolio.get("positions"):
+            return {
+                "status": "unavailable",
+                "message": "Aktif portföyde açık pozisyon bulunamadı.",
+            }
 
         if scenario == "all":
             report = engine.run_all_scenarios(portfolio)

@@ -298,7 +298,10 @@ class BacktestEngine:
             p["peak_price"] = max(p.get("peak_price", high_price), high_price)
 
             is_stop_loss = low_price <= p["avg_cost"] * (1 - stop_loss_pct)
-            is_trailing_stop = low_price <= p["peak_price"] * (1 - trailing_stop_pct)
+            # Trailing stop sadece pozisyon en azından kâr gördükten sonra (%2+ yükseliş) kârı kilitlemek için devreye girmeli
+            is_trailing_stop = (p["peak_price"] >= p["avg_cost"] * 1.02) and (
+                low_price <= p["peak_price"] * (1 - trailing_stop_pct)
+            )
 
             if is_stop_loss or is_trailing_stop:
                 stop_level = min(
