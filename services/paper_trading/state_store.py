@@ -10,6 +10,7 @@ Persistent state yönetimi: DuckDB.
 
 import os
 import shutil
+import threading
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -36,11 +37,14 @@ class PaperStateStore:
         self._buffer_size = 20  # Batch size
         self._last_flush = 0.0
         self._flush_interval = 30.0  # saniye
+        self._periodic_thread: threading.Thread | None = None
+        self._stop_periodic = threading.Event()
         if duckdb is not None:
             self._init_db()
             logger.info("PaperStateStore initialized", db_path=str(self.db_path))
         else:
             logger.warning("PaperStateStore initialized without persistence (duckdb not installed)")
+        self._start_periodic_flush()
 
     def _init_db(self) -> Any:
         """SQLite tablolarini olustur."""
@@ -220,6 +224,19 @@ class PaperStateStore:
             self._last_flush = _time.time()
         except Exception as e:
             logger.error("Paper state buffer flush error", error=str(e))
+
+    def _start_periodic_flush(self) -> None:
+        """Arka planda periyodik flush başlat."""
+        import time as _time
+
+        def _loop() -> None:
+            while not self._stop_periodic.wait(self._flush_interval):
+                try:
+                    self.periodic_flush()
+                except Exception:
+                    pass
+        self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="paper-periodic-flush")
+        self._periodic_thread.start()
 
     def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafından çağrılır)."""

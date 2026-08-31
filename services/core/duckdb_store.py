@@ -22,6 +22,7 @@ Kullanım:
 import atexit
 import functools
 import signal
+import threading
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
@@ -68,7 +69,10 @@ class DuckDBStore:
         self._buffer_size = 10
         self._last_flush = time.time()
         self._flush_interval = 30.0
+        self._periodic_thread: threading.Thread | None = None
+        self._stop_periodic = threading.Event()
         self._init_connection()
+        self._start_periodic_flush()
 
     def _init_connection(self) -> Any:
         """DuckDB bağlantısını başlat."""
@@ -146,6 +150,17 @@ class DuckDBStore:
         if len(self._write_buffer) >= self._buffer_size:
             self._flush_buffer()
 
+    def _start_periodic_flush(self) -> None:
+        """Arka planda periyodik flush başlat."""
+        def _loop() -> None:
+            while not self._stop_periodic.wait(self._flush_interval):
+                try:
+                    self.periodic_flush()
+                except Exception:
+                    pass
+        self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="duckdb-periodic-flush")
+        self._periodic_thread.start()
+
     def periodic_flush(self) -> Any:
         """Periyodik flush."""
         if time.time() - self._last_flush > self._flush_interval:
@@ -157,6 +172,7 @@ class DuckDBStore:
 
     def close(self) -> Any:
         """Bağlantıyı kapat."""
+        self._stop_periodic.set()
         self._flush_buffer()
         if self._conn:
             self._conn.close()

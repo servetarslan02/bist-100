@@ -9,6 +9,7 @@ Kalıcı model hafızası:
 """
 
 import os
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -74,8 +75,11 @@ class ModelMemoryStore:
         self._buffer_size = 20
         self._last_flush = 0.0
         self._flush_interval = 30.0
+        self._periodic_thread: threading.Thread | None = None
+        self._stop_periodic = threading.Event()
         if HAS_DUCKDB:
             self._init_tables()
+        self._start_periodic_flush()
 
     def _get_conn(self) -> Any:
         """Otomatik eklendi."""
@@ -115,6 +119,19 @@ class ModelMemoryStore:
     def flush(self) -> None:
         """Manuel flush."""
         self._flush_buffer()
+
+    def _start_periodic_flush(self) -> None:
+        """Arka planda periyodik flush başlat."""
+        import time as _time
+
+        def _loop() -> None:
+            while not self._stop_periodic.wait(self._flush_interval):
+                try:
+                    self.periodic_flush()
+                except Exception:
+                    pass
+        self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="model-memory-periodic-flush")
+        self._periodic_thread.start()
 
     def periodic_flush(self) -> None:
         """Periyodik flush."""

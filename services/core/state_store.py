@@ -33,6 +33,7 @@ Kullanım:
 
 import atexit
 import signal
+import threading
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -114,6 +115,9 @@ class CentralStateStore:
         self._buffer_size = 10  # Küçük buffer — crash safety için
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
+        self._periodic_thread: threading.Thread | None = None
+        self._stop_periodic = threading.Event()
+        self._start_periodic_flush()
 
     def _init_db(self) -> Any:
         """Tabloları oluştur."""
@@ -255,6 +259,17 @@ class CentralStateStore:
         self._write_buffer.append((query, params))
         if len(self._write_buffer) >= self._buffer_size:
             self._flush_buffer()
+
+    def _start_periodic_flush(self) -> None:
+        """Arka planda periyodik flush başlat."""
+        def _loop() -> None:
+            while not self._stop_periodic.wait(self._flush_interval):
+                try:
+                    self.periodic_flush()
+                except Exception:
+                    pass
+        self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="state-periodic-flush")
+        self._periodic_thread.start()
 
     def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafından çağrılır)."""

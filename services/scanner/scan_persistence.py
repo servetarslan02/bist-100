@@ -7,6 +7,7 @@ Geçmiş tarama analizi ve performans takibi için.
 Kaynaklar: TradingAgents (TauricResearch 2025), Endüstri standardı
 """
 
+import threading
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -68,6 +69,9 @@ class ScanPersistence:
         self._buffer_size = 20
         self._last_flush = 0.0
         self._flush_interval = 30.0
+        self._periodic_thread: threading.Thread | None = None
+        self._stop_periodic = threading.Event()
+        self._start_periodic_flush()
 
     def _ensure_table(self) -> Any:
         """Tabloyu oluştur (yoksa)."""
@@ -163,6 +167,17 @@ class ScanPersistence:
     def flush(self) -> None:
         """Manuel flush."""
         self._flush_buffer()
+
+    def _start_periodic_flush(self) -> None:
+        """Arka planda periyodik flush başlat."""
+        def _loop() -> None:
+            while not self._stop_periodic.wait(self._flush_interval):
+                try:
+                    self.periodic_flush()
+                except Exception:
+                    pass
+        self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="scan-periodic-flush")
+        self._periodic_thread.start()
 
     def periodic_flush(self) -> None:
         """Periyodik flush."""
