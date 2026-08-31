@@ -10,6 +10,8 @@ Kalıcı model hafızası:
 
 import os
 import threading
+import time
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -72,8 +74,9 @@ class ModelMemoryStore:
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_lock = threading.Lock()
         self._buffer_size = 20
-        self._last_flush = 0.0
+        self._last_flush = time.time()
         self._flush_interval = 30.0
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -81,10 +84,12 @@ class ModelMemoryStore:
             self._init_tables()
         self._start_periodic_flush()
 
+    @contextmanager
     def _get_conn(self) -> Any:
-        """Otomatik eklendi."""
+        """DuckDB bağlantısı — context manager (resource leak önleme)."""
         if not HAS_DUCKDB or duckdb is None:
-            return _DummyDuckDBConn()
+            yield _DummyDuckDBConn()
+            return
         conn = duckdb.connect(self.db_path)
         # SSD write reduction: DuckDB WAL ayarları
         try:
@@ -92,29 +97,37 @@ class ModelMemoryStore:
             configure_duckdb_wal(conn)
         except Exception:
             pass
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
 
     def _buffered_write(self, query: str, params: tuple) -> None:
         """Buffered write — toplu yaz (SSD dostu)."""
-        self._write_buffer.append((query, params))
-        if len(self._write_buffer) >= self._buffer_size:
+        with self._buffer_lock:
+            self._write_buffer.append((query, params))
+            should_flush = len(self._write_buffer) >= self._buffer_size
+        if should_flush:
             self._flush_buffer()
 
     def _flush_buffer(self) -> None:
         """Write buffer'ı flush et (batched write — SSD dostu)."""
-        if not self._write_buffer:
-            return
+        with self._buffer_lock:
+            if not self._write_buffer:
+                return
+            batch = self._write_buffer.copy()
+            self._write_buffer.clear()
         try:
             with self._get_conn() as conn:
-                for query, params in self._write_buffer:
+                for query, params in batch:
                     conn.execute(query, params)
                 if hasattr(conn, 'commit'):
                     conn.commit()
-            self._write_buffer.clear()
-            import time as _time
-            self._last_flush = _time.time()
+            self._last_flush = time.time()
         except Exception as e:
             logger.error("Model memory buffer flush error", error=str(e))
+            with self._buffer_lock:
+                self._write_buffer = batch + self._write_buffer  # Re-queue on failure
 
     def flush(self) -> None:
         """Manuel flush."""
@@ -122,8 +135,6 @@ class ModelMemoryStore:
 
     def _start_periodic_flush(self) -> None:
         """Arka planda periyodik flush başlat."""
-        import time as _time
-
         def _loop() -> None:
             while not self._stop_periodic.wait(self._flush_interval):
                 try:
@@ -135,8 +146,7 @@ class ModelMemoryStore:
 
     def periodic_flush(self) -> None:
         """Periyodik flush."""
-        import time as _time
-        if _time.time() - self._last_flush > self._flush_interval:
+        if time.time() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def _init_tables(self) -> Any:

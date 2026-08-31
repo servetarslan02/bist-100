@@ -66,6 +66,7 @@ class DuckDBStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn: duckdb.DuckDBPyConnection | None = None
         self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_lock = threading.Lock()
         self._buffer_size = 10
         self._last_flush = time.time()
         self._flush_interval = 30.0
@@ -73,6 +74,7 @@ class DuckDBStore:
         self._stop_periodic = threading.Event()
         self._init_connection()
         self._start_periodic_flush()
+        _stores.append(self)
 
     def _init_connection(self) -> Any:
         """DuckDB bağlantısını başlat."""
@@ -136,18 +138,22 @@ class DuckDBStore:
 
     def _flush_buffer(self) -> Any:
         """Write buffer'ı flush et."""
-        if not self._write_buffer:
-            return
+        with self._buffer_lock:
+            if not self._write_buffer:
+                return
+            batch = self._write_buffer.copy()
+            self._write_buffer.clear()
         with self._get_conn() as conn:
-            for query, params in self._write_buffer:
+            for query, params in batch:
                 conn.execute(query, params)
-        self._write_buffer.clear()
         self._last_flush = time.time()
 
     def buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write — toplu yaz."""
-        self._write_buffer.append((query, params))
-        if len(self._write_buffer) >= self._buffer_size:
+        with self._buffer_lock:
+            self._write_buffer.append((query, params))
+            should_flush = len(self._write_buffer) >= self._buffer_size
+        if should_flush:
             self._flush_buffer()
 
     def _start_periodic_flush(self) -> None:
@@ -177,6 +183,8 @@ class DuckDBStore:
         if self._conn:
             self._conn.close()
             self._conn = None
+        if self in _stores:
+            _stores.remove(self)
 
     @staticmethod
     def _is_valid_identifier(name: str) -> bool:
@@ -207,7 +215,7 @@ class DuckDBStore:
         return {
             "db_path": str(self._db_path),
             "db_size_bytes": self._db_path.stat().st_size if self._db_path.exists() else 0,
-            "buffer_size": len(self._write_buffer),
+            "buffer_size": len(self._write_buffer),  # len() is atomic on CPython
             "table_counts": stats,
         }
 

@@ -11,6 +11,7 @@ Persistent state yönetimi: DuckDB.
 import os
 import shutil
 import threading
+import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,8 +35,9 @@ class PaperStateStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_lock = threading.Lock()
         self._buffer_size = 20  # Batch size
-        self._last_flush = 0.0
+        self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -175,7 +177,6 @@ class PaperStateStore:
     @contextmanager
     def _connect(self) -> Any:
         """Otomatik eklendi."""
-        import time
         if duckdb is None:
             raise RuntimeError("DuckDB module is not installed in the environment.")
 
@@ -206,29 +207,32 @@ class PaperStateStore:
 
     def _buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write — toplu yaz (SSD dostu)."""
-        self._write_buffer.append((query, params))
-        if len(self._write_buffer) >= self._buffer_size:
+        with self._buffer_lock:
+            self._write_buffer.append((query, params))
+            should_flush = len(self._write_buffer) >= self._buffer_size
+        if should_flush:
             self._flush_buffer()
 
     def _flush_buffer(self) -> Any:
         """Write buffer'ı flush et (batched write — SSD dostu)."""
-        if not self._write_buffer:
-            return
+        with self._buffer_lock:
+            if not self._write_buffer:
+                return
+            batch = self._write_buffer.copy()
+            self._write_buffer.clear()
         try:
-            import time as _time
             with self._connect() as conn:
-                for query, params in self._write_buffer:
+                for query, params in batch:
                     conn.execute(query, params)
                 conn.commit()
-            self._write_buffer.clear()
-            self._last_flush = _time.time()
+            self._last_flush = time.time()
         except Exception as e:
             logger.error("Paper state buffer flush error", error=str(e))
+            with self._buffer_lock:
+                self._write_buffer = batch + self._write_buffer  # Re-queue on failure
 
     def _start_periodic_flush(self) -> None:
         """Arka planda periyodik flush başlat."""
-        import time as _time
-
         def _loop() -> None:
             while not self._stop_periodic.wait(self._flush_interval):
                 try:
@@ -240,8 +244,7 @@ class PaperStateStore:
 
     def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafından çağrılır)."""
-        import time as _time
-        if _time.time() - self._last_flush > self._flush_interval:
+        if time.time() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def flush(self) -> Any:

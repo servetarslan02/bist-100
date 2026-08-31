@@ -138,12 +138,12 @@ class HistoricalDataWarehouse:
         if all_dfs:
             comb_df = pl.concat(all_dfs, how="diagonal")
             with duckdb.connect(DB_FILE) as conn:
-            # SSD write reduction: DuckDB WAL ayarları
-            try:
-                from services.core.debounce import configure_duckdb_wal
-                configure_duckdb_wal(conn)
-            except Exception:
-                pass
+                # SSD write reduction: DuckDB WAL ayarları
+                try:
+                    from services.core.debounce import configure_duckdb_wal
+                    configure_duckdb_wal(conn)
+                except Exception:
+                    pass
                 # Polars → DuckDB (native, pandas dönüşümü gereksiz)
                 conn.execute("DROP TABLE IF EXISTS stock_candles")
                 conn.register("_comb_tmp", comb_df)

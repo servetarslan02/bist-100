@@ -112,6 +112,7 @@ class CentralStateStore:
         if HAS_DUCKDB:
             self._init_db()
         self._write_buffer: list[tuple] = []
+        self._buffer_lock = threading.Lock()
         self._buffer_size = 10  # Küçük buffer — crash safety için
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
@@ -238,26 +239,32 @@ class CentralStateStore:
 
     def _flush_buffer(self) -> Any:
         """Write buffer'ı flush et (batched write — SSD dostu)."""
-        if not self._write_buffer:
-            return
+        with self._buffer_lock:
+            if not self._write_buffer:
+                return
+            batch = self._write_buffer.copy()
+            self._write_buffer.clear()
 
         try:
             with self._connect() as conn:
                 if isinstance(conn, _DummyDuckDBConn):
                     return
-                for query, params in self._write_buffer:
+                for query, params in batch:
                     conn.execute(query, params)
                 if hasattr(conn, "commit"):
                     conn.commit()
-            self._write_buffer.clear()
             self._last_flush = time.time()
         except Exception as e:
             logger.debug("State store buffer flush note", error=str(e))
+            with self._buffer_lock:
+                self._write_buffer = batch + self._write_buffer  # Re-queue on failure
 
     def _buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write — toplu yaz (SSD dostu)."""
-        self._write_buffer.append((query, params))
-        if len(self._write_buffer) >= self._buffer_size:
+        with self._buffer_lock:
+            self._write_buffer.append((query, params))
+            should_flush = len(self._write_buffer) >= self._buffer_size
+        if should_flush:
             self._flush_buffer()
 
     def _start_periodic_flush(self) -> None:
@@ -501,29 +508,34 @@ class CentralStateStore:
     # ===================== CORRELATION TRACKER =====================
 
     def save_correlation_history(self, var1: str, var2: str, values: list[float]) -> Any:
-        """Korelasyon geçmişini kaydet."""
+        """Korelasyon geçmişini kaydet.
+
+        Not: var1/var2 normalize edilerek (küçük, büyük) sırasıyla saklanır,
+        böylece (A,B) ve (B,A) aynı kayıt olarak eşlenir.
+        """
         now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(values).decode()
-        f"{min(var1, var2)}:{max(var1, var2)}"
+        norm_v1, norm_v2 = min(var1, var2), max(var1, var2)
         self._buffered_write(
             """
             INSERT OR REPLACE INTO correlation_history
             (var1, var2, corr_values, updated_at)
             VALUES (?, ?, ?, ?)
         """,
-            (var1, var2, values_json, now),
+            (norm_v1, norm_v2, values_json, now),
         )
 
     def load_correlation_history(self, var1: str, var2: str) -> list[float] | None:
         """Korelasyon geçmişini yükle."""
         self._flush_buffer()
+        norm_v1, norm_v2 = min(var1, var2), max(var1, var2)
         with self._connect() as conn:
             row = conn.execute(
                 """
                 SELECT corr_values FROM correlation_history
                 WHERE var1 = ? AND var2 = ?
             """,
-                (var1, var2),
+                (norm_v1, norm_v2),
             ).fetchone()
             if row:
                 return orjson.loads(row["corr_values"])
@@ -582,7 +594,7 @@ class CentralStateStore:
         return {
             "db_path": str(self._db_path),
             "db_size_bytes": self._db_path.stat().st_size if self._db_path.exists() else 0,
-            "buffer_size": len(self._write_buffer),
+            "buffer_size": len(self._write_buffer),  # len() is atomic on CPython
             "table_counts": stats,
         }
 

@@ -66,17 +66,21 @@ class ScanPersistence:
         self._db_path = db_path
         self._initialized = False
         self._write_buffer: list[tuple[str, tuple]] = []
+        self._buffer_lock = threading.Lock()
         self._buffer_size = 20
-        self._last_flush = 0.0
+        self._last_flush = time.time()
         self._flush_interval = 30.0
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
         self._start_periodic_flush()
 
     def _ensure_table(self) -> Any:
-        """Tabloyu oluştur (yoksa)."""
+        """Tabloyu oluştur (yoksa). Thread-safe double-checked locking."""
         if self._initialized:
             return
+        with self._buffer_lock:
+            if self._initialized:
+                return
 
         try:
             import duckdb
@@ -139,14 +143,19 @@ class ScanPersistence:
 
     def _buffered_write(self, query: str, params: tuple) -> None:
         """Buffered write — toplu yaz (SSD dostu)."""
-        self._write_buffer.append((query, params))
-        if len(self._write_buffer) >= self._buffer_size:
+        with self._buffer_lock:
+            self._write_buffer.append((query, params))
+            should_flush = len(self._write_buffer) >= self._buffer_size
+        if should_flush:
             self._flush_buffer()
 
     def _flush_buffer(self) -> None:
         """Write buffer'ı flush et (batched write — SSD dostu)."""
-        if not self._write_buffer:
-            return
+        with self._buffer_lock:
+            if not self._write_buffer:
+                return
+            batch = self._write_buffer.copy()
+            self._write_buffer.clear()
         try:
             import duckdb
             conn = duckdb.connect(self._db_path)
@@ -155,14 +164,15 @@ class ScanPersistence:
                 configure_duckdb_wal(conn)
             except Exception:
                 pass
-            for query, params in self._write_buffer:
+            for query, params in batch:
                 conn.execute(query, params)
             conn.commit()
             conn.close()
-            self._write_buffer.clear()
             self._last_flush = time.time()
         except Exception as e:
             logger.error("Scan persistence buffer flush error", error=str(e))
+            with self._buffer_lock:
+                self._write_buffer = batch + self._write_buffer  # Re-queue on failure
 
     def flush(self) -> None:
         """Manuel flush."""
@@ -265,6 +275,7 @@ class ScanPersistence:
         """
         self._ensure_table()
 
+        conn = None
         try:
             import duckdb
 
@@ -285,13 +296,15 @@ class ScanPersistence:
 
             rows = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description] if cursor.description else []
-            conn.close()
 
             return [dict(zip(columns, row, strict=False)) for row in rows]
 
         except Exception as e:
             logger.error("Failed to get scan history", ticker=ticker, error=str(e))
             return []
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_scan_stats(
         self,
@@ -309,6 +322,7 @@ class ScanPersistence:
         """
         self._ensure_table()
 
+        conn = None
         try:
             import duckdb
 
@@ -345,7 +359,6 @@ class ScanPersistence:
                 )
 
             row = cursor.fetchone()
-            conn.close()
 
             return {
                 "total_records": row[0] if row else 0,
@@ -360,6 +373,9 @@ class ScanPersistence:
         except Exception as e:
             logger.error("Failed to get scan stats", error=str(e))
             return {}
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_hit_rate(
         self,
@@ -379,6 +395,7 @@ class ScanPersistence:
         """
         self._ensure_table()
 
+        conn = None
         try:
             import duckdb
 
@@ -423,8 +440,6 @@ class ScanPersistence:
                 d = row[3] or "NEUTRAL"
                 direction_dist[d] = direction_dist.get(d, 0) + 1
 
-            conn.close()
-
             return {
                 "total_high_score_signals": len(high_score_signals),
                 "signal_distribution": signal_dist,
@@ -436,6 +451,9 @@ class ScanPersistence:
         except Exception as e:
             logger.error("Failed to get hit rate", error=str(e))
             return {}
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_top_scanned_tickers(
         self,
@@ -453,6 +471,7 @@ class ScanPersistence:
         """
         self._ensure_table()
 
+        conn = None
         try:
             import duckdb
 
@@ -478,7 +497,6 @@ class ScanPersistence:
             )
 
             rows = cursor.fetchall()
-            conn.close()
 
             return [
                 {
@@ -494,6 +512,9 @@ class ScanPersistence:
         except Exception as e:
             logger.error("Failed to get top scanned tickers", error=str(e))
             return []
+        finally:
+            if conn is not None:
+                conn.close()
 
     def cleanup_old_records(self, days: int = 90) -> Any:
         """Eski kayıtları temizle.
@@ -503,6 +524,7 @@ class ScanPersistence:
         """
         self._ensure_table()
 
+        conn = None
         try:
             import duckdb
 
@@ -521,12 +543,14 @@ class ScanPersistence:
             deleted = cursor.rowcount
 
             conn.commit()
-            conn.close()
 
             logger.info("Old scan records cleaned up", deleted=deleted, older_than_days=days)
 
         except Exception as e:
             logger.error("Failed to cleanup old records", error=str(e))
+        finally:
+            if conn is not None:
+                conn.close()
 
 
 # Singleton
