@@ -38,8 +38,7 @@ class LSTMConfig:
             if os.environ.get("FORCE_CPU") != "1" and torch.cuda.is_available():
                 self.device = "cuda"
         except Exception:
-            pass
-            pass
+            logger.debug("CUDA not available, using CPU")
 
 
 class AttentionLayer:

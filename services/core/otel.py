@@ -115,7 +115,6 @@ def setup_telemetry(
             logger.warning("opentelemetry-instrumentation-httpx not installed")
 
         try:
-            pass
             logger.info("OpenTelemetry SQLAlchemy instrumentation available")
         except ImportError:
             logger.warning("opentelemetry-instrumentation-sqlalchemy not installed")

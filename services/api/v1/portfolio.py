@@ -404,8 +404,6 @@ async def attribution(
         Factor attribution (value/momentum/quality) + sector attribution
     """
     try:
-        pass
-
         pm = _get_pm()
 
         # Equity curve'den getiri dizisi oluştur
