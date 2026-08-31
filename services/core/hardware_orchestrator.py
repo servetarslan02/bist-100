@@ -140,6 +140,7 @@ class SSDThrottledWriter:
                 logger.error("SSD Batch Flush Error", path=path, error=str(e))
 
     def get_stats(self) -> dict[str, Any]:
+        """Yazma istatistiklerini döner."""
         with self._lock:
             return {
                 "pending_queue_size": self._write_queue.qsize(),
@@ -148,6 +149,7 @@ class SSDThrottledWriter:
             }
 
     def shutdown(self) -> None:
+        """Yazma kuyruğunu temizle ve kapat."""
         self._running = False
         self.flush()
 
@@ -203,6 +205,7 @@ class HardwareOrchestrator:
         return self._device
 
     def is_gpu_available(self) -> bool:
+        """GPU mevcut mu kontrol eder."""
         return self._device == "cuda"
 
     def get_catboost_params(self, custom_params: dict[str, Any] | None = None) -> dict[str, Any]:

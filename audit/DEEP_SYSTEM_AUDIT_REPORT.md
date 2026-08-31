@@ -1,10 +1,10 @@
 # ALPHA BIST — Derin Sistem Bütünlük Denetim Raporu
 
-> **Tarih:** 2026-09-01 00:17:21  
+> **Tarih:** 2026-09-01 00:48:33  
 > **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  
 > **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  
-> **Taranan:** 877 dosya, 267,830 satır  
-> **Süre:** 9.67 saniye  
+> **Taranan:** 877 dosya, 267,841 satır  
+> **Süre:** 9.31 saniye  
 > **Sistem Sağlık Puanı:** **100 / 100**
 
 ---
@@ -16,8 +16,8 @@
 | **KRİTİK** | **0** | Sistem çökebilir, data bütünlüğü tehlikede, güvenlik açığı |
 | **YÜKSEK**  | **2** | Motor zinciri kırık, hata maskeleme, mimari ihlal |
 | **ORTA**    | **3** | Kod kalitesi, standart ihlali, uyarı |
-| **DÜŞÜK**   | **12** | Dokümantasyon, tip eksikliği, biçim |
-| **TOPLAM**  | **18** | |
+| **DÜŞÜK**   | **0** | Dokümantasyon, tip eksikliği, biçim |
+| **TOPLAM**  | **6** | |
 
 ## 2. 36 Boyut Bazlı Analiz
 
@@ -38,7 +38,7 @@
 | **B13** | Loglama Standardi | 3 | 🟡 ORTA |
 | **B14** | Kaynak Sizintisi | 0 | ✅ TEMİZ |
 | **B15** | Test Kapsami | 0 | ✅ TEMİZ |
-| **B16** | Dokumantasyon Butunlugu | 12 | 🟡 ORTA |
+| **B16** | Dokumantasyon Butunlugu | 0 | ✅ TEMİZ |
 | **B17** | Orchestrator Servis Kaydi | 0 | ✅ TEMİZ |
 | **B18** | Servis Arayzü Uyumu | 0 | ✅ TEMİZ |
 | **B19** | Sinyal Fuzyon Agirlik Butunlugu | 0 | ✅ TEMİZ |
@@ -64,9 +64,7 @@
 
 | Kategori | Boyut | Adet | Seviye |
 |---|---|---|---|
-| `FUNC_MISSING_DOCSTRING` | B16 | **9** | LOW |
 | `PRINT_IN_PROD` | B13 | **3** | MEDIUM |
-| `CLASS_MISSING_DOCSTRING` | B16 | **3** | LOW |
 | `REQUIRED_ENV_EMPTY` | B12 | **2** | HIGH |
 | `MLFLOW_TRACKING_USED` | B31 | **1** | INFO |
 
@@ -90,4 +88,4 @@ Motor ve sinyal zincirinde sorun tespit edilmedi. ✅
 | B13 | `services/replace_market.py` | `13` | PRINT_IN_PROD | print() — production'da structlog kullanılmalı |
 
 ---
-*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260901_001721.json`*
+*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260901_004833.json`*

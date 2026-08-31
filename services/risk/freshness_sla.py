@@ -20,6 +20,7 @@ logger = structlog.get_logger(__name__)
 
 
 class DataType(StrEnum):
+    """Veri türleri enum'u."""
     TICK = "TICK"
     INTRADAY = "INTRADAY"
     DAILY = "DAILY"
@@ -36,6 +37,7 @@ FRESHNESS_SLA_SECONDS: dict[DataType, float] = {
 
 @dataclass
 class FreshnessResult:
+    """Veri tazeliği kontrol sonucu."""
     is_fresh: bool
     data_type: DataType
     age_seconds: float

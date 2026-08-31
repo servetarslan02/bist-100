@@ -22,8 +22,10 @@ def debounced_save(key: str, min_interval_sec: float = 30.0) -> Callable:
             ...  # Gerçek kayıt
     """
     def decorator(func: Callable) -> Callable:
+        """Func'ı debounce eden decorator."""
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
+            """Debounce wrapper — zaman kontrolü yapar."""
             now = time.time()
             last = _last_writes.get(key, 0)
             if now - last < min_interval_sec:

@@ -224,6 +224,7 @@ async def lifespan(app: FastAPI) -> Any:
 
 
 def create_app() -> FastAPI:
+    """FastAPI uygulamasını oluştur ve yapılandır."""
     from fastapi.responses import ORJSONResponse
 
     app = FastAPI(

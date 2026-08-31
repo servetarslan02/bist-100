@@ -7,10 +7,10 @@ if not sys.warnoptions:
     warnings.warn("replace_market.py çalıştırılıyor! Bu dosya market.py'yi yeniden yazar.", stacklevel=1)
 
 # Kullanıcı etkileşimi için print() kullanılıyor (CLI script)
-print("⚠️  UYARI: Bu script services/api/v1/market.py dosyasını yeniden yazacak!")
-print("Devam etmek için 'YES' yazın:")
+print("⚠️  UYARI: Bu script services/api/v1/market.py dosyasını yeniden yazacak!")  # noqa: T201
+print("Devam etmek için 'YES' yazın:")  # noqa: T201
 if input().strip() != "YES":
-    print("İptal edildi.")
+    print("İptal edildi.")  # noqa: T201
     sys.exit(0)
 
 with open("services/api/v1/market.py", encoding="utf-8") as f:
