@@ -578,4 +578,5 @@ try:
     _signal.signal(_signal.SIGTERM, _flush_scan_on_signal)
     _signal.signal(_signal.SIGINT, _flush_scan_on_signal)
 except (ValueError, OSError):
-    pass
+    # Signal handler sadece main thread'de kaydedilebilir
+    logger.debug("Signal handler kaydedilemedi (main thread değil)")

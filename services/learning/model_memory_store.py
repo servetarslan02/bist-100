@@ -529,9 +529,14 @@ def _flush_model_memory_on_signal(signum, frame) -> None:
     except Exception:
         logger.warning("Model memory flush on signal failed", exc_info=True)
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 atexit.register(_flush_model_memory_on_exit)
 try:
     _signal.signal(_signal.SIGTERM, _flush_model_memory_on_signal)
     _signal.signal(_signal.SIGINT, _flush_model_memory_on_signal)
 except (ValueError, OSError):
-    pass
+    # Signal handler sadece main thread'de kaydedilebilir
+    logger.debug("Signal handler kaydedilemedi (main thread değil)")

@@ -83,11 +83,12 @@ def setup_telemetry(
             # Her span stdout'a yazılıyordu → Docker JSON log
             from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
             class _NoopExporter(SpanExporter):
-                def export(self, spans):
+                def export(self, spans) -> SpanExportResult:
                     return SpanExportResult.SUCCESS
-                def shutdown(self):
-                    pass
-                def force_flush(self, timeout_millis=30000):
+                def shutdown(self) -> None:
+                    # No-op: exporter kapatma gerektirmez
+                    self._shutdown = True
+                def force_flush(self, timeout_millis=30000) -> bool:
                     return True
             exporter = _NoopExporter()
 

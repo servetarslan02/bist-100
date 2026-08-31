@@ -69,7 +69,7 @@ def run_live_allocation(total_capital: float = 1_000_000.0, regime: str = "SIDEW
         tutar = total_capital * weight
         lot = int(tutar / price) if price > 0 else 0
 
-        print(
+        logger.info(
             f"{ticker:<7} | {strat:<15} | %{weight*100:>6.2f} | {tutar:>10,.0f} TL | {lot:>8,} | "
             f"{price:>7.2f} TL | {stop_p:>8.2f} TL | {target_p:>8.2f} TL | +%{exp_ret:.1f}"
         )

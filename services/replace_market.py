@@ -6,6 +6,7 @@ if not sys.warnoptions:
     import warnings
     warnings.warn("replace_market.py çalıştırılıyor! Bu dosya market.py'yi yeniden yazar.", stacklevel=1)
 
+# Kullanıcı etkileşimi için print() kullanılıyor (CLI script)
 print("⚠️  UYARI: Bu script services/api/v1/market.py dosyasını yeniden yazacak!")
 print("Devam etmek için 'YES' yazın:")
 if input().strip() != "YES":
