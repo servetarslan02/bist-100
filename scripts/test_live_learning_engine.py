@@ -153,7 +153,7 @@ def test_closed_loop_learning():
             if isinstance(score, dict):
                 m_id = score.get("model_id", "Unknown")
                 r_score = score.get("reliability_score", 0.5)
-                acc = score.get("accuracy_score", 0.5)
+                score.get("accuracy_score", 0.5)
                 rec_w = score.get("recommended_fusion_weight", 0.16)
                 print(f"     - {m_id:25s}: Güven Skoru = {r_score:.3f} | Önerilen Ağırlık = %{rec_w*100:.2f}")
             else:

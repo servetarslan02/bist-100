@@ -13,6 +13,12 @@ Hedefler:
 import os
 import sys
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 # Windows UTF-8 Terminal desteği
 if sys.platform == "win32":
     try:
@@ -21,14 +27,8 @@ if sys.platform == "win32":
     except Exception:
         logger.error("Exception caught", exc_info=True)
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import structlog
-
 from services.data.historical_warehouse import HistoricalDataWarehouse
 from services.risk.risk_parity_engine import RiskParityEngine, RiskParityParameters
-
-logger = structlog.get_logger(__name__)
 
 
 def main() -> Any:

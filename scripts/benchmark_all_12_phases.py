@@ -75,7 +75,7 @@ async def measure_all_12_phases():
     print("=" * 90)
 
     results = {}
-    init_stats = get_process_stats()
+    get_process_stats()
 
     # -------------------------------------------------------------------------
     # FAZ 0: Baseline & Sistem Kaynak Profili
@@ -114,12 +114,12 @@ async def measure_all_12_phases():
 
     # 1. Normal çağrı süresi
     t0 = time.perf_counter()
-    res1 = await test_srv.execute({"val": 42}, idempotency_key="idemp_key_100")
+    await test_srv.execute({"val": 42}, idempotency_key="idemp_key_100")
     t_normal_ms = (time.perf_counter() - t0) * 1000
 
     # 2. Idempotent mükerrer çağrı (önbellekten anında dönüş)
     t0 = time.perf_counter()
-    res2 = await test_srv.execute({"val": 42}, idempotency_key="idemp_key_100")
+    await test_srv.execute({"val": 42}, idempotency_key="idemp_key_100")
     t_idemp_ms = (time.perf_counter() - t0) * 1000
 
     # 3. Circuit Breaker trip hızı
@@ -184,7 +184,7 @@ async def measure_all_12_phases():
 
     # Pushdown filtre ve sütun seçimi
     t0 = time.perf_counter()
-    filtered_df = duck_engine.query_parquet_columns(parquet_path, columns=["symbol", "price"], where_clause="price > 250.0")
+    duck_engine.query_parquet_columns(parquet_path, columns=["symbol", "price"], where_clause="price > 250.0")
     t_pushdown_ms = (time.perf_counter() - t0) * 1000
     duck_engine.close()
 
@@ -213,7 +213,7 @@ async def measure_all_12_phases():
 
     # Sıcak (RAM cache) tarama
     t0 = time.perf_counter()
-    opps_warm = bist_ml_scanner.scan_all_opportunities(limit=50, force_warehouse=False)
+    bist_ml_scanner.scan_all_opportunities(limit=50, force_warehouse=False)
     t_warm_feat_ms = (time.perf_counter() - t0) * 1000
 
     # FeatureCacheManager mikro gecikmesi
@@ -304,7 +304,7 @@ async def measure_all_12_phases():
     returns = np.random.normal(0.001, 0.015, 2520)  # 10 yıllık günlük getiri
     t0 = time.perf_counter()
     sharpe = (np.mean(returns) / np.std(returns)) * np.sqrt(252)
-    var_sharpe = (1 + 0.5 * sharpe**2) / 2520
+    (1 + 0.5 * sharpe**2) / 2520
     t_backtest_eval_ms = (time.perf_counter() - t0) * 1000
 
     faz5_data = {
@@ -355,7 +355,7 @@ async def measure_all_12_phases():
     # -------------------------------------------------------------------------
     print("\n>>> [FAZ 7] 🛡️ Risk Engine — Veri Türüne Duyarlı Freshness SLA & Fail-Closed...")
     now_ts = time.time()
-    fresh_eval = data_freshness_monitor.evaluate_freshness(DataType.TICK, now_ts)
+    data_freshness_monitor.evaluate_freshness(DataType.TICK, now_ts)
 
     # Pre-trade gate kararı (Taze veri)
     t0 = time.perf_counter()

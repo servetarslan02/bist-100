@@ -242,7 +242,7 @@ def run():
     time_reduction = (1 - new_r["elapsed"] / old_r["elapsed"]) * 100 if old_r["elapsed"] > 0 else 0
     size_reduction = (1 - new_size / old_size) * 100 if old_size > 0 else 0
 
-    print(f"\n  Eski (her kayıtta commit):")
+    print("\n  Eski (her kayıtta commit):")
     print(f"    Commit sayısı: {old_r['commit_count']:>8}")
     print(f"    Execute sayısı: {old_r['write_count']:>8}")
     print(f"    Süre: {old_r['elapsed']:>12.4f} s")
@@ -254,7 +254,7 @@ def run():
     print(f"    Süre: {new_r['elapsed']:>12.4f} s")
     print(f"    DB boyutu: {new_size:>12,} byte ({new_size/1024:.1f} KB)")
 
-    print(f"\n  📉 Azalma:")
+    print("\n  📉 Azalma:")
     print(f"    Commit sayısı: %{commit_reduction:>8.1f}")
     print(f"    Süre:          %{time_reduction:>8.1f}")
     print(f"    DB boyutu:     %{size_reduction:>8.1f}")
@@ -291,20 +291,20 @@ def run():
     old_json_size = os.path.getsize(old_json) if os.path.exists(old_json) else 0
     new_json_size = os.path.getsize(new_json) if os.path.exists(new_json) else 0
 
-    print(f"\n  Eski (her kayıtta dosyaya yaz):")
+    print("\n  Eski (her kayıtta dosyaya yaz):")
     print(f"    Yazma sayısı: {N}")
     print(f"    Süre: {old_json_time:.4f} s")
     print(f"    Dosya boyutu: {old_json_size:,} byte")
 
-    print(f"\n  Yeni (tek seferde batch yaz):")
-    print(f"    Yazma sayısı: 1")
+    print("\n  Yeni (tek seferde batch yaz):")
+    print("    Yazma sayısı: 1")
     print(f"    Süre: {new_json_time:.4f} s")
     print(f"    Dosya boyutu: {new_json_size:,} byte")
 
     json_write_reduction = (1 - 1 / N) * 100
     json_time_reduction = (1 - new_json_time / old_json_time) * 100 if old_json_time > 0 else 0
 
-    print(f"\n  📉 Azalma:")
+    print("\n  📉 Azalma:")
     print(f"    Yazma sayısı: %{json_write_reduction:.1f} ({N} → 1)")
     print(f"    Süre:         %{json_time_reduction:.1f}")
 
@@ -394,7 +394,7 @@ def run():
             print(f"  {r['test']:<30} {r['total_calls']:>12} {r['actual_writes']:>12} {'%'+str(r['reduction_pct']):>10}")
 
     # Saatlik tahmini
-    print(f"\n  📈 Saatlik SSD Yazma Tahmini:")
+    print("\n  📈 Saatlik SSD Yazma Tahmini:")
     # 500 işlem ~ gerçek senaryoda saatte ~2000 kayıt varsayımı
     scale = 2000 / N
     old_hourly_commits = all_results[0]["old_commits"] * scale

@@ -306,7 +306,7 @@ def compute_factors(
 
     # SMA filtre (temel giriş koşulu)
     sma20 = float(np.mean(c_arr[-20:])) if len(c_arr) >= 20 else 0.0
-    sma50 = float(np.mean(c_arr[-50:])) if len(c_arr) >= 50 else 0.0
+    float(np.mean(c_arr[-50:])) if len(c_arr) >= 50 else 0.0
 
     # Rejime gore minimum filtre
     if reg == "BULL":
@@ -597,7 +597,8 @@ def run_v3() -> None:
         p = yearly[yr]["port"]
         b = yearly[yr]["bist"]
         a = p - b
-        if a > 0: beat += 1
+        if a > 0:
+            beat += 1
         s = "[ALFA]" if a > 0 else "[KAYIP]"
         logger.info(f"  {yr:<6}|{p:>+9.1f}%|{b:>+9.1f}%|{a:>+9.1f}%|{s:>10}")
     logger.info("-"*52)

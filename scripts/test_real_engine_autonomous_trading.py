@@ -267,7 +267,7 @@ def run_real_engine_simulation():
         "direction": "SHORT",
         "model_version": "LambdaRank_v3_LOCKED",
     }]
-    report_s4 = orchestrator.run_daily_cycle(
+    orchestrator.run_daily_cycle(
         date="2026-01-20",
         market_data=market_data,
         sector_map=sector_map,

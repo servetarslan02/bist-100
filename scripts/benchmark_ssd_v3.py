@@ -57,16 +57,20 @@ def benchmark_old(db_path, n=500):
         now = time.strftime("%Y-%m-%dT%H:%M:%S")
         conn.execute("INSERT INTO t1 (ticker,direction,ret,conf,regime,features,created) VALUES (?,?,?,?,?,?,?)",
                      ("THYAO", "UP", 5.0, 0.75, "BULL", orjson.dumps({"rsi": 65}).decode(), now))
-        conn.commit(); commits += 1
+        conn.commit()
+        commits += 1
         conn.execute("INSERT OR REPLACE INTO t2 VALUES (?,?,?,?,?,?,?)",
                      (f"T{i}", f"2026-08-{(i%30)+1:02d}", "THYAO", "SELL", 100, 110.0, "{}"))
-        conn.commit(); commits += 1
+        conn.commit()
+        commits += 1
         conn.execute("INSERT OR REPLACE INTO t3 VALUES (?,?,?,?,?,?,?)",
                      (f"O{i}", f"2026-08-{(i%30)+1:02d}", "THYAO", "BUY", 100, 100.0, "{}"))
-        conn.commit(); commits += 1
+        conn.commit()
+        commits += 1
         conn.execute("INSERT OR REPLACE INTO t4 VALUES (?,?,?,?)",
                      (f"2026-08-{(i%30)+1:02d}", 100000.0+i, 50000.0, 50000.0))
-        conn.commit(); commits += 1
+        conn.commit()
+        commits += 1
     elapsed = time.perf_counter() - start
     conn.close()
     return commits, elapsed
@@ -263,28 +267,28 @@ def run():
     duckdb_result = results[0]
     json_result = results[1]
 
-    print(f"\n  1. DuckDB Commit Azalması:")
+    print("\n  1. DuckDB Commit Azalması:")
     print(f"     Eski: {duckdb_result['old_commits']} commit")
     print(f"     Yeni: {duckdb_result['new_commits']} commit")
     print(f"     ➜ %{duckdb_result['commit_reduction']} azalma")
 
-    print(f"\n  2. JSON Dosya Yazma Azalması:")
+    print("\n  2. JSON Dosya Yazma Azalması:")
     print(f"     Eski: {json_result['old_writes']} yazma")
     print(f"     Yeni: {json_result['new_writes']} yazma")
     print(f"     ➜ %{json_result['write_reduction']} azalma")
 
-    print(f"\n  3. Debounce Etkisi (60s interval):")
+    print("\n  3. Debounce Etkisi (60s interval):")
     debounce_result = [r for r in results if r['test'] == 'Debounce 60s'][0]
     print(f"     100 çağrı → {debounce_result['writes']} gerçek yazma")
     print(f"     ➜ %{debounce_result['reduction']} azalma")
 
-    print(f"\n  4. Batch Size Karşılaştırması:")
+    print("\n  4. Batch Size Karşılaştırması:")
     for r in results:
         if r['test'].startswith('Batch size'):
             print(f"     {r['test']}: {r['commits']} commit, {r['time']}s")
 
     # Saatlik tahmini
-    print(f"\n  📈 Saatlik Tahmini (sürekli çalışma):")
+    print("\n  📈 Saatlik Tahmini (sürekli çalışma):")
     scale = 2000 / N
     old_hourly = duckdb_result['old_commits'] * scale
     new_hourly = duckdb_result['new_commits'] * scale

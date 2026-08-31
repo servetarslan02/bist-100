@@ -45,13 +45,13 @@ def test_hardware_roles():
             print(f"   • CUDA Cihazı Başlatıldı : {torch.cuda.get_device_name(0)}")
 
             # Büyük Matris Çarpımı (4096 x 4096)
-            start_t = time.perf_counter()
+            time.perf_counter()
             A = torch.randn(4096, 4096, device=device, dtype=torch.float32)
             B = torch.randn(4096, 4096, device=device, dtype=torch.float32)
             torch.cuda.synchronize()
 
             t0 = time.perf_counter()
-            C = torch.matmul(A, B)
+            torch.matmul(A, B)
             torch.cuda.synchronize()
             gpu_time = (time.perf_counter() - t0) * 1000.0
 
@@ -70,7 +70,7 @@ def test_hardware_roles():
     start_ram = time.perf_counter()
     import numpy as np
     tick_data = np.random.randn(100_000, 65)  # 100 bin BIST tick'i, 65 indikatör
-    features = np.mean(tick_data, axis=0)
+    np.mean(tick_data, axis=0)
     ram_time = (time.perf_counter() - start_ram) * 1000.0
     print(f"   • 100.000 Satır x 65 Feature RAM Hesaplama Süresi : {ram_time:.2f} ms (Mikrosaniye Düzeyi)")
     print("   • Sonuç : Yüksek hızlı bellek mimarisi doğrulanmıştır.")

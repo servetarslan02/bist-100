@@ -39,7 +39,7 @@ def measure_phase3():
 
     # 2. Sıcak RAM Önbellekli Tarama
     t0 = time.perf_counter()
-    opps_warm = bist_ml_scanner.scan_all_opportunities(limit=50, force_warehouse=False)
+    bist_ml_scanner.scan_all_opportunities(limit=50, force_warehouse=False)
     t_warm_ms = (time.perf_counter() - t0) * 1000
 
     # 3. Tekil Hisse Önbellek Okuma Gecikmesi (1000 istek)

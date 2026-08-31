@@ -45,7 +45,7 @@ def measure_phase2():
     # Pipeline Batch yazma & okuma
     t0 = time.perf_counter()
     mset_cached(test_data, ttl=60)
-    res_batch = mget_cached(list(test_data.keys()))
+    mget_cached(list(test_data.keys()))
     t_batch_ms = (time.perf_counter() - t0) * 1000
 
     speedup_redis = round(t_single_ms / max(t_batch_ms, 0.001), 1)
@@ -69,12 +69,12 @@ def measure_phase2():
 
     # Pushdown olmadan (Tüm sütunları oku)
     t0 = time.perf_counter()
-    df_all = duck.query_parquet(parquet_file, "SELECT *")
+    duck.query_parquet(parquet_file, "SELECT *")
     t_full_read_ms = (time.perf_counter() - t0) * 1000
 
     # Pushdown ile (Sadece gerekli 2 sütun ve WHERE filtresi)
     t0 = time.perf_counter()
-    df_pushdown = duck.query_parquet_columns(parquet_file, columns=["ticker", "price"], where_clause="price > 250.0")
+    duck.query_parquet_columns(parquet_file, columns=["ticker", "price"], where_clause="price > 250.0")
     t_pushdown_ms = (time.perf_counter() - t0) * 1000
     duck.close()
 

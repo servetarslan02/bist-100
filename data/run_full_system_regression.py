@@ -52,7 +52,7 @@ async def run_e2e_regression_suite():
         with open(baseline_file, encoding="utf-8") as f:
             baseline_data = json.load(f)
 
-    res_start = measure_system_resources()
+    measure_system_resources()
 
     # 2. Warmup & Uçtan Uca Zincir Yürütme (10 Yineleme ile Yük Testi)
     print("\n>>> [1/5] Isınma (Warmup) ve Model Hazırlığı Yapılıyor...")
@@ -107,7 +107,7 @@ async def run_e2e_regression_suite():
             )
             for item in opps[:30]
         ]
-        plan = engine.allocate_conviction_portfolio(candidates, market_regime="BULLISH")
+        engine.allocate_conviction_portfolio(candidates, market_regime="BULLISH")
         dur_p = time.perf_counter() - t_p0
         portfolio_durations.append(dur_p)
 
@@ -118,8 +118,8 @@ async def run_e2e_regression_suite():
 
     # 3. İstatistikler
     avg_e2e_ms = round(np.mean(total_e2e_durations) * 1000, 2)
-    min_e2e_ms = round(np.min(total_e2e_durations) * 1000, 2)
-    max_e2e_ms = round(np.max(total_e2e_durations) * 1000, 2)
+    round(np.min(total_e2e_durations) * 1000, 2)
+    round(np.max(total_e2e_durations) * 1000, 2)
 
     avg_feature_ms = round(np.mean(feature_durations[1:]) * 1000, 2)  # Önbellekli ortalama
     first_feature_ms = round(feature_durations[0] * 1000, 2)

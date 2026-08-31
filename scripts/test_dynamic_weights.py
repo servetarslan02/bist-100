@@ -37,7 +37,7 @@ print(f"{'Hisse':<7} {'Skor':>5} {'Beklenen Getiri':>16} {'Güven':>7} {'Tahsis 
 print("-" * 62)
 
 tot_w = 0.0
-for p, rf in zip(candidates, raw_weights):
+for p, rf in zip(candidates, raw_weights, strict=False):
     ideal_w = (rf / tot_factor) * investable_pool
     bounded_w = round(min(max_pos_cap, max(min_pos_floor, ideal_w)), 4)
     tot_w += bounded_w

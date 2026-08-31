@@ -26,7 +26,7 @@ def sync_hashes():
     for pkl_file in ml_models_dir.glob("*.pkl"):
         try:
             with open(pkl_file, "rb") as f:
-                obj = pickle.load(f)
+                pickle.load(f)
             data = pkl_file.read_bytes()
             actual_hash = hashlib.sha256(data).hexdigest()
             sha_file = pkl_file.with_suffix(pkl_file.suffix + ".sha256")

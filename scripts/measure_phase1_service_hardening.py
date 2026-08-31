@@ -63,7 +63,7 @@ async def measure_phase1():
     t_idemp_avg_us = ((time.perf_counter() - t0) / 100) * 1_000_000
 
     # 3. Fail-Fast Circuit Breaker Açılması
-    t_fail_0 = time.perf_counter()
+    time.perf_counter()
     for i in range(5):
         try:
             await service.execute({"data": 0, "fail": True})

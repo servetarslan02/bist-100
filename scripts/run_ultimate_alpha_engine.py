@@ -352,7 +352,7 @@ def evaluate_stock(
     bm_roc20 = (ba[-1] / ba[-20] - 1) if len(ba) >= 20 else 0.0
     bm_roc60 = (ba[-1] / ba[-60] - 1) if len(ba) >= 60 else 0.0
 
-    roc5 = (p_now / ca[-5] - 1) if len(ca) >= 5 else 0.0
+    (p_now / ca[-5] - 1) if len(ca) >= 5 else 0.0
     roc20 = (p_now / ca[-20] - 1) if len(ca) >= 20 else 0.0
     roc60 = (p_now / ca[-60] - 1) if len(ca) >= 60 else 0.0
 

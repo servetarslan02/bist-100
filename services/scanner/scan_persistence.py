@@ -560,6 +560,7 @@ scan_persistence = ScanPersistence()
 import atexit
 import signal as _signal
 
+
 def _flush_scan_on_exit() -> None:
     try:
         scan_persistence.flush()

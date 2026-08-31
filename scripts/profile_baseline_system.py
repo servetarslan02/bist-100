@@ -64,6 +64,7 @@ def profile_ml_inference_latency():
     bist_ml_scanner.load_models()
 
     # 647 hisse için 70 feature sentetik matris
+    n_stocks = 647
     def _get_model_features(model):
         if model is None:
             return [f"f_{i}" for i in range(70)]

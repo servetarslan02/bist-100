@@ -138,9 +138,9 @@ class MasterStartupCatchup:
         try:
             logger.info("4/4: Guncel portfoy ve sinyaller Redis'e senkronize ediliyor...")
             fresh_signals = bist_ml_scanner.scan_all_opportunities(limit=50)
-            import json
 
             import os
+
             import redis
             r_host = os.environ.get("REDIS_HOST", "redis")
             r_port = int(os.environ.get("REDIS_PORT", 6379))

@@ -28,8 +28,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def measure_file_writes(func, *args, **kwargs):
     """Bir fonksiyonun dosya yazma miktarını ölçer."""
-    import subprocess
-
     # strace ile write syscall'larını yakala (Linux)
     # Alternatif: /proc/self/io kullan
     try:
@@ -143,8 +141,6 @@ def benchmark_new_paper_state_store(db_path: str, num_operations: int = 500):
     from services.paper_trading.state_store import PaperStateStore
 
     store = PaperStateStore(db_path)
-
-    import orjson
 
     for i in range(num_operations):
         store.save_portfolio_state({
@@ -402,17 +398,17 @@ def run_benchmark():
         if old_size > 0:
             size_reduction = (1 - new_size / old_size) * 100
 
-        print(f"\n  Eski yöntem (her kayıtta commit):")
+        print("\n  Eski yöntem (her kayıtta commit):")
         print(f"    Yazılan byte: {old_result['bytes_written']:>12,} ({old_result['mb_written']:.4f} MB)")
         print(f"    Süre:         {old_result['elapsed_sec']:>12.4f} saniye")
         print(f"    DB boyutu:    {old_size:>12,} byte ({old_size/1024:.1f} KB)")
 
-        print(f"\n  Yeni yöntem (buffered write):")
+        print("\n  Yeni yöntem (buffered write):")
         print(f"    Yazılan byte: {new_result['bytes_written']:>12,} ({new_result['mb_written']:.4f} MB)")
         print(f"    Süre:         {new_result['elapsed_sec']:>12.4f} saniye")
         print(f"    DB boyutu:    {new_size:>12,} byte ({new_size/1024:.1f} KB)")
 
-        print(f"\n  📉 Azalma:")
+        print("\n  📉 Azalma:")
         print(f"    I/O yazma:    %{write_reduction:>8.1f}")
         print(f"    Süre:         %{time_reduction:>8.1f}")
         print(f"    DB boyutu:    %{size_reduction:>8.1f}")
@@ -445,18 +441,18 @@ def run_benchmark():
     overall_write_reduction = (1 - total_new_bytes / total_old_bytes) * 100 if total_old_bytes > 0 else 0
     overall_time_reduction = (1 - total_new_time / total_old_time) * 100 if total_old_time > 0 else 0
 
-    print(f"\n  Toplam I/O yazma:")
+    print("\n  Toplam I/O yazma:")
     print(f"    Eski: {total_old_bytes:>15,} byte ({total_old_bytes/1024/1024:.2f} MB)")
     print(f"    Yeni: {total_new_bytes:>15,} byte ({total_new_bytes/1024/1024:.2f} MB)")
     print(f"    Azalma: %{overall_write_reduction:.1f}")
 
-    print(f"\n  Toplam süre:")
+    print("\n  Toplam süre:")
     print(f"    Eski: {total_old_time:.4f} saniye")
     print(f"    Yeni: {total_new_time:.4f} saniye")
     print(f"    Azalma: %{overall_time_reduction:.1f}")
 
     # Saatlik tahmini
-    print(f"\n  📈 Saatlik tahmini (sürekli çalışma senaryosu):")
+    print("\n  📈 Saatlik tahmini (sürekli çalışma senaryosu):")
     # Her 500 işlem ~1 saat çalışma varsayımıyla
     hourly_old_mb = (total_old_bytes / 1024 / 1024) * (3600 / total_old_time) if total_old_time > 0 else 0
     hourly_new_mb = (total_new_bytes / 1024 / 1024) * (3600 / total_new_time) if total_new_time > 0 else 0

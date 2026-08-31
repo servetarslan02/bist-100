@@ -8,7 +8,6 @@ Persistent state yönetimi: DuckDB.
 - Backup/rollback desteği
 """
 
-import os
 import shutil
 import threading
 import time
@@ -589,6 +588,7 @@ paper_state_store = PaperStateStore()
 # Graceful shutdown: buffer'ı flush et
 import atexit
 import signal as _signal
+
 
 def _flush_paper_on_exit() -> None:
     try:

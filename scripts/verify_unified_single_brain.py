@@ -40,14 +40,13 @@ async def verify_single_brain():
     print(f"{'Sıra':<5} {'Fırsatlar Ekranı':<18} {'Portföyün Alacağı':<18} {'Tahsis %':<12} {'Durum'}")
     print("-" * 75)
 
-    all_matched = True
     for i in range(min(5, len(api_signals), len(pending))):
         api_t = api_signals[i]["ticker"]
         port_t = pending[i]["ticker"]
         port_w = pending[i].get("target_weight", 0.0) * 100
         match = (api_t == port_t)
         if not match:
-            all_matched = False
+            pass
         print(f"#{i+1:<4} {api_t:<18} {port_t:<18} %{port_w:<10.2f} {'TAM EŞLEŞTİ (100%)' if match else 'FARKLI'}")
     print("-" * 75)
 

@@ -81,9 +81,13 @@ def _f(v: Any) -> float:
     return float(a[0]) if len(a) > 0 else 0.0
 
 def _r2(c: np.ndarray) -> float:
-    if len(c)<10: return 0.0
-    x=np.arange(len(c),dtype=float); p=np.polyfit(x,c,1); fit=np.polyval(p,x)
-    ss_r=np.sum((c-fit)**2); ss_t=np.sum((c-c.mean())**2)
+    if len(c)<10:
+        return 0.0
+    x=np.arange(len(c),dtype=float)
+    p=np.polyfit(x,c,1)
+    fit=np.polyval(p,x)
+    ss_r=np.sum((c-fit)**2)
+    ss_t=np.sum((c-c.mean())**2)
     return float(max(0.0,1.0-ss_r/ss_t)) if ss_t>1e-10 else 0.0
 
 class SectorTracker:
@@ -98,14 +102,18 @@ class SectorTracker:
         bm60 = (ba[-1]/ba[-60]-1) if len(ba)>=60 else 0.0
         perfs: dict[str,float] = {}
         for sec,tks in SECTORS.items():
-            vs20=[]; vs60=[]
+            vs20=[]
+            vs60=[]
             for t in tks:
                 df=sd.get(t)
-                if df is None or dt not in df.index: continue
+                if df is None or dt not in df.index:
+                    continue
                 c=df["Close"].loc[:dt]
-                if hasattr(c,"shape") and len(c.shape)>1: c=c.iloc[:,0]
+                if hasattr(c,"shape") and len(c.shape)>1:
+                    c=c.iloc[:,0]
                 ca=c.values.astype(float)
-                if len(ca)<60: continue
+                if len(ca)<60:
+                    continue
                 vs20.append(ca[-1]/ca[-20]-1-bm20)
                 vs60.append(ca[-1]/ca[-60]-1-bm60)
             # 20d ve 60d ortalamasini al (daha stabil)
@@ -113,7 +121,8 @@ class SectorTracker:
             p60 = float(np.mean(vs60)) if vs60 else 0.0
             perfs[sec] = 0.6*p20 + 0.4*p60
         self.sec_perf = perfs
-        ns=list(perfs.keys()); va=np.array([perfs[n] for n in ns])
+        ns=list(perfs.keys())
+        va=np.array([perfs[n] for n in ns])
         if len(va)>1:
             rk=np.argsort(np.argsort(va)).astype(float)/(len(va)-1)
         else:
@@ -125,22 +134,33 @@ class SectorTracker:
 
 def regime(bmc,dt,sma50,sma200)->str:
     c,s50,s200=_f(bmc.loc[dt]),_f(sma50.loc[dt]),_f(sma200.loc[dt])
-    if np.isnan(s50) or np.isnan(s200): return "NEUTRAL"
+    if np.isnan(s50) or np.isnan(s200):
+        return "NEUTRAL"
     return "BULL" if c>=s50 and s50>=s200 else ("NEUTRAL" if c>=s50 or s50>=s200 else "BEAR")
 
 def score_tick(t:str, sd:dict, dt:Any, bmc:Any, st:SectorTracker, reg:str) -> tuple[float,float,float,bool]|None:
     df=sd.get(t)
-    if df is None or dt not in df.index: return None
+    if df is None or dt not in df.index:
+        return None
     hist=df.loc[:dt]
-    c=hist["Close"]; h=hist["High"]; l=hist["Low"]; v=hist["Volume"]
-    if hasattr(c,"shape") and len(c.shape)>1: c=c.iloc[:,0]
-    if hasattr(h,"shape") and len(h.shape)>1: h=h.iloc[:,0]
-    if hasattr(l,"shape") and len(l.shape)>1: l=l.iloc[:,0]
-    if hasattr(v,"shape") and len(v.shape)>1: v=v.iloc[:,0]
+    c=hist["Close"]
+    h=hist["High"]
+    l=hist["Low"]
+    v=hist["Volume"]
+    if hasattr(c,"shape") and len(c.shape)>1:
+        c=c.iloc[:,0]
+    if hasattr(h,"shape") and len(h.shape)>1:
+        h=h.iloc[:,0]
+    if hasattr(l,"shape") and len(l.shape)>1:
+        l=l.iloc[:,0]
+    if hasattr(v,"shape") and len(v.shape)>1:
+        v=v.iloc[:,0]
     ca=c.values.astype(float)
-    if len(ca)<60: return None
+    if len(ca)<60:
+        return None
     p=ca[-1]
-    if p<=0: return None
+    if p<=0:
+        return None
 
     bh=bmc.loc[:dt]
     ba=bh.values.astype(float) if not (hasattr(bh,"shape") and len(bh.shape)>1) else bh.iloc[:,0].values.astype(float)
@@ -149,14 +169,19 @@ def score_tick(t:str, sd:dict, dt:Any, bmc:Any, st:SectorTracker, reg:str) -> tu
 
     mom20=(p/ca[-20]-1) if len(ca)>=20 else 0.0
     mom60=(p/ca[-60]-1) if len(ca)>=60 else 0.0
-    rs20=mom20-bm20; rs60=mom60-bm60
+    rs20=mom20-bm20
+    rs60=mom60-bm60
 
-    ha=h.values[-14:].astype(float); la=l.values[-14:].astype(float); cp=ca[-15:-1]
+    ha=h.values[-14:].astype(float)
+    la=l.values[-14:].astype(float)
+    cp=ca[-15:-1]
     if len(ha)==len(cp):
-        tr=np.maximum.reduce([ha-la,np.abs(ha-cp),np.abs(la-cp)]); atr=float(np.mean(tr))
+        tr=np.maximum.reduce([ha-la,np.abs(ha-cp),np.abs(la-cp)])
+        atr=float(np.mean(tr))
     else:
         atr=p*0.025
-    if atr<=0: atr=p*0.025
+    if atr<=0:
+        atr=p*0.025
 
     rets20=np.diff(ca[-21:])/ca[-21:-1] if len(ca)>=21 else np.array([0.0])
     vol20=float(np.std(rets20)) if len(rets20)>1 else 0.01
@@ -175,12 +200,16 @@ def score_tick(t:str, sd:dict, dt:Any, bmc:Any, st:SectorTracker, reg:str) -> tu
     if reg=="BULL":
         # Saf momentum VEYA sektor lideri VEYA toparlanma (rs60 pozitif)
         ok = (p > sma20*0.96 and rs20 > -0.02) or (in_top and rs60 > 0.0) or (is_def)
-        if not ok: return None
+        if not ok:
+            return None
     elif reg=="NEUTRAL":
         ok = (p > sma20*0.94 and rs60 > -0.03) or (in_top) or (is_def)
-        if not ok: return None
-    else:  # BEAR
-        if not (is_def or (in_top and rs20 > -0.05)): return None
+        if not ok:
+            return None
+    else:
+        # BEAR
+        if not (is_def or (in_top and rs20 > -0.05)):
+            return None
 
     fv = {
         "vol_adj_mom": float(np.clip(vol_adj,-5,5)),
@@ -195,14 +224,21 @@ def score_tick(t:str, sd:dict, dt:Any, bmc:Any, st:SectorTracker, reg:str) -> tu
     return sc, p, atr, in_top
 
 def run_v5() -> None:
-    START="2016-01-01"; END="2026-08-29"; INIT=100_000.0
-    COMM=0.0015; SLIP=0.0010; COST1W=COMM+SLIP; ATR=4.0; TIME_STP=40
+    START="2016-01-01"
+    END="2026-08-29"
+    INIT=100_000.0
+    COMM=0.0015
+    SLIP=0.0010
+    COST1W=COMM+SLIP
+    ATR=4.0
+    TIME_STP=40
 
     logger.info("="*80)
     logger.info(f"[1] BIST VERISI INDIRILIYOR ({START} -> {END})")
     logger.info("="*80)
     bm=yf.download(BENCHMARK,start=START,end=END,progress=False)
-    if bm.empty: raise RuntimeError("BIST indirilemedi")
+    if bm.empty:
+        raise RuntimeError("BIST indirilemedi")
     if hasattr(bm.columns,"levels") and len(bm.columns.levels)>1:
         bm.columns=bm.columns.get_level_values(0)
     bm_df=bm[["Open","High","Low","Close","Volume"]].dropna()
@@ -214,7 +250,8 @@ def run_v5() -> None:
         try:
             if hasattr(sr.columns,"levels") and t in sr.columns.get_level_values(0):
                 df=sr[t][["Open","High","Low","Close","Volume"]].dropna()
-                if len(df)>250: sd[t]=df
+                if len(df)>250:
+                    sd[t]=df
         except Exception:
             continue
     logger.info(f"  [OK] {len(sd)} hisse hazir.\n")
@@ -230,14 +267,22 @@ def run_v5() -> None:
     logger.info("-"*80)
 
     bmc=bm_df["Close"]
-    if hasattr(bmc,"shape") and len(bmc.shape)>1: bmc=bmc.iloc[:,0]
-    s50=bmc.rolling(50).mean(); s200=bmc.rolling(200).mean()
+    if hasattr(bmc,"shape") and len(bmc.shape)>1:
+        bmc=bmc.iloc[:,0]
+    s50=bmc.rolling(50).mean()
+    s200=bmc.rolling(200).mean()
     dates=list(bm_df.index)[200:]
-    cap=INIT; pos:dict[str,dict]={}; tlog:list[dict]=[]
+    cap=INIT
+    pos:dict[str,dict]={}
+    tlog:list[dict]=[]
     eq_curve:list[float]=[]
     yearly:dict[int,dict]={}
-    cy=dates[0].year; yc=cap; yb=_f(bmc.loc[dates[0]])
-    last_rb=-1; last_sec=-1; st=SectorTracker()
+    cy=dates[0].year
+    yc=cap
+    yb=_f(bmc.loc[dates[0]])
+    last_rb=-1
+    last_sec=-1
+    st=SectorTracker()
     rcnt:dict[str,int]={"BULL":0,"NEUTRAL":0,"BEAR":0}
 
     for di,dt in enumerate(dates):
@@ -245,43 +290,63 @@ def run_v5() -> None:
             pv=cap+sum(p["s"]*p["cp"] for p in pos.values())
             bn=_f(bmc.loc[dt])
             yearly[cy]={"p":(pv-yc)/yc*100,"b":(bn-yb)/yb*100,"eq":pv}
-            cy=dt.year; yc=pv; yb=bn
+            cy=dt.year
+            yc=pv
+            yb=bn
 
-        reg=regime(bmc,dt,s50,s200); rcnt[reg]+=1
+        reg=regime(bmc,dt,s50,s200)
+        rcnt[reg]+=1
         iso_w=dt.isocalendar()[1]
         if iso_w!=last_sec:
-            last_sec=iso_w; st.update(sd,bmc,dt)
+            last_sec=iso_w
+            st.update(sd,bmc,dt)
 
         # Rejime gore hedef pozisyon sayisi
         if reg=="BULL":
-            target=13; invest=0.97
+            target=13
+            invest=0.97
         elif reg=="NEUTRAL":
-            target=8; invest=0.90
+            target=8
+            invest=0.90
         else:
-            target=3; invest=0.65
+            target=3
+            invest=0.65
 
         # Pozisyon guncelle
         cl=[]
         for t,p in list(pos.items()):
             df=sd.get(t)
-            if df is None or dt not in df.index: continue
+            if df is None or dt not in df.index:
+                continue
             bar=df.loc[dt]
-            ph=_f(bar["High"]); pl=_f(bar["Low"]); pc=_f(bar["Close"]); po=_f(bar["Open"])
+            ph=_f(bar["High"])
+            pl=_f(bar["Low"])
+            pc=_f(bar["Close"])
+            po=_f(bar["Open"])
             p["cp"]=pc
             if ph>p["pk"]:
-                p["pk"]=ph; ns=p["pk"]-ATR*p["atr"]
-                if ns>p["sl"]: p["sl"]=ns
+                p["pk"]=ph
+                ns=p["pk"]-ATR*p["atr"]
+                if ns>p["sl"]:
+                    p["sl"]=ns
             hd=(dt-p["ed"]).days
             exit,reason,ep=False,"",pc
             if pl<=p["sl"]:
-                exit=True; ep=min(po,p["sl"]); reason="TRAIL" if ep>p["ep"] else "STOP"
+                exit=True
+                ep=min(po,p["sl"])
+                reason="TRAIL" if ep>p["ep"] else "STOP"
             elif hd>TIME_STP and pc<p["ep"]*0.98:
-                exit=True; reason="TIME"
+                exit=True
+                reason="TIME"
             if exit:
-                proc=p["s"]*ep*(1-SLIP)*(1-COMM); cost=p["s"]*p["ep"]*(1+COST1W)
-                pnl=proc-cost; cap+=proc
-                tlog.append({"t":t,"pnl":pnl,"pp":pnl/cost*100,"r":reason,"h":hd,"rg":reg}); cl.append(t)
-        for t in cl: pos.pop(t,None)
+                proc=p["s"]*ep*(1-SLIP)*(1-COMM)
+                cost=p["s"]*p["ep"]*(1+COST1W)
+                pnl=proc-cost
+                cap+=proc
+                tlog.append({"t":t,"pnl":pnl,"pp":pnl/cost*100,"r":reason,"h":hd,"rg":reg})
+                cl.append(t)
+        for t in cl:
+            pos.pop(t,None)
 
         # Aylik rebalance
         if dt.month!=last_rb:
@@ -290,9 +355,11 @@ def run_v5() -> None:
             if slots>0:
                 cands:list[tuple[float,str,float,float,bool]]=[]
                 for t in sd:
-                    if t in pos: continue
+                    if t in pos:
+                        continue
                     r=score_tick(t,sd,dt,bmc,st,reg)
-                    if r: cands.append((r[0],t,r[1],r[2],r[3]))
+                    if r:
+                        cands.append((r[0],t,r[1],r[2],r[3]))
                 cands.sort(reverse=True,key=lambda x:x[0])
 
                 pv=cap+sum(p["s"]*p["cp"] for p in pos.values())
@@ -300,56 +367,83 @@ def run_v5() -> None:
 
                 # Sektor temsil takibi
                 sec_covered:set[str]=set()
-                for t in pos: sec_covered.add(TICKER_SEC.get(t,"?"))
+                for t in pos:
+                    sec_covered.add(TICKER_SEC.get(t,"?"))
 
                 # Adim 1: Her sektorden min 1 hisse al (BULL'da)
                 if reg=="BULL":
                     for sec in SECTORS:
-                        if sec in sec_covered: continue
-                        if len(pos)>=target: break
+                        if sec in sec_covered:
+                            continue
+                        if len(pos)>=target:
+                            break
                         # Bu sektorun en iyi adayi bul
                         sec_cands=[(sc,t,ps,at,it) for sc,t,ps,at,it in cands if TICKER_SEC.get(t)==sec]
-                        if not sec_cands: continue
+                        if not sec_cands:
+                            continue
                         sc,t,ps,at,it=sec_cands[0]
                         alloc=min(cap*0.92,inv/target)
-                        if alloc<1500: continue
-                        ep=ps*(1+SLIP); cps=ep*(1+COMM); shs=int(alloc/cps)
-                        if shs<=0 or shs*cps>cap: continue
-                        cap-=shs*cps; sec_covered.add(sec)
+                        if alloc<1500:
+                            continue
+                        ep=ps*(1+SLIP)
+                        cps=ep*(1+COMM)
+                        shs=int(alloc/cps)
+                        if shs<=0 or shs*cps>cap:
+                            continue
+                        cap-=shs*cps
+                        sec_covered.add(sec)
                         pos[t]={"s":shs,"ep":ep,"cp":ep,"pk":ep,"sl":ep-ATR*at,"atr":at,"ed":dt}
 
                 # Adim 2: Kalan slotlara en iyi skorlu hisseleri al
                 # Top 3'e 2x agirlik (alpha tilt - 2 slot verir)
                 top3_done=0
                 for sc,t,ps,at,it in cands:
-                    if len(pos)>=target: break
-                    if t in pos: continue
+                    if len(pos)>=target:
+                        break
+                    if t in pos:
+                        continue
                     is_top3=(sc==cands[0][0] or top3_done<3)
                     slot_mult=1.5 if is_top3 and top3_done<3 else 1.0
-                    if is_top3: top3_done+=1
+                    if is_top3:
+                        top3_done+=1
                     alloc=min(cap*0.92,inv/target*slot_mult)
-                    if alloc<1500: continue
-                    ep=ps*(1+SLIP); cps=ep*(1+COMM); shs=int(alloc/cps)
-                    if shs<=0 or shs*cps>cap: continue
+                    if alloc<1500:
+                        continue
+                    ep=ps*(1+SLIP)
+                    cps=ep*(1+COMM)
+                    shs=int(alloc/cps)
+                    if shs<=0 or shs*cps>cap:
+                        continue
                     cap-=shs*cps
                     pos[t]={"s":shs,"ep":ep,"cp":ep,"pk":ep,"sl":ep-ATR*at,"atr":at,"ed":dt}
 
-        eq=cap+sum(p["s"]*p["cp"] for p in pos.values()); eq_curve.append(eq)
+        eq=cap+sum(p["s"]*p["cp"] for p in pos.values())
+        eq_curve.append(eq)
 
     fe=cap+sum(p["s"]*p["cp"] for p in pos.values())
     if cy not in yearly:
-        bf=_f(bmc.iloc[-1]); yearly[cy]={"p":(fe-yc)/yc*100,"b":(bf-yb)/yb*100,"eq":fe}
+        bf=_f(bmc.iloc[-1])
+        yearly[cy]={"p":(fe-yc)/yc*100,"b":(bf-yb)/yb*100,"eq":fe}
 
     tot=(fe-INIT)/INIT*100
-    bi=_f(bmc.loc[dates[0]]); bf=_f(bmc.loc[dates[-1]]); bm_ret=(bf-bi)/bi*100
-    ea=np.array(eq_curve); dr=np.diff(ea)/ea[:-1]
+    bi=_f(bmc.loc[dates[0]])
+    bf=_f(bmc.loc[dates[-1]])
+    bm_ret=(bf-bi)/bi*100
+    ea=np.array(eq_curve)
+    dr=np.diff(ea)/ea[:-1]
     sh=float((dr.mean()/dr.std())*np.sqrt(252)) if dr.std()>0 else 0.0
-    pk=np.maximum.accumulate(ea); dd=(ea-pk)/pk; mdd=float(dd.min()*100)
-    ny=len(ea)/252; cagr=(fe/INIT)**(1/ny)-1 if ny>0 else 0; bm_cagr=(bf/bi)**(1/ny)-1 if ny>0 else 0
-    wins=[x for x in tlog if x["pnl"]>0]; loss=[x for x in tlog if x["pnl"]<=0]
+    pk=np.maximum.accumulate(ea)
+    dd=(ea-pk)/pk
+    mdd=float(dd.min()*100)
+    ny=len(ea)/252
+    cagr=(fe/INIT)**(1/ny)-1 if ny>0 else 0
+    bm_cagr=(bf/bi)**(1/ny)-1 if ny>0 else 0
+    wins=[x for x in tlog if x["pnl"]>0]
+    loss=[x for x in tlog if x["pnl"]<=0]
     wr=len(wins)/len(tlog)*100 if tlog else 0
-    ls=abs(sum(x["pnl"] for x in loss)); pf=sum(x["pnl"] for x in wins)/ls if ls>0 else 999
-    td=sum(rcnt.values())
+    ls=abs(sum(x["pnl"] for x in loss))
+    pf=sum(x["pnl"] for x in wins)/ls if ls>0 else 999
+    sum(rcnt.values())
 
     # KARSILASTIRMA TABLOSU
     S="="*90
@@ -376,9 +470,12 @@ def run_v5() -> None:
     logger.info("-"*53)
     beat_yrs=[]
     for yr in sorted(yearly):
-        p=yearly[yr]["p"]; b=yearly[yr]["b"]; a=p-b
+        p=yearly[yr]["p"]
+        b=yearly[yr]["b"]
+        a=p-b
         s="[ALFA]" if a>0 else "[KAYIP]"
-        if a>0: beat_yrs.append(yr)
+        if a>0:
+            beat_yrs.append(yr)
         logger.info(f"  {yr:<6}|{p:>+9.1f}%|{b:>+9.1f}%|{a:>+9.1f}%|{s:>10}")
     logger.info("-"*53)
     logger.info(f"  Toplam: {len(beat_yrs)}/{len(yearly)} yil BIST'i gecti")
@@ -388,11 +485,14 @@ def run_v5() -> None:
 
     if tlog:
         by={}
-        for x in tlog: by[x["t"]]=by.get(x["t"],0)+x["pnl"]
+        for x in tlog:
+            by[x["t"]]=by.get(x["t"],0)+x["pnl"]
         b5=sorted(by.items(),key=lambda x:x[1],reverse=True)[:5]
         w5=sorted(by.items(),key=lambda x:x[1])[:5]
-        logger.info("\n  [TOP5]"); [logger.info(f"    {t:<15} +{p:,.0f} TL") for t,p in b5]
-        logger.info("\n  [BOT5]"); [logger.info(f"    {t:<15} {p:,.0f} TL") for t,p in w5]
+        logger.info("\n  [TOP5]")
+        [logger.info(f"    {t:<15} +{p:,.0f} TL") for t,p in b5]
+        logger.info("\n  [BOT5]")
+        [logger.info(f"    {t:<15} {p:,.0f} TL") for t,p in w5]
     logger.info(S)
 
 if __name__=="__main__":

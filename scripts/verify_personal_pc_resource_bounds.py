@@ -30,7 +30,7 @@ def verify_personal_pc_profile():
     print("=" * 85)
 
     # 1. Profili Uygula
-    applied = hardware_manager.apply_profile()
+    hardware_manager.apply_profile()
     report = hardware_manager.get_status_report()
 
     specs = report["specs"]

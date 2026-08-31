@@ -65,7 +65,7 @@ async def run_benchmark():
     # Geçersiz girdi testi
     try:
         await service.execute({"invalid_key": 123})
-        assert False, "Doğrulama hatası fırlatılmalıydı!"
+        raise AssertionError("Doğrulama hatası fırlatılmalıydı!")
     except ServiceExecutionError:
         print("  * Geçersiz Girdi Doğrulama Reddi: BAŞARILI (Fail-Closed korundu)")
 
@@ -111,7 +111,7 @@ async def run_benchmark():
     sample_df = pd.DataFrame(sample_matrix, columns=feat_names)
 
     t0 = time.perf_counter()
-    lgb_preds = bist_ml_scanner.models["lightgbm"].predict(sample_df) if "lightgbm" in bist_ml_scanner.models else np.zeros(647)
+    bist_ml_scanner.models["lightgbm"].predict(sample_df) if "lightgbm" in bist_ml_scanner.models else np.zeros(647)
     dur_ml = time.perf_counter() - t0
 
     print(f"  * 647 Hisse İçin LightGBM Batch Inference  : {dur_ml*1000:.2f} ms")

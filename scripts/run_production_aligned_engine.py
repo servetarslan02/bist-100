@@ -269,7 +269,7 @@ def run_production_aligned_backtest() -> None:
             bar = df_t.loc[dt]
             p_close = _to_float(bar["Close"])
             p_high = _to_float(bar["High"])
-            p_open = _to_float(bar["Open"])
+            _to_float(bar["Open"])
             pos["current_price"] = p_close
 
             # Trailing stop güncelleme (ATR 4.0x)
@@ -395,7 +395,7 @@ def run_production_aligned_backtest() -> None:
             cands.sort(key=lambda x: x[0], reverse=True)
 
             port_equity = capital + sum(p["shares"] * p["current_price"] for p in positions.values())
-            investable = port_equity * limits.max_total_exposure
+            port_equity * limits.max_total_exposure
 
             # Sektör konsantrasyonu takibi
             sector_allocations: dict[str, float] = {}

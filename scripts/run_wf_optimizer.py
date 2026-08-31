@@ -85,7 +85,9 @@ UNIVERSE = [t for ts in SECTORS.values() for t in ts]
 TICKER_SEC = {t: s for s, ts in SECTORS.items() for t in ts}
 DEF_TICKERS = set(SECTORS["tuketim"] + SECTORS["teletek"])
 BENCHMARK = "XU100.IS"
-COMM = 0.0015; SLIP = 0.0010; COST1W = COMM + SLIP
+COMM = 0.0015
+SLIP = 0.0010
+COST1W = COMM + SLIP
 
 # ---------------------------------------------------------------------------
 # YARDIMCILAR
@@ -103,9 +105,13 @@ def _f(v: Any) -> float:
     return float(a[0]) if len(a) > 0 else 0.0
 
 def _r2(c: np.ndarray) -> float:
-    if len(c)<10: return 0.0
-    x=np.arange(len(c),dtype=float); p=np.polyfit(x,c,1); fit=np.polyval(p,x)
-    ss_r=np.sum((c-fit)**2); ss_t=np.sum((c-c.mean())**2)
+    if len(c)<10:
+        return 0.0
+    x=np.arange(len(c),dtype=float)
+    p=np.polyfit(x,c,1)
+    fit=np.polyval(p,x)
+    ss_r=np.sum((c-fit)**2)
+    ss_t=np.sum((c-c.mean())**2)
     return float(max(0.0,1.0-ss_r/ss_t)) if ss_t>1e-10 else 0.0
 
 def sample_params(n: int) -> list[dict]:
@@ -134,7 +140,7 @@ def multi_score(monthly_returns: np.ndarray) -> float:
         return -999.0
     mr = np.array(monthly_returns, dtype=float)
     sharpe = (mr.mean() / mr.std() * np.sqrt(12)) if mr.std() > 1e-10 else 0.0
-    cum = np.cumprod(1 + mr) - 1
+    np.cumprod(1 + mr) - 1
     ea = np.cumprod(1 + mr)
     peaks = np.maximum.accumulate(ea)
     dd = (ea - peaks) / peaks
@@ -174,14 +180,18 @@ def precompute_factors(
         sec_r = sec_tracker_ranks.get(dt, {})
         for t in stock_dict:
             df = stock_dict[t]
-            if dt not in df.index: continue
+            if dt not in df.index:
+                continue
             hist = df.loc[:dt]
             c = hist["Close"]
-            if hasattr(c,"shape") and len(c.shape)>1: c=c.iloc[:,0]
+            if hasattr(c,"shape") and len(c.shape)>1:
+                c=c.iloc[:,0]
             ca = c.values.astype(float)
-            if len(ca) < 90: continue
+            if len(ca) < 90:
+                continue
             p = ca[-1]
-            if p <= 0: continue
+            if p <= 0:
+                continue
             # Pre-compute all possible windows
             ret = {}
             for w, bm_rw in [(10,bm_r10),(15,bm_r10),(20,bm_r20),(30,bm_r30),(40,bm_r40),(60,bm_r60),(90,bm_r90)]:
@@ -215,7 +225,9 @@ def precompute_factors(
 
 def score_ticker_with_params(fv: dict, p: dict, regime: str) -> float | None:
     """Verilen faktor degerleri ve parametrelerle hisse skoru hesapla."""
-    ms = p["mom_short"]; ml = p["mom_long"]; rw = p["r2_window"]
+    ms = p["mom_short"]
+    ml = p["mom_long"]
+    rw = p["r2_window"]
     fw = p["_fw"]
     # Seç doğru momentum penceresini
     ms_key = min([10,15,20,30], key=lambda x: abs(x-ms))
@@ -234,11 +246,15 @@ def score_ticker_with_params(fv: dict, p: dict, regime: str) -> float | None:
     is_def = fv.get("is_def", 0.0)
     # Filtre
     if regime == "BULL":
-        if mom_s < -0.03 and rs_s < -0.02 and is_def < 0.5: return None
+        if mom_s < -0.03 and rs_s < -0.02 and is_def < 0.5:
+            return None
     elif regime == "NEUTRAL":
-        if mom_l < -0.05 and rs_s < -0.04 and is_def < 0.5: return None
-    else:  # BEAR
-        if is_def < 0.5 and rs_s < -0.06: return None
+        if mom_l < -0.05 and rs_s < -0.04 and is_def < 0.5:
+            return None
+    else:
+        # BEAR
+        if is_def < 0.5 and rs_s < -0.06:
+            return None
     sc = (fw["vol_adj"] * np.clip(vol_adj,-5,5)
          + fw["sec"]    * sec_rk
          + fw["rs_s"]   * rs_s
@@ -261,31 +277,39 @@ def mini_backtest(
     Verilen parametrelerle aylik rebalance simulasyonu.
     Returns: (score, [monthly_returns])
     """
-    sf = params["sma_fast"]; sl = params["sma_slow"]
-    bull_s = params["bull_slots"]; neu_s = params["neutral_slots"]; bear_s = params["bear_slots"]
+    sf = params["sma_fast"]
+    sl = params["sma_slow"]
+    bull_s = params["bull_slots"]
+    neu_s = params["neutral_slots"]
+    bear_s = params["bear_slots"]
     max_pp = params["max_pos_pct"]
 
     port: dict[str, float] = {}  # {ticker: weight}
     monthly_rets: list[float] = []
 
     for i in range(1, len(month_ends)):
-        prev_dt = month_ends[i-1]; curr_dt = month_ends[i]
+        prev_dt = month_ends[i-1]
+        curr_dt = month_ends[i]
         curr_str = curr_dt.strftime("%Y-%m")
 
         # Regime
         bh = bm_close.loc[:curr_dt]
         ba = bh.values.astype(float) if not (hasattr(bh,"shape") and len(bh.shape)>1) else bh.iloc[:,0].values.astype(float)
         if len(ba) < sl + 5:
-            monthly_rets.append(0.0); continue
+            monthly_rets.append(0.0)
+            continue
         sma_f = float(np.mean(ba[-sf:]))
         sma_s = float(np.mean(ba[-sl:]))
         c_now = ba[-1]
         if c_now >= sma_f and sma_f >= sma_s:
-            reg = "BULL"; target = bull_s
+            reg = "BULL"
+            target = bull_s
         elif c_now >= sma_f or sma_f >= sma_s:
-            reg = "NEUTRAL"; target = neu_s
+            reg = "NEUTRAL"
+            target = neu_s
         else:
-            reg = "BEAR"; target = bear_s
+            reg = "BEAR"
+            target = bear_s
 
         # Portfoy getirisi hesapla (prev -> curr)
         if port:
@@ -317,7 +341,8 @@ def mini_backtest(
         # Max pozisyon limiti
         n = len(selected)
         if n == 0:
-            port = {}; continue
+            port = {}
+            continue
         eq_w = 1.0/n
         # max_pos_pct uygula
         w_per = min(eq_w, max_pp)
@@ -340,14 +365,18 @@ def compute_sector_ranks_at_date(
         vs = []
         for t in tks:
             df = stock_dict.get(t)
-            if df is None or dt not in df.index: continue
+            if df is None or dt not in df.index:
+                continue
             c = df["Close"].loc[:dt]
-            if hasattr(c,"shape") and len(c.shape)>1: c=c.iloc[:,0]
+            if hasattr(c,"shape") and len(c.shape)>1:
+                c=c.iloc[:,0]
             ca = c.values.astype(float)
-            if len(ca)<20: continue
+            if len(ca)<20:
+                continue
             vs.append(ca[-1]/ca[-20]-1-bm20)
         perfs[sec] = float(np.mean(vs)) if vs else 0.0
-    ns=list(perfs.keys()); va=np.array([perfs[n] for n in ns])
+    ns=list(perfs.keys())
+    va=np.array([perfs[n] for n in ns])
     if len(va)>1:
         rk=np.argsort(np.argsort(va)).astype(float)/(len(va)-1)
     else:
@@ -367,11 +396,16 @@ def run_full_sim(
 ) -> tuple[float, dict, list[float]]:
     """Walk-forward optimal parametreler ile tam simulasyon."""
     INIT = 100_000.0
-    cap = INIT; pos: dict[str, dict] = {}
-    tlog: list[dict] = []; eq_curve: list[float] = []
+    cap = INIT
+    pos: dict[str, dict] = {}
+    tlog: list[dict] = []
+    eq_curve: list[float] = []
     yearly: dict[int, dict] = {}
-    cy = all_dates[0].year; yc = cap; yb = _f(bm_close.loc[all_dates[0]])
-    last_rb = -1; last_sec_week = -1
+    cy = all_dates[0].year
+    yc = cap
+    yb = _f(bm_close.loc[all_dates[0]])
+    last_rb = -1
+    last_sec_week = -1
     cached_sec: dict[str, float] = {}
 
     # Aktif parametre: Tarih araligi -> params
@@ -390,23 +424,38 @@ def run_full_sim(
             pv = cap + sum(p["s"]*p["cp"] for p in pos.values())
             bn = _f(bm_close.loc[dt])
             yearly[cy] = {"p":(pv-yc)/yc*100,"b":(bn-yb)/yb*100}
-            cy=dt.year; yc=pv; yb=bn
+            cy=dt.year
+            yc=pv
+            yb=bn
 
         ap = get_active_params(dt)
-        sf=ap["sma_fast"]; sl_=ap["sma_slow"]
-        atr_m=ap["atr_mult"]; t_stop=ap["time_stop"]
-        bull_s=ap["bull_slots"]; neu_s=ap["neutral_slots"]; bear_s=ap["bear_slots"]
+        sf=ap["sma_fast"]
+        sl_=ap["sma_slow"]
+        atr_m=ap["atr_mult"]
+        t_stop=ap["time_stop"]
+        bull_s=ap["bull_slots"]
+        neu_s=ap["neutral_slots"]
+        bear_s=ap["bear_slots"]
         max_pp=ap["max_pos_pct"]
 
         # Regime
         bh=bm_close.loc[:dt]
         ba=bh.values.astype(float) if not (hasattr(bh,"shape") and len(bh.shape)>1) else bh.iloc[:,0].values.astype(float)
         if len(ba)<sl_+5:
-            eq_curve.append(cap); continue
-        sma_f=float(np.mean(ba[-sf:])); sma_s=float(np.mean(ba[-sl_:])); c_now=ba[-1]
-        if c_now>=sma_f and sma_f>=sma_s: reg="BULL"; target=bull_s
-        elif c_now>=sma_f or sma_f>=sma_s: reg="NEUTRAL"; target=neu_s
-        else: reg="BEAR"; target=bear_s
+            eq_curve.append(cap)
+            continue
+        sma_f=float(np.mean(ba[-sf:]))
+        sma_s=float(np.mean(ba[-sl_:]))
+        c_now=ba[-1]
+        if c_now>=sma_f and sma_f>=sma_s:
+            reg="BULL"
+            target=bull_s
+        elif c_now>=sma_f or sma_f>=sma_s:
+            reg="NEUTRAL"
+            target=neu_s
+        else:
+            reg="BEAR"
+            target=bear_s
 
         # Sektor (haftalik)
         iso_w=dt.isocalendar()[1]
@@ -418,22 +467,36 @@ def run_full_sim(
         cl=[]
         for t,p in list(pos.items()):
             df=stock_dict.get(t)
-            if df is None or dt not in df.index: continue
+            if df is None or dt not in df.index:
+                continue
             bar=df.loc[dt]
-            ph=_f(bar["High"]); pl=_f(bar["Low"]); pc=_f(bar["Close"]); po=_f(bar["Open"])
+            ph=_f(bar["High"])
+            pl=_f(bar["Low"])
+            pc=_f(bar["Close"])
+            po=_f(bar["Open"])
             p["cp"]=pc
             if ph>p["pk"]:
-                p["pk"]=ph; ns=p["pk"]-atr_m*p["atr"]
-                if ns>p["sl"]: p["sl"]=ns
+                p["pk"]=ph
+                ns=p["pk"]-atr_m*p["atr"]
+                if ns>p["sl"]:
+                    p["sl"]=ns
             hd=(dt-p["ed"]).days
-            ex=False; reason=""; ep=pc
-            if pl<=p["sl"]: ex=True; ep=min(po,p["sl"]); reason="TRAIL" if ep>p["ep"] else "STOP"
-            elif hd>t_stop and pc<p["ep"]*0.98: ex=True; reason="TIME"
+            ex=False
+            ep=pc
+            if pl<=p["sl"]:
+                ex=True
+                ep=min(po,p["sl"])
+                "TRAIL" if ep>p["ep"] else "STOP"
+            elif hd>t_stop and pc<p["ep"]*0.98:
+                ex=True
             if ex:
-                proc=p["s"]*ep*(1-SLIP)*(1-COMM); cost=p["s"]*p["ep"]*(1+COST1W)
+                proc=p["s"]*ep*(1-SLIP)*(1-COMM)
+                cost=p["s"]*p["ep"]*(1+COST1W)
                 cap+=proc
-                tlog.append({"t":t,"pnl":proc-cost,"rg":reg}); cl.append(t)
-        for t in cl: pos.pop(t,None)
+                tlog.append({"t":t,"pnl":proc-cost,"rg":reg})
+                cl.append(t)
+        for t in cl:
+            pos.pop(t,None)
 
         # Aylik rebalance
         if dt.month!=last_rb:
@@ -441,29 +504,37 @@ def run_full_sim(
             slots=target-len(pos)
             if slots>0:
                 pv=cap+sum(p["s"]*p["cp"] for p in pos.values())
-                bh2=bm_close.loc[:dt]; ba2=bh2.values.astype(float) if not (hasattr(bh2,"shape") and len(bh2.shape)>1) else bh2.iloc[:,0].values.astype(float)
+                bh2=bm_close.loc[:dt]
+                ba2=bh2.values.astype(float) if not (hasattr(bh2,"shape") and len(bh2.shape)>1) else bh2.iloc[:,0].values.astype(float)
                 bm_s=ba2[-1]/ba2[-ap["mom_short"]]-1 if len(ba2)>=ap["mom_short"] else 0.0
                 bm_l=ba2[-1]/ba2[-ap["mom_long"]]-1 if len(ba2)>=ap["mom_long"] else 0.0
                 cands2=[]
                 for t in stock_dict:
-                    if t in pos: continue
+                    if t in pos:
+                        continue
                     df=stock_dict[t]
-                    if dt not in df.index: continue
+                    if dt not in df.index:
+                        continue
                     hist=df.loc[:dt]
                     c2=hist["Close"]
-                    if hasattr(c2,"shape") and len(c2.shape)>1: c2=c2.iloc[:,0]
+                    if hasattr(c2,"shape") and len(c2.shape)>1:
+                        c2=c2.iloc[:,0]
                     ha2=hist["High"]
-                    if hasattr(ha2,"shape") and len(ha2.shape)>1: ha2=ha2.iloc[:,0]
+                    if hasattr(ha2,"shape") and len(ha2.shape)>1:
+                        ha2=ha2.iloc[:,0]
                     la2=hist["Low"]
-                    if hasattr(la2,"shape") and len(la2.shape)>1: la2=la2.iloc[:,0]
+                    if hasattr(la2,"shape") and len(la2.shape)>1:
+                        la2=la2.iloc[:,0]
                     ca2=c2.values.astype(float)
-                    if len(ca2)<ap["mom_long"]+5: continue
+                    if len(ca2)<ap["mom_long"]+5:
+                        continue
                     p2=ca2[-1]
-                    if p2<=0: continue
+                    if p2<=0:
+                        continue
                     mom_s2=ca2[-1]/ca2[-ap["mom_short"]]-1 if len(ca2)>=ap["mom_short"] else 0.0
                     mom_l2=ca2[-1]/ca2[-ap["mom_long"]]-1 if len(ca2)>=ap["mom_long"] else 0.0
                     rs_s2=mom_s2-bm_s
-                    rs_l2=mom_l2-bm_l
+                    mom_l2-bm_l
                     rw=ap["r2_window"]
                     r2v=_r2(ca2[-rw:]) if len(ca2)>=rw else 0.0
                     rets=np.diff(ca2[-21:])/ca2[-21:-1] if len(ca2)>=21 else np.array([0.0])
@@ -473,9 +544,12 @@ def run_full_sim(
                     fw=ap["_fw"]
                     # Filtre
                     is_def=t in DEF_TICKERS
-                    if reg=="BULL" and mom_s2<-0.03 and rs_s2<-0.02 and not is_def: continue
-                    elif reg=="NEUTRAL" and mom_l2<-0.05 and rs_s2<-0.04 and not is_def: continue
-                    elif reg=="BEAR" and not is_def and rs_s2<-0.06: continue
+                    if reg=="BULL" and mom_s2<-0.03 and rs_s2<-0.02 and not is_def:
+                        continue
+                    elif reg=="NEUTRAL" and mom_l2<-0.05 and rs_s2<-0.04 and not is_def:
+                        continue
+                    elif reg=="BEAR" and not is_def and rs_s2<-0.06:
+                        continue
                     sc2=(fw["vol_adj"]*np.clip(va2,-5,5)+fw["sec"]*sec_rk
                          +fw["rs_s"]*rs_s2+fw["mom_s"]*mom_s2+fw["r2"]*r2v+fw["mom_l"]*mom_l2)
                     # ATR
@@ -487,22 +561,31 @@ def run_full_sim(
                         atr_v=float(np.mean(tr))
                     else:
                         atr_v=p2*0.025
-                    if atr_v<=0: atr_v=p2*0.025
+                    if atr_v<=0:
+                        atr_v=p2*0.025
                     cands2.append((sc2,t,p2,atr_v))
                 cands2.sort(reverse=True)
                 for sc2,t,ps2,atr_v in cands2[:slots*2]:
-                    if len(pos)>=target: break
-                    if t in pos: continue
+                    if len(pos)>=target:
+                        break
+                    if t in pos:
+                        continue
                     alloc=min(cap*0.93,pv*max_pp)
-                    if alloc<1500: continue
-                    ep2=ps2*(1+SLIP); cps2=ep2*(1+COMM); shs2=int(alloc/cps2)
-                    if shs2<=0 or shs2*cps2>cap: continue
+                    if alloc<1500:
+                        continue
+                    ep2=ps2*(1+SLIP)
+                    cps2=ep2*(1+COMM)
+                    shs2=int(alloc/cps2)
+                    if shs2<=0 or shs2*cps2>cap:
+                        continue
                     cap-=shs2*cps2
                     pos[t]={"s":shs2,"ep":ep2,"cp":ep2,"pk":ep2,"sl":ep2-atr_m*atr_v,"atr":atr_v,"ed":dt}
-        eq=cap+sum(p["s"]*p["cp"] for p in pos.values()); eq_curve.append(eq)
+        eq=cap+sum(p["s"]*p["cp"] for p in pos.values())
+        eq_curve.append(eq)
     fe=cap+sum(p["s"]*p["cp"] for p in pos.values())
     if cy not in yearly:
-        bf=_f(bm_close.iloc[-1]); yearly[cy]={"p":(fe-yc)/yc*100,"b":(bf-yb)/yb*100}
+        bf=_f(bm_close.iloc[-1])
+        yearly[cy]={"p":(fe-yc)/yc*100,"b":(bf-yb)/yb*100}
     return fe, yearly, eq_curve
 
 # ---------------------------------------------------------------------------
@@ -510,14 +593,17 @@ def run_full_sim(
 # ---------------------------------------------------------------------------
 def run_optimizer() -> None:
     t0 = time.time()
-    START="2016-01-01"; END="2026-08-29"; INIT=100_000.0
+    START="2016-01-01"
+    END="2026-08-29"
+    INIT=100_000.0
     N_SAMPLES = 400  # Her pencerede kac kombinasyon denenecek
 
     logger.info("="*80)
     logger.info("[1] BIST VERISI INDIRILIYOR")
     logger.info("="*80)
     bm=yf.download(BENCHMARK,start=START,end=END,progress=False)
-    if bm.empty: raise RuntimeError("BIST indirilemedi")
+    if bm.empty:
+        raise RuntimeError("BIST indirilemedi")
     if hasattr(bm.columns,"levels") and len(bm.columns.levels)>1:
         bm.columns=bm.columns.get_level_values(0)
     bm_df=bm[["Open","High","Low","Close","Volume"]].dropna()
@@ -528,13 +614,15 @@ def run_optimizer() -> None:
         try:
             if hasattr(sr.columns,"levels") and t in sr.columns.get_level_values(0):
                 df=sr[t][["Open","High","Low","Close","Volume"]].dropna()
-                if len(df)>250: sd[t]=df
+                if len(df)>250:
+                    sd[t]=df
         except Exception:
             continue
     logger.info(f"  [OK] {len(sd)} hisse hazir.\n")
 
     bmc=bm_df["Close"]
-    if hasattr(bmc,"shape") and len(bmc.shape)>1: bmc=bmc.iloc[:,0]
+    if hasattr(bmc,"shape") and len(bmc.shape)>1:
+        bmc=bmc.iloc[:,0]
 
     # Walk-Forward pencereleri: 18 ay egitim, 6 ay test, 6 ay kaydir
     all_dates_idx = list(bm_df.index)
@@ -542,11 +630,16 @@ def run_optimizer() -> None:
         mends=[]
         prev=None
         for d in all_dates_idx:
-            if d<d_start: prev=d; continue
-            if d>d_end: break
-            if prev and prev.month!=d.month: mends.append(prev)
+            if d<d_start:
+                prev=d
+                continue
+            if d>d_end:
+                break
+            if prev and prev.month!=d.month:
+                mends.append(prev)
             prev=d
-        if prev and (not mends or mends[-1]!=prev): mends.append(prev)
+        if prev and (not mends or mends[-1]!=prev):
+            mends.append(prev)
         return mends
 
     import pandas as pd
@@ -559,10 +652,12 @@ def run_optimizer() -> None:
     while True:
         train_end = current_start + pd.DateOffset(months=n_train_months)
         test_end  = train_end + pd.DateOffset(months=n_test_months)
-        if test_end > pd.Timestamp(END): break
+        if test_end > pd.Timestamp(END):
+            break
         wf_windows.append((current_start, train_end, test_end))
         current_start = current_start + pd.DateOffset(months=wf_step_months)
-        if len(wf_windows) >= 12: break
+        if len(wf_windows) >= 12:
+            break
     logger.info(f"  Walk-Forward pencereleri: {len(wf_windows)}")
 
     # FAKTORLERİ ÖN HESAPLA (tum tarihler icin)
@@ -585,17 +680,19 @@ def run_optimizer() -> None:
         if len(train_months) < 4:
             continue
         candidates = sample_params(N_SAMPLES)
-        best_sc = -999.0; best_p = candidates[0]
+        best_sc = -999.0
+        best_p = candidates[0]
         scores_all = []
         for pc in candidates:
             sc, _ = mini_backtest(pc, precomp, train_months, bmc)
             scores_all.append(sc)
             if sc > best_sc:
-                best_sc = sc; best_p = pc
+                best_sc = sc
+                best_p = pc
         # Test donemini kaydet
         best_params_by_period[tr_e] = best_p
         # Top 5 parametre ozeti
-        top_idx = sorted(range(len(scores_all)), key=lambda x: scores_all[x], reverse=True)[:3]
+        sorted(range(len(scores_all)), key=lambda x: scores_all[x], reverse=True)[:3]
         logger.info(f"\n  Pencere {wi+1}: Egitim {tr_s.date()} -> {tr_e.date()}  Test -> {te_e.date()}")
         logger.info(f"    En iyi skor: {best_sc:.3f}  (400 kombinasyondan)")
         logger.info("    Optimal params:")
@@ -615,11 +712,17 @@ def run_optimizer() -> None:
     final_eq, yearly, eq_curve = run_full_sim(sd, bm_df, best_params_by_period, sim_dates, bmc)
 
     total_ret = (final_eq-INIT)/INIT*100
-    bi=_f(bmc.loc[sim_dates[0]]); bf=_f(bmc.loc[sim_dates[-1]]); bm_ret=(bf-bi)/bi*100
-    ea=np.array(eq_curve); dr=np.diff(ea)/ea[:-1]
+    bi=_f(bmc.loc[sim_dates[0]])
+    bf=_f(bmc.loc[sim_dates[-1]])
+    bm_ret=(bf-bi)/bi*100
+    ea=np.array(eq_curve)
+    dr=np.diff(ea)/ea[:-1]
     sh=float((dr.mean()/dr.std())*np.sqrt(252)) if dr.std()>0 else 0.0
-    pk=np.maximum.accumulate(ea); dd=(ea-pk)/pk; mdd=float(dd.min()*100)
-    ny=len(ea)/252; cagr=(final_eq/INIT)**(1/ny)-1 if ny>0 else 0
+    pk=np.maximum.accumulate(ea)
+    dd=(ea-pk)/pk
+    mdd=float(dd.min()*100)
+    ny=len(ea)/252
+    cagr=(final_eq/INIT)**(1/ny)-1 if ny>0 else 0
     bm_cagr=(bf/bi)**(1/ny)-1 if ny>0 else 0
 
     S="="*88
@@ -642,8 +745,11 @@ def run_optimizer() -> None:
     logger.info(f"  {'YIL':<6}|{'WF-OPT':>10}|{'BIST':>10}|{'ALFA':>10}|{'SONUC':>10}")
     logger.info("-"*53)
     for yr in sorted(yearly):
-        p2=yearly[yr]["p"]; b2=yearly[yr]["b"]; a=p2-b2
-        if a>0: beat+=1
+        p2=yearly[yr]["p"]
+        b2=yearly[yr]["b"]
+        a=p2-b2
+        if a>0:
+            beat+=1
         s="[ALFA]" if a>0 else "[KAYIP]"
         logger.info(f"  {yr:<6}|{p2:>+9.1f}%|{b2:>+9.1f}%|{a:>+9.1f}%|{s:>10}")
     logger.info("-"*53)

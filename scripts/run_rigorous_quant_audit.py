@@ -14,6 +14,12 @@ import sys
 
 import numpy as np
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 # Windows UTF-8 Terminal desteği
 if sys.platform == "win32":
     try:
@@ -21,10 +27,6 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
         logger.error("Exception caught", exc_info=True)
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import structlog
 
 from services.data.historical_warehouse import HistoricalDataWarehouse
 from services.optimization.asymmetric_optimizer import AsymmetricBayesianOptimizer, StrategyParameters

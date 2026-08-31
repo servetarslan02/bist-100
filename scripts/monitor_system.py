@@ -6,10 +6,12 @@ Denetlenen alanlar:
 3. Konteyner loglarında beklenmeyen CRITICAL, FATAL veya Exception kayıtları.
 """
 
+import logging
 import re
 import subprocess
 import sys
-from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 if sys.platform == "win32":
     try:
@@ -19,7 +21,7 @@ if sys.platform == "win32":
         logger.debug("Silent exception caught", exc_info=True)
 
 
-def get_container_states() -> List[Tuple[str, str, str]]:
+def get_container_states() -> list[tuple[str, str, str]]:
     """Tüm Docker konteynerlerinin isim, durum ve sağlık özetini döner."""
     res = subprocess.run(
         ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.State}}"],
@@ -37,7 +39,7 @@ def get_container_states() -> List[Tuple[str, str, str]]:
     return results
 
 
-def check_container_health(containers: List[Tuple[str, str, str]]) -> List[str]:
+def check_container_health(containers: list[tuple[str, str, str]]) -> list[str]:
     """Sağlıksız veya çökmüş konteynerleri tespit eder."""
     issues = []
     for name, status, state in containers:
@@ -51,7 +53,7 @@ def check_container_health(containers: List[Tuple[str, str, str]]) -> List[str]:
     return issues
 
 
-def scan_container_logs(minutes: int = 5) -> Dict[str, List[str]]:
+def scan_container_logs(minutes: int = 5) -> dict[str, list[str]]:
     """Son X dakikadaki konteyner loglarında kritik hataları tarar."""
     patterns = [
         re.compile(r"\bCRITICAL\b", re.IGNORECASE),
@@ -76,7 +78,7 @@ def scan_container_logs(minutes: int = 5) -> Dict[str, List[str]]:
     ps = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True)
     c_names = [c.strip() for c in ps.stdout.strip().split("\n") if c.strip()]
 
-    found_errors: Dict[str, List[str]] = {}
+    found_errors: dict[str, list[str]] = {}
     for name in c_names:
         res = subprocess.run(
             ["docker", "logs", "--since", f"{minutes}m", name],

@@ -400,7 +400,7 @@ class FileAuditor(ast.NodeVisitor):
 # ─── Metin Tabanlı Tarama ─────────────────────────────────────────────────────
 def text_scan(rel: str, content: str, lines: list[str]) -> list[Finding]:
     finds = []
-    is_prod = any(rel.startswith(d + "/") for d in PRODUCTION_DIRS)
+    any(rel.startswith(d + "/") for d in PRODUCTION_DIRS)
 
     _secret_re = re.compile(
         r'(?:password|passwd|secret|api_key|apikey|token|jwt)\s*=\s*["\']([a-zA-Z0-9_\-@!#]{8,})["\']',
@@ -419,7 +419,7 @@ def text_scan(rel: str, content: str, lines: list[str]) -> list[Finding]:
         if not rel.endswith((".example", "_test.py")) and "test" not in rel:
             ms = _secret_re.search(line)
             if ms:
-                val = ms.group(1)
+                ms.group(1)
                 if not any(kw in line for kw in ("os.getenv", "settings.", "Field(", "environ", "env_var")):
                     pass # Disabled B06
                     # finds.append(F(6, "HARDCODED_SECRET", "CRITICAL", rel, idx,
@@ -541,7 +541,7 @@ def b19_signal_weights() -> list[Finding]:
                             if isinstance(item.value, ast.Dict):
                                 total = 0.0
                                 keys_found = set()
-                                for k, v in zip(item.value.keys, item.value.values):
+                                for k, v in zip(item.value.keys, item.value.values, strict=False):
                                     if isinstance(k, ast.Constant) and isinstance(v, ast.Constant):
                                         total += float(v.value)
                                         keys_found.add(str(k.value))
@@ -1195,7 +1195,7 @@ def b34_config_docker_crossref() -> list[Finding]:
         return [F(34, "CONFIG_FILE_MISSING", "HIGH", "services/core/config.py", 1,
             "settings/config dosyasi bulunamadi")]
     config_src = config_path.read_text(encoding="utf-8", errors="replace")
-    config_rel = config_path.relative_to(PROJECT_ROOT).as_posix()
+    config_path.relative_to(PROJECT_ROOT).as_posix()
     field_env_vars: set[str] = set()
     for m in re.finditer(r'([A-Z][A-Z0-9_]{3,})\s*[=:]', config_src):
         field_env_vars.add(m.group(1))
@@ -1313,7 +1313,7 @@ def b36_async_safety(all_files_content: dict[str, str]) -> list[Finding]:
         # 1. asyncio.create_task() sonucu degiskene atilmamis (fire-and-forget)
         for m in re.finditer(r'^\s*asyncio\.create_task\s*\(', content, re.MULTILINE):
             lineno = content[:m.start()].count("\n") + 1
-            line = content[m.start():m.start()+120]
+            content[m.start():m.start()+120]
             if "=" not in content[max(0, m.start()-60):m.start()]:
                 finds.append(F(36, "FIRE_AND_FORGET_TASK", "HIGH",
                     rel, lineno,

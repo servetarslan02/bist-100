@@ -123,9 +123,9 @@ print(f"    - Ham ECE (Olasılık Sapması)  : {xgb_metrics['raw_ece']:.4f}")
 print(f"    - Kalibre ECE (Olasılık Sapması): {xgb_metrics['calibrated_ece']:.4f}")
 
 # Canlı kalibre edilmiş olasılık testi
-sample_X = np.random.randn(10, 70)
-cal_probs_cb = cb_model.predict(sample_X, horizon=5)
-cal_probs_xgb = xgb_model.predict(sample_X, horizon=5)
+sample_x = np.random.randn(10, 70)
+cal_probs_cb = cb_model.predict(sample_x, horizon=5)
+cal_probs_xgb = xgb_model.predict(sample_x, horizon=5)
 
 print(f"\n  * Örnek Kalibre Edilmiş Olasılık Dağılımı (CatBoost): {np.round(cal_probs_cb[:5], 3)}")
 print(f"  * Örnek Kalibre Edilmiş Olasılık Dağılımı (XGBoost) : {np.round(cal_probs_xgb[:5], 3)}")

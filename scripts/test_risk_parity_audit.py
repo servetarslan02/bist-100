@@ -13,8 +13,8 @@ import os
 import sys
 
 import polars as pl
-
 import structlog
+
 logger = structlog.get_logger(__name__)
 
 # Windows UTF-8 Terminal desteği

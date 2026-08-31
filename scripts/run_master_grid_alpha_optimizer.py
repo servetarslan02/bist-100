@@ -99,7 +99,7 @@ def analyze_candlestick_metrics(opens: np.ndarray, highs: np.ndarray, lows: np.n
     """Son mumun alıcı baskısı, satıcı baskısı ve formasyon tespitini döner."""
     o, h, l, c = opens[-1], highs[-1], lows[-1], closes[-1]
     o_prev, h_prev, l_prev, c_prev = opens[-2], highs[-2], lows[-2], closes[-2]
-    o_prev2, h_prev2, l_prev2, c_prev2 = opens[-3], highs[-3], lows[-3], closes[-3]
+    o_prev2, h_prev2, _l_prev2, c_prev2 = opens[-3], highs[-3], lows[-3], closes[-3]
 
     rng = max(h - l, 1e-9)
     body = abs(c - o)
@@ -213,7 +213,7 @@ def precalculate_all_features(stock_dict: dict, bm_df: Any) -> tuple[list, dict,
             buyer_pct, lower_wick, has_bull_pat = analyze_candlestick_metrics(o, h, l, c)
 
             # Quant Momentum & RS
-            roc5 = (p_now / c[-5] - 1) if len(c) >= 5 else 0.0
+            (p_now / c[-5] - 1) if len(c) >= 5 else 0.0
             roc20 = (p_now / c[-20] - 1) if len(c) >= 20 else 0.0
             roc60 = (p_now / c[-60] - 1) if len(c) >= 60 else 0.0
             rs20 = roc20 - bm_r20
@@ -528,7 +528,7 @@ def run_hyper_optimizer() -> None:
         ret, sh, mdd, curve = simulate_strategy_fast(candidate, all_dates, month_ends, features_by_date, bm_close)
 
         # Skor Kriteri: BIST'i geçme + Yüksek Return + Sharpe
-        composite_score = ret * 0.70 + (sh * 300)
+        ret * 0.70 + (sh * 300)
 
         if ret > best_return:
             best_return = ret

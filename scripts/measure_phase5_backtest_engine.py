@@ -67,7 +67,7 @@ def measure_phase5():
     })
 
     t0 = time.perf_counter()
-    lazy_plan = df_raw.lazy().filter(pl.col("timestamp").is_between(20_000, 40_000)).collect()
+    df_raw.lazy().filter(pl.col("timestamp").is_between(20_000, 40_000)).collect()
     t_lazy_fold_ms = (time.perf_counter() - t0) * 1000
 
     # 4. Deterministik Seed Hash Doğrulaması

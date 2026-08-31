@@ -14,6 +14,7 @@ import sys
 import time
 
 import structlog
+
 logger = structlog.get_logger(__name__)
 
 # Windows UTF-8 Terminal desteği

@@ -45,7 +45,7 @@ def measure_phase6():
     large_payload = nats_client._prepare_payload(large_data)
 
     small_is_compressed = small_payload.startswith(b"GZ:")
-    large_is_compressed = large_payload.startswith(b"GZ:")
+    large_payload.startswith(b"GZ:")
 
     raw_large_bytes = len(orjson.dumps(large_data))
     compressed_large_bytes = len(large_payload)
