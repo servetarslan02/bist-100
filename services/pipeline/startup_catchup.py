@@ -89,8 +89,8 @@ class MasterStartupCatchup:
             try:
                 logger.info("1/4: Kacirilan seanslar icin piyasa verileri taraniyor (Backfill)...")
                 active_tickers = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
-                from services.core.constants import BIST_30_TICKERS
-                target_tickers = list(set(active_tickers + list(BIST_30_TICKERS)))
+                from services.ingestion.bist_universe import bist_universe
+                target_tickers = list(set(active_tickers + list(bist_universe.BIST_30_TICKERS)))
                 gaps = await backfill_manager.detect_all_gaps(tickers=target_tickers)
                 if gaps:
                     logger.info(f"Hedef veri boslugu tespit edildi ({len(gaps)} adet). Dolduruluyor...")
