@@ -1,14 +1,10 @@
 -- =====================================================
 -- ALPHA BIST — Shard Database Creation
--- Her shard bağımsız bir PostgreSQL database'i
--- Ticker-based sharding: A-F, G-M, N-Z
+-- NOT: Sharding devre dışı (SHARDING_ENABLED=false)
+-- Bu script sadece ileride sharding aktif edilirse kullanılır.
 -- =====================================================
 
--- Shard 0: A-F tickers
-CREATE DATABASE alpha_bist_af;
-
--- Shard 1: G-M tickers
-CREATE DATABASE alpha_bist_gm;
-
--- Shard 2: N-Z tickers
-CREATE DATABASE alpha_bist_nz;
+-- Sharding aktif edilmek istenirse aşağıdaki komutları çalıştırın:
+-- CREATE DATABASE alpha_bist_af;
+-- CREATE DATABASE alpha_bist_gm;
+-- CREATE DATABASE alpha_bist_nz;

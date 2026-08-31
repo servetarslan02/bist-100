@@ -8,17 +8,6 @@ datasources:
     isDefault: true
     editable: true
 
-  - name: Redis
-    type: redis-datasource
-    access: proxy
-    url: redis://alpha-redis:6379
-    jsonData:
-      password: ${REDIS_PASSWORD}
-      poolSize: 5
-      timeout: 10
-      pipelineWindow: 100ms
-    editable: true
-
   - name: PostgreSQL
     type: postgres
     access: proxy

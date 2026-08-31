@@ -1,11 +1,11 @@
 name: bist-100-main
 x-common:
   restart: unless-stopped
-  env_file: &id001
+  env_file: &id002
   - .env
-  networks: &id002
+  networks: &id003
   - alpha-net
-  logging: &id003
+  logging: &id001
     driver: json-file
     options:
       max-size: 100k
@@ -16,7 +16,8 @@ services:
     restart: unless-stopped
     container_name: alpha-traefik
     mem_limit: 128m
-    logging: *id003
+    cpus: 0.5
+    logging: *id001
     ports:
     - 80:80
     - 443:443
@@ -30,9 +31,9 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - traefik version || exit 0
-      interval: 60s
-      timeout: 10s
+      - wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ping || exit 1
+      interval: 30s
+      timeout: 5s
       retries: 3
       start_period: 10s
     depends_on:
@@ -40,18 +41,76 @@ services:
   postgres:
     restart: unless-stopped
     stop_grace_period: 30s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: timescale/timescaledb:latest-pg17
     container_name: alpha-postgres
     mem_limit: 512m
+    cpus: 1.5
     ports:
     - 5432:5432
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=off\n  -c full_page_writes=off\n  -c max_connections=50\n  -c shared_buffers=128MB\n  -c work_mem=4MB\n  -c maintenance_work_mem=64MB\n  -c effective_cache_size=256MB\n  -c wal_level=minimal\n  -c max_wal_size=256MB\n  -c min_wal_size=64MB\n  -c max_wal_senders=0\n  -c max_replication_slots=0\n  -c hot_standby=off\n  -c checkpoint_completion_target=0.5\n  -c wal_buffers=8MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=100\n  -c max_worker_processes=2\n  -c max_parallel_workers_per_gather=1\n  -c max_parallel_workers=2\n  -c max_parallel_maintenance_workers=1\n  -c autovacuum_max_workers=2\n  -c autovacuum_naptime=300\n  -c log_min_duration_statement=1000\n  -c pg_stat_statements.track=top\n  -c auto_explain.log_min_duration=1000\n"
+    command:
+    - postgres
+    - -c
+    - shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain
+    - -c
+    - fsync=on
+    - -c
+    - synchronous_commit=off
+    - -c
+    - full_page_writes=off
+    - -c
+    - max_connections=50
+    - -c
+    - shared_buffers=128MB
+    - -c
+    - work_mem=4MB
+    - -c
+    - maintenance_work_mem=64MB
+    - -c
+    - effective_cache_size=256MB
+    - -c
+    - wal_level=minimal
+    - -c
+    - max_wal_size=256MB
+    - -c
+    - min_wal_size=64MB
+    - -c
+    - max_wal_senders=0
+    - -c
+    - max_replication_slots=0
+    - -c
+    - hot_standby=off
+    - -c
+    - checkpoint_completion_target=0.5
+    - -c
+    - wal_buffers=8MB
+    - -c
+    - random_page_cost=1.1
+    - -c
+    - effective_io_concurrency=100
+    - -c
+    - max_worker_processes=2
+    - -c
+    - max_parallel_workers_per_gather=1
+    - -c
+    - max_parallel_workers=2
+    - -c
+    - max_parallel_maintenance_workers=1
+    - -c
+    - autovacuum_max_workers=2
+    - -c
+    - autovacuum_naptime=300
+    - -c
+    - log_min_duration_statement=1000
+    - -c
+    - pg_stat_statements.track=top
+    - -c
+    - auto_explain.log_min_duration=1000
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
@@ -64,56 +123,19 @@ services:
       timeout: 5s
       retries: 15
       start_period: 15s
-  # DISABLED: SSD write reduction - replica gereksiz
-  postgres-replica-disabled:
-    profiles: ["disabled"]
-    restart: unless-stopped
-    stop_grace_period: 30s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
-    image: timescale/timescaledb:latest-pg17
-    container_name: alpha-postgres
-    mem_limit: 512m-replica
-    ports:
-    - 5433:5432
-    volumes:
-    - postgres_replica_data:/var/lib/postgresql/data
-    - ./database/replica/setup.sh:/setup.sh:ro
-    entrypoint:
-    - /bin/bash
-    - /setup.sh
-    environment:
-      POSTGRES_DB: alpha_bist
-      POSTGRES_USER: alpha
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
-      PRIMARY_HOST: alpha-postgres
-      PRIMARY_PORT: '5432'
-      REPL_USER: replicator
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U alpha -d alpha_bist
-      interval: 30s
-      timeout: 5s
-      retries: 15
-      start_period: 60s
-    depends_on:
-      postgres:
-        condition: service_healthy
   clickhouse:
     restart: unless-stopped
     stop_grace_period: 30s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: clickhouse/clickhouse-server:26.3-alpine
     container_name: alpha-clickhouse
     mem_limit: 1g
+    cpus: 1.5
     ports:
-      - 8123:8123
-      - 9002:9000
+    - 8123:8123
+    - 9002:9000
     volumes:
     - clickhouse_data:/var/lib/clickhouse
     - ./database/clickhouse/config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
@@ -142,14 +164,15 @@ services:
   zookeeper:
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
+    env_file: *id002
     environment:
       ZOO_4LW_COMMANDS_WHITELIST: ruok
-    networks: *id002
-    logging: *id003
+    networks: *id003
+    logging: *id001
     image: zookeeper:3.9.5
     container_name: alpha-zookeeper
     mem_limit: 256m
+    cpus: 0.5
     ports:
     - 2181:2181
     volumes:
@@ -162,61 +185,62 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-  clickhouse-2:
-    restart: unless-stopped
-    stop_grace_period: 30s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
-    image: clickhouse/clickhouse-server:26.3-alpine
-    container_name: alpha-clickhouse
-    mem_limit: 1g-2
-    ports:
-    - 8124:8123
-    - 9001:9000
-    volumes:
-    - clickhouse_2_data:/var/lib/clickhouse
-    - ./database/clickhouse/config/cluster-2.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
-    - ./database/clickhouse/config/system_logs.xml:/etc/clickhouse-server/config.d/system_logs.xml:ro
-    - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
-    environment:
-      CLICKHOUSE_DB: alpha_bist
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --query 'SELECT 1'
-      interval: 30s
-      timeout: 5s
-      retries: 15
-      start_period: 15s
-    depends_on:
-      zookeeper:
-        condition: service_healthy
   redis:
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: redis:8.8-alpine
     container_name: alpha-redis
     mem_limit: 256m
+    cpus: 1.0
     ports:
     - 6379:6379
     volumes:
     - redis_data:/data
-    command: "redis-server\n  --appendonly no\n  --save 3600 1\n  --save 900 10\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
-      \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 5\n  --dynamic-hz yes\n\
-      \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
-      \  --activedefrag yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
-      \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
+    command:
+    - redis-server
+    - --appendonly
+    - 'no'
+    - --save
+    - '3600'
+    - '1'
+    - --save
+    - '900'
+    - '10'
+    - --dir
+    - /data
+    - --maxmemory
+    - 192mb
+    - --maxmemory-policy
+    - allkeys-lru
+    - --requirepass
+    - ${REDIS_PASSWORD}
+    - --hz
+    - '5'
+    - --dynamic-hz
+    - 'yes'
+    - --lazyfree-lazy-eviction
+    - 'yes'
+    - --lazyfree-lazy-expire
+    - 'yes'
+    - --lazyfree-lazy-server-del
+    - 'yes'
+    - --activedefrag
+    - 'yes'
+    - --active-defrag-threshold-lower
+    - '10'
+    - --active-defrag-threshold-upper
+    - '100'
+    - --active-defrag-cycle-min
+    - '1'
+    - --active-defrag-cycle-max
+    - '25'
+    - --tcp-keepalive
+    - '300'
+    - --timeout
+    - '0'
     healthcheck:
       test:
       - CMD
@@ -228,113 +252,30 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
-  redis-sentinel-1:
-    restart: unless-stopped
-    stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
-    image: redis:8.8-alpine
-    container_name: alpha-sentinel-1
-    mem_limit: 64m
-    entrypoint:
-    - /bin/sh
-    - /etc/sentinel/entrypoint.sh
-    volumes:
-    - ./infrastructure/sentinel/sentinel-1.conf.template:/etc/sentinel/sentinel.conf.template:ro
-    - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
-    - sentinel_1_data:/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test:
-      - CMD
-      - redis-cli
-      - -p
-      - '26379'
-      - ping
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-  redis-sentinel-2:
-    restart: unless-stopped
-    stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
-    image: redis:8.8-alpine
-    container_name: alpha-sentinel-2
-    mem_limit: 64m
-    entrypoint:
-    - /bin/sh
-    - /etc/sentinel/entrypoint.sh
-    volumes:
-    - ./infrastructure/sentinel/sentinel-2.conf.template:/etc/sentinel/sentinel.conf.template:ro
-    - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
-    - sentinel_2_data:/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test:
-      - CMD
-      - redis-cli
-      - -p
-      - '26379'
-      - ping
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-  redis-sentinel-3:
-    restart: unless-stopped
-    stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
-    image: redis:8.8-alpine
-    container_name: alpha-sentinel-3
-    mem_limit: 64m
-    entrypoint:
-    - /bin/sh
-    - /etc/sentinel/entrypoint.sh
-    volumes:
-    - ./infrastructure/sentinel/sentinel-3.conf.template:/etc/sentinel/sentinel.conf.template:ro
-    - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
-    - sentinel_3_data:/data
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test:
-      - CMD
-      - redis-cli
-      - -p
-      - '26379'
-      - ping
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
   nats:
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: nats:2.14-alpine
     container_name: alpha-nats
     mem_limit: 128m
+    cpus: 0.5
     ports:
     - 4222:4222
     - 8222:8222
-    command: ["nats-server", "-js", "-sd", "/data", "-m", "8222", "--sync_interval", "10s"]
+    command:
+    - nats-server
+    - -js
+    - -sd
+    - /data
+    - -m
+    - '8222'
+    - --sync_interval
+    - 10s
     volumes:
     - nats_data:/data
-    storage_opt:
-      size: 256M
     healthcheck:
       test:
       - CMD
@@ -347,18 +288,86 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+  pgbouncer:
+    restart: unless-stopped
+    stop_grace_period: 10s
+    networks: *id003
+    logging: *id001
+    image: edoburu/pgbouncer:latest
+    container_name: alpha-pgbouncer
+    mem_limit: 64m
+    cpus: 0.5
+    ports:
+    - 6432:5432
+    environment:
+      DATABASE_URL: postgres://alpha:${POSTGRES_PASSWORD}@alpha-postgres:5432/alpha_bist
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 3
+      SERVER_IDLE_TIMEOUT: 300
+      SERVER_LIFETIME: 3600
+      SERVER_CONNECT_TIMEOUT: 15
+      QUERY_TIMEOUT: 120
+      QUERY_WAIT_TIMEOUT: 120
+      LOG_CONNECTIONS: 0
+      LOG_DISCONNECTIONS: 0
+      LOG_POOLER_ERRORS: 1
+      STATS_PERIOD: 60
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -h 127.0.0.1 -p 5432 -U alpha
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+  questdb:
+    restart: unless-stopped
+    stop_grace_period: 10s
+    networks: *id003
+    logging: *id001
+    image: questdb/questdb:10.0.1
+    container_name: alpha-questdb
+    mem_limit: 512m
+    cpus: 1.0
+    ports:
+    - 9009:9009
+    - 8812:8812
+    - 9000:9000
+    volumes:
+    - questdb_data:/var/lib/questdb
+    environment:
+      QDB_PG_NET_ENABLED: 'true'
+      QDB_HTTP_ENABLED: 'true'
+      QDB_LINE_TCP_ENABLED: 'true'
+      QDB_LINE_TCP_NET_BIND_TO: 0.0.0.0:9009
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9000/ping || exit 1
+      interval: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
   api:
     restart: unless-stopped
     stop_grace_period: 20s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
     image: alpha-bist-base:latest
     container_name: alpha-api
-    mem_limit: 2g
+    mem_limit: 1536m
+    cpus: 2.0
     ports:
     - 8000:8000
     - 50051:50051
@@ -388,8 +397,9 @@ services:
     - NATS_URL=nats://nats:4222
     - GRPC_PORT=50051
     - GRPC_HOSTS=alpha-api
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_SERVER_CERT=/app/certs/server.crt
     - MTLS_SERVER_KEY=/app/certs/server.key
@@ -423,12 +433,13 @@ services:
   ingestion:
     restart: unless-stopped
     stop_grace_period: 15s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-ingestion
     mem_limit: 512m
+    cpus: 1.0
     command: python -m services.ingestion.main
     volumes:
     - ./services:/app/services:ro
@@ -438,8 +449,9 @@ services:
     tmpfs:
     - /tmp:size=16M,mode=1777
     environment:
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -463,12 +475,13 @@ services:
         condition: service_healthy
   feature-engine:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-feature-engine
     mem_limit: 1g
+    cpus: 1.5
     command: python -m services.features.main
     volumes:
     - ./services:/app/services:ro
@@ -478,19 +491,11 @@ services:
     - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
     - /tmp:size=16M,mode=1777
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities:
-            - gpu
     environment:
-    - TORCH_DEVICE=cuda
-    - NVIDIA_VISIBLE_DEVICES=all
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - TORCH_DEVICE=cpu
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -513,12 +518,13 @@ services:
         condition: service_healthy
   market-state:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-market-state
     mem_limit: 512m
+    cpus: 1.0
     command: python -m services.market_state.main
     volumes:
     - ./services:/app/services:ro
@@ -528,8 +534,9 @@ services:
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -552,12 +559,13 @@ services:
         condition: service_healthy
   intelligence:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-intelligence
-    mem_limit: 2g
+    mem_limit: 1g
+    cpus: 1.5
     command: python -m services.intelligence.main
     volumes:
     - ./services:/app/services:ro
@@ -568,19 +576,11 @@ services:
     - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
     - /tmp:size=32M,mode=1777
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities:
-            - gpu
     environment:
-    - TORCH_DEVICE=cuda
-    - NVIDIA_VISIBLE_DEVICES=all
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - TORCH_DEVICE=cpu
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -603,12 +603,13 @@ services:
         condition: service_healthy
   simulation:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-simulation
     mem_limit: 1g
+    cpus: 1.5
     command: python -m services.simulation.main
     volumes:
     - ./services:/app/services:ro
@@ -618,19 +619,11 @@ services:
     - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
     - /tmp:size=16M,mode=1777
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities:
-            - gpu
     environment:
-    - TORCH_DEVICE=cuda
-    - NVIDIA_VISIBLE_DEVICES=all
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - TORCH_DEVICE=cpu
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -653,12 +646,13 @@ services:
         condition: service_healthy
   risk:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-risk
     mem_limit: 512m
+    cpus: 1.0
     command: python -m services.risk.main
     volumes:
     - ./services:/app/services:ro
@@ -668,8 +662,9 @@ services:
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -690,12 +685,13 @@ services:
         condition: service_healthy
   portfolio:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-portfolio
     mem_limit: 512m
+    cpus: 1.0
     command: python -m services.portfolio.main
     volumes:
     - ./services:/app/services:ro
@@ -705,8 +701,9 @@ services:
     tmpfs:
     - /tmp:size=8M,mode=1777
     environment:
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -728,12 +725,13 @@ services:
   learning:
     restart: unless-stopped
     stop_grace_period: 15s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-learning
-    mem_limit: 2g
+    mem_limit: 1g
+    cpus: 1.5
     command: python -m services.learning.main
     volumes:
     - ./services:/app/services:ro
@@ -754,8 +752,9 @@ services:
     environment:
     - TORCH_DEVICE=cuda
     - NVIDIA_VISIBLE_DEVICES=all
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
+    - REDIS_HOST=redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -778,13 +777,23 @@ services:
         condition: service_healthy
   celery-worker:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: alpha-bist-base:latest
     container_name: alpha-celery-worker
-    mem_limit: 1g
-    command: celery -A services.tasks.queue worker --loglevel=info --concurrency=2 --without-gossip --without-mingle --without-heartbeat
+    mem_limit: 768m
+    cpus: 1.0
+    command:
+    - celery
+    - -A
+    - services.tasks.queue
+    - worker
+    - --loglevel=info
+    - --concurrency=2
+    - --without-gossip
+    - --without-mingle
+    - --without-heartbeat
     volumes:
     - ./services:/app/services:ro
     - ./ml:/app/ml:ro
@@ -795,9 +804,8 @@ services:
     - /tmp:size=16M,mode=1777
     environment:
     - REDIS_HOST=redis
+    - REDIS_PORT=6379
     - REDIS_PASSWORD=${REDIS_PASSWORD}
-    - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
-    - REDIS_SENTINEL_MASTER=alpha-master
     - MTLS_CA_CERT=/app/certs/ca.crt
     - MTLS_CLIENT_CERT=/app/certs/client.crt
     - MTLS_CLIENT_KEY=/app/certs/client.key
@@ -814,14 +822,15 @@ services:
         condition: service_healthy
   dashboard:
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     build:
       context: ./apps/web
       dockerfile: Dockerfile
     container_name: alpha-dashboard
     mem_limit: 256m
+    cpus: 1.0
     ports:
     - 3000:3000
     environment:
@@ -848,13 +857,16 @@ services:
       retries: 5
       start_period: 30s
   postgres-exporter:
+    profiles:
+    - monitoring
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: prometheuscommunity/postgres-exporter:v0.17.1
-    container_name: alpha-postgres
-    mem_limit: 512m-exporter
+    container_name: alpha-postgres-exporter
+    mem_limit: 64m
+    cpus: 0.25
     ports:
     - 9187:9187
     environment:
@@ -875,13 +887,16 @@ services:
       retries: 3
       start_period: 10s
   redis-exporter:
+    profiles:
+    - monitoring
     restart: unless-stopped
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: oliver006/redis_exporter:v1.73.0-alpine
-    container_name: alpha-redis
-    mem_limit: 256m-exporter
+    container_name: alpha-redis-exporter
+    mem_limit: 64m
+    cpus: 0.25
     ports:
     - 9121:9121
     environment:
@@ -903,23 +918,26 @@ services:
       retries: 3
       start_period: 10s
   prometheus:
+    profiles:
+    - monitoring
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: prom/prometheus:v3.14.0
     container_name: alpha-prometheus
     mem_limit: 512m
+    cpus: 1.0
     ports:
     - 9090:9090
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--storage.tsdb.retention.size=512MB'
-      - '--storage.tsdb.wal-compression'
-      - '--web.enable-lifecycle'
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=7d
+    - --storage.tsdb.retention.size=512MB
+    - --storage.tsdb.wal-compression
+    - --web.enable-lifecycle
     volumes:
     - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_data:/prometheus
@@ -936,14 +954,17 @@ services:
       retries: 5
       start_period: 180s
   grafana:
+    profiles:
+    - monitoring
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: grafana/grafana:13.0.7
     container_name: alpha-grafana
     mem_limit: 256m
+    cpus: 0.5
     ports:
     - 3001:3000
     volumes:
@@ -953,9 +974,12 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
       GF_LOG_LEVEL: error
-      GF_DATABASE_WAL: "false"
-      GF_EXPLORE_ENABLED: "false"
-      GF_ALERTING_ENABLED: "false"
+      GF_DATABASE_WAL: 'false'
+      GF_EXPLORE_ENABLED: 'false'
+      GF_ALERTING_ENABLED: 'false'
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     healthcheck:
       test:
       - CMD
@@ -969,24 +993,30 @@ services:
       retries: 5
       start_period: 240s
   mlflow:
+    profiles:
+    - monitoring
     restart: unless-stopped
     stop_grace_period: 10s
-    env_file: *id001
-    networks: *id002
-    logging: *id003
+    env_file: *id002
+    networks: *id003
+    logging: *id001
     image: ghcr.io/mlflow/mlflow:v3.15.2
     container_name: alpha-mlflow
     mem_limit: 512m
+    cpus: 1.0
     ports:
     - 5000:5000
     volumes:
     - mlflow_data:/mlflow
-    command: >
-      sh -c "pip install -q psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/alpha_mlflow --default-artifact-root /mlflow/artifacts --allowed-hosts '*' --workers 1"
+    command:
+    - sh
+    - -c
+    - pip install -q psycopg2-binary && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/alpha_mlflow
+      --default-artifact-root /mlflow/artifacts --allowed-hosts '*' --workers 1
     environment:
       MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/alpha_mlflow
-      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
-      MLFLOW_ALLOWED_HOSTS: "*"
+      MLFLOW_SERVER_ALLOWED_HOSTS: '*'
+      MLFLOW_ALLOWED_HOSTS: '*'
     depends_on:
       postgres:
         condition: service_healthy
@@ -1000,76 +1030,13 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
-  pgbouncer:
-    restart: unless-stopped
-    stop_grace_period: 10s
-    networks: *id002
-    logging: *id003
-    image: edoburu/pgbouncer:latest
-    container_name: alpha-pgbouncer
-    mem_limit: 64m
-    ports:
-    - 6432:5432
-    environment:
-      DATABASE_URL: "postgres://alpha:${POSTGRES_PASSWORD}@alpha-postgres:5432/alpha_bist"
-      POOL_MODE: transaction
-      MAX_CLIENT_CONN: 200
-      DEFAULT_POOL_SIZE: 25
-      MIN_POOL_SIZE: 5
-      RESERVE_POOL_SIZE: 5
-      RESERVE_POOL_TIMEOUT: 3
-      SERVER_IDLE_TIMEOUT: 300
-      SERVER_LIFETIME: 3600
-      SERVER_CONNECT_TIMEOUT: 15
-      QUERY_TIMEOUT: 120
-      QUERY_WAIT_TIMEOUT: 120
-      LOG_CONNECTIONS: 0
-      LOG_DISCONNECTIONS: 0
-      LOG_POOLER_ERRORS: 1
-      STATS_PERIOD: 60
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -h 127.0.0.1 -p 5432 -U alpha
-      interval: 60s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    depends_on:
-      postgres:
-        condition: service_healthy
-  questdb:
-    restart: unless-stopped
-    stop_grace_period: 10s
-    networks: *id002
-    logging: *id003
-    image: questdb/questdb:10.0.1
-    container_name: alpha-questdb
-    mem_limit: 512m
-    ports:
-    - 9009:9009
-    - 8812:8812
-    - 9000:9000
-    volumes:
-    - questdb_data:/var/lib/questdb
-    environment:
-      QDB_PG_NET_ENABLED: "true"
-      QDB_HTTP_ENABLED: "true"
-      QDB_LINE_TCP_ENABLED: "true"
-      QDB_LINE_TCP_NET_BIND_TO: "0.0.0.0:9009"
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - curl -f http://127.0.0.1:9000/ping || exit 1
-      interval: 60s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
   autoheal:
     image: willfarrell/autoheal
     restart: always
-    networks: *id002
-    logging: *id003
+    networks: *id003
+    logging: *id001
+    mem_limit: 32m
+    cpus: 0.25
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -1078,9 +1045,7 @@ services:
     - AUTOHEAL_START_PERIOD=300
 volumes:
   postgres_data: null
-  postgres_replica_data: null
   clickhouse_data: null
-  clickhouse_2_data: null
   zookeeper_data: null
   redis_data: null
   nats_data: null
@@ -1088,9 +1053,6 @@ volumes:
   grafana_data: null
   mlflow_data: null
   questdb_data: null
-  sentinel_1_data: null
-  sentinel_2_data: null
-  sentinel_3_data: null
 networks:
   alpha-net:
     driver: bridge
