@@ -50,7 +50,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(self._conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
         return self._conn
 
     def _fetchall_dicts(self, conn, query: str, params: tuple = ()) -> list[dict]:

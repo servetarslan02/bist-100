@@ -111,7 +111,7 @@ class HistoricalDataWarehouse:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
             # Polars → DuckDB (native, pandas dönüşümü gereksiz)
             conn.execute("DROP TABLE IF EXISTS benchmark_xu100")
             conn.register("_bm_tmp", bm_df)
@@ -143,7 +143,7 @@ class HistoricalDataWarehouse:
                     from services.core.debounce import configure_duckdb_wal
                     configure_duckdb_wal(conn)
                 except Exception:
-                    pass
+                    logger.debug("Silent exception caught", exc_info=True)
                 # Polars → DuckDB (native, pandas dönüşümü gereksiz)
                 conn.execute("DROP TABLE IF EXISTS stock_candles")
                 conn.register("_comb_tmp", comb_df)

@@ -91,7 +91,7 @@ class ScanPersistence:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
             cursor = conn.cursor()
 
             cursor.execute("CREATE SEQUENCE IF NOT EXISTS scan_results_seq START 1")
@@ -163,7 +163,7 @@ class ScanPersistence:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
             for query, params in batch:
                 conn.execute(query, params)
             conn.commit()
@@ -534,7 +534,7 @@ class ScanPersistence:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()

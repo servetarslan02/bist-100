@@ -183,7 +183,7 @@ class PersistentDeadLetterQueue:
             from services.core.debounce import configure_duckdb_wal
             configure_duckdb_wal(conn)
         except Exception:
-            pass
+            logger.debug("Silent exception caught", exc_info=True)
         try:
             yield conn
         finally:

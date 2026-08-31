@@ -226,7 +226,7 @@ class CentralStateStore:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
 
         try:
             yield conn
@@ -461,12 +461,12 @@ class CentralStateStore:
                     try:
                         d["features"] = orjson.loads(d["features"])
                     except Exception:
-                        pass
+                        logger.debug("Silent exception caught", exc_info=True)
                 if d.get("outcome"):
                     try:
                         d["outcome"] = orjson.loads(d["outcome"])
                     except Exception:
-                        pass
+                        logger.debug("Silent exception caught", exc_info=True)
                 results.append(d)
             return results
 

@@ -61,4 +61,4 @@ def configure_duckdb_wal(conn, wal_size: str = "2MB", checkpoint: str = "4MB") -
         conn.execute(f"SET wal_autocheckpoint = '{wal_size}'")
         conn.execute(f"SET checkpoint_threshold = '{checkpoint}'")
     except Exception:
-        pass  # Read-only bağlantılarda hata verir, sorun değil
+        logger.debug("DuckDB WAL config skipped (read-only connection)")

@@ -1232,7 +1232,7 @@ class UnifiedScheduler:
             from services.core.debounce import configure_duckdb_wal
             configure_duckdb_wal(conn)
         except Exception:
-            pass
+            logger.debug("Silent exception caught", exc_info=True)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS scheduler_state (
                 key TEXT PRIMARY KEY,
@@ -1265,7 +1265,7 @@ class UnifiedScheduler:
                 from services.core.debounce import configure_duckdb_wal
                 configure_duckdb_wal(conn)
             except Exception:
-                pass
+                logger.debug("Silent exception caught", exc_info=True)
             # Job run'ları kaydet
             for job_type, ts in self._last_run.items():
                 conn.execute(

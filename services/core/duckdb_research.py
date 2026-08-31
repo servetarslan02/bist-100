@@ -91,7 +91,7 @@ class DuckDBResearchEngine:
                     from services.core.debounce import configure_duckdb_wal
                     configure_duckdb_wal(self._conn)
                 except Exception:
-                    pass
+                    logger.debug("Silent exception caught", exc_info=True)
             except Exception as lock_err:
                 logger.debug("duckdb_rw_connect_failed_trying_readonly", error=str(lock_err))
                 self._conn = duckdb.connect(str(self._db_path), read_only=True)

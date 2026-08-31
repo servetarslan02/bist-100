@@ -16,7 +16,7 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        pass
+        logger.debug("Silent exception caught", exc_info=True)
 
 
 def get_container_states() -> List[Tuple[str, str, str]]:
