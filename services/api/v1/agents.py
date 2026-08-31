@@ -12,10 +12,10 @@ router = APIRouter()
 @router.get("/list")
 async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Agent listesi."""
-    try:
-        return {"agents": ["researcher", "risk_manager", "executor", "monitor"], "count": 4}
-    except Exception as e:
-        return {"agents": [], "error": str(e)}
+    from services.agents.agent_system import AgentRole
+
+    agents = [role.value for role in AgentRole]
+    return {"agents": agents, "count": len(agents)}
 
 
 @router.get("/status")

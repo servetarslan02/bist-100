@@ -143,86 +143,26 @@ async def ohlcv(
 
 
 _KNOWN_COMPANIES = {
-    "THYAO": {
-        "name": "Türk Hava Yolları A.O.",
-        "sector": "Havacılık & Ulaştırma",
-        "pe": 4.8,
-        "pb": 0.95,
-        "cap": "415.0 Milyar ₺",
-    },
-    "ASELS": {
-        "name": "Aselsan Elektronik Sanayi",
-        "sector": "Savunma Sanayi",
-        "pe": 11.2,
-        "pb": 2.40,
-        "cap": "152.0 Milyar ₺",
-    },
-    "GARAN": {"name": "Garanti BBVA", "sector": "Bankacılık", "pe": 3.8, "pb": 0.82, "cap": "510.0 Milyar ₺"},
-    "AKBNK": {"name": "Akbank T.A.Ş.", "sector": "Bankacılık", "pe": 3.6, "pb": 0.78, "cap": "318.0 Milyar ₺"},
-    "ISCTR": {"name": "Türkiye İş Bankası", "sector": "Bankacılık", "pe": 3.4, "pb": 0.75, "cap": "325.0 Milyar ₺"},
-    "YKBNK": {"name": "Yapı ve Kredi Bankası", "sector": "Bankacılık", "pe": 3.5, "pb": 0.80, "cap": "260.0 Milyar ₺"},
-    "KCHOL": {"name": "Koç Holding", "sector": "Holding", "pe": 5.2, "pb": 1.10, "cap": "550.0 Milyar ₺"},
-    "SAHOL": {"name": "Sabancı Holding", "sector": "Holding", "pe": 4.6, "pb": 0.88, "cap": "210.0 Milyar ₺"},
-    "TUPRS": {
-        "name": "Tüpraş Türkiye Petrol Rafinerileri",
-        "sector": "Enerji & Petrol",
-        "pe": 5.8,
-        "pb": 1.45,
-        "cap": "335.0 Milyar ₺",
-    },
-    "EREGL": {
-        "name": "Ereğli Demir ve Çelik Fabrikaları",
-        "sector": "Demir & Çelik",
-        "pe": 9.4,
-        "pb": 0.92,
-        "cap": "182.0 Milyar ₺",
-    },
-    "BIMAS": {
-        "name": "BİM Birleşik Mağazalar",
-        "sector": "Perakende Ticaret",
-        "pe": 14.2,
-        "pb": 4.10,
-        "cap": "328.0 Milyar ₺",
-    },
-    "MGROS": {"name": "Migros Ticaret", "sector": "Perakende Ticaret", "pe": 11.5, "pb": 3.20, "cap": "95.0 Milyar ₺"},
-    "FROTO": {"name": "Ford Otosan", "sector": "Otomotiv", "pe": 8.4, "pb": 3.80, "cap": "395.0 Milyar ₺"},
-    "TOASO": {
-        "name": "Tofaş Türk Otomobil Fabrikası",
-        "sector": "Otomotiv",
-        "pe": 7.8,
-        "pb": 2.90,
-        "cap": "125.0 Milyar ₺",
-    },
-    "PGSUS": {
-        "name": "Pegasus Hava Taşımacılığı",
-        "sector": "Havacılık & Ulaştırma",
-        "pe": 6.2,
-        "pb": 1.80,
-        "cap": "124.0 Milyar ₺",
-    },
-    "SISE": {
-        "name": "Türkiye Şişe ve Cam Fabrikaları",
-        "sector": "Cam & Sanayi",
-        "pe": 7.4,
-        "pb": 1.05,
-        "cap": "144.0 Milyar ₺",
-    },
-    "TCELL": {
-        "name": "Turkcell İletişim Hizmetleri",
-        "sector": "Telekomünikasyon",
-        "pe": 8.9,
-        "pb": 1.65,
-        "cap": "215.0 Milyar ₺",
-    },
-    "TTKOM": {
-        "name": "Türk Telekomünikasyon",
-        "sector": "Telekomünikasyon",
-        "pe": 9.2,
-        "pb": 1.70,
-        "cap": "178.0 Milyar ₺",
-    },
-    "ASTOR": {"name": "Astor Enerji", "sector": "Elektrik & Enerji", "pe": 12.8, "pb": 3.60, "cap": "98.0 Milyar ₺"},
-    "ENJSA": {"name": "Enerjisa Enerji", "sector": "Elektrik & Enerji", "pe": 8.1, "pb": 1.85, "cap": "72.0 Milyar ₺"},
+    "THYAO": {"name": "Türk Hava Yolları A.O.", "sector": "Havacılık & Ulaştırma"},
+    "ASELS": {"name": "Aselsan Elektronik Sanayi", "sector": "Savunma Sanayi"},
+    "GARAN": {"name": "Garanti BBVA", "sector": "Bankacılık"},
+    "AKBNK": {"name": "Akbank T.A.Ş.", "sector": "Bankacılık"},
+    "ISCTR": {"name": "Türkiye İş Bankası", "sector": "Bankacılık"},
+    "YKBNK": {"name": "Yapı ve Kredi Bankası", "sector": "Bankacılık"},
+    "KCHOL": {"name": "Koç Holding", "sector": "Holding"},
+    "SAHOL": {"name": "Sabancı Holding", "sector": "Holding"},
+    "TUPRS": {"name": "Tüpraş Türkiye Petrol Rafinerileri", "sector": "Enerji & Petrol"},
+    "EREGL": {"name": "Ereğli Demir ve Çelik Fabrikaları", "sector": "Demir & Çelik"},
+    "BIMAS": {"name": "BİM Birleşik Mağazalar", "sector": "Perakende Ticaret"},
+    "MGROS": {"name": "Migros Ticaret", "sector": "Perakende Ticaret"},
+    "FROTO": {"name": "Ford Otosan", "sector": "Otomotiv"},
+    "TOASO": {"name": "Tofaş Türk Otomobil Fabrikası", "sector": "Otomotiv"},
+    "PGSUS": {"name": "Pegasus Hava Taşımacılığı", "sector": "Havacılık & Ulaştırma"},
+    "SISE": {"name": "Türkiye Şişe ve Cam Fabrikaları", "sector": "Cam & Sanayi"},
+    "TCELL": {"name": "Turkcell İletişim Hizmetleri", "sector": "Telekomünikasyon"},
+    "TTKOM": {"name": "Türk Telekomünikasyon", "sector": "Telekomünikasyon"},
+    "ASTOR": {"name": "Astor Enerji", "sector": "Elektrik & Enerji"},
+    "ENJSA": {"name": "Enerjisa Enerji", "sector": "Elektrik & Enerji"},
 }
 
 
@@ -289,9 +229,6 @@ async def live_intel_analysis(
         {
             "name": f"{sym} Şirket Grubu",
             "sector": "BIST Sanayi & Ticaret",
-            "pe": 8.5,
-            "pb": 1.8,
-            "cap": "25.0 Milyar ₺",
         },
     )
 
@@ -483,7 +420,11 @@ async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_
 @router.get("/sectors")
 async def sectors(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Sektörler."""
-    return {"sectors": ["BANKA", "SANAYI", "TEKNOLOJI", "PERAKENDE", "ENERJI", "ULAŞTIRMA"]}
+    from services.ingestion.bist_universe import bist_universe
+
+    sector_map = bist_universe.SECTOR_MAP
+    unique_sectors = sorted(set(sector_map.values()))
+    return {"sectors": unique_sectors, "count": len(unique_sectors)}
 
 
 @router.get("/calendar")

@@ -1,10 +1,10 @@
 # ALPHA BIST — Derin Sistem Bütünlük Denetim Raporu
 
-> **Tarih:** 2026-09-01 00:05:08  
+> **Tarih:** 2026-09-01 00:17:21  
 > **Motor:** Deep System Integrity Auditor v4.0 (36 Boyut, 0 Token)  
 > **Kapsam:** Kod Kalitesi + Motor Mantığı + Sinyal Zinciri + Veri Akışı  
-> **Taranan:** 877 dosya, 267,889 satır  
-> **Süre:** 9.03 saniye  
+> **Taranan:** 877 dosya, 267,830 satır  
+> **Süre:** 9.67 saniye  
 > **Sistem Sağlık Puanı:** **100 / 100**
 
 ---
@@ -90,4 +90,4 @@ Motor ve sinyal zincirinde sorun tespit edilmedi. ✅
 | B13 | `services/replace_market.py` | `13` | PRINT_IN_PROD | print() — production'da structlog kullanılmalı |
 
 ---
-*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260901_000508.json`*
+*Deep System Integrity Auditor v3.0 — JSON: `audit/full_spectrum_audit_20260901_001721.json`*
