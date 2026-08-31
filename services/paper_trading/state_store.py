@@ -237,8 +237,8 @@ class PaperStateStore:
             while not self._stop_periodic.wait(self._flush_interval):
                 try:
                     self.periodic_flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Paper state periodic flush error", error=str(e))
         self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="paper-periodic-flush")
         self._periodic_thread.start()
 
@@ -594,13 +594,13 @@ def _flush_paper_on_exit() -> None:
     try:
         paper_state_store.flush()
     except Exception:
-        pass
+        logger.warning("Paper state flush on exit failed", exc_info=True)
 
 def _flush_paper_on_signal(signum, frame) -> None:
     try:
         paper_state_store.flush()
     except Exception:
-        pass
+        logger.warning("Paper state flush on signal failed", exc_info=True)
 
 atexit.register(_flush_paper_on_exit)
 try:

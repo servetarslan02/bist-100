@@ -162,8 +162,8 @@ class DuckDBStore:
             while not self._stop_periodic.wait(self._flush_interval):
                 try:
                     self.periodic_flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Periodic flush error", error=str(e))
         self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="duckdb-periodic-flush")
         self._periodic_thread.start()
 

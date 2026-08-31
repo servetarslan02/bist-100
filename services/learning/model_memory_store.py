@@ -139,8 +139,8 @@ class ModelMemoryStore:
             while not self._stop_periodic.wait(self._flush_interval):
                 try:
                     self.periodic_flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Model memory periodic flush error", error=str(e))
         self._periodic_thread = threading.Thread(target=_loop, daemon=True, name="model-memory-periodic-flush")
         self._periodic_thread.start()
 
@@ -520,13 +520,13 @@ def _flush_model_memory_on_exit() -> None:
     try:
         model_memory_store.flush()
     except Exception:
-        pass
+        logger.warning("Model memory flush on exit failed", exc_info=True)
 
 def _flush_model_memory_on_signal(signum, frame) -> None:
     try:
         model_memory_store.flush()
     except Exception:
-        pass
+        logger.warning("Model memory flush on signal failed", exc_info=True)
 
 atexit.register(_flush_model_memory_on_exit)
 try:
