@@ -114,7 +114,7 @@ class CentralStateStore:
         self._write_buffer: list[tuple] = []
         self._buffer_lock = threading.Lock()
         self._buffer_size = 10  # Küçük buffer — crash safety için
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
         self._flush_interval = 30.0  # saniye
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -253,7 +253,7 @@ class CentralStateStore:
                     conn.execute(query, params)
                 if hasattr(conn, "commit"):
                     conn.commit()
-            self._last_flush = time.time()
+            self._last_flush = time.monotonic()
         except Exception as e:
             logger.debug("State store buffer flush note", error=str(e))
             with self._buffer_lock:
@@ -280,7 +280,7 @@ class CentralStateStore:
 
     def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafından çağrılır)."""
-        if time.time() - self._last_flush > self._flush_interval:
+        if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     # ===================== CIRCUIT BREAKER =====================

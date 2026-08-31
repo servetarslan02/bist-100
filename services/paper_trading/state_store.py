@@ -37,7 +37,7 @@ class PaperStateStore:
         self._write_buffer: list[tuple[str, tuple]] = []
         self._buffer_lock = threading.Lock()
         self._buffer_size = 20  # Batch size
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
         self._flush_interval = 30.0  # saniye
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -225,7 +225,7 @@ class PaperStateStore:
                 for query, params in batch:
                     conn.execute(query, params)
                 conn.commit()
-            self._last_flush = time.time()
+            self._last_flush = time.monotonic()
         except Exception as e:
             logger.error("Paper state buffer flush error", error=str(e))
             with self._buffer_lock:
@@ -244,7 +244,7 @@ class PaperStateStore:
 
     def periodic_flush(self) -> Any:
         """Periyodik flush (scheduler tarafından çağrılır)."""
-        if time.time() - self._last_flush > self._flush_interval:
+        if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def flush(self) -> Any:

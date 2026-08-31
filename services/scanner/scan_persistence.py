@@ -68,7 +68,7 @@ class ScanPersistence:
         self._write_buffer: list[tuple[str, tuple]] = []
         self._buffer_lock = threading.Lock()
         self._buffer_size = 20
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
         self._flush_interval = 30.0
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -168,7 +168,7 @@ class ScanPersistence:
                 conn.execute(query, params)
             conn.commit()
             conn.close()
-            self._last_flush = time.time()
+            self._last_flush = time.monotonic()
         except Exception as e:
             logger.error("Scan persistence buffer flush error", error=str(e))
             with self._buffer_lock:
@@ -191,7 +191,7 @@ class ScanPersistence:
 
     def periodic_flush(self) -> None:
         """Periyodik flush."""
-        if time.time() - self._last_flush > self._flush_interval:
+        if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def save_scan_result(self, record: ScanResultRecord) -> Any:

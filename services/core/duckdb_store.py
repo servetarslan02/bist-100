@@ -68,7 +68,7 @@ class DuckDBStore:
         self._write_buffer: list[tuple[str, tuple]] = []
         self._buffer_lock = threading.Lock()
         self._buffer_size = 10
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
         self._flush_interval = 30.0
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -146,7 +146,7 @@ class DuckDBStore:
         with self._get_conn() as conn:
             for query, params in batch:
                 conn.execute(query, params)
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
 
     def buffered_write(self, query: str, params: tuple) -> Any:
         """Buffered write — toplu yaz."""
@@ -169,7 +169,7 @@ class DuckDBStore:
 
     def periodic_flush(self) -> Any:
         """Periyodik flush."""
-        if time.time() - self._last_flush > self._flush_interval:
+        if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def flush(self) -> Any:

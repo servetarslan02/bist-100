@@ -76,7 +76,7 @@ class ModelMemoryStore:
         self._write_buffer: list[tuple[str, tuple]] = []
         self._buffer_lock = threading.Lock()
         self._buffer_size = 20
-        self._last_flush = time.time()
+        self._last_flush = time.monotonic()
         self._flush_interval = 30.0
         self._periodic_thread: threading.Thread | None = None
         self._stop_periodic = threading.Event()
@@ -123,7 +123,7 @@ class ModelMemoryStore:
                     conn.execute(query, params)
                 if hasattr(conn, 'commit'):
                     conn.commit()
-            self._last_flush = time.time()
+            self._last_flush = time.monotonic()
         except Exception as e:
             logger.error("Model memory buffer flush error", error=str(e))
             with self._buffer_lock:
@@ -146,7 +146,7 @@ class ModelMemoryStore:
 
     def periodic_flush(self) -> None:
         """Periyodik flush."""
-        if time.time() - self._last_flush > self._flush_interval:
+        if time.monotonic() - self._last_flush > self._flush_interval:
             self._flush_buffer()
 
     def _init_tables(self) -> Any:
