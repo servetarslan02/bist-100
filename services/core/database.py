@@ -701,7 +701,7 @@ async def get_redis() -> Any:
             _redis = aioredis.from_url(
                 settings.redis_url,
                 decode_responses=True,
-                max_connections=20,
+                max_connections=500,
                 # Socket timeout — bellek leak önleme
                 socket_timeout=5.0,
                 socket_connect_timeout=3.0,

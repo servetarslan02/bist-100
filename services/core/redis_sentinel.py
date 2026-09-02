@@ -140,7 +140,7 @@ async def get_ha_redis() -> Any:
         _ha_redis = aioredis.from_url(
             settings.redis_url,
             decode_responses=True,
-            max_connections=20,
+            max_connections=500,
         )
         _ha_loop = current_loop
         logger.info("Redis direct connection", host=settings.redis_host)

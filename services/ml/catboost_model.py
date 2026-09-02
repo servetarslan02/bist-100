@@ -506,21 +506,25 @@ class CatBoostModel:
         """Feature interactions hesapla."""
         try:
             interactions = model.get_feature_importance(type="Interaction")
-            if interactions is not None and len(interactions) > 0:
-                result = {}
-                for f1_idx, f2_idx, score in interactions[:10]:
-                    f1 = (
-                        feature_names[int(f1_idx)]
-                        if feature_names and int(f1_idx) < len(feature_names)
-                        else f"f{f1_idx}"
-                    )
-                    f2 = (
-                        feature_names[int(f2_idx)]
-                        if feature_names and int(f2_idx) < len(feature_names)
-                        else f"f{f2_idx}"
-                    )
-                    result[f"{f1}×{f2}"] = round(float(score), 4)
-                self._feature_interactions = result
+            if interactions is not None:
+                interactions_arr = np.asarray(interactions)
+                if interactions_arr.size > 0:
+                    result = {}
+                    for row in interactions_arr[:10]:
+                        if len(row) >= 3:
+                            f1_idx, f2_idx, score = int(row[0]), int(row[1]), float(row[2])
+                            f1 = (
+                                feature_names[f1_idx]
+                                if feature_names and f1_idx < len(feature_names)
+                                else f"f{f1_idx}"
+                            )
+                            f2 = (
+                                feature_names[f2_idx]
+                                if feature_names and f2_idx < len(feature_names)
+                                else f"f{f2_idx}"
+                            )
+                            result[f"{f1}×{f2}"] = round(score, 4)
+                    self._feature_interactions = result
         except Exception as e:
             logger.warning("catboost_handled_exception", error=str(e), context="feature_interaction_compute")
 
