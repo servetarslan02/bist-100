@@ -463,7 +463,7 @@ class XGBoostModel:
                     true_dir = (y_val > 0).astype(int)
                     metrics["val_directional_accuracy"] = round(float(np.mean(pred_dir == true_dir)), 4)
                     # IC
-                    if len(np.unique(val_pred)) > 1:
+                    if len(np.unique(val_pred)) > 1 and len(np.unique(y_val)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
                 except Exception as e:
                     logger.warning("xgboost_handled_exception", error=str(e), context="regressor_metrics")
@@ -639,7 +639,7 @@ def compare_xgboost_vs_lightgbm(
             lgb_pred = lgb_model.predict_batch([dict(zip(feature_names, row, strict=False)) for row in X_val_s])
             lgb_pred = np.array(lgb_pred)
             results["lightgbm"] = {
-                "val_ic": round(float(np.corrcoef(lgb_pred, y_val)[0, 1]), 4) if len(np.unique(lgb_pred)) > 1 else 0.0,
+                "val_ic": round(float(np.corrcoef(lgb_pred, y_val)[0, 1]), 4) if (len(np.unique(lgb_pred)) > 1 and len(np.unique(y_val)) > 1) else 0.0,
                 "val_directional_accuracy": round(float(np.mean((lgb_pred > 0) == (y_val > 0))), 4),
                 "train_samples": lgb_model.train_samples,
                 "confidence": lgb_model.confidence_score,

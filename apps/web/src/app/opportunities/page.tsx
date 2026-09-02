@@ -14,6 +14,8 @@ interface OpportunitySignal {
   ticker: string;
   symbol: string;
   name: string;
+  company_name?: string;
+  confidence_score?: number;
   price: number;
   change_pct: number;
   score: number;
@@ -33,6 +35,7 @@ interface OpportunitySignal {
   momentum_3m: number;
   horizon: string;
   risk_level: string;
+  [key: string]: any;
 }
 
 const CAT_FILTERS = [

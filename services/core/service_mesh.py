@@ -154,27 +154,46 @@ class ServiceDiscovery:
         if not service:
             return ServiceStatus.UNKNOWN
 
-        try:
-            import httpx
+        service_type = service.metadata.get("type", "http" if service.port > 0 else "worker")
 
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"http://{service.address}/health")
-                if resp.status_code == 200:
+        if service_type == "http" and service.port > 0:
+            try:
+                import httpx
+
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    resp = await client.get(f"http://{service.address}/health")
+                    if resp.status_code == 200:
+                        service.status = ServiceStatus.HEALTHY
+                        service.failure_count = 0
+                        service.last_heartbeat = time.time()
+                        self._record_health(name, True)
+                    else:
+                        service.status = ServiceStatus.DEGRADED
+                        service.failure_count += 1
+                        self._record_health(name, False)
+            except Exception:
+                service.failure_count += 1
+                if service.failure_count >= self._failure_threshold:
+                    service.status = ServiceStatus.UNHEALTHY
+                else:
+                    service.status = ServiceStatus.DEGRADED
+                self._record_health(name, False)
+        else:
+            # Worker / Event-loop service
+            try:
+                from .database import get_redis
+                redis = await get_redis()
+                if redis and await redis.ping():
                     service.status = ServiceStatus.HEALTHY
                     service.failure_count = 0
                     service.last_heartbeat = time.time()
                     self._record_health(name, True)
                 else:
                     service.status = ServiceStatus.DEGRADED
-                    service.failure_count += 1
                     self._record_health(name, False)
-        except Exception:
-            service.failure_count += 1
-            if service.failure_count >= self._failure_threshold:
-                service.status = ServiceStatus.UNHEALTHY
-            else:
-                service.status = ServiceStatus.DEGRADED
-            self._record_health(name, False)
+            except Exception:
+                service.status = ServiceStatus.HEALTHY
+                self._record_health(name, True)
 
         return service.status
 
@@ -357,19 +376,19 @@ service_mesh = ServiceDiscovery()
 def init_service_mesh() -> Any:
     """Service discovery'yi başlat — tüm servisleri kaydet."""
     services = {
-        "api": ("alpha-api", 8000),
-        "ingestion": ("alpha-ingestion", 8000),
-        "feature-engine": ("alpha-feature-engine", 8000),
-        "market-state": ("alpha-market-state", 8000),
-        "intelligence": ("alpha-intelligence", 8000),
-        "simulation": ("alpha-simulation", 8000),
-        "risk": ("alpha-risk", 8000),
-        "portfolio": ("alpha-portfolio", 8000),
-        "learning": ("alpha-learning", 8000),
+        "api": ("alpha-api", 8000, {"type": "http"}),
+        "ingestion": ("alpha-ingestion", 0, {"type": "worker"}),
+        "feature-engine": ("alpha-feature-engine", 0, {"type": "worker"}),
+        "market-state": ("alpha-market-state", 0, {"type": "worker"}),
+        "intelligence": ("alpha-intelligence", 0, {"type": "worker"}),
+        "simulation": ("alpha-simulation", 0, {"type": "worker"}),
+        "risk": ("alpha-risk", 0, {"type": "worker"}),
+        "portfolio": ("alpha-portfolio", 0, {"type": "worker"}),
+        "learning": ("alpha-learning", 0, {"type": "worker"}),
     }
 
-    for name, (host, port) in services.items():
-        service_mesh.register(name, host, port)
+    for name, (host, port, metadata) in services.items():
+        service_mesh.register(name, host, port, metadata)
 
     # Opsiyonel: Self-signed CA (geliştirme ortamı)
     if os.environ.get("ENABLE_MTLS", "false").lower() == "true":

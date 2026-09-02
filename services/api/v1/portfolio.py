@@ -41,6 +41,7 @@ def _get_pm() -> Any:
     """Tekil gerceklik kaynagi: paper_orchestrator VirtualPortfolio."""
     from services.paper_trading.paper_orchestrator import paper_orchestrator
 
+    paper_orchestrator.portfolio.load_from_store()
     return paper_orchestrator.portfolio
 
 
@@ -63,11 +64,10 @@ def _get_service() -> Any:
 async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Portföy özeti — cash, invested, total value, positions count."""
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
-
-        summary = paper_orchestrator.portfolio.get_summary()
+        pm = _get_pm()
+        summary = pm.get_summary()
         summary["positions_count"] = summary.get("num_positions", 0)
-        summary["positions"] = paper_orchestrator.portfolio.get_all_positions()
+        summary["positions"] = pm.get_all_positions()
         return summary
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
@@ -78,10 +78,9 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
 async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Açık pozisyonlar — ticker, quantity, entry/current price, P&L."""
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
-
-        pos_list = paper_orchestrator.portfolio.get_all_positions()
-        total_val = paper_orchestrator.portfolio.get_total_value()
+        pm = _get_pm()
+        pos_list = pm.get_all_positions()
+        total_val = pm.get_total_value()
         return {
             "positions": pos_list,
             "count": len(pos_list),

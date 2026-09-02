@@ -12,16 +12,17 @@ from services.core.risk_manager import RiskManager
 
 
 class FeatureAblator:
-    """Otomatik eklendi."""
+    """Feature ablation and redundancy analysis engine."""
+
     def __init__(self, base_features: list[str]):
-        """Otomatik eklendi."""
+        """Initialize FeatureAblator."""
         self.base_features = base_features
         self.engine = AlphaEngine()
         self.rm = RiskManager()
         self.wf = WalkForwardEngine(train_days=252, test_days=63, step_days=63, purge_days=5, embargo_days=5)
 
     def _run_ablation_test(self, active_features: list[str], market_data, bm_df, sector_map, common_dates) -> dict:
-        """Belirtilen feature seti ile hizli bir OOS testi dondurur (Sadece 5 fold - temsil kabiliyeti yuksek son yillar)"""
+        """Belirtilen feature seti ile hizli bir OOS testi dondurur (Sadece 5 fold - temsil kabiliyeti yuksek son yillar)."""
         all_signals = []
         folds = self.wf.create_folds(common_dates)
 
@@ -30,9 +31,8 @@ class FeatureAblator:
 
         for fold in target_folds:
             # AlphaEngine'e sadece aktif feature'lari kullanmasi icin kanca atiyoruz
-            self.engine.params = self.engine.params.with_columns(
-                pl.lit(1.0).alias("feature_fraction")
-            )  # Ablasyonda fraction kullanilmaz
+            if isinstance(self.engine.params, dict):
+                self.engine.params["feature_fraction"] = 1.0  # Ablasyonda fraction kullanilmaz
 
             success = self.engine.train(market_data, bm_df, sector_map, fold["train_start"], fold["train_end"])
             if not success:
@@ -43,22 +43,29 @@ class FeatureAblator:
             if not top_picks:
                 continue
 
-            # Eşit ağırlık (%10) ve rejim (Market Regime'i 1.0 sabitliyoruz ki ablation sadece feature'lari test etsin)
-
+            # Eşit ağırlık (%10)
             for pick in top_picks:
                 ticker = pick["ticker"]
                 adj_weight = 0.10  # Equal weight
 
                 df_t = market_data.get(ticker)
-                t_start = pl.Series(fold["test_start"])
-                t_end = pl.Series(fold["test_end"])
-                df_test = df_t[(df_t.index >= t_start) & (df_t.index <= t_end)]
-                if df_test.empty:
+                if df_t is None or len(df_t) == 0:
                     continue
+
+                if "Date" in df_t.columns:
+                    df_test = df_t.filter((pl.col("Date") >= fold["test_start"]) & (pl.col("Date") <= fold["test_end"]))
+                else:
+                    continue
+
+                if len(df_test) == 0:
+                    continue
+
+                start_date_str = str(df_test["Date"][0])[:10]
+                end_date_str = str(df_test["Date"][-1])[:10]
 
                 all_signals.append(
                     {
-                        "date": str(df_test.index[0].date()),
+                        "date": start_date_str,
                         "ticker": ticker,
                         "action": "BUY",
                         "score": pick["score"],
@@ -67,7 +74,7 @@ class FeatureAblator:
                 )
                 all_signals.append(
                     {
-                        "date": str(df_test.index[-1].date()),
+                        "date": end_date_str,
                         "ticker": ticker,
                         "action": "SELL",
                         "score": pick["score"],
@@ -76,18 +83,20 @@ class FeatureAblator:
                 )
 
         if not all_signals:
-            return {"cagr_pct": 0, "max_drawdown_pct": 0, "sharpe_ratio": 0}
+            return {"cagr_pct": 0.0, "max_drawdown_pct": 0.0, "sharpe_ratio": 0.0}
 
         # Fiyat verilerini formatla
         price_data_formatted = {}
         for ticker, df_t in market_data.items():
-            if df_t.empty:
+            if df_t is None or len(df_t) == 0:
                 continue
             rows = []
-            for d, row in df_t.iterrows():
+            for row in df_t.iter_rows(named=True):
+                d_val = row.get("Date")
+                date_str = str(d_val)[:10] if d_val is not None else ""
                 rows.append(
                     {
-                        "date": str(d.date()) if hasattr(d, "date") else str(d)[:10],
+                        "date": date_str,
                         "close": float(row.get("Close", 0.0)),
                         "volume": float(row.get("Volume", 0.0)),
                     }
@@ -110,15 +119,18 @@ class FeatureAblator:
         return report.metrics
 
     def run_full_ablation(self) -> Any:
-        """Otomatik eklendi."""
+        """Run full ablation study across all base features."""
         logger.info("📥 Ablasyon icin 3 yillik hizli veri seti indiriliyor (2021-2024)...")
         market_data, bm_df, sector_map = self.engine.fetch_data("2021-01-01", "2024-11-03")
-        common_dates = list(sorted([d.strftime("%Y-%m-%d") for d in bm_df.index]))
+        common_dates = list(sorted([str(d)[:10] for d in bm_df["Date"]])) if "Date" in bm_df.columns else []
 
         logger.info("▶ Baseline (Tum featurelar) OOS hesaplaniyor...")
         base_metrics = self._run_ablation_test(self.base_features, market_data, bm_df, sector_map, common_dates)
+        cagr = getattr(base_metrics, "cagr_pct", 0.0)
+        maxdd = getattr(base_metrics, "max_drawdown_pct", 0.0)
+        sharpe = getattr(base_metrics, "sharpe_ratio", 0.0)
         logger.info(
-            f"🌟 Baseline -> CAGR: %{base_metrics.cagr_pct:.2f}, MaxDD: -%{base_metrics.max_drawdown_pct:.2f}, Sharpe: {base_metrics.sharpe_ratio:.2f}"
+            f"🌟 Baseline -> CAGR: %{cagr:.2f}, MaxDD: -%{maxdd:.2f}, Sharpe: {sharpe:.2f}"
         )
 
         ablation_results = []
@@ -130,26 +142,27 @@ class FeatureAblator:
             test_features = [f for f in self.base_features if f != feature]
             m = self._run_ablation_test(test_features, market_data, bm_df, sector_map, common_dates)
 
-            diff = m.sharpe_ratio - base_metrics.sharpe_ratio
+            m_sharpe = getattr(m, "sharpe_ratio", 0.0)
+            diff = m_sharpe - sharpe
             if diff > 0.05:
                 logger.info(
-                    f"  🔴 KESIN ZARARLI! '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f} ({(diff):.2f} artis)"
+                    f"  🔴 KESIN ZARARLI! '{feature}' cikarildiginda Sharpe {sharpe:.2f} -> {m_sharpe:.2f} ({(diff):.2f} artis)"
                 )
             elif diff > 0.0:
                 logger.info(
-                    f"  🟠 MUHTEMEL GURULTU. '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f} ({(diff):.2f} artis)"
+                    f"  🟠 MUHTEMEL GURULTU. '{feature}' cikarildiginda Sharpe {sharpe:.2f} -> {m_sharpe:.2f} ({(diff):.2f} artis)"
                 )
             else:
                 logger.info(
-                    f"  🟢 FAYDALI. '{feature}' cikarildiginda Sharpe {base_metrics.sharpe_ratio:.2f} -> {m.sharpe_ratio:.2f}"
+                    f"  🟢 FAYDALI. '{feature}' cikarildiginda Sharpe {sharpe:.2f} -> {m_sharpe:.2f}"
                 )
 
             ablation_results.append(
                 {
                     "dropped_feature": feature,
-                    "cagr": m.cagr_pct,
-                    "maxdd": m.max_drawdown_pct,
-                    "sharpe": m.sharpe_ratio,
+                    "cagr": getattr(m, "cagr_pct", 0.0),
+                    "maxdd": getattr(m, "max_drawdown_pct", 0.0),
+                    "sharpe": m_sharpe,
                     "diff": diff,
                 }
             )
@@ -159,3 +172,4 @@ class FeatureAblator:
         for res in ablation_results:
             if res["diff"] > 0:
                 logger.info(f"DROP: {res['dropped_feature']} -> Yeni Sharpe: {res['sharpe']:.2f} (Artis: +{res['diff']:.2f})")
+

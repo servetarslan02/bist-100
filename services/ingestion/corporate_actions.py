@@ -115,33 +115,8 @@ class CorporateActionsHandler:
         actions = self._actions.get(ticker, [])
 
         for action in actions:
-            # Sadece price_date'ten ÖNCEKİ olayları düzelt
-            # (price_date = ex_date ise o günkü fiyat henüz düzeltilmemiş)
-            if action.ex_date >= price_date:
-                continue
-
-            if action.action_type == ActionType.DIVIDEND:
-                # Temettü: fiyat temettü miktarı kadar düşürülür
-                if action.dividend_per_share > 0:
-                    adjusted = adjusted - action.dividend_per_share
-
-            elif action.action_type == ActionType.STOCK_SPLIT:
-                # Bölünme: fiyat bölünme oranına göre düşürülür, lot sayısı artar
-                if action.split_ratio > 1:
-                    adjusted = adjusted / action.split_ratio
-
-            elif action.action_type == ActionType.BONUS_SHARE:
-                # Bedelsiz: fiyat düzeltilir
-                if action.bonus_ratio > 0:
-                    # Yeni fiyat = eski fiyat / (1 + bonus_ratio)
-                    adjusted = adjusted / (1 + action.bonus_ratio)
-
-            elif action.action_type == ActionType.RIGHTS_ISSUE:
-                # Bedelli: ağırlıklı ortalama fiyat hesaplanır
-                if action.rights_ratio > 0 and action.rights_price > 0:
-                    # Teorik fiyat = (eski fiyat + yeni fiyat × ratio) / (1 + ratio)
-                    # Ama bu fiyat düzeltmesi için basitleştirilmiş hali
-                    adjusted = (adjusted + action.rights_price * action.rights_ratio) / (1 + action.rights_ratio)
+            if action.ex_date > price_date:
+                adjusted = self._adjust_single_price(adjusted, action)
 
         return round(adjusted, 4)
 

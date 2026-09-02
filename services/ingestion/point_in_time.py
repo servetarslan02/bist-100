@@ -111,6 +111,12 @@ class PointInTimeValidator:
             True: Veri o anda biliniyordu
             False: Veri gelecekte (look-ahead bias!)
         """
+        # Timezone uyumluluğu sağla
+        if data_timestamp.tzinfo is not None and query_timestamp.tzinfo is None:
+            query_timestamp = query_timestamp.replace(tzinfo=data_timestamp.tzinfo)
+        elif data_timestamp.tzinfo is None and query_timestamp.tzinfo is not None:
+            data_timestamp = data_timestamp.replace(tzinfo=query_timestamp.tzinfo)
+
         config = self.DATA_DELAYS.get(data_type)
         if not config:
             # Bilinmeyen veri tipi — varsayılan: anında

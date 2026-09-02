@@ -23,7 +23,7 @@ from typing import Any
 import numpy as np
 import structlog
 from opentelemetry import trace
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.data_schemas")
@@ -55,18 +55,21 @@ class OHLCVSchema(BaseModel):
     close: float = Field(gt=0)
     volume: float = Field(ge=0)
 
-    @validator("high")
-    def high_gte_low(self, v, values) -> Any:
+    @field_validator("high")
+    @classmethod
+    def high_gte_low(cls, v: float, info: ValidationInfo) -> float:
         """Otomatik eklendi."""
-        if "low" in values and v < values["low"]:
+        if info.data and "low" in info.data and v < info.data["low"]:
             raise ValueError("high must be >= low")
         return v
 
-    @validator("open")
-    def open_in_range(self, v, values) -> Any:
+    @field_validator("open")
+    @classmethod
+    def open_in_range(cls, v: float, info: ValidationInfo) -> float:
         """Otomatik eklendi."""
-        if "high" in values and "low" in values and (v > values["high"] or v < values["low"]):
-            raise ValueError("open must be between low and high")
+        if info.data and "high" in info.data and "low" in info.data:
+            if v > info.data["high"] or v < info.data["low"]:
+                raise ValueError("open must be between low and high")
         return v
 
 
@@ -77,8 +80,9 @@ class FeatureVectorSchema(BaseModel):
     date: datetime
     features: dict[str, float]
 
-    @validator("features")
-    def no_nan_inf(self, v) -> Any:
+    @field_validator("features")
+    @classmethod
+    def no_nan_inf(cls, v: dict[str, float]) -> dict[str, float]:
         """Otomatik eklendi."""
         for key, val in v.items():
             if val is not None and (np.isnan(val) or np.isinf(val)):

@@ -272,8 +272,6 @@ services:
     - /data
     - -m
     - '8222'
-    - --sync_interval
-    - 10s
     volumes:
     - nats_data:/data
     healthcheck:
@@ -343,6 +341,7 @@ services:
     volumes:
     - questdb_data:/var/lib/questdb
     environment:
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx256m
       QDB_PG_NET_ENABLED: 'true'
       QDB_HTTP_ENABLED: 'true'
       QDB_LINE_TCP_ENABLED: 'true'

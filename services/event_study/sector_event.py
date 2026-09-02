@@ -11,18 +11,31 @@ import structlog
 
 logger = structlog.get_logger()
 
-# BIST sektör mapping
-SECTOR_STOCKS = {
-    "BANKA": ["AKBNK", "GARAN", "HALKB", "ISCTR", "SKBNK", "TSKB", "VAKBN", "YKBNK"],
-    "SANAYI": ["ASELS", "EREGL", "KRDMD", "SAHOL", "SISE", "TCELL", "THYAO", "TOASO"],
-    "TEKNOLOJI": ["ASELS", "HTTBT", "LOGO", "NETAS", "PENTA"],
-    "ENERJI": ["AYEN", "AYDEM", "ENERYAK", "ODAS", "TUPRS"],
-    "GIDA": ["AEFES", "BANVT", "CCOLA", "KNFRT", "MGROS", "SAHOL"],
-    "ULAŞIM": ["THYAO", "PEGASUS", "DOHOL"],
-    "İNŞAAT": ["ENKAI", "ISGYO", "KLGYO", "OYAYO"],
-    "METAL": ["EREGL", "KRDMD", "IZMDC"],
-    "TEKSTIL": ["BRISA", "DESA", "KORDS"],
-}
+class DynamicSectorMap(dict):
+    """BIST evreninden dinamik sektör eşleme haritası."""
+
+    def get(self, key: Any, default: Any = None) -> list[str]:
+        try:
+            from services.ingestion.bist_universe import bist_universe
+
+            stocks = bist_universe.get_tickers_by_sector(str(key))
+            if stocks:
+                return stocks
+        except Exception:
+            pass
+        return default if default is not None else []
+
+    def items(self) -> Any:
+        try:
+            from services.ingestion.bist_universe import bist_universe
+
+            sectors = ["BANKA", "SANAYI", "TEKNOLOJI", "ENERJI", "GIDA", "ULASIM", "INSAAT", "METAL", "TEKSTIL", "HOLDING", "SIGORTA", "MADEN"]
+            return [(s, bist_universe.get_tickers_by_sector(s)) for s in sectors]
+        except Exception:
+            return []
+
+
+SECTOR_STOCKS = DynamicSectorMap()
 
 
 class SectorEventAnalyzer:

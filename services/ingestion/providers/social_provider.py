@@ -427,44 +427,65 @@ class SocialProvider:
         if not text:
             return 0.0
 
-        text_lower = text.lower()
-        words = text_lower.split()
-
-        pos_count = 0
-        neg_count = 0
-        negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
-        negate = False
-        for word in words:
-            if word in negation_words:
-                negate = True
-                continue
-            if word in TURKISH_POSITIVE:
-                if negate:
-                    neg_count += 1
-                else:
-                    pos_count += 1
-                negate = False
-            elif word in TURKISH_NEGATIVE:
-                if negate:
-                    pos_count += 1
-                else:
-                    neg_count += 1
-                negate = False
-
-        total = pos_count + neg_count
-        if total == 0:
-            return 0.0
-
-        # Normalize edilmiş sentiment
-        sentiment = (pos_count - neg_count) / total
-
-        # Emoji kontrolü
+        # Emojileri önce say
         emoji_pos = text.count("🚀") + text.count("📈") + text.count("💰") + text.count("🟢")
         emoji_neg = text.count("📉") + text.count("💀") + text.count("🔴") + text.count("😱")
 
+        # Noktalama işaretlerini temizle
+        clean_text = re.sub(r"[^\w\s]", " ", text.lower())
+        words = clean_text.split()
+
+        pos_count = 0
+        neg_count = 0
+        post_negations = {"değil", "degil", "yok", "olmayan", "değildir"}
+        pre_negations = {"hiç", "asla", "sakın"}
+        negate_next = False
+        last_sentiment = None
+
+        for word in words:
+            if word in post_negations:
+                if last_sentiment == "pos":
+                    pos_count -= 1
+                    neg_count += 1
+                elif last_sentiment == "neg":
+                    neg_count -= 1
+                    pos_count += 1
+                last_sentiment = None
+                continue
+            if word in pre_negations:
+                negate_next = True
+                continue
+            if word in TURKISH_POSITIVE:
+                if negate_next:
+                    neg_count += 1
+                    last_sentiment = "neg"
+                else:
+                    pos_count += 1
+                    last_sentiment = "pos"
+                negate_next = False
+            elif word in TURKISH_NEGATIVE:
+                if negate_next:
+                    pos_count += 1
+                    last_sentiment = "pos"
+                else:
+                    neg_count += 1
+                    last_sentiment = "neg"
+                negate_next = False
+            else:
+                last_sentiment = None
+                negate_next = False
+
+        total = pos_count + neg_count
+        word_sentiment = (pos_count - neg_count) / total if total > 0 else 0.0
+
         if emoji_pos + emoji_neg > 0:
             emoji_sentiment = (emoji_pos - emoji_neg) / (emoji_pos + emoji_neg)
-            sentiment = (sentiment + emoji_sentiment) / 2
+            if total > 0:
+                sentiment = (word_sentiment + emoji_sentiment) / 2.0
+            else:
+                sentiment = emoji_sentiment
+        else:
+            sentiment = word_sentiment
 
         return round(max(-1.0, min(1.0, sentiment)), 3)
 
@@ -514,9 +535,6 @@ class SocialProvider:
                 continue
             if isinstance(result, list):
                 all_items.extend(result)
-
-        # Aggregate sentiment
-        [item.get("sentiment", 0) for item in all_items if item.get("sentiment") is not None]
 
         return {
             "ticker": ticker,

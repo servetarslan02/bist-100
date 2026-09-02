@@ -528,7 +528,8 @@ def create_app() -> FastAPI:
             logger.warning("Caught Exception in health", exc_info=True)
 
         all_services = {**db_health, "nats": nats_status, "grpc": grpc_status, "mtls": mtls_status}
-        all_healthy = all(v in ("healthy", "disabled") for v in all_services.values())
+        core_service_keys = ["postgres", "clickhouse", "redis", "questdb", "nats", "grpc", "mtls"]
+        all_healthy = all(all_services.get(k) in ("healthy", "disabled") for k in core_service_keys)
         return {
             "status": "healthy" if all_healthy else "degraded",
             "timestamp": datetime.now(UTC).isoformat(),

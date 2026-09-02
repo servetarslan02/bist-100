@@ -28,6 +28,10 @@ class EventTask:
     priority: int  # 1=en yüksek, 5=en düşük
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
+    def __lt__(self, other: "EventTask") -> bool:
+        """Tie-breaker for PriorityQueue ordering."""
+        return self.timestamp < other.timestamp
+
 
 class EventPriorityQueue:
     """

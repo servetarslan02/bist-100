@@ -133,7 +133,7 @@ class BackfillManager:
             try:
                 from ..ingestion.bist_universe import bist_universe
 
-                tickers = bist_universe.BIST_ALL_TICKERS
+                tickers = bist_universe.get_tickers()
             except Exception:
                 logger.warning("Cannot load BIST universe for gap detection")
                 return []

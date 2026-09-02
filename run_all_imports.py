@@ -61,7 +61,7 @@ ALL_MODULES = [
     "services.ingestion.providers.bist_stream",
     "services.ingestion.providers.macro_provider",
     "services.ingestion.providers.matriks_provider",
-    "services.ingestion.providers.provider_manager",
+    "services.ingestion.provider_manager",
     "services.ingestion.bist_universe",
     "services.ingestion.universe_enhancements",
     "services.ingestion.main",
@@ -123,7 +123,7 @@ ALL_MODULES = [
     "services.backtest.walk_forward",
     "services.backtest.enhanced_walk_forward",
     "services.agents.agent_system",
-    "services.scanner.alpha_engine",
+    "services.scanner.custom_filters",
     "services.scanner.alpha_scanner",
     "services.scanner.event_queue",
     "services.scanner.event_scanner",
@@ -184,13 +184,13 @@ def main() -> Any:
     for mod in ALL_MODULES:
         try:
             importlib.import_module(mod)
-            logger.info(f"  ✅ {mod}")
+            logger.info(f"  [OK] {mod}")
             passed += 1
         except Exception as e:
-            logger.info(f"  ❌ {mod}: {e}")
+            logger.error(f"  [FAIL] {mod}: {e}")
             failed += 1
     elapsed = time.time() - start
-    logger.info(f"\n{'=' * 60}\nSONUÇ: {passed} başarılı, {failed} başarısız ({elapsed:.1f}s)\n{'=' * 60}")
+    logger.info(f"\n{'=' * 60}\nSONUC: {passed} basarili, {failed} basarisiz ({elapsed:.1f}s)\n{'=' * 60}")
     sys.exit(0 if failed == 0 else 1)
 
 

@@ -34,8 +34,9 @@ class RelativeStrengthMotor:
             return result
 
         # Relative strength (stock / benchmark ratio)
-        rs = stock_close / benchmark_close
-        rs = rs[~np.isnan(rs)]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rs = np.where(benchmark_close > 0, stock_close / benchmark_close, np.nan)
+        rs = rs[np.isfinite(rs)]
         if len(rs) < 5:
             return result
 

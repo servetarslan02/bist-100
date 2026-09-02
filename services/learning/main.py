@@ -90,87 +90,65 @@ class LearningService:
                 await asyncio.sleep(3600)
 
     async def _train_all_models(self) -> Any:
-        """Train all ML models."""
+        """Train all ML models across full BIST universe using 70+ feature engine."""
         try:
-            from ml.models import MODEL_CONFIGS, LightGBMModel
-
-            # Get training data
-            training_data = await self._prepare_training_data()
-            if training_data is None or training_data.is_empty():
-                logger.warning("No training data available")
-                return
-
-            for model_name, config in MODEL_CONFIGS.items():
-                try:
-                    logger.info("Training model", name=model_name)
-
-                    # Prepare features and target
-                    feature_cols = [f for f in config.features if f in training_data.columns]
-                    target_col = config.target
-
-                    if target_col not in training_data.columns:
-                        logger.warning("Target column not found", target=target_col)
-                        continue
-
-                    # Split data
-                    X = training_data.select(feature_cols).to_numpy()
-                    y = training_data.select(target_col).to_numpy().ravel()
-
-                    # Remove NaN
-                    mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
-                    X, y = X[mask], y[mask]
-
-                    if len(X) < 100:
-                        logger.warning("Insufficient training data", name=model_name, samples=len(X))
-                        continue
-
-                    # Train/test split (80/20)
-                    split_idx = int(len(X) * 0.8)
-                    X_train, X_val = X[:split_idx], X[split_idx:]
-                    y_train, y_val = y[:split_idx], y[split_idx:]
-
-                    # Train model
-                    model = LightGBMModel(config)
-                    model.train(X_train, y_train, X_val, y_val)
-
-                    # Evaluate
-                    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-                    y_pred = model.predict(X_val)
-
-                    metrics = {
-                        "rmse": float(np.sqrt(mean_squared_error(y_val, y_pred))),
-                        "mae": float(mean_absolute_error(y_val, y_pred)),
-                        "r2": float(r2_score(y_val, y_pred)),
-                        "training_samples": len(X_train),
-                        "validation_samples": len(X_val),
-                    }
-
-                    model.metrics = metrics
-
-                    # Save model
-                    import os
-
-                    model_dir = f"ml/saved_models/{model_name}"
-                    os.makedirs(model_dir, exist_ok=True)
-                    model.save(f"{model_dir}/{config.version}.pkl")
-
-                    # Register in database
-                    await self._register_model(model_name, config, metrics)
-
-                    logger.info("Model trained", name=model_name, metrics=metrics)
-
-                except Exception as e:
-                    logger.error("Model training failed", name=model_name, error=str(e))
-
-            # 4-Direkli Master Swing Ranking Modelini (Tum 629 hisse) de senkron egit ve guncelle
+            logger.info("Executing Master 4-Pillar Ranking & Alpha Training across Full BIST Universe...")
+            # 1. PRIMARY: 70+ Özellikli Master Ranking Modelini (Tüm 600+ BIST hissesi) eğit ve güncelle
             try:
                 from services.ml.train_all_models import train_all_models
-                train_all_models()
-                logger.info("Master 4-pillar swing ranking models updated successfully")
-            except Exception as e:
-                logger.warning("Master 4-pillar ranking training notice", error=str(e))
 
+                await asyncio.to_thread(train_all_models)
+                logger.info("Master 4-pillar swing ranking models updated successfully across full BIST universe")
+            except Exception as e:
+                logger.error("Master 4-pillar ranking training error", error=str(e), exc_info=True)
+
+            # 2. SECONDARY: Legacy modeller varsa ve veri hazırsa eğit
+            training_data = await self._prepare_training_data()
+            if training_data is not None and not training_data.is_empty():
+                from ml.models import MODEL_CONFIGS, LightGBMModel
+
+                for model_name, config in MODEL_CONFIGS.items():
+                    try:
+                        feature_cols = [f for f in config.features if f in training_data.columns]
+                        target_col = config.target
+                        if target_col not in training_data.columns:
+                            continue
+
+                        X = training_data.select(feature_cols).to_numpy()
+                        y = training_data.select(target_col).to_numpy().ravel()
+                        mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
+                        X, y = X[mask], y[mask]
+                        if len(X) < 100:
+                            continue
+
+                        split_idx = int(len(X) * 0.8)
+                        X_train, X_val = X[:split_idx], X[split_idx:]
+                        y_train, y_val = y[:split_idx], y[split_idx:]
+
+                        model = LightGBMModel(config)
+                        model.train(X_train, y_train, X_val, y_val)
+
+                        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+                        y_pred = model.predict(X_val)
+                        metrics = {
+                            "rmse": float(np.sqrt(mean_squared_error(y_val, y_pred))),
+                            "mae": float(mean_absolute_error(y_val, y_pred)),
+                            "r2": float(r2_score(y_val, y_pred)),
+                            "training_samples": len(X_train),
+                            "validation_samples": len(X_val),
+                        }
+                        model.metrics = metrics
+
+                        import os
+
+                        model_dir = f"ml/saved_models/{model_name}"
+                        os.makedirs(model_dir, exist_ok=True)
+                        model.save(f"{model_dir}/{config.version}.pkl")
+                        await self._register_model(model_name, config, metrics)
+                        logger.info("Secondary model trained", name=model_name, metrics=metrics)
+                    except Exception as e:
+                        logger.warning("Secondary model training skipped", name=model_name, error=str(e))
         except Exception as e:
             logger.error("Training cycle failed", error=str(e))
 

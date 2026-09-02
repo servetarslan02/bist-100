@@ -4,7 +4,7 @@ TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfe
 """
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -26,19 +26,12 @@ class StockInfo:
     sub_sector: str = ""
     market_cap: float = 0.0
     avg_volume_20d: float = 0.0
-    index_membership: list[str] = None
+    index_membership: list[str] = field(default_factory=list)
     listing_status: str = "ACTIVE"  # ACTIVE, SUSPENDED, DELISTED
     isin: str = ""
     currency: str = "TRY"
-    last_updated: str = ""
+    last_updated: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     source: str = ""
-
-    def __post_init__(self):
-        """Otomatik eklendi."""
-        if self.index_membership is None:
-            self.index_membership = []
-        if not self.last_updated:
-            self.last_updated = datetime.now(UTC).isoformat()
 
 
 class LiveUniverseScraper:
@@ -46,89 +39,89 @@ class LiveUniverseScraper:
 
     def __init__(self):
         """Otomatik eklendi."""
-        self.session = httpx.Client(follow_redirects=True)
-        self.session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-            }
-        )
-        self.timeout = 10
+        self.timeout = httpx.Timeout(15.0, connect=10.0)
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+        }
+
+    def _get_client(self) -> httpx.Client:
+        """Yeni veya havuzlu HTTP client döndür."""
+        return httpx.Client(headers=self.headers, timeout=self.timeout, follow_redirects=True)
 
     def discover_all_bist_stocks(self) -> dict[str, StockInfo]:
         """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfet."""
         discovered: dict[str, StockInfo] = {}
 
-        # 1. Kaynak: Mynet Finans BIST Tam Liste
-        try:
-            url = "https://finans.mynet.com/borsa/hisseler/"
-            resp = self.session.get(url, timeout=self.timeout)
-            if resp.status_code == 200:
-                # format: href="/borsa/hisseler/GARAN-garanti-bankasi/"
-                matches = re.findall(r'/borsa/hisseler/([a-z0-9]{3,6})-([^/"]+)/', resp.text)
-                for sym, slug in matches:
-                    ticker = sym.upper().strip()
-                    if 2 <= len(ticker) <= 6 and not ticker.isdigit():
-                        name = slug.replace("-", " ").title()
-                        discovered[ticker] = StockInfo(
-                            ticker=ticker,
-                            name=name,
-                            sector=self._guess_sector(ticker, name),
-                            source="mynet_live",
-                        )
-                logger.info("mynet_universe_discovery_done", count=len(discovered))
-        except Exception as e:
-            logger.debug("mynet_discovery_failed", error=str(e))
-
-        # 2. Kaynak: Bigpara Canlı Borsa
-        try:
-            url = "https://bigpara.hurriyet.com.tr/borsa/canli-borsa/"
-            resp = self.session.get(url, timeout=self.timeout)
-            if resp.status_code == 200:
-                matches = re.findall(r"/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/", resp.text)
-                for sym in matches:
-                    ticker = sym.upper().strip()
-                    if 2 <= len(ticker) <= 6 and not ticker.isdigit() and ticker not in discovered:
-                        discovered[ticker] = StockInfo(
-                            ticker=ticker,
-                            name=ticker,
-                            sector=self._guess_sector(ticker, ticker),
-                            source="bigpara_live",
-                        )
-        except Exception as e:
-            logger.debug("bigpara_discovery_failed", error=str(e))
-
-        # 3. Kaynak: İş Yatırım
-        try:
-            url = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/default.aspx"
-            resp = self.session.get(url, timeout=self.timeout)
-            if resp.status_code == 200:
-                matches = re.findall(r'value="([A-Z0-9]{3,6})"\s*data-title="([^"]*)"', resp.text)
-                for ticker, name in matches:
-                    ticker = ticker.upper().strip()
-                    if 2 <= len(ticker) <= 6 and not ticker.isdigit():
-                        if ticker not in discovered:
+        with self._get_client() as client:
+            # 1. Kaynak: Mynet Finans BIST Tam Liste
+            try:
+                url = "https://finans.mynet.com/borsa/hisseler/"
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    matches = re.findall(r'/borsa/hisseler/([a-z0-9]{3,6})-([^/"]+)/', resp.text)
+                    for sym, slug in matches:
+                        ticker = sym.upper().strip()
+                        if 2 <= len(ticker) <= 6 and not ticker.isdigit():
+                            name = slug.replace("-", " ").title()
                             discovered[ticker] = StockInfo(
                                 ticker=ticker,
-                                name=name or ticker,
+                                name=name,
                                 sector=self._guess_sector(ticker, name),
-                                source="isyatirim_live",
+                                source="mynet_live",
                             )
-                        elif name and discovered[ticker].name == ticker:
-                            discovered[ticker].name = name
-        except Exception as e:
-            logger.debug("isyatirim_discovery_failed", error=str(e))
+                    logger.info("mynet_universe_discovery_done", count=len(discovered))
+            except Exception as e:
+                logger.debug("mynet_discovery_failed", error=str(e))
+
+            # 2. Kaynak: Bigpara Canlı Borsa
+            try:
+                url = "https://bigpara.hurriyet.com.tr/borsa/canli-borsa/"
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    matches = re.findall(r"/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/", resp.text)
+                    for sym in matches:
+                        ticker = sym.upper().strip()
+                        if 2 <= len(ticker) <= 6 and not ticker.isdigit() and ticker not in discovered:
+                            discovered[ticker] = StockInfo(
+                                ticker=ticker,
+                                name=ticker,
+                                sector=self._guess_sector(ticker, ticker),
+                                source="bigpara_live",
+                            )
+                logger.info("bigpara_universe_discovery_done", total_discovered=len(discovered))
+            except Exception as e:
+                logger.debug("bigpara_discovery_failed", error=str(e))
+
+            # 3. Kaynak: İş Yatırım
+            try:
+                url = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/default.aspx"
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    matches = re.findall(r'value="([A-Z0-9]{3,6})"\s*data-title="([^"]*)"', resp.text)
+                    for ticker, name in matches:
+                        ticker = ticker.upper().strip()
+                        if 2 <= len(ticker) <= 6 and not ticker.isdigit():
+                            if ticker not in discovered:
+                                discovered[ticker] = StockInfo(
+                                    ticker=ticker,
+                                    name=name or ticker,
+                                    sector=self._guess_sector(ticker, name),
+                                    source="isyatirim_live",
+                                )
+                            elif name and discovered[ticker].name == ticker:
+                                discovered[ticker].name = name
+                logger.info("isyatirim_universe_discovery_done", total_discovered=len(discovered))
+            except Exception as e:
+                logger.debug("isyatirim_discovery_failed", error=str(e))
 
         return discovered
 
     def _guess_sector(self, ticker: str, name: str) -> str:
         """Hisse sembolü veya isminden sektörü tahmin et / eşle."""
         name_u = (name + " " + ticker).upper()
-        if any(
-            w in name_u
-            for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]
-        ):
+        if any(w in name_u for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]):
             return "BANKACILIK"
         if any(w in name_u for w in ["GYO", "GAYRIMENKUL", "KONUT"]):
             return "GAYRIMENKUL"
@@ -136,32 +129,28 @@ class LiveUniverseScraper:
             return "HAVACILIK"
         if any(w in name_u for w in ["SAVUNMA", "ASELS", "SDTTR"]):
             return "SAVUNMA"
-        if any(
-            w in name_u
-            for w in ["YAZILIM", "TEKNOLOJI", "BILISIM", "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET"]
-        ):
+        if any(w in name_u for w in ["YAZILIM", "TEKNOLOJI", "BILISIM", "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET", "REEDR", "BINHO"]):
             return "TEKNOLOJI"
-        if any(
-            w in name_u
-            for w in ["ENERJI", "ELEKTRIK", "SOLAR", "PETROL", "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR"]
-        ):
+        if any(w in name_u for w in ["ENERJI", "ELEKTRIK", "SOLAR", "PETROL", "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR", "CWENE", "YEOTK"]):
             return "ENERJI"
-        if any(w in name_u for w in ["DEMIR", "CELIK", "SANAYI", "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA"]):
+        if any(w in name_u for w in ["DEMIR", "CELIK", "SANAYI", "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA", "AKCNS", "BOBET", "KCAER"]):
             return "SANAYI"
-        if any(w in name_u for w in ["HOLDING", "YATIRIM", "KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL"]):
+        if any(w in name_u for w in ["HOLDING", "YATIRIM", "KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL", "BERA", "TKFEN"]):
             return "HOLDING"
-        if any(w in name_u for w in ["GIDA", "MARKET", "PERAKENDE", "BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM"]):
+        if any(w in name_u for w in ["GIDA", "MARKET", "PERAKENDE", "BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM", "AEFES", "TATGD"]):
             return "PERAKENDE"
-        if any(w in name_u for w in ["OTOMOTIV", "OTO", "FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR"]):
+        if any(w in name_u for w in ["OTOMOTIV", "OTO", "FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR", "KARSAN"]):
             return "OTOMOTIV"
-        if any(w in name_u for w in ["SIGORTA", "EMEKLI"]):
+        if any(w in name_u for w in ["SIGORTA", "EMEKLI", "ANSGR", "ANHYT", "TURSG", "AGESA"]):
             return "SIGORTA"
         if any(w in name_u for w in ["TELEKOM", "ILETISIM", "TCELL", "TTKOM"]):
             return "TELEKOM"
-        if any(w in name_u for w in ["SAGLIK", "ILAC", "HASTANE"]):
+        if any(w in name_u for w in ["SAGLIK", "ILAC", "HASTANE", "GENIL", "ECILC", "MPARK"]):
             return "SAGLIK"
-        if any(w in name_u for w in ["MADEN", "MADENCILIK", "ALTIN", "KOZAL", "KOZAA"]):
+        if any(w in name_u for w in ["MADEN", "MADENCILIK", "ALTIN", "KOZAL", "KOZAA", "IPEKE"]):
             return "MADENCILIK"
+        if any(w in name_u for w in ["KIMYA", "PETKIM", "PETKM", "AKSA", "SASA", "HEKTS", "GUBRF"]):
+            return "KIMYA"
         return "DIGER"
 
 
@@ -438,11 +427,18 @@ class UniverseAutoUpdater:
         except Exception as e:
             logger.debug("Cache load failed", error=str(e))
 
-    def _save_to_cache(self) -> Any:
-        """Cache'e kaydet (debounced — SSD dostu)."""
+    def _save_to_cache(self, force: bool = False) -> Any:
+        """Cache'e kaydet (debounced — SSD dostu, zorunlu veya ilk kayıtta anında yazar)."""
         from services.core.debounce import should_save
-        if not should_save("universe_cache", 300):
+
+        if not self._universe:
             return
+
+        # Cache dosyası yoksa veya içi boşsa debounce bekleme, direkt kaydet
+        cache_empty = not self.CACHE_FILE.exists() or self.CACHE_FILE.stat().st_size < 100
+        if not force and not cache_empty and not should_save("universe_cache", 300):
+            return
+
         try:
             self.CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
             data = {
@@ -453,6 +449,7 @@ class UniverseAutoUpdater:
             }
             with open(self.CACHE_FILE, "w", encoding="utf-8") as f:
                 f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
+            logger.info("universe_cache_saved", count=len(self._universe), path=str(self.CACHE_FILE))
         except Exception as e:
             logger.debug("Cache save failed", error=str(e))
 

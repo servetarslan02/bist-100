@@ -394,6 +394,8 @@ class FeatureSelector:
                     removed[feature_names[remove_idx]] = (
                         f"Correlation {corr_val:.4f} with {feature_names[keep_idx]} > {threshold}"
                     )
+                    if remove_idx == i:
+                        break
 
         kept_indices = [i for i in range(n_features) if i not in removed_set]
 

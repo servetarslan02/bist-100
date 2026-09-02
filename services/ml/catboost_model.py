@@ -341,7 +341,7 @@ class CatBoostModel:
 
         try:
             interactions = model.get_feature_importance(type="Interaction")
-            if interactions and self._feature_names:
+            if interactions is not None and len(interactions) > 0 and self._feature_names:
                 result = {}
                 for f1_idx, f2_idx, score in interactions[:20]:  # Top 20
                     f1 = self._feature_names[int(f1_idx)] if int(f1_idx) < len(self._feature_names) else f"f{f1_idx}"
@@ -478,7 +478,7 @@ class CatBoostModel:
                     true_dir = (y_val > 0).astype(int)
                     metrics["val_directional_accuracy"] = round(float(np.mean(pred_dir == true_dir)), 4)
                     # IC (Information Coefficient)
-                    if len(np.unique(val_pred)) > 1:
+                    if len(np.unique(val_pred)) > 1 and len(np.unique(y_val)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
                 except Exception as e:
                     logger.warning("catboost_handled_exception", error=str(e), context="regressor_metrics")
@@ -506,7 +506,7 @@ class CatBoostModel:
         """Feature interactions hesapla."""
         try:
             interactions = model.get_feature_importance(type="Interaction")
-            if interactions:
+            if interactions is not None and len(interactions) > 0:
                 result = {}
                 for f1_idx, f2_idx, score in interactions[:10]:
                     f1 = (

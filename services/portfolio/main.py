@@ -223,22 +223,26 @@ class PortfolioService:
             self._pm._trades.append(trade)
 
         # 5. High-water mark + equity snapshots
-        all_snapshots = await pg_fetch(
-            "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id ASC", self._portfolio_id
-        )
-        for snap in all_snapshots:
-            self._pm._equity_curve.append(
-                {
-                    "timestamp": snap.get("created_at", ""),
-                    "equity": float(snap["total_equity"]),
-                    "cash": float(snap["cash"]),
-                    "invested": float(snap["invested"]),
-                }
+        try:
+            all_snapshots = await pg_fetch(
+                "SELECT * FROM equity_snapshots WHERE portfolio_id = $1 ORDER BY id ASC", self._portfolio_id
             )
-        if all_snapshots:
-            last = all_snapshots[-1]
-            self._pm._high_water_mark = float(last["high_water_mark"])
-            self._last_snapshot_date = last["snapshot_date"]
+            for snap in all_snapshots:
+                self._pm._equity_curve.append(
+                    {
+                        "timestamp": snap.get("created_at", ""),
+                        "equity": float(snap["total_equity"]),
+                        "cash": float(snap["cash"]),
+                        "invested": float(snap["invested"]),
+                    }
+                )
+            if all_snapshots:
+                last = all_snapshots[-1]
+                self._pm._high_water_mark = float(last["high_water_mark"])
+                self._last_snapshot_date = last["snapshot_date"]
+        except Exception as exc:
+            logger.warning("Failed to restore equity snapshots, initializing default state", error=str(exc))
+
 
         # 6. Daily P&L restore
         try:

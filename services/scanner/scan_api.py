@@ -32,7 +32,8 @@ class ScanAPI:
     def __init__(self):
         """Otomatik eklendi."""
         # Singleton referansları
-        from .alpha_engine import alpha_engine
+        from services.core.alpha_engine import AlphaEngine
+
         from .custom_filters import custom_filter_engine
         from .deduplicator import scan_deduplicator
         from .performance_tracker import performance_tracker
@@ -41,7 +42,7 @@ class ScanAPI:
         from .scan_scheduler import scan_scheduler
         from .tiered_scanner import tiered_scanner
 
-        self._engine = alpha_engine
+        self._engine = AlphaEngine()
         self._scanner = tiered_scanner
         self._dedup = scan_deduplicator
         self._scheduler = scan_scheduler

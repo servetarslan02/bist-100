@@ -8,15 +8,16 @@ import structlog
 
 from services.ml.feature_engine import compute_universe_features
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 class LightGBMPipeline:
-    """Otomatik eklendi."""
+    """LightGBM training and inference pipeline for universe alpha prediction."""
+
     def __init__(self):
-        """Otomatik eklendi."""
+        """Initialize LightGBMPipeline."""
         self.model = None
-        self.features = []
+        self.features: list[str] = []
         self.params = {
             "objective": "regression",
             "metric": "rmse",
@@ -35,53 +36,68 @@ class LightGBMPipeline:
         market_data: dict[str, pl.DataFrame],
         bm_df: pl.DataFrame,
         sector_map: dict[str, str],
-        train_start: pl.Series,
-        train_end: pl.Series,
-        snapshot_offsets: list[int] = None,
+        train_start: datetime.datetime | str,
+        train_end: datetime.datetime | str,
+        snapshot_offsets: list[int] | None = None,
         forward_days: int = 20,
     ) -> Any:
-        """Otomatik eklendi."""
+        """Generate point-in-time training samples and forward return labels."""
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
         rows = []
         labels = []
-        all_keys = []
+        all_keys: list[str] = []
+
+        t_start = train_start if isinstance(train_start, datetime.datetime) else datetime.datetime.fromisoformat(str(train_start)[:10])
+        t_end = train_end if isinstance(train_end, datetime.datetime) else datetime.datetime.fromisoformat(str(train_end)[:10])
 
         for offset in snapshot_offsets:
-            t_snap = train_end - datetime.timedelta(days=int(offset))
+            t_snap = t_end - datetime.timedelta(days=int(offset))
             t_fwd = t_snap + datetime.timedelta(days=int(forward_days))
 
-            if t_snap < train_start:
+            if t_snap < t_start:
                 continue
 
             snap_md = {}
             for t, df in market_data.items():
-                sub_df = df[df.index <= t_snap]
+                if df is None or len(df) == 0:
+                    continue
+                if "Date" in df.columns:
+                    sub_df = df.filter(pl.col("Date") <= t_snap)
+                else:
+                    sub_df = df
                 if len(sub_df) >= 120:
                     snap_md[t] = sub_df
 
-            snap_bm = bm_df[bm_df.index <= t_snap]
+            if bm_df is None or len(bm_df) == 0:
+                continue
+            if "Date" in bm_df.columns:
+                snap_bm = bm_df.filter(pl.col("Date") <= t_snap)
+            else:
+                snap_bm = bm_df
             if len(snap_bm) < 120:
                 continue
 
             features = compute_universe_features(snap_md, snap_bm, sector_map)
 
             for ticker, feats in features.items():
-                if not feats:
+                if not feats or ticker not in market_data:
                     continue
 
-                df_fwd = market_data[ticker][
-                    (market_data[ticker].index >= t_snap) & (market_data[ticker].index <= t_fwd)
-                ]
-                bm_fwd = bm_df[(bm_df.index >= t_snap) & (bm_df.index <= t_fwd)]
+                df_t = market_data[ticker]
+                if df_t is None or len(df_t) == 0 or "Date" not in df_t.columns:
+                    continue
+
+                df_fwd = df_t.filter((pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd))
+                bm_fwd = bm_df.filter((pl.col("Date") >= t_snap) & (pl.col("Date") <= t_fwd)) if "Date" in bm_df.columns else pl.DataFrame()
 
                 if len(df_fwd) < 2 or len(bm_fwd) < 2:
                     continue
 
-                p_0 = df_fwd["Close"][0]
-                p_1 = df_fwd["Close"][-1]
-                b_0 = bm_fwd["Close"][0]
-                b_1 = bm_fwd["Close"][-1]
+                p_0 = float(df_fwd["Close"][0])
+                p_1 = float(df_fwd["Close"][-1])
+                b_0 = float(bm_fwd["Close"][0])
+                b_1 = float(bm_fwd["Close"][-1])
 
                 if p_0 <= 0 or b_0 <= 0:
                     continue
@@ -109,10 +125,10 @@ class LightGBMPipeline:
         market_data: dict[str, pl.DataFrame],
         bm_df: pl.DataFrame,
         sector_map: dict[str, str],
-        train_start: pl.Series,
-        train_end: pl.Series,
-    ) -> Any:
-        """Otomatik eklendi."""
+        train_start: datetime.datetime | str,
+        train_end: datetime.datetime | str,
+    ) -> bool:
+        """Train LightGBM model on historical snapshot samples."""
         X, y, feature_names = self.generate_samples(market_data, bm_df, sector_map, train_start, train_end)
 
         if len(X) == 0:
@@ -129,19 +145,31 @@ class LightGBMPipeline:
         market_data: dict[str, pl.DataFrame],
         bm_df: pl.DataFrame,
         sector_map: dict[str, str],
-        target_date: pl.Series,
+        target_date: datetime.datetime | str,
     ) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Predict universe forward excess returns as of target_date."""
         if not self.model:
             return []
 
+        t_target = target_date if isinstance(target_date, datetime.datetime) else datetime.datetime.fromisoformat(str(target_date)[:10])
+
         snap_md = {}
         for t, df in market_data.items():
-            sub_df = df[df.index <= target_date]
+            if df is None or len(df) == 0:
+                continue
+            if "Date" in df.columns:
+                sub_df = df.filter(pl.col("Date") <= t_target)
+            else:
+                sub_df = df
             if len(sub_df) >= 120:
                 snap_md[t] = sub_df
 
-        snap_bm = bm_df[bm_df.index <= target_date]
+        if bm_df is None or len(bm_df) == 0:
+            return []
+        if "Date" in bm_df.columns:
+            snap_bm = bm_df.filter(pl.col("Date") <= t_target)
+        else:
+            snap_bm = bm_df
         if len(snap_bm) < 120:
             return []
 
@@ -153,10 +181,9 @@ class LightGBMPipeline:
                 continue
             x_vec = np.array([[feats.get(k, 0.0) or 0.0 for k in self.features]])
             score = self.model.predict(x_vec)[0]
-
-            # Additional logic to extract important variables for confidence/ranking if needed
             predictions.append({"ticker": ticker, "score": float(score), "features": feats})
 
         # Sort by score descending
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
+

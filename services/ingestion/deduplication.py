@@ -48,16 +48,18 @@ class EventDeduplicator:
         self._stats = DedupStats()
 
     def _compute_hash(self, event_data: dict[str, Any]) -> str:
-        """
-        Event hash'i oluştur.
+        """Event hash'i oluştur."""
+        price_val = event_data.get("price")
+        try:
+            price_str = str(round(float(price_val), 2)) if price_val is not None and price_val != "" else "0.0"
+        except (ValueError, TypeError):
+            price_str = "0.0"
 
-        Hash_input = event_type + source + ticker + price + timestamp
-        """
         key_parts = [
             str(event_data.get("event_type", "")),
             str(event_data.get("source", "")),
             str(event_data.get("ticker", "")),
-            str(round(float(event_data.get("price", 0)), 2)),
+            price_str,
             str(event_data.get("timestamp", "")),
             str(event_data.get("kap_id", "")),
             str(event_data.get("social_id", "")),

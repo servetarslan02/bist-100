@@ -468,7 +468,7 @@ def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
     """Tüm scanner modüllerini çalıştır."""
     results = []
     try:
-        from .alpha_engine import AlphaEngine
+        from services.core.alpha_engine import AlphaEngine
 
         alpha = AlphaEngine()
         if hasattr(alpha, "scan"):

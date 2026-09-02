@@ -136,7 +136,9 @@ class YFinanceProvider:
                 }
             )
 
-            return df[["Ticker", "timestamp", "Open", "High", "Low", "Close", "Volume"]]
+            req_cols = ["Ticker", "timestamp", "Open", "High", "Low", "Close", "Volume"]
+            available = [c for c in req_cols if c in df.columns]
+            return pl.from_pandas(df[available])
 
         except Exception as e:
             logger.warning("Failed to fetch OHLCV", ticker=ticker, error=str(e))

@@ -75,13 +75,11 @@ class MacroProvider:
         self._tcmb_client = get_client("tcmb", timeout=30.0, max_retries=3)
         self._cache: dict[str, Any] = {}
         self._cache_ttl = 300  # 5 dakika cache
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 
     async def fetch_yahoo_macro(self) -> dict[str, Any]:
         """Yahoo Finance makro verileri (async)."""
-
-        # Use thread pool for sync yfinance calls
         loop = asyncio.get_event_loop()
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 
         async def _fetch_one(name: str, symbol: str) -> tuple:
             """Otomatik eklendi."""
@@ -99,7 +97,7 @@ class MacroProvider:
                     }
 
                 result = await asyncio.wait_for(
-                    loop.run_in_executor(executor, _get),
+                    loop.run_in_executor(self._executor, _get),
                     timeout=15,
                 )
                 return name, result

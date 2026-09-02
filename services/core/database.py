@@ -125,9 +125,14 @@ async def _retry_async(
         except Exception as exc:
             last_error = exc
             if attempt < max_retries:
-                # DNS çözümleme hatası varsa (host bulunamıyorsa) beklemeden çık
                 err_msg = str(exc)
-                if "getaddrinfo failed" in err_msg or "NameResolutionError" in err_msg or "Failed to resolve" in err_msg:
+                if (
+                    "getaddrinfo failed" in err_msg
+                    or "NameResolutionError" in err_msg
+                    or "Failed to resolve" in err_msg
+                    or "Name or service not known" in err_msg
+                    or "gaierror" in err_msg
+                ):
                     logger.warning("DB host unresolvable, skipping retries", operation=name, error=err_msg)
                     break
 
@@ -545,69 +550,60 @@ async def pg_fetchval(query: str, *args: Any) -> Any:
 
 # ─── ClickHouse ───────────────────────────────────────────────────────────────
 
-_ch_client: Any = None
+_ch_local = threading.local()
 _ch_healthy: bool = False
-# asyncio.Lock: thread-safe (executor üzerinden çağrılsa bile)
 _ch_lock: asyncio.Lock = asyncio.Lock()
-# threading.Lock: thread pool executor'da eş zamanlı CH sorgusu önleme
-_ch_thread_lock: threading.Lock = threading.Lock()
 
 
 def get_ch_client() -> Any:
-    """ClickHouse istemcisi döner (lazy init).
-
-    Raises:
-        RuntimeError: clickhouse-connect kurulu değilse.
-    """
-    global _ch_client, _ch_healthy
+    """Thread-local ClickHouse istemcisi döner (tamamen thread-safe ve eşzamanlı)."""
+    global _ch_healthy
     if clickhouse_connect is None:
         raise RuntimeError("clickhouse-connect kurulu değil. Komut: uv add clickhouse-connect")
-    if _ch_client is None:
-        _ch_client = clickhouse_connect.get_client(
+
+    client = getattr(_ch_local, "client", None)
+    if client is None:
+        client = clickhouse_connect.get_client(
             host=settings.clickhouse_host,
             port=settings.clickhouse_http_port,
             username=settings.clickhouse_user,
             password=settings.clickhouse_password,
             database=settings.clickhouse_db,
+            connect_timeout=5,
+            send_receive_timeout=10,
         )
+        _ch_local.client = client
         _ch_healthy = True
-        logger.info("ClickHouse client created", host=settings.clickhouse_host)
-    return _ch_client
+    return client
 
 
 get_clickhouse = get_ch_client
 
 
 def close_ch_client() -> None:
-    """ClickHouse istemcisini kapatır ve global state'i sıfırlar."""
-    global _ch_client, _ch_healthy
-    if _ch_client:
+    """ClickHouse istemcisini kapatır."""
+    global _ch_healthy
+    client = getattr(_ch_local, "client", None)
+    if client:
         try:
-            _ch_client.close()
+            client.close()
         except Exception as exc:
             logger.warning("ClickHouse client close error", error=str(exc))
-        _ch_client = None
-        _ch_healthy = False
-        logger.info("ClickHouse client closed")
+        _ch_local.client = None
+    _ch_healthy = False
+    logger.info("ClickHouse client closed")
 
 
 def ch_execute(query: str, parameters: dict[str, Any] | None = None) -> Any:
-    """ClickHouse sorgusu çalıştırır — reconnect + Jitter backoff ile.
-
-    Bu fonksiyon senkrondur (thread pool executor kullanımı için).
-    Eş zamanlı sorgu hatasını önlemek için threading.Lock kullanır.
-    """
-    global _ch_client, _ch_healthy
+    """ClickHouse sorgusu çalıştırır — thread-local client ile."""
     max_retries: int = 2
     for attempt in range(max_retries + 1):
         try:
-            with _ch_thread_lock:
-                client = get_ch_client()
-                return client.query(query, parameters=parameters)
+            client = get_ch_client()
+            return client.query(query, parameters=parameters)
         except Exception as exc:
             if attempt < max_retries:
-                _ch_client = None
-                _ch_healthy = False
+                _ch_local.client = None
                 delay = _RETRY_BASE_DELAY * (attempt + 1) + random.uniform(0, 0.5)
                 logger.warning(
                     "ClickHouse query failed, reconnecting",
@@ -796,23 +792,30 @@ async def check_db_health() -> dict[str, Any]:
         # PostgreSQL
         if _pg_healthy and _pg_pool is not None:
             try:
-                pool = await get_pg_pool()
-                async with pool.acquire() as conn:
-                    result = await conn.fetchval("SELECT 1")
-                    health["postgres"] = "healthy" if result == 1 else "degraded"
-                    health["postgres_pool_size"] = pool.get_size()
-                    health["postgres_pool_free"] = pool.get_idle_size()
+                async def _check_pg():
+                    pool = await get_pg_pool()
+                    async with pool.acquire() as conn:
+                        result = await conn.fetchval("SELECT 1")
+                        return result, pool.get_size(), pool.get_idle_size()
+
+                result, p_size, p_free = await asyncio.wait_for(_check_pg(), timeout=1.0)
+                health["postgres"] = "healthy" if result == 1 else "degraded"
+                health["postgres_pool_size"] = p_size
+                health["postgres_pool_free"] = p_free
             except Exception as exc:
                 health["postgres"] = f"error: {str(exc)[:100]}"
         else:
             health["postgres"] = "offline"
 
         # ClickHouse
-        if _ch_healthy and _ch_client is not None:
+        if _ch_healthy:
             try:
-                client = get_ch_client()
-                result = client.query("SELECT 1")
-                health["clickhouse"] = "healthy" if result.result_rows and result.result_rows[0][0] == 1 else "degraded"
+                def _check_ch():
+                    res = ch_execute("SELECT 1")
+                    return res.result_rows and res.result_rows[0][0] == 1
+
+                is_ok = await asyncio.wait_for(asyncio.to_thread(_check_ch), timeout=1.0)
+                health["clickhouse"] = "healthy" if is_ok else "degraded"
             except Exception as exc:
                 health["clickhouse"] = f"error: {str(exc)[:100]}"
         else:
@@ -821,8 +824,11 @@ async def check_db_health() -> dict[str, Any]:
         # Redis
         if _redis_healthy and _redis is not None:
             try:
-                r = await get_redis()
-                pong = await r.ping()
+                async def _check_redis():
+                    r = await get_redis()
+                    return await r.ping()
+
+                pong = await asyncio.wait_for(_check_redis(), timeout=1.0)
                 health["redis"] = "healthy" if pong else "degraded"
             except Exception as exc:
                 health["redis"] = f"error: {str(exc)[:100]}"

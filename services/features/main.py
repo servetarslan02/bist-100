@@ -154,7 +154,7 @@ class FeatureEngineService:
                     df = df.with_columns(pl.col("Close").alias(col))
 
             # Compute features
-            features = feature_calculator.compute_all_features(df)
+            features = feature_calculator.compute_all_features(df, ticker=ticker)
 
             # Add metadata
             features["ticker"] = ticker

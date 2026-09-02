@@ -47,9 +47,9 @@ def _get_scan_api() -> Any:
 
 def _get_engine() -> Any:
     """Alpha engine singleton'ı al."""
-    from ...scanner.alpha_engine import alpha_engine
+    from ...core.alpha_engine import AlphaEngine
 
-    return alpha_engine
+    return AlphaEngine()
 
 
 # =====================================================

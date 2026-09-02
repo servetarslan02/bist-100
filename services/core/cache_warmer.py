@@ -98,11 +98,14 @@ class CacheWarmer:
             from ..core.market_calendar import get_market_calendar
             from ..core.redis_helper import set_cached
 
-            # Tatil takvimini hesapla + BIST'ten çek
+            # Tatil takvimini hesapla
             today = date.today()
             holidays = holiday_manager.get_holidays(today.year)
             half_days = holiday_manager.get_half_days(today.year)
-            synced = await holiday_manager.sync_from_bist()
+            try:
+                synced = await asyncio.wait_for(holiday_manager.sync_from_bist(), timeout=1.0)
+            except Exception:
+                synced = False
 
             calendar = get_market_calendar()
             if calendar:

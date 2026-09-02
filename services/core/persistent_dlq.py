@@ -30,7 +30,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-import duckdb
+import sqlite3
 import structlog
 from opentelemetry import metrics, trace
 
@@ -176,14 +176,11 @@ class PersistentDeadLetterQueue:
 
     @contextmanager
     def _connect(self) -> Any:
-        """Otomatik eklendi."""
-        conn = duckdb.connect(str(self.db_path))
-        # SSD write reduction: DuckDB WAL ayarları
-        try:
-            from services.core.debounce import configure_duckdb_wal
-            configure_duckdb_wal(conn)
-        except Exception:
-            logger.debug("Silent exception caught", exc_info=True)
+        """Eşzamanlı WAL modunda SQLite bağlantısı."""
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         try:
             yield conn
         finally:

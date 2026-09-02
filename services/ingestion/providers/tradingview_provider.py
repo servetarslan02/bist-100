@@ -103,7 +103,7 @@ class TradingViewProvider:
                     if not ticker or not isinstance(ticker, str):
                         continue
 
-                    ticker = ticker.strip().upper()
+                    ticker = ticker.split(":")[-1].strip().upper()
                     close_price = raw_item.get("close")
                     if close_price is None or not isinstance(close_price, int | float) or close_price <= 0:
                         continue

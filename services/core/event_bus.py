@@ -443,38 +443,22 @@ _redis_unavailable = False
 
 
 async def _get_redis() -> Any:
-    """Reuse module-level Redis connection or create new if loop changed/closed."""
+    """Reuse centralized database Redis connection pool to prevent connection leaks."""
     global _redis_conn, _redis_loop, _redis_unavailable
     if _redis_unavailable:
         return InMemoryRedis()
 
     try:
-        current_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        current_loop = None
+        from .database import get_redis
 
-    if _redis_conn is None or _redis_loop is not current_loop:
-        try:
-            from .redis_sentinel import get_ha_redis
-
-            r = await get_ha_redis()
-            if r:
-                _redis_conn = r
-                _redis_loop = current_loop
-                return _redis_conn
-        except Exception as exc:
-            logger.debug("Sentinel unavailable, falling back to direct url", error=str(exc))
-
-        try:
-            import redis.asyncio as aioredis
-
-            r = aioredis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=0.5)
-            await asyncio.wait_for(r.ping(), timeout=0.5)
+        r = await get_redis()
+        if r:
             _redis_conn = r
-            _redis_loop = current_loop
-        except Exception:
-            _redis_conn = InMemoryRedis()
-            _redis_loop = current_loop
+            return _redis_conn
+    except Exception as exc:
+        logger.debug("Database redis unavailable, falling back to InMemoryRedis", error=str(exc))
+        _redis_conn = InMemoryRedis()
+
     return _redis_conn
 
 

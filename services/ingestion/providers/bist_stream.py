@@ -85,9 +85,9 @@ class BISTStreamProvider:
 
         while self._running:
             try:
-                # Batch download
+                # Batch download for all universe tickers
                 data = yf.download(
-                    [f"{t}.IS" for t in tickers[:100]],  # İlk 100
+                    [f"{t}.IS" for t in tickers],
                     period="1d",
                     interval="1m",
                     group_by="ticker",
@@ -96,14 +96,13 @@ class BISTStreamProvider:
                 )
 
                 if not data.empty:
-                    for ticker in tickers[:100]:
+                    for ticker in tickers:
                         try:
                             td = data[f"{ticker}.IS"].dropna()
                             if td.empty:
                                 continue
 
                             last_row = td.iloc[-1]
-                            td.iloc[-2] if len(td) > 1 else last_row
 
                             tick = StreamTick(
                                 ticker=ticker,
@@ -216,11 +215,14 @@ class BISTStreamProvider:
                 ).decode()
                 await ws.send(auth_msg)
 
+                from ..bist_universe import bist_universe
+                sub_tickers = bist_universe.get_tickers()
+
                 # Subscribe
                 subscribe_msg = orjson.dumps(
                     {
                         "type": "subscribe",
-                        "symbols": ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"],
+                        "symbols": sub_tickers,
                     }
                 ).decode()
                 await ws.send(subscribe_msg)

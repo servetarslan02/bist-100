@@ -50,74 +50,11 @@ class DynamicOpportunityScanner:
 
     def scan_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
         """Otomatik eklendi."""
-        from ..ingestion.bist_universe import BISTUniverse
+        from ..ingestion.bist_universe import bist_universe
 
-        uni = BISTUniverse()
-        tickers = getattr(uni, "BIST_ALL_TICKERS", [])[:120]
+        tickers = bist_universe.get_tickers()
         if not tickers:
-            tickers = [
-                "THYAO",
-                "GARAN",
-                "AKBNK",
-                "ISCTR",
-                "YKBNK",
-                "KCHOL",
-                "SAHOL",
-                "TUPRS",
-                "ASELS",
-                "BIMAS",
-                "MGROS",
-                "TCELL",
-                "TTKOM",
-                "EREGL",
-                "KRDMD",
-                "SISE",
-                "FROTO",
-                "TOASO",
-                "PGSUS",
-                "TAVHL",
-                "ENKAI",
-                "PETKM",
-                "CCOLA",
-                "HALKB",
-                "VAKBN",
-                "AKSEN",
-                "ENJSA",
-                "ODAS",
-                "ZOREN",
-                "SOKM",
-                "TTRAK",
-                "OYAKC",
-                "ARCLK",
-                "EKGYO",
-                "MPARK",
-                "CIMSA",
-                "AKCNS",
-                "VESTL",
-                "VESBE",
-                "BRSAN",
-                "ISDMR",
-                "TKFEN",
-                "AGHOL",
-                "AEFES",
-                "TSKB",
-                "KLNMA",
-                "ISGYO",
-                "ALGYO",
-                "ULKER",
-                "BANVT",
-                "MAVI",
-                "PKART",
-                "BRISA",
-                "JANTS",
-                "GUBRF",
-                "AFYON",
-                "ADEL",
-                "LOGO",
-                "BURCE",
-                "GLYHO",
-                "DOHOL",
-            ]
+            return []
 
         yf_tickers = [f"{t}.IS" for t in tickers]
         raw = yf.download(

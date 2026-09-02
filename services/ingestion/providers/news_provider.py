@@ -628,9 +628,9 @@ class NewsProvider:
                 if tokens:
                     # Ana marka kelimesi (ör: "zorlu", "a1 capital", "garanti", "aselsan")
                     first_two = " ".join(tokens[:2])
-                    if len(first_two) >= 4 and first_two in text_lower:
+                    if len(first_two) >= 4 and re.search(r"\b" + re.escape(first_two) + r"\b", text_lower):
                         return True
-                    if len(tokens[0]) >= 4 and tokens[0] in text_lower:
+                    if len(tokens[0]) >= 4 and re.search(r"\b" + re.escape(tokens[0]) + r"\b", text_lower):
                         return True
         except Exception:
             logger.warning("Caught Exception in match_news_to_ticker", exc_info=True)

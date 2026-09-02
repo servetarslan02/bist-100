@@ -491,8 +491,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
         "alerts": alerts,
         "count": len(alerts),
     }
-    _ALERTS_CACHE = res
-    _ALERTS_CACHE_TIME = now_ts
+    _alerts_cache.set(res)
     return res
 
 

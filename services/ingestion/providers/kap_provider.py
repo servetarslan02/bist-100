@@ -354,23 +354,29 @@ class KAPProvider:
         """Temettü miktarını çıkar."""
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
-            r"hisseye\s+(\d+[.,]\d+)\s*(?:TL|₺)",
-            r"(\d+[.,]\d+)\s*(?:TL|₺)\s*/?\s*hisse",
-            r"kar\s+payı\s+(\d+[.,]\d+)",
+            r"(\d+[.,]\d+)\s*(?:TL|₺|tl)",
+            r"hisse\s+başına.*?(\d+[.,]\d+)\s*(?:TL|₺|tl)?",
+            r"kar\s+payı.*?(\d+[.,]\d+)",
+            r"(\d+[.,]\d+)\s*kuruş",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 try:
-                    return float(match.group(1).replace(",", "."))
+                    val = float(match.group(1).replace(",", "."))
+                    if "kuruş" in match.group(0).lower():
+                        val /= 100.0
+                    return val
                 except ValueError:
                     continue
         return None
 
     def _extract_ratio(self, item: dict) -> float | None:
-        """Bölünme/bedelsiz oranını çıkar."""
+        """Bölünme/bedelsiz oranını çıkar (% veya x:y formatı)."""
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
+            r"%\s*(\d+[.,]?\d*)",
+            r"yüzde\s*(\d+[.,]?\d*)",
             r"1[''e]\s*(\d+)",
             r"(\d+)\s*:\s*1",
         ]
@@ -378,7 +384,8 @@ class KAPProvider:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 try:
-                    return float(match.group(1))
+                    val = float(match.group(1).replace(",", "."))
+                    return val
                 except ValueError:
                     continue
         return None

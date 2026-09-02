@@ -24,8 +24,8 @@ from ..core.questdb_client import questdb_client
 from .bist_universe import BIST_INDICES, bist_universe, get_sector
 
 # Dinamik hisse listesi — otomatik keşif aktif (tüm 600+ hisse)
-BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
-BIST_ALL = bist_universe.BIST_ALL_TICKERS
+BIST_STOCKS = bist_universe.get_tickers()
+BIST_ALL = bist_universe.get_tickers()
 from .providers.investing_provider import investing_provider
 from .providers.kap_provider import kap_provider
 from .providers.news_provider import news_provider
@@ -99,8 +99,8 @@ class IngestionService:
         try:
             logger.info("Refreshing BIST universe...")
             bist_universe.refresh()
-            BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
-            BIST_ALL = bist_universe.BIST_ALL_TICKERS
+            BIST_STOCKS = bist_universe.get_tickers()
+            BIST_ALL = bist_universe.get_tickers()
             logger.info("BIST universe refreshed", total_stocks=len(BIST_STOCKS))
         except Exception as e:
             logger.warning("Universe refresh failed, using cached/static", error=str(e))

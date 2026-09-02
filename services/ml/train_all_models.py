@@ -155,31 +155,28 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     os.makedirs("models", exist_ok=True)
     np.random.seed(42)
 
-    # 1. BIST EVRENİNİ DİNAMİK YÜKLE (BIST-100 Eksiksiz Evreni)
+    # 1. TÜM BIST EVRENİNİ DİNAMİK YÜKLE (648 Hisse Eksiksiz Tüm Borsa)
     tickers: list[str] = []
     try:
-        from services.ingestion.providers.universe_provider import get_all_tickers, get_bist_100
+        from services.ingestion.bist_universe import bist_universe
 
-        b100 = get_bist_100()
-        if b100 and len(b100) >= 80:
-            tickers = sorted(list(set(b100)))
-            logger.info("Dinamik BIST-100 resmi endeks evreni yuklendi", total_tickers=len(tickers))
+        all_tickers = bist_universe.get_tickers()
+        if all_tickers and len(all_tickers) > 100:
+            tickers = sorted(list(set(all_tickers)))
+            logger.info("Dinamik TÜM BIST evreni eksiksiz yuklendi", total_tickers=len(tickers))
         else:
+            from services.ingestion.providers.universe_provider import get_all_tickers
+
             discovered = get_all_tickers()
-            if discovered and len(discovered) > 50:
-                tickers = sorted(list(set(discovered)))[:100]
+            if discovered:
+                tickers = sorted(list(set(discovered)))
                 logger.info("Dinamik BIST evreni yuklendi", total_tickers=len(tickers))
     except Exception as e:
-        logger.warning("Dinamik evren yukleme uyarisi, fallback kullaniliyor", error=str(e))
+        logger.warning("Dinamik evren yukleme uyarisi, bist_universe fallback kullaniliyor", error=str(e))
+        from services.ingestion.bist_universe import bist_universe
+        tickers = bist_universe.get_tickers()
 
-    if not tickers:
-        tickers = [
-            "THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "PGSUS", "FROTO", "BIMAS",
-            "AKBNK", "SISE", "POLTK", "SDTTR", "KONYA", "REEDR", "FORTE", "EREGL",
-            "SAHOL", "ISCTR", "YKBNK", "KOZAL", "ASTOR", "EUPWR", "KONTR", "CANTE"
-        ]
-
-    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Eksiksiz BIST-100 Çapraz Kesiti)")
+    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Tüm BIST Evreni Eksiksiz)")
 
     # 2. 70 CANONICAL QUANT, FUNDAMENTAL, SENTIMENT VE MUM ALPHA FEATURE SETİ
     feature_names = list(RankingModel()._feature_names)

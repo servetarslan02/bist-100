@@ -15,10 +15,10 @@ tracer = trace.get_tracer("alpha-bist.background_tasks")
 async def radar_cache_refresher() -> Any:
     """BIST hisselerini TradingView'den çeker ve cache'i günceller.
 
-    Seans saatlerinde her 2 saniyede bir gerçek veri çeker.
-    Seans kapalıyken daha seyrek kontrol eder.
+    Seans saatlerinde 60 saniyede bir gerçek veri çeker.
+    Seans kapalıyken 300 saniyede bir kontrol eder.
     """
-    await asyncio.sleep(2)
+    await asyncio.sleep(10)
     while True:
         try:
             from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
@@ -26,67 +26,28 @@ async def radar_cache_refresher() -> Any:
             current_phase = bist_session_fsm.get_phase()
 
             if current_phase != BISTMarketPhase.CLOSED:
-                # Seans açık — gerçek veri çek
                 from .v1.market import _fetch_radar_fresh
 
                 with tracer.start_as_current_span("background.radar_cache_refresher.fetch"):
                     await _fetch_radar_fresh(limit=1000)
-            # else: Seans kapalı — cache'i koru, sahte veri üretme
 
         except Exception as e:
             logger.warning(f"radar_cache_refresher error: {e}")
 
-        # Seans açıkken sık, kapalıyken seyrek güncelle
         try:
             if current_phase != BISTMarketPhase.CLOSED:
-                await asyncio.sleep(5)  # SSD write reduction: 2s → 5s
+                await asyncio.sleep(60)
             else:
-                await asyncio.sleep(120)  # SSD write reduction: 60s → 120s
+                await asyncio.sleep(300)
         except Exception:
-            await asyncio.sleep(10)
+            await asyncio.sleep(60)
 
 
 async def ml_learning_scheduler() -> Any:
-    """PC kapalı kaldığında kaçırılan eğitimleri tamamlar ve 4 saatte bir otonom öğrenir."""
-    await asyncio.sleep(15)
-
-    try:
-        from ..learning.learning_pipeline import LearningPipeline
-
-        pipeline = LearningPipeline()
-        loop = asyncio.get_event_loop()
-        logger.info("ml_scheduler: Başlangıç eksik eğitim/veri telafi kontrolü yapılıyor...")
-        with tracer.start_as_current_span("background.ml_learning_scheduler.catchup"):
-            await loop.run_in_executor(None, pipeline.check_and_catchup_if_needed)
-        logger.info("ml_scheduler: Başlangıç telafi kontrolü tamamlandı.")
-    except Exception as e:
-        logger.warning(f"ml_scheduler startup catchup error: {e}")
-
+    """ML eğitimleri müstakil alpha-learning konteynerinde yürütülür; API hafif kalır."""
+    logger.info("ml_scheduler: ML eğitimleri müstakil alpha-learning servisine delege edildi.")
     while True:
-        await asyncio.sleep(4 * 3600)
-        try:
-            from ..learning.learning_loop import learning_loop
-            from ..learning.learning_pipeline import LearningPipeline
-
-            loop = asyncio.get_event_loop()
-
-            # 1. Model Degradation & Otonom Kapalı Devre Yeniden Eğitim Kontrolü
-            if learning_loop.should_retrain():
-                logger.info(
-                    "ml_scheduler: Model bozulması saptandı, otonom yeniden eğitim tetikleniyor...",
-                    reason=learning_loop.get_retrain_reason(),
-                )
-                with tracer.start_as_current_span("background.ml_learning_scheduler.autonomous_retrain"):
-                    await loop.run_in_executor(None, learning_loop.trigger_autonomous_retrain)
-
-            # 2. Periyodik Model Güven & Performans Güncellemesi
-            pipeline = LearningPipeline()
-            logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
-            with tracer.start_as_current_span("background.ml_learning_scheduler.cycle"):
-                await loop.run_in_executor(None, pipeline.run_learning_cycle)
-            logger.info("ml_scheduler: Periyodik öğrenme başarıyla tamamlandı.")
-        except Exception as e:
-            logger.warning(f"ml_scheduler periodic error: {e}")
+        await asyncio.sleep(86400)
 
 
 async def auto_storage_optimizer() -> Any:

@@ -71,8 +71,33 @@ class BISTUniverse:
         return info.sector if info else "DIGER"
 
     def get_tickers_by_sector(self, sector: str) -> list[str]:
-        """Sektöre göre hisseleri getir."""
-        return self._updater.get_tickers_by_sector(sector)
+        """Sektöre göre hisseleri getir (alias destekli)."""
+        sec_u = sector.upper().strip()
+        alias_map = {
+            "BANK": "BANKACILIK",
+            "BANKA": "BANKACILIK",
+            "BANKS": "BANKACILIK",
+            "GYO": "GAYRIMENKUL",
+            "REAL_ESTATE": "GAYRIMENKUL",
+            "TECH": "TEKNOLOJI",
+            "TEKNO": "TEKNOLOJI",
+            "ENERGY": "ENERJI",
+            "IND": "SANAYI",
+            "INDUSTRY": "SANAYI",
+            "RETAIL": "PERAKENDE",
+            "GIDA": "PERAKENDE",
+            "AUTO": "OTOMOTIV",
+            "INS": "SIGORTA",
+            "TELCO": "TELEKOM",
+            "DEFENSE": "SAVUNMA",
+            "MINING": "MADENCILIK",
+            "CHEM": "KIMYA",
+        }
+        target_sector = alias_map.get(sec_u, sec_u)
+        stocks = self._updater.get_tickers_by_sector(target_sector)
+        if not stocks and target_sector != sec_u:
+            stocks = self._updater.get_tickers_by_sector(sec_u)
+        return stocks
 
     def get_tickers(self) -> list[str]:
         """Tüm hisseleri getir."""
@@ -90,23 +115,33 @@ class BISTUniverse:
 # Singleton instance
 bist_universe = BISTUniverse()
 
-BIST_STOCKS = bist_universe.BIST_ALL_TICKERS
-BIST_ALL = bist_universe.BIST_ALL_TICKERS
-
 
 def get_bist_universe() -> list[str]:
-    """Otomatik eklendi."""
+    """Tüm BIST hisse sembolleri."""
     return bist_universe.get_tickers()
 
 
 def get_sector(ticker: str) -> str:
-    """Otomatik eklendi."""
+    """Hissenin sektörünü getir."""
     return bist_universe.get_ticker_sector(ticker)
 
 
+def get_bist_stocks() -> list[str]:
+    """Dinamik tüm hisseler."""
+    return bist_universe.BIST_ALL_TICKERS
+
+
+# Geriye dönük uyumluluk için modül özellikleri
 BIST_INDICES = {
     "XU100": "BIST 100",
     "XU030": "BIST 30",
     "XU050": "BIST 50",
     "XUTUM": "BIST TÜM",
 }
+
+
+def __getattr__(name: str) -> Any:
+    """Modül seviyesinde BIST_STOCKS ve BIST_ALL çağrıldığında canlı evreni döndür."""
+    if name in ("BIST_STOCKS", "BIST_ALL"):
+        return bist_universe.BIST_ALL_TICKERS
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

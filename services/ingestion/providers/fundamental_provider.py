@@ -96,7 +96,7 @@ class FundamentalProvider:
                     "ev_ebitda": info.get("enterpriseToEbitda"),
                     "ev_revenue": info.get("enterpriseToRevenue"),
                     "dividend_yield": info.get("dividendYield"),
-                    "earnings_yield": info.get("trailingPE"),
+                    "earnings_yield": (1.0 / info.get("trailingPE")) if (info.get("trailingPE") and info.get("trailingPE") > 0) else None,
                     "fcf_yield": None,
                     # Kârlılık
                     "gross_margin": info.get("grossMargins"),

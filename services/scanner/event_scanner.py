@@ -139,40 +139,17 @@ class EventScanner:
             "GOLD": ["MINING", "HOLDING"],
         }
 
-        # Sektör → hisse eşleme
-        SECTOR_STOCKS = {
-            "BANK": ["AKBNK", "GARAN", "YKBNK", "HALKB", "VAKBN", "SKBNK"],
-            "ENERGY": ["TUPRS", "PETKM", "AKSEN", "ODAS", "AYEN"],
-            "AVIATION": ["THYAO", "PGSUS"],
-            "METAL": ["EREGL", "KRDMD", "ISDMR"],
-            "RETAIL": ["BIMAS", "MGROS", "SOKM"],
-            "INDUST": ["ARCLK", "ASELS", "TOASO"],
-            "TECH": ["ASELS", "NETAS", "LOGO"],
-            "HOLDING": ["KCHOL", "SAHOL", "DOHOL"],
-            "REAL": ["EKGYO", "HLGYO"],
-            "FOOD": ["ULKER", "CCOLA", "AEFES"],
-            "CHEM": ["SISE", "BAGFS", "SASA"],
-            "TRANSPORT": ["THYAO", "PGSUS"],
-            "MINING": [],
-        }
-
-        # Indicator'a göre sektörleri belirle
-        indicator_upper = indicator.upper()
-        exposed_sectors = []
-
-        for key, sectors in SECTOR_MACRO_EXPOSURE.items():
-            if key in indicator_upper:
-                exposed_sectors.extend(sectors)
-
-        # Eğer eşleşme yoksa genel etki
-        if not exposed_sectors:
-            exposed_sectors = ["BANK", "ENERGY", "HOLDING"]
-
-        # Sektörlerden hisseleri topla
+        # Sektörlerden hisseleri dinamik bist_universe üzerinden topla
         affected = set()
-        for sector in exposed_sectors:
-            stocks = SECTOR_STOCKS.get(sector, [])
-            affected.update(stocks)
+        exposed_sectors = SECTOR_MACRO_EXPOSURE.get(indicator.upper(), [])
+        try:
+            from ..ingestion.bist_universe import bist_universe
+
+            for sector in exposed_sectors:
+                stocks = bist_universe.get_tickers_by_sector(sector)
+                affected.update(stocks)
+        except Exception:
+            pass
 
         return list(affected)
 

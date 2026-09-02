@@ -39,13 +39,27 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
         tickers_set = set(bist_universe.get_tickers())
 
         if ticker:
-            news_items = await news_provider.fetch_news_for_ticker(ticker, max_items=25)
+            try:
+                news_items = await asyncio.wait_for(news_provider.fetch_news_for_ticker(ticker, max_items=25), timeout=2.5)
+            except Exception:
+                news_items = []
         else:
-            kap_task = news_provider.fetch_official_kap_disclosures(max_items=25)
-            tcmb_task = news_provider.fetch_official_tcmb_news(max_items=25)
-            news_task = news_provider.fetch_financial_news_rss(max_items=40)
-            kap_items, tcmb_items, general_items = await asyncio.gather(kap_task, tcmb_task, news_task)
-            news_items = list(kap_items) + list(tcmb_items) + list(general_items)
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(
+                        news_provider.fetch_official_kap_disclosures(max_items=25),
+                        news_provider.fetch_official_tcmb_news(max_items=25),
+                        news_provider.fetch_financial_news_rss(max_items=40),
+                        return_exceptions=True,
+                    ),
+                    timeout=3.0,
+                )
+                news_items = []
+                for res in results:
+                    if isinstance(res, list):
+                        news_items.extend(res)
+            except Exception:
+                news_items = []
 
         # KESİN KRONOLOJİK SIRALAMA: En yeniden en eskiye doğru (Newest First)
         news_items.sort(key=lambda x: x.get("published_epoch", 0.0), reverse=True)

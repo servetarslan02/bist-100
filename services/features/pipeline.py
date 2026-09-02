@@ -123,7 +123,10 @@ class FeaturePipeline:
                 elif hasattr(ohlcv_df, "to_pandas"):
                     pdf = pl.from_pandas(ohlcv_df.to_pandas())
                 else:
-                    pdf = None
+                    try:
+                        pdf = pl.from_pandas(ohlcv_df)
+                    except Exception:
+                        pdf = None
 
                 if pdf is not None and len(pdf) > 5:
                     # Kolon adı normalize et (büyük/küçük harf uyumu)
