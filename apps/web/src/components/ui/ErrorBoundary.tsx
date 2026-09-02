@@ -33,9 +33,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error(`[ErrorBoundary${this.props.name ? `:${this.props.name}` : ""}]`, error, errorInfo);
+    const isChunkError =
+      error.message?.includes("Loading chunk") ||
+      error.name === "ChunkLoadError" ||
+      error.message?.includes("Failed to fetch dynamically imported module");
+
+    if (isChunkError && typeof window !== "undefined") {
+      const hasRetried = sessionStorage.getItem("alpha_chunk_retry");
+      if (!hasRetried) {
+        sessionStorage.setItem("alpha_chunk_retry", "true");
+        window.location.reload();
+      }
+    }
   }
 
   handleReset = () => {
+    const isChunkError =
+      this.state.error?.message?.includes("Loading chunk") ||
+      this.state.error?.name === "ChunkLoadError" ||
+      this.state.error?.message?.includes("Failed to fetch dynamically imported module");
+
+    if (isChunkError && typeof window !== "undefined") {
+      sessionStorage.removeItem("alpha_chunk_retry");
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 
