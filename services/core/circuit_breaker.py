@@ -44,7 +44,6 @@ CB_FAILURES_COUNTER = meter.create_counter(
 
 
 class CircuitState(StrEnum):
-    """Otomatik eklendi."""
     CLOSED = "CLOSED"  # Normal çalışıyor
     OPEN = "OPEN"  # Hatalı, atla
     HALF_OPEN = "HALF_OPEN"  # Dene, başarırsa CLOSED
@@ -229,7 +228,6 @@ class RetryPolicy:
     """
 
     def __init__(self, max_retries: int = 5, base_delay: float = 1.0, max_delay: float = 32.0):
-        """Otomatik eklendi."""
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -289,7 +287,6 @@ class ProviderReliability:
     """
 
     def __init__(self, name: str, window_size: int = 100):
-        """Otomatik eklendi."""
         self.name = name
         self.window_size = window_size
         self._results = __import__('collections').deque(maxlen=500)  # (success: bool, latency_ms: float, timestamp: datetime)
@@ -379,7 +376,6 @@ class ProtectedProvider:
         retry_policy: RetryPolicy | None = None,
         reliability: ProviderReliability | None = None,
     ):
-        """Otomatik eklendi."""
         self.name = name
         self.func = func
         self.circuit = circuit_breaker or CircuitBreaker(name=name)

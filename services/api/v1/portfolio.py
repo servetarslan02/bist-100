@@ -812,9 +812,9 @@ async def deposit_funds(
         raise HTTPException(500, "Internal server error") from e
 
 
-# In-memory fast cache
-_ALPHA_SIGNALS_CACHE = None
-_ALPHA_SIGNALS_TIME = 0.0
+from ...core.swr_cache import SWRCache
+
+_alpha_signals_cache = SWRCache(ttl_seconds=300)
 
 
 @router.get("/alpha")
@@ -825,28 +825,24 @@ async def alpha_signals(
     _=Depends(check_rate_limit),
 ) -> Any:
     """Doğrulanmış Alpha Stratejisi canlı sinyalleri ve portföy dağılımı."""
-    global _ALPHA_SIGNALS_CACHE, _ALPHA_SIGNALS_TIME
     import time
 
-    now = time.time()
-
-    if _ALPHA_SIGNALS_CACHE and (now - _ALPHA_SIGNALS_TIME < 300):
-        return _ALPHA_SIGNALS_CACHE
+    cached = _alpha_signals_cache.get()
+    if cached is not None:
+        return cached
 
     from ...core.redis_helper import get_cached, set_cached
 
     # 1. Redis Cache Kontrolü
     try:
-        cached = get_cached("alpha:signals")
-        if cached:
-            _ALPHA_SIGNALS_CACHE = cached
-            _ALPHA_SIGNALS_TIME = now
-            return cached
+        redis_cached = get_cached("alpha:signals")
+        if redis_cached:
+            _alpha_signals_cache.set(redis_cached)
+            return redis_cached
     except Exception as e:
         logger.debug("alpha_signals_cache_read_failed", error=str(e))
 
     def _compute_alpha_live() -> Any:
-        """Otomatik eklendi."""
         try:
             from ...core.redis_helper import get_cached
 
@@ -912,8 +908,7 @@ async def alpha_signals(
     loop = asyncio.get_event_loop()
     res = await loop.run_in_executor(None, _compute_alpha_live)
 
-    _ALPHA_SIGNALS_CACHE = res
-    _ALPHA_SIGNALS_TIME = now
+    _alpha_signals_cache.set(res)
 
     # Redis'e 15 dk cache yaz
     try:

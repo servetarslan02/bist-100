@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import functools
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -25,28 +24,11 @@ import numpy as np
 import polars as pl
 import structlog
 from opentelemetry import metrics, trace
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.orchestrator")
 meter = metrics.get_meter("alpha-bist.orchestrator")
-
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 _pipeline_runs = meter.create_counter(
     "alpha.orchestrator.pipeline_runs.total",
     description="Toplam pipeline çalışma sayısı",
@@ -121,7 +103,6 @@ class MasterOrchestrator:
     """Tüm servisleri orkestre eden ana sınıf."""
 
     def __init__(self):
-        """Otomatik eklendi."""
         self._initialized = False
         self._services: dict[str, Any] = {}
         self._simulation_results: dict[str, Any] = {}  # MC simulation cache
@@ -240,7 +221,6 @@ class MasterOrchestrator:
                 from services.core.event_schema import EventType
 
                 async def _on_simulation_completed(event) -> Any:
-                    """Otomatik eklendi."""
                     ticker = event.data.get("ticker", "")
                     if ticker:
                         if not hasattr(self, "_simulation_results"):
@@ -263,7 +243,6 @@ class MasterOrchestrator:
                 from services.core.event_schema import EventType
 
                 async def _on_regime_transition(event) -> Any:
-                    """Otomatik eklendi."""
                     old_regime = event.data.get("old_regime", "")
                     new_regime = event.data.get("new_regime", "")
                     logger.info("Regime transition detected", old=old_regime, new=new_regime)
@@ -281,7 +260,6 @@ class MasterOrchestrator:
                 from services.core.event_schema import EventType
 
                 async def _on_agent_analysis(event) -> Any:
-                    """Otomatik eklendi."""
                     ticker = event.data.get("ticker", "")
                     direction = event.data.get("direction", "")
                     confidence = event.data.get("confidence", 0)

@@ -1,48 +1,31 @@
-import functools
 from typing import Any
 
 import numpy as np
 import polars as pl
 import structlog
 from opentelemetry import trace
+from services.core.otel import otel_trace
+from services.core.risk_config import risk_config
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.risk_manager")
-
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
 
 class RiskManager:
     """
     Phase 17 - Dinamik Pozisyon ve Risk Yonetimi (Polars-Native)
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        # Risk parametreleri
-        self.max_position_pct = 0.10  # Tek hisse max %10
-        self.max_sector_pct = 0.25  # Tek sektör max %25
-        self.max_drawdown_pct = 0.15  # Max drawdown %15
-        self.stop_loss_pct = 0.07  # Stop loss %7
-        self.trailing_stop_pct = 0.05  # Trailing stop %5
-        self.max_open_positions = 15  # Max açık pozisyon
-        self.min_cash_ratio = 0.10  # Min nakit oranı %10
-        self.volatility_cap = 0.50  # Max volatilite %50
-        self.correlation_threshold = 0.70  # Korelasyon eşiği
+    def __init__(self, config=None):
+        cfg = config or risk_config
+        self.max_position_pct = cfg.max_position_pct
+        self.max_sector_pct = cfg.max_sector_pct
+        self.max_drawdown_pct = cfg.max_drawdown_pct
+        self.stop_loss_pct = cfg.stop_loss_pct
+        self.trailing_stop_pct = cfg.trailing_stop_pct
+        self.max_open_positions = cfg.max_open_positions
+        self.min_cash_ratio = cfg.min_cash_ratio
+        self.volatility_cap = cfg.volatility_cap
+        self.correlation_threshold = cfg.correlation_threshold
         self._risk_state = {
             "current_drawdown": 0.0,
             "peak_equity": 0.0,

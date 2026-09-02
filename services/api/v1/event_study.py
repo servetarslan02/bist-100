@@ -10,58 +10,26 @@ import yfinance as yf
 from fastapi import APIRouter, Depends, Query
 
 from ..dependencies import check_rate_limit, get_current_user
+from ...core.swr_cache import SWRCache
 
 logger = structlog.get_logger()
 router = APIRouter()
 
-
-_EVENTS_CACHE = [
-    {
-        "id": "ev-kap-thyao",
-        "title": "THYAO — Filo Genişleme ve Yeni Uçak Teslimatları Hakkında",
-        "summary": "Türk Hava Yolları, 2026 yılı büyüme hedefleri doğrultusunda yeni nesil uçak teslimatlarını sürdürüyor.",
-        "category": "KAP",
-        "source": "KAP",
-        "ticker": "THYAO",
-        "impact_score": 85,
-        "sentiment": "POSITIVE",
-        "timestamp": "Bugün 10:30",
-    },
-    {
-        "id": "ev-kap-asels",
-        "title": "ASELS — Yeni Savunma Sanayii İhracat Sözleşmesi İmzalandı",
-        "summary": "Aselsan Elektronik, uluslararası bir müşteri ile 45 milyon USD tutarında sözleşme imzaladı.",
-        "category": "KAP",
-        "source": "KAP",
-        "ticker": "ASELS",
-        "impact_score": 92,
-        "sentiment": "POSITIVE",
-        "timestamp": "Bugün 09:45",
-    },
-    {
-        "id": "ev-macro-tcmb",
-        "title": "TCMB — Para Politikası ve Likidite Yönetimi Bilgilendirmesi",
-        "summary": "Merkez Bankası piyasa likiditesi ve sterilizasyon araçlarını kararlılıkla uygulamaya devam ediyor.",
-        "category": "MACRO",
-        "source": "TCMB",
-        "ticker": "BIST",
-        "impact_score": 78,
-        "sentiment": "NEUTRAL",
-        "timestamp": "Bugün 09:15",
-    },
-]
-_EVENTS_CACHE_TIME = 0.0
+# Thread-safe SWR cache — no hardcoded fallback data
+_events_cache = SWRCache(ttl_seconds=60)
 
 
 async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
     """Canlı KAP, Finans Haberleri ve Makro takvim verilerini çeker."""
-    global _EVENTS_CACHE, _EVENTS_CACHE_TIME
     import time
 
     now = time.time()
 
-    if not ticker and _EVENTS_CACHE and (now - _EVENTS_CACHE_TIME < 60):
-        return _EVENTS_CACHE
+    # Thread-safe cache check (no hardcoded fallback)
+    if not ticker:
+        cached = _events_cache.get()
+        if cached is not None:
+            return cached
 
     events = []
     try:
@@ -214,7 +182,6 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
 
                 def _has_word(kw: str, text: str = text_check) -> bool:
-                    """Otomatik eklendi."""
                     return bool(_re.search(r"\b" + _re.escape(kw) + r"\b", text))
 
                 macro_keywords = [
@@ -284,8 +251,7 @@ async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
             )
 
         if not ticker and events:
-            _EVENTS_CACHE = events
-            _EVENTS_CACHE_TIME = now
+            _events_cache.set(events)
 
     except Exception as e:
         logger.warning(f"Live events fetch note: {e}")

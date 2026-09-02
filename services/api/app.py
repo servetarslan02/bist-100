@@ -34,7 +34,6 @@ try:
     import orjson
 except ImportError:
     import orjson as orjson
-import functools
 
 import structlog
 from fastapi.responses import Response as FastAPIResponse
@@ -44,27 +43,10 @@ from ..core.database import check_db_health, init_databases
 from ..core.otel import setup_telemetry
 from .rate_limiter import rate_limiter
 from .v1 import v1_router
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
-
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return await func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
     await init_databases()
@@ -257,7 +239,6 @@ def create_app() -> FastAPI:
     # Request timing middleware
     @app.middleware("http")
     async def timing_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         start = time.monotonic()
         response = await call_next(request)
         duration = (time.monotonic() - start) * 1000
@@ -267,7 +248,6 @@ def create_app() -> FastAPI:
     # Request ID middleware — her isteğe unique ID ata
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         import uuid as _uuid
 
         import structlog
@@ -297,7 +277,6 @@ def create_app() -> FastAPI:
     # Request timeout middleware — uzun süren istekleri kes
     @app.middleware("http")
     async def timeout_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         import asyncio
 
         # Timeout'suz endpoint'ler
@@ -338,7 +317,6 @@ def create_app() -> FastAPI:
     # Rate limit headers middleware
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         client_id = request.client.host if request.client else "unknown"
         path = request.url.path
         method = request.method
@@ -457,7 +435,6 @@ def create_app() -> FastAPI:
     # API version header — tüm response'larda
     @app.middleware("http")
     async def api_version_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         response = await call_next(request)
         if request.url.path.startswith("/api/"):
             response.headers["X-API-Version"] = "1.0.0"
@@ -474,7 +451,6 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def deprecation_middleware(request: Request, call_next) -> Any:
-        """Otomatik eklendi."""
         response = await call_next(request)
         path = request.url.path
         if path in DEPRECATED_ENDPOINTS:
@@ -508,7 +484,6 @@ def create_app() -> FastAPI:
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
     async def dashboard() -> Any:
-        """Otomatik eklendi."""
         dashboard_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html"
         )
@@ -521,7 +496,6 @@ def create_app() -> FastAPI:
     @app.get("/health")
     @app.get("/api/health")
     async def health() -> Any:
-        """Otomatik eklendi."""
         db_health = await check_db_health()
 
         # NATS sağlık kontrolü

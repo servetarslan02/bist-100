@@ -399,17 +399,17 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
     return result
 
 
-_ALERTS_CACHE = None
-_ALERTS_CACHE_TIME = 0.0
+from ...core.swr_cache import SWRCache
+
+_alerts_cache = SWRCache(ttl_seconds=30)
 
 
 @router.get("/alerts")
 async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları (Hızlı Önbellekli)."""
-    global _ALERTS_CACHE, _ALERTS_CACHE_TIME
-    now_ts = time.time()
-    if _ALERTS_CACHE and (now_ts - _ALERTS_CACHE_TIME < 30):
-        return _ALERTS_CACHE
+    cached = _alerts_cache.get()
+    if cached is not None:
+        return cached
 
     now = datetime.now(UTC)
     alerts: list[dict[str, Any]] = []

@@ -1,0 +1,29 @@
+# =====================================================
+# ALPHA BIST — Optional Dependencies
+# =====================================================
+# These are lazy-loaded and not required for core operation.
+# Install only what you need:
+#   pip install -r requirements-optional.txt
+#   pip install -r requirements-optional.txt  # all
+
+# === Deep Learning (GPU training) ===
+torch>=2.13.0
+
+# === NLP & Sentiment Analysis ===
+transformers>=5.16.0
+feedparser>=6.0.0
+
+# === Reinforcement Learning ===
+gymnasium>=1.3.0
+stable-baselines3>=2.9.0
+
+# === Alternative Data ===
+pytrends>=4.9.2
+
+# === Advanced Statistics ===
+numba>=0.67.0
+hmmlearn>=0.3.0
+shap>=0.52.0
+
+# === Satellite Data ===
+rasterio>=1.4.0

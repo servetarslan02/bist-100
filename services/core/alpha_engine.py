@@ -8,7 +8,6 @@ ALPHA BIST — Alpha Engine v2.0 (Enterprise-Grade)
 
 
 import datetime
-import functools
 import hashlib
 from pathlib import Path
 
@@ -22,28 +21,11 @@ from opentelemetry import metrics, trace
 from services.core.safe_pickle import safe_pickle_dump, safe_pickle_load
 from services.ingestion.bist_universe import bist_universe
 from services.ml.feature_engine import compute_universe_features
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.alpha_engine")
 meter = metrics.get_meter("alpha-bist.alpha_engine")
-
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 def _yf_to_polars(yf_df) -> pl.DataFrame:
     """yfinance pandas DataFrame'ini Polars'a çevir."""
     if yf_df is None or len(yf_df) == 0:
@@ -67,9 +49,7 @@ def _detect_gpu_cuda() -> Any:
 
 
 class AlphaEngine:
-    """Otomatik eklendi."""
     def __init__(self, exclude_features: list[str] = None):
-        """Otomatik eklendi."""
         has_gpu, dev_name = _detect_gpu_cuda()
         self.has_gpu = has_gpu
         self.gpu_device_name = dev_name
@@ -93,7 +73,6 @@ class AlphaEngine:
 
     @otel_trace("alpha_engine.fetch_data")
     def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None) -> Any:
-        """Otomatik eklendi."""
         if tickers is None:
             tickers = (
                 bist_universe.BIST_ALL_TICKERS
@@ -156,7 +135,6 @@ class AlphaEngine:
         snapshot_offsets: list[int] = None,
         forward_days: int = 20,
     ) -> Any:
-        """Otomatik eklendi."""
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
         rows = []
@@ -235,7 +213,6 @@ class AlphaEngine:
 
     @otel_trace("alpha_engine.train")
     def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True) -> Any:
-        """Otomatik eklendi."""
         t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
         t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
@@ -274,7 +251,6 @@ class AlphaEngine:
 
     @otel_trace("alpha_engine.predict")
     def predict(self, market_data, bm_df, sector_map, target_date_str: str) -> Any:
-        """Otomatik eklendi."""
         if not self.model:
             raise ValueError("Model not trained")
 
@@ -315,7 +291,6 @@ class AlphaEngine:
         return predictions
 
     def _save_model(self, path: str = "data/alpha_engine_model.pkl") -> Any:
-        """Otomatik eklendi."""
         if self.model is None:
             return
         try:
@@ -334,7 +309,6 @@ class AlphaEngine:
             logger.warning("Failed to save AlphaEngine model", error=str(e))
 
     def _load_model(self, path: str = "data/alpha_engine_model.pkl", max_age_hours: int = 24) -> bool:
-        """Otomatik eklendi."""
         if not Path(path).exists():
             return False
         try:
@@ -361,7 +335,6 @@ class AlphaEngine:
 
     @otel_trace("alpha_engine.run_daily_pipeline")
     def run_daily_pipeline(self, date: str) -> Any:
-        """Otomatik eklendi."""
         end_date_dt = datetime.datetime.strptime(date, "%Y-%m-%d")
         start_date_dt = end_date_dt - datetime.timedelta(days=400)
 

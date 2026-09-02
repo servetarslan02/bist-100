@@ -68,3 +68,29 @@ infrastructure/mtls/certs/
 
 # Audit run json reports
 audit/*.json
+
+# OpenClaw agent workspace (not project source)
+.openclaw/
+
+# Agent memory files (OpenClaw runtime state)
+memory/
+
+# ALL pickle files (security risk — arbitrary code execution)
+*.pkl
+*.pkl.sha256
+
+# Process ID files
+*.pid
+
+# Binary model artifacts (use MLflow artifact store instead)
+models/*.pkl
+models/*.pkl.sha256
+ml/saved_models/**/*.pkl
+ml/saved_models/**/*.pkl.sha256
+ml/ranking_model/model.txt
+
+# Audit reports with non-ASCII folder names
+audit raporlar/
+
+# Archived dead code (not production)
+archive/

@@ -29,14 +29,13 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from ..dependencies import check_rate_limit, get_current_user
+from ...core.swr_cache import SWRCache
 
 logger = structlog.get_logger()
 router = APIRouter()
 
-# Memory cache for signals (SWR)
-_SCAN_SIGNALS_CACHE = []
-_SCAN_SIGNALS_TIME = 0.0
-_SCAN_SIGNALS_ETAG = ""
+# Thread-safe SWR cache for signals
+_signals_cache = SWRCache(ttl_seconds=60)
 
 
 def _get_scan_api() -> Any:
@@ -71,13 +70,12 @@ async def scanner_signals(
     _=Depends(check_rate_limit),
 ) -> Any:
     """Canlı model sinyalleri ve piyasa fırsatları (Filtreli, Güven & Getiri Sıralı ve ETag/SWR Korumalı)."""
-    global _SCAN_SIGNALS_CACHE, _SCAN_SIGNALS_TIME, _SCAN_SIGNALS_ETAG
     now = time.time()
 
     # ETag / If-None-Match Kontrolü (Client tarafı 304 Not Modified)
     client_etag = request.headers.get("if-none-match")
-    if client_etag and _SCAN_SIGNALS_ETAG and client_etag.strip('"') == _SCAN_SIGNALS_ETAG.strip('"'):
-        if (now - _SCAN_SIGNALS_TIME < 60) and not category and not search:
+    if client_etag and _signals_cache.etag and client_etag.strip('"') == _signals_cache.etag.strip('"'):
+        if _signals_cache.is_fresh and not category and not search:
             response.status_code = 304
             return response
 
@@ -86,8 +84,9 @@ async def scanner_signals(
         from ...core.redis_helper import get_cached, set_cached
 
         # Stabilizasyon: Eğer hafızada taze sinyaller varsa (60 sn) ve filtre uygulanmamışsa hızlı dön
-        if _SCAN_SIGNALS_CACHE and (now - _SCAN_SIGNALS_TIME < 60) and not category and not search:
-            signals = list(_SCAN_SIGNALS_CACHE)
+        cached = _signals_cache.get()
+        if cached is not None and not category and not search:
+            signals = list(cached)
         else:
             preds = get_cached("phase18:predictions")
             if not preds or len(preds) == 0 or not preds[0].get("target_price"):
@@ -111,9 +110,7 @@ async def scanner_signals(
 
             # Sıralama en çok güven (score) ve en yüksek getiri (expected_return_pct)
             signals.sort(key=lambda x: (x.get("score", 0), x.get("expected_return_pct", 0)), reverse=True)
-            _SCAN_SIGNALS_CACHE = list(signals)
-            _SCAN_SIGNALS_TIME = now
-            _SCAN_SIGNALS_ETAG = hashlib.md5(orjson.dumps(signals)).hexdigest()[:16]
+            _signals_cache.set(signals)
 
         # Filtreleme (Kategori ve Arama)
         result_signals = signals
@@ -134,8 +131,8 @@ async def scanner_signals(
                 if q in s.get("symbol", "").lower() or q in s.get("name", "").lower() or q in s.get("spec_reason", "").lower()
             ]
 
-        if _SCAN_SIGNALS_ETAG:
-            response.headers["ETag"] = f'"{_SCAN_SIGNALS_ETAG}"'
+        if _signals_cache.etag:
+            response.headers["ETag"] = f'"{_signals_cache.etag}"'
             response.headers["Cache-Control"] = "public, max-age=15, stale-while-revalidate=45"
 
         return {"signals": result_signals[:limit], "count": len(result_signals[:limit])}

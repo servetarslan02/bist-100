@@ -185,7 +185,6 @@ async def get_pg_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             return _pg_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
-            """Otomatik eklendi."""
             return await asyncpg.create_pool(
                 host=settings.postgres_host,
                 port=settings.postgres_port,
@@ -236,7 +235,6 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             return _pg_replica_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
-            """Otomatik eklendi."""
             return await asyncpg.create_pool(
                 host=replica_host,
                 port=replica_port,

@@ -193,9 +193,16 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 // 1. SWR Polling Hook (0.0ms Instant Render & Global Live Sync)
 // =====================================================
 
-export function usePolling<T>(path: string, intervalMs: number = 3000) {
-  const [data, setData] = useState<T | null>(() => getInitialCachedData<T>(path));
-  const [loading, setLoading] = useState<boolean>(() => !memoryCache.has(path));
+export function usePolling<T>(path: string, intervalMs: number = 3000, initialData?: T | null) {
+  const [data, setData] = useState<T | null>(() => {
+    // Priority: SSR initial data > memory cache
+    if (initialData !== undefined && initialData !== null) {
+      memoryCache.set(path, { data: initialData, timestamp: Date.now() });
+      return initialData;
+    }
+    return getInitialCachedData<T>(path);
+  });
+  const [loading, setLoading] = useState<boolean>(() => !initialData && !memoryCache.has(path));
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(() => {

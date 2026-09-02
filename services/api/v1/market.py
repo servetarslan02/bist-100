@@ -81,24 +81,27 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
         }
 
 
-_INSTRUMENTS_CACHE = None
+from ...core.swr_cache import SWRCache
+
+_instruments_cache = SWRCache(ttl_seconds=3600)  # 1 hour — universe rarely changes
 
 
 @router.get("/instruments")
 async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Tüm hisseler."""
-    global _INSTRUMENTS_CACHE
-    if _INSTRUMENTS_CACHE:
-        return _INSTRUMENTS_CACHE
+    cached = _instruments_cache.get()
+    if cached is not None:
+        return cached
     try:
         from ...ingestion.bist_universe import bist_universe
 
-        _INSTRUMENTS_CACHE = {
+        result = {
             "bist_100": getattr(bist_universe, "BIST_100_TICKERS", []),
             "all": getattr(bist_universe, "BIST_ALL_TICKERS", []),
             "count": len(getattr(bist_universe, "BIST_ALL_TICKERS", [])),
         }
-        return _INSTRUMENTS_CACHE
+        _instruments_cache.set(result)
+        return result
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
         raise HTTPException(500, "Internal server error") from e
@@ -243,7 +246,6 @@ async def live_intel_analysis(
         raw_daily = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
 
         def _to_pandas_df(d) -> Any:
-            """Otomatik eklendi."""
             if d is None:
                 return None
             if isinstance(d, pl.DataFrame):
@@ -565,7 +567,6 @@ async def _fetch_radar_fresh(limit: int = 1000) -> Any:
         return None
 
     def _calc_rsi(closes, period=14) -> Any:
-        """Otomatik eklendi."""
         if len(closes) < period + 1:
             return 50.0
         arr = np.array(closes)
@@ -583,7 +584,6 @@ async def _fetch_radar_fresh(limit: int = 1000) -> Any:
         return round(100 - 100 / (1 + rs), 1)
 
     def _batch_fetch() -> Any:
-        """Otomatik eklendi."""
         # Önce 0 gecikmeli TradingView canlı beslemesini dene
         tv_results = _fetch_tradingview_live()
         if tv_results:
@@ -708,27 +708,27 @@ async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         return {"regime": "UNKNOWN", "error": str(e)}
 
 
-_HEATMAP_CACHE = None
-_HEATMAP_TIME = 0.0
+_heatmap_cache = SWRCache(ttl_seconds=30)
 
 
 @router.get("/heatmap")
 async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """BIST 100% dinamik canlı sektör ısı haritası — yeni hisseler ve halka arzlar otomatik dahil edilir."""
-    global _HEATMAP_CACHE, _HEATMAP_TIME
-    now = time.time()
-    if _HEATMAP_CACHE and (now - _HEATMAP_TIME < 30):
-        return _HEATMAP_CACHE
+    cached = _heatmap_cache.get()
+    if cached is not None:
+        return cached
 
     from ...core.redis_helper import get_cached
     from ...ingestion.bist_universe import bist_universe
 
     stock_items = get_cached("radar:data")
     if not stock_items:
-        stock_items = [
-            {"symbol": t, "name": t, "price": 50.0, "change": 1.2, "volume": 15000000, "score": 80}
-            for t in getattr(bist_universe, "BIST_100_TICKERS", [])[:50]
-        ]
+        # Fail-closed: no fake data — return empty with status message
+        return {
+            "status": "unavailable",
+            "sectors": [],
+            "message": "Canlı veri bekleniyor veya altyapı güncelleniyor",
+        }
 
     # Bilinen ana hisseler için deterministik kesin sektör eşleme
     TICKER_SECTORS = {
@@ -912,6 +912,5 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
         "status": "ok",
         "sectors": sectors,
     }
-    _HEATMAP_CACHE = res
-    _HEATMAP_TIME = now
+    _heatmap_cache.set(res)
     return res

@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import structlog
 
+from services.core.risk_config import backtest_config
 from services.portfolio.portfolio_manager import CommissionModel
 
 logger = structlog.get_logger()
@@ -87,7 +88,7 @@ class BacktestEngine:
         price: float,
         volume: float,
         quantity: int,
-        base_slippage_pct: float = 0.05,
+        base_slippage_pct: float = backtest_config.base_slippage_pct,
     ) -> float:
         """F-010: Dinamik slippage modeli.
 
@@ -113,7 +114,7 @@ class BacktestEngine:
         price: float,
         volume: float,
         quantity: int,
-        max_participation: float = 0.10,
+        max_participation: float = backtest_config.max_participation,
     ) -> tuple[bool, int]:
         """F-011: Likidite kısıtı kontrolü.
 
@@ -418,7 +419,6 @@ class BacktestEngine:
         trailing_stop_pct: float = 0.15,
         market_regime: float = 1.0,
     ) -> Any:
-        """Otomatik eklendi."""
         import csv
         import os
         from collections import defaultdict
