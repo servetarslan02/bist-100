@@ -112,8 +112,14 @@ class ModelRegistry:
             pass
 
         for m in model_candidates:
-            p = Path(m["path"])
-            if not p.exists():
+            possible_paths = [
+                Path(m["path"]),
+                Path("ml/saved_models") / Path(m["path"]).name,
+                Path("data/models") / Path(m["path"]).name,
+                Path("models") / Path(m["path"]).name,
+            ]
+            p = next((path for path in possible_paths if path.exists()), None)
+            if p is None:
                 continue
 
             created_at = datetime.fromtimestamp(p.stat().st_mtime, tz=UTC).isoformat()
