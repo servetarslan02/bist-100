@@ -24,6 +24,10 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
     from services.learning.model_registry import model_registry
 
     versions = model_registry.get_all_versions()
+    if not versions:
+        if hasattr(model_registry, "_init_default_models"):
+            model_registry._init_default_models()
+        versions = model_registry.get_all_versions()
 
     return {
         "models": versions,
