@@ -156,12 +156,9 @@ Bu liste, "P0/P1 açıkların bir kısmı zaten kapatılmaya başlandı" anlamı
 gelir ama **tamamı kapatılmamıştır** — özellikle sahte/sabit veri (P0) ve
 walk-forward gerçekliği (P1) hâlâ açıktır. Ancak Mask-first ihlali çözülmüştür.
 
-### Veri Alım Katmanı (services/ingestion) — Henüz Düzeltilmemiş Kritik Bulgular
+### Veri Alım Katmanı (services/ingestion) — Kısmen Güncellendi
 
-Bu bulgular (kullanıcının "canlı veride sürekli zarar" şüphesi üzerine
-yapılan araştırmada bulundu) henüz **düzeltilmedi**, sadece tespit edildi
-— detaylar ve çözüm önerileri için `documentation/12` madde 7-10'a bakın:
-
+`documentation/12` madde 7-10'da listelenen bulgulardan hâlâ **açık** olanlar:
 - `bist_provider.py` ve `matriks_provider.py`'nin hedeflediği API
   uç noktalarının gerçekte var olmadığı şüphesi (web araştırmasıyla
   doğrulanamadı) — sistem muhtemelen iddia ettiği çoklu-kaynak
@@ -169,6 +166,74 @@ yapılan araştırmada bulundu) henüz **düzeltilmedi**, sadece tespit edildi
 - Canlı/sanal işlemde (`paper_orchestrator.py`) T+1 koruması kâğıt
   üzerinde var ama devre dışı — backtest'te düzeltilen aynı sorunun
   canlı tarafındaki hâlâ açık hali.
-- "Son güncelleme" zaman damgasının gerçek veri zaman damgası yerine
-  fetch anını göstermesi — tazelik kontrolünü kör bırakıyor.
-- En az iki modülde sabit `[:50]` evren tavanı.
+
+**Çözüldü:** "Son güncelleme" zaman damgası sorunu ve sabit `[:50]`
+evren tavanı — bu ikisinin güncel durumu doğrulanmadı, tekrar kontrol
+gerekir.
+
+### `WhyFallingMotor` Restorasyonu — Tamamlandı
+
+Önceki bir turda kaybolduğu tespit edilip (bkz. yukarı) sınıf olarak
+`services/features/seven_motors.py`'ye geri eklenen `WhyFallingMotor`,
+artık `services/backtest/engine_v4.py`'ye de gerçekten bağlanmış
+durumda (satır ~1171-1217, `WhyFallingMotor()` örneklenip
+kullanılıyor). Bu madde tam olarak kapatılmıştır.
+
+### Ekim 2026 Turu — Ek Kritik Bulgular ve Çözümleri
+
+Sistem 470→576+ dosyaya büyüdüğü, çoklu AI oturumu (Mimo, Gemini,
+diğerleri) tarafından hızlı geliştirildiği bir dönemde, sadece kod
+okuyarak (test'e güvenmeden) yapılan bir "en önemli mantık hataları"
+taramasında bulunan ve sonradan **doğrulanmış şekilde çözülen** maddeler:
+
+- **`services/api/v1/scanner.py`** — En kritik bulgu: altyapı (Redis/
+  scanner) çöktüğünde, sistem sessizce **tamamen uydurma** hisse
+  önerileri (sahte fiyat, sahte skor, sahte "analist" gerekçe metni,
+  `"timestamp": "Şimdi"`) sunuyordu — `documentation/01.6` kırmızı
+  çizgisinin doğrudan ihlali. **Çözüldü**: kod artık `"NO HARDCODED
+  FAKE SIGNALS"` yorumuyla dürüst `{"signals": [], "status":
+  "unavailable"}` döndürüyor.
+- **`services/portfolio/autonomous_conviction_engine.py`** — Trailing
+  stop mantığında, bir pozisyon zirve kârdan küçük bir zarara
+  gerilediğinde hiçbir kuralla (ne trailing stop ne hard stop-loss)
+  korunmadığı somut senaryoyla kanıtlandı. **Çözüldü**: `pnl_pct > 0.02`
+  "tuzak şartı" kaldırılıp `has_reached_profit` mantığıyla değiştirildi
+  (kod yorumu bug'ı açıkça tanımlıyor: "ölüm bölgesi kapatılmıştır").
+- **`services/api/v1/portfolio.py`** (`/accounting`) — Realized PnL,
+  var olmayan bir sözlük anahtarına (`total_pnl`) baktığı için her
+  zaman `0.0` dönüyordu. **Çözüldü**: gerçekten var olan `realized_pnl`
+  anahtarına geçirildi (iki endpoint arasında hâlâ küçük bir isim
+  tutarsızlığı var, işlevsel hata giderildi).
+- **`services/core/state_store.py`** — Her tahmin için DuckDB
+  bağlantısı açıp/kapatan, batching yapmayan (docstring "batched"
+  diyordu ama kod yapmıyordu) yazma mantığı, WSL/Docker'da sürekli
+  SSD yazma/donma sorununa yol açıyordu (106 hisseye genişleyen
+  evrenle katlanarak kötüleşti). **Çözüldü**: gerçek `_buffered_write`
+  + boyut-bazlı flush (10 öğe) eklendi. (`periodic_flush()` zaman
+  bazlı güvenlik ağı hâlâ hiçbir yerden çağrılmıyor — küçük risk.)
+- **`docker-compose.yml`** — Toplam `mem_limit` fiziksel RAM'i (16GB)
+  aşıyordu (~17.7GB), bozuk değerler (`512m-replica`, `1g-2`) ve
+  çakışan `container_name`'ler (aynı isim 2-3 serviste) vardı.
+  **Çözüldü**: bozuk değerler düzeltildi, çakışmalar giderildi, tek
+  makinede gerçek HA faydası olmayan servisler (3 Redis Sentinel,
+  ikinci ClickHouse node'u) kaldırıldı, toplam bütçe ~12.7GB'a
+  (%79.5 doluluk, host/WSL için pay bırakarak) çekildi, tüm servislere
+  `cpus` limiti eklendi.
+- **`services/features/seven_motors.py`, `engine_v4.py`** — Bkz.
+  yukarıdaki "WhyFallingMotor Restorasyonu" — tamamlandı.
+- **Karakter kodlaması bozulması** — `services/core/` altında 10
+  dosyada bulunan mojibake (bozuk Türkçe karakter) sorunu artık
+  temizlenmiş görünüyor (sonraki bir "code quality" turunda).
+
+**Hâlâ açık kalan (bu turda çözülmeyen):**
+- `services/portfolio/autonomous_conviction_engine.py::base_hurdle_rate=0.35`
+  — yıllıklandırılmış getiri eşiği %35-60'a kadar çıkıyor,
+  `documentation/01 §1.7.2`'deki resmi hedefle (%10-20 alfa) hâlâ
+  çelişiyor. Yeni merkezi `services/core/risk_config.py`'ye bile
+  taşınmamış.
+- `services/risk/var_cvar.py::calculate_monte_carlo_var` — GPU yolu
+  (`torch.normal`) hâlâ `seed` parametresini kullanmıyor, tekrarlanabilirlik
+  tutarsızlığı devam ediyor olabilir (bu turda tekrar doğrulanmadı).
+- `trade_planner.py`, `simulation/main.py` — senaryo olasılıklarının
+  (%30/%50/%20 gibi) sabit kodlanmış olması, sinyal gücüne duyarsız
+  olması (bu turda tekrar doğrulanmadı).

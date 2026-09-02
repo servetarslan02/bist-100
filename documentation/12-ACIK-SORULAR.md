@@ -93,6 +93,10 @@ korunarak doğru UTF-8 ile yeniden yazıldı.
   olarak mı güncellenecek?
 
 ## 8. services/paper_trading/paper_orchestrator.py — Canlı/Sanal İşlemde T+1 Koruması Devre Dışı
+- **Durum (güncelleme):** Bu madde henüz çözülmediği doğrulandı — bkz.
+  `documentation/09` "Veri Alım Katmanı" bölümü. Backtest tarafındaki
+  T+1 açığı (`multi_asset_engine.py`, commit `3edfb45`) çözülmüştü;
+  canlı/sanal tarafındaki bu madde hâlâ aynı durumda.
 - **Senaryo:** `execute_signal(signal_price=price, market_price=price)`
   — ikisine de aynı değişken veriliyor. `paper_execution.py`'nin kendi
   docstring'i bu iki fiyatın AYRI olması gerektiğini (look-ahead bias'ı
@@ -107,6 +111,9 @@ korunarak doğru UTF-8 ile yeniden yazıldı.
   zamanlamasıyla ilgili bir tasarım kararı gerektiriyor.
 
 ## 9. services/ingestion/realtime.py, realtime_provider.py — Yanlış "Tazelik" Zaman Damgası
+- **Durum (güncelleme):** Bu maddenin güncel kod durumu tekrar
+  doğrulanmadı (son "code quality" refactor turundan sonra). Bir
+  sonraki denetimde tekrar kontrol edilmeli.
 - **Senaryo:** `self._last_update[ticker] = datetime.now(timezone.utc)`
   — bu, verinin gerçek piyasa zaman damgası değil, kodun çalıştığı an.
   yfinance kaynağı zaten ~15-20 dakika gecikmeli (bilinen bir Yahoo
@@ -127,3 +134,47 @@ korunarak doğru UTF-8 ile yeniden yazıldı.
 - **Soru:** Bu sabit tavan, HOT/WARM/COLD modeliyle mi değiştirilecek,
   yoksa bilinçli bir kaynak kısıtlaması olarak mı kalacak (ki bu durumda
   en azından açıkça belgelenmeli)?
+
+## 11. services/portfolio/autonomous_conviction_engine.py — Hurdle Rate Resmi Hedefle Çelişiyor
+- **Senaryo:** `base_hurdle_rate=0.35` (%35, "BIST politika faizi/mevduat
+  barajı") + rejim primi (%5-40) + friction → toplam kabul eşiği
+  %40-60'a kadar çıkıyor. `CandidateAsset.expected_return` alanının
+  kendi docstring örneği bile ("0.15 = %15") bu eşiği hiçbir zaman
+  geçemez.
+- **Neden şüpheli:** `documentation/01 §1.7.2`'de belirlediğimiz resmi
+  hedef aralığıyla (%10-20 BIST100 üzeri alfa) doğrudan çelişiyor. İki
+  kötü senaryodan biri gerçekleşir: (a) ML modeli gerçekçi tahminler
+  üretiyorsa portföy sürekli %100 nakitte kalır, (b) ML modeli %40-60
+  gibi gerçekçi olmayan tahminler üretiyorsa bu filtre onları
+  sorgusuzca kabul eder ("Holy Grail" tuzağı).
+- **Not:** `services/core/risk_config.py` (merkezi risk parametreleri)
+  eklendiğinde bu alan oraya taşınmamış, hâlâ `autonomous_conviction_
+  engine.py` içinde sabit kodlu.
+- **Soru:** `base_hurdle_rate`, projenin resmi %10-20 alfa hedefiyle
+  tutarlı bir seviyeye mi çekilmeli (örn. risk-free oranı ayrı bir
+  "fırsat maliyeti" olarak değil, doğrudan BIST100 karşılaştırmalı
+  alfa hedefine göre mi tanımlanmalı)?
+
+## 12. services/risk/var_cvar.py — Monte Carlo GPU Yolunda Seed Yok Sayılıyor
+- **Senaryo:** `calculate_monte_carlo_var`'ın CPU yolu
+  (`np.random.default_rng(seed)`) seed'i doğru kullanıyor (test
+  edildi), ama GPU yolu (`torch.normal(...)`) seed parametresini hiç
+  almıyor, PyTorch'un global rastgele durumunu kullanıyor.
+- **Neden şüpheli:** Fonksiyonun kendi docstring'i seed'i
+  "reproducibility için" tanımlıyor. GPU'lu bir makinede üretilen bir
+  VaR kararı, aynı seed'le asla tam olarak yeniden üretilemez —
+  `documentation/02.4`'teki "kanıt paketi/tekrar-oynatılabilirlik"
+  ilkesiyle çelişiyor.
+- **Soru:** GPU yolu da `rng`'den türetilen bir seed ile mi
+  başlatılmalı (örn. `torch.manual_seed(seed)` çağrısı eklenerek)?
+
+## 13. services/intelligence/trade_planner.py, services/simulation/main.py — Sabit Senaryo Olasılıkları
+- **Senaryo:** Bull/Base/Bear (ve simulation/main.py'de Crash) senaryo
+  olasılıkları (%30/%50/%20 veya %25/%50/%20/%5) her ticker/portföy
+  için sabit — fonksiyon imzaları `spec_score`/`regime` parametresi
+  bile almıyor.
+- **Neden şüpheli:** Kullanıcıya/karar zincirine gerçek bir olasılıksal
+  analiz yapılmış izlenimi veriyor ama girdiye hiç duyarlı değil.
+- **Soru:** Bu olasılıklar gerçekten sinyal gücüne/rejime duyarlı hale
+  mi getirilmeli, yoksa "kaba bir varsayılan senaryo şablonu" olduğu
+  açıkça mı belgelenmeli?
