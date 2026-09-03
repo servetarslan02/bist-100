@@ -12,7 +12,11 @@
 2. **Tüm Hatalar Düzeltilecek.** Boundary hatası, dead code, exception yutma, yanlış veri kaynağı, bypass, tutarsızlık — sistemi bozan her şey düzeltilir.
 3. **Eksik Fonksiyonellik Tamamlanacak.** Eksik parametre, eksik loglama, eksik fallback, eksik validasyon tespit edilen her eksik tamamlanır.
 4. **Kod Profesyonel Olacak.** Her docstring açıklayıcı ve Türkçe. Her dataclass'ta `__repr__`. Return type annotation doğru. Gereksiz import olmayacak. Değişken isimleri anlamlı olacak.
-5. **Düzeltme Sonrası Kontrol.** Syntax kontrolü ve import zinciri kontrolü yapılacak.
+5. **Düzeltme Sonrası Doğrulama.** Her düzeltme aşağıdaki yöntemlerle doğrulanır:
+   - **Syntax:** `ast.parse()` ile sözdizimi kontrolü
+   - **Import:** `python3 -c "from services.agents.modul import X"` ile import zinciri kontrolü
+   - **Mantık:** Kod okunarak düzeltmenin doğru uygulandığı doğrulanır (boundary, filtre, parametre vb.)
+   - **Etki:** Değişen kodun caller dosyalara doğru yansıtıldığı kontrol edilir
 6. **Geliştirme Önerileri Verilecek.** Eksik değil ama geliştirilebilecek her alan için öneri sunulacak.
 
 ---
