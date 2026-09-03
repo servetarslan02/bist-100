@@ -39,7 +39,7 @@ class DebateRound:
     bear_evidence: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+        """DebateRound sonucunu dict'e çevir."""
         return {
             "round": self.round_num,
             "bull": {
@@ -69,7 +69,7 @@ class DebateResult:
     bear_final_confidence: float = 0.0
 
     def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+        """to_dict metodu."""
         return {
             "consensus": self.consensus,
             "consensus_confidence": self.consensus_confidence,
@@ -104,7 +104,7 @@ class DebateEngine:
         max_rounds: int = 3,
         confidence_damping: float = 0.9,
     ):
-        """Otomatik eklendi."""
+        """metod metodu."""
         self.max_rounds = max_rounds
         self.confidence_damping = confidence_damping
 

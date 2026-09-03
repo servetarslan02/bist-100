@@ -533,7 +533,7 @@ class PromptFactory:
         return system_prompt, user_prompt
 
     @classmethod
-    def register_template(cls, name: str, system: str, user: str) -> Any:
+    def register_template(cls, name: str, system: str, user: str) -> None:
         """Yeni prompt şablonu kaydet."""
         cls._templates[name] = {"system": system, "user": user}
 

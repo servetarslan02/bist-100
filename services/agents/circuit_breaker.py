@@ -199,7 +199,7 @@ class CircuitBreakerLLMClient:
         user_prompt: str,
         temperature: float | None = None,
         max_tokens: int | None = None,
-    ) -> Any:
+    ) -> 'LLMResponse':
         """Circuit breaker kontrollü LLM çağrısı."""
         if not self._breaker.can_execute():
             logger.warning("Circuit breaker OPEN — LLM call rejected")
@@ -229,7 +229,7 @@ class CircuitBreakerLLMClient:
             self._breaker.record_failure()
             raise
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> object:
         """Diğer attribute'ları gerçek client'a pasla."""
         return getattr(self._client, name)
 

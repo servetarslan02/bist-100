@@ -33,7 +33,7 @@ class RiskAssessment:
     reasoning: str = ""
 
     def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+        """Risk değerlendirme sonucu."""
         return {
             "approved": self.approved,
             "risk_level": self.risk_level,

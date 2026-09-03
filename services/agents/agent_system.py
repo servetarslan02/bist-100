@@ -475,9 +475,9 @@ class BaseAgent:
                 "prompt": task.prompt[:200],
                 "context_keys": sorted(task.context.keys()),
             },
-            sort_keys=True,
+            option=orjson.OPT_SORT_KEYS,
         )
-        input_hash = hashlib.sha256(input_str.encode()).hexdigest()[:16]
+        input_hash = hashlib.sha256(input_str).hexdigest()[:16]
 
         try:
             if client:
@@ -651,177 +651,10 @@ class BaseAgent:
         )
 
 
-class AgentOrchestrator:
-    """Agent'ları yöneten üst katman v2.0.
-
-    Basit versiyon — test ve hafif kullanımlar için.
-    Production için AgentPipelineOrchestrator kullanın.
-
-    Kullanım:
-        orch = AgentOrchestrator(llm_client=client)
-        result = await orch.run_research_pipeline("THYAO", context)
-    """
-
-    def __init__(self, llm_client: BaseLLMClient | None = None):
-        """Agent orchestrator oluştur."""
-        self._agents: dict[AgentRole, BaseAgent] = {}
-        self._results: deque[AgentResult] = deque(maxlen=1000)
-        self.llm_client = llm_client
-
-    def register_agent(self, agent: BaseAgent) -> None:
-        """Agent'ı orchestrator'a kaydet."""
-        self._agents[agent.role] = agent
-
-    def set_llm_client(self, client: BaseLLMClient) -> None:
-        """LLM client'ı ayarla (tüm agent'lar için geçerli)."""
-        self.llm_client = client
-
-    async def run_research_pipeline(
-        self,
-        ticker: str,
-        context: dict[str, Any],
-        llm_client: BaseLLMClient | None = None,
-    ) -> dict[str, Any]:
-        """Tam araştırma pipeline'ı çalıştır.
-
-        4 agent paralel çalışır, sonra synthesis yapılır.
-
-        Args:
-            ticker: Hisse kodu
-            context: Bağlam (features, news, vb.)
-            llm_client: LLM client (opsiyonel)
-
-        Returns:
-            Tüm agent sonuçlarını ve sentez sonucunu içerir
-        """
-        client = llm_client or self.llm_client
-
-        research_roles = [
-            AgentRole.TECHNICAL,
-            AgentRole.FUNDAMENTAL,
-            AgentRole.NEWS,
-            AgentRole.MACRO,
-        ]
-
-        template_map = {
-            AgentRole.TECHNICAL: "technical",
-            AgentRole.FUNDAMENTAL: "fundamental",
-            AgentRole.NEWS: "news",
-            AgentRole.MACRO: "macro",
-        }
-
-        async def _run_agent(role: AgentRole) -> tuple[str, AgentResult]:
-            """Tek agent'ı çalıştır (asyncio.gather için)."""
-            agent = self._agents.get(role) or BaseAgent(role, llm_client=client)
-            task = AgentTask(
-                task_id=f"{ticker}-{role.value}-{uuid.uuid4().hex[:8]}",
-                agent_role=role,
-                ticker=ticker,
-                prompt=f"Analyze {ticker} from {role.value} perspective",
-                context=context,
-                template_name=template_map.get(role),
-            )
-            return role.value, await agent.execute(task, client)
-
-        gather_results = await asyncio.gather(
-            *[_run_agent(r) for r in research_roles],
-            return_exceptions=True,
-        )
-
-        results: dict[str, AgentResult] = {}
-        for item in gather_results:
-            if isinstance(item, Exception):
-                logger.warning("Agent execution failed", error=str(item))
-                continue
-            role_val, result = item
-            results[role_val] = result
-            self._results.append(result)
-
-        # Synthesis — hata yönetimi ile
-        synth_result: AgentResult
-        try:
-            synth_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(
-                AgentRole.SYNTHESIS, llm_client=client
-            )
-            synth_task = AgentTask(
-                task_id=f"{ticker}-SYNTHESIS-{uuid.uuid4().hex[:8]}",
-                agent_role=AgentRole.SYNTHESIS,
-                ticker=ticker,
-                prompt=f"Synthesize all analysis for {ticker}",
-                context={
-                    **context,
-                    "agent_results": {k: v.output for k, v in results.items()},
-                },
-                template_name="synthesis",
-            )
-            synth_result = await synth_agent.execute(synth_task, client)
-        except Exception as e:
-            logger.error("Synthesis failed", error=str(e))
-            synth_result = AgentResult(
-                task_id=f"{ticker}-SYNTHESIS-error",
-                agent_role=AgentRole.SYNTHESIS,
-                ticker=ticker,
-                success=False,
-                output={"direction": "NO_TRADE", "confidence": 0.0},
-                confidence=0.0,
-                evidence=[],
-                reasoning=f"Synthesis failed: {e}",
-                model_version="error",
-                prompt_version="",
-                input_hash="",
-                duration_ms=0,
-                error=str(e),
-            )
-
-        results["SYNTHESIS"] = synth_result
-
-        return {
-            "ticker": ticker,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "results": {
-                k: {
-                    "direction": v.output.get("direction", "NEUTRAL"),
-                    "confidence": v.confidence,
-                    "reasoning": v.reasoning,
-                    "evidence": v.evidence,
-                }
-                for k, v in results.items()
-            },
-            "overall_direction": synth_result.output.get("direction", "NEUTRAL"),
-            "overall_confidence": synth_result.confidence,
-        }
-
-    def get_recent_results(self, limit: int = 10) -> list[dict[str, Any]]:
-        """Son sonuçları getir."""
-        return [
-            {
-                "task_id": r.task_id,
-                "agent": r.agent_role.value,
-                "ticker": r.ticker,
-                "direction": r.output.get("direction", "NEUTRAL"),
-                "confidence": r.confidence,
-                "duration_ms": r.duration_ms,
-            }
-            for r in list(self._results)[-limit:]
-        ]
-
-    def __repr__(self) -> str:
-        return (
-            f"AgentOrchestrator("
-            f"agents={len(self._agents)}, "
-            f"llm={'set' if self.llm_client else 'none'}, "
-            f"results={len(self._results)})"
-        )
-
-
-# Singleton
-agent_orchestrator = AgentOrchestrator()
-
-
 def run_agent_analysis(ticker: str, features: dict, news: list | None = None) -> dict[str, Any]:
     """Agent tabanlı analiz çalıştır (sync wrapper).
 
-    Singleton orchestrator kullanır — memory ve sonuçlar korunur.
+    AgentPipelineOrchestrator kullanır.
     Not: Zaten bir async loop içindeyken çağrılamaz.
 
     Args:
@@ -832,6 +665,8 @@ def run_agent_analysis(ticker: str, features: dict, news: list | None = None) ->
     Returns:
         Analiz sonuçları
     """
+    from .agent_pipeline import AgentPipelineOrchestrator
+
     result: dict[str, Any] = {"ticker": ticker}
     try:
         context = {"features": features, "news": news or []}
@@ -842,13 +677,18 @@ def run_agent_analysis(ticker: str, features: dict, news: list | None = None) ->
             result["agent_available"] = False
             result["error"] = (
                 "Cannot call sync wrapper inside async context. "
-                "Use AgentOrchestrator.run_research_pipeline() directly."
+                "Use AgentPipelineOrchestrator.run() directly."
             )
             return result
         except RuntimeError:
             pass  # Loop yok, güvenle devam et
 
-        report = asyncio.run(agent_orchestrator.run_research_pipeline(ticker, context))
+        async def _run() -> dict[str, Any]:
+            orch = AgentPipelineOrchestrator()
+            pipeline_result = await orch.run(ticker=ticker, features=features)
+            return pipeline_result.to_dict()
+
+        report = asyncio.run(_run())
         result.update(report)
         result["agent_available"] = True
 

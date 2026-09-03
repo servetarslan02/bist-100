@@ -40,18 +40,18 @@ class ParallelRunResult:
 
     @property
     def success_rate(self) -> float:
-        """Otomatik eklendi."""
+        """Paralel çalıştırma sonucu."""
         total = self.success_count + self.failure_count + self.timeout_count
         return self.success_count / total if total > 0 else 0
 
     @property
     def all_failed(self) -> bool:
-        """Otomatik eklendi."""
+        """all_failed metodu."""
         return self.success_count == 0
 
     @property
     def partial_success(self) -> bool:
-        """Otomatik eklendi."""
+        """partial_success metodu."""
         return 0 < self.success_count < (self.success_count + self.failure_count + self.timeout_count)
 
 
@@ -72,7 +72,7 @@ class ParallelAgentRunner:
         timeout_seconds: int = 120,
         enable_fallback: bool = True,
     ):
-        """Otomatik eklendi."""
+        """metod metodu."""
         self.max_concurrent = max_concurrent
         self.timeout_seconds = timeout_seconds
         self.enable_fallback = enable_fallback
@@ -245,18 +245,18 @@ class AgentPipelineBuilder:
     """Agent pipeline builder — kolay kullanım için."""
 
     def __init__(self, llm_client: BaseLLMClient | None = None):
-        """Otomatik eklendi."""
+        """__init__ metodu."""
         self.llm_client = llm_client
         self._runner = ParallelAgentRunner()
         self._agents: dict[AgentRole, BaseAgent] = {}
 
     def with_runner(self, runner: ParallelAgentRunner) -> "AgentPipelineBuilder":
-        """Otomatik eklendi."""
+        """with_runner metodu."""
         self._runner = runner
         return self
 
     def with_agent(self, role: AgentRole, agent: BaseAgent) -> "AgentPipelineBuilder":
-        """Otomatik eklendi."""
+        """with_agent metodu."""
         self._agents[role] = agent
         return self
 

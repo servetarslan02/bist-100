@@ -17,7 +17,6 @@ from .agent_memory import (
 from .agent_pipeline import AgentPipelineOrchestrator, PipelineMetrics, PipelineResult
 from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
 from .agent_system import (
-    AgentOrchestrator,
     AgentResult,
     AgentRole,
     AgentTask,
@@ -25,7 +24,6 @@ from .agent_system import (
     AIFallback,
     AIOutputValidator,
     BaseAgent,
-    agent_orchestrator,
     run_agent_analysis,
 )
 
@@ -87,8 +85,6 @@ __all__ = [
     "AIOutputValidator",
     "AIFallback",
     "BaseAgent",
-    "AgentOrchestrator",
-    "agent_orchestrator",
     "run_agent_analysis",
     # LLM
     "BaseLLMClient",

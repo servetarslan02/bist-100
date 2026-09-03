@@ -56,7 +56,7 @@ class LLMConfig:
     max_retries: int = 3
     retry_delay: float = 1.0
 
-    def __repr__(self) -> Any:
+    def __repr__(self) -> str:
         """API key'i gizle."""
         masked_key = "***" if self.api_key else None
         return (
@@ -70,7 +70,7 @@ class BaseLLMClient(ABC):
     """Abstract LLM client interface."""
 
     def __init__(self, config: LLMConfig):
-        """Otomatik eklendi."""
+        """Chat completion."""
         self.config = config
 
     @abstractmethod
@@ -143,7 +143,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Otomatik eklendi."""
+        """metod metodu."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -219,7 +219,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Otomatik eklendi."""
+        """metod metodu."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -303,7 +303,7 @@ class AnthropicLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Otomatik eklendi."""
+        """metod metodu."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -427,7 +427,7 @@ class LLMClientFactory:
         return cls.create(config)
 
     @classmethod
-    def register_provider(cls, name: str, client_class) -> Any:
+    def register_provider(cls, name: str, client_class) -> None:
         """Yeni provider kaydet."""
         cls._providers[name.lower()] = client_class
 

@@ -45,7 +45,7 @@ class SynthesisResult:
     memory_context: dict | None = None
 
     def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+        """Sentez sonucu."""
         return {
             "ticker": self.ticker,
             "final_direction": self.final_direction,
