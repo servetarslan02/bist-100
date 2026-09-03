@@ -283,15 +283,31 @@ grep -rn "alternative" workers/ --include="*.py"
 
 ---
 
-## 5. Yapılacak İşlemler
+## 5. Yapılan İşlemler
 
-### Kullanıcı Kararı Gerektiren Durumlar
+### 5.1. `satellite.py` → `satellite_adapter.py` Birleştirme ✅
 
-| # | Bulgu | Seçenekler | Risk |
-|---|-------|-----------|------|
-| 1 | `services/alternative/` production'da kullanılmıyor | a) Entegre et, b) Arşivle, c) Bırak | Yüksek |
-| 2 | Legacy `compute_*` fonksiyonları | a) Migrate et, b) Bırak | Düşük |
-| 3 | `satellite.py` legacy | a) `satellite_adapter.py`'ye taşı, b) Bırak | Düşük |
+- `compute_satellite_features()` fonksiyonu `satellite_adapter.py`'ye taşındı
+- `__init__.py` import'u güncellendi: `from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter`
+- `tests/test_bolum25_32.py` import'u güncellendi
+- `satellite.py` → `archive/2026-09-03/satellite.py.legacy` arşivlendi
+- Doğrulama: `python3 -c "from services.alternative import compute_satellite_features"` → OK
+
+### 5.2. Orchestrator Entegrasyonu ✅
+
+- `_SERVICE_REGISTRY`'ye `alt_feature_engine` eklendi
+- `_compute_alternative_features()` metodu oluşturuldu
+- `run_pipeline`'da `_compute_news_sentiment` sonrası çağrılıyor
+- Kapsanan kaynaklar: Google Trends, BKM, Kariyer.net, Ekşi Sözlük, Investing.com, uydu verisi
+- Doğrulama: `ast.parse` OK, tüm import'lar OK
+
+### 5.3. Kullanıcı Kararı Gerektiren Durumlar
+
+| # | Bulgu | Durum |
+|---|-------|-------|
+| 1 | `services/alternative/` production'da kullanılmıyor | ✅ ÇÖZÜLDÜ — orchestrator'a entegre edildi |
+| 2 | Legacy `compute_*` fonksiyonları | Düşük risk — backward compatibility için tutuldu |
+| 3 | `satellite.py` legacy | ✅ ÇÖZÜLDÜ — `satellite_adapter.py`'ye taşındı, arşivlendi |
 
 ---
 
@@ -301,15 +317,22 @@ grep -rn "alternative" workers/ --include="*.py"
 - [x] Production kod taraması: orchestrator, workers, config — hiçbiri kullanmıyor
 - [x] `feature_store` — üç farklı dosya, farklı amaç
 - [x] `reconciliation` — dört farklı dosya, farklı amaç
-- [x] `satellite` — iki dosya, legacy + modern
+- [x] `satellite` — iki dosya, legacy + modern → BİRLEŞTİRİLDİ
 - [x] DAG — döngüsellik yok
-- [x] Taşıma/silme yapılmadı
+- [x] `satellite.py` → `satellite_adapter.py` taşındı, arşivlendi
+- [x] Orchestrator entegrasyonu: service registry + _compute_alternative_features
+- [x] Import doğrulaması: `python3 -c "from services.alternative import ..."` → OK
+- [x] Syntax doğrulaması: `ast.parse(orchestrator.py)` → OK
 
 ---
 
 ## 7. Sonuç (services/alternative/)
 
-**Paket iyi yapılandırılmış ama hiçbir üretim kodu tarafından kullanılmıyor.** Kullanıcı kararı gerektirir:
-- Alternatif veri aktif kullanılacaksa → entegre et
-- Hazır değilse → arşivle
-- Sadece test amaçlıysa → bırak
+**Paket production'a entegre edildi.** Orchestrator artık alternatif veri kaynaklarını kullanıyor:
+
+- ✅ `satellite.py` legacy → `satellite_adapter.py`'ye taşındı, arşivlendi
+- ✅ Orchestrator'a `alt_feature_engine` eklendi
+- ✅ `_compute_alternative_features()` pipeline'da çağrılıyor
+- ✅ Tüm import'lar doğrulandı
+
+Kalan legacy `compute_*` fonksiyonları (social, jobs, cc, web_scraping) backward compatibility için tutuldu — düşük risk.
