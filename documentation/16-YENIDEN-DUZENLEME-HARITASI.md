@@ -421,3 +421,160 @@ Kalan legacy `compute_*` fonksiyonları (social, jobs, cc, web_scraping) backwar
 - `start.py` — Başlatma scripti
 - `run_all_imports.py` — Import doğrulama
 - `pyproject.toml`, `requirements.txt`, `setup.sh` — Konfigürasyon
+
+---
+
+# 16-E — Yeniden Düzenleme Haritası: `services/api/`
+
+**Tarih:** 2026-09-03
+**Kapsam:** `services/api/` dizini
+**Yöntem:** Gerçek `grep` ile doğrulanmış import analizi (tahmin değil)
+
+---
+
+## 1. Dosya Envanteri
+
+| # | Dosya | Satır | Rolü |
+|---|-------|-------|------|
+| 1 | `__init__.py` | ~15 | Package facade — app, auth, dependencies, rate_limiter export |
+| 2 | `app.py` | 577 | **Canonical** production FastAPI uygulaması (ENTRYPOINTS.md) |
+| 3 | `auth.py` | ~300 | APIKeyManager, JWTHandler, RBACChecker, Role |
+| 4 | `background_tasks.py` | 116 | Radar cache, ML scheduler, storage optimizer, paper trading scheduler |
+| 5 | `binary_ws.py` | 801 | Protobuf tabanlı binary WebSocket desteği |
+| 6 | `dependencies.py` | ~80 | FastAPI dependency injection (auth, rate limit, orchestrator) |
+| 7 | `main.py` | 39 | **DEPRECATED** — sadece `app.py`'yi re-export eder |
+| 8 | `rate_limiter.py` | ~120 | InMemoryRateLimiter + endpoint grup limitleri |
+| 9 | `server.py` | 730 | **DEPRECATED** — ayrı FastAPI app + admin endpoint'leri |
+| 10 | `websocket.py` | 271 | WebSocketConnection + WebSocketServer sınıfları |
+| 11 | `v1/__init__.py` | ~30 | V1 router — 19 alt router'ı birleştirir |
+| 12 | `v1/agents.py` | ~50 | Agent sistem endpoint'leri |
+| 13 | `v1/alternative.py` | ~150 | Alternatif veri endpoint'leri |
+| 14 | `v1/backtest.py` | ~100 | Backtest endpoint'leri |
+| 15 | `v1/decisions.py` | ~80 | Karar geçmişi endpoint'leri |
+| 16 | `v1/event_study.py` | ~200 | Event study endpoint'leri (yfinance entegre) |
+| 17 | `v1/factors.py` | ~100 | Faktör skorlama endpoint'leri |
+| 18 | `v1/holidays.py` | ~120 | Tatil günü CRUD endpoint'leri |
+| 19 | `v1/intelligence.py` | ~200 | Regime, Monte Carlo, Gemini endpoint'leri |
+| 20 | `v1/learning.py` | ~150 | Öğrenme pipeline endpoint'leri |
+| 21 | `v1/macro.py` | ~250 | Makro veri endpoint'leri (yfinance entegre) |
+| 22 | `v1/market.py` | ~400 | Piyasa verisi endpoint'leri (yfinance entegre) |
+| 23 | `v1/models.py` | ~100 | ML model endpoint'leri |
+| 24 | `v1/portfolio.py` | ~350 | Portföy yönetim endpoint'leri |
+| 25 | `v1/risk.py` | ~200 | Risk analizi endpoint'leri |
+| 26 | `v1/scanner.py` | ~250 | Tarama/sinyal endpoint'leri (SWR cache) |
+| 27 | `v1/schemas.py` | 350 | Pydantic response modelleri (BaseResponse, ErrorResponse, vb.) |
+| 28 | `v1/sse.py` | ~150 | Server-Sent Events endpoint'leri |
+| 29 | `v1/system.py` | ~150 | Sistem durumu endpoint'leri |
+| 30 | `v1/viop.py` | ~150 | VİOP opsiyon fiyatlandırma endpoint'leri |
+| 31 | `v1/ws.py` | 282 | WebSocket endpoint + ConnectionManager |
+
+**Toplam:** 31 dosya, ~5,500 satır
+
+---
+
+## 2. Dahili Bağımlılık Ağacı
+
+```
+rate_limiter.py (temel — dışa bağımlı yok)
+    ↑
+auth.py → services.core.otel, services.core.security
+    ↑
+dependencies.py → auth, rate_limiter
+    ↑
+v1/* (tüm router'lar) → dependencies
+    ↑
+v1/__init__.py → v1/* (19 router)
+    ↑
+app.py → rate_limiter, v1/__init__, background_tasks, services.core.database, services.core.otel
+
+binary_ws.py (bağımsız — Protobuf)
+    ↑
+v1/ws.py → binary_ws (conditional import)
+
+websocket.py (bağımsız — HİÇBİR YERDEN İMPORT EDİLMİYOR)
+main.py → app.py (sadece re-export)
+server.py (bağımsız — kendi FastAPI app'ini oluşturur, DEPRECATED)
+```
+
+**Sonuç:** Temiz DAG, döngüsellik yok.
+
+---
+
+## 3. Dış Bağımlılıklar
+
+| Dosya | Dış İthalatçı | İthal Edilen Sembol | Tür |
+|-------|---------------|---------------------|-----|
+| `app.py` | `scripts/verify_all_api_endpoints.py` | `create_app` | Script |
+| `app.py` | `scripts/verify_dashboard_live.py` | `app` | Script |
+| `app.py` | `tests/test_api.py` | `create_app` | Test |
+| `app.py` | `tests/test_observability_pipeline.py` | `app` | Test |
+| `app.py` | `tests/test_openapi_contract.py` | `app` | Test |
+| `auth.py` | `apps/api/main.py` | `jwt_handler` | **Üretim** |
+| `auth.py` | `tests/test_api.py` | `APIKeyManager, JWTHandler, Role, rbac_checker` | Test |
+| `rate_limiter.py` | `tests/test_api.py` | `InMemoryRateLimiter, RATE_LIMITS` | Test |
+| `binary_ws.py` | `scripts/verify_all_api_endpoints.py` | `ProtobufMessage` | Script |
+
+---
+
+## 4. Tespit Edilen Yapısal Sorunlar
+
+### 4.1. 🔴 ÜÇ AYRI FastAPI UYGULAMASI
+
+| Dosya | Satır | Durum | Port |
+|-------|-------|-------|------|
+| `services/api/app.py` | 577 | **Canonical** | 8000 |
+| `services/api/server.py` | 730 | **DEPRECATED** | ? |
+| `apps/api/main.py` | ~300 | Standalone | 8001 |
+
+`server.py`'de canonical `app.py`'de OLMAYAN 15+ admin endpoint var. Kullanıcı kararı gerektirir.
+
+### 4.2. 🟡 `websocket.py` — ÖLÜ DOSYA (KANITLANMIŞ)
+- 0 dış import, alternatifleri var → ARŞİVLENDİ
+
+### 4.3. 🟡 `main.py` — ÖLÜ DOSYA (KANITLANMIŞ)
+- 0 dış import, DEPRECATED re-export → ARŞİVLENDİ
+
+### 4.4. 🟡 `schemas.py` — ÖLÜ DOSYA (KANITLANMIŞ)
+- 0 dış import, hiçbir endpoint kullanmıyor → ARŞİVLENDİ
+
+### 4.5. 🟡 `server.py` — DEPRECATED AMA BENZERSİZ İÇERİK
+- 15+ benzersiz admin endpoint'i → KULLANICI KARARI GEREKTİRİR
+
+### 4.6. 🟢 `rate_limiter.py` — İSİM TEKRARI AMA ÇAKIŞMA DEĞİL
+- `services/api/` ve `services/ingestion/` farklı domain'ler
+
+---
+
+## 5. Yapılan Taşımalar
+
+| # | Eski → Yeni | Gerekçe | Doğrulama |
+|---|-------------|---------|----------|
+| 1 | `services/api/main.py` → `archive/2026-09-03/services/api/main.py.deprecated` | 39 satır, DEPRECATED, 0 dış import | `grep` → 0 sonuç |
+| 2 | `services/api/websocket.py` → `archive/2026-09-03/services/api/websocket.py.unused` | 271 satır, 0 dış import, alternatifleri var | `grep` → 0 sonuç |
+| 3 | `services/api/v1/schemas.py` → `archive/2026-09-03/services/api/v1/schemas.py.unused` | 350 satır, 0 dış import | `grep` → 0 sonuç |
+
+---
+
+## 6. Doğrulama
+
+- [x] `grep -rn "from services.api.main" --include="*.py"` → 0 sonuç
+- [x] `grep -rn "from.*services.api.websocket" --include="*.py"` → 0 sonuç
+- [x] `grep -rn "from.*schemas" --include="*.py" services/api/` → 0 sonuç
+- [x] `grep -rn "from services.api.server" --include="*.py"` → 0 sonuç
+- [x] `grep -rn "from services.api.app" --include="*.py"` → 10+ sonuç (canonical)
+- [x] `grep -rn "from services.api.auth" --include="*.py"` → 7 sonuç (aktif)
+- [x] `grep -rn "from services.api.rate_limiter" --include="*.py"` → 12+ sonuç (aktif)
+- [x] 27/27 kalan dosya `ast.parse` → syntax OK
+- [x] ENTRYPOINTS.md cross-check: `app.py` canonical, `server.py` deprecated
+
+---
+
+## 7. Sonuç
+
+**3 dosya arşivlendi (660 satır, 0 dış import):**
+1. `main.py` — DEPRECATED re-export
+2. `websocket.py` — kullanılmayan WebSocket sınıfı
+3. `schemas.py` — kullanılmayan Pydantic modelleri
+
+**1 dosya kullanıcı kararı gerektirir:**
+- `server.py` — DEPRECATED ama 15+ benzersiz admin endpoint'i var

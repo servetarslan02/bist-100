@@ -131,7 +131,7 @@ ALL_MODULES = [
     "services.simulation.execution_simulator",
     "services.simulation.main",
     "services.api.app",
-    "services.api.websocket",
+    # "services.api.websocket" — archived 2026-09-03 (0 imports, unused)
     "services.market_state.main",
     # Alternative Data (5)
     "services.alternative.web_scraping",
