@@ -25,7 +25,6 @@ ALL_MODULES = [
     "services.core.security",
     "services.core.audit_log",
     "services.core.decision_engine",
-    "services.core.infrastructure",
     "services.core.event_bus",
     "services.core.observability",
     "services.core.recovery",
@@ -43,9 +42,6 @@ ALL_MODULES = [
     "services.core.viop_monitor",
     "services.core.compliance",
     # B27: SPK
-    "services.core.manipulation_detector",
-    "services.core.insider_detector",
-    "services.core.algo_notification",
     "services.core.reporting",
     "services.core.tax",
     # Ingestion (19)
