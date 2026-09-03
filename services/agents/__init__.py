@@ -11,8 +11,11 @@ from .agent_memory import (
     EpisodicMemory,
     MemoryConsolidator,
     MemoryEntry,
+    MemoryWriteBuffer,
     SemanticMemory,
+    WriteBufferMetrics,
     WorkingMemory,
+    get_write_buffer,
 )
 from .agent_pipeline import AgentPipelineOrchestrator, PipelineMetrics, PipelineResult
 from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
@@ -124,6 +127,9 @@ __all__ = [
     "SemanticMemory",
     "MemoryConsolidator",
     "MemoryEntry",
+    "MemoryWriteBuffer",
+    "WriteBufferMetrics",
+    "get_write_buffer",
     # Communication + Synthesis
     "AgentCommunicationBus",
     "AgentMessage",

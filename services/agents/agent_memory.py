@@ -11,7 +11,9 @@ Memory consolidation periyodik yapılır.
 FAZ 3: Agent Memory
 """
 
+import atexit
 import gzip
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -32,6 +34,333 @@ except ImportError:
 
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class WriteRequest:
+    """Tek yazma isteği — buffer'da tutulan kayıt."""
+
+    path: str
+    data: bytes  # orjson ile serialize edilmiş
+    compressed: bool = False
+    critical: bool = False
+    timestamp: float = field(default_factory=time.monotonic)
+
+    @property
+    def key(self) -> str:
+        """Duplicate kontrolü için benzersiz anahtar (dosya yolu)."""
+        return self.path
+
+
+@dataclass
+class WriteBufferMetrics:
+    """Write buffer istatistikleri."""
+
+    total_writes: int = 0
+    batch_writes: int = 0
+    immediate_writes: int = 0
+    total_records_written: int = 0
+    total_write_latency_ms: float = 0.0
+    queue_depth: int = 0
+    retries: int = 0
+    errors: int = 0
+
+    @property
+    def avg_batch_size(self) -> float:
+        """Ortalama batch boyutu."""
+        return self.total_records_written / self.batch_writes if self.batch_writes > 0 else 0
+
+    @property
+    def avg_write_latency_ms(self) -> float:
+        """Ortalama yazma süresi (ms)."""
+        return self.total_write_latency_ms / self.batch_writes if self.batch_writes > 0 else 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "total_writes": self.total_writes,
+            "batch_writes": self.batch_writes,
+            "immediate_writes": self.immediate_writes,
+            "total_records_written": self.total_records_written,
+            "avg_batch_size": round(self.avg_batch_size, 1),
+            "avg_write_latency_ms": round(self.avg_write_latency_ms, 2),
+            "queue_depth": self.queue_depth,
+            "retries": self.retries,
+            "errors": self.errors,
+        }
+
+    def __repr__(self) -> str:
+        return (
+            f"WriteBufferMetrics(writes={self.total_writes}, "
+            f"batch={self.batch_writes}, immediate={self.immediate_writes}, "
+            f"avg_batch={self.avg_batch_size:.1f}, avg_latency={self.avg_write_latency_ms:.1f}ms)"
+        )
+
+
+class MemoryWriteBuffer:
+    """Toplu yazma buffer'ı — SSD I/O optimizasyonu.
+
+    Birden fazla memory save isteğini RAM'de biriktirir,
+    belirli aralıklarla tek batch halinde diske yazar.
+
+    Özellikler:
+    - Batch window: 250 ms (varsayılan)
+    - Max batch size: 50 kayıt
+    - Critical writes: immediate flush
+    - Duplicate kontrolü: aynı path = overwrite
+    - Retry: başarısız yazmalarda 3 deneme
+    - Metrics: batch size, write latency, queue depth
+    - Shutdown flush: uygulama kapanırken tüm buffer yazılır
+
+    Kullanım:
+        buffer = MemoryWriteBuffer()
+        buffer.enqueue(path, data)
+        # ... başka işler ...
+        buffer.flush()  # veya otomatik batch flush
+        buffer.shutdown()  # uygulama kapanırken
+    """
+
+    def __init__(
+        self,
+        batch_window_ms: float = 250.0,
+        max_batch_size: int = 50,
+        max_retries: int = 3,
+        retry_delay: float = 0.1,
+    ):
+        """Write buffer oluştur.
+
+        Args:
+            batch_window_ms: Batch flush aralığı (ms)
+            max_batch_size: Tek batch'te maksimum kayıt sayısı
+            max_retries: Başarısız yazma için maksimum deneme
+n            retry_delay: Denemeler arası bekleme (saniye)
+        """
+        self._batch_window_s = batch_window_ms / 1000.0
+        self._max_batch_size = max_batch_size
+        self._max_retries = max_retries
+        self._retry_delay = retry_delay
+
+        # Buffer: path → WriteRequest (duplicate overwrite)
+        self._buffer: dict[str, WriteRequest] = {}
+        self._lock = threading.Lock()
+        self._metrics = WriteBufferMetrics()
+
+        # Background flush thread
+        self._flush_thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+        self._flush_event = threading.Event()  # Manuel flush tetikleme
+        self._running = False
+
+        # Shutdown hook
+        atexit.register(self.shutdown)
+
+    def start(self) -> None:
+        """Background flush thread'i başlat."""
+        if self._running:
+            return
+        self._running = True
+        self._stop_event.clear()
+        self._flush_thread = threading.Thread(
+            target=self._flush_loop,
+            daemon=True,
+            name="memory-write-buffer",
+        )
+        self._flush_thread.start()
+        logger.info("MemoryWriteBuffer started", batch_window_ms=self._batch_window_s * 1000)
+
+    def stop(self) -> None:
+        """Background flush thread'i durdur."""
+        self._stop_event.set()
+        self._running = False
+        if self._flush_thread and self._flush_thread.is_alive():
+            self._flush_thread.join(timeout=5.0)
+
+    def enqueue(
+        self,
+        path: str,
+        data: bytes,
+        compressed: bool = False,
+        critical: bool = False,
+    ) -> None:
+        """Yazma isteği ekle.
+
+        Args:
+            path: Dosya yolu
+            data: Serialize edilmiş veri (orjson bytes)
+            compressed: gzip sıkıştırılmış mı
+            critical: Kritik yazma — immediate flush
+        """
+        request = WriteRequest(
+            path=path,
+            data=data,
+            compressed=compressed,
+            critical=critical,
+        )
+
+        with self._lock:
+            # Duplicate kontrolü: aynı path varsa overwrite
+            self._buffer[path] = request
+            self._metrics.total_writes += 1
+            self._metrics.queue_depth = len(self._buffer)
+
+        # Critical write — immediate flush
+        if critical:
+            self._flush_immediate()
+
+    def flush(self) -> int:
+        """Buffer'daki tüm istekleri diske yaz.
+
+        Returns:
+            Yazılan kayıt sayısı
+        """
+        return self._flush_immediate()
+
+    def shutdown(self) -> None:
+        """Uygulama kapanırken — tüm buffer'ı yaz.
+
+        Bu fonksiyon atexit ile otomatik çağrılır.
+        Manuel olarak da çağrılabilir.
+        """
+        if not self._running:
+            # Thread çalışmıyorsa bile buffer'da kalan varsa yaz
+            remaining = self._flush_immediate()
+            if remaining > 0:
+                logger.info("MemoryWriteBuffer shutdown flush", records=remaining)
+            return
+
+        self._stop_event.set()
+        # Son bir flush yap
+        remaining = self._flush_immediate()
+        self._running = False
+        if self._flush_thread and self._flush_thread.is_alive():
+            self._flush_thread.join(timeout=5.0)
+        logger.info("MemoryWriteBuffer shutdown", remaining_flushed=remaining)
+
+    def get_metrics(self) -> dict[str, Any]:
+        """Buffer istatistiklerini getir."""
+        with self._lock:
+            self._metrics.queue_depth = len(self._buffer)
+        return self._metrics.to_dict()
+
+    def _flush_loop(self) -> None:
+        """Background flush döngüsü — batch window kadar bekler, sonra flush yapar."""
+        while not self._stop_event.is_set():
+            # Batch window bekle veya manuel flush tetikle
+            self._stop_event.wait(timeout=self._batch_window_s)
+            if self._stop_event.is_set():
+                break
+            self._flush_batch()
+
+    def _flush_batch(self) -> int:
+        """Buffer'daki istekleri batch olarak yaz (max_batch_size limiti ile)."""
+        with self._lock:
+            if not self._buffer:
+                return 0
+            # Batch boyutu kadar al
+            items = list(self._buffer.items())[:self._max_batch_size]
+            for key, _ in items:
+                del self._buffer[key]
+            self._metrics.queue_depth = len(self._buffer)
+
+        return self._write_items(items)
+
+    def _flush_immediate(self) -> int:
+        """Buffer'daki tüm istekleri hemen yaz."""
+        with self._lock:
+            if not self._buffer:
+                return 0
+            items = list(self._buffer.items())
+            self._buffer.clear()
+            self._metrics.queue_depth = 0
+
+        return self._write_items(items)
+
+    def _write_items(self, items: list[tuple[str, WriteRequest]]) -> int:
+        """İstekleri diske yaz — retry mekanizmalı."""
+        if not items:
+            return 0
+
+        start = time.monotonic()
+        written = 0
+
+        for _key, request in items:
+            success = False
+            for attempt in range(self._max_retries):
+                try:
+                    target = Path(request.path)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+
+                    if request.compressed:
+                        tmp_path = target.with_suffix(".tmp.gz")
+                        final_path = target.with_suffix(".json.gz") if target.suffix == ".json" else target.with_suffix(".gz")
+                    else:
+                        tmp_path = target.with_suffix(".tmp")
+                        final_path = target
+
+                    if request.compressed:
+                        with gzip.open(tmp_path, "wb") as f:
+                            f.write(request.data)
+                    else:
+                        with open(tmp_path, "wb") as f:
+                            f.write(request.data)
+
+                    tmp_path.rename(final_path)
+                    written += 1
+                    success = True
+                    break
+
+                except Exception as e:
+                    if attempt < self._max_retries - 1:
+                        self._metrics.retries += 1
+                        time.sleep(self._retry_delay * (attempt + 1))
+                    else:
+                        self._metrics.errors += 1
+                        logger.error(
+                            "MemoryWriteBuffer write failed",
+                            path=request.path,
+                            attempts=self._max_retries,
+                            error=str(e),
+                        )
+                        # tmp dosyasını temizle
+                        try:
+                            tmp_path.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+        duration_ms = (time.monotonic() - start) * 1000
+        self._metrics.batch_writes += 1
+        self._metrics.total_records_written += written
+        self._metrics.total_write_latency_ms += duration_ms
+
+        if written > 0:
+            logger.debug(
+                "MemoryWriteBuffer batch written",
+                records=written,
+                duration_ms=round(duration_ms, 2),
+            )
+
+        return written
+
+    def __repr__(self) -> str:
+        with self._lock:
+            depth = len(self._buffer)
+        return (
+            f"MemoryWriteBuffer(depth={depth}, "
+            f"batch_window={self._batch_window_s * 1000:.0f}ms, "
+            f"max_batch={self._max_batch_size})"
+        )
+
+
+# Global write buffer instance — tüm AgentMemory'ler paylaşır
+_global_write_buffer: MemoryWriteBuffer | None = None
+
+
+def get_write_buffer() -> MemoryWriteBuffer:
+    """Global write buffer instance'ını getir (lazy init)."""
+    global _global_write_buffer
+    if _global_write_buffer is None:
+        _global_write_buffer = MemoryWriteBuffer()
+        _global_write_buffer.start()
+    return _global_write_buffer
 
 
 @dataclass
@@ -527,11 +856,15 @@ class AgentMemory:
             "semantic_patterns": self.semantic.to_dict(),
         }
 
-    def save(self, path: str | None = None) -> None:
-        """Memory'yi dosyaya kaydet (debounced — SSD dostu).
+    def save(self, path: str | None = None, critical: bool = False) -> None:
+        """Memory'yi dosyaya kaydet — WriteBuffer üzerinden.
 
-        Atomik yazım kullanır: önce tmp dosyaya yazar, sonra rename yapar.
-        Bu sayede crash sırasında dosya bozulmaz.
+        WriteBuffer batch yazım kullanır: istekler RAM'de biriktirilir,
+        250ms aralıklarla tek batch halinde diske yazılır.
+
+        Args:
+            path: Dosya yolu (opsiyonel, persistence_path kullanılır)
+            critical: Kritik yazma — immediate flush (uygulama kapanırken vb.)
         """
         save_path = path or self._persistence_path
         if not save_path:
@@ -553,33 +886,22 @@ class AgentMemory:
             "performance": self.get_performance_summary(),
         }
 
-        target = Path(save_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-
-        # Atomik yazım: tmp + rename
-        # Büyük dosyalar için gzip sıkıştırma (>100KB)
         json_bytes = orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str)
-        use_gzip = len(json_bytes) > 100 * 1024  # 100KB eşik
+        use_gzip = len(json_bytes) > 100 * 1024
 
         if use_gzip:
-            tmp_path = target.with_suffix(".tmp.gz")
-            final_path = target.with_suffix(".json.gz") if target.suffix == ".json" else target.with_suffix(".gz")
+            buf = gzip.compress(json_bytes)
         else:
-            tmp_path = target.with_suffix(".tmp")
-            final_path = target
+            buf = json_bytes
 
-        try:
-            if use_gzip:
-                with gzip.open(tmp_path, "wb") as f:
-                    f.write(json_bytes)
-            else:
-                with open(tmp_path, "wb") as f:
-                    f.write(json_bytes)
-            tmp_path.rename(final_path)
-            logger.info("Memory saved", path=str(final_path), compressed=use_gzip, size=len(json_bytes))
-        except Exception as e:
-            logger.error("Failed to save memory", path=save_path, error=str(e))
-            tmp_path.unlink(missing_ok=True)
+        buffer = get_write_buffer()
+        buffer.enqueue(
+            path=save_path,
+            data=buf,
+            compressed=use_gzip,
+            critical=critical,
+        )
+        logger.debug("Memory enqueued", agent=self.agent_role, size=len(buf), critical=critical)
 
     def load(self, path: str | None = None) -> None:
         """Memory'yi dosyadan yükle.
@@ -689,9 +1011,9 @@ class MemoryConsolidator:
         # 3. Semantic memory'den düşük doğruluklu kalıpları temizle
         memory.semantic.prune_low_accuracy(threshold=0.4)
 
-        # 3. Kaydet
+        # 3. Kaydet (critical — consolidation sonrası mutlaka yazılmalı)
         if memory._persistence_path:
-            memory.save()
+            memory.save(critical=True)
 
         self._last_consolidation[memory.agent_role] = now
 
