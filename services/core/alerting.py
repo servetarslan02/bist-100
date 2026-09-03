@@ -874,7 +874,7 @@ class AlertingSystem:
 
     def get_all_alerts(self, limit: int = 100) -> list[dict[str, Any]]:
         """Otomatik eklendi."""
-        return [a.to_dict() for a in self._alerts[-limit:]]
+        return [a.to_dict() for a in list(self._alerts)[-limit:]]
 
     def get_alert_summary(self) -> dict[str, Any]:
         """Otomatik eklendi."""
@@ -895,7 +895,7 @@ class AlertingSystem:
 
     def get_notification_log(self, limit: int = 50) -> list[dict[str, Any]]:
         """Otomatik eklendi."""
-        return [r.to_dict() for r in self._notification_log[-limit:]]
+        return [r.to_dict() for r in list(self._notification_log)[-limit:]]
 
     def get_failed_notifications(self) -> list[dict[str, Any]]:
         """Otomatik eklendi."""
@@ -1081,7 +1081,7 @@ class AlertingSystem:
                 )
                 self._alerts.append(alert)
                 if len(self._alerts) > 500:
-                    self._alerts = self._alerts[-500:]
+                    self._alerts = list(self._alerts)[-500:]
             logger.info("Alert'ler DB'den yüklendi", count=len(rows))
         except Exception as exc:
             logger.warning("Alert DB yükleme başarısız", error=str(exc))
@@ -1141,7 +1141,7 @@ class AlertingSystem:
     def _trim_alerts(self) -> None:
         """Maksimum alert sayısını aşarsa eskilerini siler."""
         if len(self._alerts) > self._max_alerts:
-            self._alerts = self._alerts[-self._max_alerts :]
+            self._alerts = list(self._alerts)[-self._max_alerts :]
 
     async def _notify_all(self, alert: Alert) -> None:
         """Alert için tüm uygun provider'lara paralel bildirim gönderir."""
@@ -1154,11 +1154,11 @@ class AlertingSystem:
                 result = await self._send_with_retry(provider, alert)
                 self._notification_log.append(result)
                 if len(self._notification_log) > 1000:
-                    self._notification_log = self._notification_log[-1000:]
+                    self._notification_log = list(self._notification_log)[-1000:]
                 if not result.success:
                     self._failed_notifications.append(result)
                     if len(self._failed_notifications) > 500:
-                        self._failed_notifications = self._failed_notifications[-500:]
+                        self._failed_notifications = list(self._failed_notifications)[-500:]
                     alert.notification_status = "failed"
                     _notification_failed_counter.add(1, {"provider": provider.name()})
                 else:

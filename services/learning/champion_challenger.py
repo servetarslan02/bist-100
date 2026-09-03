@@ -65,7 +65,7 @@ class ChampionChallengerEngine:
 
         self._champion_history.append(self._current_champion)
         if len(self._champion_history) > 1000:
-            self._champion_history = self._champion_history[-1000:]
+            self._champion_history = list(self._champion_history)[-1000:]
 
         logger.info(
             "Challenger promoted to champion",
@@ -85,7 +85,7 @@ class ChampionChallengerEngine:
             }
         )
         if len(self._rejected_challengers) > 500:
-            self._rejected_challengers = self._rejected_challengers[-500:]
+            self._rejected_challengers = list(self._rejected_challengers)[-500:]
 
         logger.info("Challenger rejected", challenger=challenger_id, reason=reason)
 

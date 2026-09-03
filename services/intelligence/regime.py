@@ -217,7 +217,7 @@ class RegimeEngine:
         self._current_regime = new_state
         self._regime_history.append(new_state)
         if len(self._regime_history) > 1000:
-            self._regime_history = self._regime_history[-1000:]
+            self._regime_history = list(self._regime_history)[-1000:]
 
         logger.info("Regime detected", regime=best_regime.value, confidence=confidence, duration=duration)
         return new_state
@@ -484,7 +484,7 @@ class RegimeEngine:
 
     def get_history(self, limit: int = 10) -> list[dict]:
         """Son regime değişimleri."""
-        history = self._regime_history[-limit:]
+        history = list(self._regime_history)[-limit:]
         return [
             {
                 "regime": s.regime.value,

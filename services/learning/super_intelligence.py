@@ -178,7 +178,7 @@ class SuperIntelligenceEngine:
         with self._lock:
             self._healing_queue.append(healing_record)
             if len(self._healing_queue) > 100:
-                self._healing_queue = self._healing_queue[-100:]
+                self._healing_queue = list(self._healing_queue)[-100:]
 
         logger.warning("Self-healing triggered", module=module_name, action=healing_action, error=error_msg)
 
@@ -280,11 +280,11 @@ class SuperIntelligenceEngine:
 
         self._model_versions.append(new_version)
         if len(self._model_versions) > 500:
-            self._model_versions = self._model_versions[-500:]
+            self._model_versions = list(self._model_versions)[-500:]
 
         # Eski versiyonları temizle
         if len(self._model_versions) > self.max_models_history:
-            self._model_versions = self._model_versions[-self.max_models_history :]
+            self._model_versions = list(self._model_versions)[-self.max_models_history :]
 
         # A/B test başlat
         self._start_ab_test(
@@ -352,7 +352,7 @@ class SuperIntelligenceEngine:
                 }
             )
             if len(self._drift_alerts) > 500:
-                self._drift_alerts = self._drift_alerts[-500:]
+                self._drift_alerts = list(self._drift_alerts)[-500:]
 
             logger.warning(
                 "Drift detected", tickers=len(drift_results), features=sum(len(v) for v in drift_results.values())
@@ -429,7 +429,7 @@ class SuperIntelligenceEngine:
 
         self._ab_test_results.append(result)
         if len(self._ab_test_results) > 1000:
-            self._ab_test_results = self._ab_test_results[-1000:]
+            self._ab_test_results = list(self._ab_test_results)[-1000:]
         self._ab_test_active = False
 
         # Kazananı aktif yap
@@ -563,7 +563,7 @@ class SuperIntelligenceEngine:
 
         # 6. Self-healing
         if self._healing_queue:
-            for healing in self._healing_queue[:]:
+            for healing in list(self._healing_queue)[:]:
                 if healing["status"] == "PENDING":
                     self.execute_healing(healing)
 

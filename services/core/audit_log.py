@@ -75,7 +75,7 @@ class AuditLog:
         idx = len(self._entries)
         self._entries.append(entry)
         if len(self._entries) > 1000:
-            self._entries = self._entries[-1000:]
+            self._entries = list(self._entries)[-1000:]
 
         # Index güncelle
         key = f"{entry.entity_type}:{entry.entity_id}"
@@ -290,7 +290,7 @@ class AuditLog:
 
     def get_recent(self, limit: int = 50) -> list[dict]:
         """Son audit kayıtları."""
-        recent = self._entries[-limit:]
+        recent = list(self._entries)[-limit:]
         return [
             {
                 "audit_id": e.audit_id,

@@ -82,7 +82,7 @@ class AgentCommunicationBus:
             self._message_queue[message.receiver] = queue[-self._max_queue :]
         self._message_log.append(message)
         if len(self._message_log) > self._max_log:
-            self._message_log = self._message_log[-self._max_log :]
+            self._message_log = list(self._message_log)[-self._max_log :]
 
     def receive(self, role: AgentRole) -> list[AgentMessage]:
         """Mesaj al (ve kuyruktan sil)."""

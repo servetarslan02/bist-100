@@ -583,7 +583,7 @@ class AgentOrchestrator:
             results[role_val] = result
             self._results.append(result)
             if len(self._results) > 1000:
-                self._results = self._results[-1000:]
+                self._results = list(self._results)[-1000:]
 
         # Synthesis
         synth_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(AgentRole.SYNTHESIS, llm_client=client)
@@ -628,7 +628,7 @@ class AgentOrchestrator:
                 "confidence": r.confidence,
                 "duration_ms": r.duration_ms,
             }
-            for r in self._results[-limit:]
+            for r in list(self._results)[-limit:]
         ]
 
 

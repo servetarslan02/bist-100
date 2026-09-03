@@ -165,7 +165,7 @@ class HMMRegimeDetector:
             result = self._rule_based_fallback(returns, volatility)
             self._regime_history.append(result)
             if len(self._regime_history) > 1000:
-                self._regime_history = self._regime_history[-1000:]
+                self._regime_history = list(self._regime_history)[-1000:]
             return result
 
         try:
@@ -189,7 +189,7 @@ class HMMRegimeDetector:
 
             self._regime_history.append(result)
             if len(self._regime_history) > 1000:
-                self._regime_history = self._regime_history[-1000:]
+                self._regime_history = list(self._regime_history)[-1000:]
 
             return result
 
@@ -388,7 +388,7 @@ class HMMRegimeDetector:
 
     def get_history(self, limit: int = 20) -> list[dict]:
         """Son rejim tahminleri."""
-        history = self._regime_history[-limit:]
+        history = list(self._regime_history)[-limit:]
         return [
             {
                 "regime": r.regime,

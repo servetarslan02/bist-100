@@ -100,7 +100,7 @@ class IntegratedLearningSystem:
 
         self._predictions.append(pred)
         if len(self._predictions) > 5000:
-            self._predictions = self._predictions[-5000:]
+            self._predictions = list(self._predictions)[-5000:]
 
         logger.debug(
             "Prediction recorded", ticker=ticker, direction=predicted_direction, confidence=confidence, regime=regime
@@ -194,7 +194,7 @@ class IntegratedLearningSystem:
         }
         self._outcomes.append(outcome_record)
         if len(self._outcomes) > 5000:
-            self._outcomes = self._outcomes[-5000:]
+            self._outcomes = list(self._outcomes)[-5000:]
 
         # Feature importance güncelle — doğru tahmin eden feature'ları ağırlıklandır
         if pred.feature_snapshot:
@@ -293,7 +293,7 @@ class IntegratedLearningSystem:
             }
         )
         if len(self._feedback_buffer) > 1000:
-            self._feedback_buffer = self._feedback_buffer[-1000:]
+            self._feedback_buffer = list(self._feedback_buffer)[-1000:]
 
         logger.info("Feedback recorded", ticker=ticker, feedback=feedback)
 
@@ -339,7 +339,7 @@ class IntegratedLearningSystem:
 
     def get_recent_predictions(self, limit: int = 20) -> list[dict]:
         """Son tahminleri getir."""
-        recent = self._predictions[-limit:]
+        recent = list(self._predictions)[-limit:]
         return [
             {
                 "prediction_id": p.prediction_id,
@@ -373,7 +373,7 @@ class IntegratedLearningSystem:
             return {"drift_detected": False, "reason": "Yetersiz veri"}
 
         # Son 20 outcome'un doğruluğu
-        recent = self._outcomes[-20:]
+        recent = list(self._outcomes)[-20:]
         recent_accuracy = sum(1 for o in recent if o.get("correct")) / len(recent)
 
         # Tüm zamanların doğruluğu

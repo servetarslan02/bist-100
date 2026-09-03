@@ -63,7 +63,7 @@ class OutcomeTracker:
             }
         )
         if len(self._pending) > 1000:
-            self._pending = self._pending[-1000:]
+            self._pending = list(self._pending)[-1000:]
 
         logger.debug(
             "Outcome tracking started", ticker=ticker, prediction_id=prediction_id, check_after=f"{wait_days} days"

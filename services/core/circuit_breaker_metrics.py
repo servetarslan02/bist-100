@@ -203,16 +203,16 @@ class CircuitBreakerMetricsCollector:
         }
         self._history.append(entry)
         if len(self._history) > 1000:
-            self._history = self._history[-1000:]
+            self._history = list(self._history)[-1000:]
 
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history :]
+            self._history = list(self._history)[-self._max_history :]
 
         logger.info("Circuit breaker state changed", name=name, old=old_state, new=new_state)
 
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """State change geçmişi."""
-        return self._history[-limit:]
+        return list(self._history)[-limit:]
 
 
 # Singleton

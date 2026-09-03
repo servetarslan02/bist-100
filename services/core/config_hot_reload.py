@@ -293,7 +293,7 @@ class ConfigHotReload:
 
         self._change_history.append(change)
         if len(self._change_history) > self._max_history:
-            self._change_history = self._change_history[-self._max_history :]
+            self._change_history = list(self._change_history)[-self._max_history :]
 
     def get_current_config(self) -> dict[str, Any]:
         """Mevcut config'i döndür."""
@@ -301,7 +301,7 @@ class ConfigHotReload:
 
     def get_change_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Değişiklik geçmişi."""
-        return [c.to_dict() for c in self._change_history[-limit:]]
+        return [c.to_dict() for c in list(self._change_history)[-limit:]]
 
     def force_reload(self) -> dict[str, Any]:
         """Zorla yeniden yükle."""
@@ -488,7 +488,7 @@ class SettingsBridge:
             # Geçmişe kaydet
             self._settings_history.append((datetime.now(UTC), safe_changes))
             if len(self._settings_history) > self._max_history:
-                self._settings_history = self._settings_history[-self._max_history :]
+                self._settings_history = list(self._settings_history)[-self._max_history :]
 
             logger.info(
                 "Settings updated via hot-reload",

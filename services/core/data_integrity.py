@@ -126,7 +126,7 @@ class DataIntegrityValidator:
         self._last_validation = time.time()
         self._validation_history.append(results)
         if len(self._validation_history) > 100:
-            self._validation_history = self._validation_history[-100:]
+            self._validation_history = list(self._validation_history)[-100:]
 
         if results["has_issues"]:
             logger.warning("Data integrity issues found", issues=len(results["issues"]), duration=round(duration, 2))

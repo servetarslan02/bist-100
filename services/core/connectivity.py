@@ -322,7 +322,7 @@ class ConnectivityMonitor:
         )
         self._event_log.append(event)
         if len(self._event_log) > self._max_event_log:
-            self._event_log = self._event_log[-self._max_event_log :]
+            self._event_log = list(self._event_log)[-self._max_event_log :]
 
     def get_status(self) -> dict[str, Any]:
         """Mevcut bağlantı durumunu döndürür."""
@@ -345,7 +345,7 @@ class ConnectivityMonitor:
                     "time": datetime.fromtimestamp(e.timestamp, tz=UTC).isoformat(),
                     "duration": round(e.duration_seconds, 1),
                 }
-                for e in self._event_log[-10:]
+                for e in list(self._event_log)[-10:]
             ],
         }
 

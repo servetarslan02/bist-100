@@ -231,7 +231,7 @@ class ConfigWatcher:
 
     def get_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
         """Config değişiklik audit log."""
-        return [e.to_dict() for e in self._audit_log[-limit:]]
+        return [e.to_dict() for e in list(self._audit_log)[-limit:]]
 
     def get_status(self) -> dict[str, Any]:
         """Watcher durumu."""

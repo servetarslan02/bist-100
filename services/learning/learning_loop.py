@@ -144,7 +144,7 @@ class LearningLoop:
             }
         )
         if len(self._prediction_history) > 5000:
-            self._prediction_history = self._prediction_history[-5000:]
+            self._prediction_history = list(self._prediction_history)[-5000:]
         self._state.total_predictions += 1
 
         # SQLite'a kaydet
@@ -183,10 +183,10 @@ class LearningLoop:
 
         # Trend hesapla
         if len(self._accuracy_window) >= 50:
-            first_half = sum(self._accuracy_window[:50]) / 50
-            second_half_len = len(self._accuracy_window[50:])
+            first_half = sum(list(self._accuracy_window)[:50]) / 50
+            second_half_len = len(list(self._accuracy_window)[50:])
             if second_half_len > 0:
-                second_half = sum(self._accuracy_window[50:]) / second_half_len
+                second_half = sum(list(self._accuracy_window)[50:]) / second_half_len
                 self._state.accuracy_trend = second_half - first_half
 
         # Regime accuracy güncelle

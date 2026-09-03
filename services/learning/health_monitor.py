@@ -146,7 +146,7 @@ class LearningHealthMonitor:
         if module not in self._restart_requests:
             self._restart_requests.append(module)
             if len(self._restart_requests) > 100:
-                self._restart_requests = self._restart_requests[-100:]
+                self._restart_requests = list(self._restart_requests)[-100:]
             logger.info("Restart requested", module=module)
 
     def get_restart_requests(self) -> list[str]:
@@ -165,7 +165,7 @@ class LearningHealthMonitor:
             }
         )
         if len(self._error_history) > 1000:
-            self._error_history = self._error_history[-1000:]
+            self._error_history = list(self._error_history)[-1000:]
 
         # Modül status güncelle
         if module in self._module_status:
