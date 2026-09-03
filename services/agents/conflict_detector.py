@@ -1,14 +1,21 @@
 """
-ALPHA BIST — Conflict Detector v2.0
+ALPHA BIST — Conflict Detector v2.1
 
 Agent sonuçları arasında çelişki tespit eder.
 LONG/SHORT dağılımını analiz eder.
 Debate gerekip gerekmediğini belirler.
 
+v2.1 değişiklikleri:
+- Confidence-weighted conflict score
+- Conflict severity seviyeleri (NONE/LOW/MEDIUM/HIGH/CRITICAL)
+- Confidence-weighted majority direction
+- detect_cross_agent_conflicts() _EXCLUDE_ROLES filtresi
+
 FAZ 2: Conflict Detection
 """
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 import structlog
@@ -16,6 +23,37 @@ import structlog
 from .agent_system import AgentResult, AgentRole
 
 logger = structlog.get_logger()
+
+
+class ConflictSeverity(StrEnum):
+    """Çelişki şiddet seviyeleri.
+
+    NONE:     Çelişki yok
+    LOW:      Hafif çelişki (0.0 - 0.3) — debate gerekmeyebilir
+    MEDIUM:   Orta çelişki (0.3 - 0.5) — debate önerilir
+    HIGH:     Yüksek çelişki (0.5 - 0.8) — debate gerekli
+    CRITICAL: Kritik çelişki (0.8 - 1.0) — kesinlikle debate gerekli
+    """
+
+    NONE = "NONE"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+    @classmethod
+    def from_score(cls, score: float) -> "ConflictSeverity":
+        """Skordan severity seviyesi belirle."""
+        if score <= 0.0:
+            return cls.NONE
+        elif score < 0.3:
+            return cls.LOW
+        elif score < 0.5:
+            return cls.MEDIUM
+        elif score < 0.8:
+            return cls.HIGH
+        else:
+            return cls.CRITICAL
 
 
 @dataclass
@@ -30,6 +68,7 @@ class ConflictReport:
     no_trade_agents: list[AgentRole] = field(default_factory=list)
     requires_debate: bool = False
     conflict_score: float = 0.0  # 0-1 arası, 1 = tam çelişki
+    severity: ConflictSeverity = ConflictSeverity.NONE
 
     @property
     def long_count(self) -> int:
@@ -66,6 +105,7 @@ class ConflictReport:
             "no_trade_count": len(self.no_trade_agents),
             "requires_debate": self.requires_debate,
             "conflict_score": self.conflict_score,
+            "severity": self.severity.value,
             "majority_direction": self.majority_direction,
             "long_agents": [a.value for a in self.long_agents],
             "short_agents": [a.value for a in self.short_agents],
@@ -75,7 +115,8 @@ class ConflictReport:
         return (
             f"ConflictReport(conflict={self.has_conflict}, "
             f"LONG={self.long_count}, SHORT={self.short_count}, "
-            f"score={self.conflict_score:.2f}, debate={self.requires_debate})"
+            f"score={self.conflict_score:.2f}, severity={self.severity.value}, "
+            f"debate={self.requires_debate})"
         )
 
 
@@ -87,6 +128,7 @@ class ConflictDetector:
     - Çelişki skoru >= 0.3 ise debate gerekli
     - Çelişki yoksa doğrudan sentez
     - NEUTRAL oy sayılır ama ağırlığı düşük
+    - Confidence ağırlıklı skor hesaplama
 
     Kullanım:
         detector = ConflictDetector()
@@ -128,6 +170,7 @@ class ConflictDetector:
                 has_conflict=False,
                 is_unanimous=False,
                 requires_debate=False,
+                severity=ConflictSeverity.NONE,
             )
 
         # Yön bazlı gruplama
@@ -157,18 +200,38 @@ class ConflictDetector:
             and (len(long_agents) == directional_count or len(short_agents) == directional_count)
         )
 
-        # Çelişki skoru (0-1)
-        # Formül: min(LONG%, SHORT%) * 2 — 0.5/0.5 dağılımda 1.0, 0.3/0.7'de 0.6
+        # Confidence-weighted çelişki skoru (0-1)
+        # Hem oy dağılımını hem confidence farkını hesaba katar
         total = len(valid_results)
         if total == 0:
             conflict_score = 0.0
         else:
             long_ratio = len(long_agents) / total
             short_ratio = len(short_agents) / total
+
             if long_ratio > 0 and short_ratio > 0:
-                conflict_score = min(long_ratio, short_ratio) * 2
+                # Temel skor: min(LONG%, SHORT%) * 2
+                base_score = min(long_ratio, short_ratio) * 2
+
+                # Confidence ağırlığı: düşük confidence farkı = yüksek çelişki
+                # LONG ve SHORT confidence'ları yakınsa çelişki daha gerçek
+                long_confs = [valid_results[a].confidence for a in long_agents]
+                short_confs = [valid_results[a].confidence for a in short_agents]
+                avg_long_conf = sum(long_confs) / len(long_confs) if long_confs else 0.5
+                avg_short_conf = sum(short_confs) / len(short_confs) if short_confs else 0.5
+
+                # Confidence farkı azsa → iki taraf da emin → çelişki daha ciddi
+                # Confidence farkı çoksa → düşük confidence'lı taraf zayıf → çelişki daha az ciddi
+                conf_diff = abs(avg_long_conf - avg_short_conf)
+                # 0 fark → weight=1.0 (tam çelişki), 0.8 fark → weight=0.2 (zayıf çelişki)
+                confidence_weight = max(0.2, 1.0 - conf_diff)
+
+                conflict_score = base_score * confidence_weight
             else:
                 conflict_score = 0.0
+
+        # Severity seviyesi
+        severity = ConflictSeverity.from_score(conflict_score)
 
         # Debate gerekli mi?
         requires_debate = has_conflict and conflict_score >= self.DEBATE_THRESHOLD
@@ -182,6 +245,7 @@ class ConflictDetector:
             no_trade_agents=no_trade_agents,
             requires_debate=requires_debate,
             conflict_score=round(conflict_score, 4),
+            severity=severity,
         )
 
         if has_conflict:
@@ -190,6 +254,7 @@ class ConflictDetector:
                 long_count=len(long_agents),
                 short_count=len(short_agents),
                 conflict_score=conflict_score,
+                severity=severity.value,
                 requires_debate=requires_debate,
             )
 
@@ -198,6 +263,7 @@ class ConflictDetector:
     def detect_cross_agent_conflicts(
         self,
         results: dict[AgentRole, AgentResult],
+        exclude_roles: set[AgentRole] | None = None,
     ) -> list[dict[str, Any]]:
         """Agent'lar arası detaylı çelişki analizi.
 
@@ -206,12 +272,17 @@ class ConflictDetector:
 
         Args:
             results: Agent sonuçları
+            exclude_roles: Hariç tutulacak roller (varsayılan: SYNTHESIS, RISK, BULL, BEAR)
 
         Returns:
             Çelişki çiftlerinin detaylı listesi
         """
+        exclude = exclude_roles if exclude_roles is not None else self._EXCLUDE_ROLES
         conflicts: list[dict[str, Any]] = []
-        valid = {r: res for r, res in results.items() if res.success}
+        valid = {
+            r: res for r, res in results.items()
+            if res.success and r not in exclude
+        }
 
         roles = list(valid.keys())
         for i in range(len(roles)):
@@ -223,16 +294,19 @@ class ConflictDetector:
 
                 # LONG vs SHORT veya SHORT vs LONG
                 if (dir_a == "LONG" and dir_b == "SHORT") or (dir_a == "SHORT" and dir_b == "LONG"):
+                    conf_a = valid[role_a].confidence
+                    conf_b = valid[role_b].confidence
                     conflicts.append(
                         {
                             "agent_a": role_a.value,
                             "direction_a": dir_a,
-                            "confidence_a": valid[role_a].confidence,
+                            "confidence_a": conf_a,
                             "reasoning_a": valid[role_a].reasoning[:200],
                             "agent_b": role_b.value,
                             "direction_b": dir_b,
-                            "confidence_b": valid[role_b].confidence,
+                            "confidence_b": conf_b,
                             "reasoning_b": valid[role_b].reasoning[:200],
+                            "confidence_diff": round(abs(conf_a - conf_b), 4),
                             "type": "direction_conflict",
                         }
                     )

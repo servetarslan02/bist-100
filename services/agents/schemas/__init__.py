@@ -6,13 +6,13 @@ Her agent rolü için beklenen JSON formatı tanımlı.
 """
 
 from enum import Enum, StrEnum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class Direction(StrEnum):
-    """Standart agent çıktı şeması."""
+    """Yön kararları — LONG, SHORT, NEUTRAL, NO_TRADE."""
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
@@ -20,7 +20,7 @@ class Direction(StrEnum):
 
 
 class RiskLevel(StrEnum):
-    """metod metodu."""
+    """Risk seviyeleri — LOW, MEDIUM, HIGH, CRITICAL."""
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -48,7 +48,7 @@ class AgentOutputSchema(BaseModel):
     @field_validator("confidence", mode="before")
     @classmethod
     def validate_confidence(cls, v) -> float | int:
-        """validate_confidence metodu."""
+        """Confidence değerini 0-1 aralığına normalize et."""
         return _normalize_confidence(v)
 
 
@@ -103,7 +103,7 @@ class DebateArgumentSchema(BaseModel):
     @field_validator("confidence", mode="before")
     @classmethod
     def validate_confidence(cls, v) -> float | int:
-        """validate_confidence metodu."""
+        """Confidence değerini 0-1 aralığına normalize et."""
         return _normalize_confidence(v)
 
 
@@ -138,7 +138,7 @@ class SynthesisResultSchema(BaseModel):
     @field_validator("final_confidence", mode="before")
     @classmethod
     def validate_confidence(cls, v) -> float | int:
-        """validate_confidence metodu."""
+        """Confidence değerini 0-1 aralığına normalize et."""
         return _normalize_confidence(v)
 
 
@@ -154,7 +154,7 @@ class AgentMessageSchema(BaseModel):
     priority: str = "NORMAL"  # LOW, NORMAL, HIGH, CRITICAL
 
 
-def validate_agent_output(data: dict[str, Any], schema_class=None) -> tuple:
+def validate_agent_output(data: dict[str, Any], schema_class=None) -> tuple[bool, dict[str, Any], list[str]]:
     """Agent çıktısını doğrula.
 
     Returns: (is_valid, parsed_data, errors)

@@ -1,14 +1,22 @@
 """
-ALPHA BIST — Risk Assessor Agent v1.0
+ALPHA BIST — Risk Assessor Agent v2.1
 
 Risk agent — tüm sonuçları değerlendirir.
 Veto yetkisi var (CRITICAL risk = işlem durdur).
+
+v2.1 değişiklikleri:
+- Risk seviye eşik mantığı düzeltmesi (boundary hatası)
+- regime kaynağı düzeltmesi (features → context)
+- Veto log'u eklendi
+- RiskAssessment.__repr__ eklendi
+- Pozisyon boyutu minimum sınırı ayarlandı
 
 FAZ 6: Risk Assessment
 """
 
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 
@@ -21,7 +29,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class RiskAssessment:
-    """Risk değerlendirme sonucu."""
+    """Risk değerlendirme sonucu — onay durumu, seviye, pozisyon limitleri."""
 
     approved: bool
     risk_level: str  # LOW, MEDIUM, HIGH, CRITICAL
@@ -32,8 +40,8 @@ class RiskAssessment:
     veto_reason: str | None = None
     reasoning: str = ""
 
-    def to_dict(self) -> dict:
-        """Risk değerlendirme sonucu."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "approved": self.approved,
             "risk_level": self.risk_level,
@@ -44,6 +52,12 @@ class RiskAssessment:
             "veto_reason": self.veto_reason,
             "reasoning": self.reasoning[:300],
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"RiskAssessment(level={self.risk_level!r}, score={self.risk_score:.1f}, "
+            f"approved={self.approved}, max_pos={self.max_position_pct:.1f}%)"
+        )
 
 
 class RiskAssessor:
@@ -57,7 +71,8 @@ class RiskAssessor:
     - CRITICAL = veto (işlem durdur)
     """
 
-    # Risk seviye eşikleri
+    # Risk seviye eşikleri (üst sınır dahil)
+    # LOW: 0-30, MEDIUM: 30-50, HIGH: 50-70, CRITICAL: 70+
     RISK_THRESHOLDS = {
         "LOW": 30,
         "MEDIUM": 50,
@@ -80,15 +95,17 @@ class RiskAssessor:
         features: dict[str, float],
         portfolio_info: dict | None = None,
         llm_client: BaseLLMClient | None = None,
+        context: dict[str, Any] | None = None,
     ) -> RiskAssessment:
         """Risk değerlendirmesi yap.
 
         Args:
             ticker: Hisse kodu
             agent_results: Agent sonuçları
-            features: Feature'lar
+            features: Feature'lar (teknik göstergeler)
             portfolio_info: Portföy bilgisi
             llm_client: LLM client
+            context: Ek bağlam (regime, sector, vb.)
 
         Returns:
             RiskAssessment
@@ -139,20 +156,15 @@ class RiskAssessor:
                 risk_score += 10
                 risk_factors.append(f"Yüksek pozisyon sayısı: {current_positions}")
 
-        # 6. Makro risk
-        regime = features.get("regime", "UNKNOWN")
+        # 6. Makro risk — context'ten gelir (features'tan değil)
+        regime = (context or {}).get("regime", "UNKNOWN")
         if regime == "RISK_OFF":
             risk_score += 15
             risk_factors.append("Risk-off rejimi")
 
         # Risk seviyesi belirle
         risk_score = min(100, risk_score)
-        risk_level = "LOW"
-        for level, threshold in sorted(self.RISK_THRESHOLDS.items(), key=lambda x: x[1]):
-            if risk_score < threshold:
-                risk_level = level
-                break
-            risk_level = level
+        risk_level = self._determine_risk_level(risk_score)
 
         # Veto kontrolü
         approved = True
@@ -161,6 +173,12 @@ class RiskAssessor:
         if risk_level == "CRITICAL":
             approved = False
             veto_reason = f"CRITICAL risk seviyesi: {risk_score}"
+            logger.warning(
+                "Risk VETO applied",
+                ticker=ticker,
+                risk_score=risk_score,
+                risk_factors=risk_factors,
+            )
 
         # Pozisyon boyutu ve stop-loss
         max_position_pct = self._calculate_max_position(risk_level, risk_score)
@@ -176,6 +194,11 @@ class RiskAssessor:
                 if llm_result.get("risk_level") == "CRITICAL" and approved:
                     approved = False
                     veto_reason = f"LLM CRITICAL: {llm_result.get('veto_reason', '')}"
+                    logger.warning(
+                        "Risk VETO applied by LLM",
+                        ticker=ticker,
+                        llm_risk_level=llm_result.get("risk_level"),
+                    )
 
         duration = (time.monotonic() - start) * 1000
 
@@ -201,6 +224,25 @@ class RiskAssessor:
 
         return assessment
 
+    @staticmethod
+    def _determine_risk_level(risk_score: float) -> str:
+        """Risk skorundan seviye belirle.
+
+        Eşikler (üst sınır exclusive):
+        - LOW: 0 ≤ score < 30
+        - MEDIUM: 30 ≤ score < 50
+        - HIGH: 50 ≤ score < 70
+        - CRITICAL: score ≥ 70
+        """
+        if risk_score >= 70:
+            return "CRITICAL"
+        elif risk_score >= 50:
+            return "HIGH"
+        elif risk_score >= 30:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
     def _calculate_max_position(self, risk_level: str, risk_score: float) -> float:
         """Maksimum pozisyon yüzdesi hesapla.
 
@@ -211,40 +253,31 @@ class RiskAssessor:
         - CRITICAL (70+): 0% (veto)
         """
         if risk_level == "CRITICAL":
-            return 0.0  # CRITICAL = veto, pozisyon yok
+            return 0.0
 
-        base = {
-            "LOW": 10.0,
-            "MEDIUM": 7.0,
-            "HIGH": 4.0,
-        }.get(risk_level, 5.0)
+        # Her seviye için üst ve alt sınır
+        level_bounds = {
+            "LOW": (10.0, 8.0, 0, 30),
+            "MEDIUM": (7.0, 5.0, 30, 50),
+            "HIGH": (4.0, 1.0, 50, 70),
+        }
 
-        # Risk skoru arttıkça pozisyon azalır — lineer interpolasyon
-        # LOW: 10→8, MEDIUM: 7→5, HIGH: 4→2
-        level_min = {
-            "LOW": 8.0,
-            "MEDIUM": 5.0,
-            "HIGH": 2.0,
-        }.get(risk_level, 2.0)
+        base, level_min, low, high = level_bounds.get(risk_level, (5.0, 1.0, 50, 70))
 
-        # risk_score 0-100 arası, level aralığına göre interpolasyon
-        level_range = {
-            "LOW": (0, 30),
-            "MEDIUM": (30, 50),
-            "HIGH": (50, 70),
-        }.get(risk_level, (50, 70))
-
-        low, high = level_range
+        # Lineer interpolasyon
         if high > low:
-            t = max(0, min(1, (risk_score - low) / (high - low)))
+            t = max(0.0, min(1.0, (risk_score - low) / (high - low)))
         else:
-            t = 0
+            t = 0.0
 
         position = base - (base - level_min) * t
-        return round(max(1.0, position), 1)
+        return round(max(0.5, position), 1)
 
     def _calculate_stop_loss(self, risk_level: str, atr_pct: float) -> float:
-        """Stop-loss yüzdesi hesapla."""
+        """Stop-loss yüzdesi hesapla.
+
+        ATR'ye göre dinamik, minimum seviye bazlı.
+        """
         base = {
             "LOW": 3.0,
             "MEDIUM": 5.0,
@@ -252,7 +285,7 @@ class RiskAssessor:
             "CRITICAL": 10.0,
         }.get(risk_level, 5.0)
 
-        # ATR'ye göre ayarla
+        # ATR'ye göre ayarla (en az 2× ATR)
         if atr_pct > 0:
             return round(max(base, atr_pct * 2), 1)
         return base
@@ -265,7 +298,11 @@ class RiskAssessor:
         portfolio_info: dict | None,
         llm_client: BaseLLMClient,
     ) -> dict | None:
-        """LLM ile risk değerlendirmesi."""
+        """LLM ile risk değerlendirmesi.
+
+        Returns:
+            LLM çıktısı (parsed dict) veya None
+        """
         try:
             # Agent sonuçlarını formatla
             agent_text = []

@@ -30,7 +30,7 @@ from .agent_system import AgentRole, AgentResult, AgentTask, BaseAgent
 from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
 from .trace_context import TraceContext
 from .communication_bus import ConflictResolver, Resolution
-from .conflict_detector import ConflictDetector, ConflictReport
+from .conflict_detector import ConflictDetector, ConflictReport, ConflictSeverity
 from .debate_engine import DebateEngine, DebateResult
 from .llm_client import BaseLLMClient
 from .parallel_runner import ParallelAgentRunner, ParallelRunResult
@@ -223,7 +223,7 @@ class AgentPipelineOrchestrator:
         """
         self.llm_client = client
         self._wrapped_llm = CircuitBreakerLLMClient(client, self.circuit_breaker)
-        # Cache'lenmiş agent'ların client'ını da güncelle
+        # Cache'lenmiş agent'ların client'ını da güncelle (wrapped)
         for agent in self._agent_cache.values():
             agent.llm_client = self._wrapped_llm
 
@@ -371,6 +371,7 @@ class AgentPipelineOrchestrator:
                 features=features,
                 portfolio_info=portfolio_info,
                 llm_client=effective_llm,
+                context=full_context,
             )
         except Exception as e:
             logger.error("Risk assessment failed, using conservative default", error=str(e))
@@ -403,6 +404,7 @@ class AgentPipelineOrchestrator:
                 risk_approved=risk_assessment.approved,
                 agent_memory=self._memories.get("SYNTHESIS"),
                 llm_client=effective_llm,
+                context=full_context,
             )
         except Exception as e:
             logger.error("Synthesis failed, using fallback", error=str(e))
@@ -456,7 +458,7 @@ class AgentPipelineOrchestrator:
         empty_parallel = ParallelRunResult(
             results={}, total_duration_ms=0, success_count=0, failure_count=0, timeout_count=0
         )
-        empty_conflict = ConflictReport(has_conflict=False, is_unanimous=False)
+        empty_conflict = ConflictReport(has_conflict=False, is_unanimous=False, severity=ConflictSeverity.NONE)
         empty_resolution = Resolution(direction="NO_TRADE", confidence=0.0, method="pipeline_error")
         empty_risk = RiskAssessment(
             approved=False, risk_level="HIGH", risk_score=100.0,
@@ -485,14 +487,16 @@ class AgentPipelineOrchestrator:
         """Agent instance'larını getir veya oluştur (cache'li).
 
         LLM client değişirse cache'lenmiş agent'lar da güncellenir.
+        Circuit breaker wrapped client kullanılır.
         """
+        effective_llm = self._wrapped_llm or self.llm_client
         agents = {}
         for role in roles:
             if role not in self._agent_cache:
-                self._agent_cache[role] = BaseAgent(role, llm_client=self.llm_client)
+                self._agent_cache[role] = BaseAgent(role, llm_client=effective_llm)
             else:
-                # LLM client güncellemesi varsa yansıt
-                self._agent_cache[role].llm_client = self.llm_client
+                # LLM client güncellemesi varsa yansıt (wrapped)
+                self._agent_cache[role].llm_client = effective_llm
             agents[role] = self._agent_cache[role]
         return agents
 

@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Self-Evaluator v1.0
+ALPHA BIST — Self-Evaluator v2.1
 
 Agent self-evaluation — periyodik performans kontrolü.
 
@@ -10,14 +10,20 @@ Kontroller:
 4. Overconfidence check
 5. Agent-specific tuning önerileri
 
+v2.1 değişiklikleri:
+- Placeholder docstring'ler temizlendi
+- numpy → statistics (basit istatistikler için)
+- EvalReport.__repr__ eklendi
+- NO_trade outcomes dağılımda ayrı kategori
+
 FAZ 5: Self-Evaluation
 """
 
+import statistics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 import structlog
 
 from .agent_memory import AgentMemory
@@ -27,7 +33,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class EvalReport:
-    """Değerlendirme raporu."""
+    """Değerlendirme raporu — agent performans metrikleri ve öneriler."""
 
     agent_role: str
     accuracy: float
@@ -40,8 +46,8 @@ class EvalReport:
     recommendation: str  # OK, RETRAIN, INVESTIGATE_DRIFT, RECALIBRATE
     details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
-        """Değerlendirme raporu."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "agent_role": self.agent_role,
             "accuracy": self.accuracy,
@@ -54,6 +60,12 @@ class EvalReport:
             "recommendation": self.recommendation,
             "details": self.details,
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"EvalReport(role={self.agent_role!r}, acc={self.accuracy:.2f}, "
+            f"recent={self.recent_accuracy:.2f}, rec={self.recommendation!r})"
+        )
 
 
 class AgentSelfEvaluator:
@@ -74,7 +86,14 @@ class AgentSelfEvaluator:
         calibration_bins: int = 5,
         overconfidence_threshold: float = 0.15,
     ):
-        """metod metodu."""
+        """Self-evaluator oluştur.
+
+        Args:
+            drift_threshold: Drift tespit eşiği (accuracy farkı)
+            min_samples: Minimum örnek sayısı (drift için)
+            calibration_bins: Confidence kalibrasyonu için bin sayısı
+            overconfidence_threshold: Overconfidence eşik değeri
+        """
         self.drift_threshold = drift_threshold
         self.min_samples = min_samples
         self.calibration_bins = calibration_bins
@@ -199,7 +218,14 @@ class AgentSelfEvaluator:
         drift: bool,
         overconfident: bool,
     ) -> str:
-        """Öneri oluştur."""
+        """Öneri oluştur.
+
+        Öncelik sırası:
+        1. RETRAIN — doğruluk çok düşük (<0.45)
+        2. INVESTIGATE_DRIFT — performans kayması tespit edildi
+        3. RECALIBRATE — overconfidence tespit edildi
+        4. OK — her şey normal
+        """
         if accuracy < 0.45:
             return "RETRAIN"
         elif drift:
@@ -223,21 +249,21 @@ class AgentSelfEvaluator:
         }
 
     def _confidence_stats(self, memory: AgentMemory) -> dict[str, float]:
-        """Confidence istatistikleri."""
+        """Confidence istatistikleri (statistics modülü ile)."""
         confidences = [e.confidence for e in memory.episodic.episodes]
         if not confidences:
             return {"mean": 0, "std": 0, "min": 0, "max": 0}
 
         return {
-            "mean": round(float(np.mean(confidences)), 4),
-            "std": round(float(np.std(confidences)), 4),
-            "min": round(float(np.min(confidences)), 4),
-            "max": round(float(np.max(confidences)), 4),
+            "mean": round(statistics.mean(confidences), 4),
+            "std": round(statistics.stdev(confidences) if len(confidences) > 1 else 0, 4),
+            "min": round(min(confidences), 4),
+            "max": round(max(confidences), 4),
         }
 
     def _outcome_distribution(self, memory: AgentMemory) -> dict[str, int]:
-        """Sonuç dağılımı."""
-        outcomes = list(memory.episodic.outcomes.values())  # Listeye çevir (generator değil)
+        """Sonuç dağılımı — LONG, SHORT, NO_TRADE ayrı kategoriler."""
+        outcomes = list(memory.episodic.outcomes.values())
         return {
             "total": len(outcomes),
             "correct": sum(1 for o in outcomes if o["correct"]),
@@ -246,21 +272,29 @@ class AgentSelfEvaluator:
             "long_wrong": sum(1 for o in outcomes if o["predicted"] == "LONG" and not o["correct"]),
             "short_correct": sum(1 for o in outcomes if o["predicted"] == "SHORT" and o["correct"]),
             "short_wrong": sum(1 for o in outcomes if o["predicted"] == "SHORT" and not o["correct"]),
+            "no_trade": sum(1 for o in outcomes if o["predicted"] == "NO_TRADE"),
         }
 
 
 class MultiAgentEvaluator:
-    """Tüm agent'ları değerlendir — toplu rapor."""
+    """Tüm agent'ları değerlendir — toplu rapor ve sistem sağlığı."""
 
     def __init__(self):
-        """__init__ metodu."""
+        """Multi-agent evaluator oluştur."""
         self.evaluator = AgentSelfEvaluator()
 
     def evaluate_all(
         self,
         memories: dict[str, AgentMemory],
     ) -> dict[str, Any]:
-        """Tüm agent'ları değerlendir."""
+        """Tüm agent'ları değerlendir.
+
+        Args:
+            memories: {role_name: AgentMemory}
+
+        Returns:
+            Sistem sağlık raporu + her agent için değerlendirme
+        """
         reports = {}
         alerts = []
 
@@ -279,8 +313,7 @@ class MultiAgentEvaluator:
                     }
                 )
 
-        # Genel sistem sağlığı (double-evaluation'ı önlemek için
-        # zaten hesaplanmış report'ları kullan)
+        # Genel sistem sağlığı
         accuracies = [r["accuracy"] for r in reports.values()]
 
         system_health = "HEALTHY"
@@ -301,3 +334,6 @@ class MultiAgentEvaluator:
                 "avg_accuracy": round(sum(r["accuracy"] for r in reports.values()) / len(reports) if reports else 0, 4),
             },
         }
+
+    def __repr__(self) -> str:
+        return "MultiAgentEvaluator()"

@@ -118,7 +118,14 @@ class AgentCommunicationBus:
 
         Args:
             message: Gönderilecek mesaj
+
+        Raises:
+            ValueError: Geçersiz alıcı veya boş task_id
         """
+        if message.receiver not in self._message_queue:
+            raise ValueError(f"Geçersiz alıcı: {message.receiver}")
+        if not message.task_id:
+            raise ValueError("task_id boş olamaz")
         self._message_queue[message.receiver].append(message)
         self._message_log.append(message)
 

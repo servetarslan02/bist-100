@@ -1,9 +1,16 @@
 """
-ALPHA BIST — Synthesis Engine v1.0
+ALPHA BIST — Synthesis Engine v2.1
 
 Tüm agent sonuçlarını birleştiren gelişmiş sentez.
 LLM destekli sentez (varsa).
 Confidence-weighted scoring.
+
+v2.1 değişiklikleri:
+- _analyze_conflicts is_unanimous düzeltmesi (sadece directional)
+- _llm_synthesize context eksikliği giderildi
+- _simple_majority değişken gölgeleme düzeltmesi
+- consensus_reached mantığı basitleştirildi
+- to_dict() docstring düzeltmesi
 
 FAZ 4: Synthesis Engine
 """
@@ -26,7 +33,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class SynthesisResult:
-    """Sentez sonucu."""
+    """Sentez sonucu — nihai yön, güven, skor ve tüm analiz detayları."""
 
     ticker: str
     final_direction: str  # LONG, SHORT, NEUTRAL, NO_TRADE
@@ -44,8 +51,8 @@ class SynthesisResult:
     risks: list[str] = field(default_factory=list)
     memory_context: dict | None = None
 
-    def to_dict(self) -> dict:
-        """Sentez sonucu."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "ticker": self.ticker,
             "final_direction": self.final_direction,
@@ -61,7 +68,14 @@ class SynthesisResult:
             "reasoning": self.reasoning,
             "reasons": self.reasons,
             "risks": self.risks,
+            "memory_context": self.memory_context,
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"SynthesisResult(ticker={self.ticker!r}, direction={self.final_direction!r}, "
+            f"confidence={self.final_confidence:.2f}, score={self.weighted_score:.1f})"
+        )
 
 
 class SynthesisEngine:
@@ -85,6 +99,7 @@ class SynthesisEngine:
         risk_approved: bool = True,
         agent_memory: AgentMemory | None = None,
         llm_client: BaseLLMClient | None = None,
+        context: dict[str, Any] | None = None,
     ) -> SynthesisResult:
         """Gelişmiş sentez.
 
@@ -96,6 +111,7 @@ class SynthesisEngine:
             risk_approved: Risk onayı
             agent_memory: Agent hafızası
             llm_client: LLM client (opsiyonel)
+            context: Ek bağlam (features, regime, price, vb.)
 
         Returns:
             SynthesisResult
@@ -128,6 +144,7 @@ class SynthesisEngine:
                 resolution,
                 risk_approved,
                 llm_client,
+                context or {},
             )
             llm_reasoning = llm_result.get("reasoning", "")
             llm_reasons = llm_result.get("reasons", [])
@@ -148,6 +165,13 @@ class SynthesisEngine:
             final_confidence = self._simple_confidence(agent_results)
             reasoning = llm_reasoning or "Simple majority vote"
 
+        # Consensus: resolution varsa ve çelişki yoksa consensus var
+        if resolution:
+            consensus_reached = not resolution.conflict
+        else:
+            # Resolution yoksa conflict_analysis'den kontrol et
+            consensus_reached = not conflict_analysis.get("has_conflict", False)
+
         # Risk ve nedenleri topla
         all_reasons = llm_reasons or self._collect_reasons(agent_results)
         all_risks = llm_risks or self._collect_risks(agent_results)
@@ -159,7 +183,7 @@ class SynthesisEngine:
             final_direction=final_direction,
             final_confidence=round(final_confidence, 4),
             weighted_score=round(weighted_score, 2),
-            consensus_reached=resolution is not None and not resolution.conflict if resolution else True,
+            consensus_reached=consensus_reached,
             debate_occurred=debate_result is not None,
             risk_approved=risk_approved,
             agent_summary=agent_summary,
@@ -197,9 +221,9 @@ class SynthesisEngine:
         return summary
 
     def _analyze_conflicts(self, results: dict[AgentRole, AgentResult]) -> dict[str, Any]:
-        """Çelişki analizi."""
+        """Çelişki analizi — sadece directional (LONG/SHORT) agent'lar üzerinden."""
         valid = {r: res for r, res in results.items() if res.success}
-        directions = {}
+        directions: dict[str, list[str]] = {}
         for role, result in valid.items():
             d = result.output.get("direction", "NEUTRAL")
             if d not in directions:
@@ -210,12 +234,19 @@ class SynthesisEngine:
         short_count = len(directions.get("SHORT", []))
         has_conflict = long_count > 0 and short_count > 0
 
+        # Unanimous = tüm directional agent'lar aynı yönde
+        directional_count = long_count + short_count
+        is_unanimous = (
+            directional_count > 0
+            and (long_count == directional_count or short_count == directional_count)
+        )
+
         return {
             "directions": directions,
             "long_count": long_count,
             "short_count": short_count,
             "has_conflict": has_conflict,
-            "is_unanimous": len(directions) == 1,
+            "is_unanimous": is_unanimous,
         }
 
     def _weighted_score(self, results: dict[AgentRole, AgentResult]) -> float:
@@ -237,16 +268,16 @@ class SynthesisEngine:
     def _simple_majority(self, results: dict[AgentRole, AgentResult]) -> str:
         """Basit çoğunluk oyu — beraberlik durumunda confidence'a bak."""
         valid = {r: res for r, res in results.items() if res.success}
-        directions = {}
+        direction_counts: dict[str, int] = {}
         for _role, result in valid.items():
             d = result.output.get("direction", "NEUTRAL")
-            directions[d] = directions.get(d, 0) + 1
+            direction_counts[d] = direction_counts.get(d, 0) + 1
 
-        if not directions:
+        if not direction_counts:
             return "NO_TRADE"
 
         # Sadece LONG/SHORT oylarını say
-        directional = {d: c for d, c in directions.items() if d in ["LONG", "SHORT"]}
+        directional = {d: c for d, c in direction_counts.items() if d in ["LONG", "SHORT"]}
         if not directional:
             return "NEUTRAL"
 
@@ -255,14 +286,11 @@ class SynthesisEngine:
 
         # Beraberlik varsa confidence'a bak
         if len(top_dirs) > 1:
-            # Beraberlikte yüksek confidence'a sahip yönü seç
-            best_dir = None
-            best_conf = -1
+            best_dir: str | None = None
+            best_conf = -1.0
             for d in top_dirs:
-                avg_conf = sum(
-                    r.confidence for r2, r in valid.items()
-                    if r.output.get("direction") == d
-                ) / max(1, sum(1 for r2, r in valid.items() if r.output.get("direction") == d))
+                matching = [res for res in valid.values() if res.output.get("direction") == d]
+                avg_conf = sum(res.confidence for res in matching) / len(matching) if matching else 0
                 if avg_conf > best_conf:
                     best_conf = avg_conf
                     best_dir = d
@@ -272,13 +300,13 @@ class SynthesisEngine:
 
     def _simple_confidence(self, results: dict[AgentRole, AgentResult]) -> float:
         """Basit ortalama güven."""
-        valid = [res for r, res in results.items() if res.success]
+        valid = [res for _role, res in results.items() if res.success]
         if not valid:
             return 0.0
         return sum(r.confidence for r in valid) / len(valid)
 
     def _collect_reasons(self, results: dict[AgentRole, AgentResult]) -> list[str]:
-        """Tüm nedenleri topla."""
+        """Tüm nedenleri topla (her agent'tan en fazla 2, toplam en fazla 10)."""
         reasons = []
         for role, result in results.items():
             if result.success:
@@ -287,7 +315,7 @@ class SynthesisEngine:
         return reasons[:10]
 
     def _collect_risks(self, results: dict[AgentRole, AgentResult]) -> list[str]:
-        """Tüm riskleri topla."""
+        """Tüm riskleri topla (her agent'tan en fazla 2, toplam en fazla 10)."""
         risks = []
         for role, result in results.items():
             if result.success:
@@ -303,29 +331,42 @@ class SynthesisEngine:
         resolution: Resolution | None,
         risk_approved: bool,
         llm_client: BaseLLMClient,
+        context: dict[str, Any],
     ) -> dict[str, Any]:
-        """LLM ile sentez yap."""
-        # Agent sonuçlarını formatla
-        agent_text = []
-        for role, result in agent_results.items():
-            if result.success:
-                agent_text.append(
-                    f"{role.value}: {result.output.get('direction')} "
-                    f"(güven: {result.confidence:.2f}) - {result.reasoning[:150]}"
-                )
+        """LLM ile sentez yap.
 
-        debate_text = ""
-        if debate_result:
-            debate_text = f"Debate: {debate_result.consensus} (anlaşma: {debate_result.agreement})"
+        Args:
+            ticker: Hisse kodu
+            agent_results: Agent sonuçları
+            debate_result: Debate sonucu
+            resolution: Resolution sonucu
+            risk_approved: Risk onayı
+            llm_client: LLM client
+            context: Bağlam (features, regime, price, vb.)
 
-        risk_text = "Onaylandı" if risk_approved else "Reddedildi"
-
-        # LLM çağrısı
+        Returns:
+            LLM çıktısı (parsed dict) veya boş dict
+        """
         try:
+            # Agent sonuçlarını formatla
+            agent_text = []
+            for role, result in agent_results.items():
+                if result.success:
+                    agent_text.append(
+                        f"{role.value}: {result.output.get('direction')} "
+                        f"(güven: {result.confidence:.2f}) - {result.reasoning[:150]}"
+                    )
+
+            debate_text = ""
+            if debate_result:
+                debate_text = f"Debate: {debate_result.consensus} (anlaşma: {debate_result.agreement})"
+
+            risk_text = "Onaylandı" if risk_approved else "Reddedildi"
+
             system_prompt, user_prompt = PromptFactory.get_prompts(
                 template_name="synthesis",
                 ticker=ticker,
-                context={},
+                context=context,
                 agent_results="\n".join(agent_text),
                 debate_result=debate_text,
                 risk_assessment=risk_text,

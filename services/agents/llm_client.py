@@ -1,5 +1,5 @@
 """
-ALPHA BIST — LLM Client Abstraction v1.0
+ALPHA BIST — LLM Client Abstraction v2.1
 
 Çoklu LLM provider desteği:
 - Ollama (yerel)
@@ -9,6 +9,13 @@ ALPHA BIST — LLM Client Abstraction v1.0
 
 Her provider aynı interface'i kullanır.
 Retry, timeout, token counting dahil.
+
+v2.1 değişiklikleri:
+- Docstring düzeltmeleri (placeholder'lar temizlendi)
+- OpenAI/Anthropic response parsing güvenli hale getirildi
+- parse_llm_json log seviyesi ERROR → DEBUG
+- LLMResponse.__repr__ eklendi
+- parse_llm_json regex derinlik artırıldı
 """
 
 import asyncio
@@ -40,6 +47,14 @@ class LLMResponse:
     error: str | None = None
     raw_response: dict | None = None
 
+    def __repr__(self) -> str:
+        status = "ok" if self.success else f"err={self.error!r}"
+        return (
+            f"LLMResponse(model={self.model!r}, provider={self.provider!r}, "
+            f"tokens={self.tokens_in}→{self.tokens_out}, "
+            f"duration={self.duration_ms:.0f}ms, {status})"
+        )
+
 
 @dataclass
 class LLMConfig:
@@ -70,7 +85,11 @@ class BaseLLMClient(ABC):
     """Abstract LLM client interface."""
 
     def __init__(self, config: LLMConfig):
-        """Chat completion."""
+        """LLM client oluştur.
+
+        Args:
+            config: LLM yapılandırması (provider, model, api_key, vb.)
+        """
         self.config = config
 
     @abstractmethod
@@ -80,7 +99,7 @@ class BaseLLMClient(ABC):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Chat completion."""
+        """Chat completion — provider'a özgü implementasyon."""
 
     async def generate(
         self,
@@ -103,7 +122,11 @@ class BaseLLMClient(ABC):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Retry mekanizmalı generate."""
+        """Retry mekanizmalı generate.
+
+        Exponential backoff ile maksimum config.max_retries deneme yapar.
+        Circuit breaker entegrasyonu dış katmanda (agent_pipeline.py) yapılır.
+        """
         last_error = None
         for attempt in range(self.config.max_retries):
             try:
@@ -143,7 +166,7 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """metod metodu."""
+        """Ollama API ile chat completion."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -219,7 +242,7 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """metod metodu."""
+        """OpenAI-compatible API ile chat completion."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -260,7 +283,21 @@ class OpenAILLMClient(BaseLLMClient):
                         )
 
                     data = await resp.json()
-                    content = data["choices"][0]["message"]["content"]
+
+                    # Güvenli parsing — choices boş veya eksik olabilir
+                    choices = data.get("choices", [])
+                    if not choices:
+                        return LLMResponse(
+                            content="",
+                            model=self.config.model,
+                            provider="openai-compatible",
+                            success=False,
+                            error="Empty choices in response",
+                            duration_ms=(time.monotonic() - start) * 1000,
+                            raw_response=data,
+                        )
+
+                    content = choices[0].get("message", {}).get("content", "")
                     usage = data.get("usage", {})
 
                     return LLMResponse(
@@ -303,7 +340,7 @@ class AnthropicLLMClient(BaseLLMClient):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """metod metodu."""
+        """Anthropic API ile chat completion."""
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -354,7 +391,21 @@ class AnthropicLLMClient(BaseLLMClient):
                         )
 
                     data = await resp.json()
-                    content = data["content"][0]["text"]
+
+                    # Güvenli parsing — content boş veya eksik olabilir
+                    content_blocks = data.get("content", [])
+                    if not content_blocks:
+                        return LLMResponse(
+                            content="",
+                            model=self.config.model,
+                            provider="anthropic",
+                            success=False,
+                            error="Empty content in response",
+                            duration_ms=(time.monotonic() - start) * 1000,
+                            raw_response=data,
+                        )
+
+                    content = content_blocks[0].get("text", "")
                     usage = data.get("usage", {})
 
                     return LLMResponse(
@@ -438,7 +489,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
     Birden fazla strateji dener:
     1. Doğrudan JSON parse
     2. ```json ... ``` bloğu
-    3. İlk { ... } bul
+    3. İlk { ... } bul (iç içe destekli)
     4. Metinden direction/confidence çıkar
     """
     if not content:
@@ -450,7 +501,7 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
     try:
         return orjson.loads(content)
     except orjson.JSONDecodeError:
-        logger.error("Exception caught", exc_info=True)
+        logger.debug("JSON parse: direct failed, trying alternatives")
 
     # 2. ```json ... ``` bloğu
     json_block = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
@@ -458,18 +509,59 @@ def parse_llm_json(content: str) -> dict[str, Any] | None:
         try:
             return orjson.loads(json_block.group(1))
         except orjson.JSONDecodeError:
-            logger.error("Exception caught", exc_info=True)
+            logger.debug("JSON parse: code block failed, trying next")
 
-    # 3. İlk { ... }
-    json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, re.DOTALL)
+    # 3. İlk { ... } — iç içe destekli (brace counting)
+    json_match = _find_json_object(content)
     if json_match:
         try:
-            return orjson.loads(json_match.group())
+            return orjson.loads(json_match)
         except orjson.JSONDecodeError:
-            logger.error("Exception caught", exc_info=True)
+            logger.debug("JSON parse: extracted object failed, trying text extraction")
 
     # 4. Metinden fallback extraction
     return _extract_from_text(content)
+
+
+def _find_json_object(text: str) -> str | None:
+    """Metinde ilk geçerli JSON objesini bul (brace counting ile).
+
+    İç içe geçmiş destekler: {a: {b: {c: 1}}}
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i in range(start, len(text)):
+        ch = text[i]
+
+        if escape:
+            escape = False
+            continue
+
+        if ch == "\\":
+            escape = True
+            continue
+
+        if ch == '"':
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+
+    return None
 
 
 def _extract_from_text(content: str) -> dict[str, Any]:

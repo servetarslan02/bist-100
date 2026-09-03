@@ -36,7 +36,7 @@ from .communication_bus import (
 )
 
 # === Phase 2: Conflict + Debate ===
-from .conflict_detector import ConflictDetector, ConflictReport
+from .conflict_detector import ConflictDetector, ConflictReport, ConflictSeverity
 from .debate_engine import DebateEngine, DebateResult, DebateRound
 
 # === LLM ===
@@ -113,6 +113,7 @@ __all__ = [
     # Conflict + Debate
     "ConflictDetector",
     "ConflictReport",
+    "ConflictSeverity",
     "DebateEngine",
     "DebateResult",
     "DebateRound",

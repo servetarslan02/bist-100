@@ -1,15 +1,22 @@
 """
-ALPHA BIST — Parallel Agent Runner v1.0
+ALPHA BIST — Parallel Agent Runner v2.1
 
 Agent'ları asyncio.gather() ile paralel çalıştırır.
 Semaphore ile LLM rate limit koruması.
 Partial failure handling.
+
+v2.1 değişiklikleri:
+- Placeholder docstring'ler temizlendi
+- Gereksiz exception handling kaldırıldı
+- AgentPipelineBuilder task_id UUID ile değiştirildi
+- __repr__ metodları eklendi
 
 FAZ 1: Paralel Çalışma
 """
 
 import asyncio
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,7 +36,7 @@ logger = structlog.get_logger()
 
 @dataclass
 class ParallelRunResult:
-    """Paralel çalıştırma sonucu."""
+    """Paralel çalıştırma sonucu — tüm agent sonuçlarını ve istatistikleri içerir."""
 
     results: dict[AgentRole, AgentResult]
     total_duration_ms: float
@@ -40,19 +47,27 @@ class ParallelRunResult:
 
     @property
     def success_rate(self) -> float:
-        """Paralel çalıştırma sonucu."""
+        """Başarı oranı (0-1 arası)."""
         total = self.success_count + self.failure_count + self.timeout_count
         return self.success_count / total if total > 0 else 0
 
     @property
     def all_failed(self) -> bool:
-        """all_failed metodu."""
+        """Tüm agent'lar başarısız oldu mu?"""
         return self.success_count == 0
 
     @property
     def partial_success(self) -> bool:
-        """partial_success metodu."""
-        return 0 < self.success_count < (self.success_count + self.failure_count + self.timeout_count)
+        """Kısmi başarı — bazı agent'lar başarılı, bazıları başarısız mı?"""
+        total = self.success_count + self.failure_count + self.timeout_count
+        return 0 < self.success_count < total
+
+    def __repr__(self) -> str:
+        return (
+            f"ParallelRunResult(success={self.success_count}, "
+            f"failed={self.failure_count}, timeout={self.timeout_count}, "
+            f"rate={self.success_rate:.1%}, duration={self.total_duration_ms:.0f}ms)"
+        )
 
 
 class ParallelAgentRunner:
@@ -72,7 +87,13 @@ class ParallelAgentRunner:
         timeout_seconds: int = 120,
         enable_fallback: bool = True,
     ):
-        """metod metodu."""
+        """Paralel agent runner oluştur.
+
+        Args:
+            max_concurrent: Aynı anda çalışacak maksimum agent sayısı
+            timeout_seconds: Tek agent için timeout süresi (saniye)
+            enable_fallback: Başarısız agent için rule-based fallback kullan
+        """
         self.max_concurrent = max_concurrent
         self.timeout_seconds = timeout_seconds
         self.enable_fallback = enable_fallback
@@ -181,21 +202,19 @@ class ParallelAgentRunner:
         task: AgentTask,
         llm_client: BaseLLMClient | None,
     ) -> AgentResult:
-        """Tek agent'ı semaphore ile çalıştır."""
+        """Tek agent'ı semaphore ile çalıştır.
+
+        Timeout durumunda asyncio.TimeoutError fırlatır.
+        asyncio.gather(return_exceptions=True) tarafından yakalanır.
+        """
         async with self._semaphore:
-            try:
-                return await asyncio.wait_for(
-                    agent.execute(task, llm_client),
-                    timeout=self.timeout_seconds,
-                )
-            except TimeoutError:
-                raise
-            except Exception as e:
-                logger.error("Agent execution error", role=role.value, error=str(e))
-                raise
+            return await asyncio.wait_for(
+                agent.execute(task, llm_client),
+                timeout=self.timeout_seconds,
+            )
 
     def _create_timeout_result(self, task: AgentTask, role: AgentRole) -> AgentResult:
-        """Timeout sonucu oluştur."""
+        """Timeout sonucu oluştur — fallback varsa rule-based analiz kullanır."""
         fallback_output = {}
         if self.enable_fallback:
             fallback_output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
@@ -205,20 +224,20 @@ class ParallelAgentRunner:
             task_id=task.task_id,
             agent_role=role,
             ticker=task.ticker,
-            success=False,  # Timeout = başarısız (fallback ayrı field)
+            success=False,
             output=fallback_output,
             confidence=fallback_output.get("confidence", 0.0),
             evidence=[],
             reasoning=f"Agent timed out after {self.timeout_seconds}s, fallback used",
             model_version="timeout_fallback" if self.enable_fallback else "timeout",
-            prompt_version="",
+            prompt_version=task.template_name or "",
             input_hash="",
             duration_ms=self.timeout_seconds * 1000,
             error=f"Timeout after {self.timeout_seconds}s",
         )
 
     def _create_error_result(self, task: AgentTask, role: AgentRole, error: str) -> AgentResult:
-        """Hata sonucu oluştur."""
+        """Hata sonucu oluştur — fallback varsa rule-based analiz kullanır."""
         fallback_output = {}
         if self.enable_fallback:
             fallback_output = AIFallback.rule_based_analysis(task.context.get("features", {}), task.ticker)
@@ -228,40 +247,71 @@ class ParallelAgentRunner:
             task_id=task.task_id,
             agent_role=role,
             ticker=task.ticker,
-            success=False,  # Hata = başarısız (fallback ayrı field)
+            success=False,
             output=fallback_output,
             confidence=fallback_output.get("confidence", 0.0),
             evidence=[],
             reasoning=f"Agent error: {error}, fallback used" if self.enable_fallback else "",
             model_version="error_fallback" if self.enable_fallback else "error",
-            prompt_version="",
+            prompt_version=task.template_name or "",
             input_hash="",
             duration_ms=0,
             error=error,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"ParallelAgentRunner(max_concurrent={self.max_concurrent}, "
+            f"timeout={self.timeout_seconds}s, fallback={self.enable_fallback})"
+        )
+
 
 class AgentPipelineBuilder:
-    """Agent pipeline builder — kolay kullanım için."""
+    """Agent pipeline builder — fluent API ile kolay kullanım.
+
+    Kullanım:
+        result = await (AgentPipelineBuilder(llm_client)
+            .with_default_agents()
+            .run(ticker="THYAO", context={...}))
+    """
 
     def __init__(self, llm_client: BaseLLMClient | None = None):
-        """__init__ metodu."""
+        """Pipeline builder oluştur.
+
+        Args:
+            llm_client: LLM client (opsiyonel)
+        """
         self.llm_client = llm_client
         self._runner = ParallelAgentRunner()
         self._agents: dict[AgentRole, BaseAgent] = {}
 
     def with_runner(self, runner: ParallelAgentRunner) -> "AgentPipelineBuilder":
-        """with_runner metodu."""
+        """Custom runner ata.
+
+        Args:
+            runner: Paralel agent runner instance'ı
+
+        Returns:
+            Builder (fluent API)
+        """
         self._runner = runner
         return self
 
     def with_agent(self, role: AgentRole, agent: BaseAgent) -> "AgentPipelineBuilder":
-        """with_agent metodu."""
+        """Tek agent ekle.
+
+        Args:
+            role: Agent rolü
+            agent: Agent instance'ı
+
+        Returns:
+            Builder (fluent API)
+        """
         self._agents[role] = agent
         return self
 
     def with_default_agents(self) -> "AgentPipelineBuilder":
-        """Varsayılan agent'ları ekle."""
+        """Varsayılan agent'ları ekle (TECHNICAL, FUNDAMENTAL, NEWS, MACRO)."""
         for role in [
             AgentRole.TECHNICAL,
             AgentRole.FUNDAMENTAL,
@@ -276,8 +326,15 @@ class AgentPipelineBuilder:
         ticker: str,
         context: dict[str, Any],
     ) -> ParallelRunResult:
-        """Pipeline'ı çalıştır."""
-        # Task'ları oluştur
+        """Pipeline'ı çalıştır.
+
+        Args:
+            ticker: Hisse kodu
+            context: Bağlam (features, price, news, vb.)
+
+        Returns:
+            ParallelRunResult
+        """
         template_map = {
             AgentRole.TECHNICAL: "technical",
             AgentRole.FUNDAMENTAL: "fundamental",
@@ -288,7 +345,7 @@ class AgentPipelineBuilder:
         tasks = {}
         for role in self._agents:
             tasks[role] = AgentTask(
-                task_id=f"{ticker}-{role.value}-{int(time.time())}",
+                task_id=f"{ticker}-{role.value}-{uuid.uuid4().hex[:8]}",
                 agent_role=role,
                 ticker=ticker,
                 prompt=f"Analyze {ticker} from {role.value} perspective",
@@ -297,3 +354,9 @@ class AgentPipelineBuilder:
             )
 
         return await self._runner.run_agents(self._agents, tasks, self.llm_client)
+
+    def __repr__(self) -> str:
+        return (
+            f"AgentPipelineBuilder(agents={len(self._agents)}, "
+            f"runner={self._runner!r})"
+        )

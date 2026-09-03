@@ -7,9 +7,8 @@ Version tracking ile.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -488,7 +487,7 @@ class PromptFactory:
         ticker: str,
         context: dict[str, Any],
         **kwargs,
-    ) -> tuple:
+    ) -> tuple[str, str]:
         """Prompt şablonunu döndür (system_prompt, user_prompt)."""
         template = cls._templates.get(template_name)
         if not template:
@@ -534,7 +533,22 @@ class PromptFactory:
 
     @classmethod
     def register_template(cls, name: str, system: str, user: str) -> None:
-        """Yeni prompt şablonu kaydet."""
+        """Yeni prompt şablonu kaydet.
+
+        Args:
+            name: Şablon adı
+            system: System prompt (format string olabilir)
+            user: User prompt (format string olabilir)
+
+        Raises:
+            ValueError: Format string sözdizimi hatalıysa
+        """
+        # Temel validasyon — format string sözdizimini kontrol et
+        try:
+            system.format(**{k: "" for k in re.findall(r"\{(\w+)\}", system)})
+            user.format(**{k: "" for k in re.findall(r"\{(\w+)\}", user)})
+        except (KeyError, ValueError, IndexError) as e:
+            raise ValueError(f"Geçersiz prompt şablonu '{name}': {e}") from e
         cls._templates[name] = {"system": system, "user": user}
 
     @classmethod

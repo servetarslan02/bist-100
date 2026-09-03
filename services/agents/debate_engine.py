@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Debate Engine v1.0
+ALPHA BIST — Debate Engine v2.1
 
 Bull/Bear debate — CGX protokolü (MDPI 2026).
 
@@ -8,6 +8,12 @@ Kurallar:
 - Structured output (JSON argümanlar)
 - Confidence damping (her turda *= 0.9)
 - Consensus Gate: anlaşma yoksa NO_TRADE
+
+v2.1 değişiklikleri:
+- __init__ docstring düzeltmesi
+- bull_arg/bear_arg → last_round tek değişken
+- LLM hata yönetimi (debate turu başarısız olursa fallback)
+- Reasoning kesme cümle sınırında
 
 FAZ 2: Bull/Bear Debate
 """
@@ -22,6 +28,27 @@ from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger()
+
+
+def _truncate_at_sentence(text: str, max_len: int) -> str:
+    """Metni cümle sınırında kes.
+
+    Args:
+        text: Kesilecek metin
+        max_len: Maksimum karakter uzunluğu
+
+    Returns:
+        Cümle sınırında kesilmiş metin
+    """
+    if len(text) <= max_len:
+        return text
+    truncated = text[:max_len]
+    # Son nokta, ünlem veya soru işaretini bul
+    for sep in (".", "!", "?", "\n"):
+        last_sep = truncated.rfind(sep)
+        if last_sep > max_len * 0.5:  # En az %50'sini koru
+            return truncated[: last_sep + 1]
+    return truncated + "..."
 
 
 @dataclass
@@ -45,12 +72,12 @@ class DebateRound:
             "bull": {
                 "direction": self.bull_direction,
                 "confidence": self.bull_confidence,
-                "reasoning": self.bull_reasoning[:300],
+                "reasoning": _truncate_at_sentence(self.bull_reasoning, 300),
             },
             "bear": {
                 "direction": self.bear_direction,
                 "confidence": self.bear_confidence,
-                "reasoning": self.bear_reasoning[:300],
+                "reasoning": _truncate_at_sentence(self.bear_reasoning, 300),
             },
         }
 
@@ -104,7 +131,12 @@ class DebateEngine:
         max_rounds: int = 3,
         confidence_damping: float = 0.9,
     ):
-        """metod metodu."""
+        """Debate Engine oluştur.
+
+        Args:
+            max_rounds: Maksimum tartışma turu sayısı
+            confidence_damping: Her turda uygulanan confidence azaltma faktörü
+        """
         self.max_rounds = max_rounds
         self.confidence_damping = confidence_damping
 
@@ -137,28 +169,32 @@ class DebateEngine:
             bear_agent = BaseAgent(AgentRole.BEAR, llm_client=llm_client)
 
         history: list[DebateRound] = []
-        bull_arg = None
-        bear_arg = None
+        last_round: DebateRound | None = None
 
         for round_num in range(self.max_rounds):
-            round_result = await self._run_round(
-                round_num=round_num,
-                ticker=ticker,
-                context=context,
-                bull_agent=bull_agent,
-                bear_agent=bear_agent,
-                llm_client=llm_client,
-                bull_arg=bull_arg,
-                bear_arg=bear_arg,
-                history=history,
-            )
+            try:
+                round_result = await self._run_round(
+                    round_num=round_num,
+                    ticker=ticker,
+                    context=context,
+                    bull_agent=bull_agent,
+                    bear_agent=bear_agent,
+                    llm_client=llm_client,
+                    last_round=last_round,
+                    history=history,
+                )
+            except Exception as e:
+                logger.error(
+                    "Debate round failed, stopping debate",
+                    round=round_num,
+                    ticker=ticker,
+                    error=str(e),
+                )
+                # Tur başarısız — mevcut sonuçlarla devam et
+                break
 
             history.append(round_result)
-
-            # Son argümanları güncelle (bir sonraki tur için)
-            # Her iki taraf da kendi son pozisyonunu korumalı
-            bull_arg = round_result  # Bull'ın son argümanı
-            bear_arg = round_result  # Bear'ın son argümanı
+            last_round = round_result
 
             # Erken konsensüs kontrolü
             if round_result.bull_direction == round_result.bear_direction:
@@ -168,6 +204,18 @@ class DebateEngine:
                     direction=round_result.bull_direction,
                 )
                 break
+
+        # Hiç tur tamamlanamadıysa
+        if not history:
+            total_duration = (time.monotonic() - start) * 1000
+            return DebateResult(
+                consensus="NO_TRADE",
+                consensus_confidence=0.0,
+                rounds=[],
+                agreement=False,
+                total_rounds=0,
+                total_duration_ms=round(total_duration, 2),
+            )
 
         # Consensus belirle — confidence damping dahil
         final_bull = history[-1].bull_direction
@@ -228,8 +276,7 @@ class DebateEngine:
         bull_agent: BaseAgent,
         bear_agent: BaseAgent,
         llm_client: BaseLLMClient | None,
-        bull_arg: DebateRound | None,
-        bear_arg: DebateRound | None,
+        last_round: DebateRound | None,
         history: list[DebateRound],
     ) -> DebateRound:
         """Tek tur tartışma çalıştır."""
@@ -238,7 +285,7 @@ class DebateEngine:
         damping = self.confidence_damping**round_num
 
         # === BULL ARGÜMAN ===
-        bull_prompt_vars = self._create_bull_prompt_vars(round_num, ticker, context, bear_arg, history)
+        bull_prompt_vars = self._create_bull_prompt_vars(round_num, ticker, context, last_round, history)
         # Template adı: tur 1-3 için özel, sonrası için genel
         bull_template = f"bull_tur{round_num + 1}" if round_num < 3 else "bull_tur3"
         bull_task = AgentTask(
@@ -288,14 +335,14 @@ class DebateEngine:
         round_num: int,
         ticker: str,
         context: dict[str, Any],
-        bear_arg: DebateRound | None,
+        last_round: DebateRound | None,
         history: list[DebateRound],
     ) -> dict[str, str]:
         """Bull prompt değişkenlerini oluştur."""
         if round_num == 0:
             return {}  # Template kendi prompt'unu oluşturur
-        elif round_num == 1 and bear_arg:
-            return {"bear_argument": bear_arg.bear_reasoning}
+        elif round_num == 1 and last_round:
+            return {"bear_argument": last_round.bear_reasoning}
         else:
             return {"debate_summary": self._summarize_history(history)}
 
@@ -320,7 +367,7 @@ class DebateEngine:
         for r in history:
             lines.append(f"Tur {r.round_num + 1}:")
             lines.append(f"  Bull: {r.bull_direction} (güven: {r.bull_confidence:.2f})")
-            lines.append(f"    {r.bull_reasoning[:150]}...")
+            lines.append(f"    {_truncate_at_sentence(r.bull_reasoning, 150)}")
             lines.append(f"  Bear: {r.bear_direction} (güven: {r.bear_confidence:.2f})")
-            lines.append(f"    {r.bear_reasoning[:150]}...")
+            lines.append(f"    {_truncate_at_sentence(r.bear_reasoning, 150)}")
         return "\n".join(lines)

@@ -5,7 +5,7 @@ Refactored:
 - LLM client abstraction (Ollama, OpenAI, Anthropic, DeepSeek, Qwen)
 - Structured JSON output (Pydantic schemas)
 - Prompt templates (BIST-specific)
-- Hallucination protection (5 katmanlı)
+- Hallucination protection (6 katmanlı)
 - Rule-based fallback (LLM yoksa)
 
 FAZ 0: Temel altyapı refactor
@@ -187,7 +187,7 @@ class AgentToolRegistry:
 
 
 class AIOutputValidator:
-    """AI çıktısını doğrula — 5 katmanlı hallucination koruması.
+    """AI çıktısını doğrula — 6 katmanlı hallucination koruması.
 
     Katmanlar:
     1. JSON parse — geçerli JSON mı?
@@ -195,6 +195,7 @@ class AIOutputValidator:
     3. Range validation — confidence 0-1, score 0-100
     4. Domain validation — makul fiyat, tarih, risk seviyesi
     5. Source validation — URL formatı kontrolü
+    6. Price/Date hallucination validation — mantıksız fiyat ve tarih kontrolü
     """
 
     @staticmethod
@@ -306,7 +307,7 @@ class AIOutputValidator:
 class AIFallback:
     """LLM çalışmadığında rule-based fallback.
 
-    5 temel gösterge kullanarak kural tabanlı analiz yapar:
+    7 temel gösterge kullanarak kural tabanlı analiz yapar:
     1. Momentum (ROC 5d)
     2. Volume (z-score)
     3. RSI (14)

@@ -11,7 +11,6 @@ Kullanım:
 """
 
 import uuid
-from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
@@ -47,6 +46,7 @@ class TraceContext:
         self._tokens = [
             (_trace_id_var, _trace_id_var.set(self.trace_id)),
             (_ticker_var, _ticker_var.set(self.ticker)),
+            (_phase_var, _phase_var.set("")),
         ]
         return self
 
