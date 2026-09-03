@@ -2,7 +2,8 @@
 
 **Tarih:** 2026-09-04  
 **Kapsam:** 16 `.py` dosyası  
-**Denetim Sonucu:** 61 sorun tespit edildi, 61 düzeltildi
+**Denetim Sonucu:** 66 sorun tespit edildi, 66 düzeltildi  
+**Doğrulama:** Syntax ✅ | Import ✅ | Mantık ✅ | __repr__ ✅ | Placeholder ✅
 
 ---
 
@@ -26,13 +27,13 @@
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
 | 1 | `__init__.py` | 1 | ✅ |
-| 2 | `agent_memory.py` | 0 | ✅ Temiz |
-| 3 | `agent_pipeline.py` | 4 | ✅ |
+| 2 | `agent_memory.py` | 1 | ✅ |
+| 3 | `agent_pipeline.py` | 5 | ✅ |
 | 4 | `agent_system.py` | 3 | ✅ |
-| 5 | `circuit_breaker.py` | 0 | ✅ Temiz |
+| 5 | `circuit_breaker.py` | 1 | ✅ |
 | 6 | `communication_bus.py` | 1 | ✅ |
 | 7 | `conflict_detector.py` | 4 | ✅ |
-| 8 | `debate_engine.py` | 5 | ✅ |
+| 8 | `debate_engine.py` | 7 | ✅ |
 | 9 | `llm_client.py` | 7 | ✅ |
 | 10 | `parallel_runner.py` | 6 | ✅ |
 | 11 | `risk_assessor.py` | 7 | ✅ |
@@ -54,7 +55,9 @@
 
 ## `agent_memory.py`
 
-Sorun bulunmadı. TTL, gzip, atomik yazım, O(1) index, deque(maxlen) — hepsi doğru uygulanmış.
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `MemoryEntry` dataclass'ında `__repr__` eksik | `__repr__` eklendi |
 
 ---
 
@@ -66,6 +69,7 @@ Sorun bulunmadı. TTL, gzip, atomik yazım, O(1) index, deque(maxlen) — hepsi 
 | 2 | `assess()` çağrısına `context` gönderilmiyordu — `regime` feature'dan okunuyordu | `context=full_context` eklendi |
 | 3 | `synthesize()` çağrısına `context` gönderilmiyordu — LLM synthesis bağlamdan yoksundu | `context=full_context` eklendi |
 | 4 | Fallback `ConflictReport`'ta `severity` eksik | `severity=ConflictSeverity.NONE` eklendi |
+| 5 | `PipelineMetrics` dataclass'ında `__repr__` eksik | `__repr__` eklendi |
 
 ---
 
@@ -81,7 +85,9 @@ Sorun bulunmadı. TTL, gzip, atomik yazım, O(1) index, deque(maxlen) — hepsi 
 
 ## `circuit_breaker.py`
 
-Sorun bulunmadı. State makinesi, stats, LLM wrapper — hepsi doğru.
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `CircuitBreakerStats` dataclass'ında `__repr__` eksik | `__repr__` eklendi |
 
 ---
 
@@ -113,6 +119,8 @@ Sorun bulunmadı. State makinesi, stats, LLM wrapper — hepsi doğru.
 | 3 | LLM hata yönetimi yoktu — tek tur başarısız olsa tüm debate çöküyordu | try/except + NO_TRADE fallback |
 | 4 | Hiç tur tamamlanamadı durumu yoktu | Boş history → NO_TRADE |
 | 5 | Reasoning cümle ortasında kesiliyordu | `_truncate_at_sentence()` fonksiyonu eklendi |
+| 6 | `DebateRound` dataclass'ında `__repr__` eksik | `__repr__` eklendi |
+| 7 | `DebateResult` dataclass'ında `__repr__` eksik | `__repr__` eklendi |
 
 ---
 

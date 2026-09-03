@@ -52,6 +52,12 @@ class MemoryEntry:
     outcome: dict | None = None
     expires_at: str | None = None  # ISO format, None = süresiz
 
+    def __repr__(self) -> str:
+        return (
+            f"MemoryEntry(task={self.task_id!r}, role={self.agent_role!r}, "
+            f"ticker={self.ticker!r}, dir={self.direction!r}, conf={self.confidence:.2f})"
+        )
+
     def is_expired(self) -> bool:
         """Kayıt süresi dolmuş mu?"""
         if self.expires_at is None:

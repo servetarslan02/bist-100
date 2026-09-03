@@ -49,6 +49,13 @@ class CircuitBreakerStats:
             "last_state_change": self.last_state_change,
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"CircuitBreakerStats(calls={self.total_calls}, "
+            f"ok={self.successful_calls}, fail={self.failed_calls}, "
+            f"rejected={self.rejected_calls})"
+        )
+
 
 class CircuitBreaker:
     """Circuit Breaker — LLM çağrılarını korur.

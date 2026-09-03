@@ -81,6 +81,13 @@ class DebateRound:
             },
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"DebateRound(round={self.round_num}, "
+            f"bull={self.bull_direction}({self.bull_confidence:.2f}), "
+            f"bear={self.bear_direction}({self.bear_confidence:.2f}))"
+        )
+
 
 @dataclass
 class DebateResult:
@@ -96,7 +103,7 @@ class DebateResult:
     bear_final_confidence: float = 0.0
 
     def to_dict(self) -> dict:
-        """to_dict metodu."""
+        """Serialization için dict'e çevir."""
         return {
             "consensus": self.consensus,
             "consensus_confidence": self.consensus_confidence,
@@ -107,6 +114,13 @@ class DebateResult:
             "bear_final_confidence": self.bear_final_confidence,
             "rounds": [r.to_dict() for r in self.rounds],
         }
+
+    def __repr__(self) -> str:
+        return (
+            f"DebateResult(consensus={self.consensus!r}, "
+            f"conf={self.consensus_confidence:.2f}, "
+            f"rounds={self.total_rounds}, agreement={self.agreement})"
+        )
 
 
 class DebateEngine:

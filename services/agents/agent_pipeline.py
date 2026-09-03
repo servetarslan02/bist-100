@@ -86,6 +86,13 @@ class PipelineMetrics:
             "last_run_timestamp": self.last_run_timestamp,
         }
 
+    def __repr__(self) -> str:
+        return (
+            f"PipelineMetrics(runs={self.total_runs}, "
+            f"success={self.successful_runs}, failed={self.failed_runs}, "
+            f"rate={self.success_rate:.1%})"
+        )
+
 
 @dataclass
 class PipelineResult:
