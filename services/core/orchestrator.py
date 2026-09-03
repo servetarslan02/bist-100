@@ -153,6 +153,8 @@ class MasterOrchestrator:
         ("financial_scores", "services.intelligence.factor_engine", "compute_financial_scores", False),
         # Event Study (B31)
         ("event_impact", "services.intelligence.impact_engine", "analyze_event_impact", False),
+        # Alternative Data
+        ("alt_feature_engine", "services.alternative.feature_engine", "AlternativeFeatureEngine", True),
     ]
 
     # Multi-attribute imports: one module → multiple services
@@ -378,6 +380,52 @@ class MasterOrchestrator:
                             features["news_key_insight"] = processed.key_insight
         except Exception as e:
             logger.debug("news_sentiment_failed", ticker=ticker, error=str(e))
+
+    def _compute_alternative_features(self, features: dict, market_data: dict, ticker: str) -> None:
+        """Alternatif veri kaynaklarından feature'ları features'a ekle (in-place).
+
+        Google Trends, BKM, Kariyer.net, Ekşi Sözlük, Investing.com, uydu verisi.
+        """
+        try:
+            alt_engine = self._services.get("alt_feature_engine")
+            if not alt_engine:
+                return
+
+            if not alt_engine._initialized:
+                alt_engine.initialize()
+
+            sector = market_data.get("sector_map", {}).get(ticker, None)
+            extra_data = market_data.get("alternative", {})
+
+            # Sync context'ten async çağır
+            try:
+                loop = asyncio.get_running_loop()
+                alt_features = self._get_thread_pool().submit(
+                    asyncio.run,
+                    alt_engine.compute_all_features(
+                        ticker=ticker,
+                        sector=sector,
+                        extra_data=extra_data,
+                    ),
+                ).result(timeout=30)
+            except RuntimeError:
+                alt_features = asyncio.run(
+                    alt_engine.compute_all_features(
+                        ticker=ticker,
+                        sector=sector,
+                        extra_data=extra_data,
+                    ),
+                )
+
+            if alt_features:
+                features.update(alt_features)
+                logger.debug(
+                    "alternative_features_computed",
+                    ticker=ticker,
+                    count=len(alt_features),
+                )
+        except Exception as e:
+            logger.debug("alternative_features_failed", ticker=ticker, error=str(e))
 
     def _compute_world_state(self) -> dict:
         """Küresel piyasa durumunu al."""
@@ -969,6 +1017,7 @@ class MasterOrchestrator:
                 features = self._compute_features(ticker, market_data, raw_prices)
                 self._compute_macro_features(features, market_data, ticker)
                 self._compute_news_sentiment(features, market_data, ticker)
+                self._compute_alternative_features(features, market_data, ticker)
                 result["features"] = features
 
                 # 3. Dünya durumu ve rejim
