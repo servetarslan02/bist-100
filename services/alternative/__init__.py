@@ -50,8 +50,7 @@ from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
 
 # === Reconciliation ===
 from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
-from .satellite import compute_satellite_features
-from .satellite_adapter import SatelliteAdapter, satellite_adapter
+from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
 
 # === Legacy Feature Functions (backward compatibility) ===
 from .social import compute_social_features

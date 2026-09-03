@@ -119,7 +119,7 @@ class TestAlternativeData:
 
     def test_satellite_features(self) -> Any:
         """Otomatik eklendi."""
-        from services.alternative.satellite import compute_satellite_features
+        from services.alternative.satellite_adapter import compute_satellite_features
 
         f = compute_satellite_features({"factory_traffic": 0.05}, "THYAO")
         assert "factory_traffic_change" in f
