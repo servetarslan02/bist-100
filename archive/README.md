@@ -39,3 +39,10 @@ Arşivlenen dosyalar — `documentation/16-YENIDEN-DUZENLEME-HARITASI.md` kapsam
 
 ### `services/core/duckdb_store.py` → `core/duckdb_store.py`
 - **Gerekçe:** 0 referans. `duckdb_research.py` farklı dosya, aktif kullanımda.
+
+### Root-level test/verify scriptleri → `archive/2026-09-03/root/`
+- `test_core_regressions.py`, `test_engine.py`, `test_engine2.py`, `test_len.py`, `test_llm_system.py`, `test_phase5_end_to_end.py`, `test_providers_live.py` — Kök dizinde kalmış test dosyaları, `tests/` dizinine taşınmalı.
+- `verify_3_learning_fixes.py`, `verify_data_sources.py` — Kök dizinde kalmış doğrulama scriptleri.
+- `mock_redis.py` — Mock Redis helper, hiçbir yerde kullanılmıyor.
+- `run_baseline_test.py` — Baseline test scripti, hiçbir yerde kullanılmıyor.
+- **Gerekçe:** Kök dizin sadece `main.py`, `start.py`, `run_all_imports.py` ve `pyproject.toml` gibi temel dosyaları içermeli.
