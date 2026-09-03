@@ -1,38 +1,23 @@
 # services/event_study/ — Denetim Raporu
 
----
-
-## SAYFA 1 — Denetim Kuralları
-
-### K1 — Placeholder Docstring
-`"metod metodu"`, `"__init__ metodu"`, `"X metodu"`, `"Otomatik eklendi"`, sınıf docstring'i ile aynı olan metod docstring'leri → düzeltilir.
-
-### K2 — Kritik Mantık Hataları
-Boundary hataları, yanlış veri kaynağı, eksik filtreleme, dead code → düzeltilir.
-
-### K3 — Eksik Fonksiyonellik
-Eksik parametreler, eksik loglama, eksik fallback → düzeltilir.
-
-### K4 — Güvenlik ve Dayanıklılık
-Güvensiz dict erişimi, exception handling eksikliği, regex sınırlamaları → düzeltilir.
-
-### K5 — Kod Kalitesi
-`__repr__` eksik, gereksiz import, return type eksik, değişken gölgeleme → düzeltilir.
-
-### Düzeltme Standartları
-- Docstring'ler Türkçe ve açıklayıcı
-- Production-grade, mock/statik veri yok
-- `__repr__` tüm dataclass'lara
-- Return type'lar doğru
-- Düzeltme sonrası syntax + import zinciri kontrolü
-
----
-
-## SAYFA 2 — Genel Bakış
-
 **Tarih:** —  
-**Kapsam:** `services/event_study/` — ? dosya  
+**Kapsam:** ? `.py` dosyası  
 **Denetim Sonucu:** — sorun tespit edildi, — düzeltildi
+
+---
+
+## Denetim Kuralları
+
+1. **Mock / Sahte Veri — Kesinlikle Yasak.** Test verisi, hardcoded değer, statik JSON, placeholder data production kodunda olmayacak.
+2. **Tüm Hatalar Düzeltilecek.** Boundary hatası, dead code, exception yutma, yanlış veri kaynağı, bypass, tutarsızlık — sistemi bozan her şey düzeltilir.
+3. **Eksik Fonksiyonellik Tamamlanacak.** Eksik parametre, eksik loglama, eksik fallback, eksik validasyon tespit edilen her eksik tamamlanır.
+4. **Kod Profesyonel Olacak.** Her docstring açıklayıcı ve Türkçe. Her dataclass'ta `__repr__`. Return type annotation doğru. Gereksiz import olmayacak. Değişken isimleri anlamlı olacak.
+5. **Düzeltme Sonrası Kontrol.** Syntax kontrolü ve import zinciri kontrolü yapılacak.
+6. **Geliştirme Önerileri Verilecek.** Eksik değil ama geliştirilebilecek her alan için öneri sunulacak.
+
+---
+
+## Dosya Özeti
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
@@ -40,27 +25,23 @@ Güvensiz dict erişimi, exception handling eksikliği, regex sınırlamaları �
 
 ---
 
-## SAYFA 3 — `<dosya_adı>.py`
+## `<dosya_adı>.py`
 
-**Sorun:** — | **Durum:** ⏳ Bekliyor
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| — | — | — | — |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| — | — | — |
 
 ---
 
-## SAYFA 4 — `<dosya_adı>.py`
+## Geliştirme Önerileri
 
-**Sorun:** — | **Durum:** ⏳ Bekliyor
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| — | — | — | — |
+| # | Alan | Öneri |
+|---|------|-------|
+| — | — | — |
 
 ---
 
-## SAYFA 5 — Bilinen Eksikler
+## Bilinen Eksikler
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|

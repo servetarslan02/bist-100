@@ -1,242 +1,243 @@
 # services/agents/ — Denetim Raporu
 
----
-
-## SAYFA 1 — Denetim Kuralları
-
-### K1 — Placeholder Docstring
-`"metod metodu"`, `"__init__ metodu"`, `"X metodu"`, `"Otomatik eklendi"`, sınıf docstring'i ile aynı olan metod docstring'leri → düzeltilir.
-
-### K2 — Kritik Mantık Hataları
-Boundary hataları, yanlış veri kaynağı, eksik filtreleme, dead code → düzeltilir.
-
-### K3 — Eksik Fonksiyonellik
-Eksik parametreler, eksik loglama, eksik fallback → düzeltilir.
-
-### K4 — Güvenlik ve Dayanıklılık
-Güvensiz dict erişimi, exception handling eksikliği, regex sınırlamaları → düzeltilir.
-
-### K5 — Kod Kalitesi
-`__repr__` eksik, gereksiz import, return type eksik, değişken gölgeleme → düzeltilir.
-
-### Düzeltme Standartları
-- Docstring'ler Türkçe ve açıklayıcı
-- Production-grade, mock/statik veri yok
-- `__repr__` tüm dataclass'lara
-- Return type'lar doğru
-- Düzeltme sonrası syntax + import zinciri kontrolü
+**Tarih:** 2026-09-04  
+**Kapsam:** 16 `.py` dosyası  
+**Denetim Sonucu:** 61 sorun tespit edildi, 61 düzeltildi
 
 ---
 
-## SAYFA 2 — `__init__.py`
+## Denetim Kuralları
 
-**Sorun:** 1 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K3 | `ConflictSeverity` export eksik | Import ve `__all__`'a eklendi |
-
----
-
-## SAYFA 3 — `agent_memory.py`
-
-**Sorun:** 0 | **Durum:** ✅ Temiz
-
-TTL, gzip, atomik yazım, O(1) index, deque(maxlen) — hepsi doğru uygulanmış. Sorun bulunmadı.
+1. **Mock / Sahte Veri — Kesinlikle Yasak.** Test verisi, hardcoded değer, statik JSON, placeholder data production kodunda olmayacak.
+2. **Tüm Hatalar Düzeltilecek.** Boundary hatası, dead code, exception yutma, yanlış veri kaynağı, bypass, tutarsızlık — sistemi bozan her şey düzeltilir.
+3. **Eksik Fonksiyonellik Tamamlanacak.** Eksik parametre, eksik loglama, eksik fallback, eksik validasyon tespit edilen her eksik tamamlanır.
+4. **Kod Profesyonel Olacak.** Her docstring açıklayıcı ve Türkçe. Her dataclass'ta `__repr__`. Return type annotation doğru. Gereksiz import olmayacak. Değişken isimleri anlamlı olacak.
+5. **Düzeltme Sonrası Kontrol.** Syntax kontrolü ve import zinciri kontrolü yapılacak.
+6. **Geliştirme Önerileri Verilecek.** Eksik değil ama geliştirilebilecek her alan için öneri sunulacak.
 
 ---
 
-## SAYFA 4 — `agent_pipeline.py`
+## Dosya Özeti
 
-**Sorun:** 4 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K2 | `_get_or_create_agents()` unwrapped LLM atıyordu — circuit breaker bypass | `self._wrapped_llm` kullanılıyor |
-| 2 | K3 | `assess()` çağrısına `context` gönderilmiyordu | `context=full_context` eklendi |
-| 3 | K3 | `synthesize()` çağrısına `context` gönderilmiyordu | `context=full_context` eklendi |
-| 4 | K3 | Fallback `ConflictReport`'ta `severity` eksik | `severity=ConflictSeverity.NONE` eklendi |
-
----
-
-## SAYFA 5 — `agent_system.py`
-
-**Sorun:** 3 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | Modül docstring "5 katmanlı" (6 tane var) | "6 katmanlı" |
-| 2 | K1 | `AIOutputValidator` docstring "5 katmanlı" | "6 katmanlı" |
-| 3 | K1 | `AIFallback` docstring "5 gösterge" (7 tane var) | "7 gösterge" |
+| # | Dosya | Sorun | Durum |
+|---|-------|-------|-------|
+| 1 | `__init__.py` | 1 | ✅ |
+| 2 | `agent_memory.py` | 0 | ✅ Temiz |
+| 3 | `agent_pipeline.py` | 4 | ✅ |
+| 4 | `agent_system.py` | 3 | ✅ |
+| 5 | `circuit_breaker.py` | 0 | ✅ Temiz |
+| 6 | `communication_bus.py` | 1 | ✅ |
+| 7 | `conflict_detector.py` | 4 | ✅ |
+| 8 | `debate_engine.py` | 5 | ✅ |
+| 9 | `llm_client.py` | 7 | ✅ |
+| 10 | `parallel_runner.py` | 6 | ✅ |
+| 11 | `risk_assessor.py` | 7 | ✅ |
+| 12 | `self_evaluator.py` | 5 | ✅ |
+| 13 | `synthesis_engine.py` | 8 | ✅ |
+| 14 | `trace_context.py` | 2 | ✅ |
+| 15 | `prompts/__init__.py` | 3 | ✅ |
+| 16 | `schemas/__init__.py` | 5 | ✅ |
 
 ---
 
-## SAYFA 6 — `circuit_breaker.py`
+## `__init__.py`
 
-**Sorun:** 0 | **Durum:** ✅ Temiz
-
-State makinesi, stats, LLM wrapper — hepsi doğru. Sorun bulunmadı.
-
----
-
-## SAYFA 7 — `communication_bus.py`
-
-**Sorun:** 1 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K2 | `send()` exception fırlatmıyordu — DLQ tamamen işlevsiz | `send()`'e receiver + task_id validasyonu eklendi |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `ConflictSeverity` export eksik | Import ve `__all__`'a eklendi |
 
 ---
 
-## SAYFA 8 — `conflict_detector.py`
+## `agent_memory.py`
 
-**Sorun:** 4 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K2 | `detect_cross_agent_conflicts()` `_EXCLUDE_ROLES` filtresi yok — BULL/BEAR çelişkileri raporlanıyordu | `exclude_roles` parametresi eklendi |
-| 2 | K3 | Confidence-weighted skor yok — sadece oy sayısına bakıyordu | `conf_diff` ağırlıklı skor formülü eklendi |
-| 3 | K3 | Conflict severity seviyeleri yok | `ConflictSeverity` enum eklendi (NONE/LOW/MEDIUM/HIGH/CRITICAL) |
-| 4 | K3 | `ConflictReport`'ta `severity` alanı eksik | `severity` alanı + log eklendi |
+Sorun bulunmadı. TTL, gzip, atomik yazım, O(1) index, deque(maxlen) — hepsi doğru uygulanmış.
 
 ---
 
-## SAYFA 9 — `debate_engine.py`
+## `agent_pipeline.py`
 
-**Sorun:** 5 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | `__init__` docstring "metod metodu" | Açıklayıcı docstring |
-| 2 | K2 | `bull_arg` ve `bear_arg` aynı obje — yanıltıcı | Tek `last_round` değişkeni |
-| 3 | K3 | LLM hata yönetimi yok — tüm debate çöker | try/except + NO_TRADE fallback |
-| 4 | K3 | Hiç tur tamamlanamadı durumu yok | Boş history → NO_TRADE |
-| 5 | K4 | Reasoning cümle ortasında kesiliyor | `_truncate_at_sentence()` fonksiyonu |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `_get_or_create_agents()` unwrapped LLM atıyordu — circuit breaker bypass ediliyordu | `self._wrapped_llm` kullanılıyor |
+| 2 | `assess()` çağrısına `context` gönderilmiyordu — `regime` feature'dan okunuyordu | `context=full_context` eklendi |
+| 3 | `synthesize()` çağrısına `context` gönderilmiyordu — LLM synthesis bağlamdan yoksundu | `context=full_context` eklendi |
+| 4 | Fallback `ConflictReport`'ta `severity` eksik | `severity=ConflictSeverity.NONE` eklendi |
 
 ---
 
-## SAYFA 10 — `llm_client.py`
+## `agent_system.py`
 
-**Sorun:** 7 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | `OllamaLLMClient.chat()` docstring "metod metodu" | "Ollama API ile chat completion" |
-| 2 | K1 | `OpenAILLMClient.chat()` docstring "metod metodu" | "OpenAI-compatible API ile chat completion" |
-| 3 | K1 | `AnthropicLLMClient.chat()` docstring "metod metodu" | "Anthropic API ile chat completion" |
-| 4 | K4 | `OpenAILLMClient` `data["choices"][0]` güvenliksiz — IndexError | `.get()` + boş kontrolü |
-| 5 | K4 | `AnthropicLLMClient` `data["content"][0]` güvenliksiz — IndexError | `.get()` + boş kontrolü |
-| 6 | K4 | `parse_llm_json` her hatada ERROR log + stack trace | DEBUG seviyesine düşürüldü |
-| 7 | K4 | `parse_llm_json` regex 2 seviye JSON limit | `_find_json_object()` brace counting |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Modül docstring "5 katmanlı" diyor, kodda 6 katman var | "6 katmanlı" |
+| 2 | `AIOutputValidator` docstring "5 katmanlı" diyor | "6 katmanlı" |
+| 3 | `AIFallback` docstring "5 gösterge" diyor, kodda 7 tane var | "7 gösterge" |
 
 ---
 
-## SAYFA 11 — `parallel_runner.py`
+## `circuit_breaker.py`
 
-**Sorun:** 6 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | 7× placeholder docstring | Açıklayıcı docstring'ler |
-| 2 | K2 | `_run_one_with_semaphore` gereksiz `except TimeoutError: raise` | Kaldırıldı |
-| 3 | K3 | `_create_timeout_result` / `_create_error_result` boş `prompt_version` | `task.template_name or ""` atandı |
-| 4 | K5 | `AgentPipelineBuilder.run()` task_id `int(time.time())` — collision riski | `uuid.uuid4().hex[:8]` |
-| 5 | K5 | `__repr__` yok (3 sınıf) | `ParallelRunResult`, `ParallelAgentRunner`, `AgentPipelineBuilder` eklendi |
-| 6 | K5 | `partial_success` property — eksik total hesabı | `total` değişkeni eklendi |
+Sorun bulunmadı. State makinesi, stats, LLM wrapper — hepsi doğru.
 
 ---
 
-## SAYFA 12 — `risk_assessor.py`
+## `communication_bus.py`
 
-**Sorun:** 7 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K2 | Risk seviye eşik mantığı boundary hatası (`score=50` → MEDIUM, HIGH olmalı) | `_determine_risk_level()` static method, `>=` ile doğru eşik |
-| 2 | K2 | `features.get("regime")` — yanlış kaynak | `context` parametresi eklendi, `(context or {}).get("regime")` |
-| 3 | K1 | `to_dict()` docstring "Risk değerlendirme sonucu" | "Serialization için dict'e çevir" |
-| 4 | K3 | Veto log'u yok | `logger.warning("Risk VETO applied")` eklendi |
-| 5 | K5 | `__repr__` yok | Eklendi |
-| 6 | K5 | Pozisyon minimum 1% (HIGH'ta bile) | 0.5%'e düşürüldü |
-| 7 | K3 | `agent_pipeline.py`'de `context` parametresi eksik | `full_context` olarak eklendi |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `send()` exception fırlatmıyordu — DLQ tamamen işlevsizdi | `send()`'e receiver ve task_id validasyonu eklendi |
 
 ---
 
-## SAYFA 13 — `self_evaluator.py`
+## `conflict_detector.py`
 
-**Sorun:** 5 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | `AgentSelfEvaluator.__init__` docstring "metod metodu" | Açıklayıcı docstring |
-| 2 | K1 | `MultiAgentEvaluator.__init__` docstring "__init__ metodu" | Açıklayıcı docstring |
-| 3 | K4 | `_confidence_stats` — basit istatistikler için numpy aşırı | `statistics` modülüne geçildi |
-| 4 | K5 | `__repr__` yok (2 sınıf) | `EvalReport`, `MultiAgentEvaluator` eklendi |
-| 5 | K3 | `_outcome_distribution` — NO_TRADE outcomes sayılmıyor | `"no_trade"` kategorisi eklendi |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `detect_cross_agent_conflicts()` BULL/BEAR rollerini de dahil ediyordu | `exclude_roles` parametresi eklendi |
+| 2 | Conflict score sadece oy sayısına bakıyordu, confidence'ı hesaba katmıyordu | Confidence-weighted skor formülü eklendi |
+| 3 | Conflict severity seviyeleri yoktu | `ConflictSeverity` enum eklendi (NONE/LOW/MEDIUM/HIGH/CRITICAL) |
+| 4 | `ConflictReport`'ta `severity` alanı eksikti | `severity` alanı ve log eklendi |
 
 ---
 
-## SAYFA 14 — `synthesis_engine.py`
+## `debate_engine.py`
 
-**Sorun:** 8 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | `to_dict()` docstring "Sentez sonucu" | "Serialization için dict'e çevir" |
-| 2 | K2 | `_analyze_conflicts` `is_unanimous` NEUTRAL sayıyordu | Sadece directional (LONG/SHORT) sayılır |
-| 3 | K3 | `_llm_synthesize` boş context gönderiyordu | `context` parametresi eklendi |
-| 4 | K5 | `_simple_majority` değişken gölgeleme (`r`) | `r` → `res` |
-| 5 | K2 | `consensus_reached` mantığı karmaşık | Basitleştirildi |
-| 6 | K3 | `to_dict()` eksik `memory_context` | Eklendi |
-| 7 | K5 | `__repr__` yok | Eklendi |
-| 8 | K3 | `agent_pipeline.py`'de `context` parametresi eksik | `full_context` olarak eklendi |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `__init__` docstring "metod metodu" | Açıklayıcı docstring yazıldı |
+| 2 | `bull_arg` ve `bear_arg` aynı objeydi — değişken isimleri yanıltıcı | Tek `last_round` değişkeni |
+| 3 | LLM hata yönetimi yoktu — tek tur başarısız olsa tüm debate çöküyordu | try/except + NO_TRADE fallback |
+| 4 | Hiç tur tamamlanamadı durumu yoktu | Boş history → NO_TRADE |
+| 5 | Reasoning cümle ortasında kesiliyordu | `_truncate_at_sentence()` fonksiyonu eklendi |
 
 ---
 
-## SAYFA 15 — `trace_context.py`
+## `llm_client.py`
 
-**Sorun:** 2 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K2 | `_phase_var` exit'te sıfırlanmıyordu — nested context'te faz sızıntısı | `__enter__`'a kayıt eklendi |
-| 2 | K5 | Gereksiz `contextmanager` import'u | Kaldırıldı |
-
----
-
-## SAYFA 16 — `prompts/__init__.py`
-
-**Sorun:** 3 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K5 | Gereksiz import'lar (`orjson`, `Dict`, `List`, `Optional`) | Kaldırıldı |
-| 2 | K5 | `get_prompts` return type `tuple` | `tuple[str, str]` |
-| 3 | K3 | `register_template` validasyon yok | Format string sözdizimi kontrolü eklendi |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `OllamaLLMClient.chat()` docstring "metod metodu" | "Ollama API ile chat completion" |
+| 2 | `OpenAILLMClient.chat()` docstring "metod metodu" | "OpenAI-compatible API ile chat completion" |
+| 3 | `AnthropicLLMClient.chat()` docstring "metod metodu" | "Anthropic API ile chat completion" |
+| 4 | `OpenAILLMClient` `data["choices"][0]` güvenliksiz — boş choices'ta IndexError | `.get()` + boş kontrolü |
+| 5 | `AnthropicLLMClient` `data["content"][0]` güvenliksiz — boş content'te IndexError | `.get()` + boş kontrolü |
+| 6 | `parse_llm_json` her JSON parse denemesinde ERROR log + stack trace atıyordu | DEBUG seviyesine düşürüldü |
+| 7 | `parse_llm_json` regex sadece 2 seviye iç içe JSON destekliyordu | `_find_json_object()` ile brace counting — sınırsız derinlik |
 
 ---
 
-## SAYFA 17 — `schemas/__init__.py`
+## `parallel_runner.py`
 
-**Sorun:** 5 | **Durum:** ✅ Düzeltildi
-
-| # | Kategori | Sorun | Düzeltme |
-|---|----------|-------|----------|
-| 1 | K1 | `RiskLevel` docstring "metod metodu" | "Risk seviyeleri — LOW, MEDIUM, HIGH, CRITICAL" |
-| 2 | K1 | 3× `validate_confidence` docstring "validate_confidence metodu" | "Confidence değerini 0-1 aralığına normalize et" |
-| 3 | K1 | `Direction` docstring "Standart agent çıktı şeması" | "Yön kararları — LONG, SHORT, NEUTRAL, NO_TRADE" |
-| 4 | K5 | Gereksiz import'lar (`Dict`, `List`, `Optional`) | Kaldırıldı |
-| 5 | K5 | `validate_agent_output` return type `tuple` | `tuple[bool, dict[str, Any], list[str]]` |
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 7 farklı yerde placeholder docstring ("metod metodu", "all_failed metodu" vb.) | Açıklayıcı docstring'ler yazıldı |
+| 2 | `_run_one_with_semaphore` içinde gereksiz `except TimeoutError: raise` bloğu | Kaldırıldı |
+| 3 | `_create_timeout_result` ve `_create_error_result` boş `prompt_version` atıyordu | `task.template_name or ""` atandı |
+| 4 | `AgentPipelineBuilder.run()` task_id için `int(time.time())` kullanıyordu — aynı saniyede collision riski | `uuid.uuid4().hex[:8]` ile değiştirildi |
+| 5 | `__repr__` yoktu (3 sınıf) | `ParallelRunResult`, `ParallelAgentRunner`, `AgentPipelineBuilder` eklendi |
+| 6 | `partial_success` property'si eksik total hesabı yapıyordu | `total` değişkeni eklendi |
 
 ---
 
-## SAYFA 18 — Bilinen Eksikler
+## `risk_assessor.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Risk seviye eşik mantığı boundary hatası — `score=50` MEDIUM oluyordu, HIGH olmalıydı | `_determine_risk_level()` static method ile `>=` doğru eşik |
+| 2 | `regime` feature'dan okunuyordu, context'ten gelmeliydi | `context` parametresi eklendi |
+| 3 | `to_dict()` docstring sınıf docstring'i ile aynıydı | "Serialization için dict'e çevir" |
+| 4 | Veto log'u yoktu — veto olduğunda loglanmıyordu | `logger.warning("Risk VETO applied")` eklendi |
+| 5 | `__repr__` yoktu | Eklendi |
+| 6 | Pozisyon minimum sınırı HIGH risk'te bile 1% idi | 0.5%'e düşürüldü |
+| 7 | `agent_pipeline.py`'deki `assess()` çağrısında `context` parametresi eksikti | `full_context` olarak eklendi |
+
+---
+
+## `self_evaluator.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `AgentSelfEvaluator.__init__` docstring "metod metodu" | Açıklayıcı docstring |
+| 2 | `MultiAgentEvaluator.__init__` docstring "__init__ metodu" | Açıklayıcı docstring |
+| 3 | `_confidence_stats` basit istatistikler için numpy kullanıyordu — gereksiz overhead | `statistics` modülüne geçildi |
+| 4 | `__repr__` yoktu (2 sınıf) | `EvalReport`, `MultiAgentEvaluator` eklendi |
+| 5 | `_outcome_distribution` NO_TRADE outcomes saymıyordu | `"no_trade"` kategorisi eklendi |
+
+---
+
+## `synthesis_engine.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `to_dict()` docstring sınıf docstring'i ile aynıydı | "Serialization için dict'e çevir" |
+| 2 | `_analyze_conflicts` `is_unanimous` hesabında NEUTRAL'ı da sayıyordu | Sadece directional (LONG/SHORT) sayılır |
+| 3 | `_llm_synthesize` boş context gönderiyordu — LLM bağlamdan yoksun sentez yapıyordu | `context` parametresi eklendi |
+| 4 | `_simple_majority` içinde değişken gölgeleme (`r` dış scope ile karışıyor) | `r` → `res` |
+| 5 | `consensus_reached` mantığı karmaşıktı — `resolution None` iken `True` dönüyordu | Basitleştirildi |
+| 6 | `to_dict()` içinde `memory_context` dahil edilmemişti | Eklendi |
+| 7 | `__repr__` yoktu | Eklendi |
+| 8 | `agent_pipeline.py`'deki `synthesize()` çağrısında `context` parametresi eksikti | `full_context` olarak eklendi |
+
+---
+
+## `trace_context.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `_phase_var` exit'te sıfırlanmıyordu — nested context'te faz sızıntısı oluyordu | `__enter__`'a kayıt eklendi |
+| 2 | Gereksiz `contextmanager` import'u | Kaldırıldı |
+
+---
+
+## `prompts/__init__.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | Gereksiz import'lar (`orjson`, `Dict`, `List`, `Optional`) | Kaldırıldı |
+| 2 | `get_prompts` return type `tuple` idi | `tuple[str, str]` |
+| 3 | `register_template` validasyon yoktu — geçersiz format string kaydedilebiliyordu | Format string sözdizimi kontrolü eklendi |
+
+---
+
+## `schemas/__init__.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `RiskLevel` docstring "metod metodu" | "Risk seviyeleri — LOW, MEDIUM, HIGH, CRITICAL" |
+| 2 | 3× `validate_confidence` docstring "validate_confidence metodu" | "Confidence değerini 0-1 aralığına normalize et" |
+| 3 | `Direction` docstring "Standart agent çıktı şeması" — yanlış | "Yön kararları — LONG, SHORT, NEUTRAL, NO_TRADE" |
+| 4 | Gereksiz import'lar (`Dict`, `List`, `Optional`) | Kaldırıldı |
+| 5 | `validate_agent_output` return type `tuple` idi | `tuple[bool, dict[str, Any], list[str]]` |
+
+---
+
+## Pipeline Entegrasyon Düzeltmeleri
+
+| Faz | Değişiklik |
+|-----|-----------|
+| Agent Cache | `_get_or_create_agents()` artık `self._wrapped_llm` kullanıyor |
+| Phase 4 (Risk) | `assess()` → `context=full_context` eklendi |
+| Phase 6 (Synthesis) | `synthesize()` → `context=full_context` eklendi |
+| Fallback | `ConflictReport` → `severity=ConflictSeverity.NONE` eklendi |
+| Import | `ConflictSeverity` import edildi |
+
+---
+
+## Geliştirme Önerileri
+
+| # | Alan | Öneri |
+|---|------|-------|
+| 1 | Observability | Prometheus/Grafana metric'leri eklenebilir — pipeline başarı oranı, latency, circuit breaker durumu |
+| 2 | Distributed Tracing | Jaeger/OpenTelemetry entegrasyonu — çoklu servis arası trace takibi |
+| 3 | Thread Safety | `AgentMemory` şu an tek thread çalışıyor, çoklu thread gerekirse lock mekanizması eklenebilir |
+| 4 | Test Coverage | Mevcut testler refactor sonrası çalışır durumda olmalı, yeni testler yazılmalı |
+| 5 | BULL/BEAR Debate | TUR2/TUR3 prompt'larında `{context}` yok — debate'te bağlam kasıtlı çıkarılmış, tasarım kararı olarak kalmış |
+
+---
+
+## Bilinen Eksikler
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| 1 | `AgentOrchestrator` kaldırma | `tests/test_phase7.py` bağımlılığı |
-| 2 | Thread safety (memory) | Gerekli değil — tek thread |
-| 3 | Prometheus/Grafana metrics | Altyapı gerektirir |
-| 4 | Distributed tracing (Jaeger) | Altyapı gerektirir |
-| 5 | BULL/BEAR TUR2/TUR3 `{context}` | Tasarım kararı |
+| 1 | `AgentOrchestrator` kaldırma | Test bağımlılığı — test güncellenmeli |
+| 2 | Thread safety (memory) | Şu an gerekli değil — tek thread |
