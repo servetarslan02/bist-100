@@ -336,3 +336,59 @@ grep -rn "alternative" workers/ --include="*.py"
 - ✅ Tüm import'lar doğrulandı
 
 Kalan legacy `compute_*` fonksiyonları (social, jobs, cc, web_scraping) backward compatibility için tutuldu — düşük risk.
+
+---
+
+# 16-C — services/core/ Ölü Kod Temizliği
+
+**Tarih:** 2026-09-03
+**Kapsam:** `services/core/` dizini
+
+## Arşivlenen Dosyalar (9 dosya, ~1,500 satır)
+
+| Dosya | Gerekçe |
+|-------|----------|
+| `algo_notification.py` | 0 referans |
+| `insider_detector.py` | 0 referans |
+| `manipulation_detector.py` | 0 referans |
+| `infrastructure.py` | 0 referans |
+| `clickhouse_replication_health.py` | 0 referans |
+| `data_schemas.py` | 0 referans |
+| `health_reporter.py` | 0 referans |
+| `pg_replication_health.py` | 0 referans |
+| `duckdb_store.py` | 0 referans |
+
+## Kalan Durum
+
+- `services/core/` artık 94 dosya (103'ten düştü)
+- Geri kalan dosyalar aktif kullanımda (production, test veya script)
+- `config_loader.py`, `grafana_provisioning.py`, `nats_bus.py` — sadece testler tarafından kullanılıyor, düşük risk
+
+---
+
+# 16-D — Kök Dizin Temizliği
+
+**Tarih:** 2026-09-03
+
+## Arşivlenen Dosyalar (11 dosya)
+
+| Dosya | Gerekçe |
+|-------|----------|
+| `test_core_regressions.py` | Kök dizinde kalmış test |
+| `test_engine.py` | Kök dizinde kalmış test |
+| `test_engine2.py` | Kök dizinde kalmış test |
+| `test_len.py` | Kök dizinde kalmış test |
+| `test_llm_system.py` | Kök dizinde kalmış test |
+| `test_phase5_end_to_end.py` | Kök dizinde kalmış test |
+| `test_providers_live.py` | Kök dizinde kalmış test |
+| `verify_3_learning_fixes.py` | Kök dizinde kalmış script |
+| `verify_data_sources.py` | Kök dizinde kalmış script |
+| `mock_redis.py` | 0 referans |
+| `run_baseline_test.py` | 0 referans |
+
+## Kök Dizin Artık
+
+- `main.py` — Ana giriş noktası
+- `start.py` — Başlatma scripti
+- `run_all_imports.py` — Import doğrulama
+- `pyproject.toml`, `requirements.txt`, `setup.sh` — Konfigürasyon
