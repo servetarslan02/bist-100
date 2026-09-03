@@ -155,6 +155,18 @@ class MasterOrchestrator:
         ("event_impact", "services.intelligence.impact_engine", "analyze_event_impact", False),
         # Alternative Data
         ("alt_feature_engine", "services.alternative.feature_engine", "AlternativeFeatureEngine", True),
+        # Compliance & Detection
+        ("insider_detector", "services.core.insider_detector", "InsiderDetector", True),
+        ("manipulation_detector", "services.core.manipulation_detector", "ManipulationDetector", True),
+        ("algo_notification", "services.core.algo_notification", "generate_algo_notification", False),
+        # Data Quality
+        ("data_schemas", "services.core.data_schemas", "validate_ohlcv", False),
+        # Monitoring
+        ("health_reporter", "services.core.health_reporter", "HealthReporter", True),
+        ("ch_replication", "services.core.clickhouse_replication_health", "check_replication_health", False),
+        ("pg_replication", "services.core.pg_replication_health", "check_replication_health", False),
+        # Storage
+        ("duckdb_store", "services.core.duckdb_store", "DuckDBStore", True),
     ]
 
     # Multi-attribute imports: one module → multiple services
@@ -426,6 +438,132 @@ class MasterOrchestrator:
                 )
         except Exception as e:
             logger.debug("alternative_features_failed", ticker=ticker, error=str(e))
+
+    def _check_insider_trading(self, ticker: str, features: dict, market_data: dict) -> dict:
+        """SPK insider trading tespiti (KAP açıklaması öncesi anomali)."""
+        result = {"insider_alert": False}
+        try:
+            detector = self._services.get("insider_detector")
+            if not detector:
+                return result
+
+            kap_events = market_data.get("kap_events", [])
+            prices = market_data.get("closes", [])
+            volumes = market_data.get("volumes", [])
+
+            if kap_events and len(prices) > 0 and len(volumes) > 0:
+                import numpy as np
+                alerts = detector.detect_pre_kap_trade(
+                    ticker=ticker,
+                    kap_events=kap_events,
+                    prices=np.array(prices),
+                    volumes=np.array(volumes),
+                )
+                if alerts:
+                    result["insider_alert"] = True
+                    result["insider_alerts"] = [a.to_dict() if hasattr(a, "to_dict") else str(a) for a in alerts]
+                    logger.warning("insider_trading_detected", ticker=ticker, count=len(alerts))
+        except Exception as e:
+            logger.debug("insider_detection_failed", ticker=ticker, error=str(e))
+        return result
+
+    def _check_manipulation(self, ticker: str, market_data: dict) -> dict:
+        """SPK manipülasyon tespiti (wash trading, spoofing, volume manipulation)."""
+        result = {"manipulation_alert": False}
+        try:
+            detector = self._services.get("manipulation_detector")
+            if not detector:
+                return result
+
+            volumes = market_data.get("volumes", [])
+            prices = market_data.get("closes", [])
+
+            if len(volumes) > 20:
+                import numpy as np
+                vol_alerts = detector.detect_volume_manipulation(list(volumes), window=20)
+                if vol_alerts:
+                    result["manipulation_alert"] = True
+                    result["volume_manipulation"] = [a.to_dict() if hasattr(a, "to_dict") else str(a) for a in vol_alerts]
+
+            if len(prices) > 50:
+                price_alerts = detector.detect_price_clustering(list(prices), window=50)
+                if price_alerts:
+                    result["manipulation_alert"] = True
+                    result["price_clustering"] = [a.to_dict() if hasattr(a, "to_dict") else str(a) for a in price_alerts]
+
+            if result["manipulation_alert"]:
+                logger.warning("manipulation_detected", ticker=ticker, details=result)
+        except Exception as e:
+            logger.debug("manipulation_detection_failed", ticker=ticker, error=str(e))
+        return result
+
+    def _generate_algo_notification(self, ticker: str, decision: dict, trade_plan: dict) -> dict | None:
+        """SPK algo trading bildirimi üret (eğer eşik aşıldıysa)."""
+        try:
+            compliance = self._services.get("compliance")
+            algo_gen = self._services.get("algo_notification")
+            if not compliance or not algo_gen:
+                return None
+
+            # Compliance check
+            daily_orders = trade_plan.get("daily_order_count", 0)
+            daily_volume_pct = trade_plan.get("daily_volume_pct", 0.0)
+            comp_result = compliance.check_algo_trading_notification(daily_orders, daily_volume_pct)
+
+            if hasattr(comp_result, "notification_required") and comp_result.notification_required:
+                notification = algo_gen({
+                    "name": decision.get("model_id", "ensemble"),
+                    "type": decision.get("strategy_type", "momentum"),
+                    "description": f"Auto-generated for {ticker}",
+                    "risk_level": decision.get("risk_level", "MEDIUM"),
+                })
+                logger.info("algo_notification_generated", ticker=ticker)
+                return notification
+        except Exception as e:
+            logger.debug("algo_notification_failed", ticker=ticker, error=str(e))
+        return None
+
+    def _get_system_health(self) -> dict:
+        """Sistem sağlık raporu üret."""
+        health = {}
+        try:
+            reporter = self._services.get("health_reporter")
+            if reporter:
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    health = self._get_thread_pool().submit(
+                        asyncio.run, reporter.generate_report()
+                    ).result(timeout=10)
+                except RuntimeError:
+                    health = asyncio.run(reporter.generate_report())
+                if hasattr(health, "to_dict"):
+                    health = health.to_dict()
+        except Exception as e:
+            logger.debug("health_report_failed", error=str(e))
+        return health
+
+    def _check_db_replication(self) -> dict:
+        """Veritabanı replikasyon sağlık kontrolü."""
+        result = {"pg": {}, "clickhouse": {}}
+        try:
+            pg_check = self._services.get("pg_replication")
+            if pg_check and callable(pg_check):
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    result["pg"] = self._get_thread_pool().submit(asyncio.run, pg_check()).result(timeout=10)
+                except RuntimeError:
+                    result["pg"] = asyncio.run(pg_check())
+        except Exception as e:
+            logger.debug("pg_replication_check_failed", error=str(e))
+        try:
+            ch_check = self._services.get("ch_replication")
+            if ch_check and callable(ch_check):
+                result["clickhouse"] = ch_check()
+        except Exception as e:
+            logger.debug("ch_replication_check_failed", error=str(e))
+        return result
 
     def _compute_world_state(self) -> dict:
         """Küresel piyasa durumunu al."""
@@ -1020,6 +1158,10 @@ class MasterOrchestrator:
                 self._compute_alternative_features(features, market_data, ticker)
                 result["features"] = features
 
+                # 2b. SPK tespitleri (insider trading + manipülasyon)
+                result["insider_check"] = self._check_insider_trading(ticker, features, market_data)
+                result["manipulation_check"] = self._check_manipulation(ticker, market_data)
+
                 # 3. Dünya durumu ve rejim
                 world_state = self._compute_world_state()
                 result["world_state"] = world_state
@@ -1073,6 +1215,9 @@ class MasterOrchestrator:
                 risk_check = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
                 result["risk"] = risk_check
                 result["compliance"] = self._check_compliance(ticker, decision, trade_plan, prices)
+
+                # 9b. SPK algo trading bildirimi
+                result["algo_notification"] = self._generate_algo_notification(ticker, decision, trade_plan)
 
                 # Execute decision if risk check passed
                 if risk_check.get("allowed"):
