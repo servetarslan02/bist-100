@@ -152,3 +152,164 @@ Gerekçe:
 ## 7. Sonuç
 
 **`services/agents/` dizini iyi yapılandırılmış, temiz ve bakımlı.** Bu kapsam dahilinde yeniden düzenleme gerektiren bir durum bulunmamaktadır. Bir sonraki kapsama geçilebilir.
+
+---
+
+# 16-B — Yeniden Düzenleme Haritası: `services/alternative/`
+
+**Tarih:** 2026-09-03
+**Kapsam:** `services/alternative/` dizini
+**Yöntem:** Gerçek `grep` ile doğrulanmış import analizi (tahmin değil)
+
+---
+
+## 1. Dosya Envanteri
+
+| # | Dosya | Satır | Rolü |
+|---|-------|-------|------|
+| 1 | `__init__.py` | 103 | Package facade |
+| 2 | `base.py` | 479 | BaseAdapter, RateLimiter, CircuitBreaker, DataQualityValidator, AdapterRegistry |
+| 3 | `bkm_adapter.py` | 211 | BKM kredi kartı adapter |
+| 4 | `credit_card.py` | 40 | Legacy kredi kartı feature fonksiyonu |
+| 5 | `eksi_sozluk.py` | 247 | Ekşi Sözlük sentiment adapter |
+| 6 | `feature_engine.py` | 330 | Alternatif veri feature motoru |
+| 7 | `feature_store.py` | 252 | Dosya tabanlı feature store |
+| 8 | `google_trends.py` | 163 | Google Trends adapter |
+| 9 | `investing_adapter.py` | 225 | Investing.com adapter |
+| 10 | `jobs.py` | 36 | Legacy iş ilanı feature fonksiyonu |
+| 11 | `kariyer_net.py` | 239 | Kariyer.net adapter |
+| 12 | `llm_sentiment.py` | 310 | LLM Türkçe sentiment analizi |
+| 13 | `reconciliation.py` | 209 | Çapraz kaynak uzlaştırma |
+| 14 | `satellite.py` | 40 | Legacy uydu feature fonksiyonu |
+| 15 | `satellite_adapter.py` | 352 | Copernicus API uydu adapter |
+| 16 | `social.py` | 68 | Legacy sosyal medya feature fonksiyonu |
+| 17 | `web_scraping.py` | 42 | Legacy web scraping feature fonksiyonu |
+
+**Toplam:** 17 dosya, 3,346 satır
+
+---
+
+## 2. Dahili Bağımlılık Ağacı
+
+```
+base.py (temel)
+    ↑
+├── bkm_adapter.py → base
+├── eksi_sozluk.py → base
+├── google_trends.py → base
+├── investing_adapter.py → base
+├── kariyer_net.py → base
+├── satellite_adapter.py → base
+
+feature_store.py (bağımsız)
+reconciliation.py (bağımsız)
+llm_sentiment.py (bağımsız)
+
+feature_engine.py → base, bkm_adapter, eksi_sozluk, feature_store, google_trends,
+                     investing_adapter, kariyer_net, llm_sentiment, reconciliation,
+                     satellite_adapter
+
+Legacy fonksiyonlar (bağımsız): credit_card.py, jobs.py, satellite.py, social.py, web_scraping.py
+```
+
+**Sonuç:** Temiz DAG, döngüsellik yok.
+
+---
+
+## 3. Dış Bağımlılıklar — KRİTİK BULGU
+
+### HİÇBİR ÜRETİM KODU `services/alternative/` İTHAL ETMİYOR
+
+Tüm dış referanslar SADECE test ve doğrulama dosyalarından geliyor:
+
+| Dosya | Dış İthalatçı | Tür |
+|-------|---------------|-----|
+| `__init__.py` | `tests/test_alternative_data.py` | Test |
+| `__init__.py` | `tests/test_bolum25_32.py` | Test |
+| `credit_card.py` | `tests/test_bolum25_32.py` | Test |
+| `jobs.py` | `tests/test_bolum25_32.py` | Test |
+| `satellite.py` | `tests/test_bolum25_32.py` | Test |
+| `satellite_adapter.py` | `tests/test_alternative_data.py` | Test |
+| `social.py` | `tests/test_alternative_data.py`, `tests/test_bolum25_32.py` | Test |
+| `web_scraping.py` | `tests/test_bolum25_32.py` | Test |
+| `llm_sentiment.py` | `scripts/verify_all_api_endpoints.py` | Script |
+
+**Doğrulama:**
+```bash
+grep -rn "from services\.alternative" --include="*.py" | grep -v "services/alternative/" | grep -v "tests/" | grep -v "scripts/" | grep -v "run_all_imports"
+# Sonuç: BOŞ
+
+grep -rn "alternative" services/core/orchestrator.py
+# Sonuç: BOŞ
+
+grep -rn "alternative" workers/ --include="*.py"
+# Sonuç: BOŞ
+```
+
+---
+
+## 4. Tespit Edilen Yapısal Sorunlar
+
+### 4.1. KRİTİK: Tüm Paket Üretim Kodunda Kullanılmıyor
+
+`services/alternative/` (3,346 satır, 17 dosya) hiçbir üretim kodu tarafından import edilmiyor.
+
+**Öneri:** Kullanıcı kararı gerektirir:
+- a) Orchestrator'a entegre et
+- b) `archive/2026-09-03/` altına taşı
+- c) Olduğu gibi bırak
+
+### 4.2. `satellite.py` vs `satellite_adapter.py` — Legacy + Modern
+
+| Dosya | Satır | Amaç | Kullanan |
+|-------|-------|------|----------|
+| `satellite.py` | 40 | Basit dict→feature (legacy) | Sadece testler |
+| `satellite_adapter.py` | 352 | Copernicus API (modern) | `feature_engine.py` + testler |
+
+### 4.3. Legacy `compute_*` vs Modern Adapter'lar
+
+| Legacy | Modern Karşılığı | Durum |
+|--------|-------------------|-------|
+| `compute_satellite_features()` | `SatelliteAdapter` | İkisi de var |
+| `compute_social_features()` | — | Sadece legacy |
+| `compute_job_features()` | `KariyerNetAdapter` | İkisi de var |
+| `compute_cc_features()` | `BKMAdapter` | İkisi de var |
+| `compute_web_features()` | — | Sadece legacy |
+
+### 4.4. Repo Genelinde İsim Tekrarları — ÇAKIŞMA DEĞİL
+
+**`feature_store` (3 dosya):** alternative (dosya tabanlı), core (Redis-backed), features (Feast-inspired)
+**`reconciliation` (4 dosya):** alternative, core, ingestion, risk — her biri farklı domain
+
+---
+
+## 5. Yapılacak İşlemler
+
+### Kullanıcı Kararı Gerektiren Durumlar
+
+| # | Bulgu | Seçenekler | Risk |
+|---|-------|-----------|------|
+| 1 | `services/alternative/` production'da kullanılmıyor | a) Entegre et, b) Arşivle, c) Bırak | Yüksek |
+| 2 | Legacy `compute_*` fonksiyonları | a) Migrate et, b) Bırak | Düşük |
+| 3 | `satellite.py` legacy | a) `satellite_adapter.py`'ye taşı, b) Bırak | Düşük |
+
+---
+
+## 6. Doğrulama
+
+- [x] Tüm dış importlar grep ile doğrulandı
+- [x] Production kod taraması: orchestrator, workers, config — hiçbiri kullanmıyor
+- [x] `feature_store` — üç farklı dosya, farklı amaç
+- [x] `reconciliation` — dört farklı dosya, farklı amaç
+- [x] `satellite` — iki dosya, legacy + modern
+- [x] DAG — döngüsellik yok
+- [x] Taşıma/silme yapılmadı
+
+---
+
+## 7. Sonuç (services/alternative/)
+
+**Paket iyi yapılandırılmış ama hiçbir üretim kodu tarafından kullanılmıyor.** Kullanıcı kararı gerektirir:
+- Alternatif veri aktif kullanılacaksa → entegre et
+- Hazır değilse → arşivle
+- Sadece test amaçlıysa → bırak
