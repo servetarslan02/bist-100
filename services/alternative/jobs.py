@@ -20,17 +20,35 @@ logger = structlog.get_logger()
 
 
 def compute_job_features(job_data: dict[str, Any], ticker: str) -> dict[str, float]:
-    """İş ilanı feature'ları."""
-    features = {}
+    """İş ilanı feature'larını hesapla.
+
+    Args:
+        job_data: İş ilanı ham verisi (Kariyer.net veya diğer kaynaklardan).
+        ticker: Hisse sembolü.
+
+    Returns:
+        Feature sözlüğü. Her değer float tipindedir.
+    """
+    features: dict[str, float] = {}
 
     if not job_data:
         return features
 
-    features["job_posting_growth"] = job_data.get("posting_growth", 0)
-    features["tech_hiring_pct"] = job_data.get("tech_hiring_pct", 0)
+    key_feature_map = {
+        "posting_growth": "job_posting_growth",
+        "tech_hiring_pct": "tech_hiring_pct",
+        "salary_change": "avg_salary_change",
+        "posting_count": "job_posting_count",
+        "remote_ratio": "job_remote_ratio",
+    }
+    for key, feature_name in key_feature_map.items():
+        value = job_data.get(key)
+        if value is not None:
+            try:
+                features[feature_name] = float(value)
+            except (TypeError, ValueError):
+                logger.debug("Skipping non-numeric value", feature=feature_name, value=value)
+
     features["layoff_signal"] = 1.0 if job_data.get("layoff", False) else 0.0
-    features["avg_salary_change"] = job_data.get("salary_change", 0)
-    features["job_posting_count"] = float(job_data.get("posting_count", 0))
-    features["job_remote_ratio"] = job_data.get("remote_ratio", 0)
 
     return features

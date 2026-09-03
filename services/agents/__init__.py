@@ -2,7 +2,26 @@
 ALPHA BIST — Agent System Package v2.0
 
 Tüm agent modülleri.
+
+Modüller:
+- agent_system: Temel agent altyapısı (BaseAgent, AgentRole, AgentTask)
+- llm_client: LLM istemcileri (Ollama, OpenAI, Anthropic)
+- parallel_runner: Paralel agent çalıştırıcı
+- conflict_detector: Çatışma tespit
+- debate_engine: Tartışma motoru
+- communication_bus: Agent iletişim bus'ı
+- synthesis_engine: Sentez motoru
+- self_evaluator: Öz-değerlendirme
+- risk_assessor: Risk değerlendirme
+- agent_pipeline: Pipeline orkestrasyon
+- agent_memory: Agent hafıza sistemi
+- circuit_breaker: Devre kesici
+- trace_context: İzleme bağlamı
+- schemas: Veri şemaları
+- prompts: Prompt şablonları
 """
+
+__version__ = "2.0.0"
 
 # === Core ===
 # === Phase 3: Memory ===

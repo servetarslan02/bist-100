@@ -18,6 +18,8 @@ Modüller:
 - web_scraping: Web scraping feature'ları (mevcut)
 """
 
+__version__ = "2.0.0"
+
 # === Base Infrastructure ===
 from .base import (
     AdapterRegistry,
@@ -41,7 +43,6 @@ from .feature_store import FeatureManifest, FeatureStore, feature_store
 
 # === Adapters ===
 from .google_trends import GoogleTrendsAdapter, google_trends_adapter
-from .investing_adapter import InvestingAdapter, investing_adapter
 from .jobs import compute_job_features
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
 
@@ -50,11 +51,29 @@ from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
 
 # === Reconciliation ===
 from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
-from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
 
 # === Legacy Feature Functions (backward compatibility) ===
-from .social import compute_social_features
-from .web_scraping import compute_web_features
+# Lazy import: nadiren kullanılan modüller __getattr__ ile yüklenir
+_LAZY_IMPORTS = {
+    "compute_social_features": (".social", "compute_social_features"),
+    "compute_web_features": (".web_scraping", "compute_web_features"),
+    "InvestingAdapter": (".investing_adapter", "InvestingAdapter"),
+    "investing_adapter": (".investing_adapter", "investing_adapter"),
+    "SatelliteAdapter": (".satellite_adapter", "SatelliteAdapter"),
+    "satellite_adapter": (".satellite_adapter", "satellite_adapter"),
+    "compute_satellite_features": (".satellite_adapter", "compute_satellite_features"),
+}
+
+
+def __getattr__(name: str):
+    """Nadiren kullanılan adapter'lar için lazy import."""
+    if name in _LAZY_IMPORTS:
+        module_path, attr_name = _LAZY_IMPORTS[name]
+        import importlib
+        module = importlib.import_module(module_path, __package__)
+        return getattr(module, attr_name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Base

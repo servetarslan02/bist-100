@@ -62,7 +62,19 @@ def compute_social_features(social_data: dict[str, Any], ticker: str) -> dict[st
 
 
 def _clamp(value: float, min_val: float, max_val: float) -> float:
-    """Değeri sınırla."""
+    """Değeri belirli aralıkta sınırla.
+
+    Args:
+        value: Sınırlandırılacak değer.
+        min_val: Minimum değer.
+        max_val: Maximum değer.
+
+    Returns:
+        Sınırlandırılmış float değer.
+    """
     if value is None:
         return 0.0
-    return max(min_val, min(max_val, float(value)))
+    try:
+        return max(min_val, min(max_val, float(value)))
+    except (TypeError, ValueError):
+        return 0.0

@@ -26,11 +26,9 @@ from .bkm_adapter import bkm_adapter
 from .eksi_sozluk import eksi_sozluk_adapter
 from .feature_store import feature_store
 from .google_trends import google_trends_adapter
-from .investing_adapter import investing_adapter
 from .kariyer_net import kariyer_net_adapter
 from .llm_sentiment import llm_sentiment
 from .reconciliation import reconciler
-from .satellite_adapter import satellite_adapter
 
 logger = structlog.get_logger()
 
@@ -41,8 +39,15 @@ class AlternativeFeatureEngine:
     Tüm kaynakları orkestre eder, feature'ları birleştirir.
     """
 
+    # KAP etki seviyesi mapping
+    IMPACT_LEVELS: dict[str, int] = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+
     def __init__(self, llm_client=None):
-        """Otomatik eklendi."""
+        """Feature engine başlat.
+
+        Args:
+            llm_client: LLM istemcisi (opsiyonel). Verilirse sentiment analizi için kullanılır.
+        """
         self._initialized = False
         self._feature_cache: dict[str, dict[str, float]] = {}
         self._feature_cache_ttl: dict[str, float] = {}
@@ -52,8 +57,8 @@ class AlternativeFeatureEngine:
         if llm_client:
             llm_sentiment.set_llm_client(llm_client)
 
-    def initialize(self) -> Any:
-        """Adapter'ları kaydet."""
+    def initialize(self) -> None:
+        """Tüm adapter'ları registry'ye kaydet."""
         if self._initialized:
             return
 
@@ -61,6 +66,11 @@ class AlternativeFeatureEngine:
         adapter_registry.register(bkm_adapter)
         adapter_registry.register(kariyer_net_adapter)
         adapter_registry.register(eksi_sozluk_adapter)
+
+        # Lazy import: nadiren kullanılan adapter'lar
+        from .investing_adapter import investing_adapter
+        from .satellite_adapter import satellite_adapter
+
         adapter_registry.register(investing_adapter)
         adapter_registry.register(satellite_adapter)
 
@@ -166,7 +176,7 @@ class AlternativeFeatureEngine:
                 if result.get("sentiment_score") is not None:
                     features["llm_kap_sentiment"] = result["sentiment_score"]
                     features["llm_kap_confidence"] = result["confidence"]
-                    features["llm_kap_impact"] = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}.get(
+                    features["llm_kap_impact"] = self.IMPACT_LEVELS.get(
                         result.get("impact_level", "LOW"), 0
                     )
                     break
@@ -245,13 +255,12 @@ class AlternativeFeatureEngine:
             "google_trends_zscore",
             # BKM Credit Card
             "cc_spend_growth",
-            "cc_spend_growth_mom",
             "cc_transaction_count",
             "cc_avg_transaction",
             "cc_online_ratio",
-            "cc_vs_sector",
+            "cc_contactless_ratio",
             "cc_seasonal_deviation",
-            "cc_foreign_ratio",
+            "cc_vs_sector",
             # Kariyer.net Jobs
             "job_posting_count",
             "job_posting_growth",
@@ -259,6 +268,9 @@ class AlternativeFeatureEngine:
             "job_management_ratio",
             "job_remote_ratio",
             "job_diversity",
+            "tech_hiring_pct",
+            "avg_salary_change",
+            "layoff_signal",
             # Ekşi Sözlük
             "eksi_sentiment",
             "eksi_volume",
@@ -308,11 +320,15 @@ class AlternativeFeatureEngine:
             "social_viral",
             "social_positive_ratio",
             "social_mention_count",
+            "social_engagement",
+            "social_sentiment_momentum",
+            "social_manipulation_score",
             # Web Scraping (mevcut)
             "web_traffic_change",
             "app_ranking_change",
             "review_count_growth",
             "price_vs_competitors",
+            "search_volume_change",
         ]
 
     def get_status(self) -> dict[str, Any]:

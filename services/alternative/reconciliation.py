@@ -34,8 +34,8 @@ class ReconciliationReport:
     discrepancies: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Raporu sözlük formatına çevir."""
         return {
             "ticker": self.ticker,
             "consensus_direction": self.consensus_direction,
@@ -109,15 +109,9 @@ class CrossSourceReconciler:
             if feat in features and features[feat] != 0:
                 growth_scores[feat] = features[feat]
 
-        # 3. Sentiment consensus
-        self._compute_consensus(sentiment_scores, "sentiment")
-
-        # 4. Büyüme consensus
-        self._compute_consensus(growth_scores, "growth")
-
-        # 5. Genel consensus
+        # 3. Genel consensus
         all_scores = {**sentiment_scores, **growth_scores}
-        overall_consensus = self._compute_consensus(all_scores, "overall")
+        overall_consensus = self._compute_consensus(all_scores)
 
         # 6. Tutarsızlık tespiti
         for category, scores in [("sentiment", sentiment_scores), ("growth", growth_scores)]:
@@ -160,8 +154,15 @@ class CrossSourceReconciler:
             warnings=warnings,
         )
 
-    def _compute_consensus(self, scores: dict[str, float], category: str) -> dict[str, Any]:
-        """Consensus hesapla."""
+    def _compute_consensus(self, scores: dict[str, float]) -> dict[str, Any]:
+        """Kaynaklar arası consensus hesapla.
+
+        Args:
+            scores: Kaynak adı → skor sözlüğü.
+
+        Returns:
+            Consensus sonucu (mean, confidence, agreeing, disagreeing).
+        """
         if not scores:
             return {"mean": 0, "confidence": 0, "agreeing": 0, "disagreeing": 0}
 

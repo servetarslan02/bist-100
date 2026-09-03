@@ -53,7 +53,15 @@ class EksiSozlukAdapter(BaseAdapter):
     }
 
     async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
-        """Ekşi Sözlük verisi çek."""
+        """Ekşi Sözlük verisi çek.
+
+        Args:
+            ticker: Hisse sembolü (ör. THYAO, GARAN).
+            **kwargs: Ek parametreler.
+
+        Returns:
+            Entry listesi ve metadata içeren sözlük veya None.
+        """
         topics = self.TICKER_TOPICS.get(ticker.upper())
         if not topics:
             return None
@@ -78,7 +86,14 @@ class EksiSozlukAdapter(BaseAdapter):
             return None
 
     async def _scrape_topic(self, topic: str) -> list[dict]:
-        """Başlıktaki entry'leri çek."""
+        """Başlıktaki entry'leri scrape et.
+
+        Args:
+            topic: Ekşi Sözlük başlık adı.
+
+        Returns:
+            Entry sözlükleri listesi (text, favorites, date).
+        """
         try:
             import aiohttp
             from bs4 import BeautifulSoup
@@ -131,15 +146,23 @@ class EksiSozlukAdapter(BaseAdapter):
 
                     return entries
 
-        except ImportError:
-            logger.warning("beautifulsoup4 not installed")
+        except ImportError as e:
+            logger.warning("Missing dependency for Ekşi scraping", missing=str(e))
             return []
         except Exception as e:
             logger.debug("Ekşi scrape error", topic=topic, error=str(e))
             return []
 
     def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
-        """Ekşi Sözlük feature'ları hesapla."""
+        """Ekşi Sözlük feature'larını hesapla.
+
+        Args:
+            data: collect() ile döndürülen veri.
+            ticker: Hisse sembolü.
+
+        Returns:
+            Feature sözlüğü.
+        """
         if not data or not data.get("entries"):
             return {}
 
@@ -169,7 +192,16 @@ class EksiSozlukAdapter(BaseAdapter):
         return features
 
     def _basic_sentiment(self, text: str) -> float:
-        """Keyword-based sentiment with negation handling (-1 ile +1)."""
+        """Keyword tabanlı basit sentiment analizi (-1 ile +1 arası).
+
+        Olumsuzluk ekleri (değil, yok, asla) ile birlikte çalışır.
+
+        Args:
+            text: Analiz edilecek metin.
+
+        Returns:
+            -1 (negatif) ile +1 (pozitif) arası sentiment skoru.
+        """
         text_lower = text.lower()
         words = text_lower.split()
 

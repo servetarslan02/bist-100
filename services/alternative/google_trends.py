@@ -57,12 +57,16 @@ class GoogleTrendsAdapter(BaseAdapter):
     }
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Google Trends adapter'ı başlat."""
         super().__init__()
         self._pytrends = None
 
-    def _get_pytrends(self) -> Any:
-        """pytrends instance'ı al (lazy init)."""
+    def _get_pytrends(self):
+        """pytrends instance'ı al (lazy init).
+
+        Returns:
+            TrendReq instance'ı veya None (yüklü değilse).
+        """
         if self._pytrends is None:
             try:
                 from pytrends.request import TrendReq
@@ -74,7 +78,15 @@ class GoogleTrendsAdapter(BaseAdapter):
         return self._pytrends
 
     async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
-        """Google Trends verisi çek."""
+        """Google Trends verisi çek.
+
+        Args:
+            ticker: Hisse sembolü.
+            **kwargs: Ek parametreler.
+
+        Returns:
+            Ham trend verisi sözlüğü veya None.
+        """
         pytrends = self._get_pytrends()
         if pytrends is None:
             return None
@@ -93,7 +105,15 @@ class GoogleTrendsAdapter(BaseAdapter):
             return None
 
     def _fetch_trends(self, pytrends, search_terms: list[str]) -> dict[str, Any]:
-        """pytrends ile veri çek (sync)."""
+        """pytrends ile veri çek (sync).
+
+        Args:
+            pytrends: TrendReq instance'ı.
+            search_terms: Arama terimleri listesi.
+
+        Returns:
+            Ham trend verisi sözlüğü.
+        """
         try:
             pytrends.build_payload(
                 search_terms[:5],  # max 5 terim
@@ -134,7 +154,15 @@ class GoogleTrendsAdapter(BaseAdapter):
             return {}
 
     def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
-        """Google Trends feature'ları hesapla."""
+        """Google Trends feature'larını hesapla.
+
+        Args:
+            data: collect() ile döndürülen ham veri.
+            ticker: Hisse sembolü.
+
+        Returns:
+            Feature sözlüğü.
+        """
         if not data:
             return {}
 

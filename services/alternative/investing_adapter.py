@@ -52,7 +52,15 @@ class InvestingAdapter(BaseAdapter):
     }
 
     async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
-        """Investing.com verisi çek."""
+        """Investing.com verisi çek.
+
+        Args:
+            ticker: Hisse sembolü.
+            **kwargs: Ek parametreler.
+
+        Returns:
+            Yorum listesi ve metadata içeren sözlük veya None.
+        """
         slug = self.TICKER_URLS.get(ticker.upper())
         if not slug:
             return None
@@ -65,7 +73,15 @@ class InvestingAdapter(BaseAdapter):
             return None
 
     async def _scrape_comments(self, slug: str, ticker: str) -> dict[str, Any]:
-        """Yorumları scrape et."""
+        """Investing.com yorumlarını scrape et.
+
+        Args:
+            slug: Investing.com URL slug'ı.
+            ticker: Hisse sembolü.
+
+        Returns:
+            Yorum listesi ve metadata içeren sözlük.
+        """
         try:
             import aiohttp
             from bs4 import BeautifulSoup
@@ -106,15 +122,23 @@ class InvestingAdapter(BaseAdapter):
                         "timestamp": datetime.now(UTC).isoformat(),
                     }
 
-        except ImportError:
-            logger.warning("beautifulsoup4 not installed")
+        except ImportError as e:
+            logger.warning("Missing dependency for Investing scraping", missing=str(e))
             return {}
         except Exception as e:
             logger.debug("Investing.com scrape error", error=str(e))
             return {}
 
     def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
-        """Investing.com feature'ları hesapla."""
+        """Investing.com feature'larını hesapla.
+
+        Args:
+            data: collect() ile döndürülen ham veri.
+            ticker: Hisse sembolü.
+
+        Returns:
+            Feature sözlüğü.
+        """
         if not data or not data.get("comments"):
             return {}
 
@@ -148,10 +172,19 @@ class InvestingAdapter(BaseAdapter):
         return features
 
     def _basic_sentiment(self, text: str) -> float:
-        """Keyword-based sentiment with negation handling."""
+        """Keyword tabanlı basit sentiment analizi (-1 ile +1 arası).
+
+        Olumsuzluk ekleri (değil, yok, asla) ile birlikte çalışır.
+
+        Args:
+            text: Analiz edilecek metin.
+
+        Returns:
+            -1 (negatif) ile +1 (pozitif) arası sentiment skoru.
+        """
         text_lower = text.lower()
         words = text_lower.split()
-        pos = [
+        positive_words = [
             "yükseliş",
             "artış",
             "güçlü",
@@ -174,7 +207,7 @@ class InvestingAdapter(BaseAdapter):
             "sipariş",
             "sözleşme",
         ]
-        neg = [
+        negative_words = [
             "düşüş",
             "zarar",
             "zayıf",
@@ -197,28 +230,28 @@ class InvestingAdapter(BaseAdapter):
             "daralma",
             "temerrüt",
         ]
-        p = 0
-        n = 0
+        positive_count = 0
+        negative_count = 0
         negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
         negate = False
         for word in words:
             if word in negation_words:
                 negate = True
                 continue
-            if word in pos:
+            if word in positive_words:
                 if negate:
-                    n += 1
+                    negative_count += 1
                 else:
-                    p += 1
+                    positive_count += 1
                 negate = False
-            elif word in neg:
+            elif word in negative_words:
                 if negate:
-                    p += 1
+                    positive_count += 1
                 else:
-                    n += 1
+                    negative_count += 1
                 negate = False
-        t = p + n
-        return (p - n) / t if t > 0 else 0
+        total = positive_count + negative_count
+        return (positive_count - negative_count) / total if total > 0 else 0.0
 
 
 # Singleton

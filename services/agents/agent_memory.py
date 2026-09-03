@@ -30,6 +30,7 @@ try:
 except ImportError:
     # Fallback: her zaman kaydet
     def should_save(_key: str, _interval: int) -> bool:
+        """Fallback: her zaman kaydet."""
         return True
 
 
@@ -76,6 +77,7 @@ class WriteBufferMetrics:
         return self.total_write_latency_ms / self.batch_writes if self.batch_writes > 0 else 0
 
     def to_dict(self) -> dict[str, Any]:
+        """Metrikleri sözlük formatına çevir."""
         return {
             "total_writes": self.total_writes,
             "batch_writes": self.batch_writes,
@@ -132,7 +134,7 @@ class MemoryWriteBuffer:
             batch_window_ms: Batch flush aralığı (ms)
             max_batch_size: Tek batch'te maksimum kayıt sayısı
             max_retries: Başarısız yazma için maksimum deneme
-n            retry_delay: Denemeler arası bekleme (saniye)
+            retry_delay: Denemeler arası bekleme (saniye)
         """
         self._batch_window_s = batch_window_ms / 1000.0
         self._max_batch_size = max_batch_size

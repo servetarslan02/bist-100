@@ -34,15 +34,20 @@ class RateLimiter:
     """
 
     def __init__(self, max_requests: int = 60, window_seconds: int = 60):
-        """Otomatik eklendi."""
+        """Rate limiter başlat.
+
+        Args:
+            max_requests: Pencere başına maksimum istek sayısı.
+            window_seconds: Zaman penceresi süresi (saniye).
+        """
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._tokens = max_requests
         self._last_refill = time.monotonic()
         self._lock = asyncio.Lock()
 
-    async def acquire(self) -> Any:
-        """Token al (yoksa bekle)."""
+    async def acquire(self) -> None:
+        """Token al, yoksa pencere dolana kadar bekle."""
         async with self._lock:
             now = time.monotonic()
             elapsed = now - self._last_refill
@@ -57,6 +62,9 @@ class RateLimiter:
 
             self._tokens -= 1
 
+    def __repr__(self) -> str:
+        return f"RateLimiter(max_requests={self.max_requests}, window_seconds={self.window_seconds})"
+
 
 # =====================================================
 # CIRCUIT BREAKER
@@ -64,7 +72,7 @@ class RateLimiter:
 
 
 class CircuitState(StrEnum):
-    """Otomatik eklendi."""
+    """Devre kesici durumları: CLOSED, OPEN, HALF_OPEN."""
     CLOSED = "CLOSED"  # Normal çalışma
     OPEN = "OPEN"  # Servis kesik, istek yok
     HALF_OPEN = "HALF_OPEN"  # Test aşaması
@@ -91,14 +99,14 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
-        """Otomatik eklendi."""
+        """Mevcut durumu döndür, recovery timeout kontrolü ile."""
         if self._state == CircuitState.OPEN:
             if time.monotonic() - self._last_failure_time >= self.recovery_timeout_seconds:
                 self._state = CircuitState.HALF_OPEN
         return self._state
 
-    def record_success(self) -> Any:
-        """Başarılı istek kaydet."""
+    def record_success(self) -> None:
+        """Başarılı istek kaydet. HALF_OPEN durumunda 2 başarılı istek sonrası CLOSED'a geçer."""
         if self._state == CircuitState.HALF_OPEN:
             self._success_count += 1
             if self._success_count >= 2:
@@ -109,8 +117,8 @@ class CircuitBreaker:
         elif self._state == CircuitState.CLOSED:
             self._failure_count = 0
 
-    def record_failure(self) -> Any:
-        """Başarısız istek kaydet."""
+    def record_failure(self) -> None:
+        """Başarısız istek kaydet. Eşik aşılırsa OPEN durumuna geçer."""
         self._failure_count += 1
         self._last_failure_time = time.monotonic()
 
@@ -150,8 +158,8 @@ class QualityReport:
     checks_passed: int = 0
     checks_failed: int = 0
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Raporu sözlük formatına çevir."""
         return {
             "is_valid": self.is_valid,
             "score": round(self.score, 4),
@@ -180,7 +188,17 @@ class DataQualityValidator:
         expected_fields: list[str] | None = None,
         max_age_hours: int | None = None,
     ) -> QualityReport:
-        """Veri kalitesi kontrolü."""
+        """Veri kalitesi kontrolü yap.
+
+        Args:
+            data: Kontrol edilecek veri.
+            source: Veri kaynak adı (loglama için).
+            expected_fields: Olması gereken alanlar.
+            max_age_hours: Verinin maksimum yaşı (saat).
+
+        Returns:
+            QualityReport nesnesi.
+        """
         issues = []
         checks_passed = 0
         checks_failed = 0
@@ -243,9 +261,11 @@ class DataQualityValidator:
                 if ("confidence" in key.lower() or "ratio" in key.lower()) and (val < -1 or val > 1.5):
                     issues.append(f"{key}={val} out of expected range")
                     checks_failed += 1
-                if "score" in key.lower() and (val < -50 or val > 150):
+                elif "score" in key.lower() and (val < -50 or val > 150):
                     issues.append(f"{key}={val} out of expected range")
                     checks_failed += 1
+                else:
+                    checks_passed += 1
 
         # 7. Staleness check
         if max_age_hours and "timestamp" in data:
@@ -299,17 +319,15 @@ class BaseAdapter(ABC):
 
     source_name: str = "unknown"
     rate_limit: int = 60
-    DEFAULT_CACHE_TTL: int = 3600  # Configurable per adapter
-    circuit_breaker: CircuitBreaker = None
+    DEFAULT_CACHE_TTL: int = 3600
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Adapter'ı başlat: rate limiter, circuit breaker, validator ve cache."""
         self.rate_limiter = RateLimiter(
             max_requests=self.rate_limit,
             window_seconds=60,
         )
-        if self.circuit_breaker is None:
-            self.circuit_breaker = CircuitBreaker()
+        self.circuit_breaker = CircuitBreaker()
         self._validator = DataQualityValidator()
         self._cache: dict[str, Any] = {}
         self._cache_ttl: dict[str, float] = {}
@@ -325,8 +343,16 @@ class BaseAdapter(ABC):
     async def fetch(self, ticker: str, **kwargs) -> dict[str, float]:
         """Tam pipeline: collect → validate → compute_features.
 
-        Bu method orchestrator tarafından çağrılır.
+        Args:
+            ticker: Hisse sembolü.
+            **kwargs: Ek parametreler.
+
+        Returns:
+            Feature sözlüğü veya boş dict.
         """
+        if not ticker or not ticker.strip():
+            logger.warning("Empty ticker provided", source=self.source_name)
+            return self._empty_features()
         # Cache kontrolü
         cache_key = f"{self.source_name}:{ticker}"
         cached = self._get_cached(cache_key)
@@ -401,20 +427,23 @@ class BaseAdapter(ABC):
                 del self._cache_ttl[key]
         return None
 
-    def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None) -> Any:
+    def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None) -> None:
         """Cache'e yaz."""
         ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
         self._cache[key] = value
         self._cache_ttl[key] = time.time() + ttl
 
     def get_status(self) -> dict[str, Any]:
-        """Adapter durumu."""
+        """Adapter durum bilgisini döndür."""
         return {
             "source": self.source_name,
             "rate_limit": self.rate_limit,
             "circuit_state": self.circuit_breaker.state.value,
             "cache_size": len(self._cache),
         }
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(source={self.source_name!r}, rate_limit={self.rate_limit})"
 
 
 # =====================================================
@@ -426,25 +455,28 @@ class AdapterRegistry:
     """Adapter kayıt ve yönetim merkezi."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Boş registry başlat."""
         self._adapters: dict[str, BaseAdapter] = {}
 
-    def register(self, adapter: BaseAdapter) -> Any:
-        """Adapter kaydet."""
+    def register(self, adapter: BaseAdapter) -> None:
+        """Adapter'ı registry'ye kaydet."""
         self._adapters[adapter.source_name] = adapter
         logger.info("Adapter registered", source=adapter.source_name)
 
     def get(self, source_name: str) -> BaseAdapter | None:
-        """Adapter getir."""
+        """Kaynak adına göre adapter getir."""
         return self._adapters.get(source_name)
 
     def list_adapters(self) -> list[str]:
-        """Kayıtlı adapter'ları listele."""
+        """Kayıtlı adapter isimlerini listele."""
         return list(self._adapters.keys())
 
     def get_all_status(self) -> dict[str, Any]:
-        """Tüm adapter durumları."""
+        """Tüm adapter'ların durum bilgisini döndür."""
         return {name: adapter.get_status() for name, adapter in self._adapters.items()}
+
+    def __repr__(self) -> str:
+        return f"AdapterRegistry(adapters={len(self._adapters)})"
 
     async def collect_all(
         self,
@@ -465,7 +497,7 @@ class AdapterRegistry:
             return_exceptions=True,
         )
 
-        for (name, _), result in zip(tasks.items(), gathered, strict=False):
+        for (name, _), result in zip(tasks.items(), gathered, strict=True):
             if isinstance(result, Exception):
                 logger.error("Adapter failed", source=name, error=str(result))
                 results[name] = {}

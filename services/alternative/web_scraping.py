@@ -20,8 +20,16 @@ logger = structlog.get_logger()
 
 
 def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str, float]:
-    """Web scraping feature'ları."""
-    features = {}
+    """Web scraping feature'larını hesapla.
+
+    Args:
+        scraped_data: Web scraping ham verisi.
+        ticker: Hisse sembolü.
+
+    Returns:
+        Feature sözlüğü. Her değer float tipindedir.
+    """
+    features: dict[str, float] = {}
 
     if not scraped_data:
         return features
@@ -37,6 +45,9 @@ def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str,
     for key in feature_keys:
         value = scraped_data.get(key)
         if value is not None:
-            features[key] = value
+            try:
+                features[key] = float(value)
+            except (TypeError, ValueError):
+                logger.debug("Skipping non-numeric value", feature=key, value=value)
 
     return features

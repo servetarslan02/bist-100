@@ -40,6 +40,7 @@ class CircuitBreakerStats:
     last_state_change: str = ""
 
     def to_dict(self) -> dict[str, Any]:
+        """İstatistikleri sözlük formatına çevir."""
         return {
             "total_calls": self.total_calls,
             "successful_calls": self.successful_calls,

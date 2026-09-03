@@ -35,8 +35,8 @@ class FeatureManifest:
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     dependencies: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Manifest'i sözlük formatına çevir."""
         return {
             "feature_name": self.feature_name,
             "version": self.version,
@@ -61,13 +61,17 @@ class FeatureStore:
     """
 
     def __init__(self, store_path: str | None = None):
-        """Otomatik eklendi."""
+        """Feature store başlat.
+
+        Args:
+            store_path: Kalıcı depolama dosya yolu (opsiyonel).
+        """
         self._store_path = store_path
         self._manifests: dict[str, FeatureManifest] = {}
         self._feature_values: dict[str, dict[str, dict[str, float]]] = {}  # date → ticker → features
 
-    def register_feature(self, manifest: FeatureManifest) -> Any:
-        """Feature kaydet."""
+    def register_feature(self, manifest: FeatureManifest) -> None:
+        """Feature manifest'ini kaydet."""
         self._manifests[manifest.feature_name] = manifest
         logger.debug("Feature registered", name=manifest.feature_name, version=manifest.version)
 
@@ -77,14 +81,14 @@ class FeatureStore:
         date: str,
         features: dict[str, float],
         source: str = "alternative",
-    ) -> Any:
+    ) -> None:
         """Feature değerleri yaz.
 
         Args:
-            ticker: Hisse kodu
-            date: Tarih (YYYY-MM-DD)
-            features: Feature değerleri
-            source: Kaynak adı
+            ticker: Hisse kodu.
+            date: Tarih (YYYY-MM-DD).
+            features: Feature değerleri.
+            source: Kaynak adı.
         """
         if date not in self._feature_values:
             self._feature_values[date] = {}
@@ -188,13 +192,14 @@ class FeatureStore:
             "sources": list(set(m.source for m in self._manifests.values())),
         }
 
-    def save(self, path: str | None = None) -> Any:
-        """Feature store'u dosyaya kaydet (debounced — SSD dostu)."""
-        from services.core.debounce import should_save
+    def save(self, path: str | None = None) -> None:
+        """Feature store'u dosyaya kaydet.
+
+        Args:
+            path: Kayıt dosya yolu (None ise store_path kullanılır).
+        """
         save_path = path or self._store_path
         if not save_path:
-            return
-        if not should_save("feature_store", 60):
             return
 
         data = {
@@ -209,8 +214,12 @@ class FeatureStore:
 
         logger.info("Feature store saved", path=save_path)
 
-    def load(self, path: str | None = None) -> Any:
-        """Feature store'u dosyadan yükle."""
+    def load(self, path: str | None = None) -> None:
+        """Feature store'u dosyadan yükle.
+
+        Args:
+            path: Yükleme dosya yolu (None ise store_path kullanılır).
+        """
         load_path = path or self._store_path
         if not load_path or not Path(load_path).exists():
             return
@@ -230,16 +239,16 @@ class FeatureStore:
         except Exception as e:
             logger.warning("Failed to load feature store", path=load_path, error=str(e))
 
-    def __del__(self) -> Any:
-        """Auto-save on garbage collection."""
+    def __del__(self) -> None:
+        """GC sırasında otomatik kayıt — hatalar sessizce yutulur."""
         try:
             if self._store_path and (self._manifests or self._feature_values):
                 self.save()
-        except Exception as e:
-            logger.debug("feature_store_autosave_failed", error=str(e))
+        except Exception:
+            pass
 
-    def shutdown(self) -> Any:
-        """Explicit save and cleanup."""
+    def shutdown(self) -> None:
+        """Feature store'u güvenli şekilde kapat ve kaydet."""
         try:
             if self._store_path:
                 self.save()

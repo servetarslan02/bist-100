@@ -57,12 +57,20 @@ class LLMSentimentAnalyzer:
     """LLM tabanlı Türkçe sentiment analizi."""
 
     def __init__(self, llm_client=None):
-        """Otomatik eklendi."""
+        """LLM sentiment analyzer başlat.
+
+        Args:
+            llm_client: LLM istemcisi (opsiyonel). Verilirse LLM tabanlı analiz kullanılır.
+        """
         self._llm_client = llm_client
         self._cache: dict[str, tuple] = {}  # key → (result, cached_at)
 
-    def set_llm_client(self, client) -> Any:
-        """LLM client ayarla."""
+    def set_llm_client(self, client) -> None:
+        """LLM istemcisini ayarla.
+
+        Args:
+            client: LLM istemcisi (generate_with_retry methodu olmalı).
+        """
         self._llm_client = client
 
     async def analyze(
@@ -145,7 +153,16 @@ class LLMSentimentAnalyzer:
             return self._keyword_analyze(text)
 
     def _keyword_analyze(self, text: str) -> dict[str, Any]:
-        """Keyword-based sentiment with negation handling (fallback)."""
+        """Keyword tabanlı sentiment analizi (LLM fallback).
+
+        Olumsuzluk ekleri (değil, yok, asla) ile birlikte çalışır.
+
+        Args:
+            text: Analiz edilecek metin.
+
+        Returns:
+            Sentiment sonucu sözlüğü.
+        """
         text_lower = text.lower()
         words = text_lower.split()
 
@@ -203,14 +220,12 @@ class LLMSentimentAnalyzer:
             "skandal",
             "yanlış",
             "iptal",
-            "ertelemme",
+            "erteleme",
             "askıya",
             "durdurma",
             "kapatma",
             "işten çıkarma",
             "tasfiye",
-            "kayıp",
-            "zarar",
         ]
 
         pos_count = 0
@@ -282,11 +297,14 @@ class LLMSentimentAnalyzer:
     async def analyze_batch(
         self,
         texts: list[dict[str, str]],
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, Any] | Exception]:
         """Toplu sentiment analizi.
 
         Args:
             texts: [{"text": "...", "ticker": "...", "source": "..."}]
+
+        Returns:
+            Sonuç listesi. Başarısız analizler Exception nesnesi döndürür.
         """
         tasks = [
             self.analyze(

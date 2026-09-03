@@ -66,7 +66,15 @@ class KariyerNetAdapter(BaseAdapter):
     }
 
     async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
-        """Kariyer.net verisi çek."""
+        """Kariyer.net verisi çek.
+
+        Args:
+            ticker: Hisse sembolü.
+            **kwargs: Ek parametreler.
+
+        Returns:
+            İlan listesi ve metadata içeren sözlük veya None.
+        """
         company = self.TICKER_COMPANY.get(ticker.upper())
         if not company:
             logger.debug("No company mapping for ticker", ticker=ticker)
@@ -80,10 +88,14 @@ class KariyerNetAdapter(BaseAdapter):
             return None
 
     async def _scrape_postings(self, company: str, ticker: str) -> dict[str, Any]:
-        """İlanları scrape et.
+        """Kariyer.net ilanlarını scrape et.
 
-        Production'da: aiohttp + BeautifulSoup ile Kariyer.net'ten çekilecek.
-        Şimdilik: Placeholder yapı — veri çekme mantığı eklenecek.
+        Args:
+            company: Şirket adı.
+            ticker: Hisse sembolü.
+
+        Returns:
+            İlan listesi ve metadata içeren sözlük.
         """
         try:
             import aiohttp
@@ -116,15 +128,22 @@ class KariyerNetAdapter(BaseAdapter):
                         "timestamp": datetime.now(UTC).isoformat(),
                     }
 
-        except ImportError:
-            logger.warning("beautifulsoup4 not installed")
+        except ImportError as e:
+            logger.warning("Missing dependency for Kariyer.net scraping", missing=str(e))
             return {}
         except Exception as e:
             logger.warning("Scraping error", error=str(e))
             return {}
 
-    def _parse_postings(self, soup) -> list[dict]:
-        """HTML'den ilan bilgilerini çıkar."""
+    def _parse_postings(self, soup) -> list[dict[str, Any]]:
+        """HTML'den ilan bilgilerini çıkar.
+
+        Args:
+            soup: BeautifulSoup instance'ı.
+
+        Returns:
+            İlan sözlükleri listesi.
+        """
         postings = []
         # Kariyer.net HTML yapısına göre parse
         job_cards = soup.select('.job-card, .listing-item, [data-testid="job-card"]')
@@ -206,7 +225,15 @@ class KariyerNetAdapter(BaseAdapter):
         return any(kw.lower() in title_lower for kw in mgmt_keywords)
 
     def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
-        """İş ilanı feature'ları hesapla."""
+        """İş ilanı feature'larını hesapla.
+
+        Args:
+            data: collect() ile döndürülen ham veri.
+            ticker: Hisse sembolü.
+
+        Returns:
+            Feature sözlüğü.
+        """
         if not data or not data.get("postings"):
             return {}
 

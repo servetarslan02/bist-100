@@ -112,7 +112,7 @@ class SatelliteAdapter(BaseAdapter):
     PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Uydu verisi adapter'ı başlat."""
         super().__init__()
         self._token: str | None = None
         self._token_expiry: float = 0
@@ -189,8 +189,6 @@ class SatelliteAdapter(BaseAdapter):
             import aiohttp
 
             bbox = _bbox_from_center(location["lat"], location["lon"], location["radius_m"])
-            _bbox_to_wkt(bbox)
-
             # Son 30 günün en bulutsuz görüntüsünü ara
             end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=30)
@@ -270,8 +268,6 @@ class SatelliteAdapter(BaseAdapter):
         """TIFF görüntüsünden NDVI/NDBI istatistikleri çıkar."""
         try:
             import io
-
-            import numpy as np
 
             try:
                 import rasterio
@@ -373,6 +369,9 @@ def compute_satellite_features(sat_data: dict[str, Any], ticker: str) -> dict[st
     for key, feature_name in key_feature_map.items():
         value = sat_data.get(key)
         if value is not None:
-            features[feature_name] = value
+            try:
+                features[feature_name] = float(value)
+            except (TypeError, ValueError):
+                logger.debug("Skipping non-numeric value", feature=feature_name, value=value)
 
     return features
