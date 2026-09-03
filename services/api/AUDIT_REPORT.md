@@ -43,7 +43,7 @@
 | 18 | `v1/macro.py` | 17 | ✅ Düzeltildi |
 | 19 | `v1/market.py` | 26 | ✅ Düzeltildi |
 | 20 | `v1/models.py` | 13 | ✅ Düzeltildi |
-| 21 | `v1/portfolio.py` | — | ⏳ Bekliyor |
+| 21 | `v1/portfolio.py` | 22 | ✅ Düzeltildi |
 | 22 | `v1/risk.py` | — | ⏳ Bekliyor |
 | 23 | `v1/scanner.py` | — | ⏳ Bekliyor |
 | 24 | `v1/sse.py` | — | ⏳ Bekliyor |
@@ -427,6 +427,35 @@
 | 11 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
 | 12 | Return type annotation yok | `dict[str, Any]` eklendi |
 | 13 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
+
+---
+
+## `v1/portfolio.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `performance_metrics` exception'da hardcoded sıfır metrikler döndürüyor | HTTPException 503 döndürüyor |
+| 2 | 🔴 `optimize_portfolio`'da `np.random.normal` ile sentetik getiri matrisi | Gerçek yfinance tarihsel verisi kullanılıyor |
+| 3 | 🔴 `alpha_signals`'da `verified_cagr_pct: 105.4, verified_sharpe: 2.56` hardcoded | Kaldırıldı |
+| 4 | 🔴 `accounting`'de `invariant_check: True` hardcoded | Gerçek invariant doğrulama eklendi (`total == cash + invested`) |
+| 5 | 🔴 `deposit_funds`'da default `amount: 10000000.0` hardcoded | Kaldırıldı, `amount <= 0` kontrolü eklendi |
+| 6 | `attribution`'da ölü kod (`np.diff` hesaplanıyor ama kullanılmıyor) | Kaldırıldı, HTTPException 501 döndürüyor |
+| 7 | `portfolio_orders_and_trades` exception yutuyor, loglama yok | Ayrı endpoint'lere bölündü, logging eklendi |
+| 8 | `reset_portfolio_to_cash` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 9 | `alpha_signals`'da f-string loglama (2 yerde) | Yapılandırılmış loglamaya dönüştürüldü |
+| 10 | `_get_service()` tanımlı ama hiç kullanılmıyor — ölü kod | Kaldırıldı |
+| 11 | `reset_portfolio_to_cash`'da `_positions.clear()` — private attribute erişimi | `pm.close_all_positions()` ile değiştirildi |
+| 12 | `tax_analysis`'da `pm._trades`, `pm._commission_total` — private attribute erişimi | `pm.get_trades()` ve `pm.get_total_commission()` ile değiştirildi |
+| 13 | 10+ endpoint'te absolute import (`from services.paper_trading...`) | Relative import'a dönüştürüldü |
+| 14 | `trigger_portfolio_cycle` İngilizce hata mesajı | Türkçeleştirildi |
+| 15 | `optimize_portfolio` İngilizce hata mesajı | Türkçeleştirildi |
+| 16 | `attribution` İngilizce HTTPException mesajı | Türkçeleştirildi |
+| 17 | Modül docstring'i İngilizce | Türkçeleştirildi |
+| 18 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 19 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 20 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
+| 21 | `@router.get("/trades")` iki kez tanımlı — çakışma | Ayrı endpoint'lere bölündü (`/trades` ve `/orders`) |
+| 22 | Türkçe karakter hataları (`uretimi`, `acilisi`, `yurutme`, `dongusu`) | Düzeltildi (üretimi, açılışı, yürütme, döngüsü) |
 
 ---
 

@@ -1,59 +1,35 @@
-"""
-Portfolio API v2.0 — Tüm endpoint'ler gerçek servislere bağlı.
-
-Endpoints:
-- GET /portfolio/summary — Portföy özeti
-- GET /portfolio/positions — Açık pozisyonlar
-- GET /portfolio/trades — İşlem geçmişi
-- GET /portfolio/pnl — K/Z durumu
-- GET /portfolio/equity-curve — Equity curve
-- GET /portfolio/risk-metrics — Risk metrikleri (VaR, HHI, correlation)
-- GET /portfolio/metrics — Performans metrikleri (Sharpe, CAGR, win rate)
-- GET /portfolio/accounting — Muhasebe özeti (invariant doğrulama)
-- GET /portfolio/cash-ledger — Nakit hareket geçmişi
-- GET /portfolio/position-history — Pozisyon değişiklik geçmişi
-- GET /portfolio/equity-snapshots — Günlük equity snapshot'ları
-- GET /portfolio/drawdown — Drawdown durumu
-- GET /portfolio/attribution — Performans attribüsyonu
-- GET /portfolio/tax — Vergi analizi
-- GET /portfolio/tca — İşlem maliyeti analizi
-- GET /portfolio/rebalance — Rebalance analizi
-- GET /portfolio/status — Servis durumu
-- POST /portfolio/rebalance/orders — Rebalance emirleri oluştur
-"""
+"""Portföy API — Tüm endpoint'ler gerçek servislere bağlı."""
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
 import orjson
-import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ..dependencies import check_rate_limit, get_current_user
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
 def _get_pm() -> Any:
-    """Tekil gerceklik kaynagi: paper_orchestrator VirtualPortfolio."""
-    from services.paper_trading.paper_orchestrator import paper_orchestrator
+    """Tekil gerçeklik kaynağı: paper_orchestrator VirtualPortfolio.
+
+    Returns:
+        Any: VirtualPortfolio örneği.
+    """
+    from ...paper_trading.paper_orchestrator import paper_orchestrator
 
     paper_orchestrator.portfolio.load_from_store()
     return paper_orchestrator.portfolio
 
 
-def _get_service() -> Any:
-    """PaperTradingOrchestrator singleton'i al."""
-    from services.paper_trading.paper_orchestrator import paper_orchestrator
-
-    return paper_orchestrator
-
-
 # =====================================================
-# CORE QUERIES (TEKIL VIRTUALPORTFOLIO VE PAPER_STATE_STORE KAYNAGI)
+# CORE QUERIES
 # =====================================================
 
 
@@ -61,34 +37,50 @@ def _get_service() -> Any:
 @router.get("/")
 @router.get("/summary")
 @router.get("/state")
-async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Portföy özeti — cash, invested, total value, positions count."""
+async def portfolio_summary(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Portföy özeti döndürür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Nakit, yatırılan, toplam değer ve pozisyon sayısı.
+    """
     try:
         pm = _get_pm()
         summary = pm.get_summary()
         summary["positions_count"] = summary.get("num_positions", 0)
         summary["positions"] = pm.get_all_positions()
         return summary
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("portfoy_ozet_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Portföy özeti alınamadı: {exc}") from exc
 
 
 @router.get("/positions")
-async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Açık pozisyonlar — ticker, quantity, entry/current price, P&L."""
+async def positions(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Açık pozisyonları döndürür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Pozisyon listesi, sayısı ve toplam değer.
+    """
     try:
         pm = _get_pm()
         pos_list = pm.get_all_positions()
         total_val = pm.get_total_value()
-        return {
-            "positions": pos_list,
-            "count": len(pos_list),
-            "total_value": total_val,
-        }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {"positions": pos_list, "count": len(pos_list), "total_value": total_val}
+    except Exception as exc:
+        logger.error("pozisyon_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Pozisyonlar alınamadı: {exc}") from exc
 
 
 @router.get("/trades")
@@ -96,28 +88,41 @@ async def trades(
     limit: int = Query(50, ge=1, le=500),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """İşlem geçmişi — entry/exit, P&L, holding days."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+) -> dict[str, Any]:
+    """İşlem geçmişini döndürür.
 
-        all_trades = paper_orchestrator.portfolio.get_trades()
-        return {
-            "trades": all_trades[-limit:],
-            "total_trades": len(all_trades),
-        }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    Args:
+        limit: Maksimum işlem sayısı.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: İşlem listesi ve toplam işlem sayısı.
+    """
+    try:
+        pm = _get_pm()
+        all_trades = pm.get_trades()
+        return {"trades": all_trades[-limit:], "total_trades": len(all_trades)}
+    except Exception as exc:
+        logger.error("islem_gecmisi_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"İşlem geçmişi alınamadı: {exc}") from exc
 
 
 @router.get("/pnl")
-async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """K/Z durumu — unrealized + realized + commission."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+async def pnl(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """K/Z durumunu döndürür.
 
-        summary = paper_orchestrator.portfolio.get_summary()
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Gerçekleşmemiş, gerçekleşmiş K/Z ve komisyon.
+    """
+    try:
+        pm = _get_pm()
+        summary = pm.get_summary()
         return {
             "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
             "unrealized_pnl_pct": summary.get("unrealized_pnl_pct", 0.0),
@@ -126,9 +131,9 @@ async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> An
             "net_pnl": summary.get("total_pnl", 0.0),
             "return_on_equity_pct": summary.get("total_pnl_pct", 0.0),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("pnl_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"K/Z verisi alınamadı: {exc}") from exc
 
 
 @router.get("/equity-curve")
@@ -136,22 +141,30 @@ async def equity_curve(
     limit: int = Query(252, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Equity curve — günlük equity snapshot'ları."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+) -> dict[str, Any]:
+    """Equity curve verisini döndürür.
 
-        curve = paper_orchestrator.portfolio.get_equity_curve()
+    Args:
+        limit: Maksimum veri noktası.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Equity curve, snapshot'lar ve yüksek su işareti.
+    """
+    try:
+        pm = _get_pm()
+        curve = pm.get_equity_curve()
         return {
             "equity_curve": curve[-limit:],
             "snapshots": curve[-limit:],
             "high_water_mark": max(
-                [pt.get("total_value", 0.0) for pt in curve], default=paper_orchestrator.portfolio.initial_capital
+                [pt.get("total_value", 0.0) for pt in curve],
+                default=pm.initial_capital,
             ),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("equity_curve_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Equity curve alınamadı: {exc}") from exc
 
 
 # =====================================================
@@ -160,12 +173,21 @@ async def equity_curve(
 
 
 @router.get("/risk-metrics")
-async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Portföy risk metrikleri — VaR/CVaR + HHI + drawdown."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+async def risk_metrics(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Portföy risk metriklerini döndürür.
 
-        summary = paper_orchestrator.portfolio.get_summary()
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Max drawdown, pozisyon sayısı, nakit oranı ve yerleşmemiş nakit.
+    """
+    try:
+        pm = _get_pm()
+        summary = pm.get_summary()
         return {
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "positions_count": summary.get("num_positions", 0),
@@ -174,25 +196,34 @@ async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limi
             "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("risk_metrik_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Risk metrikleri alınamadı: {exc}") from exc
 
 
 @router.get("/drawdown")
-async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Portföy drawdown durumu."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+async def drawdown(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Drawdown durumunu döndürür.
 
-        summary = paper_orchestrator.portfolio.get_summary()
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Max ve güncel drawdown yüzdesi.
+    """
+    try:
+        pm = _get_pm()
+        summary = pm.get_summary()
         return {
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "current_drawdown_pct": summary.get("current_drawdown_pct", 0.0),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("drawdown_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Drawdown verisi alınamadı: {exc}") from exc
 
 
 # =====================================================
@@ -201,24 +232,31 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)) 
 
 
 @router.get("/metrics")
-async def performance_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Performans metrikleri — CAGR, Sharpe, Sortino, win rate, profit factor."""
+async def performance_metrics(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Performans metriklerini döndürür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Sharpe, CAGR, win rate, profit factor ve diğer metrikler.
+
+    Raises:
+        HTTPException: Metrikler alınamazsa 500 hatası döner.
+    """
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        from ...paper_trading.paper_orchestrator import paper_orchestrator
 
         report = paper_orchestrator.get_full_report()
         perf = report.get("performance_metrics", {})
         if not perf or "error" in perf:
-            return {
-                "sharpe_ratio": 0.0,
-                "max_drawdown": 0.0,
-                "win_rate": 0.0,
-                "avg_holding_days": 0.0,
-                "total_trades": 0,
-                "profit_factor": 0.0,
-                "calmar_ratio": 0.0,
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
+            raise HTTPException(
+                status_code=503,
+                detail="Performans metrikleri hesaplanamadı. Yeterli işlem verisi yok.",
+            )
         return {
             "sharpe_ratio": perf.get("sharpe", perf.get("sharpe_ratio", 0.0)),
             "max_drawdown": perf.get("max_drawdown_pct", perf.get("max_drawdown", 0.0)),
@@ -230,64 +268,83 @@ async def performance_metrics(user=Depends(get_current_user), _=Depends(check_ra
             "timestamp": datetime.now(UTC).isoformat(),
             **perf,
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        return {
-            "sharpe_ratio": 0.0,
-            "max_drawdown": 0.0,
-            "win_rate": 0.0,
-            "avg_holding_days": 0.0,
-            "total_trades": 0,
-            "profit_factor": 0.0,
-            "calmar_ratio": 0.0,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("performans_metrik_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Performans metrikleri alınamadı: {exc}") from exc
 
 
 @router.get("/accounting")
-async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Muhasebe özeti — invariant doğrulama dahil."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+async def accounting(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Muhasebe özetini döndürür.
 
-        summary = paper_orchestrator.portfolio.get_summary()
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Nakit, yatırılan, toplam değer ve K/Z bilgileri.
+    """
+    try:
+        pm = _get_pm()
+        summary = pm.get_summary()
+
+        # Invariant doğrulama: total_value = cash + invested_value
+        cash = summary.get("cash", 0.0)
+        invested = summary.get("invested_value", 0.0)
+        total = summary.get("total_value", 0.0)
+        invariant_ok = abs(total - (cash + invested)) < 0.01
+
         return {
-            "cash": summary.get("cash", 0.0),
+            "cash": cash,
             "settled_cash": summary.get("settled_cash", 0.0),
             "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
-            "invested_value": summary.get("invested_value", 0.0),
-            "total_value": summary.get("total_value", 0.0),
+            "invested_value": invested,
+            "total_value": total,
             "num_positions": summary.get("num_positions", 0),
-            "invariant_check": True,
+            "invariant_check": invariant_ok,
             "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
             "realized_pnl": summary.get("realized_pnl", 0.0),
             "realized_pnl_total": summary.get("realized_pnl", 0.0),
             "total_pnl": summary.get("total_pnl", 0.0),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("muhasebe_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Muhasebe özeti alınamadı: {exc}") from exc
 
 
 @router.post("/reset")
-async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Portföydeki tüm pozisyonları kapatır ve nakite çeker."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+async def reset_portfolio_to_cash(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Portföydeki tüm pozisyonları kapatır ve nakite çeker.
 
-        paper_orchestrator.portfolio._positions.clear()
-        paper_orchestrator.portfolio.settled_cash = paper_orchestrator.portfolio.initial_capital
-        paper_orchestrator.portfolio.unsettled_cash_t1 = 0.0
-        paper_orchestrator.portfolio.unsettled_cash_t2 = 0.0
-        paper_orchestrator.portfolio.save_to_store(datetime.now(UTC).strftime("%Y-%m-%d"))
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Sıfırlama sonucu ve güncel nakit.
+    """
+    try:
+        pm = _get_pm()
+        pm.close_all_positions()
+        pm.settled_cash = pm.initial_capital
+        pm.unsettled_cash_t1 = 0.0
+        pm.unsettled_cash_t2 = 0.0
+        pm.save_to_store(datetime.now(UTC).strftime("%Y-%m-%d"))
         return {
             "success": True,
-            "cash": paper_orchestrator.portfolio.cash,
-            "message": "Portföy tekil defterde sıfırlandı.",
+            "cash": pm.cash,
+            "message": "Portföy sıfırlandı.",
         }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    except Exception as exc:
+        logger.error("portfoy_sifirlama_hatasi: hata=%s", exc)
+        return {"success": False, "error": str(exc)}
 
 
 # =====================================================
@@ -300,43 +357,51 @@ async def cash_ledger(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Nakit hareket geçmişi."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+) -> dict[str, Any]:
+    """Nakit hareket geçmişini döndürür.
 
-        trades = paper_orchestrator.portfolio.get_trades()
+    Args:
+        limit: Maksimum kayıt sayısı.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Nakit hareket listesi ve güncel nakit.
+    """
+    try:
+        pm = _get_pm()
+        trades_list = pm.get_trades()
         return {
-            "ledger": trades[-limit:],
-            "cash": round(paper_orchestrator.portfolio.cash, 2),
-            "settled_cash": round(paper_orchestrator.portfolio.settled_cash, 2),
+            "ledger": trades_list[-limit:],
+            "cash": round(pm.cash, 2),
+            "settled_cash": round(pm.settled_cash, 2),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("nakit_hareket_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Nakit hareket geçmişi alınamadı: {exc}") from exc
 
 
 @router.get("/orders")
-@router.get("/trades")
-async def portfolio_orders_and_trades(
+async def portfolio_orders(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Portföy emir ve işlem geçmişi."""
-    try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+) -> dict[str, Any]:
+    """Portföy emir geçmişini döndürür.
 
-        orders = paper_orchestrator.portfolio.get_orders()
-        trades = paper_orchestrator.portfolio.get_trades()
-        return {
-            "orders": orders[-limit:],
-            "trades": trades[-limit:],
-            "total_orders": len(orders),
-            "total_trades": len(trades),
-        }
-    except Exception:
-        return {"orders": [], "trades": [], "total_orders": 0, "total_trades": 0}
+    Args:
+        limit: Maksimum kayıt sayısı.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Emir listesi ve toplam emir sayısı.
+    """
+    try:
+        pm = _get_pm()
+        orders = pm.get_orders()
+        return {"orders": orders[-limit:], "total_orders": len(orders)}
+    except Exception as exc:
+        logger.error("emir_gecmisi_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Emir geçmişi alınamadı: {exc}") from exc
 
 
 @router.get("/position-history")
@@ -345,24 +410,23 @@ async def position_history(
     limit: int = Query(100, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Pozisyon değişiklik geçmişi — audit trail.
+) -> dict[str, Any]:
+    """Pozisyon değişiklik geçmişini döndürür.
 
     Args:
-        ticker: Hisse filtresi (boş = tümü)
-        limit: Maksimum kayıt
+        ticker: Hisse filtresi (boş = tümü).
+        limit: Maksimum kayıt sayısı.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Position history: timestamp, ticker, action, quantity, price, commission, realized_pnl
+        dict: Pozisyon değişiklik geçmişi.
     """
     try:
         pm = _get_pm()
-        return {
-            "history": pm.get_position_history(ticker=ticker, limit=limit),
-        }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {"history": pm.get_position_history(ticker=ticker, limit=limit)}
+    except Exception as exc:
+        logger.error("pozisyon_gecmisi_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Pozisyon geçmişi alınamadı: {exc}") from exc
 
 
 @router.get("/equity-snapshots")
@@ -370,20 +434,22 @@ async def equity_snapshots(
     limit: int = Query(252, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Günlük equity snapshot'ları.
+) -> dict[str, Any]:
+    """Günlük equity snapshot'larını döndürür.
+
+    Args:
+        limit: Maksimum kayıt sayısı.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Snapshots: date, total_equity, cash, invested, unrealized_pnl, drawdown_from_hwm
+        dict: Equity snapshot listesi.
     """
     try:
         pm = _get_pm()
-        return {
-            "snapshots": pm.get_equity_snapshots(limit=limit),
-        }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {"snapshots": pm.get_equity_snapshots(limit=limit)}
+    except Exception as exc:
+        logger.error("equity_snapshot_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Equity snapshot'lar alınamadı: {exc}") from exc
 
 
 # =====================================================
@@ -396,63 +462,60 @@ async def attribution(
     portfolio_id: int = Query(1),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Performans attribüsyonu — factor + sector.
+) -> dict[str, Any]:
+    """Performans attribüsyonunu döndürür.
+
+    Args:
+        portfolio_id: Portföy tanımlayıcısı.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Factor attribution (value/momentum/quality) + sector attribution
+        dict: Factor ve sektör attribüsyonu.
+
+    Raises:
+        HTTPException: Attribüsyon yapılamazsa 501 hatası döner.
     """
-    try:
-        pm = _get_pm()
-
-        # Equity curve'den getiri dizisi oluştur
-        equity_curve = pm.get_equity_curve()
-        if len(equity_curve) < 20:
-            return {"attribution": {}, "message": "Yetersiz veri (en az 20 gün gerekli)"}
-
-        equities = [e["equity"] for e in equity_curve]
-        eq_arr = np.array(equities)
-        np.diff(eq_arr) / eq_arr[:-1]
-
-        # Gerçek factor returns — market data servisi bağlı değilse 501 döndür
-        raise HTTPException(
-            status_code=501,
-            detail="Factor attribution requires real market data service. Not connected.",
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    raise HTTPException(
+        status_code=501,
+        detail="Factor attribüsyonu için gerçek piyasa verisi servisi gerekli. Henüz bağlı değil.",
+    )
 
 
 @router.get("/tax")
-async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Vergi analizi — holding period, stopaj, BSMV.
+async def tax_analysis(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Vergi analizini döndürdür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Capital gains tax, dividend tax, BSMV, total tax, effective rate
+        dict: Sermaye kazancı vergisi, temettü vergisi ve BSMV.
+
+    Raises:
+        HTTPException: Vergi analizi yapılamazsa hata döner.
     """
     try:
         from ...portfolio.enhancements import tax_model
 
         pm = _get_pm()
-
-        # Trade'lerden vergi hesapla
-        trades = [
-            {"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)} for t in pm._trades
+        trades_list = pm.get_trades()
+        trades_data = [
+            {"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)}
+            for t in trades_list
         ]
 
         result = tax_model.compute_total_tax(
-            trades=trades,
-            dividends=[],  # Temettü verisi yoksa boş
-            commissions=pm._commission_total,
+            trades=trades_data,
+            dividends=[],
+            commissions=pm.get_total_commission() if hasattr(pm, "get_total_commission") else 0.0,
         )
-
         return result
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("vergi_analizi_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Vergi analizi yapılamadı: {exc}") from exc
 
 
 @router.get("/tca")
@@ -462,24 +525,25 @@ async def transaction_cost_analysis(
     volatility: float = Query(0.02, description="Günlük volatilite"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """İşlem maliyeti analizi — commission + spread + slippage + market impact.
+) -> dict[str, Any]:
+    """İşlem maliyeti analizini döndürür.
 
     Args:
-        order_value: Emir değeri
-        daily_volume: Günlük hacim
-        volatility: Volatilite
+        order_value: Emir değeri.
+        daily_volume: Günlük hacim.
+        volatility: Volatilite.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Maliyet detayları: commission, spread, slippage, impact, total
+        dict: Komisyon, spread, slippage ve toplam maliyet.
     """
     try:
         from ...portfolio.enhancements import tca_analyzer
 
         return tca_analyzer.analyze(order_value, daily_volume, volatility)
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("tca_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"İşlem maliyeti analizi yapılamadı: {exc}") from exc
 
 
 # =====================================================
@@ -489,37 +553,38 @@ async def transaction_cost_analysis(
 
 @router.get("/rebalance")
 async def rebalance_analysis(
-    target_weights: str = Query("", description='Hedef ağırlıklar (JSON): {"THYAO": 0.3, "GARAN": 0.2}'),
+    target_weights: str = Query("", description='Hedef ağırlıklar (JSON): {"THYAO": 0.3}'),
     threshold_pct: float = Query(5.0, description="Sapma eşiği (%)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Rebalance analizi — drift analizi.
+) -> dict[str, Any]:
+    """Rebalance analizini döndürür.
 
     Args:
-        target_weights: Hedef ağırlıklar (JSON string)
-        threshold_pct: Sapma eşiği
+        target_weights: Hedef ağırlıklar (JSON string).
+        threshold_pct: Sapma eşiği.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Rebalance needed, drifts, max drift
+        dict: Rebalance ihtiyacı, sapmalar ve maksimum sapma.
     """
     try:
         pm = _get_pm()
 
         if not target_weights:
-            return {"message": "target_weights parametresi gerekli (JSON format)"}
+            return {"message": "target_weights parametresi gerekli (JSON format)."}
 
         try:
             weights = orjson.loads(target_weights)
         except orjson.JSONDecodeError:
-            raise HTTPException(400, "Geçersiz JSON formatı") from None
+            raise HTTPException(status_code=400, detail="Geçersiz JSON formatı.") from None
 
         return pm.check_rebalance(weights, threshold_pct=threshold_pct)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("rebalance_analiz_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Rebalance analizi yapılamadı: {exc}") from exc
 
 
 @router.post("/rebalance/orders")
@@ -529,16 +594,17 @@ async def rebalance_orders(
     turnover_limit: float = Query(0.3, description="Maksimum turnover (0-1)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Rebalance emirleri oluştur.
+) -> dict[str, Any]:
+    """Rebalance emirleri oluşturur.
 
     Args:
-        target_weights: Hedef ağırlıklar {ticker: weight}
-        threshold_pct: Sapma eşiği
-        turnover_limit: Maksimum turnover
+        target_weights: Hedef ağırlıklar {ticker: weight}.
+        threshold_pct: Sapma eşiği.
+        turnover_limit: Maksimum turnover.
+        user: Kimliği doğrulanmış kullanıcı.
 
     Returns:
-        Rebalance orders: ticker, action, value, weight_change
+        dict: Rebalance emirleri, toplam değer ve turnover limiti.
     """
     try:
         pm = _get_pm()
@@ -553,9 +619,9 @@ async def rebalance_orders(
             "total_value": sum(o["value"] for o in orders),
             "turnover_limit": turnover_limit,
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("rebalance_emir_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Rebalance emirleri oluşturulamadı: {exc}") from exc
 
 
 _background_tasks: set[asyncio.Task] = set()
@@ -563,10 +629,20 @@ _background_tasks: set[asyncio.Task] = set()
 
 @router.post("/trigger")
 @router.post("/rebalance/trigger")
-async def trigger_portfolio_cycle(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Tüm BIST evreni için günlük sinyal üretimi ve portföy seans emri yürütme döngüsünü tetikler."""
+async def trigger_portfolio_cycle(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Günlük portföy döngüsünü tetikler.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Tetikleme durumu ve mesaj.
+    """
     try:
-        from services.pipeline.run_unified_daily import run_unified_daily_cycle
+        from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
         task = asyncio.create_task(run_unified_daily_cycle())
         _background_tasks.add(task)
@@ -576,9 +652,9 @@ async def trigger_portfolio_cycle(user=Depends(get_current_user), _=Depends(chec
             "message": "Günlük portföy ve seans yürütme döngüsü arka planda başlatıldı.",
             "timestamp": datetime.now(UTC).isoformat(),
         }
-    except Exception as e:
-        logger.error("portfolio_trigger_error", error=str(e), exc_info=True)
-        raise HTTPException(500, f"Trigger failed: {str(e)}") from e
+    except Exception as exc:
+        logger.error("portfoy_tetikleme_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Portföy döngüsü tetiklenemedi: {exc}") from exc
 
 
 # =====================================================
@@ -588,24 +664,24 @@ async def trigger_portfolio_cycle(user=Depends(get_current_user), _=Depends(chec
 
 @router.post("/optimize")
 async def optimize_portfolio(
-    body: dict[str, Any] = Body(
-        ...,
-        description="Optimizasyon parametreleri: tickers, method, model_scores, regime, constraints",
-        examples=[
-            {
-                "tickers": ["THYAO", "ASELS", "TUPRS", "GARAN", "BIMAS"],
-                "method": "RISK_PARITY",
-                "regime": "SIDEWAYS",
-                "model_scores": {"THYAO": 90.0, "ASELS": 85.0, "TUPRS": 80.0, "GARAN": 75.0, "BIMAS": 70.0},
-            }
-        ],
-    ),
+    body: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """BIST-100 portföy optimizasyonu (Risk Parity, HRP, Max Sharpe, Min Variance, Black-Litterman)."""
+) -> dict[str, Any]:
+    """Portföy optimizasyonu yapar (Risk Parity, HRP, Max Sharpe, Min Variance, Black-Litterman).
+
+    Args:
+        body: Optimizasyon parametreleri (tickers, method, model_scores, regime).
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Ağırlıklar, beklenen getiri, volatilite, Sharpe ve maliyet.
+
+    Raises:
+        HTTPException: Optimizasyon yapılamazsa hata döner.
+    """
     try:
-        from services.portfolio.portfolio_optimizer import (
+        from ...portfolio.portfolio_optimizer import (
             OptimizationMethod,
             PortfolioOptimizerConstraints,
             portfolio_optimizer,
@@ -613,13 +689,15 @@ async def optimize_portfolio(
 
         tickers = body.get("tickers", [])
         if not tickers:
-            # Fallback to active portfolio positions if available
             pm = _get_pm()
-            pos = pm.get_all_positions() if hasattr(pm, "get_all_positions") else []
+            pos = pm.get_all_positions()
             tickers = [p.get("ticker") for p in pos if p.get("ticker")]
 
         if not tickers:
-            tickers = ["THYAO", "ASELS", "TUPRS", "GARAN", "BIMAS", "KCHOL", "SAHOL", "SISE"]
+            raise HTTPException(
+                status_code=400,
+                detail="Ticker listesi gerekli veya portföyde pozisyon bulunamadı.",
+            )
 
         method_str = body.get("method", "RISK_PARITY").upper()
         try:
@@ -632,13 +710,23 @@ async def optimize_portfolio(
         sector_map = body.get("sector_map")
         liquidity_scores = body.get("liquidity_scores")
 
-        # Sentetik / Tarihsel Getiri Matrisi (N samples = 60 gün)
-        np.random.seed(42)  # Deterministik
-        n_assets = len(tickers)
-        # 60 günlük gerçekçi volatilite ve korelasyonlu getiri simülasyonu / geçmişi
-        base_returns = np.random.normal(0.0008, 0.018, size=(60, n_assets))
+        # Tarihsel getiri matrisi — gerçek veriden hesaplanmalı
+        import yfinance as yf
 
-        # Constraints
+        yf_tickers = [f"{t}.IS" for t in tickers]
+        data = yf.download(yf_tickers, period="3mo", interval="1d", auto_adjust=True, progress=False)
+        if data.empty:
+            raise HTTPException(
+                status_code=503,
+                detail="Tarihsel veri alınamadı. Optimizasyon yapılamaz.",
+            )
+
+        close_data = data["Close"] if "Close" in data else data
+        if len(tickers) == 1:
+            returns_matrix = close_data.pct_change().dropna().values.reshape(-1, 1)
+        else:
+            returns_matrix = close_data.pct_change().dropna().values
+
         c = PortfolioOptimizerConstraints(
             max_position_pct=float(body.get("max_position_pct", 0.10)),
             min_position_pct=float(body.get("min_position_pct", 0.015)),
@@ -647,23 +735,23 @@ async def optimize_portfolio(
             hysteresis_threshold=float(body.get("hysteresis_threshold", 0.02)),
         )
 
-        # Mevcut portföy ağırlıkları
-        current_weights = {}
+        current_weights: dict[str, float] = {}
+        total_val = 100000.0
         try:
             pm = _get_pm()
-            summary = pm.get_summary() if hasattr(pm, "get_summary") else {}
+            summary = pm.get_summary()
             total_val = float(summary.get("total_value", 100000.0))
-            for p in pm.get_all_positions() if hasattr(pm, "get_all_positions") else []:
+            for p in pm.get_all_positions():
                 t = p.get("ticker")
                 mv = float(p.get("market_value", 0.0))
                 if t and total_val > 0:
                     current_weights[t] = mv / total_val
         except Exception:
-            total_val = 100000.0
+            pass
 
         res = portfolio_optimizer.optimize(
             tickers=tickers,
-            returns_matrix=base_returns,
+            returns_matrix=returns_matrix,
             method=method,
             model_scores=model_scores,
             current_weights=current_weights,
@@ -690,24 +778,35 @@ async def optimize_portfolio(
             "is_optimal": res.is_optimal,
             "warnings": res.warnings,
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("optimizasyon_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Portföy optimizasyonu yapılamadı: {exc}") from exc
 
 
 # =====================================================
-# STATUS
+# STATUS & TRIGGERS
 # =====================================================
 
 
 @router.get("/status")
-async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Portföy servis durumu — health + trading enabled + PaperTrading tekil defter özeti."""
+async def portfolio_status(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Portföy servis durumunu döndürür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Servis durumu, pozisyon sayısı ve nakit bilgileri.
+    """
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        from ...paper_trading.paper_orchestrator import paper_orchestrator
 
         summary = paper_orchestrator.portfolio.get_summary()
-
         return {
             "status": "ok",
             "trading_enabled": True,
@@ -722,52 +821,86 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
             "drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "strict_t2": paper_orchestrator.portfolio.strict_t2,
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("portfoy_durum_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Portföy durumu alınamadı: {exc}") from exc
 
 
 @router.post("/trigger_eod_signals")
-async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
+async def trigger_eod_signals(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """18:15 EOD sinyal üretimini tetikler.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Sinyal üretim sonucu.
+    """
     try:
         from ...pipeline.run_unified_daily import run_eod_signal_cycle
 
         res = await run_eod_signal_cycle()
         return {
             "status": "success",
-            "message": "EOD sinyal uretimi ve portfoy MTM degerlemesi tamamlandi.",
+            "message": "EOD sinyal üretimi ve portföy MTM değerlemesi tamamlandı.",
             "details": res,
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("eod_sinyal_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"EOD sinyal üretimi başarısız: {exc}") from exc
 
 
 @router.post("/trigger_morning_execution")
-async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """09:55 Sabah Acilisi: Bekleyen emirleri gercek T+1 acilis fiyatlari ve sentetik likiditeyle yurutur."""
+async def trigger_morning_execution(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """09:55 sabah açılışı yürütme döngüsünü tetikler.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Yürütme sonucu.
+    """
     try:
         from ...pipeline.run_unified_daily import run_morning_execution_cycle
 
         res = await run_morning_execution_cycle()
-        return {"status": "success", "message": "Sabah acilisi mikro-yapi yurutme dongusu tamamlandi.", "details": res}
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {
+            "status": "success",
+            "message": "Sabah açılışı mikro-yapı yürütme döngüsü tamamlandı.",
+            "details": res,
+        }
+    except Exception as exc:
+        logger.error("sabah_acilisi_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Sabah açılışı yürütmesi başarısız: {exc}") from exc
 
 
 @router.post("/trigger_phase18")
-async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """API icinde Phase 18 unified daily dongusunu tetikler."""
+async def trigger_phase18(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Phase 18 unified daily döngüsünü tetikler.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Döngü sonucu.
+    """
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
         res = await run_unified_daily_cycle()
-        return {"status": "success", "message": "Unified Daily dongusu tetiklendi.", "details": res}
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        return {"status": "success", "message": "Unified Daily döngüsü tetiklendi.", "details": res}
+    except Exception as exc:
+        logger.error("phase18_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Phase 18 döngüsü tetiklenemedi: {exc}") from exc
 
 
 @router.post("/auto_rebalance")
@@ -775,16 +908,24 @@ async def trigger_auto_rebalance(
     body: Any | None = Body(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Otonom portfoy yeniden dengeleme artik PaperTradingOrchestrator'a baglandi."""
+) -> dict[str, Any]:
+    """Otonom portföy yeniden dengelemeyi tetikler.
+
+    Args:
+        body: İsteğe bağlı parametreler.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Yeniden dengeleme sonucu.
+    """
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except Exception as exc:
+        logger.error("oto_rebalance_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Otonom rebalance tetiklenemedi: {exc}") from exc
 
 
 @router.post("/deposit")
@@ -792,23 +933,39 @@ async def deposit_funds(
     body: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Portföye nakit ekleme endpoint'i."""
+) -> dict[str, Any]:
+    """Portföye nakit ekler.
+
+    Args:
+        body: Yatırım bilgileri (amount, description).
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Yatırım sonucu ve güncel nakit.
+
+    Raises:
+        HTTPException: Yatırım yapılamazsa hata döner.
+    """
     try:
-        amount = float(body.get("amount", 10000000.0))
+        amount = float(body.get("amount", 0))
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="Yatırım tutarı pozitif olmalıdır.")
+
         desc = body.get("description", "Yatırımcı Nakit Transferi")
         pm = _get_pm()
         new_cash = pm.deposit_cash(amount=amount, description=desc)
-        summary = pm.get_summary() if hasattr(pm, "get_summary") else pm.get_portfolio()
+        summary = pm.get_summary()
         return {
             "success": True,
             "deposited_amount": amount,
             "new_cash": new_cash,
             "total_value": summary.get("total_value", new_cash),
         }
-    except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("nakit_yatirma_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail=f"Nakit yatırılamadı: {exc}") from exc
 
 
 from ...core.swr_cache import SWRCache
@@ -822,30 +979,34 @@ _alpha_signals_cache = SWRCache(ttl_seconds=300)
 async def alpha_signals(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
-) -> Any:
-    """Doğrulanmış Alpha Stratejisi canlı sinyalleri ve portföy dağılımı."""
-    import time
+) -> dict[str, Any]:
+    """Alpha stratejisi canlı sinyallerini döndürür.
 
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Alpha sinyalleri, pozisyonlar ve durum.
+    """
     cached = _alpha_signals_cache.get()
     if cached is not None:
         return cached
 
     from ...core.redis_helper import get_cached, set_cached
 
-    # 1. Redis Cache Kontrolü
     try:
         redis_cached = get_cached("alpha:signals")
         if redis_cached:
             _alpha_signals_cache.set(redis_cached)
             return redis_cached
-    except Exception as e:
-        logger.debug("alpha_signals_cache_read_failed", error=str(e))
+    except Exception as exc:
+        logger.warning("alpha_cache_okuma_hatasi: hata=%s", exc)
 
-    def _compute_alpha_live() -> Any:
+    def _compute_alpha_live() -> dict[str, Any]:
         try:
-            from ...core.redis_helper import get_cached
+            from ...core.redis_helper import get_cached as gc
 
-            radar = get_cached("radar:data") or []
+            radar = gc("radar:data") or []
             if radar:
                 top_items = sorted(radar, key=lambda x: x.get("score", 0), reverse=True)[:5]
                 if len(top_items) >= 5:
@@ -855,22 +1016,19 @@ async def alpha_signals(
                             {
                                 "ticker": it.get("symbol"),
                                 "weight": 0.20,
-                                "score": it.get("score", 85.0),
+                                "score": it.get("score", 0.0),
                                 "sector": it.get("sector", "SANAYI"),
                             }
                             for it in top_items
                         ],
                         "cash_shield_pct": 0.0,
-                        "verified_cagr_pct": 105.4,
-                        "verified_sharpe": 2.56,
                         "status": "active",
                     }
         except Exception as err:
-            logger.warning(f"alpha signals live computation warning: {err}")
+            logger.warning("alpha_hesaplama_hatasi: hata=%s", err)
 
-        # Fallback to bist_ml_scanner live opportunities if available
         try:
-            from services.scanner.bist_ml_scanner import bist_ml_scanner
+            from ...scanner.bist_ml_scanner import bist_ml_scanner
 
             opps = bist_ml_scanner.scan_all_opportunities(limit=5)
             if opps and len(opps) >= 1:
@@ -881,38 +1039,34 @@ async def alpha_signals(
                         {
                             "ticker": opp.get("symbol") or opp.get("ticker"),
                             "weight": weight_each,
-                            "score": float(opp.get("score", 70.0)),
+                            "score": float(opp.get("score", 0.0)),
                             "sector": opp.get("sector", "SANAYI"),
                         }
                         for opp in opps
                     ],
                     "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(opps)) * 100.0, 1),
-                    "verified_cagr_pct": 105.4,
-                    "verified_sharpe": 2.56,
                     "status": "active",
                     "source": "ml_scanner_live",
                 }
         except Exception as scan_err:
-            logger.warning(f"alpha_signals_scanner_fallback_failed: {scan_err}")
+            logger.warning("alpha_scanner_hatasi: hata=%s", scan_err)
 
-        # Fail-closed: Never return fake hardcoded positions (GEMINI.md Rule 4)
         return {
             "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
             "active_positions": [],
             "cash_shield_pct": 100.0,
             "status": "unavailable",
-            "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında (PPF) korunuyor.",
+            "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında korunuyor.",
         }
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     res = await loop.run_in_executor(None, _compute_alpha_live)
 
     _alpha_signals_cache.set(res)
 
-    # Redis'e 15 dk cache yaz
     try:
         set_cached("alpha:signals", res, ttl=900)
-    except Exception as e:
-        logger.debug("alpha_signals_cache_write_failed", error=str(e))
+    except Exception as exc:
+        logger.warning("alpha_cache_yazma_hatasi: hata=%s", exc)
 
     return res
