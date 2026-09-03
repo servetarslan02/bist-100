@@ -237,13 +237,79 @@
 
 ## Geliştirme Önerileri
 
-| # | Alan | Öneri |
-|---|------|-------|
-| 1 | Observability | Prometheus/Grafana metric'leri eklenebilir — pipeline başarı oranı, latency, circuit breaker durumu |
-| 2 | Distributed Tracing | Jaeger/OpenTelemetry entegrasyonu — çoklu servis arası trace takibi |
-| 3 | Thread Safety | `AgentMemory` şu an tek thread çalışıyor, çoklu thread gerekirse lock mekanizması eklenebilir |
-| 4 | Test Coverage | Mevcut testler refactor sonrası çalışır durumda olmalı, yeni testler yazılmalı |
-| 5 | BULL/BEAR Debate | TUR2/TUR3 prompt'larında `{context}` yok — debate'te bağlam kasıtlı çıkarılmış, tasarım kararı olarak kalmış |
+### ÖNCELİK 1 — MemoryWriteBuffer (Yüksek Öncelik)
+
+6 agent × pipeline yapısında her `save()` ayrı dosya I/O yapıyor. Bu SSD I/O overhead'ini artırıyor.
+
+**Önerilen yapı:**
+
+```
+Agent 1 ─┐
+Agent 2 ─┤
+Agent 3 ─┤
+Agent 4 ─┼→ MemoryWriteBuffer → Batch Write → Disk
+Agent 5 ─┤
+Agent 6 ─┘
+```
+
+**Uygulama:**
+- `save()` → RAM buffer'a al
+- 250 ms batch window içinde gelen memory kayıtlarını biriktir
+- Tek batch halinde yaz
+- Kritik memory'lerde immediate flush seçeneği
+- Uygulama kapanırken `flush()` zorunlu
+- Crash durumunda kayıp riski için WAL/journal kullanılabilir
+
+**Ayarlar:**
+
+| Ayar | Öneri |
+|------|-------|
+| Batch window | 250 ms |
+| Max batch | 50-100 kayıt |
+| Flush on shutdown | ✅ |
+| Critical memory | Immediate flush |
+| Normal memory | Batch |
+| Duplicate kontrolü | ✅ |
+| Retry | ✅ |
+| Metrics | batch size / write latency / queue depth |
+
+**Önemli:** Güvenilirlik düşürülmemeli. Memory persistence kararları/öğrenme kayıtları kaybolmamalı. Bu optimizasyon özellikle SSD I/O'sunu ve küçük dosya yazma overhead'ini azaltır.
+
+### ÖNCELİK 2 — Observability
+
+Prometheus/Grafana metric'leri: pipeline başarı oranı, LLM latency dağılımı, circuit breaker tetiklenme sayısı, memory write batch size.
+
+### ÖNCELİK 3 — Rate Limiting
+
+LLM provider'ın kendi rate limit'i (dakikada X request) kontrol edilmiyor. 429 response'da retry var ama proaktif rate limiting yok. Provider ban yeme riski azalır.
+
+### ÖNCELİK 4 — Agent Result Cache
+
+Aynı ticker + aynı features için kısa sürede tekrar analiz istenirse sonucu cache'lemek (TTL: 5 dk) LLM maliyetini düşürür.
+
+### ÖNCELİK 5 — Circuit Breaker Gradual Recovery
+
+Half-open'da tek test çağrısı yetersiz. Kademeli iyileştirme: %10 → %25 → %50 traffic geçir.
+
+### ÖNCELİK 6 — Debate Per-Round Timeout
+
+Tek tur için timeout yok. Bir tur LLM'de takılırsa tüm debate bekler.
+
+### ÖNCELİK 7 — Weighted Agent Roles
+
+Tüm agent'lar eşit ağırlıkta. Rol bazlı ağırlık (TECHNICAL: 1.2, NEWS: 0.8 gibi) daha gerçekçi sonuç verir.
+
+### ÖNCELİK 8 — A/B Testing Support
+
+Farklı prompt versiyonları veya model karşılaştırması için A/B testing desteği.
+
+### ÖNCELİK 9 — Distributed Tracing
+
+Jaeger/OpenTelemetry entegrasyonu — çoklu servis arası trace takibi.
+
+### ÖNCELİK 10 — BULL/BEAR Debate Context
+
+TUR2/TUR3 prompt'larında `{context}` yok — debate'te bağlam kasıtlı çıkarılmış, tasarım kararı olarak kalmış.
 
 ---
 
