@@ -24,3 +24,18 @@ Arşivlenen dosyalar — `documentation/16-YENIDEN-DUZENLEME-HARITASI.md` kapsam
 ### `services/core/infrastructure.py` → `core/infrastructure.py`
 - **Gerekçe:** Hiçbir dosya tarafından import edilmiyor. `infrastructure/mtls` referansları dizin yolu, bu modül değil.
 - **Kanıt:** `grep -rn "from services.core.infrastructure" --include="*.py"` → 0 sonuç.
+
+### `services/core/clickhouse_replication_health.py` → `core/clickhouse_replication_health.py`
+- **Gerekçe:** 0 referans (hiçbir dosya, test veya script bile kullanmıyor).
+
+### `services/core/data_schemas.py` → `core/data_schemas.py`
+- **Gerekçe:** 0 referans.
+
+### `services/core/health_reporter.py` → `core/health_reporter.py`
+- **Gerekçe:** 0 referans.
+
+### `services/core/pg_replication_health.py` → `core/pg_replication_health.py`
+- **Gerekçe:** 0 referans.
+
+### `services/core/duckdb_store.py` → `core/duckdb_store.py`
+- **Gerekçe:** 0 referans. `duckdb_research.py` farklı dosya, aktif kullanımda.
