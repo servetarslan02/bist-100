@@ -1,100 +1,58 @@
-"""Macro API — Gerçek canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
+"""Makro API — Canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
 
 import asyncio
+import logging
 import time
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
 import yfinance as yf
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import check_rate_limit, get_current_user
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 _CACHE_TTL = 120
 _last_macro_fetch = 0.0
-_cached_macro_data: dict[str, Any] = {
-    "dxy": 98.84,
-    "dxy_change_pct": 0.09,
-    "us10y": 4.74,
-    "us10y_change_pct": 0.89,
-    "brent_crude": 93.86,
-    "brent_change_pct": 0.27,
-    "gold_ounce": 4674.60,
-    "gold_change_pct": 1.82,
-    "turkey_cds_5y": 268.0,
-    "cds_change_pct": -0.85,
-    "usd_try": 48.05,
-    "usd_try_change_pct": 0.02,
-    "eur_try": 56.14,
-    "eur_try_change_pct": 0.01,
-    "vix_level": 15.14,
-    "vix_change_pct": -5.43,
-    "global_risk_appetite": 0.68,
-    "em_risk_appetite": 0.62,
-    "geopolitical_risk": 0.44,
-    "inflation_pressure": 0.41,
-    "us_rate_pressure": 0.55,
-    "fed_rate_cut_prob": 0.72,
-    "updated_at": datetime.now(UTC).isoformat(),
-    "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
-    "macro_commentary": "Dolar ve CDS dengeli seviyelerde. Risk iştahı pozitif.",
-    "bist_macro_bias": "POZİTİF",
+_cached_macro_data: dict[str, Any] = {}
+
+# Makro sembolleri
+MAKRO_SEMBOLLERI: dict[str, str] = {
+    "usd_try": "USDTRY=X",
+    "eur_try": "EURTRY=X",
+    "gold_ounce": "GC=F",
+    "brent_crude": "BZ=F",
+    "vix": "^VIX",
+    "us10y": "^TNX",
+    "dxy": "DX-Y.NYB",
 }
 
 
 def _fetch_live_macro_data() -> dict[str, Any]:
-    """Otomatik eklendi."""
+    """Canlı makro verileri yfinance'den çeker ve önbelleğe alır.
+
+    Returns:
+        dict: DXY, VIX, altın, brent, USD/TRY, ABD 10Y ve türev metrikler.
+    """
     global _last_macro_fetch, _cached_macro_data
     now = time.time()
+
     if _cached_macro_data and (now - _last_macro_fetch < _CACHE_TTL):
         return _cached_macro_data
 
     _last_macro_fetch = now
 
-    symbols = {
-        "usd_try": "USDTRY=X",
-        "eur_try": "EURTRY=X",
-        "gold_ounce": "GC=F",
-        "brent_crude": "BZ=F",
-        "vix": "^VIX",
-        "us10y": "^TNX",
-        "dxy": "DX-Y.NYB",
-    }
-
-    result = {
-        "dxy": 98.84,
-        "dxy_change_pct": 0.09,
-        "us10y": 4.74,
-        "us10y_change_pct": 0.89,
-        "brent_crude": 93.86,
-        "brent_change_pct": 0.27,
-        "gold_ounce": 4674.60,
-        "gold_change_pct": 1.82,
-        "turkey_cds_5y": 268.0,
-        "cds_change_pct": -0.85,
-        "usd_try": 48.05,
-        "usd_try_change_pct": 0.02,
-        "eur_try": 56.14,
-        "eur_try_change_pct": 0.01,
-        "vix_level": 15.14,
-        "vix_change_pct": -5.43,
-        "global_risk_appetite": 0.68,
-        "em_risk_appetite": 0.62,
-        "geopolitical_risk": 0.44,
-        "inflation_pressure": 0.41,
-        "us_rate_pressure": 0.55,
-        "fed_rate_cut_prob": 0.72,
+    result: dict[str, Any] = {
         "updated_at": datetime.now(UTC).isoformat(),
         "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
     }
 
     try:
-        tickers = yf.Tickers(" ".join(symbols.values()))
-        for key, sym in symbols.items():
+        tickers = yf.Tickers(" ".join(MAKRO_SEMBOLLERI.values()))
+        for key, sym in MAKRO_SEMBOLLERI.items():
             try:
                 t = tickers.tickers.get(sym)
                 if t:
@@ -107,45 +65,35 @@ def _fetch_live_macro_data() -> dict[str, Any]:
                             chg = ((last - prev) / prev) * 100
                             result[f"{key}_change_pct"] = round(float(chg), 2)
             except Exception as item_err:
-                logger.debug(f"macro ticker {sym} parse error: {item_err}")
+                logger.warning("makro_sembol_hatasi: sembol=%s, hata=%s", sym, item_err)
 
-        # VIX ve US10Y'den türetilen canlı risk iştahı hesaplaması
-        vix_val = result.get("vix_level", result.get("vix", 15.14))
+        # VIX'ten türetilen canlı risk iştahı hesaplaması
+        vix_val = result.get("vix", 15.0)
         result["vix_level"] = vix_val
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
 
-        # Frontend expects specific keys for change percentages
+        # Frontend için anahtar eşlemesi
         if "gold_ounce_change_pct" in result:
             result["gold_change_pct"] = result["gold_ounce_change_pct"]
         if "brent_crude_change_pct" in result:
             result["brent_change_pct"] = result["brent_crude_change_pct"]
 
-        # UI Mapping & Dynamic Regime Commentary
+        # UI Mapping & Dinamik Rejim Yorumu
         result["usd_strength"] = round(max(0.0, min(1.0, (result.get("dxy", 100) - 90) / 20)), 2)
-        result["turkey_macro_risk"] = round(max(0.0, min(1.0, result.get("turkey_cds_5y", 300) / 600)), 2)
         result["oil_pressure"] = round(max(0.0, min(1.0, (result.get("brent_crude", 80) - 60) / 60)), 2)
 
         # Dinamik Makro Yorum ve BIST Etki Puanı
         dxy_v = result.get("dxy", 100)
-        cds_v = result.get("turkey_cds_5y", 270)
         brent_v = result.get("brent_crude", 85)
-        result.get("us10y", 4.5)
 
-        commentary_parts = []
+        commentary_parts: list[str] = []
         if dxy_v > 103:
             commentary_parts.append(
                 "Dolar küresel çapta güçlü (Gelişmekte olan piyasalara sermaye akışı baskı altında)."
             )
         else:
             commentary_parts.append("Dolar endeksi stabil (Gelişmekte olan piyasalar için nötr-pozitif ortam).")
-
-        if cds_v < 280:
-            commentary_parts.append(
-                f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) gerileme eğiliminde (Ülke risk primi olumlu)."
-            )
-        else:
-            commentary_parts.append(f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) temkinli bölgede.")
 
         if brent_v > 90:
             commentary_parts.append(
@@ -155,12 +103,12 @@ def _fetch_live_macro_data() -> dict[str, Any]:
             commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) dengeli seviyelerde.")
 
         result["macro_commentary"] = " ".join(commentary_parts)
-        result["bist_macro_bias"] = "POZİTİF" if (cds_v < 290 and dxy_v < 104) else "NÖTR"
+        result["bist_macro_bias"] = "POZİTİF" if dxy_v < 104 else "NÖTR"
 
         _cached_macro_data = result
         _last_macro_fetch = now
-    except Exception as e:
-        logger.warning(f"Live macro fetch error: {e}")
+    except Exception as exc:
+        logger.warning("makro_veri_hatasi: hata=%s", exc)
         if not _cached_macro_data:
             _cached_macro_data = result
 
@@ -171,16 +119,48 @@ def _fetch_live_macro_data() -> dict[str, Any]:
 @router.get("/world")
 @router.get("/state")
 @router.get("/indicators")
-async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Küresel makro piyasa durumu ve risk faktörleri (Canlı yfinance verileri)."""
-    loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, _fetch_live_macro_data)
-    return data
+async def macro_overview(
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Küresel makro piyasa durumu ve risk faktörlerini döndürür.
+
+    Args:
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Makro göstergeler, risk iştahı ve yorum.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        data = await loop.run_in_executor(None, _fetch_live_macro_data)
+        return data
+    except Exception as exc:
+        logger.error("makro_overview_hatasi: hata=%s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Makro veriler alınamadı: {exc}",
+        ) from exc
 
 
 @router.get("/impact/{ticker}")
-async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Hisse bazlı makro etki ve duyarlılık analizi."""
+async def macro_impact(
+    ticker: str,
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Hisse bazlı makro etki ve duyarlılık analizini döndürür.
+
+    Args:
+        ticker: Hisse sembolü (ör. THYAO).
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Faiz, döviz ve enflasyon duyarlılık katsayıları.
+
+    Raises:
+        HTTPException: Duyarlılık verisi bulunamazsa 404 hatası döner.
+    """
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine
 
@@ -188,21 +168,33 @@ async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(ch
         result = engine.get_company_sensitivity(ticker) if hasattr(engine, "get_company_sensitivity") else {}
         if result:
             return {"ticker": ticker, "macro_available": True, **result}
-    except Exception as e:
-        logger.debug("macro_sensitivity_ticker_failed", ticker=ticker, error=str(e))
-    return {
-        "ticker": ticker,
-        "macro_available": False,
-        "interest_rate_sensitivity": None,
-        "fx_sensitivity": None,
-        "inflation_beta": None,
-        "note": "Connect MacroSensitivityEngine for real data.",
-    }
+    except Exception as exc:
+        logger.warning("makro_duyarlilik_hatasi: ticker=%s, hata=%s", ticker, exc)
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"{ticker} için makro duyarlılık verisi bulunamadı.",
+    )
 
 
 @router.get("/sensitivity/{sector}")
-async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Sektör makro duyarlılık katsayıları."""
+async def sector_sensitivity(
+    sector: str,
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+) -> dict[str, Any]:
+    """Sektör makro duyarlılık katsayılarını döndürür.
+
+    Args:
+        sector: Sektör adı.
+        user: Kimliği doğrulanmış kullanıcı.
+
+    Returns:
+        dict: Sektör duyarlılık katsayıları ve veri kaynağı.
+
+    Raises:
+        HTTPException: Sektör verisi bulunamazsa 404 hatası döner.
+    """
     try:
         from ...intelligence.macro_sensitivity import MacroSensitivityEngine
 
@@ -210,15 +202,10 @@ async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depe
         result = engine.get_sector_sensitivity(sector) if hasattr(engine, "get_sector_sensitivity") else {}
         if result:
             return {"sector": sector, "sensitivity": result, "source": "macro_sensitivity_engine"}
-    except Exception as e:
-        logger.debug("macro_sensitivity_sector_failed", sector=sector, error=str(e))
-    return {
-        "sector": sector,
-        "sensitivity": {
-            "interest_rate": None,
-            "fx_usd": None,
-            "commodity": None,
-        },
-        "source": "unavailable",
-        "note": "Connect MacroSensitivityEngine for real sector sensitivity data.",
-    }
+    except Exception as exc:
+        logger.warning("sektor_duyarlilik_hatasi: sector=%s, hata=%s", sector, exc)
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"{sector} sektörü için duyarlılık verisi bulunamadı.",
+    )

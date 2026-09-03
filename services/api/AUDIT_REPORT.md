@@ -40,8 +40,8 @@
 | 17 | `v1/learning.py` | 16 | ✅ Düzeltildi |
 | 16 | `v1/intelligence.py` | — | ⏳ Bekliyor |
 | 17 | `v1/learning.py` | — | ⏳ Bekliyor |
-| 18 | `v1/macro.py` | — | ⏳ Bekliyor |
-| 19 | `v1/market.py` | — | ⏳ Bekliyor |
+| 18 | `v1/macro.py` | 17 | ✅ Düzeltildi |
+| 19 | `v1/market.py` | 26 | ✅ Düzeltildi |
 | 20 | `v1/models.py` | — | ⏳ Bekliyor |
 | 21 | `v1/portfolio.py` | — | ⏳ Bekliyor |
 | 22 | `v1/risk.py` | — | ⏳ Bekliyor |
@@ -350,6 +350,63 @@
 | 14 | `performance_report` docstring Türkçe karakter hataları (`ogrenme`, `doner`) | Düzeltildi (`öğrenme`, `döndürür`) |
 | 15 | Return type annotation yok | `dict[str, Any]` eklendi |
 | 16 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+
+---
+
+## `v1/macro.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `_cached_macro_data` modül seviyesinde hardcoded mock veri (dxy: 98.84, gold: 4674.60 vb.) | Boş dict ile başlatıldı, ilk istekte gerçek veriyle dolduruluyor |
+| 2 | 🔴 `_fetch_live_macro_data`'da `result` dict hardcoded mock veri ile başlatılıyor | Sadece `updated_at` ve `indicators` ile başlatılıyor, gerisi gerçek veriden doluyor |
+| 3 | 🔴 `macro_impact` stub — hardcoded fallback döndürüyor | Kaldırıldı, veri yoksa HTTP 404 hatası döndürüyor |
+| 4 | 🔴 `sector_sensitivity` stub — hardcoded fallback döndürüyor | Kaldırıldı, veri yoksa HTTP 404 hatası döndürüyor |
+| 5 | `_fetch_live_macro_data` f-string loglama | Yapılandırılmış loglamaya dönüştürüldü |
+| 6 | `macro_impact` `logger.debug` ile loglanıyor | `logger.warning` seviyesine yükseltildi |
+| 7 | `sector_sensitivity` `logger.debug` ile loglanıyor | `logger.warning` seviyesine yükseltildi |
+| 8 | `macro_overview` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 9 | Satır 112: `result.get("us10y", 4.5)` atanmamış, ölü kod | Kaldırıldı |
+| 10 | `_fetch_live_macro_data` docstring `"Otomatik eklendi."` | Anlamlı Türkçe docstring ile değiştirildi |
+| 11 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 12 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 13 | İngilizce yorumlar | Türkçeleştirildi |
+| 14 | `macro_impact` İngilizce mesaj | HTTPException 404 ile değiştirildi |
+| 15 | `sector_sensitivity` İngilizce mesaj | HTTPException 404 ile değiştirildi |
+| 16 | `asyncio.get_event_loop()` Python 3.10+'da deprecated | `asyncio.get_running_loop()` ile değiştirildi |
+| 17 | `turkey_cds_5y` yfinance'den hiç çekilmiyor ama varsayılan değer kullanılıyor — ölü referans | CDS ile ilgili kod kaldırıldı (çekilmeyen veri kullanılmaz) |
+
+---
+
+## `v1/market.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `market_state` exception'da hardcoded mock veri (`advancing: 250, declining: 160`) | Kaldırıldı, HTTPException 500 döndürüyor |
+| 2 | 🔴 `market_state` radar boşsa hardcoded mock (`advancing: 265, declining: 180`) | Kaldırıldı, HTTPException 503 döndürüyor |
+| 3 | 🔴 `instrument_detail` stub — `"available": True` döndürüyor | Gerçek meta veri ile zenginleştirildi |
+| 4 | 🔴 `features` stub — `"Requires historical data"` döndürüyor | Gerçek `FactorEngine.get_features()` çağrısı eklendi |
+| 5 | 🔴 `live_intel_analysis` fallback'inde rastgele fiyat verisi üretiliyor (`np.random`) | Kaldırıldı, HTTPException 503 döndürüyor |
+| 6 | 🔴 `live_intel_analysis`'da `macd_val: 1.45, sig_val: 0.92` hardcoded | `_hesapla_macd()` fonksiyonu ile dinamik hesaplama |
+| 7 | 🔴 `_get_recommendation` hardcoded skorlar (`88.5, 81.0, 35.0, 55.0`) | `_hesapla_oneri()` fonksiyonu ile dinamik hesaplama |
+| 8 | 🔴 `_calc_rsi` exception'da hardcoded `52.4` döndürüyor | `_hesapla_rsi()` fonksiyonu, hata durumunda `50.0` döndürüyor |
+| 9 | 🔴 `heatmap`'te `TICKER_SECTORS` ve `SECTOR_WEIGHTS` hardcoded | `SEKTOR_ESLEME` ve `SEKTOR_AGIRLIK` sabitlerine taşındı |
+| 10 | `market_state` f-string loglama + `logger.debug` | `logger.error` seviyesine yükseltildi |
+| 11 | `instruments` İngilizce hata mesajı | Türkçeleştirildi |
+| 12 | `instrument_detail` İngilizce hata mesajı | Türkçeleştirildi |
+| 13 | `ohlcv` İngilizce hata mesajı | Türkçeleştirildi |
+| 14 | `features` İngilizce hata mesajı | Türkçeleştirildi |
+| 15 | `live_intel_analysis` f-string loglama | Yapılandırılmış loglamaya dönüştürüldü |
+| 16 | `events` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 17 | `sectors` absolute import | Relative import'a dönüştürüldü |
+| 18 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
+| 19 | Modül docstring'i yok | Türkçe docstring eklendi |
+| 20 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 21 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 22 | `live_intel_analysis` 200+ satır — aşırı uzun | Yardımcı fonksiyonlara bölündü (`_hesapla_rsi`, `_hesapla_sma`, `_hesapla_macd`, `_hesapla_oneri`) |
+| 23 | `FactorEngine()` instantiate ediliyor ama kullanılmıyor — ölü kod | Kaldırıldı, `engine.get_features()` çağrısı eklendi |
+| 24 | `import time` üst seviyede import edilmiş ama hiç kullanılmıyor | Kaldırıldı |
+| 25 | `_batch_fetch` içinde `except Exception: continue` — sessiz hata yutma | `logger.debug` eklendi |
+| 26 | `atr_14` sabit çarpanla (`0.028`) hesaplanıyor — gerçek ATR formülü değil | Gerçek ATR hesaplaması eklendi (14 günlük high-low ortalaması) |
 
 ---
 
