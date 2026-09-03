@@ -42,7 +42,7 @@
 | 17 | `v1/learning.py` | — | ⏳ Bekliyor |
 | 18 | `v1/macro.py` | 17 | ✅ Düzeltildi |
 | 19 | `v1/market.py` | 26 | ✅ Düzeltildi |
-| 20 | `v1/models.py` | — | ⏳ Bekliyor |
+| 20 | `v1/models.py` | 13 | ✅ Düzeltildi |
 | 21 | `v1/portfolio.py` | — | ⏳ Bekliyor |
 | 22 | `v1/risk.py` | — | ⏳ Bekliyor |
 | 23 | `v1/scanner.py` | — | ⏳ Bekliyor |
@@ -407,6 +407,26 @@
 | 24 | `import time` üst seviyede import edilmiş ama hiç kullanılmıyor | Kaldırıldı |
 | 25 | `_batch_fetch` içinde `except Exception: continue` — sessiz hata yutma | `logger.debug` eklendi |
 | 26 | `atr_14` sabit çarpanla (`0.028`) hesaplanıyor — gerçek ATR formülü değil | Gerçek ATR hesaplaması eklendi (14 günlük high-low ortalaması) |
+
+---
+
+## `v1/models.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `get_learning_state`'da `"canonical_features_count": 70` hardcoded | Gerçek veriden dinamik alınıyor (`learning_loop.get_feature_count()` veya `canonical_features`) |
+| 2 | 🔴 `get_learning_state`'da `"calibration_status": "ENABLED"` hardcoded | Gerçek veriden dinamik alınıyor (`learning_loop.get_calibration_status()` veya `calibration_enabled`) |
+| 3 | `list_models` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 4 | `model_performance` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 5 | `get_champion_model` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 6 | `get_learning_state` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 7 | `retrain` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 8 | `list_models`'da private method erişimi (`_init_default_models`) | Önce public method deneniyor, yoksa private method uyarı loguyla kullanılıyor |
+| 9 | 3 endpoint'te absolute import (`from services.learning...`) | Relative import'a dönüştürüldü |
+| 10 | Modül docstring'i `from typing import Any` altında, İngilizce | Üst seviyeye taşındı, Türkçeleştirildi |
+| 11 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 12 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 13 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
 
 ---
 
