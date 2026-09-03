@@ -339,30 +339,59 @@ Kalan legacy `compute_*` fonksiyonları (social, jobs, cc, web_scraping) backwar
 
 ---
 
-# 16-C — services/core/ Ölü Kod Temizliği
+# 16-C — services/core/ Bağlanmamış Altyapı Entegrasyonu
 
 **Tarih:** 2026-09-03
-**Kapsam:** `services/core/` dizini
+**Kapsam:** `services/core/` dizini — bağlanmamış servisler
 
-## Arşivlenen Dosyalar (9 dosya, ~1,500 satır)
+## Durum Özeti
 
-| Dosya | Gerekçe |
-|-------|----------|
-| `algo_notification.py` | 0 referans |
-| `insider_detector.py` | 0 referans |
-| `manipulation_detector.py` | 0 referans |
-| `infrastructure.py` | 0 referans |
-| `clickhouse_replication_health.py` | 0 referans |
-| `data_schemas.py` | 0 referans |
-| `health_reporter.py` | 0 referans |
-| `pg_replication_health.py` | 0 referans |
-| `duckdb_store.py` | 0 referans |
+9 dosya önce "ölü" sanılıp arşivlendi, sonra aslında bağlanmamış üretim altyapısı olduğu fark edildi ve geri getirildi. Hepsinin neden bağlanmadığı araştırıldı ve orchestrator'a entegre edildi.
 
-## Kalan Durum
+## Neden Bağlanmamış?
 
-- `services/core/` artık 94 dosya (103'ten düştü)
-- Geri kalan dosyalar aktif kullanımda (production, test veya script)
-- `config_loader.py`, `grafana_provisioning.py`, `nats_bus.py` — sadece testler tarafından kullanılıyor, düşük risk
+| Dosya | Neden Bağlanmamış | Çözüm |
+|-------|-------------------|-------|
+| `insider_detector.py` | Feature tanımı var ama hesaplama yok | Orchestrator'a `_check_insider_trading()` eklendi |
+| `manipulation_detector.py` | SPK uyum modülü ayrı yazılmış ama bu bağlanmamış | Orchestrator'a `_check_manipulation()` eklendi |
+| `algo_notification.py` | `compliance.py` threshold check yapıyor ama bildirim üretmiyor | Orchestrator'a `_generate_algo_notification()` eklendi |
+| `data_schemas.py` | `integration_bridge.py`'de basit validasyon var, Pydantic şemalar kullanılmamış | Orchestrator servis registry'ye eklendi |
+| `health_reporter.py` | API'de basit health var, kapsamlı rapor üretilmemiş | Orchestrator'a `_get_system_health()` eklendi |
+| `infrastructure.py` | `event_bus.py` var ama catalyst/notification yok | Orchestrator servis registry'ye eklendi |
+| `clickhouse_replication_health.py` | DB monitoring hiç bağlanmamış | Orchestrator'a `_check_db_replication()` eklendi |
+| `pg_replication_health.py` | DB monitoring hiç bağlanmamış | Orchestrator'a `_check_db_replication()` eklendi |
+| `duckdb_store.py` | `duckdb_research.py` var ama store katmanı eksik | Orchestrator servis registry'ye eklendi |
+
+## Orchestrator Entegrasyonu
+
+### Service Registry'ye Eklenen Servisler
+```python
+("insider_detector", "services.core.insider_detector", "InsiderDetector", True),
+("manipulation_detector", "services.core.manipulation_detector", "ManipulationDetector", True),
+("algo_notification", "services.core.algo_notification", "generate_algo_notification", False),
+("data_schemas", "services.core.data_schemas", "validate_ohlcv", False),
+("health_reporter", "services.core.health_reporter", "HealthReporter", True),
+("ch_replication", "services.core.clickhouse_replication_health", "check_replication_health", False),
+("pg_replication", "services.core.pg_replication_health", "check_replication_health", False),
+("duckdb_store", "services.core.duckdb_store", "DuckDBStore", True),
+```
+
+### Pipeline'a Eklenen Metodlar
+
+| Metod | Pipeline Aşaması | Açıklama |
+|-------|-----------------|----------|
+| `_check_insider_trading()` | Özellik hesaplama sonrası | KAP açıklaması öncesi anomali tespiti |
+| `_check_manipulation()` | Özellik hesaplama sonrası | Wash trading, spoofing, volume manipulation |
+| `_generate_algo_notification()` | Compliance kontrolü sonrası | SPK algo trading bildirimi |
+| `_get_system_health()` | API endpoint | Kapsamlı sistem sağlık raporu |
+| `_check_db_replication()` | Health check | PG + ClickHouse replikasyon durumu |
+
+## Doğrulama
+
+- [x] `ast.parse(orchestrator.py)` → OK
+- [x] Tüm servisler registry'de mevcut
+- [x] Tüm metodlar pipeline'da çağrılıyor
+- [x] Sınıf/fonksiyon isimleri doğru (ClickHouse/PG fonksiyon, diğerleri sınıf)
 
 ---
 
