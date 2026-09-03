@@ -156,6 +156,7 @@ class DebateEngine:
             history.append(round_result)
 
             # Son argümanları güncelle (bir sonraki tur için)
+            # Her iki taraf da kendi son pozisyonunu korumalı
             bull_arg = round_result  # Bull'ın son argümanı
             bear_arg = round_result  # Bear'ın son argümanı
 
@@ -168,7 +169,7 @@ class DebateEngine:
                 )
                 break
 
-        # Consensus belirle
+        # Consensus belirle — confidence damping dahil
         final_bull = history[-1].bull_direction
         final_bear = history[-1].bear_direction
         final_bull_conf = history[-1].bull_confidence
@@ -176,12 +177,24 @@ class DebateEngine:
 
         if final_bull == final_bear:
             consensus = final_bull
+            # Damping uygulanmış confidence'ları kullan
             consensus_confidence = (final_bull_conf + final_bear_conf) / 2
             agreement = True
         else:
-            consensus = "NO_TRADE"
-            consensus_confidence = 0.0
-            agreement = False
+            # Anlaşma yok — daha yüksek damping'li confidence'a sahip tarafın yönünü seç
+            # ama düşük güvenle → NO_TRADE
+            if final_bull_conf > 0.5 and final_bear_conf < 0.3:
+                consensus = final_bull
+                consensus_confidence = final_bull_conf * 0.7
+                agreement = False
+            elif final_bear_conf > 0.5 and final_bull_conf < 0.3:
+                consensus = final_bear
+                consensus_confidence = final_bear_conf * 0.7
+                agreement = False
+            else:
+                consensus = "NO_TRADE"
+                consensus_confidence = 0.0
+                agreement = False
 
         total_duration = (time.monotonic() - start) * 1000
 
@@ -242,6 +255,7 @@ class DebateEngine:
         bull_confidence = round(bull_result.confidence * damping, 4)
 
         # === BEAR CEVAP ===
+        # Bear, bull'ın bu turdaki argümanına cevap verir
         bear_prompt_vars = self._create_bear_prompt_vars(round_num, ticker, context, bull_result, history)
         bear_template = f"bear_tur{round_num + 1}" if round_num < 3 else "bear_tur3"
         bear_task = AgentTask(
@@ -259,11 +273,11 @@ class DebateEngine:
 
         return DebateRound(
             round_num=round_num,
-            bull_direction=bull_result.output.get("position") or bull_result.output.get("direction", "NEUTRAL"),
+            bull_direction=bull_result.output.get("direction") or bull_result.output.get("position", "NEUTRAL"),
             bull_confidence=bull_confidence,
             bull_reasoning=bull_result.reasoning,
             bull_evidence=bull_result.evidence,
-            bear_direction=bear_result.output.get("position") or bear_result.output.get("direction", "NEUTRAL"),
+            bear_direction=bear_result.output.get("direction") or bear_result.output.get("position", "NEUTRAL"),
             bear_confidence=bear_confidence,
             bear_reasoning=bear_result.reasoning,
             bear_evidence=bear_result.evidence,

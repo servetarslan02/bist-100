@@ -202,19 +202,46 @@ class RiskAssessor:
         return assessment
 
     def _calculate_max_position(self, risk_level: str, risk_score: float) -> float:
-        """Maksimum pozisyon yüzdesi hesapla."""
+        """Maksimum pozisyon yüzdesi hesapla.
+
+        Risk skoru arttıkça pozisyon kademeli azalır:
+        - LOW (0-30): 8-10%
+        - MEDIUM (30-50): 5-8%
+        - HIGH (50-70): 2-5%
+        - CRITICAL (70+): 0% (veto)
+        """
         if risk_level == "CRITICAL":
             return 0.0  # CRITICAL = veto, pozisyon yok
 
         base = {
             "LOW": 10.0,
             "MEDIUM": 7.0,
-            "HIGH": 5.0,
+            "HIGH": 4.0,
         }.get(risk_level, 5.0)
 
-        # Risk skoru arttıkça pozisyon azalır
-        adjustment = max(0, (risk_score - 50) / 100)
-        return round(max(1.0, base * (1 - adjustment)), 1)
+        # Risk skoru arttıkça pozisyon azalır — lineer interpolasyon
+        # LOW: 10→8, MEDIUM: 7→5, HIGH: 4→2
+        level_min = {
+            "LOW": 8.0,
+            "MEDIUM": 5.0,
+            "HIGH": 2.0,
+        }.get(risk_level, 2.0)
+
+        # risk_score 0-100 arası, level aralığına göre interpolasyon
+        level_range = {
+            "LOW": (0, 30),
+            "MEDIUM": (30, 50),
+            "HIGH": (50, 70),
+        }.get(risk_level, (50, 70))
+
+        low, high = level_range
+        if high > low:
+            t = max(0, min(1, (risk_score - low) / (high - low)))
+        else:
+            t = 0
+
+        position = base - (base - level_min) * t
+        return round(max(1.0, position), 1)
 
     def _calculate_stop_loss(self, risk_level: str, atr_pct: float) -> float:
         """Stop-loss yüzdesi hesapla."""

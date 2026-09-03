@@ -14,7 +14,8 @@ from .agent_memory import (
     SemanticMemory,
     WorkingMemory,
 )
-from .agent_pipeline import AgentPipelineOrchestrator, PipelineResult
+from .agent_pipeline import AgentPipelineOrchestrator, PipelineMetrics, PipelineResult
+from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
 from .agent_system import (
     AgentOrchestrator,
     AgentResult,
@@ -75,6 +76,7 @@ from .schemas import (
 # === Phase 5: Self-Evaluation ===
 from .self_evaluator import AgentSelfEvaluator, EvalReport, MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
+from .trace_context import TraceContext, get_trace_id, trace_processor
 
 __all__ = [
     # Core
@@ -141,4 +143,13 @@ __all__ = [
     "RiskAssessment",
     "AgentPipelineOrchestrator",
     "PipelineResult",
+    "PipelineMetrics",
+    # Circuit Breaker
+    "CircuitBreaker",
+    "CircuitBreakerLLMClient",
+    "CircuitState",
+    # Trace
+    "TraceContext",
+    "get_trace_id",
+    "trace_processor",
 ]

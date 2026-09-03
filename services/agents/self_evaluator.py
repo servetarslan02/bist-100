@@ -147,7 +147,11 @@ class AgentSelfEvaluator:
         Son N outcome vs önceki N outcome karşılaştırması.
         Fark > threshold = drift.
         """
-        outcomes = list(memory.episodic.outcomes.values())
+        # timestamp'e göre sırala — dict insertion order garanti değil
+        outcomes = sorted(
+            memory.episodic.outcomes.values(),
+            key=lambda o: o.get("timestamp", ""),
+        )
         if len(outcomes) < self.min_samples * 2:
             return False
 

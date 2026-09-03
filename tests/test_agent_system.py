@@ -533,7 +533,7 @@ class TestFaz3_MemoryConsolidator:
         consolidator = MemoryConsolidator(consolidation_interval_hours=24)
         mem = AgentMemory("TECHNICAL")
         # Boş memory — consolidation yapmaz
-        result = await consolidator.consolidate(mem)
+        result = consolidator.consolidate(mem)
         assert result["consolidated"] is False
         assert result["reason"] == "empty_memory"
 
@@ -543,9 +543,9 @@ class TestFaz3_MemoryConsolidator:
         consolidator = MemoryConsolidator(consolidation_interval_hours=24)
         mem = AgentMemory("TECHNICAL")
         # İlk çalıştırma
-        await consolidator.consolidate(mem)
+        consolidator.consolidate(mem)
         # İkinci çalıştırma — too_soon
-        result = await consolidator.consolidate(mem)
+        result = consolidator.consolidate(mem)
         assert not result["consolidated"]
         assert result["reason"] == "too_soon"
 
@@ -817,7 +817,7 @@ class TestBugFixes:
         """Boş memory'de consolidation çalışmamalı."""
         consolidator = MemoryConsolidator()
         mem = AgentMemory("TECHNICAL")
-        result = await consolidator.consolidate(mem)
+        result = consolidator.consolidate(mem)
         assert not result["consolidated"]
         assert result["reason"] == "empty_memory"
 
@@ -828,7 +828,7 @@ class TestBugFixes:
         mem = AgentMemory("TECHNICAL")
         for i in range(10):
             mem.record_task(f"t{i}", "THYAO", "LONG", 0.7, "test")
-        result = await consolidator.consolidate(mem)
+        result = consolidator.consolidate(mem)
         assert result["consolidated"] is True
 
     def test_conflict_resolver_neutral_excluded(self) -> Any:

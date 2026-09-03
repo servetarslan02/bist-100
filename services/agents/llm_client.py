@@ -486,11 +486,22 @@ def _extract_from_text(content: str) -> dict[str, Any]:
 
     content_upper = content.upper()
 
-    # Direction tespiti
-    if any(w in content_upper for w in ["LONG", "AL ", "YUKSEL", "YÜKSEL", "BULLISH"]):
-        result["direction"] = "LONG"
-    elif any(w in content_upper for w in ["SHORT", "SAT ", "DUS", "DÜŞ", "BEARISH"]):
-        result["direction"] = "SHORT"
+    # Direction tespiti — sadece tam kelime eşleşmesi
+    # Türkçe: "AL" (alım), "SAT" (satım), "YÜKSELİŞ", "DÜŞÜŞ"
+    # İngilizce: "LONG", "SHORT", "BULLISH", "BEARISH"
+    long_patterns = ["LONG", "BULLISH", "YÜKSELİŞ", "YUKSELIS"]
+    short_patterns = ["SHORT", "BEARISH", "DÜŞÜŞ", "DUSUS"]
+
+    # Tam kelime eşleşmesi için regex word boundary
+    for pat in long_patterns:
+        if re.search(rf'\b{pat}\b', content_upper):
+            result["direction"] = "LONG"
+            break
+    if result["direction"] == "NEUTRAL":
+        for pat in short_patterns:
+            if re.search(rf'\b{pat}\b', content_upper):
+                result["direction"] = "SHORT"
+                break
 
     # Confidence tespiti
     conf_match = re.search(r"(?:confidence|güven)[\s:]*(\d+(?:\.\d+)?)", content, re.IGNORECASE)

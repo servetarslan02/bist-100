@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Agent Memory System v1.0
+ALPHA BIST — Agent Memory System v2.0
 
 3 katmanlı hafıza (arXiv Agentic Trading 2026 meta-analiz):
 1. Working Memory — anlık bağlam (son 100 görev)
@@ -11,21 +11,36 @@ Memory consolidation periyodik yapılır.
 FAZ 3: Agent Memory
 """
 
+import gzip
 import time
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import orjson
 import structlog
 
+# Import at module level to avoid repeated import cost and circular import risk
+try:
+    from services.core.debounce import should_save
+except ImportError:
+    # Fallback: her zaman kaydet
+    def should_save(_key: str, _interval: int) -> bool:
+        return True
+
+
 logger = structlog.get_logger()
 
 
 @dataclass
 class MemoryEntry:
-    """Tek hafıza kaydı."""
+    """Tek hafıza kaydı.
+
+    Her bir agent görevi için oluşturulan hafıza kaydı.
+    Working ve episodic memory'de kullanılır.
+    """
 
     task_id: str
     agent_role: str
@@ -35,10 +50,23 @@ class MemoryEntry:
     reasoning: str
     timestamp: str
     outcome: dict | None = None
+    expires_at: str | None = None  # ISO format, None = süresiz
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
-        return {
+    def is_expired(self) -> bool:
+        """Kayıt süresi dolmuş mu?"""
+        if self.expires_at is None:
+            return False
+        try:
+            exp = datetime.fromisoformat(self.expires_at)
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=UTC)
+            return datetime.now(UTC) > exp
+        except (ValueError, TypeError):
+            return False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Dict'e çevir (serialization için)."""
+        d = {
             "task_id": self.task_id,
             "agent_role": self.agent_role,
             "ticker": self.ticker,
@@ -48,25 +76,37 @@ class MemoryEntry:
             "timestamp": self.timestamp,
             "outcome": self.outcome,
         }
+        if self.expires_at:
+            d["expires_at"] = self.expires_at
+        return d
 
 
 class WorkingMemory:
     """Anlık bağlam — son N görev.
 
-    Amaç: Agent'ın yakın geçmişini bilmesi (son 100 görev).
-    Hızlı erişim, kısa süreli.
+    Amaç: Agent'ın yakın geçmişini bilmesi (varsayılan son 100 görev).
+    Hızlı erişim, kısa süreli. deque kullanarak O(1) ekleme/silme.
     """
 
-    def __init__(self, max_items: int = 100):
-        """Otomatik eklendi."""
-        self.items: list[MemoryEntry] = []
+    def __init__(self, max_items: int = 100, ttl_hours: int = 24):
+        self.items: deque[MemoryEntry] = deque(maxlen=max_items)
         self.max_items = max_items
+        self._ttl_hours = ttl_hours
 
-    def add(self, entry: MemoryEntry) -> Any:
-        """Görev ekle."""
+    def add(self, entry: MemoryEntry) -> None:
+        """Görev ekle. TTL otomatik atanır. maxlen dolunca eski kayıt silinir."""
+        if entry.expires_at is None:
+            entry.expires_at = (datetime.now(UTC) + timedelta(hours=self._ttl_hours)).isoformat()
         self.items.append(entry)
-        if len(self.items) > self.max_items:
-            self.items = self.items[-self.max_items :]
+
+    def cleanup_expired(self) -> int:
+        """Süresi dolan kayıtları temizle. Silinen kayıt sayısı döner."""
+        before = len(self.items)
+        self.items = deque(
+            [e for e in self.items if not e.is_expired()],
+            maxlen=self.max_items,
+        )
+        return before - len(self.items)
 
     def get_recent(
         self,
@@ -74,13 +114,13 @@ class WorkingMemory:
         agent_role: str | None = None,
         limit: int = 10,
     ) -> list[MemoryEntry]:
-        """Son görevleri getir."""
+        """Son görevleri getir (opsiyonel filtre ile)."""
         filtered = self.items
         if ticker:
             filtered = [e for e in filtered if e.ticker == ticker]
         if agent_role:
             filtered = [e for e in filtered if e.agent_role == agent_role]
-        return filtered[-limit:]
+        return list(filtered)[-limit:]
 
     def get_last_direction(self, ticker: str) -> str | None:
         """Son yön kararını getir."""
@@ -89,15 +129,15 @@ class WorkingMemory:
                 return entry.direction
         return None
 
-    def clear(self) -> Any:
+    def clear(self) -> None:
         """Working memory'yi temizle."""
         self.items.clear()
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "count": len(self.items),
-            "items": [e.to_dict() for e in self.items[-10:]],  # Son 10
+            "items": [e.to_dict() for e in list(self.items)[-10:]],  # Son 10
         }
 
 
@@ -108,22 +148,42 @@ class EpisodicMemory:
     Uzun süreli, outcome odaklı.
     """
 
-    def __init__(self, max_items: int = 1000, min_confidence_for_episode: float = 0.6):
-        """Otomatik eklendi."""
-        self.episodes: list[MemoryEntry] = []
+    def __init__(self, max_items: int = 1000, min_confidence_for_episode: float = 0.6, ttl_days: int = 30):
+        self.episodes: deque[MemoryEntry] = deque(maxlen=max_items)
         self.outcomes: dict[str, dict] = {}  # task_id → outcome
         self.accuracy_by_regime: dict[str, list[float]] = {}
         self.accuracy_by_ticker: dict[str, list[float]] = {}
         self.max_items = max_items
         self._min_confidence = min_confidence_for_episode
+        self._ttl_days = ttl_days
+        # Hızlı task_id araması için indeks
+        self._episode_index: dict[str, MemoryEntry] = {}
 
-    def add(self, entry: MemoryEntry) -> Any:
-        """Önemli olay ekle."""
-        # Sadece yüksek güven veya başarısız olayları kaydet
+    def add(self, entry: MemoryEntry) -> None:
+        """Önemli olay ekle.
+
+        Sadece yüksek güven (>0.6) veya NO_TRADE yönündeki olayları kaydeder.
+        TTL otomatik atanır.
+        """
         if entry.confidence > self._min_confidence or entry.direction == "NO_TRADE":
+            if entry.expires_at is None:
+                entry.expires_at = (datetime.now(UTC) + timedelta(days=self._ttl_days)).isoformat()
             self.episodes.append(entry)
-            if len(self.episodes) > self.max_items:
-                self.episodes = self.episodes[-self.max_items :]
+            self._episode_index[entry.task_id] = entry
+
+    def cleanup_expired(self) -> int:
+        """Süresi dolan kayıtları temizle. Silinen kayıt sayısı döner."""
+        before = len(self.episodes)
+        expired_ids = [e.task_id for e in self.episodes if e.is_expired()]
+        self.episodes = deque(
+            [e for e in self.episodes if not e.is_expired()],
+            maxlen=self.max_items,
+        )
+        for tid in expired_ids:
+            self._episode_index.pop(tid, None)
+        for tid in expired_ids:
+            self.outcomes.pop(tid, None)
+        return before - len(self.episodes)
 
     def record_outcome(
         self,
@@ -131,9 +191,12 @@ class EpisodicMemory:
         actual_return: float,
         regime: str = "UNKNOWN",
         holding_days: int = 1,
-    ) -> Any:
-        """Sonuç kaydet — accuracy tracking."""
-        episode = next((e for e in self.episodes if e.task_id == task_id), None)
+    ) -> None:
+        """Sonuç kaydet — accuracy tracking.
+
+        Predicted direction ile actual_return karşılaştırarak doğruluk hesaplar.
+        """
+        episode = self._episode_index.get(task_id)
         if not episode:
             return
 
@@ -172,7 +235,7 @@ class EpisodicMemory:
         ticker: str | None = None,
         last_n: int | None = None,
     ) -> float:
-        """Doğruluk oranı."""
+        """Doğruluk oranı hesapla (0-1 arası)."""
         if regime:
             scores = self.accuracy_by_regime.get(regime, [])
         elif ticker:
@@ -186,7 +249,7 @@ class EpisodicMemory:
         return round(sum(scores) / len(scores) if scores else 0, 4)
 
     def get_accuracy_by_regime(self) -> dict[str, float]:
-        """Rejim bazlı doğruluk."""
+        """Rejim bazlı doğruluk oranları."""
         return {
             regime: round(sum(scores) / len(scores) if scores else 0, 4)
             for regime, scores in self.accuracy_by_regime.items()
@@ -194,7 +257,7 @@ class EpisodicMemory:
         }
 
     def get_accuracy_by_ticker(self) -> dict[str, float]:
-        """Ticker bazlı doğruluk."""
+        """Ticker bazlı doğruluk oranları."""
         return {
             ticker: round(sum(scores) / len(scores) if scores else 0, 4)
             for ticker, scores in self.accuracy_by_ticker.items()
@@ -218,8 +281,12 @@ class EpisodicMemory:
                 return regime_matches[-limit:]
         return filtered[-limit:]
 
-    def get_confidence_calibration(self) -> dict:
-        """Confidence kalibrasyonu — beklenen vs gerçek doğruluk."""
+    def get_confidence_calibration(self) -> dict[str, Any]:
+        """Confidence kalibrasyonu — beklenen vs gerçek doğruluk.
+
+        Confidence aralıklarına göre gerçek doğruluk oranını hesaplar.
+        İyi kalibre edilmiş bir modelde: confidence 0.7 ise gerçek doğruluk ~%70 olmalı.
+        """
         if len(self.outcomes) < 10:
             return {"calibrated": False, "reason": "insufficient_data"}
 
@@ -245,8 +312,8 @@ class EpisodicMemory:
 
         return {"calibrated": True, "calibration": calibration}
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "episode_count": len(self.episodes),
             "outcome_count": len(self.outcomes),
@@ -262,11 +329,11 @@ class SemanticMemory:
     Pattern recognition, korelasyonlar, sezonluk kalıplar.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self, max_patterns_per_key: int = 500):
         self.patterns: dict[str, list[dict]] = {}  # ticker → patterns
         self.regime_patterns: dict[str, list[dict]] = {}  # regime → patterns
         self.sector_patterns: dict[str, list[dict]] = {}  # sector → patterns
+        self._max_per_key = max_patterns_per_key
 
     def add_pattern(
         self,
@@ -274,8 +341,8 @@ class SemanticMemory:
         regime: str,
         pattern: dict[str, Any],
         sector: str | None = None,
-    ) -> Any:
-        """Kalıp ekle."""
+    ) -> None:
+        """Kalıp ekle (ticker, regime, opsiyonel sektör bazlı)."""
         entry = {
             **pattern,
             "ticker": ticker,
@@ -286,15 +353,22 @@ class SemanticMemory:
         if ticker not in self.patterns:
             self.patterns[ticker] = []
         self.patterns[ticker].append(entry)
+        # Sınırlı büyüme
+        if len(self.patterns[ticker]) > self._max_per_key:
+            self.patterns[ticker] = self.patterns[ticker][-self._max_per_key :]
 
         if regime not in self.regime_patterns:
             self.regime_patterns[regime] = []
         self.regime_patterns[regime].append(entry)
+        if len(self.regime_patterns[regime]) > self._max_per_key:
+            self.regime_patterns[regime] = self.regime_patterns[regime][-self._max_per_key :]
 
         if sector:
             if sector not in self.sector_patterns:
                 self.sector_patterns[sector] = []
             self.sector_patterns[sector].append(entry)
+            if len(self.sector_patterns[sector]) > self._max_per_key:
+                self.sector_patterns[sector] = self.sector_patterns[sector][-self._max_per_key :]
 
     def get_patterns(
         self,
@@ -303,8 +377,8 @@ class SemanticMemory:
         sector: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
-        """Kalıpları getir."""
-        results = []
+        """Kalıpları getir (opsiyonel filtre ile)."""
+        results: list[dict] = []
 
         if ticker:
             results.extend(self.patterns.get(ticker, [])[-limit:])
@@ -319,7 +393,7 @@ class SemanticMemory:
 
         return results[-limit:]
 
-    def prune_low_accuracy(self, threshold: float = 0.4) -> Any:
+    def prune_low_accuracy(self, threshold: float = 0.4) -> None:
         """Düşük doğruluklu kalıpları temizle.
 
         Not: Kalıplarda "accuracy" anahtarı yoksa, "confidence" kullanılır.
@@ -330,8 +404,8 @@ class SemanticMemory:
                 p for p in self.patterns[ticker] if p.get("accuracy", p.get("confidence", 0.5)) >= threshold
             ]
 
-    def to_dict(self) -> dict:
-        """Otomatik eklendi."""
+    def to_dict(self) -> dict[str, Any]:
+        """Serialization için dict'e çevir."""
         return {
             "ticker_patterns": sum(len(v) for v in self.patterns.values()),
             "regime_patterns": sum(len(v) for v in self.regime_patterns.values()),
@@ -346,6 +420,8 @@ class AgentMemory:
     1. Working Memory — anlık bağlam (son 100 görev)
     2. Episodic Memory — geçmiş olaylar (önemli olaylar + outcome tracking)
     3. Semantic Memory — bilgi grafiği (öğrenilen kalıplar)
+
+    Her agent rolü (TECHNICAL, FUNDAMENTAL, vb.) kendi AgentMemory instance'ına sahiptir.
     """
 
     def __init__(
@@ -355,7 +431,6 @@ class AgentMemory:
         max_episodic: int = 1000,
         persistence_path: str | None = None,
     ):
-        """Otomatik eklendi."""
         self.agent_role = agent_role
         self.working = WorkingMemory(max_items=max_working)
         self.episodic = EpisodicMemory(max_items=max_episodic)
@@ -369,8 +444,8 @@ class AgentMemory:
         direction: str,
         confidence: float,
         reasoning: str,
-    ) -> Any:
-        """Görev kaydet (tüm katmanlara)."""
+    ) -> None:
+        """Görev kaydet (working + episodic memory'ye)."""
         entry = MemoryEntry(
             task_id=task_id,
             agent_role=self.agent_role,
@@ -392,8 +467,8 @@ class AgentMemory:
         task_id: str,
         actual_return: float,
         regime: str = "UNKNOWN",
-    ) -> Any:
-        """Sonuç kaydet."""
+    ) -> None:
+        """Sonuç kaydet (accuracy tracking için)."""
         self.episodic.record_outcome(task_id, actual_return, regime)
 
     def get_context_for_task(
@@ -401,7 +476,10 @@ class AgentMemory:
         ticker: str,
         regime: str | None = None,
     ) -> dict[str, Any]:
-        """Yeni görev için bağlam oluştur."""
+        """Yeni görev için bağlam oluştur.
+
+        Agent'ın geçmiş deneyimlerini, benzer olayları ve öğrenilen kalıpları döndürür.
+        """
         return {
             "recent_tasks": [e.to_dict() for e in self.working.get_recent(ticker, limit=5)],
             "similar_events": [e.to_dict() for e in self.episodic.get_similar(ticker, limit=3)],
@@ -411,8 +489,27 @@ class AgentMemory:
             "ticker_accuracy": self.episodic.get_accuracy(ticker=ticker),
         }
 
-    def get_performance_summary(self) -> dict:
-        """Performans özeti."""
+    def cleanup_expired(self) -> dict[str, int]:
+        """Süresi dolan kayıtları tüm katmanlardan temizle.
+
+        Returns:
+            Her katmandan silinen kayıt sayısı
+        """
+        working_cleaned = self.working.cleanup_expired()
+        episodic_cleaned = self.episodic.cleanup_expired()
+        logger.info(
+            "Memory cleanup",
+            agent=self.agent_role,
+            working_cleaned=working_cleaned,
+            episodic_cleaned=episodic_cleaned,
+        )
+        return {
+            "working": working_cleaned,
+            "episodic": episodic_cleaned,
+        }
+
+    def get_performance_summary(self) -> dict[str, Any]:
+        """Performans özeti — tüm katmanların istatistikleri."""
         return {
             "agent_role": self.agent_role,
             "working_memory_size": len(self.working.items),
@@ -424,9 +521,12 @@ class AgentMemory:
             "semantic_patterns": self.semantic.to_dict(),
         }
 
-    def save(self, path: str | None = None) -> Any:
-        """Memory'yi dosyaya kaydet (debounced — SSD dostu)."""
-        from services.core.debounce import should_save
+    def save(self, path: str | None = None) -> None:
+        """Memory'yi dosyaya kaydet (debounced — SSD dostu).
+
+        Atomik yazım kullanır: önce tmp dosyaya yazar, sonra rename yapar.
+        Bu sayede crash sırasında dosya bozulmaz.
+        """
         save_path = path or self._persistence_path
         if not save_path:
             return
@@ -437,43 +537,97 @@ class AgentMemory:
             "agent_role": self.agent_role,
             "saved_at": datetime.now(UTC).isoformat(),
             "working": self.working.to_dict(),
-            "episodic": self.episodic.to_dict(),
+            "episodic": {
+                "episodes": [e.to_dict() for e in self.episodic.episodes],
+                "outcomes": self.episodic.outcomes,
+                "accuracy_by_regime": self.episodic.accuracy_by_regime,
+                "accuracy_by_ticker": self.episodic.accuracy_by_ticker,
+            },
             "semantic": self.semantic.to_dict(),
             "performance": self.get_performance_summary(),
         }
 
-        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(save_path, "w") as f:
-            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str).decode())
+        target = Path(save_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info("Memory saved", path=save_path)
+        # Atomik yazım: tmp + rename
+        # Büyük dosyalar için gzip sıkıştırma (>100KB)
+        json_bytes = orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str)
+        use_gzip = len(json_bytes) > 100 * 1024  # 100KB eşik
 
-    def load(self, path: str | None = None) -> Any:
-        """Memory'yi dosyadan yükle."""
+        if use_gzip:
+            tmp_path = target.with_suffix(".tmp.gz")
+            final_path = target.with_suffix(".json.gz") if target.suffix == ".json" else target.with_suffix(".gz")
+        else:
+            tmp_path = target.with_suffix(".tmp")
+            final_path = target
+
+        try:
+            if use_gzip:
+                with gzip.open(tmp_path, "wb") as f:
+                    f.write(json_bytes)
+            else:
+                with open(tmp_path, "wb") as f:
+                    f.write(json_bytes)
+            tmp_path.rename(final_path)
+            logger.info("Memory saved", path=str(final_path), compressed=use_gzip, size=len(json_bytes))
+        except Exception as e:
+            logger.error("Failed to save memory", path=save_path, error=str(e))
+            tmp_path.unlink(missing_ok=True)
+
+    def load(self, path: str | None = None) -> None:
+        """Memory'yi dosyadan yükle.
+
+        Hatalı kayıtları atlar, bozuk dosyayı loglar.
+        Hem gzip sıkıştırılmış hem normal dosyaları okuyabilir.
+        """
         load_path = path or self._persistence_path
-        if not load_path or not Path(load_path).exists():
+        if not load_path:
+            return
+
+        # Hem .json.gz hem .json dosyalarını kontrol et
+        target = Path(load_path)
+        if target.with_suffix(".gz").exists():
+            target = target.with_suffix(".gz")
+        elif not target.exists():
             return
 
         try:
-            with open(load_path) as f:
-                data = orjson.loads(f.read())
+            if target.suffix == ".gz":
+                with gzip.open(target, "rb") as f:
+                    data = orjson.loads(f.read())
+            else:
+                with open(target, "rb") as f:
+                    data = orjson.loads(f.read())
 
-            # Working memory — her item'ı ayrı ayrı yükle, hatalı olanı atla
+            # Working memory
             for item in data.get("working", {}).get("items", []):
                 try:
                     self.working.add(MemoryEntry(**item))
                 except (TypeError, KeyError) as e:
                     logger.debug("Skipping invalid working memory entry", error=str(e))
 
-            # Episodic memory
-            for item in data.get("episodic", {}).get("items", []):
+            # Episodic memory — hem eski format ("items") hem yeni format ("episodes") desteği
+            episodic_data = data.get("episodic", {})
+            episode_items = episodic_data.get("episodes", episodic_data.get("items", []))
+            for item in episode_items:
                 try:
                     self.episodic.add(MemoryEntry(**item))
                 except (TypeError, KeyError) as e:
                     logger.debug("Skipping invalid episodic memory entry", error=str(e))
 
+            # Outcomes ve accuracy istatistiklerini yükle
+            for task_id, outcome in episodic_data.get("outcomes", {}).items():
+                self.episodic.outcomes[task_id] = outcome
+            self.episodic.accuracy_by_regime = episodic_data.get("accuracy_by_regime", {})
+            self.episodic.accuracy_by_ticker = episodic_data.get("accuracy_by_ticker", {})
+
             logger.info(
-                "Memory loaded", path=load_path, working=len(self.working.items), episodic=len(self.episodic.episodes)
+                "Memory loaded",
+                path=load_path,
+                working=len(self.working.items),
+                episodic=len(self.episodic.episodes),
+                outcomes=len(self.episodic.outcomes),
             )
         except orjson.JSONDecodeError as e:
             logger.warning("Corrupted memory file", path=load_path, error=str(e))
@@ -487,19 +641,22 @@ class MemoryConsolidator:
     """Periyodik memory consolidation.
 
     Yapar:
-    - Working memory'deki eski kayıtları episodic'e taşı
+    - Working memory'deki düşük güvenli kayıtları temizle
     - Başarısız pattern'ları semantic memory'den kaldır
     - Accuracy istatistiklerini güncelle
     - Dosyaya kaydet
     """
 
     def __init__(self, consolidation_interval_hours: int = 24):
-        """Otomatik eklendi."""
         self.interval_hours = consolidation_interval_hours
         self._last_consolidation: dict[str, float] = {}
 
-    async def consolidate(self, memory: AgentMemory) -> dict[str, Any]:
-        """Memory'yi temizle ve özetle."""
+    def consolidate(self, memory: AgentMemory) -> dict[str, Any]:
+        """Memory'yi temizle ve özetle.
+
+        Not: Bu fonksiyon async değildi, gereksiz async kaldırıldı.
+        I/O operasyonu (save) zaten blocking.
+        """
         now = time.time()
         last = self._last_consolidation.get(memory.agent_role, 0)
 
@@ -512,12 +669,18 @@ class MemoryConsolidator:
             self._last_consolidation[memory.agent_role] = now
             return {"consolidated": False, "reason": "empty_memory"}
 
-        # 1. Düşük güvenli working memory'yi temizle
+        # 1. Süresi dolan kayıtları temizle (TTL)
+        ttl_cleaned = memory.cleanup_expired()
+
+        # 2. Düşük güvenli working memory'yi temizle
         old_count = len(memory.working.items)
-        memory.working.items = [e for e in memory.working.items if e.confidence > 0.3]
+        memory.working.items = deque(
+            [e for e in memory.working.items if e.confidence > 0.3],
+            maxlen=memory.working.max_items,
+        )
         cleaned = old_count - len(memory.working.items)
 
-        # 2. Semantic memory'den düşük doğruluklu kalıpları temizle
+        # 3. Semantic memory'den düşük doğruluklu kalıpları temizle
         memory.semantic.prune_low_accuracy(threshold=0.4)
 
         # 3. Kaydet
@@ -528,7 +691,9 @@ class MemoryConsolidator:
 
         result = {
             "consolidated": True,
-            "cleaned_working": cleaned,
+            "ttl_cleaned_working": ttl_cleaned["working"],
+            "ttl_cleaned_episodic": ttl_cleaned["episodic"],
+            "low_confidence_cleaned": cleaned,
             "episodic_count": len(memory.episodic.episodes),
             "outcome_count": len(memory.episodic.outcomes),
             "accuracy": memory.episodic.get_accuracy(),
