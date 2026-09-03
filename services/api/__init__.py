@@ -1,8 +1,8 @@
 """
-ALPHA BIST — API Package v2.0
+ALPHA BIST — API Paketi v2.0
 
-92 REST endpoint + 10 WebSocket kanalı.
-JWT + RBAC + Rate Limiting + OpenAPI.
+92 REST uç noktası + 10 WebSocket kanalı.
+JWT + RBAC + Hız Sınırı + OpenAPI desteği.
 """
 
 from .app import app, create_app

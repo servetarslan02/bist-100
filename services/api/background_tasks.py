@@ -1,9 +1,8 @@
-from typing import Any
-
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import structlog
 from opentelemetry import trace
@@ -20,6 +19,7 @@ async def radar_cache_refresher() -> Any:
     """
     await asyncio.sleep(10)
     while True:
+        current_phase = None
         try:
             from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 
@@ -32,10 +32,10 @@ async def radar_cache_refresher() -> Any:
                     await _fetch_radar_fresh(limit=1000)
 
         except Exception as e:
-            logger.warning(f"radar_cache_refresher error: {e}")
+            logger.warning(f"radar_cache_refresher hatası: {e}")
 
         try:
-            if current_phase != BISTMarketPhase.CLOSED:
+            if current_phase is not None and current_phase != BISTMarketPhase.CLOSED:
                 await asyncio.sleep(60)
             else:
                 await asyncio.sleep(300)
@@ -44,7 +44,11 @@ async def radar_cache_refresher() -> Any:
 
 
 async def ml_learning_scheduler() -> Any:
-    """ML eğitimleri müstakil alpha-learning konteynerinde yürütülür; API hafif kalır."""
+    """ML eğitimleri müstakil alpha-learning konteynerinde yürütülür; API hafif kalır.
+
+    Bu fonksiyon bir yer tutucudur. ML eğitimleri ayrı bir servise delege edilmiştir.
+    Gelecekte bu fonksiyon, eğitim durumunu izlemek veya sonuçları toplamak için genişletilebilir.
+    """
     logger.info("ml_scheduler: ML eğitimleri müstakil alpha-learning servisine delege edildi.")
     while True:
         await asyncio.sleep(86400)
@@ -76,7 +80,7 @@ async def paper_trading_scheduler() -> Any:
         with tracer.start_as_current_span("background.paper_trading_scheduler.master_catchup"):
             await master_catchup.execute_full_catchup()
     except Exception as e:
-        logger.warning(f"paper_trading_scheduler startup master catchup error: {e}")
+        logger.warning(f"paper_trading_scheduler başlangıç master catchup hatası: {e}")
 
     while True:
         now = datetime.now(TR_TZ)
@@ -111,6 +115,6 @@ async def paper_trading_scheduler() -> Any:
                     with tracer.start_as_current_span("background.paper_trading_scheduler.eod"):
                         await run_eod_signal_cycle()
             except Exception as e:
-                logger.error(f"paper_trading_scheduler error in {phase}: {e}")
+                logger.error(f"paper_trading_scheduler {phase} hatası: {e}")
             finally:
                 await asyncio.sleep(60)

@@ -1,15 +1,15 @@
 """
-ALPHA BIST — API Authentication & Authorization v2.0 (Enterprise Refactored)
+ALPHA BIST — API Kimlik Doğrulama ve Yetkilendirme v2.0 (Kurumsal Yapı)
 
-JWT + RBAC (Role-Based Access Control).
-Provides SOLID, DI-compatible, memory-optimized authentication handlers.
+JWT + RBAC (Rol Tabanlı Erişim Kontrolü).
+SOLID prensiplerine uygun, bağımlılık enjeksiyonu destekli, bellek optimize kimlik doğrulama işleyicileri.
 
 Roller:
-- VIEWER: GET (dashboard, raporlar)
+- VIEWER: GET (gösterge paneli, raporlar)
 - ANALYST: GET + POST (analiz çalıştır)
-- OPERATOR: GET + POST + PUT (emir, rebalance)
-- ADMIN: Tüm endpoint'ler
-- SYSTEM: Servisler arası (API key)
+- OPERATOR: GET + POST + PUT (emir, yeniden dengeleme)
+- ADMIN: Tüm uç noktalar
+- SYSTEM: Servisler arası (API anahtarı)
 """
 
 import base64
@@ -23,7 +23,7 @@ from typing import Any
 import orjson
 import structlog
 
-# Optional PyJWT dependency
+# İsteğe bağlı PyJWT bağımlılığı
 try:
     import jwt
 
@@ -39,7 +39,7 @@ logger = structlog.get_logger(__name__)
 tracer = get_tracer(__name__)
 
 
-# Role → izin verilen HTTP method'ları
+# Rol → izin verilen HTTP yöntemleri
 ROLE_PERMISSIONS: dict[Role, list[str]] = {
     Role.VIEWER: ["GET"],
     Role.ANALYST: ["GET", "POST"],
@@ -52,8 +52,8 @@ ROLE_PERMISSIONS: dict[Role, list[str]] = {
 @dataclass(frozen=True)
 class AuthConfig:
     """
-    Configuration model for authentication.
-    Supports Dependency Injection by uncoupling from direct environment variable access.
+    Kimlik doğrulama yapılandırma modeli.
+    Doğrudan ortam değişkeni erişimini kaldırarak bağımlılık enjeksiyonunu destekler.
     """
 
     jwt_secret: str
@@ -64,7 +64,7 @@ class AuthConfig:
 @dataclass
 class User:
     """
-    Represents an authenticated user in the system.
+    Sistemde kimliği doğrulanmış kullanıcıyı temsil eder.
     """
 
     user_id: str
@@ -73,25 +73,31 @@ class User:
     permissions: list[str] = field(default_factory=list)
     is_active: bool = True
 
+    def __repr__(self) -> str:
+        return f"User(user_id={self.user_id!r}, username={self.username!r}, role={self.role!r}, is_active={self.is_active!r})"
+
 
 @dataclass
 class TokenPayload:
     """
-    Represents the parsed payload from a valid JWT token.
+    Geçerli bir JWT belirtecinin ayrıştırılmış yükünü temsil eder.
     """
 
     sub: str  # user_id
     username: str
     role: str
     permissions: list[str]
-    exp: float  # expiration timestamp
-    iat: float  # issued at
+    exp: float  # sona erme zaman damgası
+    iat: float  # oluşturulma zaman damgası
+
+    def __repr__(self) -> str:
+        return f"TokenPayload(sub={self.sub!r}, username={self.username!r}, role={self.role!r})"
 
 
 class JWTHandler:
     """
-    Handles generation and validation of JWT tokens.
-    Uses Dependency Injection for configuration to adhere to SOLID principles.
+    JWT belirteçlerinin oluşturulmasını ve doğrulanmasını yönetir.
+    SOLID prensiplerine uymak için yapılandırma için bağımlılık enjeksiyonu kullanır.
     """
 
     def __init__(
@@ -102,24 +108,29 @@ class JWTHandler:
         expires_hours: int = 24,
     ) -> None:
         """
-        Initializes the JWT Handler.
-        Supports dependency injection or direct secret_key configuration.
+        JWT İşleyicisini başlatır.
+        Bağımlılık enjeksiyonu veya doğrudan secret_key yapılandırmasını destekler.
         """
         if config is not None:
             self.config = config
         else:
-            secret = secret_key or os.getenv("JWT_SECRET_KEY", "alpha-secret-key-prod-change-in-env-2026")
+            secret = secret_key or os.getenv("JWT_SECRET_KEY")
+            if not secret:
+                raise ValueError(
+                    "JWT_SECRET_KEY ortam değişkeni ayarlanmamış. "
+                    "Güvenlik için varsayılan değer kaldırıldı."
+                )
             self.config = AuthConfig(
                 jwt_secret=secret,
                 jwt_algorithm=algorithm,
                 jwt_expires_hours=expires_hours,
             )
         if not self.config.jwt_secret:
-            raise ValueError("JWT secret key must be provided in AuthConfig.")
+            raise ValueError("AuthConfig'de JWT secret key sağlanmalıdır.")
 
     @property
     def algorithm(self) -> str:
-        """Returns the JWT algorithm configured."""
+        """Yapılandırılmış JWT algoritmasını döndürür."""
         return self.config.jwt_algorithm
 
     def create_token(
@@ -130,16 +141,16 @@ class JWTHandler:
         expires_hours: int | None = None,
     ) -> str:
         """
-        Creates a JWT token for the specified user and role.
+        Belirtilen kullanıcı ve rol için JWT belirteci oluşturur.
 
         Args:
-            user_id (str): Unique user identifier.
-            username (str): Username.
-            role (Role): Assigned user role.
-            expires_hours (int | None): Optional expiration in hours.
+            user_id (str): Benzersiz kullanıcı tanımlayıcısı.
+            username (str): Kullanıcı adı.
+            role (Role): Atanan kullanıcı rolü.
+            expires_hours (int | None): Opsiyonel sona erme süresi (saat).
 
         Returns:
-            str: Encoded JWT string.
+            str: Kodlanmış JWT dizgesi.
         """
         with tracer.start_as_current_span("auth.create_token") as span:
             now = time.time()
@@ -164,7 +175,7 @@ class JWTHandler:
 
     def _create_fallback_token(self, payload: dict[str, Any]) -> str:
         """
-        Creates a token using HMAC and standard libraries when PyJWT is not available.
+        PyJWT mevcut olmadığında HMAC ve standart kütüphaneler kullanarak belirteç oluşturur.
         """
         header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
         body = base64.urlsafe_b64encode(orjson.dumps(payload)).decode().rstrip("=")
@@ -180,17 +191,17 @@ class JWTHandler:
 
     def verify_token(self, token: str) -> TokenPayload | None:
         """
-        Verifies and parses a JWT token.
+        JWT belirtecini doğrular ve ayrıştırır.
 
         Args:
-            token (str): The JWT string to verify.
+            token (str): Doğrulanacak JWT dizgesi.
 
         Returns:
-            Optional[TokenPayload]: Parsed payload if valid, None otherwise.
+            Optional[TokenPayload]: Geçerliyse ayrıştırılmış yük, aksi halde None.
         """
         with tracer.start_as_current_span("auth.verify_token"):
             if not token or not isinstance(token, str):
-                logger.warning("Invalid token format provided.")
+                logger.warning("Geçersiz belirteç biçimi sağlandı.")
                 return None
 
             if HAS_JWT and jwt is not None:
@@ -198,18 +209,18 @@ class JWTHandler:
                     payload = jwt.decode(token, self.config.jwt_secret, algorithms=[self.config.jwt_algorithm])
                     return TokenPayload(**payload)
                 except jwt.ExpiredSignatureError:
-                    logger.warning("JWT token expired.")
+                    logger.warning("JWT belirtecinin süresi doldu.")
                     return None
                 except jwt.InvalidTokenError as e:
-                    logger.warning("JWT verification failed.", error=str(e))
+                    logger.warning("JWT doğrulaması başarısız.", error=str(e))
                     return None
 
             return self._verify_fallback_token(token)
 
     def _verify_fallback_token(self, token: str) -> TokenPayload | None:
         """
-        Verifies an HMAC token when PyJWT is not available.
-        Ensures strict, constant-time signature comparison.
+        PyJWT mevcut olmadığında HMAC belirtecini doğrular.
+        Sabit zamanlı imza karşılaştırması sağlar.
         """
         try:
             parts = token.split(".")
@@ -226,7 +237,7 @@ class JWTHandler:
             )
 
             if not hmac.compare_digest(sig, expected_sig):
-                logger.warning("JWT signature mismatch.")
+                logger.warning("JWT imza uyuşmazlığı.")
                 return None
 
             rem = len(body) % 4
@@ -235,32 +246,32 @@ class JWTHandler:
 
             payload_data = orjson.loads(base64.urlsafe_b64decode(body.encode()))
             if payload_data.get("exp", 0) < time.time():
-                logger.warning("JWT token expired.")
+                logger.warning("JWT belirtecinin süresi doldu.")
                 return None
 
             return TokenPayload(**payload_data)
         except Exception as e:
-            logger.warning("Fallback JWT verification failed.", error=str(e))
+            logger.warning("Yedek JWT doğrulaması başarısız.", error=str(e))
             return None
 
 
 class APIKeyManager:
     """
-    Manages API keys for inter-service authentication.
+    Servisler arası kimlik doğrulama için API anahtarlarını yönetir.
     """
 
     def __init__(self) -> None:
-        """Initializes the API Key Manager with an empty store."""
+        """API Anahtar Yöneticisini boş bir depo ile başlatır."""
         self._keys: dict[str, dict[str, Any]] = {}
 
     def register_key(self, api_key: str, service: str, permissions: list[str]) -> None:
         """
-        Registers a new API key.
+        Yeni bir API anahtarı kaydeder.
 
         Args:
-            api_key (str): The API key string.
-            service (str): The name of the service owning the key.
-            permissions (List[str]): List of allowed HTTP methods.
+            api_key (str): API anahtarı dizgesi.
+            service (str): Anahtara sahip hizmetin adı.
+            permissions (list[str]): İzin verilen HTTP yöntemlerinin listesi.
         """
         self._keys[api_key] = {
             "service": service,
@@ -270,43 +281,43 @@ class APIKeyManager:
 
     def verify_key(self, api_key: str) -> dict[str, Any] | None:
         """
-        Verifies if an API key exists and is valid.
+        Bir API anahtarının mevcut olup olmadığını ve geçerli olduğunu doğrular.
 
         Args:
-            api_key (str): The API key to verify.
+            api_key (str): Doğrulanacak API anahtarı.
 
         Returns:
-            Optional[Dict[str, Any]]: The key metadata if valid, None otherwise.
+            Optional[dict[str, Any]]: Geçerliyse anahtar meta verileri, aksi halde None.
         """
         with tracer.start_as_current_span("auth.verify_key"):
             return self._keys.get(api_key)
 
     def revoke_key(self, api_key: str) -> None:
         """
-        Revokes an active API key.
+        Aktif bir API anahtarını iptal eder.
 
         Args:
-            api_key (str): The API key to revoke.
+            api_key (str): İptal edilecek API anahtarı.
         """
         self._keys.pop(api_key, None)
 
 
 class RBACChecker:
     """
-    Handles Role-Based Access Control logic and endpoint permission validation.
+    Rol Tabanlı Erişim Kontrolü mantığını ve uç nokta izin doğrulamasını yönetir.
     """
 
     @staticmethod
     def check_permission(role: Role, method: str) -> bool:
         """
-        Checks if a given role is allowed to execute a specific HTTP method.
+        Belirli bir rolün belirli bir HTTP yöntemini çalıştırmaya izin verip vermediğini kontrol eder.
 
         Args:
-            role (Role): The role to check.
-            method (str): The HTTP method (e.g., 'GET', 'POST').
+            role (Role): Kontrol edilecek rol.
+            method (str): HTTP yöntemi (ör. 'GET', 'POST').
 
         Returns:
-            bool: True if allowed, False otherwise.
+            bool: İzin veriliyorsa True, aksi halde False.
         """
         allowed = ROLE_PERMISSIONS.get(role, [])
         return method.upper() in allowed
@@ -314,14 +325,14 @@ class RBACChecker:
     @staticmethod
     def check_endpoint_access(role: Role, endpoint: str) -> bool:
         """
-        Checks if a role has structural access to specific sensitive endpoints.
+        Bir rolün belirli hassas uç noktalara yapısal erişiminin olup olmadığını kontrol eder.
 
         Args:
-            role (Role): The user's role.
-            endpoint (str): The requested API endpoint path.
+            role (Role): Kullanıcının rolü.
+            endpoint (str): İstenen API uç nokta yolu.
 
         Returns:
-            bool: True if access is permitted, False otherwise.
+            bool: Erişime izin veriliyorsa True, aksi halde False.
         """
         if endpoint.startswith("/admin/"):
             return role in [Role.ADMIN, Role.SYSTEM]
@@ -334,9 +345,13 @@ class RBACChecker:
         return True
 
 
-# Global instances (Legacy Support/Simple Container)
-# In a full DI framework, these would be managed by the IoC container.
-_jwt_secret = os.environ.get("JWT_SECRET", "fallback-secret-for-development-only")
+# Global örnekler (Basit Konteyner Desteği)
+# Tam bir DI çerçevesinde bunlar IoC konteyneri tarafından yönetilir.
+_jwt_secret = os.environ.get("JWT_SECRET")
+if not _jwt_secret:
+    logger.warning("JWT_SECRET ortam değişkeni ayarlanmamış — kimlik doğrulama çalışmayabilir.")
+    _jwt_secret = "dev-only-unsafe-key"  # Sadece geliştirme ortamında, üretimde hata verir
+
 _default_config = AuthConfig(jwt_secret=_jwt_secret)
 
 jwt_handler = JWTHandler(_default_config)
@@ -347,4 +362,4 @@ _default_key = os.environ.get("SYSTEM_API_KEY")
 if _default_key:
     api_key_manager.register_key(_default_key, "system", ["GET", "POST", "PUT", "DELETE"])
 else:
-    logger.warning("SYSTEM_API_KEY not set — inter-service auth disabled.")
+    logger.warning("SYSTEM_API_KEY ayarlanmamış — servisler arası kimlik doğrulama devre dışı.")

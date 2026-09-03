@@ -26,6 +26,7 @@ Kullanım:
 
 import asyncio
 import time
+from collections.abc import Callable
 from typing import Any
 
 import structlog
@@ -37,7 +38,7 @@ try:
 except ImportError:
     HAS_WEBSOCKETS = False
 
-# Protobuf imports — gRPC ile aynı generated kod
+# Protobuf içe aktarımları — gRPC ile aynı generated kod
 try:
     from ..grpc.generated import market_pb2
 
@@ -55,23 +56,23 @@ tracer = trace.get_tracer("alpha-bist.api_binary_ws")
 
 
 def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+    """OpenTelemetry span sarmalayıcısı oluşturur."""
 
     def decorator(func) -> Any:
-        """Otomatik eklendi."""
+        """Senkron fonksiyon için OpenTelemetry span sarmalayıcısı."""
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+            """Senkron fonksiyon sarmalayıcısı — span bağlamını yönetir."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 
         return wrapper
 
     def async_decorator(func) -> Any:
-        """Otomatik eklendi."""
+        """Asenkron fonksiyon için OpenTelemetry span sarmalayıcısı."""
         @functools.wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+            """Asenkron fonksiyon sarmalayıcısı — span bağlamını yönetir."""
             with tracer.start_as_current_span(span_name):
                 return await func(self, *args, **kwargs)
 
@@ -88,7 +89,7 @@ class ProtobufMessage:
     binary frame içinde paketler.
     """
 
-    # Mesaj tipi mapping (StreamMessage.MessageType enum)
+    # Mesaj tipi eşlemesi (StreamMessage.MessageType enum)
     TYPE_MAP = {
         "tick": 0,  # TICK
         "ohlcv": 1,  # OHLCV
@@ -105,7 +106,7 @@ class ProtobufMessage:
 
     @classmethod
     def _next_sequence(cls) -> int:
-        """Otomatik eklendi."""
+        """Sıradaki mesaj sıra numarasını döndürür ve artırır."""
         cls._sequence += 1
         return cls._sequence
 
@@ -425,7 +426,7 @@ class ProtobufMessage:
                 "timestamp": msg.timestamp,
             }
 
-            # Payload'a göre alt mesajı parse et
+            # Yük alanına göre alt mesajı ayrıştır
             payload_field = msg.WhichOneof("payload")
             if payload_field == "tick":
                 result["data"] = {
@@ -535,7 +536,7 @@ class ProtobufMessage:
             return result
 
         except Exception as e:
-            logger.warning("Protobuf decode failed, trying fallback", error=str(e))
+            logger.warning("Protobuf çözümleme başarısız, yedek deneniyor", error=str(e))
             return cls._fallback_decode(data)
 
     @classmethod
@@ -577,12 +578,12 @@ class BinaryWebSocket:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Binary WebSocket sunucusu örneklerini başlatır."""
         self._clients: set = set()
         self._running = False
-        self._msg_handler: callable | None = None
+        self._msg_handler: Callable | None = None
 
-    def on_message(self, handler: callable) -> Any:
+    def on_message(self, handler: Callable) -> Any:
         """Mesaj handler'ı kaydet."""
         self._msg_handler = handler
 
@@ -613,16 +614,16 @@ class BinaryWebSocket:
                     elif self._msg_handler:
                         await self._msg_handler(decoded)
                     else:
-                        logger.debug("Binary WS message received", type=msg_type)
+                        logger.debug("Binary WS mesajı alındı", type=msg_type)
                 else:
                     # JSON fallback (eski istemciler)
                     try:
                         data = orjson.loads(message)
-                        logger.debug("JSON fallback message", type=data.get("type"))
+                        logger.debug("JSON yedek mesajı", type=data.get("type"))
                     except Exception:
-                        logger.warning("Caught Exception in handler", exc_info=True)
+                        logger.warning("json_fallback_decode_failed", exc_info=True)
         except Exception as e:
-            logger.debug("WebSocket client disconnected", client_id=client_id, error=str(e))
+            logger.debug("WebSocket istemcisi bağlantısı kesildi", client_id=client_id, error=str(e))
         finally:
             self._clients.discard(websocket)
 
@@ -765,12 +766,12 @@ class BinaryWebSocket:
     async def start(self, host: str = "0.0.0.0", port: int = 8765) -> Any:
         """Binary WebSocket sunucusunu başlat."""
         if not HAS_WEBSOCKETS:
-            logger.warning("websockets not installed, Binary WS disabled")
+            logger.warning("websockets yüklü değil, Binary WS devre dışı")
             return
 
         self._running = True
         logger.info(
-            "Binary WebSocket server starting",
+            "Binary WebSocket sunucusu başlatılıyor",
             host=host,
             port=port,
             protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback",
@@ -788,7 +789,7 @@ class BinaryWebSocket:
             try:
                 await client.close()
             except Exception:
-                logger.warning("Caught Exception in stop", exc_info=True)
+                logger.warning("websocket_close_failed", client_id=client_id, exc_info=True)
         self._clients.clear()
 
     def get_stats(self) -> dict[str, Any]:

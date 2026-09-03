@@ -1,39 +1,34 @@
-from typing import Any
-
 """
-ALPHA BIST — API Application v2.0 (CANONICAL PRODUCTION SERVER)
+ALPHA BIST — API Uygulaması v2.0 (CANONICAL ÜRETİM SUNUCUSU)
 
 Tüm API bileşenlerini birleştiren ana uygulama.
 
 Özellikler:
-- 92 REST endpoint (v1)
+- 92 REST uç noktası (v1)
 - 10 WebSocket kanalı
-- JWT + RBAC authentication
-- Rate limiting
+- JWT + RBAC kimlik doğrulama
+- Hız sınırı
 - OpenAPI/Swagger
 - CORS
-- Health checks
+- Sağlık kontrolleri
 - PostgreSQL + ClickHouse + Redis
 
-NOT: Bu dosya CANONICAL production entry point'tir.
-- server.py → DEV/legacy (SQLite)
-- main.py → DEPRECATED (eski entry point)
+NOT: Bu dosya CANONICAL üretim giriş noktasıdır.
+- server.py → GELİŞTİRME/legacy (SQLite)
+- main.py → KULLANIMDAN KALDIRILMIŞ (eski giriş noktası)
 """
 
 import asyncio
 import os
 import time
+import uuid as _uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
-
-try:
-    import orjson
-except ImportError:
-    import orjson as orjson
 
 import structlog
 from fastapi.responses import Response as FastAPIResponse
@@ -59,7 +54,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
 
         await init_sharding()
     except Exception as e:
-        logger.warning(f"Sharding not started: {e}")
+        logger.warning(f"Sharding başlatılamadı: {e}")
 
     refresh_task = None
     try:
@@ -68,13 +63,13 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
         await cache_warmer.warm_all()
         refresh_task = asyncio.create_task(cache_warmer.refresh_hot_keys())
     except Exception as e:
-        logger.warning(f"Cache warming failed: {e}")
+        logger.warning(f"Önbellek ısıtma başarısız: {e}")
 
     try:
         from services.portfolio.main import portfolio_service
 
         await portfolio_service.start()
-        logger.info("PortfolioService started in API lifespan")
+        logger.info("PortfolioService API yaşam döngüsünde başlatıldı")
     except Exception as e:
         logger.error(f"PortfolioService baslatilamadi: {e}")
 
@@ -119,10 +114,10 @@ async def _start_grpc() -> Any:
         grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
         server = await start_grpc_server(port=grpc_port)
         if server:
-            logger.info("grpc_server_started", port=grpc_port)
+            logger.info("grpc_sunucusu_başlatıldı", port=grpc_port)
         return server
     except Exception as e:
-        logger.warning("grpc_server_failed", error=str(e))
+        logger.warning("grpc_sunucusu_başarısız", error=str(e))
         return None
 
 
@@ -134,7 +129,7 @@ async def _start_nats() -> Any:
 
         await nats_client.connect()
     except Exception as e:
-        logger.warning("nats_connection_failed", error=str(e))
+        logger.warning("nats_bağlantısı_başarısız", error=str(e))
 
 
 @otel_trace("api.start_service_mesh")
@@ -146,7 +141,7 @@ async def _start_service_mesh() -> Any:
         init_service_mesh()
         return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
-        logger.warning("service_mesh_failed", error=str(e))
+        logger.warning("servis_mesh_başarısız", error=str(e))
         return None
 
 
@@ -164,38 +159,38 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
         from ..core.state_store import state_store
 
         state_store.flush()
-        logger.info("State store buffer flushed on shutdown")
+        logger.info("Durum deposu tampon belleği kapatmada temizlendi")
     except Exception as e:
-        logger.warning(f"State store flush on shutdown failed: {e}")
+        logger.warning(f"Kapatmada durum deposu temizleme başarısız: {e}")
 
     try:
         from ..core.offline_queue import offline_queue
 
         await offline_queue.flush()
-        logger.info("Offline queue flushed on shutdown")
+        logger.info("Çevrimdışı kuyruk kapatmada temizlendi")
     except Exception as e:
-        logger.warning(f"Offline queue flush on shutdown failed: {e}")
+        logger.warning(f"Kapatmada çevrimdışı kuyruk temizleme başarısız: {e}")
 
     if grpc_server:
         try:
             await grpc_server.stop(grace=5)
-            logger.info("gRPC server stopped")
+            logger.info("gRPC sunucusu durduruldu")
         except Exception as e:
-            logger.warning("gRPC stop error", error=str(e))
+            logger.warning("gRPC durdurma hatası", error=str(e))
 
     try:
         from ..nats.client import nats_client
 
         await nats_client.close()
     except Exception:
-        logger.warning("Caught Exception in _shutdown", exc_info=True)
+        logger.warning("nats_kapatma_başarısız", exc_info=True)
 
-    logger.info("ALPHA BIST API shutdown complete")
+    logger.info("ALPHA BIST API kapatma tamamlandı")
 
 
 async def lifespan(app: FastAPI) -> Any:
     """Application lifespan — DB lifecycle dahil."""
-    logger.info("ALPHA BIST API starting (canonical production server)")
+    logger.info("ALPHA BIST API başlatılıyor (canonical üretim sunucusu)")
 
     refresh_task = await _startup_services(app)
     background_tasks = _start_background_tasks(refresh_task)
@@ -239,58 +234,55 @@ def create_app() -> FastAPI:
     # Otomatik GZip Sıkıştırma (1KB'dan büyük tüm yanıtları %85-90 sıkıştırır)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # Request timing middleware
+    # İstek zamanlama middleware
     @app.middleware("http")
     async def timing_middleware(request: Request, call_next) -> Any:
+        """Her isteğin işlenme süresini ölçer ve X-Process-Time-Ms başlığı olarak ekler."""
         start = time.monotonic()
         response = await call_next(request)
         duration = (time.monotonic() - start) * 1000
         response.headers["X-Process-Time-Ms"] = str(round(duration, 2))
         return response
 
-    # Request ID middleware — her isteğe unique ID ata
+    # İstek kimliği middleware — her isteğe benzersiz ID ata
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next) -> Any:
-        import uuid as _uuid
-
-        import structlog
-
-        # Client'tan gelen X-Request-ID'yi kullan, yoksa üret
+        """Her isteğe benzersiz bir X-Request-ID atar, dağıtık izleme ile uyumlu."""
+        # İstemciden gelen X-Request-ID'yi kullan, yoksa üret
         request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
 
-        # Context variable'a kaydet (distributed tracing ile uyumlu)
+        # Context değişkenine kaydet (dağıtık izleme ile uyumlu)
         try:
             from services.core.distributed_tracing import correlation_id_var
 
             correlation_id_var.set(request_id)
         except ImportError:
-            logger.error("Exception caught", exc_info=True)
+            logger.debug("dağıtık_izleme_modülü_mevcut_değil")
 
-        # Structlog context'e ekle (tüm loglarda otomatik görünür)
+        # Structlog bağlamına ekle (tüm loglarda otomatik görünür)
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
-        # Request state'e ekle (endpoint'lerden erişim için)
+        # İstek durumuna ekle (uç noktalardan erişim için)
         request.state.request_id = request_id
 
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
 
-    # Request timeout middleware — uzun süren istekleri kes
+    # İstek zaman aşımı middleware — uzun süren istekleri kes
     @app.middleware("http")
     async def timeout_middleware(request: Request, call_next) -> Any:
-        import asyncio
-
-        # Timeout'suz endpoint'ler
+        """30 saniyeyi aşan istekleri zaman aşımına uğratır, WebSocket/SSE hariç."""
+        # Zaman aşımı olmayan uç noktalar
         if request.url.path in ("/health", "/docs", "/redoc", "/openapi.json"):
             return await call_next(request)
 
-        # WebSocket ve SSE endpoint'leri timeout'dan muaf (uzun ömürlü bağlantılar)
+        # WebSocket ve SSE uç noktaları zaman aşımından muaf (uzun ömürlü bağlantılar)
         if "/ws/" in request.url.path or request.url.path.endswith("/stream"):
             return await call_next(request)
 
-        # Accept header'ı SSE ise timeout uygulama
+        # Accept header'ı SSE ise zaman aşımı uygulama
         accept = request.headers.get("accept", "")
         if "text/event-stream" in accept:
             return await call_next(request)
@@ -317,14 +309,15 @@ def create_app() -> FastAPI:
                 },
             )
 
-    # Rate limit headers middleware
+    # Hız sınırı başlıkları middleware
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next) -> Any:
+        """İstemci bazlı hız sınırı uygular, yerel ve dahili istekleri baypas eder."""
         client_id = request.client.host if request.client else "unknown"
         path = request.url.path
         method = request.method
 
-        # Local dev and internal docker proxy bypass
+        # Yerel geliştirme ve dahili docker proxy baypası
         if (
             client_id in ["127.0.0.1", "localhost", "testclient"]
             or client_id.startswith("172.")
@@ -353,15 +346,13 @@ def create_app() -> FastAPI:
         response.headers["X-RateLimit-Remaining"] = str(info.get("remaining", 0))
         return response
 
-    # Global exception handlers — structured error responses
+    # Yapısal hata yanıtları — global istisna işleyicileri
     from fastapi.exceptions import RequestValidationError
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Any:
         """HTTP hatalarını structured ErrorResponse formatında döndür."""
-        import uuid as _uuid
-
         request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
         logger.warning(
             "http_error",
@@ -385,8 +376,6 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> Any:
         """Validation hatalarını structured ErrorResponse formatında döndür."""
-        import uuid as _uuid
-
         request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
         errors = exc.errors()
         logger.warning(
@@ -411,8 +400,6 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception) -> Any:
         """Beklenmedik hataları structured ErrorResponse formatında döndür."""
-        import uuid as _uuid
-
         request_id = getattr(request.state, "request_id", None) or str(_uuid.uuid4())
         logger.error(
             "unhandled_exception",
@@ -435,9 +422,10 @@ def create_app() -> FastAPI:
             },
         )
 
-    # API version header — tüm response'larda
+    # API sürüm başlığı — tüm yanıtlarda
     @app.middleware("http")
     async def api_version_middleware(request: Request, call_next) -> Any:
+        """API uç noktalarına X-API-Version ve deprecation politikası başlıkları ekler."""
         response = await call_next(request)
         if request.url.path.startswith("/api/"):
             response.headers["X-API-Version"] = "1.0.0"
@@ -446,47 +434,49 @@ def create_app() -> FastAPI:
             )
         return response
 
-    # Deprecation tracking — eski endpoint'ler için Sunset header
-    DEPRECATED_ENDPOINTS: dict[str, str] = {
-        # path: sunset_date (ISO 8601)
-        # Örnek: "/api/v1/old endpoint": "2027-03-01",
+    # Kullanımdan kaldırma takibi — eski uç noktalar için Sunset başlığı
+    KULLANIMDAN_KALDIRILAN_UCT_NOKTALAR: dict[str, str] = {
+        # yol: sunset_tarihi (ISO 8601)
+        # Örnek: "/api/v1/eski_uct_nokta": "2027-03-01",
     }
 
     @app.middleware("http")
     async def deprecation_middleware(request: Request, call_next) -> Any:
+        """Kullanımdan kaldırılan uç noktalar için Sunset ve Deprecation başlıkları ekler."""
         response = await call_next(request)
         path = request.url.path
-        if path in DEPRECATED_ENDPOINTS:
-            response.headers["Sunset"] = DEPRECATED_ENDPOINTS[path]
+        if path in KULLANIMDAN_KALDIRILAN_UCT_NOKTALAR:
+            response.headers["Sunset"] = KULLANIMDAN_KALDIRILAN_UCT_NOKTALAR[path]
             response.headers["Deprecation"] = "true"
             response.headers["Link"] = '</api/v1/docs>; rel="successor-version"'
             logger.warning(
                 "deprecated_endpoint_used",
                 path=path,
-                sunset=DEPRECATED_ENDPOINTS[path],
+                sunset=KULLANIMDAN_KALDIRILAN_UCT_NOKTALAR[path],
                 request_id=getattr(request.state, "request_id", None),
             )
         return response
 
-    # v1 router
+    # v1 yönlendirici
     app.include_router(v1_router)
     from .v1.ws import router as root_ws_router
 
     app.include_router(root_ws_router, prefix="/ws", tags=["WebSockets (Root)"])
 
-    # mTLS health endpoint
+    # mTLS sağlık uç noktası
     try:
         from ..core.mtls import create_mtls_health_endpoint
 
         app.include_router(create_mtls_health_endpoint(), tags=["mTLS"])
-        logger.info("mTLS health endpoint registered")
+        logger.info("mTLS sağlık uç noktası kaydedildi")
     except Exception as e:
-        logger.debug("mTLS health endpoint not registered", error=str(e))
+        logger.debug("mTLS sağlık uç noktası kaydedilmedi", error=str(e))
 
-    # Root endpoints & Web UI Dashboard
+    # Kök uç noktalar ve Web UI Gösterge Paneli
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
     async def dashboard() -> Any:
+        """Ana sayfa ve gösterge paneli — HTML dosyası veya JSON bilgi döndürür."""
         dashboard_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html"
         )
@@ -499,9 +489,10 @@ def create_app() -> FastAPI:
     @app.get("/health")
     @app.get("/api/health")
     async def health() -> Any:
+        """Tüm servislerin sağlık durumunu kontrol eder."""
         db_health = await check_db_health()
 
-        # NATS sağlık kontrolü
+        # NATS sağlık denetimi
         nats_status = "unavailable"
         try:
             from ..nats.client import nats_client
@@ -509,18 +500,18 @@ def create_app() -> FastAPI:
             if nats_client.is_connected:
                 nats_status = "healthy"
         except Exception:
-            logger.warning("Caught Exception in health", exc_info=True)
+            logger.warning("nats_sağlık_denetimi_başarısız", exc_info=True)
 
-        # gRPC sağlık kontrolü
+        # gRPC sağlık denetimi
         grpc_status = "unavailable"
         try:
             from ..grpc.server import HAS_GRPC
 
             grpc_status = "healthy" if HAS_GRPC else "unavailable"
         except Exception:
-            logger.warning("Caught Exception in health", exc_info=True)
+            logger.warning("grpc_sağlık_denetimi_başarısız", exc_info=True)
 
-        # mTLS sağlık kontrolü
+        # mTLS sağlık denetimi
         mtls_status = "unavailable"
         try:
             from ..core.mtls import get_mtls_status
@@ -528,7 +519,7 @@ def create_app() -> FastAPI:
             mtls_info = get_mtls_status()
             mtls_status = "healthy" if mtls_info.get("enabled") else "disabled"
         except Exception:
-            logger.warning("Caught Exception in health", exc_info=True)
+            logger.warning("mtls_sağlık_denetimi_başarısız", exc_info=True)
 
         all_services = {**db_health, "nats": nats_status, "grpc": grpc_status, "mtls": mtls_status}
         core_service_keys = ["postgres", "clickhouse", "redis", "questdb", "nats", "grpc", "mtls"]
@@ -573,20 +564,20 @@ def create_app() -> FastAPI:
                 media_type="text/plain; version=0.0.4; charset=utf-8",
             )
 
-    # ===================== ADMIN ENDPOINTS (migrated from server.py) =====================
+    # ===================== YÖNETİCİ UÇ NOKTALARI (server.py'den taşındı) =====================
 
     @app.get("/admin/lock-metrics")
     async def admin_lock_metrics(request: Request) -> Any:
         """Lock performans metrikleri (admin — token gerekli)."""
         client_ip = request.client.host if request.client else "unknown"
         if not monitoring_auth.check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
 
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
             monitoring_auth.record_failed_attempt(client_ip)
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return await portfolio_monitor.get_lock_metrics_api()
 
@@ -595,23 +586,27 @@ def create_app() -> FastAPI:
         """Portfolio sağlık ve muhasebe durumu (admin — token gerekli)."""
         client_ip = request.client.host if request.client else "unknown"
         if not monitoring_auth.check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
 
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
             monitoring_auth.record_failed_attempt(client_ip)
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return await portfolio_monitor.get_portfolio_api()
 
     @app.get("/admin/alerts")
     async def admin_alerts(request: Request) -> Any:
         """Aktif alert'ler (admin — token gerekli)."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return {
             "summary": alerting.get_alert_summary(),
@@ -627,10 +622,14 @@ def create_app() -> FastAPI:
     @app.get("/admin/policy")
     async def admin_policy_get(request: Request) -> Any:
         """Mevcut alert policy."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return {
             "policy": alerting.get_policy_info(),
@@ -641,50 +640,64 @@ def create_app() -> FastAPI:
     async def admin_policy_update(request: Request) -> Any:
         """Policy güncelle."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json()
         result = alerting.update_policy(body, actor=f"api:{client_ip}")
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("errors", ["Update failed"]))
+            raise HTTPException(status_code=400, detail=result.get("errors", ["Güncelleme başarısız"]))
         return result
 
     @app.post("/admin/policy/rollback")
     async def admin_policy_rollback(request: Request) -> Any:
         """Policy rollback."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
         target = body.get("version", 0)
         result = alerting.rollback_policy(target, actor=f"api:{client_ip}")
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("error", "Rollback failed"))
+            raise HTTPException(status_code=400, detail=result.get("error", "Geri alma başarısız"))
         return result
 
     @app.get("/admin/policy/history")
     async def admin_policy_history(request: Request) -> Any:
         """Policy versiyon geçmişi."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return {"history": alerting.get_policy_history()}
 
     @app.get("/admin/policy/audit")
     async def admin_policy_audit(request: Request) -> Any:
         """Policy audit log."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         return {"audit_log": alerting.get_policy_audit_log()}
 
@@ -692,10 +705,13 @@ def create_app() -> FastAPI:
     async def admin_silence_add(request: Request) -> Any:
         """Alert susturma ekle."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json()
         result = alerting.add_silence(
@@ -711,10 +727,13 @@ def create_app() -> FastAPI:
     async def admin_silence_remove(request: Request) -> Any:
         """Alert susturma kaldır."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
         removed = alerting.remove_silence(
@@ -727,10 +746,14 @@ def create_app() -> FastAPI:
     @app.post("/admin/policy/diff")
     async def admin_policy_diff(request: Request) -> Any:
         """Policy diff (uygulamadan)."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json()
         diff = alerting.compute_policy_diff(body)
@@ -740,15 +763,18 @@ def create_app() -> FastAPI:
     async def admin_silence_batch_add(request: Request) -> Any:
         """Toplu susturma ekle."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json()
         rules = body.get("rules", [])
         if not rules:
-            raise HTTPException(status_code=400, detail="rules array required")
+            raise HTTPException(status_code=400, detail="rules dizisi gerekli")
 
         results = alerting.batch_add_silences(rules, created_by=f"api:{client_ip}")
         return {"results": results, "total": len(rules)}
@@ -757,15 +783,18 @@ def create_app() -> FastAPI:
     async def admin_silence_batch_remove(request: Request) -> Any:
         """Toplu susturma kaldır."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
         filters = body.get("filters", [])
         if not filters:
-            raise HTTPException(status_code=400, detail="filters array required")
+            raise HTTPException(status_code=400, detail="filters dizisi gerekli")
 
         result = alerting.batch_remove_silences(filters, actor=f"api:{client_ip}")
         return result
@@ -774,10 +803,13 @@ def create_app() -> FastAPI:
     async def admin_policy_lock(request: Request) -> Any:
         """Policy düzenleme kilidi al."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
         timeout = body.get("timeout_s", 30)
@@ -789,7 +821,7 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=409,
                 detail={
-                    "error": "Policy is locked by another user",
+                    "error": "Policy başka bir kullanıcı tarafından kilitli",
                     "lock_info": lock_info,
                 },
             )
@@ -799,19 +831,22 @@ def create_app() -> FastAPI:
     async def admin_policy_unlock(request: Request) -> Any:
         """Policy düzenleme kilidi bırak."""
         client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Hız sınırı aşıldı")
+
         token = extract_bearer_token(request.headers.get("authorization"))
         api_key = extract_api_key(dict(request.headers))
         if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
-            raise HTTPException(status_code=401, detail="Admin access required")
+            raise HTTPException(status_code=401, detail="Yönetici erişimi gerekli")
 
         owner = f"api:{client_ip}"
         released = alerting._policy.release_edit_lock(owner)
         if not released:
-            raise HTTPException(status_code=409, detail="Lock not owned by you")
+            raise HTTPException(status_code=409, detail="Kilit size ait değil")
         return {"success": True}
 
     return app
 
 
-# Singleton app
+# Tekil uygulama
 app = create_app()

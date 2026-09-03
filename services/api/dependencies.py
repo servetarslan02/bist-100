@@ -1,14 +1,13 @@
-from typing import Any
-
 """
-ALPHA BIST — API Dependencies v1.0
+ALPHA BIST — API Bağımlılıkları v1.0
 
-FastAPI dependency injection.
-Auth, rate limiting, service resolution.
+FastAPI bağımlılık enjeksiyonu.
+Kimlik doğrulama, hız sınırı, servis çözümleme.
 """
 
 import os
 import time
+from typing import Any
 
 import structlog
 from fastapi import Depends, HTTPException, Request, status
@@ -73,12 +72,12 @@ async def get_current_user(
             if not rbac_checker.check_permission(role, method):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Role {role.value} cannot use {method}",
+                    detail=f"Rol {role.value} {method} yöntemini kullanamaz",
                 )
             if not rbac_checker.check_endpoint_access(role, path):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Role {role.value} cannot access {path}",
+                    detail=f"Rol {role.value} {path} uç noktasına erişemez",
                 )
             return payload
 
@@ -96,7 +95,7 @@ async def get_current_user(
 
     auth_strict = os.environ.get("AUTH_STRICT", "false").lower() in ("true", "1")
     if not auth_strict:
-        # Development / non-strict modda dashboard butonları ve istekleri için tam yetki ver
+        # Geliştirme / katı olmayan modda gösterge paneli butonları ve istekleri için tam yetki ver
         return TokenPayload(
             sub="anonymous",
             username="dashboard_user",
@@ -108,7 +107,7 @@ async def get_current_user(
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
+        detail="Kimlik doğrulama gerekli",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -128,7 +127,7 @@ async def check_rate_limit(
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. Retry after {info.get('retry_after', 60)}s",
+            detail=f"Hız sınırı aşıldı. {info.get('retry_after', 60)} sn sonra tekrar deneyin",
             headers={"Retry-After": str(info.get("retry_after", 60))},
         )
 
@@ -139,12 +138,12 @@ async def require_role(required_roles: list[Role]) -> Any:
     async def checker(
         user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
-        """Otomatik eklendi."""
+        """Kullanıcının gerekli rollere sahip olup olmadığını kontrol eder."""
         role = Role(user.role)
         if role not in required_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required roles: {[r.value for r in required_roles]}",
+                detail=f"Gerekli roller: {[r.value for r in required_roles]}",
             )
         return user
 
