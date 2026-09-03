@@ -30,6 +30,12 @@ class RateLimitConfig:
     max_requests: int
     window_seconds: int
 
+    def __repr__(self) -> str:
+        return (
+            f"RateLimitConfig(max_requests={self.max_requests}, "
+            f"window_seconds={self.window_seconds})"
+        )
+
 
 # Endpoint grup limitleri — Canlı Dashboard ve Sürekli Telemetri Uyumlu
 RATE_LIMITS: dict[str, RateLimitConfig] = {

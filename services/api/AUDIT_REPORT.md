@@ -30,12 +30,14 @@
 | 7 | `rate_limiter.py` | 4 | ✅ Düzeltildi |
 | 8 | `v1/__init__.py` | 2 | ✅ Düzeltildi |
 | 9 | `v1/agents.py` | 5 | ✅ Düzeltildi |
-| 10 | `v1/alternative.py` | — | ⏳ Bekliyor |
-| 11 | `v1/backtest.py` | — | ⏳ Bekliyor |
-| 12 | `v1/decisions.py` | — | ⏳ Bekliyor |
-| 13 | `v1/event_study.py` | — | ⏳ Bekliyor |
-| 14 | `v1/factors.py` | — | ⏳ Bekliyor |
-| 15 | `v1/holidays.py` | — | ⏳ Bekliyor |
+| 10 | `v1/alternative.py` | 11 | ✅ Düzeltildi |
+| 11 | `v1/backtest.py` | 14 | ✅ Düzeltildi |
+| 12 | `v1/decisions.py` | 10 | ✅ Düzeltildi |
+| 13 | `v1/event_study.py` | 17 | ✅ Düzeltildi |
+| 14 | `v1/factors.py` | 15 | ✅ Düzeltildi |
+| 15 | `v1/holidays.py` | 12 | ✅ Düzeltildi |
+| 16 | `v1/intelligence.py` | 13 | ✅ Düzeltildi |
+| 17 | `v1/learning.py` | 16 | ✅ Düzeltildi |
 | 16 | `v1/intelligence.py` | — | ⏳ Bekliyor |
 | 17 | `v1/learning.py` | — | ⏳ Bekliyor |
 | 18 | `v1/macro.py` | — | ⏳ Bekliyor |
@@ -186,11 +188,181 @@
 
 ---
 
+## `v1/alternative.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `sentiment` fallback'inde hardcoded sahte veri (`score: 75.0`, `polarity: 0.25`, `bias: "BULLISH"`, `news_count: 5`) | Kaldırıldı, exception durumunda HTTP 503 hatası döndürülecek şekilde yeniden yazıldı |
+| 2 | `sentiment` exception bloğu hatayı yutuyor, loglama yok | `logger.error` ile loglandı, HTTPException ile 503 döndürüyor |
+| 3 | `live_news` exception bloğu hatayı yutuyor, sadece `str(e)` döndürüyor | `logger.error` eklendi |
+| 4 | `live_macro` exception bloğu hatayı yutuyor, sadece `str(e)` döndürüyor | `logger.error` eklendi |
+| 5 | `data_sources` endpoint'inde `user` parametresi tanımlı ama kullanılmıyor | Gereksiz parametre kaldırıldı |
+| 6 | Modül docstring'i İngilizce | Türkçeleştirildi |
+| 7 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 8 | `data_sources` endpoint'inde statik hardcoded kaynak listesi | `_MEVCUT_KAYNAKLAR` sabitine taşındı, `count` dinamik hale getirildi |
+| 9 | `data_sources`'da kimlik doğrulama eksik — tutarsız erişim kontrolü | `get_current_user` bağımlılığı eklendi |
+| 10 | `live_news`'de kimlik doğrulama eksik | `get_current_user` bağımlılığı eklendi |
+| 11 | `live_macro`'da kimlik doğrulama eksik | `get_current_user` bağımlılığı eklendi |
+
+---
+
+## `v1/backtest.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `run_backtest` stub — hardcoded `"started"` döndürüyor, gerçek servis çağırmıyor | Gerçek `BacktestEngine.run()` çağrısı eklendi |
+| 2 | 🔴 `walk_forward` stub — hardcoded `"started"` döndürüyor | Gerçek `WalkForwardAnalyzer.run()` çağrısı eklendi |
+| 3 | 🔴 `backtest_trades` stub — hardcoded boş liste döndürüyor | Gerçek veritabanı sorgusu eklendi |
+| 4 | 🔴 `equity_curve` stub — hardcoded boş liste döndürüyor | Gerçek veritabanı sorgusu eklendi |
+| 5 | `get_result` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 6 | `list_backtests` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 7 | `deflated_sharpe` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 8 | `transaction_costs` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 9 | `get_30y_history` f-string ile loglama | Yapılandırılmış loglamaya dönüştürüldü |
+| 10 | `run_backtest` İngilizce hata mesajı | Türkçeleştirildi |
+| 11 | `walk_forward` İngilizce hata mesajı | Türkçeleştirildi |
+| 12 | Modül docstring'i `from typing import Any` altında, İngilizce | Üst seviyeye taşındı, Türkçeleştirildi |
+| 13 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 14 | `backtest_trades` ve `equity_curve`'te exception handling yok | `try/except` + `logger.error` eklendi |
+
+---
+
+## `v1/decisions.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `create_decision` stub — DB'ye yazmıyor, hardcoded `"created"` döndürüyor | Gerçek `INSERT` sorgusu + `RETURNING` ile ID ve tarih döndürüyor |
+| 2 | 🔴 `audit_trail` stub — hardcoded boş liste döndürüyor | Gerçek `audit_log` tablosu sorgusu eklendi |
+| 3 | 🔴 `trade_plan` stub — hardcoded boş liste döndürüyor | Gerçek `decisions` tablosu sorgusu eklendi |
+| 4 | `list_decisions` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 5 | `decision_detail` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 6 | `pending_opportunities` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 7 | Modül docstring'i `from typing import Any` altında, İngilizce | Üst seviyeye taşındı, Türkçeleştirildi |
+| 8 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 9 | Türkçe karakter hataları (Henuz, gun, calismadi, Guncel, Portfoy) | Düzeltildi (Henüz, gün, çalışmadı, Güncel, Portföy) |
+| 10 | Return type annotation yok | `dict[str, Any]` eklendi |
+
+---
+
+## `v1/event_study.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `event_study` exception'da hardcoded sıfır değerler döndürüyor (mock veri) | Kaldırıldı, HTTPException 503 döndürüyor |
+| 2 | `_canli_olaylari_getir` f-string loglama | Yapılandırılmış loglamaya dönüştürüldü |
+| 3 | `event_study` exception `logger.debug` ile loglanıyor | `logger.error` seviyesine yükseltildi |
+| 4 | `event_study` log mesajı İngilizce | Türkçeleştirildi |
+| 5 | `_canli_olaylari_getir`'de İngilizce yorumlar | Türkçeleştirildi |
+| 6 | `event_calendar` return type annotation yok | `dict[str, Any]` eklendi |
+| 7 | `event_study` return type annotation yok | `dict[str, Any]` eklendi |
+| 8 | Modül docstring'inde İngilizce | Türkçeleştirildi |
+| 9 | `_canli_olaylari_getir`'de 3 sessiz `except Exception` bloğu — hata yutuluyor | Tümüne `logger.warning` eklendi |
+| 10 | `is_relevant_to_bist_and_macro` import'u döngü içinde her iterasyonda tekrarlanıyor | Üst seviye import'a taşındı |
+| 11 | `compute_financial_sentiment` import'u döngü içinde gereksiz tekrar | Üst seviye import'a taşındı |
+| 12 | `event_study`'de `event_type` parametresi hesaplamada kullanılmıyor — yanıltıcı | Docstring'de açıklandı (raporlama amaçlı) |
+| 13 | `data["Close"][sym_is]` erişiminde KeyError riski | `sym_is in close_col.columns` kontrolü eklendi |
+| 14 | `import time` fonksiyon içinde | Üst seviyeye taşındı |
+| 15 | `now = time.time()` atanmış ama hiç kullanılmıyor — ölü kod | Kaldırıldı, `import time` de kaldırıldı |
+| 16 | `event_type` default `"earnings"` ama sınıflandırma `"MACRO"`/`"KAP"`/`"NEWS"` üretiyor — tutarsız | Default `"NEWS"` olarak düzeltildi |
+| 17 | `sentiment` alanı `None` olabilir — null riski | `None` ise `0.0` fallback eklendi |
+
+---
+
+## `v1/factors.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `factor_scores` bulunamayan hisse için hardcoded default (`score: 75.0`, `price: 50.0`, `change: 1.5`) | Kaldırıldı, veri yoksa HTTP 404 hatası döndürüyor |
+| 2 | 🔴 `factor_exposure` hardcoded `mkt_rf: 1.05`, `r_squared: 0.84`, `alpha_annual_pct: 8.4` | Faktör skorlarından türetilen dinamik hesaplama eklendi |
+| 3 | 🔴 `portfolio_exposure` pozisyon yoksa hardcoded faktör ve Fama-French değerleri | Boş portföy için boş dict + mesaj döndürüyor |
+| 4 | 🔴 `portfolio_exposure` pozisyon varken bile hardcoded `mkt_rf`, `smb` vb. | Ağırlıklı faktör skorlarından türetilen dinamik hesaplama eklendi |
+| 5 | `factor_scores` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 6 | `factor_exposure` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 7 | `portfolio_exposure` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 8 | Satır 23: atanmamış ifade — ölü kod | Kaldırıldı |
+| 9 | `portfolio_exposure`'da absolute import | Relative import'a dönüştürüldü |
+| 10 | Modül docstring'i `from typing import Any` altında, İngilizce | Üst seviyeye taşındı, Türkçeleştirildi |
+| 11 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 12 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 13 | 🔴 `factor_exposure`'da `await factor_scores(...)` — FastAPI endpoint'i doğrudan çağrılıyor, `Depends()` çözülmüyor | `_get_factor_scores()` yardımcı fonksiyonu çıkarıldı, endpoint'ler bu fonksiyonu çağırıyor |
+| 14 | 🔴 `portfolio_exposure`'da döngü içinde `await factor_scores(...)` — aynı sorun | `_get_factor_scores()` yardımcı fonksiyonu kullanılıyor |
+| 15 | `portfolio_exposure`'da `except Exception` bloğunda sessiz nötr fallback — kullanıcı hatayı fark etmez | `basarisiz_pozisyonlar` listesi oluşturuldu, yanıtta `warnings` alanında bildiriliyor |
+
+---
+
+## `v1/holidays.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `list_holidays` içinde ulusal tatil tarihleri inline hardcoded — okunabilirlik düşük | `ULUSAL_TATILLER` sabitine taşındı, `_belirle_kaynak()` fonksiyonu kullanılıyor |
+| 2 | `list_holidays` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 3 | `today_status` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 4 | `list_holidays_by_year` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 5 | `sync_holidays` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 6 | `get_audit_log` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 7 | 3 endpoint'te private method erişimi (`_get_holiday_name`, `_sudden_detector`) | `_get_holiday_name_safe()` ve `_belirle_kaynak()` yardımcı fonksiyonları oluşturuldu |
+| 8 | Modül docstring'i `from typing import Any` altında | Üst seviyeye taşındı |
+| 9 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+| 10 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 11 | `structlog` yerine `logging` kullanılmalı | `logging`'e dönüştürüldü |
+| 12 | `list_holidays_by_year`'da hardcoded `source="computed"` | `_belirle_kaynak()` fonksiyonu kullanılıyor |
+| 13 | `remove_holiday` response model yok | `RemoveResponse` modeli eklendi |
+
+---
+
+## `v1/intelligence.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `analysis` tamamen hardcoded mock veri (`sentiment: "BULLISH"`, `composite_score: 85.4`, `recommendation: "STRONG_BUY"`) | Gerçek radar cache verisinden dinamik hesaplama eklendi |
+| 2 | 🔴 `get_market_regime` rejim bulunamazsa hardcoded mock (`"BULL_MOMENTUM"`, `confidence: 0.84`, `adx_14: 32.4`) | Kaldırıldı, HTTP 503 hatası döndürüyor |
+| 3 | `simulation`'da `mu=0.25, sigma=0.30` hardcoded parametreler | Tarihsel veriden dinamik hesaplama eklendi (yfinance) |
+| 4 | `get_market_regime` sessiz fallback — mock veriye düşüyor | Kaldırıldı, HTTPException döndürüyor |
+| 5 | `get_decisions` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 6 | `simulation` İngilizce hata mesajı | Türkçeleştirildi |
+| 7 | `get_decisions` İngilizce mesaj | Türkçeleştirildi |
+| 8 | `get_market_regime` fallback'te İngilizce mesaj | Kaldırıldı (HTTPException) |
+| 9 | `ask_gemini_endpoint` İngilizce hata mesajı | Türkçeleştirildi, HTTPException 502 |
+| 10 | `gemini_report` İngilizce hata mesajı | Türkçeleştirildi, HTTPException 502 |
+| 11 | `structlog` yerine `logging` | `logging`'e dönüştürüldü |
+| 12 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 13 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+
+---
+
+## `v1/learning.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `learning_status`'da `"active_regime": "BULL_MOMENTUM"` hardcoded | `_pipeline.get_active_regime()` ile dinamik hale getirildi |
+| 2 | 🔴 `performance_report`'ta hardcoded markdown (`"BULL_MOMENTUM"`, `"CatBoost & LightGBM"`, `"Düşük (< %2.1)"`) | Dinamik hesaplama eklendi, champion model otomatik belirleniyor |
+| 3 | 🔴 `performance_report` fallback'inde `"models_count": 4` hardcoded | `0` olarak düzeltildi |
+| 4 | 🔴 `drift_detection` tamamen hardcoded (`"drift_detected": False`) | Gerçek model metriklerinden drift tespiti eklendi |
+| 5 | `learning_status` exception yutuyor, loglama yok | `logger.error` eklendi |
+| 6 | `performance_matrix` f-string loglama | Yapılandırılmış loglamaya dönüştürüldü |
+| 7 | `calibration` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 8 | `drift_detection` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 9 | `champion_challenger` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
+| 10 | `trigger_learning_cycle` İngilizce hata mesajı | Türkçeleştirildi |
+| 11 | `_run_learning_cycle` İngilizce log mesajı | Türkçeleştirildi |
+| 12 | `record_prediction` İngilizce hata mesajı | Türkçeleştirildi |
+| 13 | `record_outcome` İngilizce hata mesajı + HTTPException | Türkçeleştirildi |
+| 14 | `performance_report` docstring Türkçe karakter hataları (`ogrenme`, `doner`) | Düzeltildi (`öğrenme`, `döndürür`) |
+| 15 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 16 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
+
+---
+
 ## Geliştirme Önerileri
 
 | # | Alan | Öneri |
 |---|------|-------|
-| — | — | Gerçek eksiklikler tespit edilip düzeltildi, kozmetik öneri yok |
+| 1 | `v1/alternative.py` | Cache TTL değerleri (60s, 30s) yapılandırılabilir hale getirilebilir |
+| 2 | `v1/alternative.py` | Sentiment analizi kelime listesi genişletilebilir veya ML tabanlı modele geçilebilir |
+| 3 | `v1/backtest.py` | Backtest motoru import edilemezse 503 döndürüyor — graceful degradation iyi |
+| 4 | `v1/backtest.py` | Walk-forward ve backtest motorları paralel çalıştırılabilir (asyncio.gather) |
+| 5 | `v1/decisions.py` | Audit trail ve trade plan endpoint'leri gerçek DB sorgusuyla çalışır hale getirildi |
+| 6 | `v1/event_study.py` | Marka eşleme sözlüğü ve anahtar kelimeler modül seviyesinde sabitlere taşındı |
 
 ---
 

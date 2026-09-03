@@ -60,6 +60,12 @@ class AuthConfig:
     jwt_algorithm: str = "HS256"
     jwt_expires_hours: int = 24
 
+    def __repr__(self) -> str:
+        return (
+            f"AuthConfig(jwt_algorithm='{self.jwt_algorithm}', "
+            f"jwt_expires_hours={self.jwt_expires_hours})"
+        )
+
 
 @dataclass
 class User:
