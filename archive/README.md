@@ -54,3 +54,4 @@ Arşivlenen dosyalar — `documentation/16-YENIDEN-DUZENLEME-HARITASI.md` kapsam
 | `services/api/main.py` → `main.py.deprecated` | 39 satır, DEPRECATED re-export, 0 dış import |
 | `services/api/websocket.py` → `websocket.py.unused` | 271 satır, 0 dış import, alternatifleri var (v1/ws.py, binary_ws.py) |
 | `services/api/v1/schemas.py` → `schemas.py.unused` | 350 satır, 0 dış import, hiçbir endpoint kullanmıyor |
+| `services/api/server.py` → `server.py.deprecated` | 730 satır, DEPRECATED, admin endpoint'leri app.py'ye taşındı |

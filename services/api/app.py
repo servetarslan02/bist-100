@@ -25,7 +25,7 @@ import os
 import time
 from datetime import UTC, datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -44,6 +44,9 @@ from ..core.otel import setup_telemetry
 from .rate_limiter import rate_limiter
 from .v1 import v1_router
 from services.core.otel import otel_trace
+from services.core.alerting import alerting
+from services.core.monitoring import portfolio_monitor
+from services.core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
@@ -569,6 +572,243 @@ def create_app() -> FastAPI:
                 content=prometheus_metrics.get_prometheus_text().encode("utf-8"),
                 media_type="text/plain; version=0.0.4; charset=utf-8",
             )
+
+    # ===================== ADMIN ENDPOINTS (migrated from server.py) =====================
+
+    @app.get("/admin/lock-metrics")
+    async def admin_lock_metrics(request: Request) -> Any:
+        """Lock performans metrikleri (admin — token gerekli)."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            monitoring_auth.record_failed_attempt(client_ip)
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return await portfolio_monitor.get_lock_metrics_api()
+
+    @app.get("/admin/portfolio")
+    async def admin_portfolio(request: Request) -> Any:
+        """Portfolio sağlık ve muhasebe durumu (admin — token gerekli)."""
+        client_ip = request.client.host if request.client else "unknown"
+        if not monitoring_auth.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            monitoring_auth.record_failed_attempt(client_ip)
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return await portfolio_monitor.get_portfolio_api()
+
+    @app.get("/admin/alerts")
+    async def admin_alerts(request: Request) -> Any:
+        """Aktif alert'ler (admin — token gerekli)."""
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return {
+            "summary": alerting.get_alert_summary(),
+            "active": alerting.get_active_alerts(),
+            "recent": alerting.get_all_alerts(limit=50),
+        }
+
+    @app.get("/admin/auth-status")
+    async def admin_auth_status() -> Any:
+        """Authentication durumu (public)."""
+        return monitoring_auth.get_auth_status()
+
+    @app.get("/admin/policy")
+    async def admin_policy_get(request: Request) -> Any:
+        """Mevcut alert policy."""
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return {
+            "policy": alerting.get_policy_info(),
+            "active_silences": alerting.get_active_silences(),
+        }
+
+    @app.post("/admin/policy")
+    async def admin_policy_update(request: Request) -> Any:
+        """Policy güncelle."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json()
+        result = alerting.update_policy(body, actor=f"api:{client_ip}")
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("errors", ["Update failed"]))
+        return result
+
+    @app.post("/admin/policy/rollback")
+    async def admin_policy_rollback(request: Request) -> Any:
+        """Policy rollback."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        target = body.get("version", 0)
+        result = alerting.rollback_policy(target, actor=f"api:{client_ip}")
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Rollback failed"))
+        return result
+
+    @app.get("/admin/policy/history")
+    async def admin_policy_history(request: Request) -> Any:
+        """Policy versiyon geçmişi."""
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return {"history": alerting.get_policy_history()}
+
+    @app.get("/admin/policy/audit")
+    async def admin_policy_audit(request: Request) -> Any:
+        """Policy audit log."""
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        return {"audit_log": alerting.get_policy_audit_log()}
+
+    @app.post("/admin/silence")
+    async def admin_silence_add(request: Request) -> Any:
+        """Alert susturma ekle."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json()
+        result = alerting.add_silence(
+            alert_type=body.get("alert_type"),
+            fingerprint=body.get("fingerprint"),
+            duration_s=body.get("duration_s", 3600),
+            reason=body.get("reason", ""),
+            created_by=f"api:{client_ip}",
+        )
+        return result
+
+    @app.delete("/admin/silence")
+    async def admin_silence_remove(request: Request) -> Any:
+        """Alert susturma kaldır."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        removed = alerting.remove_silence(
+            fingerprint=body.get("fingerprint"),
+            alert_type=body.get("alert_type"),
+            actor=f"api:{client_ip}",
+        )
+        return {"removed": removed}
+
+    @app.post("/admin/policy/diff")
+    async def admin_policy_diff(request: Request) -> Any:
+        """Policy diff (uygulamadan)."""
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json()
+        diff = alerting.compute_policy_diff(body)
+        return {"diff": diff.to_dict()}
+
+    @app.post("/admin/silence/batch")
+    async def admin_silence_batch_add(request: Request) -> Any:
+        """Toplu susturma ekle."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json()
+        rules = body.get("rules", [])
+        if not rules:
+            raise HTTPException(status_code=400, detail="rules array required")
+
+        results = alerting.batch_add_silences(rules, created_by=f"api:{client_ip}")
+        return {"results": results, "total": len(rules)}
+
+    @app.delete("/admin/silence/batch")
+    async def admin_silence_batch_remove(request: Request) -> Any:
+        """Toplu susturma kaldır."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        filters = body.get("filters", [])
+        if not filters:
+            raise HTTPException(status_code=400, detail="filters array required")
+
+        result = alerting.batch_remove_silences(filters, actor=f"api:{client_ip}")
+        return result
+
+    @app.post("/admin/policy/lock")
+    async def admin_policy_lock(request: Request) -> Any:
+        """Policy düzenleme kilidi al."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+        timeout = body.get("timeout_s", 30)
+        owner = f"api:{client_ip}"
+
+        acquired = alerting._policy.acquire_edit_lock(owner, timeout)
+        if not acquired:
+            lock_info = alerting._policy.get_lock_info()
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "Policy is locked by another user",
+                    "lock_info": lock_info,
+                },
+            )
+        return {"success": True, "owner": owner, "timeout_s": timeout}
+
+    @app.delete("/admin/policy/lock")
+    async def admin_policy_unlock(request: Request) -> Any:
+        """Policy düzenleme kilidi bırak."""
+        client_ip = request.client.host if request.client else "unknown"
+        token = extract_bearer_token(request.headers.get("authorization"))
+        api_key = extract_api_key(dict(request.headers))
+        if not (monitoring_auth.verify_admin_token(token or "") or monitoring_auth.verify_admin_token(api_key or "")):
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+        owner = f"api:{client_ip}"
+        released = alerting._policy.release_edit_lock(owner)
+        if not released:
+            raise HTTPException(status_code=409, detail="Lock not owned by you")
+        return {"success": True}
 
     return app
 

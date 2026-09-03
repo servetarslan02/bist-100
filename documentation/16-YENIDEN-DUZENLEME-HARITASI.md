@@ -578,3 +578,38 @@ server.py (bağımsız — kendi FastAPI app'ini oluşturur, DEPRECATED)
 
 **1 dosya kullanıcı kararı gerektirir:**
 - `server.py` — DEPRECATED ama 15+ benzersiz admin endpoint'i var
+
+---
+
+## 8. Ek Karar: `server.py` Taşındı
+
+**Tarih:** 2026-09-03 (devam)
+
+### Karar
+`server.py`'deki 15+ admin endpoint'i **ölü kod değil**, gerçek operasyonel endpoint'lerdi:
+- `alerting.get_active_alerts()` — aktif alarmlar
+- `alerting.update_policy()` / `rollback_policy()` — policy yönetimi
+- `portfolio_monitor.get_lock_metrics_api()` — lock metrikleri
+- `monitoring_auth` — admin auth
+
+### Yapılan
+1. Admin endpoint'leri `app.py`'ye taşındı (create_app() içinde)
+2. Gerekli import'lar eklendi: `alerting`, `portfolio_monitor`, `monitoring_security`
+3. `server.py` → `archive/2026-09-03/services/api/server.py.deprecated`
+4. `Dockerfile.api` → `services.api.app:app` olarak güncellendi (önceden `services.api.main:app` kullanıyordu — bu bir ihmaldi)
+
+### Doğrulama
+- [x] `ast.parse(app.py)` → Syntax OK (817 satır)
+- [x] 15 admin endpoint'i `app.py`'de mevcut
+- [x] `Dockerfile.api` → canonical entry point'e güncellendi
+
+---
+
+## 9. Arşivleme Nedenleri — Dürüst Değerlendirme
+
+| Dosya | Neden Kullanılmıyor? | Tür |
+|-------|---------------------|-----|
+| `main.py` | DEPRECATED re-export. **Ama Dockerfile hala bunu kullanıyordu — ihmal.** Dockerfile düzeltildi. | İhmal |
+| `websocket.py` | v1.0 standalone WS sunucusu. `v1/ws.py` v2.0 ile değiştirilmiş, eski temizlenmemiş. | Yarım iş |
+| `schemas.py` | Standart response modelleri oluşturulmuş ama hiçbir endpoint'e bağlanmamış. | Yarım iş |
+| `server.py` | DEPRECATED + admin endpoint'leri. `app.py`'ye taşındı. | Başarısız migration |
