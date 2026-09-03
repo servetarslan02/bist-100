@@ -1,16 +1,14 @@
-from typing import Any
-
 """
-ALPHA BIST — API Rate Limiter v1.0
+ALPHA BIST — API Hız Sınırı v1.0
 
-Token bucket rate limiting.
-Farklı endpoint grupları için farklı limitler.
+Token bucket hız sınırı.
+Farklı uç nokta grupları için farklı limitler.
 
 Limitler:
 - Genel: 100 istek/dakika
 - Analiz: 10 istek/dakika
-- Backtest: 5 istek/dakika
-- Scanner: 3 istek/dakika
+- Geri test: 5 istek/dakika
+- Tarayıcı: 3 istek/dakika
 - WebSocket: 100 mesaj/saniye
 """
 
@@ -18,6 +16,7 @@ import asyncio
 import time
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Any
 
 import structlog
 
@@ -50,8 +49,8 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
-        self._buckets: dict[str, dict[str, any]] = defaultdict(
+        """In-memory hız sınırı sınıflandırıcısını başlatır."""
+        self._buckets: dict[str, dict[str, Any]] = defaultdict(
             lambda: {
                 "tokens": 100,
                 "last_refill": time.monotonic(),
@@ -63,7 +62,7 @@ class InMemoryRateLimiter:
         self,
         client_id: str,
         group: str = "default",
-    ) -> tuple[bool, dict[str, any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """Rate limit kontrolü.
 
         Args:
@@ -129,7 +128,7 @@ class InMemoryRateLimiter:
         for k in stale_keys:
             del self._buckets[k]
         if stale_keys:
-            logger.info("Rate limiter cleanup", removed=len(stale_keys))
+            logger.info("Hız sınırı temizlendi", removed=len(stale_keys))
 
 
 # Singleton

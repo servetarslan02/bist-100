@@ -1,7 +1,7 @@
 """
-ALPHA BIST — API v1 Router Package
+ALPHA BIST — API v1 Yönlendirici Paketi
 
-Tüm v1 endpoint'leri.
+Tüm v1 uç noktaları.
 """
 
 from fastapi import APIRouter
@@ -28,30 +28,32 @@ from .ws import router as ws_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
-v1_router.include_router(market_router, prefix="/market", tags=["Market Data"])
-v1_router.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
+v1_router.include_router(market_router, prefix="/market", tags=["Piyasa Verileri"])
+v1_router.include_router(portfolio_router, prefix="/portfolio", tags=["Portföy"])
 v1_router.include_router(risk_router, prefix="/risk", tags=["Risk"])
-v1_router.include_router(intelligence_router, prefix="/intelligence", tags=["Intelligence"])
-v1_router.include_router(decisions_router, prefix="/decisions", tags=["Decisions"])
-v1_router.include_router(backtest_router, prefix="/backtests", tags=["Backtest"])
-v1_router.include_router(learning_router, prefix="/learning", tags=["Learning"])
-v1_router.include_router(models_router, prefix="/models", tags=["Models"])
-v1_router.include_router(agents_router, prefix="/agents", tags=["Agents"])
-v1_router.include_router(scanner_router, prefix="/scanner", tags=["Scanner"])
-v1_router.include_router(macro_router, prefix="/macro", tags=["Macro"])
-v1_router.include_router(factors_router, prefix="/factors", tags=["Factors"])
-v1_router.include_router(alternative_router, prefix="/alternative", tags=["Alternative Data"])
+v1_router.include_router(intelligence_router, prefix="/intelligence", tags=["Zeka"])
+v1_router.include_router(decisions_router, prefix="/decisions", tags=["Kararlar"])
+v1_router.include_router(backtest_router, prefix="/backtests", tags=["Geri Test"])
+v1_router.include_router(learning_router, prefix="/learning", tags=["Öğrenme"])
+v1_router.include_router(models_router, prefix="/models", tags=["Modeller"])
+v1_router.include_router(agents_router, prefix="/agents", tags=["Ajanlar"])
+v1_router.include_router(scanner_router, prefix="/scanner", tags=["Tarayıcı"])
+v1_router.include_router(macro_router, prefix="/macro", tags=["Makro"])
+v1_router.include_router(factors_router, prefix="/factors", tags=["Faktörler"])
+v1_router.include_router(alternative_router, prefix="/alternative", tags=["Alternatif Veri"])
 v1_router.include_router(viop_router, prefix="/viop", tags=["VIOP"])
-v1_router.include_router(event_study_router, prefix="/event-study", tags=["Event Study"])
-v1_router.include_router(system_router, prefix="/system", tags=["System"])
-v1_router.include_router(ws_router, prefix="/ws", tags=["WebSockets"])
-v1_router.include_router(sse_router, prefix="/sse", tags=["Server-Sent Events"])
-v1_router.include_router(holidays_router, prefix="/holidays", tags=["Holidays"])
+v1_router.include_router(event_study_router, prefix="/event-study", tags=["Olay Çalışması"])
+v1_router.include_router(system_router, prefix="/system", tags=["Sistem"])
+v1_router.include_router(ws_router, prefix="/ws", tags=["WebSocket"])
+v1_router.include_router(sse_router, prefix="/sse", tags=["Sunucu Tarafı Olaylar"])
+v1_router.include_router(holidays_router, prefix="/holidays", tags=["Tatiller"])
 
-# Direct Frontend Route Aliases (Sıfır 404 Garantisi)
-v1_router.include_router(scanner_router, prefix="", tags=["Scanner (Direct)"])
-v1_router.include_router(system_router, prefix="", tags=["System (Direct)"])
-v1_router.include_router(portfolio_router, prefix="/strategy", tags=["Strategy (Direct)"])
-v1_router.include_router(holidays_router, prefix="/tatil", tags=["Tatil (Direct)"])
+# Doğrudan Ön Yüz Rota Takma Adları (Sıfır 404 Garantisi)
+# DİKKAT: Bu yönlendiriciler OpenAPI dokümantasyonunda duplike uç nokta oluşturur.
+# Frontend'in farklı yollardan erişebilmesi için kasıtlı olarak eklenmiştir.
+v1_router.include_router(scanner_router, prefix="", tags=["Tarayıcı (Doğrudan)"])
+v1_router.include_router(system_router, prefix="", tags=["Sistem (Doğrudan)"])
+v1_router.include_router(portfolio_router, prefix="/strategy", tags=["Strateji (Doğrudan)"])
+v1_router.include_router(holidays_router, prefix="/tatil", tags=["Tatil (Doğrudan)"])
 
 router = v1_router

@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-04  
 **Kapsam:** 27 `.py` dosyası  
-**Denetim Sonucu:** 60+ sorun tespit edildi, 60+ düzeltildi
+**Denetim Sonucu:** 70+ sorun tespit edildi, 70+ düzeltildi
 
 ---
 
@@ -27,9 +27,9 @@
 | 4 | `background_tasks.py` | 6 | ✅ Düzeltildi |
 | 5 | `binary_ws.py` | 14 | ✅ Düzeltildi |
 | 6 | `dependencies.py` | 8 | ✅ Düzeltildi |
-| 7 | `rate_limiter.py` | — | ⏳ Bekliyor |
-| 8 | `v1/__init__.py` | — | ⏳ Bekliyor |
-| 9 | `v1/agents.py` | — | ⏳ Bekliyor |
+| 7 | `rate_limiter.py` | 4 | ✅ Düzeltildi |
+| 8 | `v1/__init__.py` | 2 | ✅ Düzeltildi |
+| 9 | `v1/agents.py` | 5 | ✅ Düzeltildi |
 | 10 | `v1/alternative.py` | — | ⏳ Bekliyor |
 | 11 | `v1/backtest.py` | — | ⏳ Bekliyor |
 | 12 | `v1/decisions.py` | — | ⏳ Bekliyor |
@@ -80,6 +80,40 @@
 | 15 | `orjson` import edilmiş ama kullanılmıyor | Kaldırıldı |
 | 16 | 8 middleware/fonksiyonda docstring eksik | Türkçe docstring eklendi |
 | 17 | 20+ İngilizce hata mesajı (detail) | Türkçeleştirildi |
+
+---
+
+## `v1/agents.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `from typing import Any` docstring'den önce | Kaldırıldı, `dict` dönüş tipi kullanıldı |
+| 2 | `"Agents API — Gerçek servislere bağlı."` karışık dil docstring | `"Ajanlar API — Gerçek servislere bağlı."` olarak düzeltildi |
+| 3 | `list_agents`'da `AgentRole` import hatası yakalanmamış | `try/except ImportError` eklendi |
+| 4 | `agent_status` hardcoded boş liste + İngilizce mesaj döndürüyor | Gerçek servis çağrısı + Türkçe hata mesajı eklendi |
+| 5 | `run_agent` stub — hiçbir şey çalıştırmıyor, sadece `"started"` döndürüyor | Gerçek `agent_system.run()` çağrısı + hata yönetimi eklendi |
+
+---
+
+## `v1/__init__.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 19 tag İngilizce (Market Data, Portfolio, Risk...) | Tümü Türkçeleştirildi |
+| 2 | `"Direct Frontend Route Aliases (Sıfır 404 Garantisi)"` karışık dil | `"Doğrudan Ön Yüz Rota Takma Adları (Sıfır 404 Garantisi)"` olarak düzeltildi |
+| 3 | Docstring'de `"endpoint"` İngilizce kelime | `"uç noktaları"` olarak düzeltildi |
+| 4 | Duplike yönlendirici tanımları OpenAPI'de sorun çıkarabilir | Kasıtlı olduğu belirtilen uyarı yorumu eklendi |
+
+---
+
+## `rate_limiter.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `from typing import Any` docstring'den önce | Modül docstring'i üst seviyeye taşındı |
+| 2 | `dict[str, any]` küçük `any` (2 yerde) | `dict[str, Any]` olarak düzeltildi |
+| 3 | `__init__` docstring `"Otomatik eklendi."` | Anlamlı Türkçe docstring ile değiştirildi |
+| 4 | `"Rate limiter cleanup"` İngilizce log | `"Hız sınırı temizlendi"` olarak düzeltildi |
 
 ---
 
