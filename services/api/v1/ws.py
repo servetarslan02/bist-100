@@ -11,10 +11,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import orjson
-import structlog
+import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -34,9 +34,9 @@ except ImportError:
 
 
 class ConnectionManager:
-    """Otomatik eklendi."""
+    """WebSocket bağlantı yöneticisi — kanal bazlı bağlantı takibi ve yayın."""
     def __init__(self):
-        """Otomatik eklendi."""
+        """Bağlantı havuzunu başlatır."""
         # Kanal bazlı aktif WebSocket bağlantıları: "live", "radar", "events"
         self.active_connections: dict[str, set[WebSocket]] = {
             "live": set(),
@@ -47,25 +47,23 @@ class ConnectionManager:
         self._client_format: dict[WebSocket, str] = {}
 
     async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json") -> Any:
-        """Otomatik eklendi."""
+        """Yeni WebSocket bağlantısını kabul eder ve kanala ekler."""
         await websocket.accept()
         if channel not in self.active_connections:
             self.active_connections[channel] = set()
         self.active_connections[channel].add(websocket)
         self._client_format[websocket] = fmt
-        logger.debug(
-            f"WS client connected to channel: {channel} format: {fmt} (Total: {len(self.active_connections[channel])})"
-        )
+        logger.debug("ws_baglanti: kanal=%s format=%s toplam=%s", channel, fmt, len(self.active_connections[channel]))
 
     def disconnect(self, websocket: WebSocket, channel: str) -> Any:
-        """Otomatik eklendi."""
+        """WebSocket bağlantısını kanaldan kaldırır."""
         if channel in self.active_connections and websocket in self.active_connections[channel]:
             self.active_connections[channel].remove(websocket)
             self._client_format.pop(websocket, None)
-            logger.debug(f"WS client disconnected from {channel}")
+            logger.debug("ws_baglanti_kesildi: kanal=%s", channel)
 
     async def broadcast(self, channel: str, message: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Kanaldeki tüm bağlantılara mesaj yayınlar."""
         if channel not in self.active_connections or not self.active_connections[channel]:
             return
 
@@ -150,7 +148,7 @@ class ConnectionManager:
                 # Bilinmeyen tip → orjson fallback
                 return orjson.dumps(message, default=str)
         except Exception as e:
-            logger.warning("Protobuf encode failed, using orjson", error=str(e))
+            logger.warning("protobuf_kodlama_hatasi: hata=%s, orjson kullanılıyor", str(e))
             return orjson.dumps(message, default=str)
 
 
@@ -165,7 +163,7 @@ def _get_ws_format(websocket: WebSocket) -> str:
 
 @router.websocket("/live")
 async def websocket_live(websocket: WebSocket) -> Any:
-    """Otomatik eklendi."""
+    """Canlı fiyat ve portföy WebSocket akışı."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "live", fmt)
     try:
@@ -192,7 +190,7 @@ async def websocket_live(websocket: WebSocket) -> Any:
 
 @router.websocket("/radar")
 async def websocket_radar(websocket: WebSocket) -> Any:
-    """Otomatik eklendi."""
+    """Radar sinyalleri WebSocket akışı."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "radar", fmt)
     try:
@@ -218,7 +216,7 @@ async def websocket_radar(websocket: WebSocket) -> Any:
 
 @router.websocket("/events")
 async def websocket_events(websocket: WebSocket) -> Any:
-    """Otomatik eklendi."""
+    """Olay bildirimleri WebSocket akışı."""
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "events", fmt)
     try:
@@ -259,7 +257,7 @@ async def websocket_binary(websocket: WebSocket) -> Any:
 
     await websocket.accept()
     protocol = "protobuf" if HAS_PROTOBUF else "orjson-fallback"
-    logger.info("Binary WS client connected", protocol=protocol)
+    logger.info("binary_ws_baglanti: protokol=%s", protocol)
 
     try:
         # Heartbeat gönder (Protobuf StreamMessage)
@@ -277,6 +275,6 @@ async def websocket_binary(websocket: WebSocket) -> Any:
                 else:
                     logger.debug("Binary WS message", type=msg_type)
     except WebSocketDisconnect:
-        logger.debug("Binary WS client disconnected")
+        logger.debug("binary_ws_baglanti_kesildi")
     except Exception as e:
-        logger.debug("Binary WS error", error=str(e))
+        logger.debug("binary_ws_hatasi: hata=%s", str(e))
