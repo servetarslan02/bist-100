@@ -54,10 +54,10 @@ def _get_scan_api() -> Any:
 async def scanner_signals(
     request: Request,
     response: Response,
-    limit: int = Query(50, ge=1, le=100),
-    category: str | None = Query(None),
-    sort_by: str | None = Query("confidence"),
-    search: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=100, description="Maksimum sinyal sayısı"),
+    category: str | None = Query(None, description="Kategori filtresi (HIGH_CONVICTION, MOMENTUM_LEADER vb.)"),
+    sort_by: str | None = Query("confidence", description="Sıralama alanı"),
+    search: str | None = Query(None, description="Sembol veya isim araması"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
@@ -203,7 +203,7 @@ async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_li
 async def scan_results(
     request: Request,
     response: Response,
-    limit: int = Query(1000, ge=1, le=1000),
+    limit: int = Query(1000, ge=1, le=1000, description="Maksimum sonuç sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
@@ -260,7 +260,7 @@ async def scanner_performance(user=Depends(get_current_user), _=Depends(check_ra
 
 @router.get("/alerts")
 async def scanner_alerts(
-    limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
+    limit: int = Query(20, ge=1, le=100, description="Maksimum alarm sayısı"), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ) -> Any:
     """Tarayıcı alarmları ve bildirimleri."""
     try:
@@ -328,7 +328,7 @@ async def trigger_scan(
         }
     except Exception as exc:
         logger.error("tarama_tetikleme_hatasi: hata=%s", str(exc))
-        raise HTTPException(500, detail=f"Tarama tetiklenemedi: {exc}") from exc
+        raise HTTPException(500, detail="Tarama tetiklenemedi.") from exc
 
 
 @router.post("/event")
@@ -361,10 +361,5 @@ async def report_event(
             "status": "received",
         }
     except Exception as exc:
-        logger.warning("event_bildirim_hatasi: hata=%s", str(exc))
-        return {
-            "event_type": event_type,
-            "affected": [ticker] if ticker else [],
-            "importance": importance,
-            "status": "received",
-        }
+        logger.error("event_bildirim_hatasi: hata=%s", str(exc))
+        raise HTTPException(500, detail="Event bildirimi alınamadı.") from exc
