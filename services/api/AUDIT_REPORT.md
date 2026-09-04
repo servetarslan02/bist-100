@@ -43,7 +43,7 @@
 | 20 | `v1/models.py` | 8 | ✅ Düzeltildi |
 | 21 | `v1/portfolio.py` | 20 | ✅ Düzeltildi |
 | 22 | `v1/risk.py` | 37 | ✅ Düzeltildi |
-| 23 | `v1/scanner.py` | 18 | ✅ Düzeltildi |
+| 23 | `v1/scanner.py` | 21 | ✅ Düzeltildi |
 | 24 | `v1/sse.py` | — | ⏳ Bekliyor |
 | 25 | `v1/system.py` | — | ⏳ Bekliyor |
 | 26 | `v1/viop.py` | — | ⏳ Bekliyor |
@@ -519,6 +519,9 @@
 | 16 | 🟡 `scan_results` fallback'te request/response vermiyor | Parametreler eklendi |
 | 17 | 🟡 Helper docstring'leri İngilizce | Türkçeleştirildi |
 | 18 | 🟡 `from typing import Any` docstring'den önce | Sonra taşındı |
+| 19 | 🟢 `import orjson` kullanılmıyor | Kaldırıldı |
+| 20 | 🟢 `_get_engine()` hiç çağrılmıyor | Kaldırıldı |
+| 21 | 🟢 `now = time.time()` atanmış ama kullanılmıyor | Kaldırıldı |
 
 ---
 
