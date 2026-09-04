@@ -1,10 +1,16 @@
 """
-ALPHA BIST — Real-Time WebSocket Streaming Router v2.0
+ALPHA BIST — Real-Time WebSocket Streaming Router v2.1
 Milisaniyelik Fiyat, KAP, Olay ve Portföy Canlı Yayını
 
 Desteklenen formatlar:
 - JSON (varsayılan, text frame)
 - Protobuf (binary frame, 10x daha küçük)
+
+Endpoint'ler:
+    WS /api/v1/ws/live     — Canlı fiyat ve portföy akışı
+    WS /api/v1/ws/radar    — Radar sinyalleri akışı
+    WS /api/v1/ws/events   — Olay bildirimleri akışı
+    WS /api/v1/ws/binary   — Binary Protobuf akışı
 """
 
 from datetime import UTC, datetime
@@ -26,8 +32,10 @@ try:
 except ImportError:
     HAS_BINARY_WS = False
 
-# Protobuf desteği
+# Protobuf desteği — gerçek import denemesi
 try:
+    from google.protobuf import descriptor  # noqa: F401
+
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -35,7 +43,8 @@ except ImportError:
 
 class ConnectionManager:
     """WebSocket bağlantı yöneticisi — kanal bazlı bağlantı takibi ve yayın."""
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Bağlantı havuzunu başlatır."""
         # Kanal bazlı aktif WebSocket bağlantıları: "live", "radar", "events"
         self.active_connections: dict[str, set[WebSocket]] = {
@@ -46,8 +55,14 @@ class ConnectionManager:
         # Bağlantı format tercihi: websocket -> "json" | "protobuf"
         self._client_format: dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json") -> Any:
-        """Yeni WebSocket bağlantısını kabul eder ve kanala ekler."""
+    async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json") -> None:
+        """Yeni WebSocket bağlantısını kabul eder ve kanala ekler.
+
+        Args:
+            websocket: FastAPI WebSocket nesnesi.
+            channel: Kanal adı (live/radar/events).
+            fmt: Veri formatı (json/protobuf).
+        """
         await websocket.accept()
         if channel not in self.active_connections:
             self.active_connections[channel] = set()
@@ -55,24 +70,34 @@ class ConnectionManager:
         self._client_format[websocket] = fmt
         logger.debug("ws_baglanti: kanal=%s format=%s toplam=%s", channel, fmt, len(self.active_connections[channel]))
 
-    def disconnect(self, websocket: WebSocket, channel: str) -> Any:
-        """WebSocket bağlantısını kanaldan kaldırır."""
+    def disconnect(self, websocket: WebSocket, channel: str) -> None:
+        """WebSocket bağlantısını kanaldan kaldırır.
+
+        Args:
+            websocket: FastAPI WebSocket nesnesi.
+            channel: Kanal adı.
+        """
         if channel in self.active_connections and websocket in self.active_connections[channel]:
             self.active_connections[channel].remove(websocket)
             self._client_format.pop(websocket, None)
             logger.debug("ws_baglanti_kesildi: kanal=%s", channel)
 
-    async def broadcast(self, channel: str, message: dict[str, Any]) -> Any:
-        """Kanaldeki tüm bağlantılara mesaj yayınlar."""
+    async def broadcast(self, channel: str, message: dict[str, Any]) -> None:
+        """Kanaldeki tüm bağlantılara mesaj yayınlar.
+
+        Args:
+            channel: Hedef kanal adı.
+            message: Gönderilecek mesaj (dict).
+        """
         if channel not in self.active_connections or not self.active_connections[channel]:
             return
 
-        dead_connections = set()
+        dead_connections: set[WebSocket] = set()
 
         for connection in self.active_connections[channel]:
             try:
                 fmt = self._client_format.get(connection, "json")
-                if fmt == "protobuf" and HAS_PROTOBUF:
+                if fmt == "protobuf" and HAS_PROTOBUF and HAS_BINARY_WS:
                     # Protobuf binary frame (10x daha küçük)
                     payload = self._to_protobuf_bytes(message)
                     await connection.send_bytes(payload)
@@ -86,11 +111,20 @@ class ConnectionManager:
         for dead in dead_connections:
             self.disconnect(dead, channel)
 
+        if dead_connections:
+            logger.debug("ws_oluyu_temizlendi: kanal=%s adet=%s", channel, len(dead_connections))
+
     def _to_protobuf_bytes(self, message: dict[str, Any]) -> bytes:
         """Dict'i Protobuf binary'ye çevir.
 
         StreamMessage wrapper kullanarak gerçek Protobuf serialization.
         Protobuf yoksa orjson fallback.
+
+        Args:
+            message: Dönüştürülecek mesaj dict'i.
+
+        Returns:
+            Protobuf veya orjson bytes.
         """
         if not HAS_PROTOBUF or not HAS_BINARY_WS:
             return orjson.dumps(message, default=str)
@@ -156,92 +190,110 @@ manager = ConnectionManager()
 
 
 def _get_ws_format(websocket: WebSocket) -> str:
-    """Query parametre'den format tercihi al: ?format=protobuf | json"""
+    """Query parametre'den format tercihi al.
+
+    Args:
+        websocket: FastAPI WebSocket nesnesi.
+
+    Returns:
+        "protobuf" veya "json".
+    """
     fmt = websocket.query_params.get("format", "json")
     return "protobuf" if fmt == "protobuf" and HAS_PROTOBUF else "json"
 
 
+async def _send_welcome(websocket: WebSocket, channel: str, fmt: str) -> None:
+    """Bağlantı karşılama mesajı gönderir.
+
+    Args:
+        websocket: FastAPI WebSocket nesnesi.
+        channel: Kanal adı.
+        fmt: Veri formatı (json/protobuf).
+    """
+    welcome = {
+        "type": "CONNECTION_ESTABLISHED",
+        "channel": channel,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "status": "connected",
+        "format": fmt,
+    }
+    if fmt == "protobuf" and HAS_BINARY_WS:
+        await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
+    else:
+        await websocket.send_text(orjson.dumps(welcome).decode())
+
+
 @router.websocket("/live")
-async def websocket_live(websocket: WebSocket) -> Any:
-    """Canlı fiyat ve portföy WebSocket akışı."""
+async def websocket_live(websocket: WebSocket) -> None:
+    """Canlı fiyat ve portföy WebSocket akışı.
+
+    Kullanım:
+        const ws = new WebSocket('ws://localhost:8000/ws/live');
+        ws.onmessage = (e) => console.log(JSON.parse(e.data));
+    """
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "live", fmt)
     try:
-        welcome = {
-            "type": "CONNECTION_ESTABLISHED",
-            "channel": "live",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "status": "connected",
-            "format": fmt,
-        }
-        if fmt == "protobuf":
-            await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
-        else:
-            await websocket.send_text(orjson.dumps(welcome).decode())
+        await _send_welcome(websocket, "live", fmt)
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "live")
-    except Exception:
+    except Exception as e:
+        logger.warning("ws_live_hatasi: hata=%s", str(e))
         manager.disconnect(websocket, "live")
 
 
 @router.websocket("/radar")
-async def websocket_radar(websocket: WebSocket) -> Any:
-    """Radar sinyalleri WebSocket akışı."""
+async def websocket_radar(websocket: WebSocket) -> None:
+    """Radar sinyalleri WebSocket akışı.
+
+    Kullanım:
+        const ws = new WebSocket('ws://localhost:8000/ws/radar');
+        ws.onmessage = (e) => console.log(JSON.parse(e.data));
+    """
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "radar", fmt)
     try:
-        welcome = {
-            "type": "CONNECTION_ESTABLISHED",
-            "channel": "radar",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "format": fmt,
-        }
-        if fmt == "protobuf":
-            await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
-        else:
-            await websocket.send_text(orjson.dumps(welcome).decode())
+        await _send_welcome(websocket, "radar", fmt)
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "radar")
-    except Exception:
+    except Exception as e:
+        logger.warning("ws_radar_hatasi: hata=%s", str(e))
         manager.disconnect(websocket, "radar")
 
 
 @router.websocket("/events")
-async def websocket_events(websocket: WebSocket) -> Any:
-    """Olay bildirimleri WebSocket akışı."""
+async def websocket_events(websocket: WebSocket) -> None:
+    """Olay bildirimleri WebSocket akışı.
+
+    Kullanım:
+        const ws = new WebSocket('ws://localhost:8000/ws/events');
+        ws.onmessage = (e) => console.log(JSON.parse(e.data));
+    """
     fmt = _get_ws_format(websocket)
     await manager.connect(websocket, "events", fmt)
     try:
-        welcome = {
-            "type": "CONNECTION_ESTABLISHED",
-            "channel": "events",
-            "timestamp": datetime.now(UTC).isoformat(),
-            "format": fmt,
-        }
-        if fmt == "protobuf":
-            await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
-        else:
-            await websocket.send_text(orjson.dumps(welcome).decode())
+        await _send_welcome(websocket, "events", fmt)
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "events")
-    except Exception:
+    except Exception as e:
+        logger.warning("ws_events_hatasi: hata=%s", str(e))
         manager.disconnect(websocket, "events")
 
 
 @router.websocket("/binary")
-async def websocket_binary(websocket: WebSocket) -> Any:
+async def websocket_binary(websocket: WebSocket) -> None:
     """Binary WebSocket — custom binary protocol.
 
     En küçük paket boyutu. Özel binary encoding.
@@ -252,12 +304,12 @@ async def websocket_binary(websocket: WebSocket) -> Any:
         ws.binaryType = 'arraybuffer';
     """
     if not HAS_BINARY_WS:
-        await websocket.close(code=1013, reason="Binary WS not available")
+        await websocket.close(code=1013, reason="Binary WS kullanilamiyor")
         return
 
+    fmt = "protobuf" if HAS_PROTOBUF else "orjson-fallback"
     await websocket.accept()
-    protocol = "protobuf" if HAS_PROTOBUF else "orjson-fallback"
-    logger.info("binary_ws_baglanti: protokol=%s", protocol)
+    logger.info("binary_ws_baglanti: protokol=%s", fmt)
 
     try:
         # Heartbeat gönder (Protobuf StreamMessage)
@@ -270,11 +322,11 @@ async def websocket_binary(websocket: WebSocket) -> Any:
                 decoded = ProtobufMessage.decode(data)
                 msg_type = decoded.get("type", "unknown")
 
-                if msg_type == "heartbeat" or msg_type == "ping":
+                if msg_type in ("heartbeat", "ping"):
                     await websocket.send_bytes(ProtobufMessage.encode_heartbeat())
                 else:
-                    logger.debug("Binary WS message", type=msg_type)
+                    logger.debug("binary_ws_mesaj: tip=%s", msg_type)
     except WebSocketDisconnect:
         logger.debug("binary_ws_baglanti_kesildi")
     except Exception as e:
-        logger.debug("binary_ws_hatasi: hata=%s", str(e))
+        logger.warning("binary_ws_hatasi: hata=%s", str(e))
