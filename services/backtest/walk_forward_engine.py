@@ -318,7 +318,7 @@ class FoldSnapshot:
 
 
 @dataclass
-class WalkForwardResult:
+class WalkForwardResultV5:
     """Walk-forward validation toplu sonucu."""
 
     run_id: str
@@ -621,7 +621,7 @@ class WalkForwardEngineV5:
         universe_at_date: list[str] | None = None,
         run_id: str | None = None,
         persist_dir: str | None = None,
-    ) -> WalkForwardResult:
+    ) -> WalkForwardResultV5:
         """Walk-forward validation çalıştır.
 
         Her fold'da:
@@ -641,7 +641,7 @@ class WalkForwardEngineV5:
             persist_dir: Sonuçların kaydedileceği dizin (None = kaydetme)
 
         Returns:
-            WalkForwardResult — kapsamlı walk-forward sonucu
+            WalkForwardResultV5 — kapsamlı walk-forward sonucu
         """
         start_time = time.time()
 
@@ -2063,7 +2063,7 @@ class WalkForwardEngineV5:
         run_id: str,
         folds: list[FoldSnapshot],
         start_time: float,
-    ) -> WalkForwardResult:
+    ) -> WalkForwardResultV5:
         """Fold sonuçlarını birleştir."""
         completed = [f for f in folds if f.status == FoldStatus.COMPLETED]
         failed = [f for f in folds if f.status == FoldStatus.FAILED]
@@ -2188,7 +2188,7 @@ class WalkForwardEngineV5:
             "random_seed": self.random_seed,
         }
 
-        return WalkForwardResult(
+        return WalkForwardResultV5(
             run_id=run_id,
             total_folds=len(folds),
             completed_folds=len(completed),
@@ -2294,7 +2294,7 @@ class WalkForwardEngineV5:
         version_str = f"{fold_config.train_start}_{fold_config.test_end}_{len(pit_data)}"
         return hashlib.sha256(version_str.encode()).hexdigest()[:16]
 
-    def _persist_result(self, result: WalkForwardResult, persist_dir: str) -> None:
+    def _persist_result(self, result: WalkForwardResultV5, persist_dir: str) -> None:
         """Sonucu dosyaya, veritabanına ve MLflow'a kaydet."""
         # 1. Dosya sistemi
         try:
@@ -2323,7 +2323,7 @@ class WalkForwardEngineV5:
         except Exception as e:
             logger.debug("Walk-forward MLflow persist skipped", error=str(e))
 
-    def _persist_to_db(self, result: WalkForwardResult) -> None:
+    def _persist_to_db(self, result: WalkForwardResultV5) -> None:
         """Walk-forward sonucunu veritabanına kaydet (best-effort)."""
         try:
             import asyncio
@@ -2366,7 +2366,7 @@ class WalkForwardEngineV5:
         except Exception:
             logger.error("Exception caught", exc_info=True)
 
-    def _persist_to_mlflow(self, result: WalkForwardResult) -> None:
+    def _persist_to_mlflow(self, result: WalkForwardResultV5) -> None:
         """Walk-forward sonucunu MLflow'a kaydet (best-effort)."""
         try:
             import mlflow
@@ -2394,9 +2394,9 @@ class WalkForwardEngineV5:
         except Exception:
             logger.error("Exception caught", exc_info=True)
 
-    def _empty_result(self, run_id: str) -> WalkForwardResult:
+    def _empty_result(self, run_id: str) -> WalkForwardResultV5:
         """Boş sonuç."""
-        return WalkForwardResult(
+        return WalkForwardResultV5(
             run_id=run_id,
             total_folds=0,
             completed_folds=0,

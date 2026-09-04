@@ -29,7 +29,7 @@ logger = structlog.get_logger()
 
 
 @dataclass
-class WalkForwardFold:
+class PurgeEmbargoFold:
     """Walk-forward fold sonucu."""
 
     fold_id: int
@@ -49,7 +49,7 @@ class WalkForwardFold:
 
 
 @dataclass
-class WalkForwardResult:
+class PurgeEmbargoResult:
     """Walk-forward tam sonuç."""
 
     total_folds: int
@@ -63,7 +63,7 @@ class WalkForwardResult:
     avg_turnover: float
     stability_score: float
     deflated_sharpe: float
-    folds: list[WalkForwardFold]
+    folds: list[PurgeEmbargoFold]
 
 
 class PurgeEmbargoWalkForward:
@@ -132,7 +132,7 @@ class PurgeEmbargoWalkForward:
         actuals: np.ndarray,
         tickers: np.ndarray,
         dates: np.ndarray,
-    ) -> WalkForwardResult:
+    ) -> PurgeEmbargoResult:
         """Walk-forward backtest çalıştır.
 
         Args:
@@ -146,7 +146,7 @@ class PurgeEmbargoWalkForward:
 
         if not folds:
             logger.warning("No walk-forward folds generated", n_days=n_days)
-            return WalkForwardResult(
+            return PurgeEmbargoResult(
                 total_folds=0,
                 avg_test_return=0,
                 avg_test_sharpe=0,
@@ -197,7 +197,7 @@ class PurgeEmbargoWalkForward:
             train_return = self._compute_top_k_return(train_preds, train_actuals, k=10)
 
             fold_results.append(
-                WalkForwardFold(
+                PurgeEmbargoFold(
                     fold_id=fold_id,
                     train_start=train_start,
                     train_end=train_end,
@@ -230,7 +230,7 @@ class PurgeEmbargoWalkForward:
         # Deflated Sharpe
         deflated = self._deflated_sharpe(test_sharpes, len(fold_results))
 
-        return WalkForwardResult(
+        return PurgeEmbargoResult(
             total_folds=len(fold_results),
             avg_test_return=round(float(np.mean(test_returns)), 4),
             avg_test_sharpe=round(float(np.mean(test_sharpes)), 4),

@@ -123,9 +123,9 @@ from .canonical_adapter import (
     backtest_canonical_adapter,
 )
 from .enhanced_walk_forward import (
+    PurgeEmbargoFold,
+    PurgeEmbargoResult,
     PurgeEmbargoWalkForward,
-    WalkForwardFold as EnhancedWalkForwardFold,
-    WalkForwardResult as EnhancedWalkForwardResult,
 )
 from .walk_forward import (
     WalkForwardEngine,
@@ -138,7 +138,7 @@ from .walk_forward_engine import (
     FoldSnapshot,
     FoldStatus,
     WalkForwardEngineV5,
-    WalkForwardResult as WalkForwardResultV5,
+    WalkForwardResultV5,
 )
 
 __all__ = [
@@ -218,8 +218,8 @@ __all__ = [
     "CanonicalAdapter",
     "backtest_canonical_adapter",
     "PurgeEmbargoWalkForward",
-    "EnhancedWalkForwardFold",
-    "EnhancedWalkForwardResult",
+    "PurgeEmbargoFold",
+    "PurgeEmbargoResult",
     "WalkForwardEngine",
     "WalkForwardFold",
     "WalkForwardResult",
