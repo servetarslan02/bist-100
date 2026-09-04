@@ -47,7 +47,7 @@
 | 24 | `v1/sse.py` | 8 | ✅ Düzeltildi |
 | 25 | `v1/system.py` | 19 | ✅ Düzeltildi |
 | 26 | `v1/viop.py` | 2 | ✅ Düzeltildi |
-| 27 | `v1/ws.py` | — | ⏳ Bekliyor |
+| 27 | `v1/ws.py` | 9 | ✅ Düzeltildi |
 
 ---
 
@@ -529,4 +529,4 @@
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| 1 | `v1/ws.py` | Henüz denetlenmedi |
+| — | — | Tüm dosyalar denetlendi |
