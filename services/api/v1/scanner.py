@@ -179,7 +179,14 @@ async def scanner_signals(
 
 @router.get("/status")
 async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Tarama durumu — scheduler + dedup + scanner özeti."""
+    """Tarama durumu — scheduler + dedup + scanner özeti.
+
+    Returns:
+        dict: Scheduler, dedup ve scanner durum bilgileri.
+
+    Raises:
+        HTTPException(503): Tarama durumu alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_status()
@@ -190,7 +197,14 @@ async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 @router.get("/dashboard")
 async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Tam dashboard verisi — tüm modüllerin birleşik özeti."""
+    """Tam dashboard verisi — tüm modüllerin birleşik özeti.
+
+    Returns:
+        dict: Tüm modüllerin birleşik dashboard verisi.
+
+    Raises:
+        HTTPException(503): Dashboard verisi alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_full_dashboard()
@@ -207,7 +221,14 @@ async def scan_results(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """Son tarama sonuçları."""
+    """Son tarama sonuçları.
+
+    Args:
+        limit: Maksimum sonuç sayısı.
+
+    Returns:
+        dict: Tarama sonuçları listesi.
+    """
     try:
         api = _get_scan_api()
         return api.get_results(limit=limit)
@@ -222,7 +243,14 @@ async def scan_results(
 
 @router.get("/tiers")
 async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Tier bazlı özet — Tier 0-5 dağılımı + top opportunities."""
+    """Tier bazlı özet — Tier 0-5 dağılımı + top opportunities.
+
+    Returns:
+        dict: Tier dağılımı ve en iyi fırsatlar.
+
+    Raises:
+        HTTPException(503): Tier verisi alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_tiers()
@@ -234,11 +262,22 @@ async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> 
 @router.get("/history/{ticker}")
 async def ticker_history(
     ticker: str,
-    days: int = Query(30, ge=1, le=365),
+    days: int = Query(30, ge=1, le=365, description="Geçmiş gün sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """Hisse tarama geçmişi."""
+    """Hisse tarama geçmişi.
+
+    Args:
+        ticker: Hisse kodu.
+        days: Geçmiş gün sayısı.
+
+    Returns:
+        dict: Hisse tarama geçmişi.
+
+    Raises:
+        HTTPException(503): Geçmiş verisi alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_ticker_history(ticker, days=days)
@@ -249,7 +288,14 @@ async def ticker_history(
 
 @router.get("/performance")
 async def scanner_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Scanner performans metrikleri."""
+    """Scanner performans metrikleri.
+
+    Returns:
+        dict: Performans istatistikleri.
+
+    Raises:
+        HTTPException(503): Performans metrikleri alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_performance()
@@ -262,7 +308,14 @@ async def scanner_performance(user=Depends(get_current_user), _=Depends(check_ra
 async def scanner_alerts(
     limit: int = Query(20, ge=1, le=100, description="Maksimum alarm sayısı"), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ) -> Any:
-    """Tarayıcı alarmları ve bildirimleri."""
+    """Tarayıcı alarmları ve bildirimleri.
+
+    Args:
+        limit: Maksimum alarm sayısı.
+
+    Returns:
+        dict: Alarm listesi.
+    """
     try:
         api = _get_scan_api()
         return api.get_alerts(limit=limit)
@@ -273,7 +326,11 @@ async def scanner_alerts(
 
 @router.get("/filters")
 async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Aktif filtreler."""
+    """Aktif filtreler.
+
+    Returns:
+        dict: Filtre listesi.
+    """
     try:
         api = _get_scan_api()
         return api.get_filters()
@@ -284,7 +341,14 @@ async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_l
 
 @router.get("/dedup")
 async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Deduplication istatistikleri."""
+    """Deduplication istatistikleri.
+
+    Returns:
+        dict: Dedup istatistikleri.
+
+    Raises:
+        HTTPException(503): Dedup istatistikleri alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_dedup_stats()
@@ -295,7 +359,14 @@ async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit
 
 @router.get("/scheduler")
 async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Scheduler istatistikleri."""
+    """Scheduler istatistikleri.
+
+    Returns:
+        dict: Scheduler istatistikleri.
+
+    Raises:
+        HTTPException(503): Scheduler istatistikleri alınamazsa.
+    """
     try:
         api = _get_scan_api()
         return api.get_scheduler_stats()
@@ -315,7 +386,17 @@ async def trigger_scan(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """Manuel tarama tetikle."""
+    """Manuel tarama tetikle.
+
+    Args:
+        scan_type: Tarama türü (manual/batch/event).
+
+    Returns:
+        dict: Tetikleme durumu ve mesaj.
+
+    Raises:
+        HTTPException(500): Tarama tetiklenemezse.
+    """
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
@@ -340,7 +421,20 @@ async def report_event(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """Event bildirimi."""
+    """Event bildirimi.
+
+    Args:
+        event_type: Event türü (kap.event, news.event, macro.event).
+        ticker: Etkilenen hisse.
+        importance: Önem seviyesi (0-1).
+        title: Event başlığı.
+
+    Returns:
+        dict: Event alındı bilgisi.
+
+    Raises:
+        HTTPException(500): Event bildirimi alınamazsa.
+    """
     try:
         from ...core.redis_helper import set_cached
 
