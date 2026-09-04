@@ -43,7 +43,7 @@
 | 20 | `v1/models.py` | 8 | ✅ Düzeltildi |
 | 21 | `v1/portfolio.py` | 20 | ✅ Düzeltildi |
 | 22 | `v1/risk.py` | 37 | ✅ Düzeltildi |
-| 23 | `v1/scanner.py` | — | ⏳ Bekliyor |
+| 23 | `v1/scanner.py` | 18 | ✅ Düzeltildi |
 | 24 | `v1/sse.py` | — | ⏳ Bekliyor |
 | 25 | `v1/system.py` | — | ⏳ Bekliyor |
 | 26 | `v1/viop.py` | — | ⏳ Bekliyor |
@@ -497,12 +497,36 @@
 
 ---
 
+## `v1/scanner.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `scan_status` fallback: `total_scans: 1420` hardcoded | `HTTPException(503)` ile değiştirildi |
+| 2 | 🔴 `scan_dashboard` fallback: tanımsız `_SCAN_SIGNALS_CACHE` + hardcoded | `HTTPException(503)` ile değiştirildi |
+| 3 | 🔴 `tiers` fallback: tier dağılımı hardcoded | `HTTPException(503)` ile değiştirildi |
+| 4 | 🔴 `ticker_history` fallback: `scans_count: 45` hardcoded | `HTTPException(503)` ile değiştirildi |
+| 5 | 🔴 `scanner_performance` tamamen hardcoded | `api.get_performance()` ile değiştirildi |
+| 6 | 🔴 `scanner_alerts` tamamen hardcoded | `api.get_alerts()` ile değiştirildi |
+| 7 | 🔴 `scanner_filters` tamamen hardcoded | `api.get_filters()` ile değiştirildi |
+| 8 | 🔴 `dedup_stats` tamamen hardcoded | `api.get_dedup_stats()` ile değiştirildi |
+| 9 | 🔴 `scheduler_stats` tamamen hardcoded | `api.get_scheduler_stats()` ile değiştirildi |
+| 10 | 🟡 `import structlog` → `logging` | Değiştirildi |
+| 11 | 🟡 Modül docstring'i İngilizce | Türkçeleştirildi |
+| 12 | 🟡 2x absolute import | Relative import |
+| 13 | 🟡 2x f-string logging | Yapılandırılmış logging |
+| 14 | 🟡 `trigger_scan` İngilizce mesaj | Türkçeleştirildi |
+| 15 | 🟡 `report_event` Redis'e yazmıyor | `set_cached` ile Redis'e yazıyor |
+| 16 | 🟡 `scan_results` fallback'te request/response vermiyor | Parametreler eklendi |
+| 17 | 🟡 Helper docstring'leri İngilizce | Türkçeleştirildi |
+| 18 | 🟡 `from typing import Any` docstring'den önce | Sonra taşındı |
+
+---
+
 ## Bilinen Eksikler
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| 1 | `v1/scanner.py` | Henüz denetlenmedi |
-| 2 | `v1/sse.py` | Henüz denetlenmedi |
-| 3 | `v1/system.py` | Henüz denetlenmedi |
-| 4 | `v1/viop.py` | Henüz denetlenmedi |
-| 5 | `v1/ws.py` | Henüz denetlenmedi |
+| 1 | `v1/sse.py` | Henüz denetlenmedi |
+| 2 | `v1/system.py` | Henüz denetlenmedi |
+| 3 | `v1/viop.py` | Henüz denetlenmedi |
+| 4 | `v1/ws.py` | Henüz denetlenmedi |
