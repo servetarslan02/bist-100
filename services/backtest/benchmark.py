@@ -1,15 +1,15 @@
 """
-ALPHA BIST — Benchmark Comparison Module
+ALPHA BIST — Benchmark Karşılaştırma Modülü
 
 Strateji performansını benchmark (BIST 100, XU030 vb.) ile karşılaştırır.
 
-Metrikler:
-1. Alpha (Jensen's alpha)
-2. Beta (piyasa duyarlılığı)
-3. Information Ratio
-4. Tracking Error
-5. Relative Return
-6. Up/Down Capture Ratio
+Hesaplanan metrikler:
+1. Alpha (Jensen's alpha) — stratejinin piyasaya göre fazla getirisi
+2. Beta — piyasa duyarlılığı
+3. Information Ratio — aktif getirinin izleme hatasına oranı
+4. Tracking Error — aktif getirilerin standart sapması
+5. Relative Return — strateji ile benchmark arasındaki getiri farkı
+6. Up/Down Capture Ratio — piyasa yükseliş/düşüşlerinde yakalama oranı
 """
 
 from dataclasses import dataclass
@@ -23,7 +23,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BenchmarkComparison:
-    """Benchmark karşılaştırma sonucu."""
+    """Benchmark karşılaştırma sonucu.
+
+    Strateji ile benchmark arasındaki tüm performans metriklerini
+    tek bir veri yapısında tutar.
+    """
 
     benchmark_name: str
     strategy_return_pct: float
@@ -38,6 +42,17 @@ class BenchmarkComparison:
     correlation: float
     r_squared: float
     num_observations: int
+
+    def __repr__(self) -> str:
+        """BenchmarkComparison okunabilir temsili."""
+        return (
+            f"BenchmarkComparison("
+            f"benchmark={self.benchmark_name!r}, "
+            f"alpha={self.alpha_pct:.2f}%, "
+            f"beta={self.beta:.4f}, "
+            f"ir={self.information_ratio:.4f}, "
+            f"n={self.num_observations})"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Sonucu sözlük formatında döndürür."""
@@ -78,15 +93,22 @@ class BenchmarkComparator:
         Strateji ve benchmark getirilerini karşılaştır.
 
         Args:
-            strategy_returns: Strateji getiri serisi
-            benchmark_returns: Benchmark getiri serisi
+            strategy_returns: Strateji getiri serisi (günlük ondalık)
+            benchmark_returns: Benchmark getiri serisi (günlük ondalık)
             benchmark_name: Benchmark adı
             risk_free_rate: Risksiz faiz (yıllık)
-            periods_per_year: Yıllık periyot
+            periods_per_year: Yıllık periyot (default: 252 iş günü)
 
         Returns:
-            BenchmarkComparison
+            BenchmarkComparison nesnesi
+
+        Raises:
+            ValueError: Getiri serileri boşsa
         """
+        # Girdi doğrulama
+        if len(strategy_returns) == 0 or len(benchmark_returns) == 0:
+            raise ValueError("Getiri serileri boş olamaz")
+
         # Uzunlukları hizala
         min_len = min(len(strategy_returns), len(benchmark_returns))
         sr = strategy_returns[:min_len]
@@ -146,15 +168,23 @@ class BenchmarkComparator:
         up_days = br > 0
         down_days = br < 0
 
-        if up_days.sum() > 0:
-            up_capture = np.mean(sr[up_days]) / np.mean(br[up_days]) * 100 if np.mean(br[up_days]) > 0 else 0
-        else:
-            up_capture = 0
+        # Yukarı yakalama oranı: benchmark pozitifken strateji/benchmark oranı
+        up_mean_br = np.mean(br[up_days]) if up_days.sum() > 0 else 0.0
+        up_mean_sr = np.mean(sr[up_days]) if up_days.sum() > 0 else 0.0
+        up_capture = (
+            (up_mean_sr / up_mean_br * 100)
+            if up_mean_br > 0
+            else 0.0
+        )
 
-        if down_days.sum() > 0:
-            down_capture = np.mean(sr[down_days]) / np.mean(br[down_days]) * 100 if np.mean(br[down_days]) != 0 else 0
-        else:
-            down_capture = 0
+        # Aşağı yakalama oranı: benchmark negatifken strateji/benchmark oranı
+        down_mean_br = np.mean(br[down_days]) if down_days.sum() > 0 else 0.0
+        down_mean_sr = np.mean(sr[down_days]) if down_days.sum() > 0 else 0.0
+        down_capture = (
+            (down_mean_sr / down_mean_br * 100)
+            if down_mean_br != 0
+            else 0.0
+        )
 
         result = BenchmarkComparison(
             benchmark_name=benchmark_name,
@@ -182,13 +212,35 @@ class BenchmarkComparator:
         benchmark_equity: list[tuple[str, float]],
         benchmark_name: str = "BIST100",
     ) -> BenchmarkComparison:
-        """Equity curve'lerden karşılaştırma yapar."""
-        # Getiri serisine dönüştür
-        strategy_values = [e[1] for e in strategy_equity]
-        benchmark_values = [e[1] for e in benchmark_equity]
+        """
+        Equity curve'lerden karşılaştırma yapar.
 
-        strategy_returns = np.diff(strategy_values) / strategy_values[:-1]
-        benchmark_returns = np.diff(benchmark_values) / benchmark_values[:-1]
+        Args:
+            strategy_equity: [(tarih, değer), ...] formatında strateji equity serisi
+            benchmark_equity: [(tarih, değer), ...] formatında benchmark equity serisi
+            benchmark_name: Benchmark adı
+
+        Returns:
+            BenchmarkComparison nesnesi
+
+        Raises:
+            ValueError: Equity serileri yetersiz veri içeriyorsa
+        """
+        if len(strategy_equity) < 2 or len(benchmark_equity) < 2:
+            raise ValueError("Equity curve en az 2 veri noktası içermeli")
+
+        strategy_values = np.array([e[1] for e in strategy_equity], dtype=np.float64)
+        benchmark_values = np.array([e[1] for e in benchmark_equity], dtype=np.float64)
+
+        # Sıfır değerde bölünme kontrolü
+        strategy_denom = strategy_values[:-1]
+        benchmark_denom = benchmark_values[:-1]
+
+        if np.any(strategy_denom == 0) or np.any(benchmark_denom == 0):
+            raise ValueError("Equity curve değerleri sıfır olamaz (bölünme hatası)")
+
+        strategy_returns = np.diff(strategy_values) / strategy_denom
+        benchmark_returns = np.diff(benchmark_values) / benchmark_denom
 
         return BenchmarkComparator.compare(strategy_returns, benchmark_returns, benchmark_name)
 
@@ -196,7 +248,15 @@ class BenchmarkComparator:
     def generate_report(
         comparisons: list[BenchmarkComparison],
     ) -> dict[str, Any]:
-        """Çoklu benchmark karşılaştırma raporu oluşturur."""
+        """
+        Çoklu benchmark karşılaştırma raporu oluşturur.
+
+        Args:
+            comparisons: BenchmarkComparison nesneleri listesi
+
+        Returns:
+            Rapor sözlüğü: her benchmark'ın metrikleri + özet istatistikler
+        """
         if not comparisons:
             return {"error": "Karşılaştırma sağlanmadı"}
 
@@ -217,6 +277,7 @@ class BenchmarkComparator:
                 "avg_correlation": round(np.mean([c.correlation for c in comparisons]), 4),
             },
         }
+
 
 
 # Singleton
