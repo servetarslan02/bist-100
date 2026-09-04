@@ -55,7 +55,11 @@ class BenchmarkComparison:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Sonucu sözlük formatında döndürür."""
+        """Sonucu sözlük formatında döndürür.
+
+        Returns:
+            Metriklerin yuvarlanmış değerlerini içeren sözlük
+        """
         return {
             "benchmark": self.benchmark_name,
             "strategy_return_pct": round(self.strategy_return_pct, 2),
@@ -103,7 +107,7 @@ class BenchmarkComparator:
             BenchmarkComparison nesnesi
 
         Raises:
-            ValueError: Getiri serileri boşsa
+            ValueError: Getiri serileri boşsa veya tek gözlem içeriyorsa
         """
         # Girdi doğrulama
         if len(strategy_returns) == 0 or len(benchmark_returns) == 0:
@@ -115,20 +119,8 @@ class BenchmarkComparator:
         br = benchmark_returns[:min_len]
 
         if min_len < 2:
-            return BenchmarkComparison(
-                benchmark_name=benchmark_name,
-                strategy_return_pct=0,
-                benchmark_return_pct=0,
-                alpha_pct=0,
-                beta=1,
-                information_ratio=0,
-                tracking_error_pct=0,
-                relative_return_pct=0,
-                up_capture_ratio=0,
-                down_capture_ratio=0,
-                correlation=0,
-                r_squared=0,
-                num_observations=0,
+            raise ValueError(
+                f"Karşılaştırma için en az 2 gözlem gerekli, {min_len} sağlandı"
             )
 
         # Toplam getiriler
@@ -168,7 +160,7 @@ class BenchmarkComparator:
         up_days = br > 0
         down_days = br < 0
 
-        # Yukarı yakalama oranı: benchmark pozitifken strateji/benchmark oranı
+        # Yukarı yakalama: benchmark pozitifken strateji/benchmark oranı
         up_mean_br = np.mean(br[up_days]) if up_days.sum() > 0 else 0.0
         up_mean_sr = np.mean(sr[up_days]) if up_days.sum() > 0 else 0.0
         up_capture = (
@@ -177,7 +169,7 @@ class BenchmarkComparator:
             else 0.0
         )
 
-        # Aşağı yakalama oranı: benchmark negatifken strateji/benchmark oranı
+        # Aşağı yakalama: benchmark negatifken strateji/benchmark oranı
         down_mean_br = np.mean(br[down_days]) if down_days.sum() > 0 else 0.0
         down_mean_sr = np.mean(sr[down_days]) if down_days.sum() > 0 else 0.0
         down_capture = (
@@ -277,7 +269,6 @@ class BenchmarkComparator:
                 "avg_correlation": round(np.mean([c.correlation for c in comparisons]), 4),
             },
         }
-
 
 
 # Singleton
