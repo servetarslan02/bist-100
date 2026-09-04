@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import orjson
-import structlog
+import logging
 
 # İsteğe bağlı PyJWT bağımlılığı
 try:
@@ -35,7 +35,7 @@ except ImportError:
 from services.core.otel import get_tracer
 from services.core.security import Role
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 
@@ -218,7 +218,7 @@ class JWTHandler:
                     logger.warning("JWT belirtecinin süresi doldu.")
                     return None
                 except jwt.InvalidTokenError as e:
-                    logger.warning("JWT doğrulaması başarısız.", error=str(e))
+                    logger.warning("jwt_dogrulamasi_basarisiz: hata=%s", str(e))
                     return None
 
             return self._verify_fallback_token(token)
@@ -257,7 +257,7 @@ class JWTHandler:
 
             return TokenPayload(**payload_data)
         except Exception as e:
-            logger.warning("Yedek JWT doğrulaması başarısız.", error=str(e))
+            logger.warning("yedek_jwt_dogrulamasi_basarisiz: hata=%s", str(e))
             return None
 
 

@@ -4,10 +4,10 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import structlog
+import logging
 from opentelemetry import trace
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.background_tasks")
 
 
@@ -32,7 +32,7 @@ async def radar_cache_refresher() -> Any:
                     await _fetch_radar_fresh(limit=1000)
 
         except Exception as e:
-            logger.warning(f"radar_cache_refresher hatası: {e}")
+            logger.warning("radar_cache_refresher_hatasi: hata=%s", e)
 
         try:
             if current_phase is not None and current_phase != BISTMarketPhase.CLOSED:
@@ -65,7 +65,7 @@ async def auto_storage_optimizer() -> Any:
                 ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
             logger.info("auto_storage_optimizer: Periyodik ZSTD disk sıkıştırması ve temizliği tamamlandı.")
         except Exception as e:
-            logger.warning(f"auto_storage_optimizer: {e}")
+            logger.warning("auto_storage_optimizer_hatasi: hata=%s", e)
 
 
 async def paper_trading_scheduler() -> Any:
@@ -80,7 +80,7 @@ async def paper_trading_scheduler() -> Any:
         with tracer.start_as_current_span("background.paper_trading_scheduler.master_catchup"):
             await master_catchup.execute_full_catchup()
     except Exception as e:
-        logger.warning(f"paper_trading_scheduler başlangıç master catchup hatası: {e}")
+        logger.warning("paper_trading_scheduler_master_catchup_hatasi: hata=%s", e)
 
     while True:
         now = datetime.now(TR_TZ)
@@ -115,6 +115,6 @@ async def paper_trading_scheduler() -> Any:
                     with tracer.start_as_current_span("background.paper_trading_scheduler.eod"):
                         await run_eod_signal_cycle()
             except Exception as e:
-                logger.error(f"paper_trading_scheduler {phase} hatası: {e}")
+                logger.error("paper_trading_scheduler_hatasi: phase=%s hata=%s", phase, e)
             finally:
                 await asyncio.sleep(60)

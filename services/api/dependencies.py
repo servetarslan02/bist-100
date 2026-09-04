@@ -9,14 +9,14 @@ import os
 import time
 from typing import Any
 
-import structlog
+import logging
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .auth import Role, TokenPayload, api_key_manager, jwt_handler, rbac_checker
 from .rate_limiter import rate_limiter
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
 

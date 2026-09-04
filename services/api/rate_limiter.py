@@ -18,9 +18,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -134,7 +134,7 @@ class InMemoryRateLimiter:
         for k in stale_keys:
             del self._buckets[k]
         if stale_keys:
-            logger.info("Hız sınırı temizlendi", removed=len(stale_keys))
+            logger.info("hiz_siniri_temizlendi: silinen=%s", len(stale_keys))
 
 
 # Singleton

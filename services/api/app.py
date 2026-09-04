@@ -30,7 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 
-import structlog
+import logging
 from fastapi.responses import Response as FastAPIResponse
 from opentelemetry import trace
 
@@ -43,7 +43,7 @@ from services.core.alerting import alerting
 from services.core.monitoring import portfolio_monitor
 from services.core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
 async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
@@ -54,7 +54,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
 
         await init_sharding()
     except Exception as e:
-        logger.warning(f"Sharding başlatılamadı: {e}")
+        logger.warning("sharding_baslatilamadi: hata=%s", e)
 
     refresh_task = None
     try:
@@ -63,7 +63,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
         await cache_warmer.warm_all()
         refresh_task = asyncio.create_task(cache_warmer.refresh_hot_keys())
     except Exception as e:
-        logger.warning(f"Önbellek ısıtma başarısız: {e}")
+        logger.warning("onbellek_isitma_basarisiz: hata=%s", e)
 
     try:
         from services.portfolio.main import portfolio_service
@@ -71,7 +71,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
         await portfolio_service.start()
         logger.info("PortfolioService API yaşam döngüsünde başlatıldı")
     except Exception as e:
-        logger.error(f"PortfolioService baslatilamadi: {e}")
+        logger.error("portfolio_service_baslatilamadi: hata=%s", e)
 
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
     setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint, app=app)
@@ -114,10 +114,10 @@ async def _start_grpc() -> Any:
         grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
         server = await start_grpc_server(port=grpc_port)
         if server:
-            logger.info("grpc_sunucusu_başlatıldı", port=grpc_port)
+            logger.info("grpc_sunucusu_baslatildi: port=%s", grpc_port)
         return server
     except Exception as e:
-        logger.warning("grpc_sunucusu_başarısız", error=str(e))
+        logger.warning("grpc_sunucusu_basarisiz: hata=%s", str(e))
         return None
 
 
@@ -129,7 +129,7 @@ async def _start_nats() -> Any:
 
         await nats_client.connect()
     except Exception as e:
-        logger.warning("nats_bağlantısı_başarısız", error=str(e))
+        logger.warning("nats_baglantisi_basarisiz: hata=%s", str(e))
 
 
 @otel_trace("api.start_service_mesh")
@@ -141,7 +141,7 @@ async def _start_service_mesh() -> Any:
         init_service_mesh()
         return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
-        logger.warning("servis_mesh_başarısız", error=str(e))
+        logger.warning("servis_mesh_basarisiz: hata=%s", str(e))
         return None
 
 
@@ -161,7 +161,7 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
         state_store.flush()
         logger.info("Durum deposu tampon belleği kapatmada temizlendi")
     except Exception as e:
-        logger.warning(f"Kapatmada durum deposu temizleme başarısız: {e}")
+        logger.warning("kapatmada_durum_deposu_basarisiz: hata=%s", e)
 
     try:
         from ..core.offline_queue import offline_queue
@@ -169,21 +169,21 @@ async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server
         await offline_queue.flush()
         logger.info("Çevrimdışı kuyruk kapatmada temizlendi")
     except Exception as e:
-        logger.warning(f"Kapatmada çevrimdışı kuyruk temizleme başarısız: {e}")
+        logger.warning("kapatmada_cevrimdisi_kuyruk_basarisiz: hata=%s", e)
 
     if grpc_server:
         try:
             await grpc_server.stop(grace=5)
             logger.info("gRPC sunucusu durduruldu")
         except Exception as e:
-            logger.warning("gRPC durdurma hatası", error=str(e))
+            logger.warning("grpc_durdurma_hatasi: hata=%s", str(e))
 
     try:
         from ..nats.client import nats_client
 
         await nats_client.close()
     except Exception:
-        logger.warning("nats_kapatma_başarısız", exc_info=True)
+        logger.warning("nats_kapatma_basarisiz", exc_info=True)
 
     logger.info("ALPHA BIST API kapatma tamamlandı")
 
@@ -260,8 +260,7 @@ def create_app() -> FastAPI:
             logger.debug("dağıtık_izleme_modülü_mevcut_değil")
 
         # Structlog bağlamına ekle (tüm loglarda otomatik görünür)
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(request_id=request_id)
+        # structlog.contextvars yerine request.state kullanılıyor
 
         # İstek durumuna ekle (uç noktalardan erişim için)
         request.state.request_id = request_id
@@ -470,7 +469,7 @@ def create_app() -> FastAPI:
         app.include_router(create_mtls_health_endpoint(), tags=["mTLS"])
         logger.info("mTLS sağlık uç noktası kaydedildi")
     except Exception as e:
-        logger.debug("mTLS sağlık uç noktası kaydedilmedi", error=str(e))
+        logger.debug("mtls_saglik_uct_noktasi_kaydedilmedi: hata=%s", str(e))
 
     # Kök uç noktalar ve Web UI Gösterge Paneli
     @app.get("/", response_class=FastAPIResponse)
@@ -500,7 +499,7 @@ def create_app() -> FastAPI:
             if nats_client.is_connected:
                 nats_status = "healthy"
         except Exception:
-            logger.warning("nats_sağlık_denetimi_başarısız", exc_info=True)
+            logger.warning("nats_saglik_denetimi_basarisiz", exc_info=True)
 
         # gRPC sağlık denetimi
         grpc_status = "unavailable"
@@ -509,7 +508,7 @@ def create_app() -> FastAPI:
 
             grpc_status = "healthy" if HAS_GRPC else "unavailable"
         except Exception:
-            logger.warning("grpc_sağlık_denetimi_başarısız", exc_info=True)
+            logger.warning("grpc_saglik_denetimi_basarisiz", exc_info=True)
 
         # mTLS sağlık denetimi
         mtls_status = "unavailable"
@@ -519,7 +518,7 @@ def create_app() -> FastAPI:
             mtls_info = get_mtls_status()
             mtls_status = "healthy" if mtls_info.get("enabled") else "disabled"
         except Exception:
-            logger.warning("mtls_sağlık_denetimi_başarısız", exc_info=True)
+            logger.warning("mtls_saglik_denetimi_basarisiz", exc_info=True)
 
         all_services = {**db_health, "nats": nats_status, "grpc": grpc_status, "mtls": mtls_status}
         core_service_keys = ["postgres", "clickhouse", "redis", "questdb", "nats", "grpc", "mtls"]

@@ -29,7 +29,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-import structlog
+import logging
 
 try:
     import websockets
@@ -51,7 +51,7 @@ import functools
 import orjson
 from opentelemetry import trace
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_binary_ws")
 
 
@@ -536,7 +536,7 @@ class ProtobufMessage:
             return result
 
         except Exception as e:
-            logger.warning("Protobuf çözümleme başarısız, yedek deneniyor", error=str(e))
+            logger.warning("protobuf_cozumleme_basarisiz: hata=%s", str(e))
             return cls._fallback_decode(data)
 
     @classmethod
@@ -614,16 +614,16 @@ class BinaryWebSocket:
                     elif self._msg_handler:
                         await self._msg_handler(decoded)
                     else:
-                        logger.debug("Binary WS mesajı alındı", type=msg_type)
+                        logger.debug("binary_ws_mesaji_alindi: tip=%s", msg_type)
                 else:
                     # JSON fallback (eski istemciler)
                     try:
                         data = orjson.loads(message)
-                        logger.debug("JSON yedek mesajı", type=data.get("type"))
+                        logger.debug("json_yedek_mesaji: tip=%s", data.get("type"))
                     except Exception:
                         logger.warning("json_fallback_decode_failed", exc_info=True)
         except Exception as e:
-            logger.debug("WebSocket istemcisi bağlantısı kesildi", client_id=client_id, error=str(e))
+            logger.debug("ws_istemci_baglantisi_kesildi: client=%s hata=%s", client_id, str(e))
         finally:
             self._clients.discard(websocket)
 
@@ -789,7 +789,7 @@ class BinaryWebSocket:
             try:
                 await client.close()
             except Exception:
-                logger.warning("websocket_close_failed", client_id=client_id, exc_info=True)
+                logger.warning("websocket_close_failed: client=%s", client_id, exc_info=True)
         self._clients.clear()
 
     def get_stats(self) -> dict[str, Any]:
