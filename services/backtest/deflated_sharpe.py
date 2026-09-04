@@ -122,12 +122,10 @@ class DeflatedSharpeCalculator:
         if num_strategies <= 1:
             return 0.0, 1.0
 
-        from scipy.stats import norm as _norm
-
         n = num_strategies
         expected_max_z = (
-            (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n)
-            + euler_mascheroni * _norm.ppf(1 - 1.0 / (n * np.e))
+            (1 - euler_mascheroni) * stats.norm.ppf(1 - 1.0 / n)
+            + euler_mascheroni * stats.norm.ppf(1 - 1.0 / (n * np.e))
         )
 
         # Sharpe'a dönüştür (sqrt(T) ile ölçekle, periods_per_year ile
