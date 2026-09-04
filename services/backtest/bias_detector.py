@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 
 try:
     import polars as pl
