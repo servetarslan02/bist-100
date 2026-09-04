@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Server-Sent Events (SSE) Router v2.0
+ALPHA BIST — Server-Sent Events (SSE) Router v2.1
 
 Tek yönlü sunucu→istemci push. WebSocket'ten daha basit,
 tarayıcıda EventSource API ile çalışır.
@@ -10,22 +10,25 @@ En iyi uygulamalar (FastAPI 2026):
 - Cache-Control: no-cache
 - Connection: keep-alive
 - Retry: client reconnect süresi
+- id: her event'e benzersiz kimlik (reconnect desteği)
+- Last-Event-ID: client reconnect'te kaldığı yerden devam eder
 
 Kullanım:
     GET /api/v1/sse/ticks?tickers=THYAO,ASELS
     GET /api/v1/sse/signals
     GET /api/v1/sse/portfolio
     GET /api/v1/sse/alerts
+    GET /api/v1/sse/regime
+    GET /api/v1/sse/radar
 """
 
 import asyncio
-import hashlib
+import logging
 import time
-from typing import Any
 from collections.abc import AsyncIterator
+from typing import Any
 
 import orjson
-import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
@@ -38,30 +41,57 @@ SSE_KEEPALIVE_INTERVAL = 15
 
 
 async def _sse_generator(
+    request: Request,
     channel: str,
     tickers: list[str] | None = None,
     interval: float = 1.0,
+    last_event_id: str | None = None,
 ) -> AsyncIterator[str]:
     """SSE event generator — sürekli veri akışı + keep-alive ping.
 
     En iyi uygulamalar:
+    - Bağlantı anında `connected` event'i gönder (client doğrulama alır)
     - Her 15 saniyede bir `: ping` comment gönder (bağlantıyı canlı tut)
-    - Data değiştiğinde event gönder
-    - Client disconnect detection (CancelledError)
+    - Data değiştiyse event gönder (değişiklik algılama: doğrudan string karşılaştırması)
+    - Her event'e `id:` ekle (client reconnect'te kaldığı yerden devam edebilir)
+    - Client disconnect detection (CancelledError + request.is_disconnected)
+
+    Args:
+        request: FastAPI request nesnesi (disconnect algılama için).
+        channel: Veri kanalı (ticks/signals/portfolio/alerts/regime/radar).
+        tickers: Hisse kodları listesi (sadece ticks kanalı için gerekli).
+        interval: Güncelleme aralığı (saniye).
+        last_event_id: Client reconnect'te gönderdiği son event ID'si.
+
+    Yields:
+        SSE formatında string event'leri.
     """
     from ...core.redis_helper import get_cached
 
-    last_data_hash = None
+    last_data: str | None = None
     last_ping_time = time.time()
-    retry_count = 0
-    max_retries = 100
+    event_counter = 0
 
     # Client reconnect süresi (ms)
     yield "retry: 3000\n\n"
 
-    while retry_count < max_retries:
+    # İlk bağlantı event'i — client "bağlandım" doğrulaması alır
+    event_counter += 1
+    yield f"id: {event_counter}\nevent: connected\ndata: {{\"channel\":\"{channel}\",\"ts\":{int(time.time())}}}\n\n"
+
+    # Client reconnect'te last_event_id gönderdiyse bilgilendir
+    if last_event_id:
+        logger.info("sse_reconnect: kanal=%s son_event_id=%s", channel, last_event_id)
+
+    while True:
         try:
+            # Client bağlantıyı kesti mi kontrol et
+            if await request.is_disconnected():
+                logger.debug("sse_baglanti_kesildi: kanal=%s", channel)
+                break
+
             now = time.time()
+            event_data: str | None = None
 
             if channel == "ticks":
                 data = {}
@@ -71,62 +101,52 @@ async def _sse_generator(
                         data[ticker] = tick
                 if data:
                     event_data = orjson.dumps(data, default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: tick\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
             elif channel == "signals":
                 signals = get_cached("signals:latest") or []
                 if signals:
                     event_data = orjson.dumps(signals, default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: signal\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
             elif channel == "portfolio":
                 pf = get_cached("portfolio:state")
                 if pf:
                     event_data = orjson.dumps(pf, default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: portfolio\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
             elif channel == "alerts":
                 alerts = get_cached("alerts:latest") or []
                 if alerts:
                     event_data = orjson.dumps(alerts, default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: alert\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
             elif channel == "regime":
                 regime = get_cached("market:regime")
                 if regime:
                     event_data = orjson.dumps(regime, default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: regime\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
             elif channel == "radar":
                 radar = get_cached("radar:data") or []
                 if radar:
                     event_data = orjson.dumps(radar[:50], default=str).decode()
-                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
-                    if current_hash != last_data_hash:
-                        yield f"event: radar\ndata: {event_data}\n\n"
-                        last_data_hash = current_hash
 
-            # Keep-alive ping: 15 saniyede bir (bağlantıyı canlı tut)
+            # Veri değiştiyse gönder (doğrudan string karşılaştırması — hash'ten verimli)
+            if event_data is not None and event_data != last_data:
+                event_counter += 1
+                event_name = {
+                    "ticks": "tick",
+                    "signals": "signal",
+                    "portfolio": "portfolio",
+                    "alerts": "alert",
+                    "regime": "regime",
+                    "radar": "radar",
+                }.get(channel, channel)
+                yield f"id: {event_counter}\nevent: {event_name}\ndata: {event_data}\n\n"
+                last_data = event_data
+                last_ping_time = now  # veri gönderildi, ping zamanlayıcısını sıfırla
+
+            # Keep-alive ping: bağımsız olarak 15 saniyede bir gönder
             if now - last_ping_time >= SSE_KEEPALIVE_INTERVAL:
                 yield f": ping {int(now)}\n\n"
                 last_ping_time = now
 
-            retry_count = 0
             await asyncio.sleep(interval)
 
         except asyncio.CancelledError:
@@ -134,8 +154,7 @@ async def _sse_generator(
             logger.debug("sse_baglanti_kesildi: kanal=%s", channel)
             break
         except Exception as e:
-            retry_count += 1
-            logger.warning("sse_hatasi: kanal=%s hata=%s deneme=%s", channel, str(e), retry_count)
+            logger.warning("sse_hatasi: kanal=%s hata=%s", channel, str(e))
             await asyncio.sleep(min(interval * 2, 10))
 
 
@@ -158,8 +177,10 @@ async def sse_ticks(
     if not ticker_list:
         raise HTTPException(status_code=400, detail="tickers parametresi gerekli (virgülle ayrılmış hisse kodları).")
 
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("ticks", tickers=ticker_list, interval=interval),
+        _sse_generator(request, "ticks", tickers=ticker_list, interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -179,8 +200,10 @@ async def sse_signals(
     Kullanım:
         curl -N http://localhost:8000/api/v1/sse/signals
     """
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("signals", interval=interval),
+        _sse_generator(request, "signals", interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -200,8 +223,10 @@ async def sse_portfolio(
     Kullanım:
         curl -N http://localhost:8000/api/v1/sse/portfolio
     """
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("portfolio", interval=interval),
+        _sse_generator(request, "portfolio", interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -221,8 +246,10 @@ async def sse_alerts(
     Kullanım:
         curl -N http://localhost:8000/api/v1/sse/alerts
     """
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("alerts", interval=interval),
+        _sse_generator(request, "alerts", interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -242,8 +269,10 @@ async def sse_regime(
     Kullanım:
         curl -N http://localhost:8000/api/v1/sse/regime
     """
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("regime", interval=interval),
+        _sse_generator(request, "regime", interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -263,8 +292,10 @@ async def sse_radar(
     Kullanım:
         curl -N http://localhost:8000/api/v1/sse/radar
     """
+    last_event_id = request.headers.get("Last-Event-ID")
+
     return StreamingResponse(
-        _sse_generator("radar", interval=interval),
+        _sse_generator(request, "radar", interval=interval, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
