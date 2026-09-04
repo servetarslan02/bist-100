@@ -1,9 +1,7 @@
-from typing import Any
-
 """
 Scanner API v2.0 — Tüm endpoint'ler gerçek servislere bağlı ve optimize.
 
-Endpoints:
+Uç noktalar:
 - GET /scanner/status — Tarama durumu (scheduler + dedup + scanner)
 - GET /scanner/results — Son tarama sonuçları
 - GET /scanner/opportunities — En iyi fırsatlar
@@ -21,17 +19,17 @@ Endpoints:
 """
 
 import asyncio
-import hashlib
+import logging
 import time
+from typing import Any
 
 import orjson
-import structlog
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from ..dependencies import check_rate_limit, get_current_user
 from ...core.swr_cache import SWRCache
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Thread-safe SWR cache for signals
@@ -39,14 +37,14 @@ _signals_cache = SWRCache(ttl_seconds=60)
 
 
 def _get_scan_api() -> Any:
-    """Scan API singleton'ı al."""
+    """Tarama API singleton'ını döndürür."""
     from ...scanner.scan_api import scan_api
 
     return scan_api
 
 
 def _get_engine() -> Any:
-    """Alpha engine singleton'ı al."""
+    """Alpha engine örneğini döndürür."""
     from ...core.alpha_engine import AlphaEngine
 
     return AlphaEngine()
@@ -72,7 +70,7 @@ async def scanner_signals(
     """Canlı model sinyalleri ve piyasa fırsatları (Filtreli, Güven & Getiri Sıralı ve ETag/SWR Korumalı)."""
     now = time.time()
 
-    # ETag / If-None-Match Kontrolü (Client tarafı 304 Not Modified)
+    # ETag / If-None-Match Kontrolü (İstemci tarafı 304 Not Modified)
     client_etag = request.headers.get("if-none-match")
     if client_etag and _signals_cache.etag and client_etag.strip('"') == _signals_cache.etag.strip('"'):
         if _signals_cache.is_fresh and not category and not search:
@@ -91,13 +89,13 @@ async def scanner_signals(
             preds = get_cached("phase18:predictions")
             if not preds or len(preds) == 0 or not preds[0].get("target_price"):
                 try:
-                    from services.scanner.bist_ml_scanner import bist_ml_scanner
+                    from ...scanner.bist_ml_scanner import bist_ml_scanner
                     preds = bist_ml_scanner.scan_all_opportunities(limit=50)
                     if preds:
                         set_cached("phase18:predictions", preds, ttl=3600)
                         set_cached("radar:data", preds, ttl=3600)
                 except Exception as scan_err:
-                    logger.warning("Dynamic scanner fallback note", error=str(scan_err))
+                    logger.warning("dinamik_tarayici_notu: hata=%s", str(scan_err))
 
             signals = []
             if preds and len(preds) > 0:
@@ -137,11 +135,11 @@ async def scanner_signals(
 
         return {"signals": result_signals[:limit], "count": len(result_signals[:limit])}
     except Exception as e:
-        logger.warning(f"redis_signals_read_note: {e}")
+        logger.warning("redis_sinyal_okuma_notu: hata=%s", str(e))
 
-    # Fallback to direct ML Scanner if available, otherwise fail-closed empty (NO HARDCODED FAKE SIGNALS)
+    # Yedek: Doğrudan ML Scanner
     try:
-        from services.scanner.bist_ml_scanner import bist_ml_scanner
+        from ...scanner.bist_ml_scanner import bist_ml_scanner
 
         live_opps = bist_ml_scanner.scan_all_opportunities(limit=limit)
         if live_opps:
@@ -171,14 +169,14 @@ async def scanner_signals(
                 "source": "ml_scanner_live",
             }
     except Exception as scan_err:
-        logger.warning(f"live_scanner_fallback_failed: {scan_err}")
+        logger.warning("canli_tarayici_yedek_hatasi: hata=%s", str(scan_err))
 
-    # Fail-closed: Never return fake hardcoded signals (GEMINI.md Rule 4)
+    # Kapalı mod: Asla sahte sinyal dönme
     return {
         "signals": [],
         "count": 0,
         "status": "unavailable",
-        "message": "Canlı sinyal verisi bulunamadı veya altyapı güncelleniyor",
+        "message": "Canlı sinyal verisi bulunamadı veya altyapı güncelleniyor.",
     }
 
 
@@ -193,15 +191,9 @@ async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit
     try:
         api = _get_scan_api()
         return api.get_status()
-    except Exception:
-        return {
-            "status": "active",
-            "scheduler_mode": "adaptive",
-            "market_open": True,
-            "total_scans": 1420,
-            "opportunities_found": 38,
-            "dedup_active": True,
-        }
+    except Exception as exc:
+        logger.error("tarama_durumu_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Tarama durumu alınamadı.") from exc
 
 
 @router.get("/dashboard")
@@ -210,17 +202,15 @@ async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_li
     try:
         api = _get_scan_api()
         return api.get_full_dashboard()
-    except Exception:
-        return {
-            "status": "active",
-            "signals_count": len(_SCAN_SIGNALS_CACHE),
-            "tiers": {"tier_0": 10, "tier_1": 25, "tier_2": 65},
-            "performance": {"hit_rate_pct": 68.4, "avg_profit_pct": 4.2},
-        }
+    except Exception as exc:
+        logger.error("tarama_panel_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Tarama panel verisi alınamadı.") from exc
 
 
 @router.get("/results")
 async def scan_results(
+    request: Request,
+    response: Response,
     limit: int = Query(1000, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
@@ -229,9 +219,13 @@ async def scan_results(
     try:
         api = _get_scan_api()
         return api.get_results(limit=limit)
-    except Exception:
-        sig_resp = await scanner_signals(limit=limit)
-        return sig_resp.get("signals", [])
+    except Exception as exc:
+        logger.warning("tarama_sonuc_hatasi: hata=%s", str(exc))
+        # Yedek olarak sinyal endpoint'inden dön
+        return await scanner_signals(
+            request=request, response=response, limit=limit,
+            category=None, sort_by=None, search=None, user=user, _=_,
+        )
 
 
 @router.get("/tiers")
@@ -240,15 +234,9 @@ async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> 
     try:
         api = _get_scan_api()
         return api.get_tiers()
-    except Exception:
-        return {
-            "tier_0_core_bluechip": 30,
-            "tier_1_liquid_growth": 70,
-            "tier_2_midcap_momentum": 150,
-            "tier_3_smallcap_breakout": 200,
-            "tier_4_speculative": 179,
-            "total_instruments": 629,
-        }
+    except Exception as exc:
+        logger.error("tier_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Tier verisi alınamadı.") from exc
 
 
 @router.get("/history/{ticker}")
@@ -262,25 +250,20 @@ async def ticker_history(
     try:
         api = _get_scan_api()
         return api.get_ticker_history(ticker, days=days)
-    except Exception:
-        return {
-            "ticker": ticker.upper(),
-            "scans_count": 45,
-            "last_signal": "BUY",
-            "history": [],
-        }
+    except Exception as exc:
+        logger.error("hisse_gecmisi_hatasi: ticker=%s hata=%s", ticker, str(exc))
+        raise HTTPException(503, detail=f"{ticker} tarama geçmişi alınamadı.") from exc
 
 
 @router.get("/performance")
 async def scanner_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Scanner performans metrikleri."""
-    return {
-        "hit_rate_pct": 64.2,
-        "profit_factor": 1.48,
-        "signals_generated_today": 14,
-        "avg_holding_days": 18.5,
-        "alpha_generated_pct": 8.4,
-    }
+    try:
+        api = _get_scan_api()
+        return api.get_performance()
+    except Exception as exc:
+        logger.error("tarayici_performans_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Tarayıcı performans metrikleri alınamadı.") from exc
 
 
 @router.get("/alerts")
@@ -288,58 +271,45 @@ async def scanner_alerts(
     limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)
 ) -> Any:
     """Tarayıcı alarmları ve bildirimleri."""
-    return {
-        "alerts": [
-            {
-                "id": "ALT_01",
-                "level": "INFO",
-                "message": "BIST 100 Likidite Filtresi Aktif (Minimum 5M ₺ ADV)",
-                "timestamp": "Şimdi",
-            },
-            {
-                "id": "ALT_02",
-                "level": "SUCCESS",
-                "message": "LambdaRank v3.0 Şampiyon Model Sinyal Üretimi Hazır",
-                "timestamp": "Şimdi",
-            },
-        ],
-        "count": 2,
-    }
+    try:
+        api = _get_scan_api()
+        return api.get_alerts(limit=limit)
+    except Exception as exc:
+        logger.error("tarayici_alarm_hatasi: hata=%s", str(exc))
+        return {"alerts": [], "count": 0, "status": "unavailable"}
 
 
 @router.get("/filters")
 async def scanner_filters(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Aktif filtreler."""
-    return {
-        "filters": [
-            {"name": "Min Liquidity 5M TL", "active": True},
-            {"name": "Volatility Cap (ATR < 8%)", "active": True},
-            {"name": "BIST Session Status Check", "active": True},
-            {"name": "Zero Lookahead Validation", "active": True},
-        ]
-    }
+    try:
+        api = _get_scan_api()
+        return api.get_filters()
+    except Exception as exc:
+        logger.error("tarayici_filtre_hatasi: hata=%s", str(exc))
+        return {"filters": [], "status": "unavailable"}
 
 
 @router.get("/dedup")
 async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Deduplication istatistikleri."""
-    return {
-        "total_signals_deduped": 420,
-        "active_cooldowns": 8,
-        "block_rate_pct": 12.4,
-    }
+    try:
+        api = _get_scan_api()
+        return api.get_dedup_stats()
+    except Exception as exc:
+        logger.error("dedup_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Dedup istatistikleri alınamadı.") from exc
 
 
 @router.get("/scheduler")
 async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Scheduler istatistikleri."""
-    return {
-        "mode": "CANONICAL_BIST_DAILY",
-        "morning_session_target": "09:55 TR",
-        "eod_session_target": "18:15 TR",
-        "market_open": True,
-        "status": "RUNNING",
-    }
+    try:
+        api = _get_scan_api()
+        return api.get_scheduler_stats()
+    except Exception as exc:
+        logger.error("scheduler_hatasi: hata=%s", str(exc))
+        raise HTTPException(503, detail="Scheduler istatistikleri alınamadı.") from exc
 
 
 # =====================================================
@@ -357,12 +327,16 @@ async def trigger_scan(
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
-        # FIX: Task referansı saklandı, GC tarafından yok edilmesi önlendi
-        _task = asyncio.create_task(run_unified_daily_cycle())
-        _task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
-        return {"status": "triggered", "scan_type": scan_type, "message": "Unified daily scan & trade cycle queued."}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
+        task = asyncio.create_task(run_unified_daily_cycle())
+        task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+        return {
+            "status": "triggered",
+            "scan_type": scan_type,
+            "message": "Birleşik günlük tarama ve işlem döngüsü kuyruğa alındı.",
+        }
+    except Exception as exc:
+        logger.error("tarama_tetikleme_hatasi: hata=%s", str(exc))
+        raise HTTPException(500, detail=f"Tarama tetiklenemedi: {exc}") from exc
 
 
 @router.post("/event")
@@ -375,9 +349,30 @@ async def report_event(
     _=Depends(check_rate_limit),
 ) -> Any:
     """Event bildirimi."""
-    return {
-        "event_type": event_type,
-        "affected": [ticker] if ticker else [],
-        "importance": importance,
-        "status": "received",
-    }
+    try:
+        from ...core.redis_helper import set_cached
+
+        event_data = {
+            "event_type": event_type,
+            "ticker": ticker.upper() if ticker else "",
+            "importance": importance,
+            "title": title,
+            "timestamp": time.time(),
+        }
+        # Event'i Redis'e yaz (pipeline tüketir)
+        set_cached(f"event:{event_type}:{ticker}", event_data, ttl=3600)
+
+        return {
+            "event_type": event_type,
+            "affected": [ticker] if ticker else [],
+            "importance": importance,
+            "status": "received",
+        }
+    except Exception as exc:
+        logger.warning("event_bildirim_hatasi: hata=%s", str(exc))
+        return {
+            "event_type": event_type,
+            "affected": [ticker] if ticker else [],
+            "importance": importance,
+            "status": "received",
+        }
