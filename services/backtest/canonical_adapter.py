@@ -74,6 +74,59 @@ class BacktestCanonicalAdapter:
 
             self._decision_engine = decision_engine
 
+    def _apply_feature_parity(
+        self,
+        features: dict[str, Any],
+        ml_model: Any,
+        ticker: str,
+        all_day_features: dict[str, dict[str, Any]] | None,
+        date_str: str,
+    ) -> dict[str, Any]:
+        """Feature parity: model beklenen feature'ları doğrula ve CS normalizasyonu uygula.
+
+        prepare_features_for_inference() ile training ile aynı feature
+        sözleşmesinin backtest'te de uygulanmasını sağlar.
+
+        Args:
+            features: Ham feature sözlüğü
+            ml_model: Eğitilmiş model (feature_names, cs_features, impute_values)
+            ticker: Hisse kodu
+            all_day_features: Aynı tarihteki tüm hisselerin feature'ları
+            date_str: Tarih string'i
+
+        Returns:
+            CS normalizasyonu uygulanmış feature sözlüğü
+        """
+        model_features = getattr(ml_model, "feature_names", [])
+        model_cs = getattr(ml_model, "cs_features", [])
+        model_impute = getattr(ml_model, "impute_values", None)
+
+        if model_features and all_day_features:
+            try:
+                from ...ml.training_validator import prepare_features_for_inference
+
+                clean_features = _scalar_features(features)
+                clean_all = {
+                    t: _scalar_features(f)
+                    for t, f in all_day_features.items()
+                }
+                features = prepare_features_for_inference(
+                    ticker=ticker,
+                    raw_features=clean_features,
+                    all_date_features=clean_all,
+                    feature_names=model_features,
+                    cs_features=model_cs,
+                    impute_values=model_impute,
+                    date_str=date_str,
+                )
+            except Exception as e:
+                logger.warning(
+                    "prepare_features_for_inference_basarisiz: hata=%s",
+                    str(e),
+                )
+
+        return features
+
     def compute_score(
         self,
         features: dict[str, Any],
@@ -84,8 +137,6 @@ class BacktestCanonicalAdapter:
         date_str: str = "",
     ) -> float:
         """Feature'lardan canonical fırsat skoru üret.
-
-        FAZ 4.7: prepare_features_for_inference() ile parity-safe.
 
         Args:
             features: Bu hissenin feature'ları (zaten enriched olabilir)
@@ -100,36 +151,10 @@ class BacktestCanonicalAdapter:
         """
         self._lazy_load()
 
-        # Feature parity: model beklenen feature'ları doğrula ve CS normalizasyonu uygula
         if ml_model is not None:
-            model_features = getattr(ml_model, "feature_names", [])
-            model_cs = getattr(ml_model, "cs_features", [])
-            model_impute = getattr(ml_model, "impute_values", None)
-
-            if model_features and all_day_features:
-                try:
-                    from ...ml.training_validator import prepare_features_for_inference
-
-                    # Scalar olmayan feature'ları filtrele (volume_profile dict vb.)
-                    clean_features = _scalar_features(features)
-                    clean_all = {
-                        t: _scalar_features(f)
-                        for t, f in all_day_features.items()
-                    }
-                    features = prepare_features_for_inference(
-                        ticker=ticker,
-                        raw_features=clean_features,
-                        all_date_features=clean_all,
-                        feature_names=model_features,
-                        cs_features=model_cs,
-                        impute_values=model_impute,
-                        date_str=date_str,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "prepare_features_for_inference_basarisiz: hata=%s",
-                        str(e),
-                    )
+            features = self._apply_feature_parity(
+                features, ml_model, ticker, all_day_features, date_str
+            )
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -166,35 +191,10 @@ class BacktestCanonicalAdapter:
         """
         self._lazy_load()
 
-        # Feature parity uygula
         if ml_model is not None:
-            model_features = getattr(ml_model, "feature_names", [])
-            model_cs = getattr(ml_model, "cs_features", [])
-            model_impute = getattr(ml_model, "impute_values", None)
-
-            if model_features and all_day_features:
-                try:
-                    from ...ml.training_validator import prepare_features_for_inference
-
-                    clean_features = _scalar_features(features)
-                    clean_all = {
-                        t: _scalar_features(f)
-                        for t, f in all_day_features.items()
-                    }
-                    features = prepare_features_for_inference(
-                        ticker=ticker,
-                        raw_features=clean_features,
-                        all_date_features=clean_all,
-                        feature_names=model_features,
-                        cs_features=model_cs,
-                        impute_values=model_impute,
-                        date_str=date_str,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "prepare_features_for_inference_basarisiz: hata=%s",
-                        str(e),
-                    )
+            features = self._apply_feature_parity(
+                features, ml_model, ticker, all_day_features, date_str
+            )
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
