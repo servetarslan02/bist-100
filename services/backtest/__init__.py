@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Backtest Package
+ALPHA BIST — Backtest Paketi
 
 Nihai backtest sistemi modülleri:
 - bias_detector: Look-ahead bias tespit sistemi
@@ -9,19 +9,19 @@ Nihai backtest sistemi modülleri:
 - multi_asset_engine: Çoklu hisse backtest motoru
 - event_replay: Gelişmiş event replay motoru
 - deterministic: Deterministik recovery sistemi
-- deflated_sharpe: Deflated Sharpe Ratio & multiple testing correction
+- deflated_sharpe: Deflated Sharpe Ratio & çoklu test düzeltmesi
 - benchmark: Benchmark karşılaştırma motoru
-- scanner_parity: Backtest-scanner parity garantisi
+- scanner_parity: Backtest-scanner parite garantisi
 """
 
-# Existing modules
+# Mevcut modüller
 from .benchmark import (
     BenchmarkComparator,
     BenchmarkComparison,
     benchmark_comparator,
 )
 
-# New modules - Phase 1: Bias Detection & PIT
+# Faz 1: Bias Tespiti & PIT
 from .bias_detector import (
     BiasDetectorMiddleware,
     BiasReport,
@@ -29,7 +29,7 @@ from .bias_detector import (
     LookAheadBiasDetector,
 )
 
-# New modules - Phase 4: Deflated Sharpe & Benchmark
+# Faz 4: Deflated Sharpe & Benchmark
 from .deflated_sharpe import (
     DeflatedSharpeCalculator,
     DeflatedSharpeResult,
@@ -54,7 +54,7 @@ from .event_replay import (
     enhanced_replay,
 )
 
-# New modules - Phase 3: Multi-Asset, Event Replay, Deterministic
+# Faz 3: Çoklu Varlık, Event Replay, Deterministik
 from .multi_asset_engine import (
     AssetAllocation,
     MultiAssetBacktestEngine,
@@ -73,7 +73,7 @@ from .pit_validator import (
 )
 from .portfolio_sim import PortfolioSimulatorV3
 
-# New modules - Phase 5: Scanner Parity
+# Faz 5: Scanner Parite
 from .scanner_parity import (
     BacktestScannerParity,
     FeatureVersionLock,
@@ -91,7 +91,7 @@ from .survivorship import (
     survivorship_handler,
 )
 
-# New modules - Phase 2: Transaction Costs
+# Faz 2: İşlem Maliyetleri
 from .transaction_costs import (
     BISTFeeStructure,
     LiquidityTier,
@@ -105,13 +105,13 @@ from .transaction_costs import (
 from .walk_forward_runner import WalkForwardBacktestRunner
 
 __all__ = [
-    # Existing
+    # Mevcut
     "PortfolioSimulatorV3",
     "BacktestEngineV4",
     "BacktestConfig",
     "BacktestPersistence",
     "WalkForwardBacktestRunner",
-    # Phase 1
+    # Faz 1
     "LookAheadBiasDetector",
     "BiasDetectorMiddleware",
     "BiasViolation",
@@ -127,7 +127,7 @@ __all__ = [
     "PITViolation",
     "PITValidationReport",
     "pit_validator",
-    # Phase 2
+    # Faz 2
     "TransactionCostEngine",
     "BISTFeeStructure",
     "SpreadModel",
@@ -136,7 +136,7 @@ __all__ = [
     "LiquidityTier",
     "MarketCapCategory",
     "bist_transaction_cost",
-    # Phase 3
+    # Faz 3
     "MultiAssetBacktestEngine",
     "MultiAssetConfig",
     "MultiAssetResult",
@@ -153,7 +153,7 @@ __all__ = [
     "SystemCheckpoint",
     "deterministic_recovery",
     "idempotency_guard",
-    # Phase 4
+    # Faz 4
     "DeflatedSharpeCalculator",
     "ProbabilisticSharpeRatio",
     "DeflatedSharpeResult",
@@ -162,7 +162,7 @@ __all__ = [
     "BenchmarkComparator",
     "BenchmarkComparison",
     "benchmark_comparator",
-    # Phase 5
+    # Faz 5
     "BacktestScannerParity",
     "FeatureVersionLock",
     "ParityConfig",

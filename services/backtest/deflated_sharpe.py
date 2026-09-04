@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import structlog
+import logging
 from scipy import stats
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -36,7 +36,7 @@ class DeflatedSharpeResult:
     confidence_level: str  # high | medium | low | not_significant
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sonucu sözlük formatında döndürür."""
         return {
             "observed_sharpe": round(self.observed_sharpe, 4),
             "expected_max_sharpe": round(self.expected_max_sharpe, 4),
@@ -189,13 +189,7 @@ class DeflatedSharpeCalculator:
             confidence_level=confidence,
         )
 
-        logger.info(
-            "Deflated Sharpe computed",
-            observed=round(observed_sharpe, 3),
-            deflated=round(deflated_sr, 3),
-            p_value=round(p_value, 4),
-            confidence=confidence,
-        )
+        logger.info("deflated_sharpe_hesaplandi: gozlenen=%s, deflated=%s, p=%s, guven=%s", round(observed_sharpe, 3), round(deflated_sr, 3), round(p_value, 4), confidence)
 
         return result
 

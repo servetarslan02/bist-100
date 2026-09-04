@@ -15,9 +15,9 @@ Bu adapter:
 from typing import Any
 
 import numpy as np
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
@@ -35,18 +35,18 @@ class BacktestCanonicalAdapter:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Canonical adapter başlatır."""
         self._scoring = None
         self._decision_engine = None
 
     def _lazy_load(self) -> Any:
-        """Otomatik eklendi."""
+        """Gerekli servisleri geç yükler (lazy loading)."""
         if self._scoring is None:
-            from services.core.canonical_scoring import canonical_scoring
+            from ...core.canonical_scoring import canonical_scoring
 
             self._scoring = canonical_scoring
         if self._decision_engine is None:
-            from services.core.decision_engine import decision_engine
+            from ...core.decision_engine import decision_engine
 
             self._decision_engine = decision_engine
 
@@ -54,7 +54,7 @@ class BacktestCanonicalAdapter:
         self,
         features: dict[str, Any],
         regime: str = "UNKNOWN",
-        ml_model=None,
+        ml_model: Any = None,
         ticker: str = "BACKTEST",
         all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
@@ -84,7 +84,7 @@ class BacktestCanonicalAdapter:
 
             if model_features and all_day_features:
                 try:
-                    from services.ml.training_validator import prepare_features_for_inference
+                    from ...ml.training_validator import prepare_features_for_inference
 
                     # Scalar olmayan feature'ları filtrele (volume_profile dict vb.)
                     clean_features = _scalar_features(features)
@@ -99,7 +99,7 @@ class BacktestCanonicalAdapter:
                         date_str=date_str,
                     )
                 except Exception as e:
-                    logger.warning("prepare_features_for_inference failed", error=str(e))
+                    logger.warning("prepare_features_for_inference_basarisiz: hata=%s", str(e))
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -115,12 +115,12 @@ class BacktestCanonicalAdapter:
         features: dict[str, Any],
         regime: str = "UNKNOWN",
         price: float = 0,
-        ml_model=None,
+        ml_model: Any = None,
         ticker: str = "BACKTEST",
         all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
-    ) -> Any:
-        """Feature'lardan canonical score + decision üret."""
+    ) -> tuple[float, str]:
+        """Feature'lardan canonical score ve decision üretir."""
         self._lazy_load()
 
         # Feature parity uygula
@@ -131,7 +131,7 @@ class BacktestCanonicalAdapter:
 
             if model_features and all_day_features:
                 try:
-                    from services.ml.training_validator import prepare_features_for_inference
+                    from ...ml.training_validator import prepare_features_for_inference
 
                     clean_features = _scalar_features(features)
                     clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
@@ -145,7 +145,7 @@ class BacktestCanonicalAdapter:
                         date_str=date_str,
                     )
                 except Exception as e:
-                    logger.warning("prepare_features_for_inference failed", error=str(e))
+                    logger.warning("prepare_features_for_inference_basarisiz: hata=%s", str(e))
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -165,6 +165,7 @@ class BacktestCanonicalAdapter:
         date_str: str = "",
     ) -> dict[str, Any]:
         """Calculator feature'larını canonical scoring için hazırla."""
+        # TODO: Gerçek enrichment logic eklenecek (şimdilik passthrough)
         enriched = dict(calc_features)
         return enriched
 

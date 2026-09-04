@@ -16,9 +16,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -40,7 +40,7 @@ class BenchmarkComparison:
     num_observations: int
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sonucu sözlük formatında döndürür."""
         return {
             "benchmark": self.benchmark_name,
             "strategy_return_pct": round(self.strategy_return_pct, 2),
@@ -87,7 +87,7 @@ class BenchmarkComparator:
         Returns:
             BenchmarkComparison
         """
-        # Align lengths
+        # Uzunlukları hizala
         min_len = min(len(strategy_returns), len(benchmark_returns))
         sr = strategy_returns[:min_len]
         br = benchmark_returns[:min_len]
@@ -109,19 +109,14 @@ class BenchmarkComparator:
                 num_observations=0,
             )
 
-        # Total returns
+        # Toplam getiriler
         strategy_total = (np.prod(1 + sr) - 1) * 100
         benchmark_total = (np.prod(1 + br) - 1) * 100
 
-        # Annualized returns
-        years = min_len / periods_per_year
-        ((1 + strategy_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
-        ((1 + benchmark_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
-
-        # Daily risk-free
+        # Günlük risksiz faiz
         daily_rf = risk_free_rate / periods_per_year
 
-        # Alpha and Beta (CAPM)
+        # Alpha ve Beta (CAPM)
         excess_sr = sr - daily_rf
         excess_br = br - daily_rf
 
@@ -129,25 +124,25 @@ class BenchmarkComparator:
         beta = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] > 0 else 1.0
         alpha = (np.mean(excess_sr) - beta * np.mean(excess_br)) * periods_per_year * 100
 
-        # Correlation and R-squared
+        # Korelasyon ve R-kare
         correlation = np.corrcoef(sr, br)[0, 1]
         r_squared = correlation**2
 
-        # Tracking error
+        # İzleme hatası
         active_returns = sr - br
         tracking_error = np.std(active_returns, ddof=1) * np.sqrt(periods_per_year) * 100
 
-        # Information ratio
+        # Bilgi oranı
         information_ratio = (
             (np.mean(active_returns) / np.std(active_returns, ddof=1) * np.sqrt(periods_per_year))
             if np.std(active_returns, ddof=1) > 0
             else 0
         )
 
-        # Relative return
+        # Göreceli getiri
         relative_return = strategy_total - benchmark_total
 
-        # Up/Down capture ratio
+        # Yukarı/Aşağı yakalama oranı
         up_days = br > 0
         down_days = br < 0
 
@@ -177,13 +172,7 @@ class BenchmarkComparator:
             num_observations=min_len,
         )
 
-        logger.info(
-            "Benchmark comparison complete",
-            benchmark=benchmark_name,
-            alpha=f"{alpha:.2f}%",
-            beta=f"{beta:.2f}",
-            info_ratio=f"{information_ratio:.2f}",
-        )
+        logger.info("benchmark_karsilastirma: benchmark=%s, alpha=%s%%, beta=%s, ir=%s", benchmark_name, f"{alpha:.2f}", f"{beta:.2f}", f"{information_ratio:.2f}")
 
         return result
 
@@ -193,8 +182,8 @@ class BenchmarkComparator:
         benchmark_equity: list[tuple[str, float]],
         benchmark_name: str = "BIST100",
     ) -> BenchmarkComparison:
-        """Equity curve'lerden karşılaştırma yap."""
-        # Convert to returns
+        """Equity curve'lerden karşılaştırma yapar."""
+        # Getiri serisine dönüştür
         strategy_values = [e[1] for e in strategy_equity]
         benchmark_values = [e[1] for e in benchmark_equity]
 
@@ -207,9 +196,9 @@ class BenchmarkComparator:
     def generate_report(
         comparisons: list[BenchmarkComparison],
     ) -> dict[str, Any]:
-        """Çoklu benchmark karşılaştırma raporu."""
+        """Çoklu benchmark karşılaştırma raporu oluşturur."""
         if not comparisons:
-            return {"error": "No comparisons provided"}
+            return {"error": "Karşılaştırma sağlanmadı"}
 
         best_alpha = max(comparisons, key=lambda c: c.alpha_pct)
         best_ir = max(comparisons, key=lambda c: c.information_ratio)

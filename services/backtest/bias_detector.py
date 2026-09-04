@@ -25,9 +25,9 @@ try:
     import polars as pl
 except ImportError:
     pl = None
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,7 +42,7 @@ class BiasViolation:
     data_point: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """İhlali sözlük formatında döndürür."""
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -63,7 +63,7 @@ class BiasReport:
     is_clean: bool = True
 
     def add_violation(self, violation: BiasViolation) -> Any:
-        """Otomatik eklendi."""
+        """Bias ihlalini ekler."""
         self.violations.append(violation)
         if violation.severity == "critical":
             self.critical_count += 1
@@ -72,7 +72,7 @@ class BiasReport:
             self.warning_count += 1
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Raporu sözlük formatında döndürür."""
         return {
             "total_checks": self.total_checks,
             "violations": [v.to_dict() for v in self.violations],
@@ -94,7 +94,7 @@ class LookAheadBiasDetector:
     """
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Look-ahead bias dedektörünü başlatır."""
         self.violations: list[BiasViolation] = []
 
     def validate_feature_timestamps(
@@ -125,7 +125,7 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=decision_timestamp,
                     feature_name=feature_name,
-                    description=f"Timestamp column '{timestamp_col}' not found in feature data",
+                    description=f"Zaman damgası sütunu '{timestamp_col}' feature verisinde bulunamadı",
                 )
             )
             return report
@@ -141,8 +141,8 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=decision_timestamp,
                     feature_name=feature_name,
-                    description=f"Feature contains {len(future_data)} data points after decision time. "
-                    f"Max future timestamp: {future_data[timestamp_col].max()}",
+                    description=f"Feature, karar anından sonra {len(future_data)} veri noktası içeriyor. "
+                    f"En ileri zaman damgası: {future_data[timestamp_col].max()}",
                     data_point={"future_rows": len(future_data)},
                 )
             )
@@ -175,7 +175,6 @@ class LookAheadBiasDetector:
             # Bu noktanın window'u data[i-window_size:i] olmalı
             # Eğer data[i-window_size:i+1] kullanılmışsa → leakage
             window_values = data[value_col][i - window_size : i]
-            data[value_col][i]
 
             # Rolling mean hesapla (sadece geçmiş veri ile)
             expected_mean = window_values.mean()
@@ -192,8 +191,8 @@ class LookAheadBiasDetector:
                                 severity="critical",
                                 timestamp=data[timestamp_col][i],
                                 feature_name=feature_name,
-                                description=f"Rolling window at index {i} uses future data. "
-                                f"Expected: {expected_mean:.4f}, Got: {actual_mean:.4f}",
+                                description=f"Rolling window indeks {i} gelecek veri kullanıyor. "
+                                f"Beklenen: {expected_mean:.4f}, Gerçek: {actual_mean:.4f}",
                             )
                         )
 
@@ -225,12 +224,12 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=datetime.now(UTC),
                     feature_name="purge_validation",
-                    description=f"Purge days ({purge_days}) < label horizon ({label_horizon_days}). "
-                    f"Minimum purge should be {min_purge} days to prevent label leakage.",
+                    description=f"Purge günleri ({purge_days}) < label ufku ({label_horizon_days}). "
+                    f"Label sızıntısını önlemek için minimum purge {min_purge} gün olmalıdır.",
                 )
             )
         else:
-            logger.info("Label-feature alignment OK", purge=purge_days, horizon=label_horizon_days)
+            logger.info("label_feature_hizalama: purge=%s, horizon=%s", purge_days, label_horizon_days)
 
         return report
 
@@ -262,8 +261,8 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=train_end,
                     feature_name="fold_boundary",
-                    description=f"Test start ({test_start}) <= train end ({train_end}). "
-                    f"Test must start after training period.",
+                    description=f"Test başlangıcı ({test_start}) <= eğitim bitişi ({train_end}). "
+                    f"Test, eğitim döneminden sonra başlamalıdır.",
                 )
             )
 
@@ -276,8 +275,8 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=train_end,
                     feature_name="purge_gap",
-                    description=f"Actual gap ({actual_gap} days) < required purge ({purge_days} days). "
-                    f"Purge gap insufficient to prevent label leakage.",
+                    description=f"Gerçek boşluk ({actual_gap} gün) < gerekli purge ({purge_days} gün). "
+                    f"Label sızıntısını önlemek için purge boşluğu yetersiz.",
                 )
             )
 
@@ -289,14 +288,14 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=train_end,
                     feature_name="purge_vs_horizon",
-                    description=f"Purge gap ({actual_gap} days) < label horizon ({label_horizon_days} days). "
-                    f"Label from training period may leak into test period.",
+                    description=f"Purge boşluğu ({actual_gap} gün) < label ufku ({label_horizon_days} gün). "
+                    f"Eğitim döneminin label'ı test dönemine sızabilir.",
                 )
             )
 
         # 4. Embargo check (informational)
         if embargo_days > 0:
-            logger.info("Embargo period configured", embargo_days=embargo_days, test_start=test_start.isoformat())
+            logger.info("embargo_suresi: gun=%s, test_baslangic=%s", embargo_days, test_start.isoformat())
 
         return report
 
@@ -330,8 +329,8 @@ class LookAheadBiasDetector:
                             severity="warning",
                             timestamp=datetime.now(UTC),
                             feature_name="data_revision",
-                            description=f"Multiple revisions found for report date {name}. "
-                            f"Only the first (as-reported) version should be used in backtest.",
+                            description=f"Rapor tarihi {name} için birden fazla revizyon bulundu. "
+                            f"Backtest'te sadece ilk (as-reported) versiyon kullanılmalıdır.",
                             data_point={"report_date": str(name), "revisions": len(group)},
                         )
                     )
@@ -407,7 +406,7 @@ class BiasDetectorMiddleware:
         is_safe = not (self.strict_mode and combined_report.critical_count > 0)
 
         if not is_safe:
-            logger.error("Bias check FAILED - blocking scan", critical=combined_report.critical_count)
+            logger.error("bias_kontrol_basarisiz: critical=%s", combined_report.critical_count)
 
         return is_safe, combined_report
 

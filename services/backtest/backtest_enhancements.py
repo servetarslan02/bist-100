@@ -1,24 +1,12 @@
-"""ALPHA BIST — Backtest Enhancements v1.0
+"""ALPHA BIST — Backtest Geliştirmeleri v1.0
 
 Backtest motoru geliştirmeleri:
-- Delisted stock handling (hisse çıkışı)
-- IPO handling (halka arz)
+- Delisted hisse çıkışı yönetimi
+- IPO (halka arz) yönetimi
 - T+1 execution (gerçek takas)
 - Market impact modeli
-- Liquidity constraints
-- Corporate actions (temettü, bölünme)
-
-Kullanım:
-    from services.backtest.backtest_enhancements import backtest_enhancements
-
-    # T+1 execution kontrolü
-    can_execute = backtest_enhancements.check_t_plus_1(ticker, signal_date, last_trade_date)
-
-    # Market impact
-    impact = backtest_enhancements.estimate_market_impact(ticker, volume, trade_size)
-
-    # Delisted kontrolü
-    is_delisted = backtest_enhancements.is_delisted(ticker, date)
+- Likidite kısıtlamaları
+- Şirket olayları (temettü, bölünme)
 """
 
 from __future__ import annotations
@@ -28,9 +16,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -89,7 +77,7 @@ class BacktestEnhancements:
         market_impact_coefficient: float = 0.1,
         min_adv_threshold: float = 1_000_000,  # TL
     ):
-        """Otomatik eklendi."""
+        """Backtest geliştirmelerini başlatır."""
         self.max_participation_rate = max_participation_rate
         self.market_impact_coefficient = market_impact_coefficient
         self.min_adv_threshold = min_adv_threshold
@@ -97,9 +85,7 @@ class BacktestEnhancements:
         self._ipo_dates: dict[str, str] = {}  # ticker → ipo_date
         self._corporate_actions: list[CorporateAction] = []
 
-    # =====================================================
-    # T+1 EXECUTION
-    # =====================================================
+    # T+1 TAKAS
 
     def check_t_plus_1(
         self,
@@ -164,9 +150,7 @@ class BacktestEnhancements:
             reason=f"T+1 execution: {delay_days} gün gecikme",
         )
 
-    # =====================================================
-    # MARKET IMPACT
-    # =====================================================
+    # PİYASA ETKİSİ
 
     def estimate_market_impact(
         self,
@@ -214,12 +198,7 @@ class BacktestEnhancements:
         total_impact = temporary_impact + permanent_impact
 
         if not is_feasible:
-            logger.warning(
-                "market_impact_excessive",
-                ticker=ticker,
-                participation_rate=round(participation_rate, 4),
-                max_allowed=self.max_participation_rate,
-            )
+            logger.warning("market_impact_asimi: ticker=%s, katilim_orani=%s, max=%s", ticker, round(participation_rate, 4), self.max_participation_rate)
 
         return MarketImpact(
             ticker=ticker,
@@ -232,9 +211,7 @@ class BacktestEnhancements:
             is_feasible=is_feasible,
         )
 
-    # =====================================================
-    # DELISTED STOCK
-    # =====================================================
+    # DELİSTED HİSSE
 
     def register_delisted(self, ticker: str, delist_date: str) -> None:
         """Delisted hisse kaydet.
@@ -244,7 +221,7 @@ class BacktestEnhancements:
             delist_date: Delist tarihi (YYYY-MM-DD)
         """
         self._delisted_stocks[ticker] = delist_date
-        logger.info("delisted_registered", ticker=ticker, date=delist_date)
+        logger.info("delisted_kaydedildi: ticker=%s, tarih=%s", ticker, delist_date)
 
     def is_delisted(self, ticker: str, date: str) -> bool:
         """Hisse bu tarihte delisted mi?
@@ -267,9 +244,7 @@ class BacktestEnhancements:
         except ValueError:
             return False
 
-    # =====================================================
-    # IPO HANDLING
-    # =====================================================
+    # IPO YÖNETİMİ
 
     def register_ipo(self, ticker: str, ipo_date: str) -> None:
         """IPO tarihi kaydet.
@@ -279,7 +254,7 @@ class BacktestEnhancements:
             ipo_date: IPO tarihi (YYYY-MM-DD)
         """
         self._ipo_dates[ticker] = ipo_date
-        logger.info("ipo_registered", ticker=ticker, date=ipo_date)
+        logger.info("ipo_kaydedildi: ticker=%s, tarih=%s", ticker, ipo_date)
 
     def is_post_ipo(
         self,
@@ -309,19 +284,12 @@ class BacktestEnhancements:
         except ValueError:
             return True
 
-    # =====================================================
-    # CORPORATE ACTIONS
-    # =====================================================
+    # ŞİRKET OLAYLARI
 
     def register_corporate_action(self, action: CorporateAction) -> None:
         """Şirket olayı kaydet."""
         self._corporate_actions.append(action)
-        logger.info(
-            "corporate_action_registered",
-            ticker=action.ticker,
-            type=action.action_type,
-            date=action.ex_date,
-        )
+        logger.info("sirket_olayi_kaydedildi: ticker=%s, tip=%s, tarih=%s", action.ticker, action.action_type, action.ex_date)
 
     def get_corporate_actions(
         self,
@@ -393,9 +361,7 @@ class BacktestEnhancements:
         """
         return price / ratio if ratio > 0 else price
 
-    # =====================================================
-    # LIQUIDITY CHECK
-    # =====================================================
+    # LİKİDİTE KONTROLÜ
 
     def check_liquidity(
         self,
@@ -424,12 +390,10 @@ class BacktestEnhancements:
 
         return True, "Likidite yeterli"
 
-    # =====================================================
-    # SUMMARY
-    # =====================================================
+    # ÖZET
 
     def get_summary(self) -> dict[str, Any]:
-        """Özet."""
+        """Geliştirme özetini döndürür."""
         return {
             "delisted_stocks": len(self._delisted_stocks),
             "ipo_dates": len(self._ipo_dates),
