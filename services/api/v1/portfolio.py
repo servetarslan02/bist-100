@@ -721,22 +721,40 @@ async def optimize_portfolio(
         sector_map = body.get("sector_map")
         liquidity_scores = body.get("liquidity_scores")
 
-        # Tarihsel getiri matrisi — gerçek veriden hesaplanmalı
-        import yfinance as yf
+        # Tarihsel getiri matrisi — warehouse (TradingView + yerel depo)
+        from ...data.data_source import data_source
 
-        yf_tickers = [f"{t}.IS" for t in tickers]
-        data = yf.download(yf_tickers, period="3mo", interval="1d", auto_adjust=True, progress=False)
-        if data.empty:
+        close_series: dict[str, list[float]] = {}
+        for ticker_sym in tickers:
+            df = data_source.get_stock_data(
+                ticker=ticker_sym,
+                period="3mo",
+                interval="1d",
+                source_priority=["warehouse", "local"],
+            )
+            if df is not None and not df.is_empty() and "Close" in df.columns:
+                closes = df["Close"].drop_nulls().to_list()
+                if len(closes) >= 20:
+                    close_series[ticker_sym] = closes
+
+        if not close_series:
             raise HTTPException(
                 status_code=503,
                 detail="Tarihsel veri alınamadı. Optimizasyon yapılamaz.",
             )
 
-        close_data = data["Close"] if "Close" in data else data
-        if len(tickers) == 1:
-            returns_matrix = close_data.pct_change().dropna().values.reshape(-1, 1)
-        else:
-            returns_matrix = close_data.pct_change().dropna().values
+        # Eşit uzunlukta getiri matrisi oluştur
+        min_len = min(len(v) for v in close_series.values())
+        import numpy as np
+
+        returns_list = []
+        for ticker_sym in tickers:
+            if ticker_sym in close_series:
+                prices = close_series[ticker_sym][-min_len:]
+                rets = np.diff(prices) / np.array(prices[:-1])
+                returns_list.append(rets)
+
+        returns_matrix = np.column_stack(returns_list) if len(returns_list) > 1 else np.array(returns_list[0]).reshape(-1, 1)
 
         c = PortfolioOptimizerConstraints(
             max_position_pct=float(body.get("max_position_pct", 0.10)),
