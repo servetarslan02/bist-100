@@ -97,7 +97,7 @@ class BiasReport:
         """Bias ihlalini rapora ekler.
 
         Args:
-            violation: Eklenacak BiasViolation nesnesi
+            violation: Eklenecek BiasViolation nesnesi
         """
         self.violations.append(violation)
         if violation.severity == "critical":
@@ -173,9 +173,6 @@ class LookAheadBiasDetector:
 
         Returns:
             BiasReport nesnesi
-
-        Raises:
-            TypeError: feature_df Polars DataFrame değilse (pl mevcutsa)
         """
         report = BiasReport()
 
@@ -256,11 +253,16 @@ class LookAheadBiasDetector:
             window_values = data[value_col][i - window_size : i]
 
             # Rolling mean hesapla (sadece geçmiş veri ile)
-            expected_mean = window_values.mean()
+            expected_raw = window_values.mean()
 
             # Gerçek rolling değeri kontrol et
             if "rolling_mean" in data.columns:
-                actual_mean = data["rolling_mean"][i]
+                actual_raw = data["rolling_mean"][i]
+                # Polars null değerleri None döner, np.isnan bunu handle edemez
+                if actual_raw is None or expected_raw is None:
+                    continue
+                actual_mean = float(actual_raw)
+                expected_mean = float(expected_raw)
                 if not np.isnan(actual_mean) and not np.isnan(expected_mean):
                     diff = abs(actual_mean - expected_mean)
                     if diff > 1e-10:
