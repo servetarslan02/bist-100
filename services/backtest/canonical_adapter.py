@@ -1,14 +1,14 @@
 """
-ALPHA BIST — Backtest Canonical Scoring Adapter v2.0
+ALPHA BIST — Backtest Canonical Scoring Adaptör v2.0
 
 FAZ 4.7: Artık prepare_features_for_inference() kullanır.
 Feature parity training ile garanti edilir.
 
-Bu adapter:
+Bu adaptör:
 - Backtest'teki feature snapshot'tan canonical score üretir
 - PIT (Point-in-Time) koruması sağlar
-- prepare_features_for_inference() ile CS normalization uygular
-- Feature contract'ı zorunlu kılar
+- prepare_features_for_inference() ile CS normalizasyonu uygular
+- Feature sözleşmesini zorunlu kılar
 - Mevcut backtest API'sini bozmaz
 """
 
@@ -21,26 +21,50 @@ logger = logging.getLogger(__name__)
 
 
 def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
-    """Dict/nested feature'ları filtrele, sadece scalar olanları tut."""
+    """Dict/nested feature'ları filtrele, sadece scalar olanları tut.
+
+    Args:
+        feats: Feature adı → değer sözlüğü
+
+    Returns:
+        Sadece sayısal (int, float) ve sonlu değerler içeren sözlük
+    """
     return {
-        k: v for k, v in feats.items() if isinstance(v, (int, float, np.floating, np.integer)) and np.isfinite(float(v))
+        k: v
+        for k, v in feats.items()
+        if isinstance(v, (int, float, np.floating, np.integer))
+        and np.isfinite(float(v))
     }
 
 
 class BacktestCanonicalAdapter:
-    """Backtest → CanonicalScoringPipeline adapter v2.0.
+    """Backtest → CanonicalScoringPipeline adaptör v2.0.
 
-    Artık her prediction için prepare_features_for_inference() kullanır.
-    Training ile aynı CS normalization ve feature contract uygulanır.
+    Her prediction için prepare_features_for_inference() kullanır.
+    Training ile aynı CS normalizasyonu ve feature sözleşmesi uygulanır.
     """
 
-    def __init__(self):
-        """Canonical adapter başlatır."""
+    def __init__(self) -> None:
+        """Canonical adaptörü başlatır."""
         self._scoring = None
         self._decision_engine = None
 
-    def _lazy_load(self) -> Any:
-        """Gerekli servisleri geç yükler (lazy loading)."""
+    def __repr__(self) -> str:
+        """BacktestCanonicalAdapter okunabilir temsili."""
+        scoring_loaded = self._scoring is not None
+        engine_loaded = self._decision_engine is not None
+        return (
+            f"BacktestCanonicalAdapter("
+            f"scoring_loaded={scoring_loaded}, "
+            f"engine_loaded={engine_loaded})"
+        )
+
+    def _lazy_load(self) -> None:
+        """Gerekli servisleri geç yükler (lazy loading).
+
+        İlk çağrıda canonical_scoring ve decision_engine modüllerini
+        yükler. Sonraki çağrılarda mevcut referansları kullanır.
+        """
         if self._scoring is None:
             from ...core.canonical_scoring import canonical_scoring
 
@@ -59,24 +83,24 @@ class BacktestCanonicalAdapter:
         all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
     ) -> float:
-        """Feature'lardan canonical opportunity score üret.
+        """Feature'lardan canonical fırsat skoru üret.
 
         FAZ 4.7: prepare_features_for_inference() ile parity-safe.
 
         Args:
             features: Bu hissenin feature'ları (zaten enriched olabilir)
             regime: Piyasa rejimi
-            ml_model: TrainedModel/MultiHorizonModel (None → rule-based)
+            ml_model: TrainedModel/MultiHorizonModel (None → kural tabanlı)
             ticker: Hisse kodu
-            all_day_features: Aynı tarihteki TUM hisselerin feature'ları (CS için)
+            all_day_features: Aynı tarihteki tüm hisselerin feature'ları (CS için)
             date_str: Tarih string'i (CS için)
 
         Returns:
-            Opportunity score (0-100)
+            Fırsat skoru (0-100)
         """
         self._lazy_load()
 
-        # Feature parity: model beklenen feature'ları doğrula ve CS normalization uygula
+        # Feature parity: model beklenen feature'ları doğrula ve CS normalizasyonu uygula
         if ml_model is not None:
             model_features = getattr(ml_model, "feature_names", [])
             model_cs = getattr(ml_model, "cs_features", [])
@@ -88,7 +112,10 @@ class BacktestCanonicalAdapter:
 
                     # Scalar olmayan feature'ları filtrele (volume_profile dict vb.)
                     clean_features = _scalar_features(features)
-                    clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
+                    clean_all = {
+                        t: _scalar_features(f)
+                        for t, f in all_day_features.items()
+                    }
                     features = prepare_features_for_inference(
                         ticker=ticker,
                         raw_features=clean_features,
@@ -99,7 +126,10 @@ class BacktestCanonicalAdapter:
                         date_str=date_str,
                     )
                 except Exception as e:
-                    logger.warning("prepare_features_for_inference_basarisiz: hata=%s", str(e))
+                    logger.warning(
+                        "prepare_features_for_inference_basarisiz: hata=%s",
+                        str(e),
+                    )
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -120,7 +150,20 @@ class BacktestCanonicalAdapter:
         all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
     ) -> tuple[float, str]:
-        """Feature'lardan canonical score ve decision üretir."""
+        """Feature'lardan canonical score ve işlem kararı üretir.
+
+        Args:
+            features: Bu hissenin feature'ları
+            regime: Piyasa rejimi
+            price: Güncel fiyat
+            ml_model: TrainedModel/MultiHorizonModel (None → kural tabanlı)
+            ticker: Hisse kodu
+            all_day_features: Aynı tarihteki tüm hisselerin feature'ları (CS için)
+            date_str: Tarih string'i (CS için)
+
+        Returns:
+            (fırsat_skoru, işlem_kararı) çifti
+        """
         self._lazy_load()
 
         # Feature parity uygula
@@ -134,7 +177,10 @@ class BacktestCanonicalAdapter:
                     from ...ml.training_validator import prepare_features_for_inference
 
                     clean_features = _scalar_features(features)
-                    clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
+                    clean_all = {
+                        t: _scalar_features(f)
+                        for t, f in all_day_features.items()
+                    }
                     features = prepare_features_for_inference(
                         ticker=ticker,
                         raw_features=clean_features,
@@ -145,7 +191,10 @@ class BacktestCanonicalAdapter:
                         date_str=date_str,
                     )
                 except Exception as e:
-                    logger.warning("prepare_features_for_inference_basarisiz: hata=%s", str(e))
+                    logger.warning(
+                        "prepare_features_for_inference_basarisiz: hata=%s",
+                        str(e),
+                    )
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -164,8 +213,20 @@ class BacktestCanonicalAdapter:
         ticker: str = "",
         date_str: str = "",
     ) -> dict[str, Any]:
-        """Calculator feature'larını canonical scoring için hazırla."""
-        # TODO: Gerçek enrichment logic eklenecek (şimdilik passthrough)
+        """Hesaplayıcı feature'larını canonical scoring için hazırla.
+
+        Mevcut feature'ları canonical scoring pipeline'ının beklediği
+        formata dönüştürür. Ek zenginleştirme (enrichment) gerektiğinde
+        bu metot genişletilir.
+
+        Args:
+            calc_features: Hesaplayıcıdan gelen ham feature'lar
+            ticker: Hisse kodu
+            date_str: Tarih string'i
+
+        Returns:
+            Canonical scoring için hazır feature sözlüğü
+        """
         enriched = dict(calc_features)
         return enriched
 
