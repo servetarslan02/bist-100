@@ -59,8 +59,22 @@ class BacktestConfig:
     historical_repository: Any = None  # HistoricalDataRepository instance
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
+    def __repr__(self) -> str:
+        """BacktestConfig okunabilir temsili."""
+        return (
+            f"BacktestConfig("
+            f"capital={self.initial_capital:,.0f}, "
+            f"lookback={self.lookback_days}, "
+            f"threshold={self.signal_threshold}, "
+            f"positions={self.max_positions})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Sözlük formatında döndürür."""
+        """Konfigürasyonu sözlük formatında döndürür.
+
+        Returns:
+            Konfigürasyon alanlarını içeren sözlük
+        """
         return {
             "initial_capital": self.initial_capital,
             "lookback_days": self.lookback_days,
@@ -95,8 +109,22 @@ class BacktestMetrics:
     cvar_95: float = 0.0
     max_drawdown_duration_days: int = 0
 
+    def __repr__(self) -> str:
+        """BacktestMetrics okunabilir temsili."""
+        return (
+            f"BacktestMetrics("
+            f"return={self.total_return_pct:.2f}%, "
+            f"sharpe={self.sharpe_ratio:.4f}, "
+            f"mdd={self.max_drawdown_pct:.2f}%, "
+            f"trades={self.total_trades})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Sözlük formatında döndürür."""
+        """Metrikleri sözlük formatında döndürür.
+
+        Returns:
+            Metriklerin yuvarlanmış değerlerini içeren sözlük
+        """
         return {k: round(v, 4) if isinstance(v, float) else v for k, v in self.__dict__.items()}
 
 
@@ -121,8 +149,22 @@ class BacktestResultV4:
     trades: list[dict[str, Any]]
     persisted: bool = False
 
+    def __repr__(self) -> str:
+        """BacktestResultV4 okunabilir temsili."""
+        return (
+            f"BacktestResultV4("
+            f"run={self.run_id!r}, "
+            f"trades={self.trades_executed}, "
+            f"return={self.metrics.total_return_pct:.2f}%, "
+            f"elapsed={self.elapsed_seconds:.1f}s)"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Sözlük formatında döndürür."""
+        """Sonucu sözlük formatında döndürür.
+
+        Returns:
+            Sonuç detaylarını içeren sözlük
+        """
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -150,28 +192,46 @@ class BacktestResultV4:
 class FeatureCache:
     """Ticker bazında feature cache."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Feature cache başlatır."""
         self._cache: dict[str, dict[str, Any]] = {}
         self._date_cache: dict[str, str] = {}
         self._hits = 0
         self._misses = 0
 
+    def __repr__(self) -> str:
+        """FeatureCache okunabilir temsili."""
+        return f"FeatureCache(entries={len(self._cache)}, hit_rate={self.hit_rate:.2%})"
+
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
-        """Cache'den değer döndürür (bulunamazsa None)."""
+        """Cache'den değer döndürür.
+
+        Args:
+            ticker: Hisse kodu
+            date: Tarih string'i
+
+        Returns:
+            Cache'deki feature sözlüğü veya None
+        """
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             self._hits += 1
             return self._cache[ticker]
         self._misses += 1
         return None
 
-    def set(self, ticker: str, date: str, features: dict[str, Any]) -> Any:
-        """Değeri cache'e kaydeder."""
+    def set(self, ticker: str, date: str, features: dict[str, Any]) -> None:
+        """Değeri cache'e kaydeder.
+
+        Args:
+            ticker: Hisse kodu
+            date: Tarih string'i
+            features: Feature sözlüğü
+        """
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
-    def clear(self) -> Any:
-        """Cache'i temizler."""
+    def clear(self) -> None:
+        """Cache'i temizler ve sayaçları sıfırlar."""
         self._cache.clear()
         self._date_cache.clear()
         self._hits = 0
@@ -179,7 +239,11 @@ class FeatureCache:
 
     @property
     def hit_rate(self) -> float:
-        """Cache hit oranını döndürür."""
+        """Cache hit oranını döndürür.
+
+        Returns:
+            0-1 arası hit oranı
+        """
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
@@ -187,19 +251,36 @@ class FeatureCache:
 class QualityCache:
     """Data quality sonucu cache."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Quality cache başlatır."""
         self._cache: dict[str, tuple[bool, float]] = {}
 
+    def __repr__(self) -> str:
+        """QualityCache okunabilir temsili."""
+        return f"QualityCache(entries={len(self._cache)})"
+
     def get(self, ticker: str) -> tuple[bool, float] | None:
-        """Cache'den değer döndürür (bulunamazsa None)."""
+        """Cache'den değer döndürür.
+
+        Args:
+            ticker: Hisse kodu
+
+        Returns:
+            (passed, score) çifti veya None
+        """
         return self._cache.get(ticker)
 
-    def set(self, ticker: str, passed: bool, score: float) -> Any:
-        """Değeri cache'e kaydeder."""
+    def set(self, ticker: str, passed: bool, score: float) -> None:
+        """Değeri cache'e kaydeder.
+
+        Args:
+            ticker: Hisse kodu
+            passed: Geçti mi?
+            score: Kalite skoru
+        """
         self._cache[ticker] = (passed, score)
 
-    def clear(self) -> Any:
+    def clear(self) -> None:
         """Cache'i temizler."""
         self._cache.clear()
 
@@ -220,8 +301,9 @@ class BacktestEngineV4:
         self,
         config: BacktestConfig | None = None,
         use_panel_features: bool = True,
-    ):
-        """
+    ) -> None:
+        """Backtest motoru v4.0 başlatır.
+
         Args:
             config: Backtest konfigürasyonu
             use_panel_features: True (varsayılan) → vektörize panel feature
@@ -247,7 +329,16 @@ class BacktestEngineV4:
         self._last_panel_seconds: float = 0.0
         self._last_scalar_fallbacks: int = 0
 
-    def _lazy_load(self) -> Any:
+    def __repr__(self) -> str:
+        """BacktestEngineV4 okunabilir temsili."""
+        return (
+            f"BacktestEngineV4("
+            f"panel={self._use_panel}, "
+            f"capital={self._config.initial_capital:,.0f}, "
+            f"lookback={self._config.lookback_days})"
+        )
+
+    def _lazy_load(self) -> None:
         """Modülleri lazy-load et (test ortamında import hatası önlemek için)."""
         if self._calc is None:
             try:
@@ -369,10 +460,14 @@ class BacktestEngineV4:
         effective_lookback = max(cfg.lookback_days, 60)
 
         if len(sorted_dates) < effective_lookback + 10:
-            logger.warning("Insufficient data", dates=len(sorted_dates), needed=effective_lookback + 10)
+            logger.warning(
+                "yetersiz_veri: tarih=%s, gerekli=%s",
+                len(sorted_dates),
+                effective_lookback + 10,
+            )
             return self._empty_result(run_id, sorted_dates, cfg, start_time)
 
-        # Benchmark prices (XU100)
+        # Benchmark fiyatları (XU100)
         benchmark_prices = {}
         benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
@@ -402,7 +497,6 @@ class BacktestEngineV4:
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
             date_str = str(current_date.date()) if hasattr(current_date, "date") else str(current_date)
-            str(next_date.date()) if hasattr(next_date, "date") else str(next_date)
 
             # Walk-forward trade penceresi (varsayılan: kısıt yok)
             if trade_start is not None and date_str < trade_start:
@@ -617,10 +711,14 @@ class BacktestEngineV4:
         effective_lookback = max(cfg.lookback_days, 60)
 
         if len(sorted_dates) < effective_lookback + 10:
-            logger.warning("Insufficient data", dates=len(sorted_dates), needed=effective_lookback + 10)
+            logger.warning(
+                "yetersiz_veri: tarih=%s, gerekli=%s",
+                len(sorted_dates),
+                effective_lookback + 10,
+            )
             return self._empty_result(run_id, sorted_dates, cfg, start_time)
 
-        # Benchmark prices (legacy ile aynı)
+        # Benchmark fiyatları (legacy ile aynı)
         benchmark_prices = {}
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
@@ -962,7 +1060,7 @@ class BacktestEngineV4:
 
         ok, errors = sim.check_invariants()
         if not ok:
-            logger.error("Invariant violations detected", errors=errors)
+            logger.error("invariant_ihlalleri_tespit_edildi: hatalar=%s", errors)
             result.metrics.max_drawdown_pct = -1  # Flag
 
         if persist:
@@ -979,14 +1077,14 @@ class BacktestEngineV4:
                 backtest_persistence.save_equity_curve(run_id, result.equity_curve)
                 result.persisted = True
             except Exception as e:
-                logger.error("Persistence failed", error=str(e))
+                logger.error("kayit_basarisiz: hata=%s", str(e))
 
         logger.info(
-            "Backtest completed",
-            run_id=run_id,
-            trades=result.trades_executed,
-            return_pct=metrics.total_return_pct,
-            elapsed=f"{elapsed:.1f}s",
+            "backtest_tamamlandi: run=%s, islem=%s, getiri=%s%%, sure=%ss",
+            run_id,
+            result.trades_executed,
+            round(metrics.total_return_pct, 2),
+            round(elapsed, 1),
         )
 
         return result
@@ -1106,7 +1204,10 @@ class BacktestEngineV4:
                 date_str=date_str,
             )
         except Exception as e:
-            logger.warning("Canonical scoring failed, falling back to legacy", error=str(e))
+            logger.warning(
+                "canonical_scoring_basarisiz_legacy_donus: hata=%s",
+                str(e),
+            )
             return self._compute_score_legacy(features)
 
     def _enrich_features_for_canonical(
@@ -1143,7 +1244,7 @@ class BacktestEngineV4:
                 if fund_features:
                     enriched.update(fund_features)
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="engine_v4.py:1091")
+                logger.debug("fundamental_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === HISTORICAL KAP + NEWS SENTIMENT (Motor5 — PIT-safe) ===
         if historical_adapter is not None:
@@ -1154,7 +1255,7 @@ class BacktestEngineV4:
                 if sentiment_features:
                     enriched.update(sentiment_features)
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="engine_v4.py:1102")
+                logger.debug("sentiment_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === HISTORICAL CATALYST (Motor6 — PIT-safe) ===
         if historical_adapter is not None:
@@ -1164,7 +1265,7 @@ class BacktestEngineV4:
                 if catalyst_features:
                     enriched.update(catalyst_features)
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="engine_v4.py:1112")
+                logger.debug("katalyst_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === MOTOR 7: WHY FALLING (PIT-safe) ===
         try:
@@ -1214,7 +1315,7 @@ class BacktestEngineV4:
             )
             enriched.update(why_feats)
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="engine_v4.py:WhyFallingMotor")
+            logger.debug("why_falling_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === MOTOR 1: RELATIVE STRENGTH (PIT-safe) ===
         if benchmark_close is not None and len(benchmark_close) > 20:
@@ -1231,7 +1332,7 @@ class BacktestEngineV4:
                         rs_feats = rs_motor.compute(ticker, stock_close, bench_slice)
                         enriched.update(rs_feats)
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="engine_v4.py:1130")
+                logger.debug("relative_strength_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === CROSS-SECTIONAL FEATURES (PIT-safe) ===
         if len(all_day_features) >= 5:
@@ -1258,7 +1359,7 @@ class BacktestEngineV4:
                     season_feats = season_motor.compute(ticker, close_arr, dates_list)
                     enriched.update(season_feats)
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="engine_v4.py:1162")
+            logger.debug("seasonality_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
         # === CANONICAL ALIASES ===
         for period in [1, 5, 20, 60]:
@@ -1282,7 +1383,17 @@ class BacktestEngineV4:
         cfg: BacktestConfig,
         start_time: float,
     ) -> BacktestResultV4:
-        """İşlevi açıklanacak."""
+        """Yetersiz veri durumunda boş sonuç döndürür.
+
+        Args:
+            run_id: Çalıştırma kimliği
+            dates: Tarih listesi
+            cfg: Backtest konfigürasyonu
+            start_time: Başlangıç zaman damgası
+
+        Returns:
+            Boş BacktestResultV4 nesnesi
+        """
         return BacktestResultV4(
             run_id=run_id,
             start_date="",
@@ -1308,30 +1419,75 @@ class BacktestEngineV4:
 
 
 class _FallbackCalculator:
-    """Test ortamında yedek implementasyon."""
-    def compute_all_features(self, df, mask=None, ticker="") -> Any:
-        """Varsayılan (test) feature seti döndürür."""
+    """Test ortamında yedek feature hesaplayıcı.
+
+    Gerçek modüller yüklenemediğinde varsayılan değerler döndürür.
+    """
+
+    def __repr__(self) -> str:
+        """_FallbackCalculator okunabilir temsili."""
+        return "_FallbackCalculator(test_modu)"
+
+    def compute_all_features(self, df, mask=None, ticker="") -> dict[str, Any]:
+        """Varsayılan (test) feature seti döndürür.
+
+        Args:
+            df: OHLCV DataFrame
+            mask: Tradability maskesi (yok sayılır)
+            ticker: Hisse kodu
+
+        Returns:
+            Varsayılan feature sözlüğü
+        """
         return {"rsi_14": 50, "momentum_20d": 0, "roc_5d": 0, "volume_zscore": 0}
 
 
 class _FallbackMask:
-    """Test ortamında yedek implementasyon."""
+    """Test ortamında yedek tradability maskesi.
+
+    Gerçek modül yüklenemediğinde boş maske döndürür.
+    """
+
+    def __repr__(self) -> str:
+        """_FallbackMask okunabilir temsili."""
+        return "_FallbackMask(test_modu)"
+
     def compute_mask(self, *args, **kwargs) -> Any:
-        """Boş tradability maskesi döndürür."""
-        class _M:
-            """İşlevi açıklanacak."""
+        """Boş tradability maskesi döndürür.
+
+        Returns:
+            mask=None içeren basit nesne
+        """
+        class _Mask:
+            """Boş tradability maskesi nesnesi."""
             mask = None
 
-        return _M()
+        return _Mask()
 
 
 class _FallbackQuality:
-    """Test ortamında yedek implementasyon."""
+    """Test ortamında yedek kalite kontrolü.
+
+    Gerçek modül yüklenemediğinde geçer varsayılan sonuç döndürür.
+    """
+
+    def __repr__(self) -> str:
+        """_FallbackQuality okunabilir temsili."""
+        return "_FallbackQuality(test_modu)"
+
     def full_quality_check(self, df, ticker="") -> Any:
-        """Varsayılan (geçerli) quality sonucu döndürür."""
-        class _Q:
-            """İşlevi açıklanacak."""
+        """Varsayılan (geçerli) kalite sonucu döndürür.
+
+        Args:
+            df: OHLCV DataFrame
+            ticker: Hisse kodu
+
+        Returns:
+            passed=True, quality_score=80.0 içeren nesne
+        """
+        class _Quality:
+            """Varsayılan kalite kontrol sonucu."""
             passed = True
             quality_score = 80.0
 
-        return _Q()
+        return _Quality()
