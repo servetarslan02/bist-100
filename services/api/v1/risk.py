@@ -204,8 +204,8 @@ async def risk_overview(
             "system_halted": dd.is_system_halted(),
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.get("/dashboard")
@@ -269,8 +269,8 @@ async def risk_dashboard(
             "calibration": cal_quality,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -333,8 +333,8 @@ async def var_report(
             "var_pct": round((param_var / max(1, portfolio_value)) * 100, 2),
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.get("/portfolio")
@@ -368,8 +368,8 @@ async def portfolio_risk(
             "source": "risk_orchestrator_live",
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.get("/liquidity")
@@ -408,8 +408,8 @@ async def liquidity_risk(
             "warnings": metrics.warnings,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -471,8 +471,8 @@ async def risk_limits(
             },
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.get("/drawdown")
@@ -511,8 +511,8 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
             "alert_message": dd.get_alert_message(state),
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -566,8 +566,8 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
             "portfolio_heat": heat,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.post("/stress-test/run")
@@ -639,8 +639,8 @@ async def run_stress_test(
                 "position_impacts": position_impacts_clean,
             }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -670,8 +670,8 @@ async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate
             "vix_levels": hedger.VIX_LEVELS,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.post("/tail-hedge/analyze")
@@ -712,8 +712,8 @@ async def analyze_tail_hedge(
             "instruments": result.instruments,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -738,8 +738,8 @@ async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_
             "usage": "POST /api/v1/risk/risk-parity/optimize ile ağırlıkları hesaplayın",
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.post("/risk-parity/optimize")
@@ -784,8 +784,8 @@ async def optimize_risk_parity(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -824,8 +824,8 @@ async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_l
             "alert_summary": monitor.get_alert_summary(),
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 @router.get("/alerts")
@@ -880,8 +880,8 @@ async def risk_alerts(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -910,8 +910,8 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
             "brier_history": cal.get_brier_history()[-10:],
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -984,8 +984,8 @@ async def pre_trade_check(
             },
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -1040,8 +1040,8 @@ async def compliance(
             "drawdown_state": dd_state.severity.value,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
 
 
 # =====================================================
@@ -1196,5 +1196,5 @@ async def run_stress_test_quick(
             "paths": paths_list,
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("uc_nokta_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Sunucu hatası: {e}") from e
