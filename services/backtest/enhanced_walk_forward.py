@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Enhanced Walk-Forward & Evaluation v1.0 (DEPRECATED)
+ALPHA BIST — Gelişmiş Walk-Forward ve Değerlendirme v1.0 (DEPRECATED)
 
 .. deprecated:: 5.0
     Bu modül yerine ``walk_forward_engine.WalkForwardEngineV5`` kullanın.
@@ -10,9 +10,9 @@ Walk-Forward with purge + embargo:
 - Purge: Gap between train end and test start (prevents leakage)
 - Embargo: Gap between test end and next train start (prevents leakage)
 
-Evaluation metrics:
+Değerlendirme metrikleri:
 - Alpha, Precision@K, IC, Hit Rate, Sharpe, Max DD, Turnover
-- Deflated Sharpe Ratio (overfitting detection)
+- Deflated Sharpe Ratio (overfitting tespiti)
 
 ⚠️ PIT UYARISI: Bu modül pre-computed predictions üzerinde çalışır.
 Modeli her fold'da YENİDEN EĞİTMEZ.
@@ -21,16 +21,19 @@ Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 
 from dataclasses import dataclass
+import logging
 
 import numpy as np
-import structlog
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class PurgeEmbargoFold:
-    """Walk-forward fold sonucu."""
+    """Walk-forward fold sonucu.
+
+    Tek bir train/test döneminin tüm performans metriklerini tutar.
+    """
 
     fold_id: int
     train_start: int
@@ -47,10 +50,23 @@ class PurgeEmbargoFold:
     max_drawdown: float
     turnover: float
 
+    def __repr__(self) -> str:
+        """PurgeEmbargoFold okunabilir temsili."""
+        return (
+            f"PurgeEmbargoFold("
+            f"id={self.fold_id}, "
+            f"test_return={self.test_return:.4f}, "
+            f"sharpe={self.sharpe:.4f}, "
+            f"ic={self.ic:.4f})"
+        )
+
 
 @dataclass
 class PurgeEmbargoResult:
-    """Walk-forward tam sonuç."""
+    """Walk-forward tam sonuç.
+
+    Tüm fold'ların ortalaması ve istikrar skoru.
+    """
 
     total_folds: int
     avg_test_return: float
@@ -64,6 +80,16 @@ class PurgeEmbargoResult:
     stability_score: float
     deflated_sharpe: float
     folds: list[PurgeEmbargoFold]
+
+    def __repr__(self) -> str:
+        """PurgeEmbargoResult okunabilir temsili."""
+        return (
+            f"PurgeEmbargoResult("
+            f"folds={self.total_folds}, "
+            f"avg_return={self.avg_test_return:.4f}, "
+            f"avg_sharpe={self.avg_test_sharpe:.4f}, "
+            f"stability={self.stability_score:.4f})"
+        )
 
 
 class PurgeEmbargoWalkForward:
@@ -86,13 +112,31 @@ class PurgeEmbargoWalkForward:
         step_days: int = 21,
         purge_days: int = 5,
         embargo_days: int = 5,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Walk-forward motorunu başlatır.
+
+        Args:
+            train_days: Eğitim döneminin gün sayısı
+            test_days: Test döneminin gün sayısı
+            step_days: Her adımda kaydırma gün sayısı
+            purge_days: Train-test arası purge gap (gün)
+            embargo_days: Test-train arası embargo gap (gün)
+        """
         self.train_days = train_days
         self.test_days = test_days
         self.step_days = step_days
         self.purge_days = purge_days
         self.embargo_days = embargo_days
+
+    def __repr__(self) -> str:
+        """PurgeEmbargoWalkForward okunabilir temsili."""
+        return (
+            f"PurgeEmbargoWalkForward("
+            f"train={self.train_days}, "
+            f"test={self.test_days}, "
+            f"purge={self.purge_days}, "
+            f"embargo={self.embargo_days})"
+        )
 
     def split(
         self,
@@ -100,8 +144,11 @@ class PurgeEmbargoWalkForward:
     ) -> list[tuple[int, int, int, int]]:
         """Walk-forward split üret.
 
+        Args:
+            n_days: Toplam gün sayısı
+
         Returns:
-            List of (train_start, train_end, test_start, test_end)
+            (train_start, train_end, test_start, test_end) demetleri listesi
         """
         folds = []
         fold_id = 0
@@ -140,12 +187,18 @@ class PurgeEmbargoWalkForward:
             actuals: Gerçek getiriler (n_days × n_tickers)
             tickers: Hisse kodları
             dates: Tarihler
+
+        Returns:
+            PurgeEmbargoResult nesnesi
         """
         n_days = len(predictions)
         folds = self.split(n_days)
 
         if not folds:
-            logger.warning("No walk-forward folds generated", n_days=n_days)
+            logger.warning(
+                "walk_forward_fold_olusturulamadi: gun=%s",
+                n_days,
+            )
             return PurgeEmbargoResult(
                 total_folds=0,
                 avg_test_return=0,
@@ -246,32 +299,45 @@ class PurgeEmbargoWalkForward:
         )
 
     def _precision_at_k(self, predictions: np.ndarray, actuals: np.ndarray, k: int) -> float:
-        """Precision@K: İlk K hisseden kaç tanesi gerçekten iyi?"""
+        """Precision@K: İlk K hisseden kaç tanesi gerçekten iyi?
+
+        Args:
+            predictions: Model tahminleri (n_days × n_tickers)
+            actuals: Gerçek getiriler (n_days × n_tickers)
+            k: Seçilecek hisse sayısı
+
+        Returns:
+            Ortalama precision@K (0-1)
+        """
         if len(predictions) == 0 or len(actuals) == 0:
             return 0.0
 
-        # Her gün için
         precisions = []
         for day in range(len(predictions)):
             if len(predictions[day]) < k:
                 continue
 
-            # En iyi K tahmin
             top_k_indices = np.argsort(predictions[day])[-k:]
 
-            # Gerçek getiriler
             day_actuals = actuals[day]
             if len(day_actuals) <= max(top_k_indices):
                 continue
 
-            # Kaç tanesi pozitif?
             correct = sum(1 for idx in top_k_indices if day_actuals[idx] > 0)
             precisions.append(correct / k)
 
         return float(np.mean(precisions)) if precisions else 0.0
 
     def _compute_ic(self, predictions: np.ndarray, actuals: np.ndarray) -> float:
-        """Information Coefficient: model skoru ile gelecek getiri korelasyonu."""
+        """Information Coefficient: model skoru ile gelecek getiri korelasyonu.
+
+        Args:
+            predictions: Model tahminleri
+            actuals: Gerçek getiriler
+
+        Returns:
+            Ortalama Spearman korelasyonu
+        """
         if len(predictions) == 0 or len(actuals) == 0:
             return 0.0
 
@@ -289,7 +355,15 @@ class PurgeEmbargoWalkForward:
         return float(np.mean(correlations)) if correlations else 0.0
 
     def _compute_hit_rate(self, predictions: np.ndarray, actuals: np.ndarray) -> float:
-        """Hit rate: yön doğruluğu."""
+        """Hit rate: yön doğruluğu.
+
+        Args:
+            predictions: Model tahminleri
+            actuals: Gerçek getiriler
+
+        Returns:
+            Yön doğruluğu oranı (0-1)
+        """
         if len(predictions) == 0 or len(actuals) == 0:
             return 0.0
 
@@ -304,7 +378,16 @@ class PurgeEmbargoWalkForward:
         return correct / total if total > 0 else 0.0
 
     def _compute_top_k_return(self, predictions: np.ndarray, actuals: np.ndarray, k: int = 10) -> float:
-        """Top-K portföy getirisi."""
+        """Top-K portföy getirisi.
+
+        Args:
+            predictions: Model tahminleri
+            actuals: Gerçek getiriler
+            k: Portföydeki hisse sayısı
+
+        Returns:
+            Toplam getiri
+        """
         if len(predictions) == 0 or len(actuals) == 0:
             return 0.0
 
@@ -319,7 +402,16 @@ class PurgeEmbargoWalkForward:
         return total_return
 
     def _compute_daily_returns(self, predictions: np.ndarray, actuals: np.ndarray, k: int = 10) -> list[float]:
-        """Günlük getiri serisi."""
+        """Günlük getiri serisi.
+
+        Args:
+            predictions: Model tahminleri
+            actuals: Gerçek getiriler
+            k: Portföydeki hisse sayısı
+
+        Returns:
+            Günlük getiri listesi
+        """
         returns = []
         for day in range(len(predictions)):
             if len(predictions[day]) < k:
@@ -330,7 +422,15 @@ class PurgeEmbargoWalkForward:
         return returns
 
     def _compute_sharpe(self, daily_returns: list[float], risk_free: float = 0) -> float:
-        """Sharpe ratio."""
+        """Sharpe oranı.
+
+        Args:
+            daily_returns: Günlük getiri serisi
+            risk_free: Yıllık risksiz faiz oranı
+
+        Returns:
+            Yıllıklaştırılmış Sharpe oranı
+        """
         if not daily_returns or len(daily_returns) < 2:
             return 0.0
         returns = np.array(daily_returns)
@@ -340,7 +440,14 @@ class PurgeEmbargoWalkForward:
         return float(np.mean(excess) / np.std(excess) * np.sqrt(252))
 
     def _compute_max_drawdown(self, daily_returns: list[float]) -> float:
-        """Max drawdown."""
+        """Maksimum drawdown.
+
+        Args:
+            daily_returns: Günlük getiri serisi
+
+        Returns:
+            Maksimum drawdown yüzdesi
+        """
         if not daily_returns:
             return 0.0
         equity = np.cumprod(1 + np.array(daily_returns))
@@ -349,7 +456,16 @@ class PurgeEmbargoWalkForward:
         return float(np.max(dd)) * 100
 
     def _compute_turnover(self, predictions: np.ndarray, actuals: np.ndarray, k: int = 10) -> float:
-        """Turnover: portföy değişim hızı."""
+        """Turnover: portföy değişim hızı.
+
+        Args:
+            predictions: Model tahminleri
+            actuals: Gerçek getiriler
+            k: Portföydeki hisse sayısı
+
+        Returns:
+            Ortalama turnover oranı (0-1)
+        """
         if len(predictions) < 2:
             return 0.0
 
@@ -367,9 +483,16 @@ class PurgeEmbargoWalkForward:
         return float(np.mean(turnovers)) if turnovers else 0.0
 
     def _deflated_sharpe(self, sharpes: list[float], n_trials: int) -> float:
-        """Deflated Sharpe Ratio — overfitting tespiti.
+        """Deflated Sharpe Oranı — overfitting tespiti.
 
         Backtest sayısı arttıkça Sharpe'ın güvenilirliği düşer.
+
+        Args:
+            sharpes: Her fold'ın Sharpe değeri
+            n_trials: Toplam deneme sayısı
+
+        Returns:
+            Deflated Sharpe değeri
         """
         if not sharpes or n_trials < 2:
             return 0.0
@@ -394,7 +517,8 @@ class PurgeEmbargoWalkForward:
 import warnings
 
 warnings.warn(
-    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
+    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, "
+    "walk_forward_engine.WalkForwardEngineV5 kullanın",
     DeprecationWarning,
     stacklevel=2,
 )
