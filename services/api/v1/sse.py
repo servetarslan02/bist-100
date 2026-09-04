@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Server-Sent Events (SSE) Yönlendirici v2.0
+ALPHA BIST — Server-Sent Events (SSE) Router v2.0
 
 Tek yönlü sunucu→istemci push. WebSocket'ten daha basit,
 tarayıcıda EventSource API ile çalışır.
@@ -20,12 +20,12 @@ Kullanım:
 
 import asyncio
 import hashlib
-import logging
 import time
-from collections.abc import AsyncIterator
 from typing import Any
+from collections.abc import AsyncIterator
 
 import orjson
+import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
@@ -130,7 +130,7 @@ async def _sse_generator(
             await asyncio.sleep(interval)
 
         except asyncio.CancelledError:
-            # İstemci bağlantıyı kesti — temiz çık
+            # Client disconnect — temiz çık
             logger.debug("sse_baglanti_kesildi: kanal=%s", channel)
             break
         except Exception as e:
