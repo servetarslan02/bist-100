@@ -135,7 +135,7 @@ def _get_live_portfolio_for_risk(requested_value: float | None = None) -> dict[s
                 "positions": positions,
             }
     except Exception as err:
-        logger.warning("failed_to_fetch_live_portfolio_for_risk", error=str(err))
+        logger.warning("canlı_portföy_hatasi: hata=%s", str(err))
 
     return {
         "total_value": requested_value or 0.0,
@@ -159,7 +159,7 @@ async def risk_overview(
     """Genel risk durumu — dynamic limits + drawdown + monitoring.
 
     Returns:
-        Risk level, limits, drawdown state, alert summary
+        Risk seviyesi, limitler, drawdown durumu, uyarı özeti
     """
     try:
         dl = _get_dynamic_limits()
@@ -218,7 +218,7 @@ async def risk_dashboard(
     """Tam risk dashboard — tüm modüllerin birleşik özeti.
 
     Returns:
-        Overview + VaR + stress test + tail hedge + monitoring + calibration
+        Genel bakış + VaR + stres testi + tail hedge + izleme + kalibrasyon
     """
     try:
         # Overview
@@ -480,7 +480,7 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
     """Drawdown durumu — drawdown_response servisi.
 
     Returns:
-        Current DD, max DD, action, severity, position scale, events
+        Güncel DD, maks DD, aksiyon, şiddet, pozisyon ölçeği, olaylar
     """
     try:
         dd = _get_drawdown_system()
@@ -525,7 +525,7 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
     """Mevcut stres testi senaryoları.
 
     Returns:
-        Historical + hypothetical senaryo listesi
+        Tarihsel + varsayımsal senaryo listesi
     """
     try:
         engine = _get_stress_engine()
@@ -653,7 +653,7 @@ async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate
     """Tail risk hedge stratejileri ve VIX seviyeleri.
 
     Returns:
-        Mevcut stratejiler + VIX eşikleri
+        Mevcut stratejiler ve VIX eşikleri
     """
     try:
         hedger = _get_tail_hedger()
@@ -726,7 +726,7 @@ async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_
     """Risk parity optimizasyon bilgisi.
 
     Returns:
-        Risk parity açıklaması + kullanım
+        Risk parity açıklaması ve kullanım bilgisi
     """
     try:
         rp = _get_risk_parity()
@@ -756,7 +756,7 @@ async def optimize_risk_parity(
         returns_data: Getiri matrisi
 
     Returns:
-        Risk parity ağırlıkları + risk katkıları + diversification ratio
+        Risk parity ağırlıkları, risk katkıları ve çeşitlendirme oranı
     """
     try:
         rp = _get_risk_parity()
@@ -798,7 +798,7 @@ async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_l
     """Risk monitoring durumu — alert kuralları ve son metrikler.
 
     Returns:
-        Alert kuralları + alert summary + son metrik snapshot
+        Alert kuralları, uyarı özeti ve son metrik anlık görüntüsü
     """
     try:
         monitor = _get_monitor()
@@ -842,7 +842,7 @@ async def risk_alerts(
         severity: Severity filtresi
 
     Returns:
-        Alert listesi + summary
+        Alert listesi ve özet
     """
     try:
         monitor = _get_monitor()
@@ -894,7 +894,7 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
     """Kalibrasyon kalitesi — Brier score + calibration curve.
 
     Returns:
-        Brier score, quality rating, calibration curve, trade count
+        Brier skoru, kalite derecesi, kalibrasyon eğrisi ve işlem sayısı
     """
     try:
         cal = _get_calibrator()
@@ -1002,7 +1002,7 @@ async def compliance(
     """Uyumluluk kontrolü — tüm limitler ve kurallar.
 
     Returns:
-        Compliance durumu: violations, checks_passed, limits
+        Uyumluluk durumu: ihlaller, geçen kontroller, limitler
     """
     try:
         dl = _get_dynamic_limits()
@@ -1045,14 +1045,14 @@ async def compliance(
 
 
 # =====================================================
-# STRESS TESTING & MONTE CARLO SCENARIOS (HIGH-SPEED QUANT ENGINE)
+# STRES TESTİ VE MONTE CARLO SENARYOLARI
 # =====================================================
 
 _cached_daily_returns = None
 
 
 def _get_historical_returns() -> Any:
-    """Otomatik eklendi."""
+    """30 yıllık BIST deposundan tarihsel günlük getirileri döndürür."""
     global _cached_daily_returns
     if _cached_daily_returns is not None:
         return _cached_daily_returns
@@ -1083,7 +1083,7 @@ async def run_stress_test_quick(
     try:
         daily_returns = _get_historical_returns()
 
-        # Scenario Shocks
+        # Senaryo şokları
         scenario_shocks = {
             "gfc_2008": {
                 "id": "gfc_2008",
@@ -1123,23 +1123,23 @@ async def run_stress_test_quick(
             },
         }
 
-        # Volatility and Drift
+        # Volatilite ve drift
         sc_info = scenario_shocks.get(scenario, scenario_shocks["gfc_2008"])
         sc_mult = 1.6 if scenario in ["gfc_2008", "covid_2020"] else 1.0
         vol_daily = float(np.std(daily_returns[-252:]) * vol_multiplier * sc_mult)
         mean_daily = float(np.mean(daily_returns[-252:]))
 
-        # Parametric & Historical VaR / CVaR
+        # Parametrik ve tarihsel VaR / CVaR
         var_95 = float(np.percentile(daily_returns, 5))
         tail_losses = daily_returns[daily_returns <= var_95]
         cvar_95 = float(np.mean(tail_losses))
 
-        # Horizon scaling
+        # Ufuk ölçekleme
         horizon_var = var_95 * np.sqrt(horizon_days)
         horizon_cvar = cvar_95 * np.sqrt(horizon_days)
         expected_ret = mean_daily * horizon_days
 
-        # 30 Ultra-Crisp Monte Carlo Paths (Initial: ₺100,000)
+        # Monte Carlo yolları (Başlangıç: ₺100.000)
         initial_val = 100000.0
         num_paths = 1000
         rng = np.random.default_rng()
@@ -1149,7 +1149,7 @@ async def run_stress_test_quick(
         cum_returns = np.cumprod(1.0 + raw_shocks, axis=1)
         paths_matrix = np.hstack([np.ones((num_paths, 1)), cum_returns]) * initial_val
 
-        # Quantile Fan Cones (5th, 25th, 50th, 75th, 95th percentiles per day)
+        # Kuantil fan konileri (5, 25, 50, 75, 95. percentil)
         p05 = np.percentile(paths_matrix, 5, axis=0).round(2).tolist()
         p25 = np.percentile(paths_matrix, 25, axis=0).round(2).tolist()
         p50 = np.percentile(paths_matrix, 50, axis=0).round(2).tolist()
@@ -1160,7 +1160,7 @@ async def run_stress_test_quick(
         final_returns = (final_values - initial_val) / initial_val
         prob_win = float(np.mean(final_returns >= 0))
 
-        # 15-Bin Return Distribution Histogram
+        # Getiri dağılımı histogramı
         hist_counts, bin_edges = np.histogram(final_returns * 100, bins=12)
         histogram = [
             {
