@@ -217,20 +217,27 @@ async def list_strategies(
 
     Returns:
         Strateji adları ve açıklamaları.
+
+    Raises:
+        HTTPException(500): Dahili hata oluşursa.
     """
-    return {
-        "strategies": [
-            {"name": "COVERED_CALL", "description": "Hisse + Call sat → gelir"},
-            {"name": "PROTECTIVE_PUT", "description": "Hisse + Put al → koruma"},
-            {"name": "COLLAR", "description": "Put al + Call sat → sınırlı risk"},
-            {"name": "IRON_CONDOR", "description": "4 bacak, düşük vol beklentisi"},
-            {"name": "STRADDLE", "description": "Call + Put al, yön belirsiz"},
-            {"name": "STRANGLE", "description": "OTM Call + Put al, büyük hareket"},
-            {"name": "BULL_CALL_SPREAD", "description": "Yükseliş beklentisi"},
-            {"name": "BEAR_PUT_SPREAD", "description": "Düşüş beklentisi"},
-            {"name": "BUTTERFLY", "description": "Dar aralık beklentisi"},
-        ]
-    }
+    try:
+        return {
+            "strategies": [
+                {"name": "COVERED_CALL", "description": "Hisse + Call sat → gelir"},
+                {"name": "PROTECTIVE_PUT", "description": "Hisse + Put al → koruma"},
+                {"name": "COLLAR", "description": "Put al + Call sat → sınırlı risk"},
+                {"name": "IRON_CONDOR", "description": "4 bacak, düşük vol beklentisi"},
+                {"name": "STRADDLE", "description": "Call + Put al, yön belirsiz"},
+                {"name": "STRANGLE", "description": "OTM Call + Put al, büyük hareket"},
+                {"name": "BULL_CALL_SPREAD", "description": "Yükseliş beklentisi"},
+                {"name": "BEAR_PUT_SPREAD", "description": "Düşüş beklentisi"},
+                {"name": "BUTTERFLY", "description": "Dar aralık beklentisi"},
+            ]
+        }
+    except Exception as e:
+        logger.error("viop_strateji_listesi_hatasi: hata=%s", str(e))
+        raise HTTPException(status_code=500, detail="Strateji listesi alınamadı.") from e
 
 
 @router.post("/strategies/analyze")
@@ -479,12 +486,12 @@ async def check_arbitrage(
 
 @router.post("/parity")
 async def check_parity(
-    call_price: float = Query(...),
-    put_price: float = Query(...),
-    spot_price: float = Query(...),
-    strike: float = Query(...),
-    r: float = Query(0.15),
-    T: float = Query(0.25),
+    call_price: float = Query(..., description="Call opsiyon fiyatı"),
+    put_price: float = Query(..., description="Put opsiyon fiyatı"),
+    spot_price: float = Query(..., description="Dayanak spot fiyatı"),
+    strike: float = Query(..., description="Kullanım (strike) fiyatı"),
+    r: float = Query(0.15, description="Risksiz faiz oranı"),
+    T: float = Query(0.25, description="Vadeye kalan süre (yıl)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
