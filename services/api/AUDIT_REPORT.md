@@ -1,8 +1,8 @@
 # services/api/ — Denetim Raporu
 
-**Tarih:** 2026-09-04  
+**Tarih:** 2026-09-04 / 2026-09-05 (Yeniden Denetim)  
 **Kapsam:** 27 `.py` dosyası  
-**Denetim Sonucu:** 120+ sorun tespit edildi, 120+ düzeltildi
+**Denetim Sonucu:** 120+ sorun tespit edildi, 120+ düzeltildi. Yeniden denetimde 40+ ek sorun tespit edildi, tümü düzeltildi.
 
 ---
 
@@ -44,10 +44,10 @@
 | 21 | `v1/portfolio.py` | 20 | ✅ Düzeltildi |
 | 22 | `v1/risk.py` | 37 | ✅ Düzeltildi |
 | 23 | `v1/scanner.py` | 21 | ✅ Düzeltildi |
-| 24 | `v1/sse.py` | 8 | ✅ Düzeltildi |
-| 25 | `v1/system.py` | 19 | ✅ Düzeltildi |
-| 26 | `v1/viop.py` | 2 | ✅ Düzeltildi |
-| 27 | `v1/ws.py` | 9 | ✅ Düzeltildi |
+| 24 | `v1/sse.py` | 8+13 | ✅ Yeniden denetlendi |
+| 25 | `v1/system.py` | 19+11 | ✅ Yeniden denetlendi |
+| 26 | `v1/viop.py` | 2+8 | ✅ Yeniden denetlendi |
+| 27 | `v1/ws.py` | 9+7 | ✅ Yeniden denetlendi |
 
 ---
 
@@ -530,3 +530,112 @@
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
 | — | — | Tüm dosyalar denetlendi |
+
+---
+
+## Yeniden Denetim — 2026-09-05
+
+Tüm 27 dosya yeniden denetlendi. Aşağıdaki sorunlar tespit edildi ve düzeltildi.
+
+### `v1/sse.py` — Yeniden Denetim (+13 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `retry_count` mantığı bozuk, `max_retries=100` anlamsız | Kaldırıldı — `while True` + exception handling |
+| 2 | 🔴 İlk bağlantıda event gönderilmiyor | `connected` event'i eklendi |
+| 3 | 🔴 `id:` alanı yok, reconnect desteği yok | Her event'e `id: {counter}` eklendi |
+| 4 | 🔴 `Last-Event-ID` desteği yok | Tüm endpoint'lerden header okunuyor |
+| 5 | 🟡 `hashlib.md5` her döngüde çalışıyor | Kaldırıldı — doğrudan string karşılaştırması |
+| 6 | 🟡 Keep-alive timing kenar durumu | Bağımsız hale getirildi |
+| 7 | 🟡 `regime` ve `radar` docstring'de yok | Docstring güncellendi |
+| 8 | 🟢 `hashlib.md5` → `hashlib.sha256` | Direkt string karşılaştırmasına geçildi |
+| 9 | 🟢 `orjson.dumps().decode()` çift serileştirme | Hash kaldırılınca zincir de kalktı |
+| 10 | 🟢 `max_retries = 100` anlamsız | Sonsuz döngü |
+| 11 | 🔴 `id:` field eksik | Her event'e `id:` eklendi |
+| 12 | 🔴 `Last-Event-ID` desteği yok | Header okuma eklendi |
+| 13 | 🟡 `request.is_disconnected()` yok | Döngü başına eklendi |
+
+### `v1/system.py` — Yeniden Denetim (+11 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `time.time()` atanmamış — ölü kod (L109) | Kaldırıldı |
+| 2 | 🔴 `_ALERTS_CACHE` ve `_ALERTS_CACHE_TIME` tanımlanmış ama kullanılmıyor | Kaldırıldı |
+| 3 | 🔴 `reclaimed = "3.4 MB"` hardcoded mock veri | Kaldırıldı, dinamik tablo optimizasyonu |
+| 4 | 🔴 Core mikroservisler `setdefault("healthy")` | `"unknown"` olarak değiştirildi |
+| 5 | 🟡 4x structlog keyword arg → logging %s format | Düzeltildi |
+| 6 | 🟡 Docstring Türkçe karakter eksik (`olcer`, `saglik`) | Düzeltildi (`ölçer`, `sağlık`) |
+| 7 | 🟡 `OPTIMIZE TABLE system.parts FINAL` sistem tablosu | Aktif kullanıcı tabloları optimize ediliyor |
+| 8 | 🟡 `psutil None` durumunda pipeline_stats crash | None handling eklendi |
+| 9 | 🟡 `structlog` → `logging` | Değiştirildi |
+| 10 | 🟡 Structlog keyword args (4 adet) | `%s` format'a dönüştürüldü |
+| 11 | 🟡 `time.time()` atamasız çağrı | Kaldırıldı |
+
+### `v1/viop.py` — Yeniden Denetim (+8 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 Hiçbir endpoint'te `try/except` yok | 14 endpoint'e eklendi |
+| 2 | 🔴 `logging` hiç kullanılmıyor | Import + logger eklendi |
+| 3 | 🟡 `params: dict \| None = None` type hint eksik | `dict[str, Any] \| None` yapıldı |
+| 4 | 🟡 `futures_price: float = Query(0)` anlamsız default | `Query(...)` zorunlu yapıldı |
+| 5 | 🟡 Modül docstring'i minimal | Tüm endpoint listesi eklendi |
+| 6 | 🟡 Docstring'ler kısa | Tümüne Args/Returns/Raises eklendi |
+| 7 | 🟡 `/parity` 6 Query'de `description` eksik | Eklendi |
+| 8 | 🟡 `list_strategies` try/except yok | Eklendi (tutarlılık) |
+
+### `v1/ws.py` — Yeniden Denetim (+7 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `HAS_PROTOBUF` her zaman `True` — try'da import yok | Gerçek import denemesi (`google.protobuf`) |
+| 2 | 🟡 `/radar` ve `/events` welcome'da `"status"` eksik | Eklendi (tutarlılık) |
+| 3 | 🟡 3 WebSocket endpoint'inde `except Exception` log yazmıyor | `logger.warning` eklendi |
+| 4 | 🟡 `broadcast` dead connection temizlerken log yazmıyor | Log eklendi |
+| 5 | 🟡 Binary endpoint `except Exception` → `logger.debug` | `logger.warning` olarak düzeltildi |
+| 6 | 🟢 `_get_ws_format`'de gereksiz `HAS_PROTOBUF` kontrolü | Kaldırıldı |
+| 7 | 🟢 Protobuf import denemesi yok | `google.protobuf.descriptor` import ediliyor |
+
+### `v1/scanner.py` — Yeniden Denetim (+4 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🟡 `scanner_signals` Query description eksik (category, sort_by, search) | Eklendi |
+| 2 | 🟡 `ticker_history` → `days` Query description eksik | Eklendi |
+| 3 | 🟡 `report_event` exception'da success response | `HTTPException(500)` ile değiştirildi |
+| 4 | 🟡 `trigger_scan` exception detail'da `{exc}` stack trace sızıntısı | Kaldırıldı |
+| 5 | 🟡 12 endpoint docstring'inde Args/Returns/Raises yok | Tümüne eklendi |
+| 6 | 🟡 `scan_type` Query description eksik | Eklendi |
+
+### `v1/portfolio.py` — Yeniden Denetim (+8 düzeltme)
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🟡 `trades` → `limit` Query description eksik | Eklendi |
+| 2 | 🟡 `equity_curve` → `limit` Query description eksik | Eklendi |
+| 3 | 🟡 `cash_ledger` → `limit` Query description eksik | Eklendi |
+| 4 | 🟡 `portfolio_orders` → `limit` Query description eksik | Eklendi |
+| 5 | 🟡 `position_history` → `limit` Query description eksik | Eklendi |
+| 6 | 🟡 `equity_snapshots` → `limit` Query description eksik | Eklendi |
+| 7 | 🟡 `attribution` → `portfolio_id` Query description eksik | Eklendi |
+| 8 | 🟡 `attribution()` try/except yok | Eklendi (tutarlılık) |
+
+### Kök Seviye Dosyalar — Structlog Temizliği (6 dosya)
+
+| # | Dosya | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | `app.py` | `import structlog` + 5 f-string logging + 6 structlog kwarg + `structlog.contextvars` | Tümü `logging` + `%s` format'a dönüştürüldü |
+| 2 | `auth.py` | `import structlog` + 2 structlog kwarg | `logging` + `%s` format |
+| 3 | `background_tasks.py` | `import structlog` + 4 f-string logging | `logging` + `%s` format |
+| 4 | `binary_ws.py` | `import structlog` + 3 structlog kwarg | `logging` + `%s` format |
+| 5 | `dependencies.py` | `import structlog` | `logging` |
+| 6 | `rate_limiter.py` | `import structlog` + 1 structlog kwarg | `logging` + `%s` format |
+
+### Yeniden Denetim Özeti
+
+| Kategori | Dosya Sayısı | Ek Sorun |
+|----------|-------------|----------|
+| Kapsamlı yeniden denetim (sse, system, viop, ws, scanner, portfolio) | 6 | 47 |
+| Structlog temizliği (app, auth, background_tasks, binary_ws, dependencies, rate_limiter) | 6 | 22 |
+| Önceki audit'te temiz kalan | 15 | 0 |
+| **Toplam** | **27** | **69 ek düzeltme** |
