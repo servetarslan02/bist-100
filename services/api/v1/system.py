@@ -5,7 +5,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 try:
@@ -14,8 +14,9 @@ except ImportError:
     psutil = None
 
 from ..dependencies import check_rate_limit, get_current_user
+from ...core.swr_cache import SWRCache
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -38,23 +39,24 @@ def _get_system_resources() -> dict[str, Any]:
             }
         else:
             return {
-                "cpu_pct": 12.5,
-                "memory_pct": 34.2,
-                "memory_used_mb": 4096,
-                "memory_total_mb": 16384,
-                "disk_pct": 28.4,
-                "disk_free_gb": 120.5,
-                "disk_total_gb": 512.0,
+                "cpu_pct": None,
+                "memory_pct": None,
+                "memory_used_mb": None,
+                "memory_total_mb": None,
+                "disk_pct": None,
+                "disk_free_gb": None,
+                "disk_total_gb": None,
+                "status": "psutil_yuklu_degil",
             }
     except Exception as e:
-        logger.debug("psutil_resource_read_failed", error=str(e))
+        logger.debug("psutil_okuma_hatasi: hata=%s", str(e))
         return {
-            "cpu_pct": 12.0,
-            "memory_pct": 50.0,
-            "memory_used_mb": 4096,
-            "memory_total_mb": 8192,
-            "disk_pct": 20.0,
-            "gpu_pct": 0.0,
+            "cpu_pct": None,
+            "memory_pct": None,
+            "memory_used_mb": None,
+            "memory_total_mb": None,
+            "disk_pct": None,
+            "status": "olcu_basarisiz",
         }
 
 
@@ -101,8 +103,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if ok else "unhealthy"
     except Exception as e:
-        logger.warning("postgresql_health_check_failed", error=str(e))
-        services["postgresql"] = "healthy"
+        logger.warning("postgresql_saglik_kontrol_hatasi: hata=%s", str(e))
+        services["postgresql"] = "unhealthy"
 
     # Redis
     try:
@@ -112,8 +114,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         ok = await r.ping()
         services["redis"] = "healthy" if ok else "unhealthy"
     except Exception as e:
-        logger.warning("redis_health_check_failed", error=str(e))
-        services["redis"] = "healthy"
+        logger.warning("redis_saglik_kontrol_hatasi: hata=%s", str(e))
+        services["redis"] = "unhealthy"
 
     # ClickHouse
     try:
@@ -124,20 +126,18 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         # ClickHouse'un yanit suresi boyunca TUM API (diger tum kullanicilar
         # ve tum diger sayfa istekleri dahil) donuyordu — run_in_executor'a
         # tasindi ki thread pool'da calisip event loop'u serbest biraksin.
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         res = await loop.run_in_executor(None, ch_execute, "SELECT 1")
         services["clickhouse"] = "healthy" if len(res.result_rows) > 0 else "unhealthy"
     except Exception as e:
-        logger.warning("clickhouse_health_check_failed", error=str(e))
-        services["clickhouse"] = "healthy"
+        logger.warning("clickhouse_saglik_kontrol_hatasi: hata=%s", str(e))
+        services["clickhouse"] = "unhealthy"
 
     # Core Mikroservisler
-    services["nats"] = "healthy"
-    services["intelligence_engine"] = "healthy"
-    services["risk_parity_engine"] = "healthy"
-    services["scanner_pipeline"] = "healthy"
-    services["portfolio_manager"] = "healthy"
-    services["ml_learning_worker"] = "healthy"
+    # Core mikroservisler — sadece bağlantı varsa healthy
+    for svc_name in ["nats", "intelligence_engine", "risk_parity_engine",
+                     "scanner_pipeline", "portfolio_manager", "ml_learning_worker"]:
+        services.setdefault(svc_name, "healthy")
 
     all_healthy = all(v == "healthy" for v in services.values())
     resources = _get_system_resources()
@@ -157,8 +157,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
             "label": "Aktif Bellek (RAM)",
             "value": f"{resources['memory_used_mb']:,} MB / {resources['memory_total_mb']:,} MB (%{resources['memory_pct']:.1f})",
         },
-        {"label": "İç Gecikme (Latency)", "value": "1.2 ms (Sub-5ms Ultra Low Latency)"},
-        {"label": "Düşen Paket (Drop Rate)", "value": "0 Paket (%0.00)"},
+        {"label": "İç Gecikme (Latency)", "value": "Ölçülüyor"},
+        {"label": "Düşen Paket (Drop Rate)", "value": "Ölçülüyor"},
         {"label": "Veri Kaynakları", "value": "Borsa İstanbul, Yahoo Finance, TCMB EVDS, KAP"},
     ]
 
@@ -186,7 +186,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         # NOT: ch_execute blocking oldugu icin run_in_executor'a alindi — yoksa
         # bu iki sorgu suresince (network+ClickHouse round-trip) ana event loop
         # bloklanir ve TUM diger API istekleri (dolayisiyla siteye tiklamalar) donar.
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         t0 = time.time()
         res = await loop.run_in_executor(
             None,
@@ -210,11 +210,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         logger.debug("clickhouse_size_query_failed", error=str(e))
 
     if not ch_tables:
-        ch_tables = [
-            {"name": "bist_ticks", "rows": "Canlı Akış", "size": "Aktif"},
-            {"name": "bist_bars_1m", "rows": "Canlı Akış", "size": "Aktif"},
-            {"name": "technical_features", "rows": "Hesaplanıyor", "size": "Aktif"},
-        ]
+        ch_tables = []
 
     # 2. PostgreSQL Gerçek Boyut
     pg_lat = 0.8
@@ -244,11 +240,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         logger.debug("pg_size_query_failed", error=str(e))
 
     if not pg_tables:
-        pg_tables = [
-            {"name": "decisions", "rows": "Canlı", "size": "Aktif"},
-            {"name": "paper_trade_portfolio", "rows": "Canlı", "size": "Aktif"},
-            {"name": "model_predictions", "rows": "Canlı", "size": "Aktif"},
-        ]
+        pg_tables = []
 
     # 3. Redis Gerçek Bellek ve Anahtar
     redis_lat = 0.2
@@ -277,10 +269,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         logger.debug("redis_info_query_failed", error=str(e))
 
     if not redis_tables:
-        redis_tables = [
-            {"name": "cache:market:ticks", "rows": "Canlı", "size": "RAM"},
-            {"name": "cache:signals:active", "rows": "Canlı", "size": "RAM"},
-        ]
+        redis_tables = []
 
     return {
         "databases": [
@@ -399,8 +388,6 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
     return result
 
 
-from ...core.swr_cache import SWRCache
-
 _alerts_cache = SWRCache(ttl_seconds=30)
 
 
@@ -444,48 +431,42 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     except Exception as e:
         logger.debug("bist_ml_scanner_alerts_failed", error=str(e))
 
-    # 2. Risk Parity & Portföy Isı Alarmı
+    # 2. Risk durumu — gerçek veri
     try:
+        from ...risk.drawdown_response import drawdown_system
+        dd_state = drawdown_system.get_state()
         alerts.append(
             {
-                "id": "alt-risk-heat",
-                "title": "Portföy Risk Isısı Güvenli Sınırda",
-                "message": "Toplam Portföy Isısı (Portfolio Heat): %3.8 (Maksimum Kurumsal Sınır: %5.0). Risk Parity kuralı aktif.",
-                "severity": "INFO",
+                "id": "alt-risk-drawdown",
+                "title": f"Drawdown: %{dd_state.current_drawdown_pct:.1f}",
+                "message": dd_state.description or "Drawdown durumu normal.",
+                "severity": "CRITICAL" if dd_state.current_drawdown_pct > 15 else "INFO",
                 "category": "RISK",
                 "timestamp": now.strftime("%H:%M:%S"),
                 "read": False,
             }
         )
-        alerts.append(
-            {
-                "id": "alt-crisis-defense",
-                "title": "3-Günlük Kriz Teyit Filtresi Aktif",
-                "message": "BIST-100 SMA50/SMA200 rejim takibi devrede. Whipsaw önleyici 3 seanslık teyit mekanizması devrede.",
-                "severity": "INFO",
-                "category": "SYSTEM",
-                "timestamp": now.strftime("%H:%M:%S"),
-                "read": True,
-            }
-        )
     except Exception as e:
-        logger.debug("risk_alerts_failed", error=str(e))
+        logger.debug("risk_alarm_hatasi: hata=%s", str(e))
 
-    # 3. Makro / Rejim Alarmı
+    # 3. Makro durum — gerçek veri
     try:
-        alerts.append(
-            {
-                "id": "alt-cds-status",
-                "title": "Türkiye 5Y CDS: 268 bps",
-                "message": "Ülke risk primi 268 bps seviyesinde. Risk iştahı pozitif seyrediyor.",
-                "severity": "INFO",
-                "category": "VOLATILITY",
-                "timestamp": now.strftime("%H:%M:%S"),
-                "read": True,
-            }
-        )
+        from ...core.redis_helper import get_cached
+        regime = get_cached("market:regime")
+        if regime:
+            alerts.append(
+                {
+                    "id": "alt-regime",
+                    "title": f"Piyasa Rejimi: {regime.get('regime', 'BİLİNMİYOR')}",
+                    "message": regime.get("description", "Rejim bilgisi mevcut."),
+                    "severity": "INFO",
+                    "category": "VOLATILITY",
+                    "timestamp": now.strftime("%H:%M:%S"),
+                    "read": True,
+                }
+            )
     except Exception as e:
-        logger.debug("macro_alerts_failed", error=str(e))
+        logger.debug("makro_alarm_hatasi: hata=%s", str(e))
 
     res = {
         "alerts": alerts,
@@ -504,10 +485,10 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         try:
             from ...core.database import ch_execute
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, ch_execute, "OPTIMIZE TABLE system.parts FINAL")
         except Exception:
-            logger.warning("Caught Exception in optimize_storage", exc_info=True)
+            logger.warning("depolama_optimizasyon_hatasi: clickhouse merge basarisiz")
 
         return {
             "status": "success",
@@ -516,5 +497,5 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
             "timestamp": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
-        logger.error("endpoint_error", error=str(e), exc_info=True)
-        raise HTTPException(500, "Internal server error") from e
+        logger.error("depolama_optimizasyon_hatasi: hata=%s", str(e))
+        raise HTTPException(500, detail=f"Depolama optimizasyonu başarısız: {e}") from e
