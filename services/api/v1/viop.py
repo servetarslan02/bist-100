@@ -1,6 +1,6 @@
-from typing import Any
-
 """VIOP API — Gerçek veriyle çalışan endpoint'ler."""
+
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -143,7 +143,7 @@ async def list_strategies(
 async def analyze_strategy(
     strategy: str = Query(..., description="Strateji adı"),
     spot: float = Query(..., description="Spot fiyat"),
-    params: dict = None,
+    params: dict | None = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
