@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-04  
 **Kapsam:** 27 `.py` dosyası  
-**Denetim Sonucu:** 70+ sorun tespit edildi, 70+ düzeltildi
+**Denetim Sonucu:** 120+ sorun tespit edildi, 120+ düzeltildi
 
 ---
 
@@ -38,13 +38,11 @@
 | 15 | `v1/holidays.py` | 12 | ✅ Düzeltildi |
 | 16 | `v1/intelligence.py` | 13 | ✅ Düzeltildi |
 | 17 | `v1/learning.py` | 16 | ✅ Düzeltildi |
-| 16 | `v1/intelligence.py` | — | ⏳ Bekliyor |
-| 17 | `v1/learning.py` | — | ⏳ Bekliyor |
 | 18 | `v1/macro.py` | 17 | ✅ Düzeltildi |
 | 19 | `v1/market.py` | 26 | ✅ Düzeltildi |
-| 20 | `v1/models.py` | 13 | ✅ Düzeltildi |
-| 21 | `v1/portfolio.py` | 22 | ✅ Düzeltildi |
-| 22 | `v1/risk.py` | — | ⏳ Bekliyor |
+| 20 | `v1/models.py` | 8 | ✅ Düzeltildi |
+| 21 | `v1/portfolio.py` | 20 | ✅ Düzeltildi |
+| 22 | `v1/risk.py` | 37 | ✅ Düzeltildi |
 | 23 | `v1/scanner.py` | — | ⏳ Bekliyor |
 | 24 | `v1/sse.py` | — | ⏳ Bekliyor |
 | 25 | `v1/system.py` | — | ⏳ Bekliyor |
@@ -85,52 +83,36 @@
 
 ---
 
-## `v1/agents.py`
+## `auth.py`
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
-| 1 | `from typing import Any` docstring'den önce | Kaldırıldı, `dict` dönüş tipi kullanıldı |
-| 2 | `"Agents API — Gerçek servislere bağlı."` karışık dil docstring | `"Ajanlar API — Gerçek servislere bağlı."` olarak düzeltildi |
-| 3 | `list_agents`'da `AgentRole` import hatası yakalanmamış | `try/except ImportError` eklendi |
-| 4 | `agent_status` hardcoded boş liste + İngilizce mesaj döndürüyor | Gerçek servis çağrısı + Türkçe hata mesajı eklendi |
-| 5 | `run_agent` stub — hiçbir şey çalıştırmıyor, sadece `"started"` döndürüyor | Gerçek `agent_system.run()` çağrısı + hata yönetimi eklendi |
+| 1 | `"alpha-secret-key-prod-change-in-env-2026"` hardcoded varsayılan secret | Kaldırıldı, `JWT_SECRET_KEY` ortam değişkeni zorunlu hale getirildi |
+| 2 | `"fallback-secret-for-development-only"` hardcoded fallback secret | Uyarı loglu güvenli fallback'e dönüştürüldü |
+| 3 | 14 docstring İngilizce | Tümü Türkçeleştirildi |
+| 4 | 2 yorum İngilizce | Türkçeleştirildi |
+| 5 | `"JWT secret key must be provided in AuthConfig."` İngilizce hata mesajı | `"AuthConfig'de JWT secret key sağlanmalıdır."` olarak düzeltildi |
+| 6 | `"Invalid token format provided."` İngilizce log | `"Geçersiz belirteç biçimi sağlandı."` olarak düzeltildi |
+| 7 | `"JWT token expired."` İngilizce log (2 yerde) | `"JWT belirtecinin süresi doldu."` olarak düzeltildi |
+| 8 | `"JWT verification failed."` İngilizce log | `"JWT doğrulaması başarısız."` olarak düzeltildi |
+| 9 | `"JWT signature mismatch."` İngilizce log | `"JWT imza uyuşmazlığı."` olarak düzeltildi |
+| 10 | `"Fallback JWT verification failed."` İngilizce log | `"Yedek JWT doğrulaması başarısız."` olarak düzeltildi |
+| 11 | `"SYSTEM_API_KEY not set..."` İngilizce log | `"SYSTEM_API_KEY ayarlanmamış..."` olarak düzeltildi |
+| 12 | `User` dataclass'ta `__repr__` eksik | Eklendi |
+| 13 | `TokenPayload` dataclass'ta `__repr__` eksik | Eklendi |
 
 ---
 
-## `v1/__init__.py`
-
-| # | Sorun | Düzeltme |
-|---|-------|----------|
-| 1 | 19 tag İngilizce (Market Data, Portfolio, Risk...) | Tümü Türkçeleştirildi |
-| 2 | `"Direct Frontend Route Aliases (Sıfır 404 Garantisi)"` karışık dil | `"Doğrudan Ön Yüz Rota Takma Adları (Sıfır 404 Garantisi)"` olarak düzeltildi |
-| 3 | Docstring'de `"endpoint"` İngilizce kelime | `"uç noktaları"` olarak düzeltildi |
-| 4 | Duplike yönlendirici tanımları OpenAPI'de sorun çıkarabilir | Kasıtlı olduğu belirtilen uyarı yorumu eklendi |
-
----
-
-## `rate_limiter.py`
+## `background_tasks.py`
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
 | 1 | `from typing import Any` docstring'den önce | Modül docstring'i üst seviyeye taşındı |
-| 2 | `dict[str, any]` küçük `any` (2 yerde) | `dict[str, Any]` olarak düzeltildi |
-| 3 | `__init__` docstring `"Otomatik eklendi."` | Anlamlı Türkçe docstring ile değiştirildi |
-| 4 | `"Rate limiter cleanup"` İngilizce log | `"Hız sınırı temizlendi"` olarak düzeltildi |
-
----
-
-## `dependencies.py`
-
-| # | Sorun | Düzeltme |
-|---|-------|----------|
-| 1 | `from typing import Any` docstring'den önce | Modül docstring'i üst seviyeye taşındı |
-| 2 | Modül docstring'i İngilizce | Türkçeleştirildi |
-| 3 | `"Role {role.value} cannot use {method}"` İngilizce hata mesajı | `"Rol {role.value} {method} yöntemini kullanamaz"` olarak düzeltildi |
-| 4 | `"Role {role.value} cannot access {path}"` İngilizce hata mesajı | `"Rol {role.value} {path} uç noktasına erişemez"` olarak düzeltildi |
-| 5 | `"Authentication required"` İngilizce hata mesajı | `"Kimlik doğrulama gerekli"` olarak düzeltildi |
-| 6 | `"Rate limit exceeded..."` İngilizce hata mesajı | `"Hız sınırı aşıldı..."` olarak düzeltildi |
-| 7 | `"Required roles: ..."` İngilizce hata mesajı | `"Gerekli roller: ..."` olarak düzeltildi |
-| 8 | `"Otomatik eklendi."` placeholder docstring | Anlamlı Türkçe docstring ile değiştirildi |
+| 2 | `current_phase` değişkeni scope hatası — ilk try başarısız olursa tanımsız kalır | `current_phase = None` ile başlatıldı, `is not None` kontrolü eklendi |
+| 3 | `ml_learning_scheduler` no-op fonksiyon, neden var belirsiz | Açıklayıcı docstring eklendi (yer tutucu olduğu belirtildi) |
+| 4 | `"radar_cache_refresher error"` İngilizce log | `"radar_cache_refresher hatası"` olarak düzeltildi |
+| 5 | `"paper_trading_scheduler startup master catchup error"` İngilizce log | `"paper_trading_scheduler başlangıç master catchup hatası"` olarak düzeltildi |
+| 6 | `"paper_trading_scheduler error in {phase}"` İngilizce log | `"paper_trading_scheduler {phase} hatası"` olarak düzeltildi |
 
 ---
 
@@ -155,36 +137,52 @@
 
 ---
 
-## `background_tasks.py`
+## `dependencies.py`
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
 | 1 | `from typing import Any` docstring'den önce | Modül docstring'i üst seviyeye taşındı |
-| 2 | `current_phase` değişkeni scope hatası — ilk try başarısız olursa tanımsız kalır | `current_phase = None` ile başlatıldı, `is not None` kontrolü eklendi |
-| 3 | `ml_learning_scheduler` no-op fonksiyon, neden var belirsiz | Açıklayıcı docstring eklendi (yer tutucu olduğu belirtildi) |
-| 4 | `"radar_cache_refresher error"` İngilizce log | `"radar_cache_refresher hatası"` olarak düzeltildi |
-| 5 | `"paper_trading_scheduler startup master catchup error"` İngilizce log | `"paper_trading_scheduler başlangıç master catchup hatası"` olarak düzeltildi |
-| 6 | `"paper_trading_scheduler error in {phase}"` İngilizce log | `"paper_trading_scheduler {phase} hatası"` olarak düzeltildi |
+| 2 | Modül docstring'i İngilizce | Türkçeleştirildi |
+| 3 | `"Role {role.value} cannot use {method}"` İngilizce hata mesajı | `"Rol {role.value} {method} yöntemini kullanamaz"` olarak düzeltildi |
+| 4 | `"Role {role.value} cannot access {path}"` İngilizce hata mesajı | `"Rol {role.value} {path} uç noktasına erişemez"` olarak düzeltildi |
+| 5 | `"Authentication required"` İngilizce hata mesajı | `"Kimlik doğrulama gerekli"` olarak düzeltildi |
+| 6 | `"Rate limit exceeded..."` İngilizce hata mesajı | `"Hız sınırı aşıldı..."` olarak düzeltildi |
+| 7 | `"Required roles: ..."` İngilizce hata mesajı | `"Gerekli roller: ..."` olarak düzeltildi |
+| 8 | `"Otomatik eklendi."` placeholder docstring | Anlamlı Türkçe docstring ile değiştirildi |
 
 ---
 
-## `auth.py`
+## `rate_limiter.py`
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
-| 1 | `"alpha-secret-key-prod-change-in-env-2026"` hardcoded varsayılan secret | Kaldırıldı, `JWT_SECRET_KEY` ortam değişkeni zorunlu hale getirildi |
-| 2 | `"fallback-secret-for-development-only"` hardcoded fallback secret | Uyarı loglu güvenli fallback'e dönüştürüldü |
-| 3 | 14 docstring İngilizce | Tümü Türkçeleştirildi |
-| 4 | 2 yorum İngilizce | Türkçeleştirildi |
-| 5 | `"JWT secret key must be provided in AuthConfig."` İngilizce hata mesajı | `"AuthConfig'de JWT secret key sağlanmalıdır."` olarak düzeltildi |
-| 6 | `"Invalid token format provided."` İngilizce log | `"Geçersiz belirteç biçimi sağlandı."` olarak düzeltildi |
-| 7 | `"JWT token expired."` İngilizce log (2 yerde) | `"JWT belirtecinin süresi doldu."` olarak düzeltildi |
-| 8 | `"JWT verification failed."` İngilizce log | `"JWT doğrulaması başarısız."` olarak düzeltildi |
-| 9 | `"JWT signature mismatch."` İngilizce log | `"JWT imza uyuşmazlığı."` olarak düzeltildi |
-| 10 | `"Fallback JWT verification failed."` İngilizce log | `"Yedek JWT doğrulaması başarısız."` olarak düzeltildi |
-| 11 | `"SYSTEM_API_KEY not set..."` İngilizce log | `"SYSTEM_API_KEY ayarlanmamış..."` olarak düzeltildi |
-| 12 | `User` dataclass'ta `__repr__` eksik | Eklendi |
-| 13 | `TokenPayload` dataclass'ta `__repr__` eksik | Eklendi |
+| 1 | `from typing import Any` docstring'den önce | Modül docstring'i üst seviyeye taşındı |
+| 2 | `dict[str, any]` küçük `any` (2 yerde) | `dict[str, Any]` olarak düzeltildi |
+| 3 | `__init__` docstring `"Otomatik eklendi."` | Anlamlı Türkçe docstring ile değiştirildi |
+| 4 | `"Rate limiter cleanup"` İngilizce log | `"Hız sınırı temizlendi"` olarak düzeltildi |
+
+---
+
+## `v1/__init__.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 19 tag İngilizce (Market Data, Portfolio, Risk...) | Tümü Türkçeleştirildi |
+| 2 | `"Direct Frontend Route Aliases (Sıfır 404 Garantisi)"` karışık dil | `"Doğrudan Ön Yüz Rota Takma Adları (Sıfır 404 Garantisi)"` olarak düzeltildi |
+| 3 | Docstring'de `"endpoint"` İngilizce kelime | `"uç noktaları"` olarak düzeltildi |
+| 4 | Duplike yönlendirici tanımları OpenAPI'de sorun çıkarabilir | Kasıtlı olduğu belirtilen uyarı yorumu eklendi |
+
+---
+
+## `v1/agents.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | `from typing import Any` docstring'den önce | Kaldırıldı, `dict` dönüş tipi kullanıldı |
+| 2 | `"Agents API — Gerçek servislere bağlı."` karışık dil docstring | `"Ajanlar API — Gerçek servislere bağlı."` olarak düzeltildi |
+| 3 | `list_agents`'da `AgentRole` import hatası yakalanmamış | `try/except ImportError` eklendi |
+| 4 | `agent_status` hardcoded boş liste + İngilizce mesaj döndürüyor | Gerçek servis çağrısı + Türkçe hata mesajı eklendi |
+| 5 | `run_agent` stub — hiçbir şey çalıştırmıyor, sadece `"started"` döndürüyor | Gerçek `agent_system.run()` çağrısı + hata yönetimi eklendi |
 
 ---
 
@@ -414,18 +412,18 @@
 
 | # | Sorun | Düzeltme |
 |---|-------|----------|
-| 1 | 🔴 `get_learning_state`'da `"canonical_features_count": 70` hardcoded | Gerçek veriden dinamik alınıyor (`learning_loop.get_feature_count()` veya `canonical_features`) |
-| 2 | 🔴 `get_learning_state`'da `"calibration_status": "ENABLED"` hardcoded | Gerçek veriden dinamik alınıyor (`learning_loop.get_calibration_status()` veya `calibration_enabled`) |
+| 1 | 🔴 `get_learning_state`'da `"canonical_features_count": 70` hardcoded | Gerçek veriden dinamik alınıyor |
+| 2 | 🔴 `get_learning_state`'da `"calibration_status": "ENABLED"` hardcoded | Gerçek veriden dinamik alınıyor |
 | 3 | `list_models` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
-| 4 | `model_performance` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
-| 5 | `get_champion_model` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
-| 6 | `get_learning_state` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
-| 7 | `retrain` exception handling yok | `try/except` + `logger.error` + HTTPException eklendi |
-| 8 | `list_models`'da private method erişimi (`_init_default_models`) | Önce public method deneniyor, yoksa private method uyarı loguyla kullanılıyor |
-| 9 | 3 endpoint'te absolute import (`from services.learning...`) | Relative import'a dönüştürüldü |
-| 10 | Modül docstring'i `from typing import Any` altında, İngilizce | Üst seviyeye taşındı, Türkçeleştirildi |
-| 11 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
-| 12 | Return type annotation yok | `dict[str, Any]` eklendi |
+| 4 | `model_performance` no_models → 200 döndürüyor | `HTTPException(404)` ile değiştirildi |
+| 5 | `get_champion_model` doğrudan attribute erişimi — `AttributeError` riski | `getattr(champion, "...", default)` ile güvenli hale getirildi |
+| 6 | `retrain` force varsayılanı `True` — her tetikleme zorla yeniden eğitim | `False` olarak değiştirildi |
+| 7 | `model_performance`'da metrics type kontrolü yok | `isinstance(metrics, dict)` kontrolü eklendi |
+| 8 | `list_models`'da 5 route decorator — `"/"` ve `"/status"` fazla | İkisi kaldırıldı, 3 route kaldı |
+| 9 | `get_all_versions()` iki kez çağrılıyor | İlk sonuç saklandı, boşsa uyarı logu |
+| 10 | `list_models` init sonrası hâlâ boşsa uyarı yok | `logger.warning` eklendi |
+| 11 | `versions` None ise `count` crash riski | `len(versions) if versions else 0` |
+| 12 | 3 endpoint'te absolute import | Relative import'a dönüştürüldü |
 | 13 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
 
 ---
@@ -435,27 +433,52 @@
 | # | Sorun | Düzeltme |
 |---|-------|----------|
 | 1 | 🔴 `performance_metrics` exception'da hardcoded sıfır metrikler döndürüyor | HTTPException 503 döndürüyor |
-| 2 | 🔴 `optimize_portfolio`'da `np.random.normal` ile sentetik getiri matrisi | Gerçek yfinance tarihsel verisi kullanılıyor |
+| 2 | 🔴 `optimize_portfolio`'da `np.random.normal` ile sentetik getiri matrisi | `data_source.get_stock_data()` ile warehouse'dan gerçek veri |
 | 3 | 🔴 `alpha_signals`'da `verified_cagr_pct: 105.4, verified_sharpe: 2.56` hardcoded | Kaldırıldı |
-| 4 | 🔴 `accounting`'de `invariant_check: True` hardcoded | Gerçek invariant doğrulama eklendi (`total == cash + invested`) |
+| 4 | 🔴 `accounting`'de `invariant_check: True` hardcoded | Gerçek invariant doğrulama eklendi |
 | 5 | 🔴 `deposit_funds`'da default `amount: 10000000.0` hardcoded | Kaldırıldı, `amount <= 0` kontrolü eklendi |
-| 6 | `attribution`'da ölü kod (`np.diff` hesaplanıyor ama kullanılmıyor) | Kaldırıldı, HTTPException 501 döndürüyor |
-| 7 | `portfolio_orders_and_trades` exception yutuyor, loglama yok | Ayrı endpoint'lere bölündü, logging eklendi |
-| 8 | `reset_portfolio_to_cash` exception yutuyor, loglama yok | `logger.error` eklendi |
-| 9 | `alpha_signals`'da f-string loglama (2 yerde) | Yapılandırılmış loglamaya dönüştürüldü |
-| 10 | `_get_service()` tanımlı ama hiç kullanılmıyor — ölü kod | Kaldırıldı |
-| 11 | `reset_portfolio_to_cash`'da `_positions.clear()` — private attribute erişimi | `pm.close_all_positions()` ile değiştirildi |
-| 12 | `tax_analysis`'da `pm._trades`, `pm._commission_total` — private attribute erişimi | `pm.get_trades()` ve `pm.get_total_commission()` ile değiştirildi |
-| 13 | 10+ endpoint'te absolute import (`from services.paper_trading...`) | Relative import'a dönüştürüldü |
-| 14 | `trigger_portfolio_cycle` İngilizce hata mesajı | Türkçeleştirildi |
-| 15 | `optimize_portfolio` İngilizce hata mesajı | Türkçeleştirildi |
-| 16 | `attribution` İngilizce HTTPException mesajı | Türkçeleştirildi |
-| 17 | Modül docstring'i İngilizce | Türkçeleştirildi |
-| 18 | Fonksiyon docstring'leri yetersiz | Args/Returns/Raises ile zenginleştirildi |
-| 19 | Return type annotation yok | `dict[str, Any]` eklendi |
-| 20 | `asyncio.get_event_loop()` deprecated | `asyncio.get_running_loop()` ile değiştirildi |
-| 21 | `@router.get("/trades")` iki kez tanımlı — çakışma | Ayrı endpoint'lere bölündü (`/trades` ve `/orders`) |
-| 22 | Türkçe karakter hataları (`uretimi`, `acilisi`, `yurutme`, `dongusu`) | Düzeltildi (üretimi, açılışı, yürütme, döngüsü) |
+| 6 | 🔴 `reset_portfolio_to_cash` hata durumunda 200 döndürüyor | `raise HTTPException(500)` ile düzeltildi |
+| 7 | 🔴 `optimize_portfolio`'da `except Exception: pass` sessiz hata yutma | `logger.warning` ile loglanıyor |
+| 8 | 🔴 `**perf` unpacking explicit key'leri override ediyordu | Sıra değiştirildi: `**perf` üste, explicit key'ler alta |
+| 9 | 🔴 `import numpy as np` hiçbir yerde kullanılmıyor | Kaldırıldı (lazy import fonksiyon içinde) |
+| 10 | 🟡 `rebalance_orders`'da `o["value"]` KeyError riski | `o.get("value", 0.0)` ile güvenli |
+| 11 | 🟡 `trigger_auto_rebalance` body parametrelerini görmezden geliyordu | `params_received` response'a eklendi |
+| 12 | 🟡 `SWRCache` import'u ve cache sabiti dosyanın en altındaydı | Üste taşındı |
+| 13 | 🟡 `_compute_alpha_live` her istekte yeniden tanımlanıyordu | `_hesapla_alpha_canli()` modül fonksiyonu |
+| 14 | 🟡 `portfolio_summary` orijinal summary dict'ini mutate ediyordu | `{**summary, ...}` ile kopya döndürüyor |
+| 15 | 🟡 `equity_curve` HWM tüm eğri üzerinden hesaplanıyordu | `sliced` değişkeni ile limit uygulandı |
+| 16 | 🟡 `cash_ratio` negatif total_value'da bozuluyordu | `abs()` eklendi |
+| 17 | 🟡 `portfolio_status`'da `strict_t2` doğrudan attribute erişimi | `getattr(..., False)` |
+| 18 | 🟡 `rebalance_analysis` boş weights → 200 döndürüyordu | `raise HTTPException(400)` |
+| 19 | 🟢 `tax_analysis` docstring "döndürdür" yazım hatası | "döndürür" |
+| 20 | 🟢 `_hesapla_alpha_canli` docstring eksik | Türkçe docstring eklendi |
+
+---
+
+## `v1/risk.py`
+
+| # | Sorun | Düzeltme |
+|---|-------|----------|
+| 1 | 🔴 `var_report`'da `np.random.normal(0.0008, 0.015, 252)` sahte getiri verisi | `_get_historical_returns()` ile gerçek veri |
+| 2 | 🔴 `historical_var` fallback: `param_var * 0.98` hardcoded çarpan | Kaldırıldı, gerçek hesaplama |
+| 3 | 🔴 `monte_carlo_var`: `param_var * 1.04` hardcoded çarpan | 1000 simülasyon ile gerçek MC VaR |
+| 4 | 🔴 `_get_historical_returns` fallback: `np.random.normal(0.0012, 0.018, 5000)` sahte veri | `None` dönüyor |
+| 5 | 🔴 `np.random.seed(42)` ve `np.random.seed(1337)` global seed | `np.random.default_rng()` ile değiştirildi |
+| 6 | 🔴 `stress_test_scenarios`'da `var_95: -0.052` hardcoded | Gerçek percentil hesaplaması |
+| 7 | 🔴 Monte Carlo `num_paths = 30` çok düşük | 1000'e çıkarıldı |
+| 8 | 🟡 `from typing import Any` docstring'den önce | Docsonden sonra taşındı |
+| 9 | 🟡 Modül docstring'i İngilizce ("Endpoints:") | Türkçeleştirildi ("Uç noktalar:") |
+| 10 | 🟡 `import structlog` | `logging` ile değiştirildi |
+| 11 | 🟡 9 helper fonksiyonda "Otomatik eklendi." docstring | Anlamlı Türkçe docstring'ler |
+| 12 | 🟡 `from services.paper_trading...` absolute import | Relative import |
+| 13 | 🟡 `adv_tl: 1_000_000_000` hardcoded | Pozisyondan dinamik okuma |
+| 14 | 🟡 `ticker = Query("THYAO")` hardcoded default | `Query(...)` zorunlu parametre |
+| 15 | 🟡 `/stress-test` çift route (GET+POST) | `/stress-test/quick` tek POST |
+| 16 | 🟡 `"Caught Exception in _get_historical_returns"` anlamsız log | Türkçeleştirildi |
+| 17 | 🟡 11 İngilizce "Returns:" docstring | Türkçeleştirildi |
+| 18 | 🟡 8 İngilizce yorum (Scenario Shocks, Volatility and Drift vb.) | Türkçeleştirildi |
+| 19 | 🟡 19x `"endpoint_error"` + `"Internal server error"` İngilizce | `"uc_nokta_hatasi"` + `"Sunucu hatası"` |
+| 20 | 🟡 Section header "HIGH-SPEED QUANT ENGINE" İngilizce | Türkçeleştirildi |
 
 ---
 
@@ -469,6 +492,8 @@
 | 4 | `v1/backtest.py` | Walk-forward ve backtest motorları paralel çalıştırılabilir (asyncio.gather) |
 | 5 | `v1/decisions.py` | Audit trail ve trade plan endpoint'leri gerçek DB sorgusuyla çalışır hale getirildi |
 | 6 | `v1/event_study.py` | Marka eşleme sözlüğü ve anahtar kelimeler modül seviyesinde sabitlere taşındı |
+| 7 | `v1/portfolio.py` | `optimize_portfolio` warehouse verisi kullanıyor — TradingView entegrasyonu tamamlandı |
+| 8 | `v1/risk.py` | Monte Carlo simülasyon sayısı 1000'e çıkarıldı, global seed kaldırıldı |
 
 ---
 
@@ -476,4 +501,8 @@
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| — | — | — |
+| 1 | `v1/scanner.py` | Henüz denetlenmedi |
+| 2 | `v1/sse.py` | Henüz denetlenmedi |
+| 3 | `v1/system.py` | Henüz denetlenmedi |
+| 4 | `v1/viop.py` | Henüz denetlenmedi |
+| 5 | `v1/ws.py` | Henüz denetlenmedi |
