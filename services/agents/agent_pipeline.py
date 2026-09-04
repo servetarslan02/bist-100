@@ -19,7 +19,7 @@ FAZ 6: Full Pipeline Integration
 import os
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -27,7 +27,7 @@ import logging
 
 from .agent_memory import AgentMemory, MemoryConsolidator
 from .agent_system import AgentRole, AgentResult, AgentTask, BaseAgent
-from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
+from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient
 from .trace_context import TraceContext
 from .communication_bus import ConflictResolver, Resolution
 from .conflict_detector import ConflictDetector, ConflictReport, ConflictSeverity
