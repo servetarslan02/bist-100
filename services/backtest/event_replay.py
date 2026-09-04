@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Enhanced Event Replay Engine
+ALPHA BIST — Gelişmiş Event Replay Motoru
 
 Belirli bir günü/anı yeniden oynatma motoru.
 - Bug reproducing
@@ -22,6 +22,7 @@ Referanslar:
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -31,18 +32,21 @@ try:
     import polars as pl
 except ImportError:
     pl = None
-import structlog
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class SystemState:
-    """Sistem durumu snapshot'ı."""
+    """Sistem durumu snapshot'ı.
+
+    Belirli bir andaki tüm sistem durumunu tutar.
+    Audit trail ve state recovery için kullanılır.
+    """
 
     timestamp: datetime
     cash: float
@@ -53,14 +57,28 @@ class SystemState:
     model_version: str
     config_hash: str
 
+    def __repr__(self) -> str:
+        """SystemState okunabilir temsili."""
+        return (
+            f"SystemState("
+            f"cash={self.cash:,.0f}, "
+            f"positions={len(self.positions)}, "
+            f"regime={self.regime!r})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sistem durumunu sözlük formatına dönüştürür.
+
+        Returns:
+            Durum bilgilerini içeren sözlük
+        """
         return {
             "timestamp": self.timestamp.isoformat(),
             "cash": self.cash,
             "positions": self.positions,
             "pending_orders": self.pending_orders,
             "regime": self.regime,
+            "feature_cache": self.feature_cache,
             "model_version": self.model_version,
             "config_hash": self.config_hash,
         }
@@ -68,7 +86,10 @@ class SystemState:
 
 @dataclass
 class ReplayDecision:
-    """Replay sırasında verilen karar."""
+    """Replay sırasında verilen karar.
+
+    Her bir ticaret kararını ve gerekçesini tutar.
+    """
 
     timestamp: datetime
     ticker: str
@@ -78,8 +99,22 @@ class ReplayDecision:
     features: dict[str, float]
     reasoning: str
 
+    def __repr__(self) -> str:
+        """ReplayDecision okunabilir temsili."""
+        return (
+            f"ReplayDecision("
+            f"ticker={self.ticker!r}, "
+            f"action={self.action!r}, "
+            f"score={self.score:.2f}, "
+            f"confidence={self.confidence:.4f})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Kararı sözlük formatına dönüştürür.
+
+        Returns:
+            Karar bilgilerini içeren sözlük
+        """
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -93,7 +128,11 @@ class ReplayDecision:
 
 @dataclass
 class AuditRecord:
-    """Denetim kaydı."""
+    """Denetim kaydı.
+
+    Audit trail zincirindeki her bir olayı tutar.
+    Hash zinciri ile bütünlük doğrulaması sağlar.
+    """
 
     event_id: str
     timestamp: datetime
@@ -103,20 +142,50 @@ class AuditRecord:
     state_after: SystemState | None = None
     hash_chain: str = ""  # Önceki hash'e zincirleme
 
+    def __repr__(self) -> str:
+        """AuditRecord okunabilir temsili."""
+        return (
+            f"AuditRecord("
+            f"id={self.event_id!r}, "
+            f"type={self.event_type!r}, "
+            f"hash={self.hash_chain!r})"
+        )
+
     def compute_hash(self, prev_hash: str = "") -> str:
-        """Hash hesapla (audit trail zinciri)."""
-        content = f"{self.event_id}:{self.timestamp.isoformat()}:{self.event_type}:{orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS).decode()}"
+        """Hash hesapla (audit trail zinciri).
+
+        Args:
+            prev_hash: Önceki kayıt hash'i
+
+        Returns:
+            SHA-256 tabanlı 16 karakterlik hash
+        """
+        content = (
+            f"{self.event_id}:{self.timestamp.isoformat()}:"
+            f"{self.event_type}:"
+            f"{orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS).decode()}"
+        )
         return hashlib.sha256(f"{prev_hash}:{content}".encode()).hexdigest()[:16]
 
     def seal(self, prev_hash: str = "") -> str:
-        """Hash hesapla ve kaydet (immutable seal)."""
+        """Hash hesapla ve kaydet (immutable seal).
+
+        Args:
+            prev_hash: Önceki kayıt hash'i
+
+        Returns:
+            Hesaplanan hash
+        """
         self.hash_chain = self.compute_hash(prev_hash)
         return self.hash_chain
 
 
 @dataclass
 class ReplaySnapshot:
-    """Replay anlık durumu."""
+    """Replay anlık durumu.
+
+    Replay sırasında belirli bir andaki tüm durumu tutar.
+    """
 
     timestamp: datetime
     equity: float
@@ -126,6 +195,16 @@ class ReplaySnapshot:
     trades: list[dict[str, Any]]
     market_state: dict[str, Any]
 
+    def __repr__(self) -> str:
+        """ReplaySnapshot okunabilir temsili."""
+        return (
+            f"ReplaySnapshot("
+            f"equity={self.equity:,.0f}, "
+            f"cash={self.cash:,.0f}, "
+            f"positions={len(self.positions)}, "
+            f"decisions={len(self.decisions)})"
+        )
+
 
 class EnhancedReplayEngine:
     """
@@ -134,17 +213,30 @@ class EnhancedReplayEngine:
     "Belirli bir tarihte ne biliyorsam sadece onu kullanarak karar ver."
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Event replay motorunu başlatır."""
         self._handlers: dict[str, Callable] = {}
         self._audit_trail: list[AuditRecord] = []
         self._state_snapshots: list[SystemState] = []
         self._current_hash: str = "genesis"
 
-    def register_handler(self, event_type: str, handler: Callable) -> Any:
-        """Event handler kaydet."""
+    def __repr__(self) -> str:
+        """EnhancedReplayEngine okunabilir temsili."""
+        return (
+            f"EnhancedReplayEngine("
+            f"handlers={len(self._handlers)}, "
+            f"audit_events={len(self._audit_trail)}, "
+            f"snapshots={len(self._state_snapshots)})"
+        )
+
+    def register_handler(self, event_type: str, handler: Callable) -> None:
+        """Event handler kaydet.
+
+        Args:
+            event_type: Olay tipi
+            handler: İşleyici fonksiyon
+        """
         self._handlers[event_type] = handler
-        return self
 
     def create_snapshot(
         self,
@@ -155,7 +247,19 @@ class EnhancedReplayEngine:
         model_version: str = "v1",
         config_hash: str = "",
     ) -> SystemState:
-        """Sistem durumu snapshot'ı oluştur."""
+        """Sistem durumu snapshot'ı oluştur.
+
+        Args:
+            timestamp: Zaman damgası
+            cash: Nakit miktarı
+            positions: Pozisyon sözlüğü
+            regime: Piyasa rejimi
+            model_version: Model versiyonu
+            config_hash: Konfigürasyon hash'i
+
+        Returns:
+            SystemState nesnesi
+        """
         state = SystemState(
             timestamp=timestamp,
             cash=cash,
@@ -172,7 +276,14 @@ class EnhancedReplayEngine:
         return state
 
     def restore_snapshot(self, snapshot: SystemState) -> dict[str, Any]:
-        """Snapshot'tan durum geri yükle."""
+        """Snapshot'tan durum geri yükle.
+
+        Args:
+            snapshot: Geri yüklenecek snapshot
+
+        Returns:
+            Durum sözlüğü
+        """
         return {
             "cash": snapshot.cash,
             "positions": snapshot.positions.copy(),
@@ -199,13 +310,13 @@ class EnhancedReplayEngine:
             signal_engine: Sinyal üretme fonksiyonu
 
         Returns:
-            (decisions, trades, audit_trail)
+            (decisions, trades, audit_trail) üçlüsü
         """
         logger.info(
-            "Starting day replay",
-            date=target_date.isoformat(),
-            initial_cash=initial_state.cash,
-            initial_positions=len(initial_state.positions),
+            "gun_replay_baslatiliyor: tarih=%s, nakit=%s, pozisyon=%s",
+            target_date.isoformat(),
+            initial_state.cash,
+            len(initial_state.positions),
         )
 
         decisions = []
@@ -228,12 +339,15 @@ class EnhancedReplayEngine:
         # Get day's market data
         day_data = market_data.filter(pl.col("date") == target_date)
 
-        if day_data.empty:
-            logger.warning("No market data for date", date=target_date.isoformat())
+        if day_data.is_empty():
+            logger.warning(
+                "tarih_icin_piyasa_verisi_yok: tarih=%s",
+                target_date.isoformat(),
+            )
             return decisions, trades, self._audit_trail
 
         # Record market data
-        for _, row in day_data.iterrows():
+        for row in day_data.iter_rows(named=True):
             self._record_event(
                 timestamp=target_date,
                 event_type="market_data",
@@ -250,14 +364,20 @@ class EnhancedReplayEngine:
         # Compute features (point-in-time)
         features_by_ticker = {}
         if feature_engine:
-            for ticker in day_data["ticker"].unique():
+            for ticker in day_data["ticker"].unique().to_list():
                 # Sadece bu ana kadar olan veriyi kullan
-                available_data = market_data[(market_data["date"] <= target_date) & (market_data["ticker"] == ticker)]
+                available_data = market_data.filter(
+                    (pl.col("date") <= target_date) & (pl.col("ticker") == ticker)
+                )
                 try:
                     features = feature_engine(available_data, ticker, target_date)
                     features_by_ticker[ticker] = features
                 except Exception as e:
-                    logger.warning("Feature engine error", ticker=ticker, error=str(e))
+                    logger.warning(
+                        "feature_engine_hatasi: ticker=%s, hata=%s",
+                        ticker,
+                        str(e),
+                    )
 
         # Generate signals
         if signal_engine:
@@ -283,24 +403,49 @@ class EnhancedReplayEngine:
 
                     # Execute trades based on decisions
                     if decision.action == "BUY" and decision.score >= 70:
-                        price = day_data.filter(pl.col("ticker") == ticker)["close"][0]
-                        quantity = self._calculate_position_size(cash, price, decision.confidence)
-                        if quantity > 0:
+                        ticker_rows = day_data.filter(pl.col("ticker") == ticker)
+                        if not ticker_rows.is_empty():
+                            price = ticker_rows["close"].item(0)
+                            quantity = self._calculate_position_size(cash, price, decision.confidence)
+                            if quantity > 0:
+                                trade = {
+                                    "date": str(target_date),
+                                    "ticker": ticker,
+                                    "side": "BUY",
+                                    "quantity": quantity,
+                                    "price": price,
+                                    "score": decision.score,
+                                }
+                                trades.append(trade)
+                                cash -= quantity * price
+                                positions[ticker] = {
+                                    "quantity": quantity,
+                                    "entry_price": price,
+                                    "entry_date": str(target_date),
+                                }
+
+                                self._record_event(
+                                    timestamp=target_date,
+                                    event_type="trade",
+                                    data=trade,
+                                )
+
+                    elif decision.action == "SELL" and ticker in positions:
+                        ticker_rows = day_data.filter(pl.col("ticker") == ticker)
+                        if not ticker_rows.is_empty():
+                            price = ticker_rows["close"].item(0)
+                            pos = positions[ticker]
                             trade = {
                                 "date": str(target_date),
                                 "ticker": ticker,
-                                "side": "BUY",
-                                "quantity": quantity,
+                                "side": "SELL",
+                                "quantity": pos["quantity"],
                                 "price": price,
-                                "score": decision.score,
+                                "pnl": (price - pos["entry_price"]) * pos["quantity"],
                             }
                             trades.append(trade)
-                            cash -= quantity * price
-                            positions[ticker] = {
-                                "quantity": quantity,
-                                "entry_price": price,
-                                "entry_date": str(target_date),
-                            }
+                            cash += pos["quantity"] * price
+                            del positions[ticker]
 
                             self._record_event(
                                 timestamp=target_date,
@@ -308,31 +453,20 @@ class EnhancedReplayEngine:
                                 data=trade,
                             )
 
-                    elif decision.action == "SELL" and ticker in positions:
-                        price = day_data.filter(pl.col("ticker") == ticker)["close"][0]
-                        pos = positions[ticker]
-                        trade = {
-                            "date": str(target_date),
-                            "ticker": ticker,
-                            "side": "SELL",
-                            "quantity": pos["quantity"],
-                            "price": price,
-                            "pnl": (price - pos["entry_price"]) * pos["quantity"],
-                        }
-                        trades.append(trade)
-                        cash += pos["quantity"] * price
-                        del positions[ticker]
-
-                        self._record_event(
-                            timestamp=target_date,
-                            event_type="trade",
-                            data=trade,
-                        )
-
                 except Exception as e:
-                    logger.warning("Signal engine error", ticker=ticker, error=str(e))
+                    logger.warning(
+                        "signal_engine_hatasi: ticker=%s, hata=%s",
+                        ticker,
+                        str(e),
+                    )
 
         # Record end-of-day state
+        equity = cash
+        for ticker, pos in positions.items():
+            ticker_rows = day_data.filter(pl.col("ticker") == ticker)
+            if not ticker_rows.is_empty():
+                equity += pos["quantity"] * ticker_rows["close"].item(0)
+
         self._record_event(
             timestamp=target_date,
             event_type="state_change",
@@ -340,21 +474,16 @@ class EnhancedReplayEngine:
                 "type": "day_end",
                 "cash": cash,
                 "positions": len(positions),
-                "equity": cash
-                + sum(
-                    p["quantity"] * day_data.filter(pl.col("ticker") == ticker)["close"][0]
-                    for t, p in positions.items()
-                    if not day_data.filter(pl.col("ticker") == ticker).empty
-                ),
+                "equity": equity,
             },
         )
 
         logger.info(
-            "Day replay complete",
-            date=target_date.isoformat(),
-            decisions=len(decisions),
-            trades=len(trades),
-            audit_events=len(self._audit_trail),
+            "gun_replay_tamamlandi: tarih=%s, karar=%s, islem=%s, audit=%s",
+            target_date.isoformat(),
+            len(decisions),
+            len(trades),
+            len(self._audit_trail),
         )
 
         return decisions, trades, self._audit_trail
@@ -418,7 +547,17 @@ class EnhancedReplayEngine:
         confidence: float,
         max_position_pct: float = 0.10,
     ) -> int:
-        """Pozisyon büyüklüğü hesapla."""
+        """Pozisyon büyüklüğü hesapla.
+
+        Args:
+            cash: Mevcut nakit
+            price: Hisse fiyatı
+            confidence: Model güven skoru
+            max_position_pct: Maksimum pozisyon yüzdesi
+
+        Returns:
+            Alınacak hisse adedi
+        """
         max_value = cash * max_position_pct * confidence
         quantity = int(max_value / price)
         return max(0, quantity)
@@ -428,8 +567,14 @@ class EnhancedReplayEngine:
         timestamp: datetime,
         event_type: str,
         data: dict[str, Any],
-    ) -> Any:
-        """Audit event kaydet."""
+    ) -> None:
+        """Audit event kaydet.
+
+        Args:
+            timestamp: Zaman damgası
+            event_type: Olay tipi
+            data: Olay verisi
+        """
         record = AuditRecord(
             event_id=f"evt_{len(self._audit_trail):06d}",
             timestamp=timestamp,
@@ -442,16 +587,27 @@ class EnhancedReplayEngine:
             self._audit_trail = self._audit_trail[-1000:]
 
     def get_audit_trail(self) -> list[dict[str, Any]]:
-        """Audit trail'i döndür."""
+        """Audit trail'i döndür.
+
+        Returns:
+            Audit kayıtlarının sözlük listesi
+        """
         return [r.to_dict() for r in self._audit_trail]
 
     def verify_audit_integrity(self) -> bool:
-        """Audit trail bütünlüğünü doğrula."""
+        """Audit trail bütünlüğünü doğrula.
+
+        Returns:
+            True ise zincir bozulmamış
+        """
         prev_hash = "genesis"
         for record in self._audit_trail:
             expected_hash = record.compute_hash(prev_hash)
             if record.hash_chain != expected_hash:
-                logger.error("Audit trail integrity violation", event_id=record.event_id)
+                logger.error(
+                    "audit_bütünlük_ihlali: event_id=%s",
+                    record.event_id,
+                )
                 return False
             prev_hash = record.hash_chain
         return True
