@@ -23,7 +23,6 @@ import logging
 import time
 from typing import Any
 
-import orjson
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from ..dependencies import check_rate_limit, get_current_user
@@ -43,11 +42,6 @@ def _get_scan_api() -> Any:
     return scan_api
 
 
-def _get_engine() -> Any:
-    """Alpha engine örneğini döndürür."""
-    from ...core.alpha_engine import AlphaEngine
-
-    return AlphaEngine()
 
 
 # =====================================================
@@ -68,8 +62,6 @@ async def scanner_signals(
     _=Depends(check_rate_limit),
 ) -> Any:
     """Canlı model sinyalleri ve piyasa fırsatları (Filtreli, Güven & Getiri Sıralı ve ETag/SWR Korumalı)."""
-    now = time.time()
-
     # ETag / If-None-Match Kontrolü (İstemci tarafı 304 Not Modified)
     client_etag = request.headers.get("if-none-match")
     if client_etag and _signals_cache.etag and client_etag.strip('"') == _signals_cache.etag.strip('"'):
