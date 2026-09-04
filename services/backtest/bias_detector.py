@@ -226,8 +226,12 @@ class LookAheadBiasDetector:
         """
         Rolling window hesaplamasının gelecek veri kullanmadığını doğrula.
 
+        Polars vektörel operasyonlarla gerçekleştirilir.
         Her veri noktası için, o noktanın window hesaplamasında sadece
         kendisinden önceki verilerin kullanıldığını kontrol eder.
+
+        Beklenen değer: shift(1).rolling_mean(window_size)
+        Gerçek değer: DataFrame'deki rolling_mean sütunu
 
         Args:
             data: Ham fiyat/veri DataFrame'i
@@ -245,41 +249,55 @@ class LookAheadBiasDetector:
         if len(data) < window_size + 1:
             return report
 
+        if "rolling_mean" not in data.columns:
+            return report
+
         data = data.sort(timestamp_col)
 
-        for i in range(window_size, len(data)):
-            # Bu noktanın window'u data[i-window_size:i] olmalı
-            # Eğer data[i-window_size:i+1] kullanılmışsa → leakage
-            window_values = data[value_col][i - window_size : i]
+        # Vektörel hesaplama: beklenen rolling mean (sadece geçmiş veri ile)
+        # shift(1) ile mevcut değer hariç tutulur, ardından rolling_mean
+        # hesaplanır — böylece her satırda sadece önceki window_size değer
+        # kullanılmış olur.
+        expected_col = "__expected_rolling_mean__"
+        diff_col = "__rolling_diff__"
 
-            # Rolling mean hesapla (sadece geçmiş veri ile)
-            expected_raw = window_values.mean()
+        computed = data.with_columns(
+            pl.col(value_col)
+            .shift(1)
+            .rolling_mean(window_size)
+            .alias(expected_col),
+        ).with_columns(
+            (pl.col("rolling_mean") - pl.col(expected_col))
+            .abs()
+            .alias(diff_col),
+        )
 
-            # Gerçek rolling değeri kontrol et
-            if "rolling_mean" in data.columns:
-                actual_raw = data["rolling_mean"][i]
-                # Polars null değerleri None döner, np.isnan bunu handle edemez
-                if actual_raw is None or expected_raw is None:
-                    continue
-                actual_mean = float(actual_raw)
-                expected_mean = float(expected_raw)
-                if not np.isnan(actual_mean) and not np.isnan(expected_mean):
-                    diff = abs(actual_mean - expected_mean)
-                    if diff > 1e-10:
-                        self._record(
-                            report,
-                            BiasViolation(
-                                violation_type="look_ahead",
-                                severity="critical",
-                                timestamp=data[timestamp_col][i],
-                                feature_name=feature_name,
-                                description=(
-                                    f"Rolling window indeks {i} gelecek veri "
-                                    f"kullanıyor. Beklenen: {expected_mean:.4f}, "
-                                    f"Gerçek: {actual_mean:.4f}"
-                                ),
-                            ),
-                        )
+        # Fark 1e-10'dan büyük olan ihlalleri filtrele
+        violations_df = computed.filter(
+            pl.col(diff_col).is_not_null()
+            & pl.col(expected_col).is_not_null()
+            & (pl.col(diff_col) > 1e-10)
+        )
+
+        for row in violations_df.iter_rows(named=True):
+            expected_val = float(row[expected_col])
+            actual_val = float(row["rolling_mean"])
+            ts = row[timestamp_col]
+
+            self._record(
+                report,
+                BiasViolation(
+                    violation_type="look_ahead",
+                    severity="critical",
+                    timestamp=ts,
+                    feature_name=feature_name,
+                    description=(
+                        f"Rolling window gelecek veri kullanıyor. "
+                        f"Beklenen: {expected_val:.4f}, "
+                        f"Gerçek: {actual_val:.4f}"
+                    ),
+                ),
+            )
 
         return report
 
