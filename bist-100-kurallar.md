@@ -96,6 +96,45 @@
 
 ---
 
+## 🔍 BACKTEST DENETİM KURALLARI
+
+> `services/backtest/AUDIT_REPORT.md` dosyasından çıkarılmıştır.
+> Her backtest dosyası bu kurallara göre denetlenir.
+
+### 1. Mock / Sahte Veri — Kesinlikle Yasak
+- Test verisi, hardcoded değer, statik JSON, placeholder data **production kodunda olmayacak**
+- `"Otomatik eklendi"` docstring'leri yasaktır — her docstring açıklayıcı ve anlamlı olacak
+- `pass` ile boş fonksiyon gövdesi yasaktır
+
+### 2. Tüm Hatalar Düzeltilecek
+- Boundary hatası, dead code, exception yutma, yanlış veri kaynağı, bypass, tutarsızlık — sistemi bozan her şey düzeltilir
+- `except: pass` gibi sessiz yutma yasaktır
+
+### 3. Eksik Fonksiyonellik Tamamlanacak
+- Eksik parametre, eksik loglama, eksik fallback, eksik validasyon tespit edilen her eksik tamamlanır
+
+### 4. Kod Profesyonel Olacak
+- Her docstring açıklayıcı ve **Türkçe**
+- Her dataclass'ta `__repr__` metodu olacak
+- Return type annotation doğru olacak
+- Gereksiz import olmayacak
+- Değişken isimleri anlamlı olacak
+- Structlog yerine standart `logging` kullanılacak
+
+### 5. Düzeltme Sonrası Kontrol
+- Syntax kontrolü yapılacak (`python -c "import ..."`)
+- Import zinciri kontrolü yapılacak
+
+### 6. Geliştirme Önerileri Verilecek
+- Eksik değil ama geliştirilebilecek her alan için öneri sunulacak
+
+### 7. Mimari Tutarlılık
+- İsim çakışmaları önlemek için sınıflar yeniden adlandırılabilir
+- Motor isimleri amacına uygun olmalı (ör. `engine.py` → `execution_engine.py`)
+- `__all__` listesi eksiksiz ve güncel olacak
+
+---
+
 ## 📁 ÇALIŞMA DOSYASI
 
 **Ana çalışma dosyası:** `Teknolojik gelişim` (repo kökünde) ve `docs/TEKNOLOJIK_GELISIM.md`
