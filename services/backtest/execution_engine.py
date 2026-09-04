@@ -13,7 +13,11 @@ engine_v4.py ile karıştırmayın:
 - engine_v4: Feature → Sinyal → Trade tam pipeline (kendi sinyal üretir)
 """
 
+import csv
 import logging
+import os
+import contextlib
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -24,6 +28,12 @@ from services.core.risk_config import backtest_config
 from services.portfolio.portfolio_manager import CommissionModel
 
 logger = logging.getLogger(__name__)
+
+# Varsayılan sinyal ağırlığı (portföydeki azami pozisyon yüzdesi)
+DEFAULT_SIGNAL_WEIGHT = 0.10
+
+# Hacim bilgisi yoksa kullanılacak varsayılan değer
+DEFAULT_FALLBACK_VOLUME = 100_000
 
 
 @dataclass
@@ -103,7 +113,16 @@ class BacktestResult:
 
 
 class BacktestEngine:
-    """Backtest motoru."""
+    """T+1 takas kurallarına göre backtest motoru.
+
+    Dışarıdan verilen alım-satım sinyallerini gün sonunda kuyruğa alır,
+    ertesi gün açılış fiyatından execute eder. Dinamik slippage, likidite
+    kısıtı, stop-loss ve trailing stop destekler.
+    """
+
+    def __repr__(self) -> str:
+        """BacktestEngine okunabilir temsili."""
+        return "BacktestEngine()"
 
     def _compute_dynamic_slippage(
         self,
@@ -112,10 +131,20 @@ class BacktestEngine:
         quantity: int,
         base_slippage_pct: float = backtest_config.base_slippage_pct,
     ) -> float:
-        """F-010: Dinamik slippage modeli.
+        """Dinamik slippage modeli (F-010).
 
         Sabit slippage yerine hacim ve pozisyon büyüklüğüne göre slippage hesaplar.
-        Likidite düşükse slippage artar.
+        Likidite düşükse slippage artar. Karekök etki modeli kullanır.
+        Hacim verisi yoksa DEFAULT_FALLBACK_VOLUME varsayılır.
+
+        Args:
+            price: Hisse birim fiyatı
+            volume: Günlük işlem hacmi (0 veya negatif ise yüksek slippage uygulanır)
+            quantity: Alınacak/satılacak hisse adedi
+            base_slippage_pct: Taban slippage yüzdesi
+
+        Returns:
+            Hesaplanan slippage yüzdesi
         """
         if volume <= 0:
             return base_slippage_pct * 3  # Hacim yoksa yüksek slippage
@@ -138,13 +167,19 @@ class BacktestEngine:
         quantity: int,
         max_participation: float = backtest_config.max_participation,
     ) -> tuple[bool, int]:
-        """F-011: Likidite kısıtı kontrolü.
+        """Likidite kısıtı kontrolü (F-011).
 
-        Günlük hacmin %10'undan fazlasını almamaya çalış.
-        Gerekirse miktarı azalt.
+        Günlük hacmin belirli bir yüzdesinden fazlasını almamaya çalışır.
+        Gerekirse miktarı azaltarak kısmi execution uygular.
+
+        Args:
+            price: Hisse birim fiyatı
+            volume: Günlük işlem hacmi
+            quantity: İstenen hisse adedi
+            max_participation: Azami katılım oranı (günlük hacme oran)
 
         Returns:
-            (is_feasible, adjusted_quantity)
+            (uygulanabilir_mi, ayarlanmış_adet) çifti
         """
         if volume <= 0:
             return False, 0
@@ -156,18 +191,37 @@ class BacktestEngine:
 
     def _execute_pending_orders(
         self,
-        pending_orders,
-        positions,
-        capital,
-        trades,
-        trade_id,
-        day_prices,
-        _cm,
-        slippage_pct,
-        dump_ledger,
-        trades_writer,
-    ) -> Any:
-        """T+1 bekleyen emirleri execute et."""
+        pending_orders: list[dict[str, Any]],
+        positions: dict[str, dict[str, Any]],
+        capital: float,
+        trades: list[BacktestTrade],
+        trade_id: int,
+        day_prices: dict[str, dict[str, Any]],
+        _cm: CommissionModel,
+        slippage_pct: float,
+        dump_ledger: bool,
+        trades_writer: Any,
+    ) -> tuple[float, int]:
+        """T+1 bekleyen emirleri execute eder.
+
+        Kuyruktaki BUY/SELL emirlerini günün açılış fiyatından,
+        dinamik slippage ve likidite kısıtı uygulayarak gerçekleştirir.
+
+        Args:
+            pending_orders: Bekleyen emir listesi
+            positions: Aktif pozisyonlar sözlüğü
+            capital: Mevcut nakit
+            trades: Gerçekleşen işlemler listesi
+            trade_id: Son işlem numarası
+            day_prices: Günün fiyatları sözlüğü
+            _cm: Komisyon modeli
+            slippage_pct: Slippage yüzdesi
+            dump_ledger: İşlem günlüğü yazılsın mı
+            trades_writer: CSV writer nesnesi
+
+        Returns:
+            (güncel_nakit, son_işlem_numarası) çifti
+        """
         for order in pending_orders:
             ticker = order["ticker"]
             action = order["action"]
@@ -187,7 +241,7 @@ class BacktestEngine:
                 continue
 
             effective_slippage = self._compute_dynamic_slippage(
-                exec_price, signal_volume if signal_volume > 0 else 100000, 100, slippage_pct
+                exec_price, signal_volume if signal_volume > 0 else DEFAULT_FALLBACK_VOLUME, 100, slippage_pct
             )
 
             if action == "BUY" and ticker not in positions:
@@ -237,6 +291,11 @@ class BacktestEngine:
                                     "",
                                 ]
                             )
+                    else:
+                        logger.warning(
+                            "buy_iptal_yetersiz_bakiye: ticker=%s, maliyet=%.2f, bakiye=%.2f",
+                            ticker, cost + commission, capital,
+                        )
 
             elif action == "SELL" and ticker in positions:
                 fill_price = exec_price * (1 - effective_slippage / 100)
@@ -245,13 +304,17 @@ class BacktestEngine:
                 commission = _cm.calculate(revenue)
                 capital += revenue - commission
                 pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
-                pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
+                pnl_pct = ((fill_price / pos["avg_cost"] - 1) * 100) if pos["avg_cost"] > 0 else 0.0
                 trade_id += 1
                 try:
                     _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
                     _d2 = datetime.strptime(order["signal_date"], "%Y-%m-%d")
                     _holding = max(1, (_d2 - _d1).days)
-                except Exception:
+                except Exception as e:
+                    logger.warning(
+                        "tarih_hatasi: entry=%s, exit=%s, hata=%s",
+                        pos["entry_date"], order["signal_date"], str(e),
+                    )
                     _holding = 1
                 trades.append(
                     BacktestTrade(
@@ -299,18 +362,35 @@ class BacktestEngine:
 
     def _check_stops_and_sell(
         self,
-        positions,
-        capital,
-        trades,
-        trade_id,
-        day_prices,
-        _cm,
-        stop_loss_pct,
-        trailing_stop_pct,
-        current_date,
-        all_dates,
-    ) -> Any:
-        """Stop-loss ve trailing stop kontrolü, satışlar."""
+        positions: dict[str, dict[str, Any]],
+        capital: float,
+        trades: list[BacktestTrade],
+        trade_id: int,
+        day_prices: dict[str, dict[str, Any]],
+        _cm: CommissionModel,
+        stop_loss_pct: float,
+        trailing_stop_pct: float,
+        current_date: str,
+    ) -> tuple[float, int, float]:
+        """Stop-loss ve trailing stop kontrolü yapar, tetiklenen pozisyonları satar.
+
+        Pozisyonların düşük ve yüksek fiyatlarını kontrol ederek
+        stop-loss veya trailing stop koşulları sağlanıyorsa satış gerçekleştirir.
+
+        Args:
+            positions: Aktif pozisyonlar sözlüğü
+            capital: Mevcut nakit
+            trades: Gerçekleşen işlemler listesi
+            trade_id: Son işlem numarası
+            day_prices: Günün fiyatları sözlüğü
+            _cm: Komisyon modeli
+            stop_loss_pct: Stop-loss eşiği (0.07 = %7)
+            trailing_stop_pct: Trailing stop eşiği
+            current_date: Mevcut tarih (YYYY-MM-DD)
+
+        Returns:
+            (güncel_nakit, son_işlem_numarası, toplam_piyasa_değeri) üçlüsü
+        """
         total_market_value = 0.0
         to_sell = []
 
@@ -352,8 +432,8 @@ class BacktestEngine:
                     exit_price=exit_price,
                     quantity=qty,
                     pnl=(gross - comm) - (qty * p["avg_cost"]),
-                    pnl_pct=(exit_price / p["avg_cost"]) - 1.0,
-                    holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]),
+                    pnl_pct=((exit_price / p["avg_cost"]) - 1.0) if p["avg_cost"] > 0 else 0.0,
+                    holding_days=max(1, (datetime.strptime(current_date, "%Y-%m-%d") - datetime.strptime(p["entry_date"], "%Y-%m-%d")).days),
                     commission=comm,
                 )
             )
@@ -362,8 +442,25 @@ class BacktestEngine:
 
         return capital, trade_id, total_market_value
 
-    def _queue_day_signals(self, current_date, signals_by_date, day_prices, pending_orders, market_regime) -> Any:
-        """Gün sonu sinyallerini T+1 kuyruğuna ekle."""
+    def _queue_day_signals(
+        self,
+        current_date: str,
+        signals_by_date: dict[str, list[dict[str, Any]]],
+        day_prices: dict[str, dict[str, Any]],
+        pending_orders: list[dict[str, Any]],
+        market_regime: float,
+    ) -> None:
+        """Gün sonu sinyallerini T+1 kuyruğuna ekler.
+
+        SELL emirlerini BUY emirlerinden önce işleyecek şekilde sıralar.
+
+        Args:
+            current_date: Mevcut tarih (YYYY-MM-DD)
+            signals_by_date: Tarih bazlı sinyal sözlüğü
+            day_prices: Günün fiyatları sözlüğü
+            pending_orders: Bekleyen emir listesi (buraya eklenir)
+            market_regime: Piyasa rejim katsayısı
+        """
         if current_date not in signals_by_date:
             return
         day_sigs = sorted(signals_by_date[current_date], key=lambda x: 0 if x.get("action") == "SELL" else 1)
@@ -378,25 +475,44 @@ class BacktestEngine:
                             "price", day_prices.get(signal.get("ticker", ""), {}).get("close", 0.0)
                         ),
                         "signal_date": current_date,
-                        "weight": signal.get("weight", 0.10),
+                        "weight": signal.get("weight", DEFAULT_SIGNAL_WEIGHT),
                         "market_regime": market_regime,
                     }
                 )
 
     def _end_of_day_accounting(
         self,
-        positions,
-        day_prices,
-        capital,
-        peak_equity,
-        prev_equity,
-        equity_curve,
-        exposure_history,
-        dump_ledger,
-        daily_writer,
-        current_date,
-    ) -> Any:
-        """Gün sonu muhasebeleştirme."""
+        positions: dict[str, dict[str, Any]],
+        day_prices: dict[str, dict[str, Any]],
+        capital: float,
+        peak_equity: float,
+        prev_equity: float,
+        equity_curve: list[float],
+        exposure_history: list[float],
+        dump_ledger: bool,
+        daily_writer: Any,
+        current_date: str,
+    ) -> tuple[float, float, float]:
+        """Gün sonu muhasebeleştirme işlemini yapar.
+
+        Pozisyonların kapanış fiyatlarını kullanarak günlük equity,
+        drawdown ve getiri hesaplamalarını gerçekleştirir.
+
+        Args:
+            positions: Aktif pozisyonlar sözlüğü
+            day_prices: Günün fiyatları sözlüğü
+            capital: Mevcut nakit
+            peak_equity: Zirve equity değeri
+            prev_equity: Bir önceki günün equity değeri
+            equity_curve: Equity eğrisi listesi (buraya eklenir)
+            exposure_history: Pozisyon maruziyet geçmişi (buraya eklenir)
+            dump_ledger: Günlük CSV'ye yazılsın mı
+            daily_writer: CSV writer nesnesi
+            current_date: Mevcut tarih (YYYY-MM-DD)
+
+        Returns:
+            (güncel_nakit, zirve_equity, gün_sonu_equity) üçlüsü
+        """
         total_market_value = 0.0
         for t, p in positions.items():
             current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
@@ -431,8 +547,8 @@ class BacktestEngine:
     def run_backtest(
         self,
         strategy_name: str,
-        signals: list[dict[str, any]],
-        price_data: dict[str, list[dict[str, any]]],
+        signals: list[dict[str, Any]],
+        price_data: dict[str, list[dict[str, Any]]],
         initial_capital: float = 100000,
         commission_rate: float | None = None,
         slippage_pct: float = 0.05,
@@ -443,12 +559,15 @@ class BacktestEngine:
     ) -> BacktestResult:
         """Backtest çalıştır.
 
+        Dışarıdan verilen sinyalleri T+1 takas kurallarına göre simüle eder.
+        Her sinyal gün sonunda kuyruğa alınır, ertesi gün açılış fiyatından execute edilir.
+
         Args:
             strategy_name: Strateji adı
-            signals: Tarih bazlı alım-satım sinyalleri
-            price_data: {ticker: [{date, open, high, low, close, volume}]}
+            signals: Tarih bazlı alım-satım sinyalleri listesi
+            price_data: Fiyat verisi {ticker: [{date, open, high, low, close, volume}]}
             initial_capital: Başlangıç sermayesi
-            commission_rate: Komisyon oranı (None ise varsayılan)
+            commission_rate: Komisyon oranı (None ise varsayılan kullanılır)
             slippage_pct: Slippage yüzdesi
             dump_ledger: İşlem günlüğü CSV'ye yazılsın mı
             stop_loss_pct: Stop-loss eşiği (0.07 = %7)
@@ -456,11 +575,8 @@ class BacktestEngine:
             market_regime: Piyasa rejim katsayısı
 
         Returns:
-            BacktestResult: Metrikler, işlemler, equity eğrisi
+            BacktestResult: Metrikler, işlemler ve equity eğrisi
         """
-        import csv
-        import os
-        from collections import defaultdict
         if not signals:
             return BacktestResult(
                 strategy_name,
@@ -486,7 +602,6 @@ class BacktestEngine:
         exposure_history = []
         trade_id = 0
 
-        import contextlib
         stack = contextlib.ExitStack()
         trades_writer = None
         daily_writer = None
@@ -498,7 +613,7 @@ class BacktestEngine:
             trades_csv_path = "data/ledgers/continuous_oos_trades.csv"
             daily_csv_path = "data/ledgers/continuous_oos_daily.csv"
 
-            # For continuous OOS, we want to overwrite cleanly
+            # Sürekli OOS için dosyaları temizce üzerine yaz
             trades_file = stack.enter_context(open(trades_csv_path, "w", newline="", encoding="utf-8"))
             daily_file = stack.enter_context(open(daily_csv_path, "w", newline="", encoding="utf-8"))
 
@@ -597,7 +712,6 @@ class BacktestEngine:
                 stop_loss_pct,
                 trailing_stop_pct,
                 current_date,
-                all_dates,
             )
 
             self._queue_day_signals(
@@ -623,7 +737,11 @@ class BacktestEngine:
 
         stack.close()
 
-        metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
+        metrics = self._compute_metrics(
+            trades, equity_curve, initial_capital, exposure_history,
+            backtest_start_date=all_dates[0] if all_dates else "",
+            backtest_end_date=all_dates[-1] if all_dates else "",
+        )
 
         return BacktestResult(
             strategy_name=strategy_name,
@@ -643,11 +761,24 @@ class BacktestEngine:
         equity_curve: list[float],
         initial_capital: float,
         exposure_history: list[float] | None = None,
+        backtest_start_date: str = "",
+        backtest_end_date: str = "",
     ) -> BacktestMetrics:
-        """İşlem listesi ve equity eğrisinden performans metrikleri hesapla.
+        """İşlem listesi ve equity eğrisinden performans metrikleri hesaplar.
 
         Hesaplanan metrikler: toplam getiri, CAGR, Sharpe, Sortino, Calmar,
         max drawdown, kazanma oranı, kâr faktörü, beklenti, toplam masraf.
+
+        Args:
+            trades: Gerçekleşen işlemler listesi
+            equity_curve: Günlük equity değerleri listesi
+            initial_capital: Başlangıç sermayesi
+            exposure_history: Günlük pozisyon maruziyet değerleri (opsiyonel)
+            backtest_start_date: Backtest döneminin başlangıç tarihi (YYYY-MM-DD)
+            backtest_end_date: Backtest döneminin bitiş tarihi (YYYY-MM-DD)
+
+        Returns:
+            BacktestMetrics nesnesi
         """
         if not trades:
             return BacktestMetrics(
@@ -701,13 +832,23 @@ class BacktestEngine:
         # Fees
         total_fees = sum(t.commission for t in trades)
 
-        # CAGR — gerçek tarih aralığı kullanarak
+        # CAGR — backtest döneminin gerçek tarih aralığını kullanarak
         try:
-            _start = datetime.strptime(trades[0].entry_date, "%Y-%m-%d")
-            _end = datetime.strptime(trades[-1].exit_date, "%Y-%m-%d")
-            _years = max((_end - _start).days / 365.25, 0.01)
-            _cagr = round(((final / initial_capital) ** (1 / _years) - 1) * 100, 2) if final > 0 else 0
-        except Exception:
+            if backtest_start_date and backtest_end_date:
+                _start = datetime.strptime(backtest_start_date, "%Y-%m-%d")
+                _end = datetime.strptime(backtest_end_date, "%Y-%m-%d")
+            elif trades:
+                _start = datetime.strptime(trades[0].entry_date, "%Y-%m-%d")
+                _end = datetime.strptime(trades[-1].exit_date, "%Y-%m-%d")
+            else:
+                _start = _end = None
+            if _start and _end:
+                _years = max((_end - _start).days / 365.25, 0.01)
+                _cagr = round(((final / initial_capital) ** (1 / _years) - 1) * 100, 2) if final > 0 else 0
+            else:
+                _cagr = 0
+        except Exception as e:
+            logger.warning("cagr_hesaplama_hatasi: hata=%s, equity_uzunluk=%s", str(e), len(equity_curve))
             _cagr = (
                 round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2)
                 if final > 0
@@ -749,10 +890,13 @@ class BacktestEngine:
         )
 
     def _compute_drawdown_curve(self, equity_curve: list[float]) -> list[float]:
-        """Equity eğrisinden drawdown yüzdesi eğrisi hesapla.
+        """Equity eğrisinden drawdown yüzdesi eğrisini hesaplar.
+
+        Args:
+            equity_curve: Günlük equity değerleri listesi
 
         Returns:
-            Her gün için drawdown yüzdesi (0-100 arası).
+            Her gün için drawdown yüzdesi (0-100 arası)
         """
         if not equity_curve:
             return []
@@ -766,7 +910,7 @@ class BacktestEngine:
         return dd
 
 
-# Singleton (deprecated — BacktestEngineV4 kullanın)
+# Singleton (kullanımdan kaldırıldı — BacktestEngineV4 kullanın)
 backtest_engine = BacktestEngine()
 
 

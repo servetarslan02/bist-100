@@ -2,16 +2,16 @@
 ALPHA BIST — Gelişmiş Event Replay Motoru
 
 Belirli bir günü/anı yeniden oynatma motoru.
-- Bug reproducing
-- Model debugging
-- Karar audit
-- State recovery
+- Hata yeniden üretme (bug reproducing)
+- Model ayıklama (debugging)
+- Karar denetimi (audit)
+- Durum kurtarma (state recovery)
 
 Özellikler:
 1. Point-in-time data ile replay
 2. Event-by-event oynatma
 3. Karar karşılaştırma (expected vs actual)
-4. State snapshot & restore
+4. State snapshot ve restore
 5. Audit trail
 
 Referanslar:
@@ -138,8 +138,6 @@ class AuditRecord:
     timestamp: datetime
     event_type: str  # market_data | signal | trade | decision | state_change
     data: dict[str, Any]
-    state_before: SystemState | None = None
-    state_after: SystemState | None = None
     hash_chain: str = ""  # Önceki hash'e zincirleme
 
     def __repr__(self) -> str:
@@ -152,13 +150,17 @@ class AuditRecord:
         )
 
     def compute_hash(self, prev_hash: str = "") -> str:
-        """Hash hesapla (audit trail zinciri).
+        """Audit trail zinciri için hash hesaplar.
+
+        Her kayıt, bir önceki hash ile birlikte SHA-256 algoritmasıyla
+        benzersiz bir hash değerine dönüştürülür. Bu sayede kayıt
+        bütünlüğü zincir yapısıyla garanti altına alınır.
 
         Args:
-            prev_hash: Önceki kayıt hash'i
+            prev_hash: Bir önceki kaydın hash değeri
 
         Returns:
-            SHA-256 tabanlı 16 karakterlik hash
+            SHA-256 tabanlı 16 karakterlik hash değeri
         """
         content = (
             f"{self.event_id}:{self.timestamp.isoformat()}:"
@@ -168,13 +170,16 @@ class AuditRecord:
         return hashlib.sha256(f"{prev_hash}:{content}".encode()).hexdigest()[:16]
 
     def seal(self, prev_hash: str = "") -> str:
-        """Hash hesapla ve kaydet (immutable seal).
+        """Hash hesaplar ve kayda işler (değiştirilemez mühür).
+
+        Kaydın hash zincirini hesaplayarak nesne üzerinde saklar.
+        Bu işlem kaydın sonradan değiştirilmesini tespit etmeye yarar.
 
         Args:
-            prev_hash: Önceki kayıt hash'i
+            prev_hash: Bir önceki kaydın hash değeri
 
         Returns:
-            Hesaplanan hash
+            Hesaplanan ve kayda işlenen hash değeri
         """
         self.hash_chain = self.compute_hash(prev_hash)
         return self.hash_chain
@@ -207,36 +212,33 @@ class ReplaySnapshot:
 
 
 class EnhancedReplayEngine:
-    """
-    Gelişmiş event replay motoru.
+    """Gelişmiş event replay motoru.
 
-    "Belirli bir tarihte ne biliyorsam sadece onu kullanarak karar ver."
+    Belirli bir tarihte bilinen verilerle karar vererek günü yeniden oynatır.
+    Bu sayede kararların tekrarlanabilirliği ve doğruluğu denetlenebilir.
     """
 
-    def __init__(self) -> None:
-        """Event replay motorunu başlatır."""
-        self._handlers: dict[str, Callable] = {}
+    def __init__(self, max_position_pct: float = 0.10, strict_errors: bool = False) -> None:
+        """Event replay motorunu başlatır.
+
+        Args:
+            max_position_pct: Tek bir pozisyonun portföydeki azami yüzdesi
+            strict_errors: True ise feature/signal motoru hataları yükseltilir;
+                           False ise loglanarak devam edilir
+        """
         self._audit_trail: list[AuditRecord] = []
         self._state_snapshots: list[SystemState] = []
         self._current_hash: str = "genesis"
+        self._max_position_pct: float = max_position_pct
+        self._strict_errors: bool = strict_errors
 
     def __repr__(self) -> str:
         """EnhancedReplayEngine okunabilir temsili."""
         return (
             f"EnhancedReplayEngine("
-            f"handlers={len(self._handlers)}, "
             f"audit_events={len(self._audit_trail)}, "
             f"snapshots={len(self._state_snapshots)})"
         )
-
-    def register_handler(self, event_type: str, handler: Callable) -> None:
-        """Event handler kaydet.
-
-        Args:
-            event_type: Olay tipi
-            handler: İşleyici fonksiyon
-        """
-        self._handlers[event_type] = handler
 
     def create_snapshot(
         self,
@@ -272,18 +274,29 @@ class EnhancedReplayEngine:
         )
         self._state_snapshots.append(state)
         if len(self._state_snapshots) > 1000:
+            logger.warning(
+                "snapshot_siniri_asildi: mevcut=%s, kisitlanacak=1000",
+                len(self._state_snapshots),
+            )
             self._state_snapshots = self._state_snapshots[-1000:]
         return state
 
     def restore_snapshot(self, snapshot: SystemState) -> dict[str, Any]:
-        """Snapshot'tan durum geri yükle.
+        """Snapshot'tan durum geri yükler.
+
+        Verilen SystemState nesnesinden aktif durum sözlüğü oluşturur.
 
         Args:
-            snapshot: Geri yüklenecek snapshot
+            snapshot: Geri yüklenecek SystemState nesnesi
 
         Returns:
-            Durum sözlüğü
+            Durum bilgilerini içeren sözlük
+
+        Raises:
+            ValueError: snapshot None ise
         """
+        if snapshot is None:
+            raise ValueError("snapshot None olamaz; gecerli bir SystemState saglanmalidir")
         return {
             "cash": snapshot.cash,
             "positions": snapshot.positions.copy(),
@@ -299,19 +312,27 @@ class EnhancedReplayEngine:
         feature_engine: Callable | None = None,
         signal_engine: Callable | None = None,
     ) -> tuple[list[ReplayDecision], list[dict[str, Any]], list[AuditRecord]]:
-        """
-        Belirli bir günü yeniden oynat.
+        """Belirli bir günü yeniden oynatır.
+
+        Point-in-time veri kullanarak o günkü tüm kararları ve işlemleri
+        sırasıyla tekrar oluşturur. Her olay audit trail'e kaydedilir.
 
         Args:
-            target_date: Oynatılacak tarih
-            market_data: O güne ait piyasa verisi
+            target_date: Yeniden oynatılacak tarih
+            market_data: Piyasa verisi (Polars DataFrame)
             initial_state: Gün başı sistem durumu
-            feature_engine: Feature hesaplama fonksiyonu
-            signal_engine: Sinyal üretme fonksiyonu
+            feature_engine: Feature hesaplama fonksiyonu (opsiyonel)
+            signal_engine: Sinyal üretme fonksiyonu (opsiyonel)
 
         Returns:
-            (decisions, trades, audit_trail) üçlüsü
+            (kararlar, islemler, audit_kayitlari) uclusu
+
+        Raises:
+            ValueError: market_data None ise
         """
+        if market_data is None:
+            raise ValueError("market_data None olamaz; gecerli bir Polars DataFrame saglanmalidir")
+
         logger.info(
             "gun_replay_baslatiliyor: tarih=%s, nakit=%s, pozisyon=%s",
             target_date.isoformat(),
@@ -319,8 +340,8 @@ class EnhancedReplayEngine:
             len(initial_state.positions),
         )
 
-        decisions = []
-        trades = []
+        decisions: list[ReplayDecision] = []
+        trades: list[dict[str, Any]] = []
         self._audit_trail = []
         self._current_hash = "genesis"
 
@@ -378,6 +399,8 @@ class EnhancedReplayEngine:
                         ticker,
                         str(e),
                     )
+                    if self._strict_errors:
+                        raise
 
         # Generate signals
         if signal_engine:
@@ -406,7 +429,9 @@ class EnhancedReplayEngine:
                         ticker_rows = day_data.filter(pl.col("ticker") == ticker)
                         if not ticker_rows.is_empty():
                             price = ticker_rows["close"].item(0)
-                            quantity = self._calculate_position_size(cash, price, decision.confidence)
+                            quantity = self._calculate_position_size(
+                                cash, price, decision.confidence, self._max_position_pct
+                            )
                             if quantity > 0:
                                 trade = {
                                     "date": str(target_date),
@@ -459,6 +484,8 @@ class EnhancedReplayEngine:
                         ticker,
                         str(e),
                     )
+                    if self._strict_errors:
+                        raise
 
         # Record end-of-day state
         equity = cash
@@ -494,16 +521,18 @@ class EnhancedReplayEngine:
         actual: list[ReplayDecision],
         tolerance: float = 0.01,
     ) -> dict[str, Any]:
-        """
-        Beklenen ve gerçekleşen kararları karşılaştır.
+        """Beklenen ve gerçekleşen kararları karşılaştır.
+
+        Her iki listedeki kararları ticker ve action bazında eşleştirir.
+        Eşleşen kararlar için skor farkı tolerans dahilinde mi kontrol edilir.
 
         Args:
-            expected: Beklenen kararlar
-            actual: Gerçekleşen kararlar
-            tolerance: Skor toleransı
+            expected: Beklenen kararlar listesi
+            actual: Gerçekleşen kararlar listesi
+            tolerance: Skor karşılaştırması için azami tolerans değeri
 
         Returns:
-            Karşılaştırma raporu
+            Karşılaştırma raporu (eşleşmeyen sayısı, determinizm durumu, detaylar)
         """
         mismatches = []
 
@@ -547,17 +576,27 @@ class EnhancedReplayEngine:
         confidence: float,
         max_position_pct: float = 0.10,
     ) -> int:
-        """Pozisyon büyüklüğü hesapla.
+        """Pozisyon büyüklüğünü hesaplar.
+
+        Portföy yüzdesi ve güven skoruna göre alınabilecek azami hisse
+        adedini döndürür.
 
         Args:
-            cash: Mevcut nakit
-            price: Hisse fiyatı
-            confidence: Model güven skoru
-            max_position_pct: Maksimum pozisyon yüzdesi
+            cash: Mevcut nakit miktarı
+            price: Hisse birim fiyatı
+            confidence: Model güven skoru (0-1 aralığında)
+            max_position_pct: Tek bir pozisyonun portföydeki azami yüzdesi
 
         Returns:
-            Alınacak hisse adedi
+            Alınacak hisse adedi (negatif olamaz)
+
+        Raises:
+            ValueError: Fiyat negatif ise
         """
+        if price < 0:
+            raise ValueError(f"Hisse fiyati negatif olamaz: {price}")
+        if price == 0:
+            return 0
         max_value = cash * max_position_pct * confidence
         quantity = int(max_value / price)
         return max(0, quantity)
@@ -568,22 +607,37 @@ class EnhancedReplayEngine:
         event_type: str,
         data: dict[str, Any],
     ) -> None:
-        """Audit event kaydet.
+        """Audit olayı kaydeder ve hash zincirini günceller.
+
+        Olay verisini AuditRecord'a dönüştürür, hash zincirine ekler
+        ve mevcut kayıtları 1000 adetle sınırlar.
 
         Args:
-            timestamp: Zaman damgası
-            event_type: Olay tipi
-            data: Olay verisi
+            timestamp: Olayın zaman damgası
+            event_type: Olay tipi (market_data, trade, decision, state_change)
+            data: Olay verisi sözlüğü
         """
-        record = AuditRecord(
-            event_id=f"evt_{len(self._audit_trail):06d}",
-            timestamp=timestamp,
-            event_type=event_type,
-            data=data,
-        )
+        try:
+            record = AuditRecord(
+                event_id=f"evt_{len(self._audit_trail):06d}",
+                timestamp=timestamp,
+                event_type=event_type,
+                data=data,
+            )
+        except Exception as e:
+            logger.error(
+                "audit_kayit_olusturma_hatasi: event_type=%s, hata=%s",
+                event_type,
+                str(e),
+            )
+            return
         self._current_hash = record.seal(self._current_hash)
         self._audit_trail.append(record)
         if len(self._audit_trail) > 1000:
+            logger.warning(
+                "audit_trail_siniri_asildi: mevcut=%s, kisitlanacak=1000",
+                len(self._audit_trail),
+            )
             self._audit_trail = self._audit_trail[-1000:]
 
     def get_audit_trail(self) -> list[dict[str, Any]]:
@@ -605,7 +659,7 @@ class EnhancedReplayEngine:
             expected_hash = record.compute_hash(prev_hash)
             if record.hash_chain != expected_hash:
                 logger.error(
-                    "audit_bütünlük_ihlali: event_id=%s",
+                    "audit_butunluk_ihlali: event_id=%s",
                     record.event_id,
                 )
                 return False

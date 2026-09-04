@@ -1,9 +1,9 @@
 # services/backtest/ — Denetim Raporu
 
 **Tarih:** 2026-09-05
-**Güncelleme:** 2026-09-05 (9/21 dosya denetlendi)
+**Güncelleme:** 2026-09-05 (11/21 dosya denetlendi)
 **Kapsam:** 21 `.py` dosyası
-**Denetim Sonucu:** 9 dosya kurallara göre denetlenip düzeltildi. 12 dosya bekliyor.
+**Denetim Sonucu:** 11 dosya kurallara göre denetlenip düzeltildi. 10 dosya bekliyor.
 
 ---
 
@@ -55,8 +55,8 @@ Eski `engine.py` (v1) ve `engine_v4.py` (v4) farklı iş yaptığı için silinm
 | 7 | `deterministic.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 8 | `engine_v4.py` | 20 | ✅ Denetlendi, düzeltildi |
 | 9 | `enhanced_walk_forward.py` | 10 | ✅ Denetlendi, düzeltildi |
-| 10 | `event_replay.py` | — | ⏳ Bekliyor |
-| 11 | `execution_engine.py` | — | ⏳ Bekliyor |
+| 10 | `event_replay.py` | 18 | ✅ Denetlendi, düzeltildi |
+| 11 | `execution_engine.py` | 16 | ✅ Denetlendi, düzeltildi |
 | 12 | `multi_asset_engine.py` | — | ⏳ Bekliyor |
 | 13 | `persistence.py` | — | ⏳ Bekliyor |
 | 14 | `pit_validator.py` | — | ⏳ Bekliyor |
@@ -258,21 +258,78 @@ Eski `engine.py` (v1) ve `engine_v4.py` (v4) farklı iş yaptığı için silinm
 
 ---
 
-## Bekleyen Dosyalar (12 adet)
+## `event_replay.py` — Denetim Raporu (10. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | `compute_hash` docstring yetersiz/İngilizce ifade | Kapsamlı Türkçe docstring |
+| 2 | 1 | `seal` docstring: "immutable seal" İngilizce | "değiştirilemez mühür" Türkçeleştirildi |
+| 3 | 2 | `market_data=None` gelirse `AttributeError` crash | `ValueError` null kontrolü eklendi |
+| 4 | 2 | Exception'lar sadece loglanıp yutuluyor | `strict_errors` parametresi eklendi, True ise raise |
+| 5 | 2 | `"audit_bütünlük_ihlali"` Türkçe karakter log parsing sorunu | `"audit_butunluk_ihlali"` düzeltildi |
+| 6 | 3 | `max_position_pct` hard-coded %10 | `__init__`'de parametre olarak eklendi |
+| 7 | 4 | `replay_day` return type annotation eksik | Açık tip belirtileri eklendi |
+| 8 | 4 | `compare_decisions` docstring eksik | Kapsamlı Türkçe docstring |
+| 9 | 4 | `replay_day` docstring eksik (Raises yok) | Raises eklendi |
+| 10 | 4 | Audit trail 1000 kayıt sınırı sessiz kesiyor | Uyarı logu eklendi |
+| 11 | 2 | `_record_event` warning logunda Türkçe karakter "kisitlanıyor" | "kisitlanacak" düzeltildi |
+| 12 | 4 | `_record_event` docstring eksik (Returns/Raises) | Kapsamlı Türkçe docstring |
+| 13 | 4 | `_calculate_position_size` negatif fiyat kontrolü yok | `ValueError` + sıfır fiyatı erken dönüş |
+| 14 | 2 | `_record_event`: `orjson.dumps` non-serializable data → crash | `try/except` ile koruma |
+| 15 | 4 | `restore_snapshot` None snapshot koruması yok | `ValueError` eklendi |
+| 16 | 4 | `_state_snapshots` truncation warning eksik | Uyarı logu eklendi |
+| 17 | 4 | Modül/sınıf docstring İngilizce ifadeler | Türkçeleştirildi |
+| 18 | 2 | Dead code: `_handlers` dict + `register_handler()` hiç kullanılmıyor | Kaldırıldı |
+| 19 | 2 | Dead code: `AuditRecord.state_before`/`state_after` hiç set edilmiyor | Kaldırıldı |
+
+### Geliştirme Önerileri
+- `compare_decisions` farklı action eşleşmelerini yakalamıyor
+- `_handlers` kaldırıldı (ölü kod)
+- `state_before`/`state_after` kaldırıldı (ölü kod)
+
+---
+
+## `execution_engine.py` — Denetim Raporu (11. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 | **Kritik:** `run_backtest` parametrelerinde `any` (küçük harf) → TypeError | `Any` düzeltildi |
+| 2 | 2 | 4 metod return type `Any` ama farklı tuple döndürüyor | Doğru tuple tipleri atandı |
+| 3 | 4 | `BacktestEngine` sınıf docstring yetersiz | Genişletildi |
+| 4 | 4 | `__repr__` eksik | Eklendi |
+| 5 | 4 | 4 yardımcı metod parametre tip annotationsız | Tümüne eklendi |
+| 6 | 4 | 4 yardımcı metod docstring eksik (Args/Returns) | Tümüne eklendi |
+| 7 | 4 | `csv`, `os`, `contextlib`, `defaultdict` fonksiyon içinde import | Dosya başına taşındı |
+| 8 | 2 | `holding_days` hesaplama O(n²) list comprehension | Doğrudan tarih farkı |
+| 9 | 4 | Singleton docstring İngilizce "deprecated" | Türkçeleştirildi |
+| 10 | 4 | `_compute_drawdown_curve` docstring Args eksik | Eklendi |
+| 11 | 4 | `run_backtest` docstring yetersiz | Genişletildi |
+| 12 | 2 | CAGR `except Exception` sessiz hata yutuyor | `as e` + log eklendi |
+| 13 | 2 | `pnl_pct` hesabında `avg_cost=0` → ZeroDivisionError | Sıfır kontrolü eklendi (2 yer) |
+| 14 | 4 | `_compute_metrics` docstring Args eksik | `exposure_history` eklendi |
+| 15 | 4 | `100000` ve `0.10` magic number'lar | `DEFAULT_FALLBACK_VOLUME` ve `DEFAULT_SIGNAL_WEIGHT` sabitleri |
+| 16 | 2 | BUY başarısız execution loglanmıyor | Uyarı logu eklendi |
+| 17 | 2 | Dead code: `_check_stops_and_sell`'de `all_dates` parametresi kullanılmıyor | Kaldırıldı |
+
+### Geliştirme Önerileri
+- CAGR hesaplaması `backtest_start_date`/`backtest_end_date` parametreleri ile doğru tarih aralığına geçirildi
+- `DEFAULT_FALLBACK_VOLUME` ve `DEFAULT_SIGNAL_WEIGHT` sabit olarak tanımlandı
+
+---
+
+## Bekleyen Dosyalar (10 adet)
 
 | # | Dosya | "Otomatik eklendi" |
 |---|-------|-------------------|
-| 1 | `event_replay.py` | 3 |
-| 2 | `execution_engine.py` | — |
-| 3 | `multi_asset_engine.py` | 3 |
-| 4 | `persistence.py` | 1 |
-| 5 | `pit_validator.py` | 5 |
-| 6 | `portfolio_sim.py` | 20 |
-| 7 | `scanner_parity.py` | 4 |
-| 8 | `survivorship.py` | 3 |
-| 9 | `transaction_costs.py` | 1 |
-| 10 | `walk_forward.py` | 2 |
-| 11 | `walk_forward_engine.py` | 9 |
-| 12 | `walk_forward_runner.py` | 7 |
+| 1 | `multi_asset_engine.py` | 3 |
+| 2 | `persistence.py` | 1 |
+| 3 | `pit_validator.py` | 5 |
+| 4 | `portfolio_sim.py` | 20 |
+| 5 | `scanner_parity.py` | 4 |
+| 6 | `survivorship.py` | 3 |
+| 7 | `transaction_costs.py` | 1 |
+| 8 | `walk_forward.py` | 2 |
+| 9 | `walk_forward_engine.py` | 9 |
+| 10 | `walk_forward_runner.py` | 7 |
 
-**Bekleyen dosyalarda toplam: 58 "Otomatik eklendi" placeholder docstring**
+**Bekleyen dosyalarda toplam: 54 "Otomatik eklendi" placeholder docstring**
