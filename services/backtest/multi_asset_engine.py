@@ -18,6 +18,7 @@ Referanslar:
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -44,8 +45,24 @@ class SectorExposure:
     max_weight_pct: float = 25.0  # Maksimum %25 tek sektör
     current_weight_pct: float = 0.0
 
+    def __repr__(self) -> str:
+        """SectorExposure okunabilir temsili."""
+        return (
+            f"SectorExposure("
+            f"sector={self.sector_name!r}, "
+            f"current={self.current_weight_pct:.1f}%, "
+            f"max={self.max_weight_pct:.1f}%)"
+        )
+
     def is_within_limit(self, additional_weight: float = 0) -> bool:
-        """Otomatik eklendi."""
+        """Ek ağırlıkla birlikte sektör limitinin aşılıp aşılmadığını kontrol eder.
+
+        Args:
+            additional_weight: Eklenmek istenen ağırlık yüzdesi
+
+        Returns:
+            True ise limit dahilinde
+        """
         return (self.current_weight_pct + additional_weight) <= self.max_weight_pct
 
 
@@ -84,6 +101,15 @@ class MultiAssetConfig:
     # Bias detection
     enable_bias_detection: bool = True
 
+    def __repr__(self) -> str:
+        """MultiAssetConfig okunabilir temsili."""
+        return (
+            f"MultiAssetConfig("
+            f"capital={self.initial_capital:,.0f}, "
+            f"max_pos={self.max_positions}, "
+            f"max_dd={self.max_drawdown_pct:.0f}%)"
+        )
+
 
 @dataclass
 class AssetAllocation:
@@ -95,6 +121,15 @@ class AssetAllocation:
     signal_score: float  # Sinyal skoru
     sector: str  # Sektör
     reason: str  # Tahsis nedeni
+
+    def __repr__(self) -> str:
+        """AssetAllocation okunabilir temsili."""
+        return (
+            f"AssetAllocation("
+            f"ticker={self.ticker!r}, "
+            f"target={self.target_weight:.2f}, "
+            f"score={self.signal_score:.1f})"
+        )
 
 
 @dataclass
@@ -125,8 +160,24 @@ class MultiAssetResult:
     trade_log: list[dict[str, Any]] = field(default_factory=list)
     daily_metrics: list[dict[str, Any]] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """MultiAssetResult okunabilir temsili."""
+        return (
+            f"MultiAssetResult("
+            f"run={self.run_id!r}, "
+            f"return={self.total_return_pct:.2f}%, "
+            f"sharpe={self.sharpe_ratio:.2f}, "
+            f"trades={self.total_trades})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sonuç sözlüğünü döndürür.
+
+        Metrikler, sektör maruziyetleri ve bias raporunu içerir.
+
+        Returns:
+            Sonuç bilgilerini içeren sözlük
+        """
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -153,8 +204,7 @@ class MultiAssetResult:
 
 
 class MultiAssetBacktestEngine:
-    """
-    Multi-asset backtest motoru.
+    """Multi-asset backtest motoru.
 
     Birden fazla hisseyi eş zamanlı olarak backtest eder.
     Portfolio-level risk yönetimi uygular.
@@ -164,12 +214,21 @@ class MultiAssetBacktestEngine:
         self,
         config: MultiAssetConfig | None = None,
         cost_engine: TransactionCostEngine | None = None,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """Multi-asset backtest motorunu başlatır.
+
+        Args:
+            config: Backtest konfigürasyonu (None ise varsayılan kullanılır)
+            cost_engine: İşlem maliyeti motoru (None ise BIST varsayılanı)
+        """
         self.config = config or MultiAssetConfig()
         self.cost_engine = cost_engine or bist_transaction_cost
         self.bias_detector = LookAheadBiasDetector()
         self.bias_middleware = BiasDetectorMiddleware(strict_mode=True)
+
+    def __repr__(self) -> str:
+        """MultiAssetBacktestEngine okunabilir temsili."""
+        return f"MultiAssetBacktestEngine(config={self.config!r})"
 
     def run(
         self,
@@ -208,12 +267,10 @@ class MultiAssetBacktestEngine:
                 universe_size=len(universe_tickers),
             )
 
-        import hashlib
-
         run_id = hashlib.md5(f"multi_{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12]
 
         logger.info(
-            "Starting multi-asset backtest",
+            "multi_asset_baslatildi",
             run_id=run_id,
             tickers=market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
             date_range=f"{market_data['date'].min()} - {market_data['date'].max()}",
@@ -318,7 +375,7 @@ class MultiAssetBacktestEngine:
             current_dd = (peak_equity - portfolio_value) / peak_equity * 100
             if current_dd > cfg.max_drawdown_pct:
                 logger.warning(
-                    "Max drawdown exceeded", current_dd=round(current_dd, 2), max_allowed=cfg.max_drawdown_pct
+                    "maks_drawdown_asildi", mevcut_dd=round(current_dd, 2), azami_izin=cfg.max_drawdown_pct
                 )
 
             if current_dd > 0 and drawdown_start is None:
@@ -601,7 +658,7 @@ class MultiAssetBacktestEngine:
         )
 
         logger.info(
-            "Multi-asset backtest complete",
+            "multi_asset_tamamlandi",
             run_id=run_id,
             total_return=f"{total_return:.2f}%",
             sharpe=round(sharpe, 3),

@@ -1,9 +1,9 @@
 # services/backtest/ — Denetim Raporu
 
 **Tarih:** 2026-09-05
-**Güncelleme:** 2026-09-05 (11/21 dosya denetlendi)
+**Güncelleme:** 2026-09-05 (12/21 dosya denetlendi)
 **Kapsam:** 21 `.py` dosyası
-**Denetim Sonucu:** 11 dosya kurallara göre denetlenip düzeltildi. 10 dosya bekliyor.
+**Denetim Sonucu:** 12 dosya kurallara göre denetlenip düzeltildi. 9 dosya bekliyor.
 
 ---
 
@@ -57,7 +57,7 @@ Eski `engine.py` (v1) ve `engine_v4.py` (v4) farklı iş yaptığı için silinm
 | 9 | `enhanced_walk_forward.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 10 | `event_replay.py` | 18 | ✅ Denetlendi, düzeltildi |
 | 11 | `execution_engine.py` | 16 | ✅ Denetlendi, düzeltildi |
-| 12 | `multi_asset_engine.py` | — | ⏳ Bekliyor |
+| 12 | `multi_asset_engine.py` | 13 | ✅ Denetlendi, düzeltildi |
 | 13 | `persistence.py` | — | ⏳ Bekliyor |
 | 14 | `pit_validator.py` | — | ⏳ Bekliyor |
 | 15 | `portfolio_sim.py` | — | ⏳ Bekliyor |
@@ -317,19 +317,43 @@ Eski `engine.py` (v1) ve `engine_v4.py` (v4) farklı iş yaptığı için silinm
 
 ---
 
-## Bekleyen Dosyalar (10 adet)
+## `multi_asset_engine.py` — Denetim Raporu (12. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | `SectorExposure.is_within_limit` docstring: "Otomatik eklendi." | Türkçe docstring |
+| 2 | 1 | `MultiAssetResult.to_dict` docstring: "Otomatik eklendi." | Türkçe docstring |
+| 3 | 1 | `MultiAssetBacktestEngine.__init__` docstring: "Otomatik eklendi." | Türkçe docstring |
+| 4 | 4 | `SectorExposure.__repr__` eksik | Eklendi |
+| 5 | 4 | `MultiAssetConfig.__repr__` eksik | Eklendi |
+| 6 | 4 | `AssetAllocation.__repr__` eksik | Eklendi |
+| 7 | 4 | `MultiAssetResult.__repr__` eksik | Eklendi |
+| 8 | 4 | `MultiAssetBacktestEngine.__repr__` eksik | Eklendi |
+| 9 | 4 | `__init__` return type eksik | `-> None` |
+| 10 | 4 | `is_within_limit` docstring Args/Returns eksik | Eklendi |
+| 11 | 4 | `to_dict` docstring Args/Returns eksik | Eklendi |
+| 12 | 4 | `import hashlib` fonksiyon içinde | Dosya başına taşındı |
+| 13 | 4 | 3 İngilizce log mesajı | Türkçeleştirildi |
+
+### Geliştirme Önerileri
+- T+1 execution modeli doğru uygulanmış (look-ahead bias koruması)
+- Gap risk kontrolü eklenmiş (tavan/taban kilidi varsayımı)
+- Likidite kısıtı günlük hacim bazlı
+
+---
+
+## Bekleyen Dosyalar (9 adet)
 
 | # | Dosya | "Otomatik eklendi" |
 |---|-------|-------------------|
-| 1 | `multi_asset_engine.py` | 3 |
-| 2 | `persistence.py` | 1 |
-| 3 | `pit_validator.py` | 5 |
-| 4 | `portfolio_sim.py` | 20 |
-| 5 | `scanner_parity.py` | 4 |
-| 6 | `survivorship.py` | 3 |
-| 7 | `transaction_costs.py` | 1 |
-| 8 | `walk_forward.py` | 2 |
-| 9 | `walk_forward_engine.py` | 9 |
-| 10 | `walk_forward_runner.py` | 7 |
+| 1 | `persistence.py` | 1 |
+| 2 | `pit_validator.py` | 5 |
+| 3 | `portfolio_sim.py` | 20 |
+| 4 | `scanner_parity.py` | 4 |
+| 5 | `survivorship.py` | 3 |
+| 6 | `transaction_costs.py` | 1 |
+| 7 | `walk_forward.py` | 2 |
+| 8 | `walk_forward_engine.py` | 9 |
+| 9 | `walk_forward_runner.py` | 7 |
 
-**Bekleyen dosyalarda toplam: 54 "Otomatik eklendi" placeholder docstring**
+**Bekleyen dosyalarda toplam: 51 "Otomatik eklendi" placeholder docstring**
