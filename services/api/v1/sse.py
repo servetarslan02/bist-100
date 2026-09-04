@@ -1,12 +1,10 @@
-from typing import Any
-
 """
-ALPHA BIST — Server-Sent Events (SSE) Router v2.0
+ALPHA BIST — Server-Sent Events (SSE) Yönlendirici v2.0
 
-Tek yönlü server→client push. WebSocket'ten daha basit,
+Tek yönlü sunucu→istemci push. WebSocket'ten daha basit,
 tarayıcıda EventSource API ile çalışır.
 
-Best Practices (FastAPI 2026):
+En iyi uygulamalar (FastAPI 2026):
 - 15 saniyede bir keep-alive ping
 - X-Accel-Buffering: no (Nginx proxy buffering kapat)
 - Cache-Control: no-cache
@@ -21,30 +19,32 @@ Kullanım:
 """
 
 import asyncio
+import hashlib
+import logging
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 
 import orjson
-import structlog
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# SSE best practice: 15 saniyede bir keep-alive ping
+# SSE en iyi uygulama: 15 saniyede bir keep-alive ping
 SSE_KEEPALIVE_INTERVAL = 15
 
 
 async def _sse_generator(
     channel: str,
-    tickers: list = None,
+    tickers: list[str] | None = None,
     interval: float = 1.0,
 ) -> AsyncIterator[str]:
     """SSE event generator — sürekli veri akışı + keep-alive ping.
 
-    Best Practices:
+    En iyi uygulamalar:
     - Her 15 saniyede bir `: ping` comment gönder (bağlantıyı canlı tut)
     - Data değiştiğinde event gönder
     - Client disconnect detection (CancelledError)
@@ -71,7 +71,7 @@ async def _sse_generator(
                         data[ticker] = tick
                 if data:
                     event_data = orjson.dumps(data, default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: tick\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -80,7 +80,7 @@ async def _sse_generator(
                 signals = get_cached("signals:latest") or []
                 if signals:
                     event_data = orjson.dumps(signals, default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: signal\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -89,7 +89,7 @@ async def _sse_generator(
                 pf = get_cached("portfolio:state")
                 if pf:
                     event_data = orjson.dumps(pf, default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: portfolio\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -98,7 +98,7 @@ async def _sse_generator(
                 alerts = get_cached("alerts:latest") or []
                 if alerts:
                     event_data = orjson.dumps(alerts, default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: alert\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -107,7 +107,7 @@ async def _sse_generator(
                 regime = get_cached("market:regime")
                 if regime:
                     event_data = orjson.dumps(regime, default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: regime\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -116,7 +116,7 @@ async def _sse_generator(
                 radar = get_cached("radar:data") or []
                 if radar:
                     event_data = orjson.dumps(radar[:50], default=str).decode()
-                    current_hash = hash(event_data)
+                    current_hash = hashlib.md5(event_data.encode()).hexdigest()
                     if current_hash != last_data_hash:
                         yield f"event: radar\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
@@ -130,20 +130,20 @@ async def _sse_generator(
             await asyncio.sleep(interval)
 
         except asyncio.CancelledError:
-            # Client disconnect — temiz çık
-            logger.debug(f"SSE {channel} client disconnected")
+            # İstemci bağlantıyı kesti — temiz çık
+            logger.debug("sse_baglanti_kesildi: kanal=%s", channel)
             break
         except Exception as e:
             retry_count += 1
-            logger.warning(f"SSE {channel} error", error=str(e), retry=retry_count)
+            logger.warning("sse_hatasi: kanal=%s hata=%s deneme=%s", channel, str(e), retry_count)
             await asyncio.sleep(min(interval * 2, 10))
 
 
 @router.get("/ticks")
 async def sse_ticks(
     request: Request,
-    tickers: str = Query("", description="Comma-separated ticker list"),
-    interval: float = Query(1.0, ge=0.1, le=10.0, description="Update interval in seconds"),
+    tickers: str = Query("", description="Virgülle ayrılmış hisse kodları"),
+    interval: float = Query(1.0, ge=0.1, le=10.0, description="Güncelleme aralığı (saniye)"),
 ) -> Any:
     """SSE: Anlık fiyat akışı.
 
@@ -156,7 +156,7 @@ async def sse_ticks(
     """
     ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
-        ticker_list = ["THYAO", "ASELS", "TUPRS", "FROTO", "KCHOL"]
+        raise HTTPException(status_code=400, detail="tickers parametresi gerekli (virgülle ayrılmış hisse kodları).")
 
     return StreamingResponse(
         _sse_generator("ticks", tickers=ticker_list, interval=interval),
