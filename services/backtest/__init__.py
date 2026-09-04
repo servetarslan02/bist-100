@@ -64,7 +64,6 @@ from .event_replay import (
 
 # Faz 3: Çoklu Varlık, Event Replay, Deterministik
 from .multi_asset_engine import (
-    AssetAllocation,
     MultiAssetBacktestEngine,
     MultiAssetConfig,
     MultiAssetResult,
@@ -182,7 +181,6 @@ __all__ = [
     "MultiAssetConfig",
     "MultiAssetResult",
     "SectorExposure",
-    "AssetAllocation",
     "EnhancedReplayEngine",
     "SystemState",
     "ReplayDecision",

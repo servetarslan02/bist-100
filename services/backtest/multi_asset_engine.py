@@ -19,6 +19,7 @@ Referanslar:
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -29,12 +30,11 @@ try:
     import polars as pl
 except ImportError:
     pl = None
-import structlog
 
 from .bias_detector import BiasDetectorMiddleware, LookAheadBiasDetector
 from .transaction_costs import TransactionCostEngine, bist_transaction_cost
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -108,27 +108,6 @@ class MultiAssetConfig:
             f"capital={self.initial_capital:,.0f}, "
             f"max_pos={self.max_positions}, "
             f"max_dd={self.max_drawdown_pct:.0f}%)"
-        )
-
-
-@dataclass
-class AssetAllocation:
-    """Tek bir varlık tahsisi."""
-
-    ticker: str
-    target_weight: float  # Hedef ağırlık (0-1)
-    current_weight: float  # Mevcut ağırlık
-    signal_score: float  # Sinyal skoru
-    sector: str  # Sektör
-    reason: str  # Tahsis nedeni
-
-    def __repr__(self) -> str:
-        """AssetAllocation okunabilir temsili."""
-        return (
-            f"AssetAllocation("
-            f"ticker={self.ticker!r}, "
-            f"target={self.target_weight:.2f}, "
-            f"score={self.signal_score:.1f})"
         )
 
 
@@ -238,8 +217,7 @@ class MultiAssetBacktestEngine:
         benchmark_data: pl.DataFrame | None = None,
         universe_tickers: set[str] | None = None,
     ) -> MultiAssetResult:
-        """
-        Multi-asset backtest çalıştır.
+        """Multi-asset backtest çalıştır.
 
         Args:
             market_data: Fiyat/hacim verisi (date, ticker, open, high, low, close, volume)
@@ -249,8 +227,15 @@ class MultiAssetBacktestEngine:
             universe_tickers: Evren hisseleri (survivorship bias için)
 
         Returns:
-            MultiAssetResult
+            MultiAssetResult nesnesi
+
+        Raises:
+            ValueError: market_data veya signal_data None ise
         """
+        if market_data is None:
+            raise ValueError("market_data None olamaz; gecerli bir Polars DataFrame saglanmalidir")
+        if signal_data is None:
+            raise ValueError("signal_data None olamaz; gecerli bir Polars DataFrame saglanmalidir")
         # universe_tickers verildiyse, market/signal verisini bu evrenle
         # sınırla. Bu, SurvivorshipBiasHandler.get_universe_at_date() ile
         # üretilen tarihe-özgü (delisted hisseleri de içeren) evrenin
@@ -263,17 +248,17 @@ class MultiAssetBacktestEngine:
             if signal_data is not None and not signal_data.empty:
                 signal_data = signal_data[signal_data["ticker"].isin(universe_tickers)]
             logger.info(
-                "Universe filtresi uygulandı (survivorship-aware)",
-                universe_size=len(universe_tickers),
+                "universe_filtresi_uygulandi: universe_boyut=%s",
+                len(universe_tickers),
             )
 
         run_id = hashlib.md5(f"multi_{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12]
 
         logger.info(
-            "multi_asset_baslatildi",
-            run_id=run_id,
-            tickers=market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
-            date_range=f"{market_data['date'].min()} - {market_data['date'].max()}",
+            "multi_asset_baslatildi: run_id=%s, hisse=%s, tarih_araligi=%s",
+            run_id,
+            market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
+            f"{market_data['date'].min()} - {market_data['date'].max()}",
         )
 
         # Config
@@ -375,7 +360,8 @@ class MultiAssetBacktestEngine:
             current_dd = (peak_equity - portfolio_value) / peak_equity * 100
             if current_dd > cfg.max_drawdown_pct:
                 logger.warning(
-                    "maks_drawdown_asildi", mevcut_dd=round(current_dd, 2), azami_izin=cfg.max_drawdown_pct
+                    "maks_drawdown_asildi: mevcut=%.2f, azami_izin=%.2f",
+                    current_dd, cfg.max_drawdown_pct,
                 )
 
             if current_dd > 0 and drawdown_start is None:
@@ -658,11 +644,8 @@ class MultiAssetBacktestEngine:
         )
 
         logger.info(
-            "multi_asset_tamamlandi",
-            run_id=run_id,
-            total_return=f"{total_return:.2f}%",
-            sharpe=round(sharpe, 3),
-            max_dd=f"{max_dd:.2f}%",
+            "multi_asset_tamamlandi: run_id=%s, getiri=%.2f%%, sharpe=%.3f, max_dd=%.2f%%",
+            run_id, total_return, round(sharpe, 3), f"{max_dd:.2f}",
         )
 
         return result
