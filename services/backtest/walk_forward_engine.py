@@ -1474,12 +1474,14 @@ class WalkForwardEngineV5:
         else:
             metrics.sharpe_ratio = 0.0
 
-        # Sortino
+        # Sortino (semi-deviation: sqrt(mean(x^2)), std değil)
         downside = returns_arr[returns_arr < 0]
-        if len(downside) > 0 and np.std(downside) > 0:
-            metrics.sortino_ratio = float(
-                (np.mean(returns_arr) - self.risk_free_rate / 252) / np.std(downside) * np.sqrt(252)
-            )
+        if len(downside) > 0:
+            downside_std = float(np.sqrt(np.mean(downside**2)))
+            if downside_std > 0:
+                metrics.sortino_ratio = float(
+                    (np.mean(returns_arr) - self.risk_free_rate / 252) / downside_std * np.sqrt(252)
+                )
 
         # Max Drawdown
         cumulative = np.cumprod(1 + returns_arr)
