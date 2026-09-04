@@ -34,6 +34,13 @@ class MarketImpact:
     total_impact_pct: float
     is_feasible: bool
 
+    def __repr__(self) -> str:
+        """Market impact sonucunu okunabilir formatta döndürür."""
+        return (
+            f"MarketImpact(ticker={self.ticker}, impact={self.total_impact_pct:.2f}%, "
+            f"participation={self.participation_rate:.2%}, feasible={self.is_feasible})"
+        )
+
 
 @dataclass
 class ExecutionResult:
@@ -47,16 +54,27 @@ class ExecutionResult:
     can_execute: bool
     reason: str
 
+    def __repr__(self) -> str:
+        """T+1 execution sonucunu okunabilir formatta döndürür."""
+        return (
+            f"ExecutionResult(ticker={self.ticker}, {self.signal_date}→{self.execution_date}, "
+            f"execute={self.can_execute}, reason={self.reason})"
+        )
+
 
 @dataclass
 class CorporateAction:
-    """Şirket olayı."""
+    """Şirket olayı (temettü, bölünme, hak kullanımı, delist)."""
 
     ticker: str
     action_type: str  # dividend, split, rights, delisting
     ex_date: str
     value: float
     description: str
+
+    def __repr__(self) -> str:
+        """Şirket olayını okunabilir formatta döndürür."""
+        return f"CorporateAction(ticker={self.ticker}, type={self.action_type}, ex_date={self.ex_date})"
 
 
 class BacktestEnhancements:

@@ -112,7 +112,7 @@ from .transaction_costs import (
 )
 from .walk_forward_runner import WalkForwardBacktestRunner
 
-# Faz 6: Eksik Modüller (isim çakışmaları alias ile çözüldü)
+# Faz 6: Ek Modüller
 from .backtest_enhancements import (
     BacktestEnhancements,
     CorporateAction,
