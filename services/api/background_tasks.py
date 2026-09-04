@@ -21,7 +21,7 @@ async def radar_cache_refresher() -> Any:
     while True:
         current_phase = None
         try:
-            from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
+            from ..core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 
             current_phase = bist_session_fsm.get_phase()
 
@@ -74,7 +74,7 @@ async def paper_trading_scheduler() -> Any:
 
     await asyncio.sleep(5)
     try:
-        from services.pipeline.startup_catchup import master_catchup
+        from ...pipeline.startup_catchup import master_catchup
 
         logger.info("paper_trading_scheduler: Başlangıç Master Catch-up (Tüm eksik seanslar ve eğitimler) başlatılıyor...")
         with tracer.start_as_current_span("background.paper_trading_scheduler.master_catchup"):
@@ -98,13 +98,14 @@ async def paper_trading_scheduler() -> Any:
         target_time, phase = min(upcoming, key=lambda x: x[0])
         sleep_seconds = (target_time - now).total_seconds()
         logger.info(
-            f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')} TR) tetiklenecek."
+            "paper_trading_scheduler: %s sn sonra (%s - %s TR) tetiklenecek.",
+            f"{sleep_seconds:.1f}", phase, target_time.strftime('%H:%M')
         )
         await asyncio.sleep(sleep_seconds)
 
         if datetime.now(TR_TZ).weekday() < 5:
             try:
-                from services.pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
+                from ...pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
 
                 if phase == "MORNING":
                     logger.info("paper_trading_scheduler: Sabah açılışı yürütme döngüsü başlıyor...")

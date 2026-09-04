@@ -38,10 +38,10 @@ from ..core.database import check_db_health, init_databases
 from ..core.otel import setup_telemetry
 from .rate_limiter import rate_limiter
 from .v1 import v1_router
-from services.core.otel import otel_trace
-from services.core.alerting import alerting
-from services.core.monitoring import portfolio_monitor
-from services.core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
+from ..core.otel import otel_trace
+from ..core.alerting import alerting
+from ..core.monitoring import portfolio_monitor
+from ..core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
@@ -66,7 +66,7 @@ async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
         logger.warning("onbellek_isitma_basarisiz: hata=%s", e)
 
     try:
-        from services.portfolio.main import portfolio_service
+        from ...portfolio.main import portfolio_service
 
         await portfolio_service.start()
         logger.info("PortfolioService API yaşam döngüsünde başlatıldı")
@@ -218,7 +218,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS
+    # CORS yapılandırması
     allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
     if not allowed_origins or allowed_origins == [""]:
         allowed_origins = ["http://localhost:3000"]  # Default: sadece local dev
@@ -231,10 +231,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Accept"],
     )
 
-    # Otomatik GZip Sıkıştırma (1KB'dan büyük tüm yanıtları %85-90 sıkıştırır)
+    # Otomatik GZip sıkıştırma (1KB'dan büyük tüm yanıtları sıkıştırır)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-    # İstek zamanlama middleware
+    # İstek zamanlama ara yazılımı
     @app.middleware("http")
     async def timing_middleware(request: Request, call_next) -> Any:
         """Her isteğin işlenme süresini ölçer ve X-Process-Time-Ms başlığı olarak ekler."""
@@ -244,7 +244,7 @@ def create_app() -> FastAPI:
         response.headers["X-Process-Time-Ms"] = str(round(duration, 2))
         return response
 
-    # İstek kimliği middleware — her isteğe benzersiz ID ata
+    # İstek kimliği ara yazılımı — her isteğe benzersiz ID ata
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next) -> Any:
         """Her isteğe benzersiz bir X-Request-ID atar, dağıtık izleme ile uyumlu."""
@@ -253,7 +253,7 @@ def create_app() -> FastAPI:
 
         # Context değişkenine kaydet (dağıtık izleme ile uyumlu)
         try:
-            from services.core.distributed_tracing import correlation_id_var
+            from ..core.distributed_tracing import correlation_id_var
 
             correlation_id_var.set(request_id)
         except ImportError:
@@ -269,7 +269,7 @@ def create_app() -> FastAPI:
         response.headers["X-Request-ID"] = request_id
         return response
 
-    # İstek zaman aşımı middleware — uzun süren istekleri kes
+    # İstek zaman aşımı ara yazılımı — uzun süren istekleri kes
     @app.middleware("http")
     async def timeout_middleware(request: Request, call_next) -> Any:
         """30 saniyeyi aşan istekleri zaman aşımına uğratır, WebSocket/SSE hariç."""
@@ -301,14 +301,14 @@ def create_app() -> FastAPI:
                 content={
                     "success": False,
                     "error": "Gateway timeout",
-                    "detail": "Request 30 saniye içinde tamamlanamadı.",
+                    "detail": "İstek 30 saniye içinde tamamlanamadı.",
                     "status_code": 504,
                     "request_id": request_id,
                     "timestamp": datetime.now(UTC).isoformat(),
                 },
             )
 
-    # Hız sınırı başlıkları middleware
+    # Hız sınırı başlıkları ara yazılımı
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next) -> Any:
         """İstemci bazlı hız sınırı uygular, yerel ve dahili istekleri baypas eder."""
@@ -332,7 +332,7 @@ def create_app() -> FastAPI:
         if not allowed:
             return JSONResponse(
                 status_code=429,
-                content={"detail": f"Rate limit exceeded. Retry after {info.get('retry_after', 60)}s"},
+                content={"detail": f"Hız sınırı aşıldı. {info.get('retry_after', 60)} saniye sonra tekrar deneyin."},
                 headers={
                     "Retry-After": str(info.get("retry_after", 60)),
                     "X-RateLimit-Limit": str(info.get("limit", 100)),
@@ -345,7 +345,7 @@ def create_app() -> FastAPI:
         response.headers["X-RateLimit-Remaining"] = str(info.get("remaining", 0))
         return response
 
-    # Yapısal hata yanıtları — global istisna işleyicileri
+    # Yapısal hata yanıtları — genel istisna işleyicileri
     from fastapi.exceptions import RequestValidationError
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -388,7 +388,7 @@ def create_app() -> FastAPI:
             status_code=422,
             content={
                 "success": False,
-                "error": "Validation error",
+                "error": "Doğrulama hatası",
                 "detail": errors,
                 "status_code": 422,
                 "request_id": request_id,
@@ -413,15 +413,15 @@ def create_app() -> FastAPI:
             status_code=500,
             content={
                 "success": False,
-                "error": "Internal server error",
-                "detail": str(exc) if os.environ.get("DEBUG") else None,
+                "error": "Sunucu hatası",
+                "detail": str(exc) if os.environ.get("ALPHA_DEBUG") else None,
                 "status_code": 500,
                 "request_id": request_id,
                 "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
-    # API sürüm başlığı — tüm yanıtlarda
+    # API sürüm başlığı — tüm yanıtlarda görünür
     @app.middleware("http")
     async def api_version_middleware(request: Request, call_next) -> Any:
         """API uç noktalarına X-API-Version ve deprecation politikası başlıkları ekler."""
@@ -433,7 +433,7 @@ def create_app() -> FastAPI:
             )
         return response
 
-    # Kullanımdan kaldırma takibi — eski uç noktalar için Sunset başlığı
+    # Kullanımdan kaldırma takibi — eski uç noktalar için Sunset başlığı ekler
     KULLANIMDAN_KALDIRILAN_UCT_NOKTALAR: dict[str, str] = {
         # yol: sunset_tarihi (ISO 8601)
         # Örnek: "/api/v1/eski_uct_nokta": "2027-03-01",
@@ -456,13 +456,13 @@ def create_app() -> FastAPI:
             )
         return response
 
-    # v1 yönlendirici
+    # v1 yönlendiricisi
     app.include_router(v1_router)
     from .v1.ws import router as root_ws_router
 
     app.include_router(root_ws_router, prefix="/ws", tags=["WebSockets (Root)"])
 
-    # mTLS sağlık uç noktası
+    # mTLS sağlık uç noktası yapılandırması
     try:
         from ..core.mtls import create_mtls_health_endpoint
 
@@ -471,7 +471,7 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.debug("mtls_saglik_uct_noktasi_kaydedilmedi: hata=%s", str(e))
 
-    # Kök uç noktalar ve Web UI Gösterge Paneli
+    # Kök uç noktalar ve web arayüzü gösterge paneli
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
     async def dashboard() -> Any:
@@ -563,7 +563,7 @@ def create_app() -> FastAPI:
                 media_type="text/plain; version=0.0.4; charset=utf-8",
             )
 
-    # ===================== YÖNETİCİ UÇ NOKTALARI (server.py'den taşındı) =====================
+    # ===================== yönetici uç noktaları (server.py'den taşındı) =====================
 
     @app.get("/admin/lock-metrics")
     async def admin_lock_metrics(request: Request) -> Any:

@@ -593,9 +593,8 @@ class BinaryWebSocket:
         self._clients.add(websocket)
         client_id = id(websocket)
         logger.info(
-            "Binary WebSocket client connected",
-            client_id=client_id,
-            protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback",
+            "binary_ws_client_connected: client=%s protocol=%s",
+            client_id, "protobuf" if HAS_PROTOBUF else "orjson-fallback",
         )
 
         try:
@@ -771,10 +770,8 @@ class BinaryWebSocket:
 
         self._running = True
         logger.info(
-            "Binary WebSocket sunucusu başlatılıyor",
-            host=host,
-            port=port,
-            protocol="protobuf" if HAS_PROTOBUF else "orjson-fallback",
+            "binary_ws_baslatiliyor: host=%s port=%s protocol=%s",
+            host, port, "protobuf" if HAS_PROTOBUF else "orjson-fallback",
         )
 
         async with websockets.serve(self.handler, host, port):
@@ -789,7 +786,7 @@ class BinaryWebSocket:
             try:
                 await client.close()
             except Exception:
-                logger.warning("websocket_close_failed: client=%s", client_id, exc_info=True)
+                logger.warning("websocket_close_failed: client=%s", id(client), exc_info=True)
         self._clients.clear()
 
     def get_stats(self) -> dict[str, Any]:

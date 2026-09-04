@@ -152,7 +152,7 @@ async def require_role(required_roles: list[Role]) -> Any:
 
 async def get_service_orchestrator() -> Any:
     """Orchestrator servisini getir."""
-    from services.core.orchestrator import MasterOrchestrator
+    from ..core.orchestrator import MasterOrchestrator
 
     orch = MasterOrchestrator()
     if not orch._initialized:

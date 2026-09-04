@@ -32,8 +32,8 @@ except ImportError:
     jwt = None
     HAS_JWT = False
 
-from services.core.otel import get_tracer
-from services.core.security import Role
+from ..core.otel import get_tracer
+from ..core.security import Role
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
@@ -353,10 +353,15 @@ class RBACChecker:
 
 # Global örnekler (Basit Konteyner Desteği)
 # Tam bir DI çerçevesinde bunlar IoC konteyneri tarafından yönetilir.
-_jwt_secret = os.environ.get("JWT_SECRET")
+_jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
 if not _jwt_secret:
-    logger.warning("JWT_SECRET ortam değişkeni ayarlanmamış — kimlik doğrulama çalışmayabilir.")
-    _jwt_secret = "dev-only-unsafe-key"  # Sadece geliştirme ortamında, üretimde hata verir
+    if os.environ.get("ALPHA_ENV") == "production":
+        raise RuntimeError(
+            "JWT_SECRET ortam değişkeni üretim ortamında zorunludur. "
+            "Güvenlik için varsayılan değer kaldırıldı."
+        )
+    logger.warning("JWT_SECRET ortam değişkeni ayarlanmamış — sadece geliştirme ortamında çalışır.")
+    _jwt_secret = "dev-only-unsafe-key-do-not-use-in-production"
 
 _default_config = AuthConfig(jwt_secret=_jwt_secret)
 

@@ -268,7 +268,7 @@ async def ask_gemini_endpoint(
     try:
         from ...intelligence.gemini_service import call_gemini
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, call_gemini, prompt)
         return {"response": response, "model": "gemini-3.7-flash", "status": "ok"}
     except Exception as exc:
@@ -314,7 +314,7 @@ async def gemini_report(
     try:
         from ...intelligence.gemini_service import analyze_company_gemini
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         report = await loop.run_in_executor(
             None,
             lambda: analyze_company_gemini(

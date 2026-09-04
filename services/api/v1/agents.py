@@ -11,7 +11,7 @@ router = APIRouter()
 async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> dict:
     """Mevcut ajanların listesini döndürür."""
     try:
-        from services.agents.agent_system import AgentRole
+        from ...agents.agent_system import AgentRole
 
         agents = [role.value for role in AgentRole]
         return {"agents": agents, "count": len(agents)}
@@ -25,7 +25,7 @@ async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit
 async def agent_status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> dict:
     """Ajanların çalışma durumunu döndürür."""
     try:
-        from services.agents.agent_system import agent_system
+        from ...agents.agent_system import agent_system
 
         return {"agents": agent_system.get_status()}
     except ImportError:
@@ -38,7 +38,7 @@ async def agent_status(user=Depends(get_current_user), _=Depends(check_rate_limi
 async def run_agent(agent_name: str = "researcher", user=Depends(get_current_user), _=Depends(check_rate_limit)) -> dict:
     """Belirtilen ajanı çalıştırır."""
     try:
-        from services.agents.agent_system import agent_system
+        from ...agents.agent_system import agent_system
 
         result = await agent_system.run(agent_name)
         return {"status": "started", "agent": agent_name, "result": result}
