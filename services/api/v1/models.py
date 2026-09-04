@@ -15,8 +15,6 @@ router = APIRouter()
 
 
 @router.get("")
-@router.get("/")
-@router.get("/status")
 @router.get("/list")
 @router.get("/registry")
 async def list_models(
@@ -46,9 +44,12 @@ async def list_models(
                 model_registry._init_default_models()
             versions = model_registry.get_all_versions()
 
+        if not versions:
+            logger.warning("model_kayit_bos: varsayilan modeller yuklenemedi")
+
         return {
-            "models": versions,
-            "count": len(versions),
+            "models": versions or [],
+            "count": len(versions) if versions else 0,
             "mlflow_url": os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"),
             "data_source": "model_registry",
         }
@@ -81,13 +82,16 @@ async def model_performance(
 
         versions = model_registry.get_all_versions()
         if not versions:
-            return {"status": "no_models", "message": "Kayıtlı model bulunamadı."}
+            raise HTTPException(
+                status_code=404,
+                detail="Kayıtlı model bulunamadı.",
+            )
 
         performance: dict[str, Any] = {}
         for v in versions:
             model_id = v.get("model_id", "unknown")
-            metrics = v.get("metrics", {})
-            if metrics:
+            metrics = v.get("metrics")
+            if isinstance(metrics, dict) and metrics:
                 performance[model_id] = metrics
 
         return {
@@ -130,13 +134,13 @@ async def get_champion_model(
             )
 
         return {
-            "champion_id": champion.model_id,
-            "name": champion.model_id,
-            "version": champion.version,
-            "status": champion.status,
-            "regime": champion.regime,
-            "created_at": champion.created_at,
-            "metrics": champion.metrics or {},
+            "champion_id": getattr(champion, "model_id", "unknown"),
+            "name": getattr(champion, "model_id", "unknown"),
+            "version": getattr(champion, "version", "?"),
+            "status": getattr(champion, "status", "unknown"),
+            "regime": getattr(champion, "regime", None),
+            "created_at": getattr(champion, "created_at", None),
+            "metrics": getattr(champion, "metrics", None) or {},
         }
     except HTTPException:
         raise
@@ -202,7 +206,7 @@ async def get_learning_state(
 
 @router.post("/retrain")
 async def retrain(
-    force: bool = Query(default=True),
+    force: bool = Query(default=False, description="Zorla yeniden eğitim tetikleme"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:

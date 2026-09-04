@@ -5,15 +5,17 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-import numpy as np
 import orjson
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ..dependencies import check_rate_limit, get_current_user
+from ...core.swr_cache import SWRCache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_alpha_signals_cache = SWRCache(ttl_seconds=300)
 
 
 def _get_pm() -> Any:
@@ -52,9 +54,11 @@ async def portfolio_summary(
     try:
         pm = _get_pm()
         summary = pm.get_summary()
-        summary["positions_count"] = summary.get("num_positions", 0)
-        summary["positions"] = pm.get_all_positions()
-        return summary
+        return {
+            **summary,
+            "positions_count": summary.get("num_positions", 0),
+            "positions": pm.get_all_positions(),
+        }
     except Exception as exc:
         logger.error("portfoy_ozet_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Portföy özeti alınamadı: {exc}") from exc
@@ -154,11 +158,12 @@ async def equity_curve(
     try:
         pm = _get_pm()
         curve = pm.get_equity_curve()
+        sliced = curve[-limit:]
         return {
-            "equity_curve": curve[-limit:],
-            "snapshots": curve[-limit:],
+            "equity_curve": sliced,
+            "snapshots": sliced,
             "high_water_mark": max(
-                [pt.get("total_value", 0.0) for pt in curve],
+                [pt.get("total_value", 0.0) for pt in sliced],
                 default=pm.initial_capital,
             ),
         }
@@ -191,7 +196,7 @@ async def risk_metrics(
         return {
             "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
             "positions_count": summary.get("num_positions", 0),
-            "cash_ratio": summary.get("cash", 0.0) / max(summary.get("total_value", 1.0), 1.0),
+            "cash_ratio": summary.get("cash", 0.0) / max(abs(summary.get("total_value", 1.0)), 1.0),
             "settled_cash": summary.get("settled_cash", 0.0),
             "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
@@ -258,6 +263,7 @@ async def performance_metrics(
                 detail="Performans metrikleri hesaplanamadı. Yeterli işlem verisi yok.",
             )
         return {
+            **perf,
             "sharpe_ratio": perf.get("sharpe", perf.get("sharpe_ratio", 0.0)),
             "max_drawdown": perf.get("max_drawdown_pct", perf.get("max_drawdown", 0.0)),
             "win_rate": perf.get("win_rate", 0.0),
@@ -266,7 +272,6 @@ async def performance_metrics(
             "profit_factor": perf.get("profit_factor", 0.0),
             "calmar_ratio": perf.get("calmar_ratio", 0.0),
             "timestamp": datetime.now(UTC).isoformat(),
-            **perf,
         }
     except HTTPException:
         raise
@@ -292,7 +297,7 @@ async def accounting(
         pm = _get_pm()
         summary = pm.get_summary()
 
-        # Invariant doğrulama: total_value = cash + invested_value
+        # Doğrulama: total_value = cash + invested_value
         cash = summary.get("cash", 0.0)
         invested = summary.get("invested_value", 0.0)
         total = summary.get("total_value", 0.0)
@@ -329,6 +334,9 @@ async def reset_portfolio_to_cash(
 
     Returns:
         dict: Sıfırlama sonucu ve güncel nakit.
+
+    Raises:
+        HTTPException: Sıfırlama başarısız olursa 500 hatası döner.
     """
     try:
         pm = _get_pm()
@@ -344,7 +352,7 @@ async def reset_portfolio_to_cash(
         }
     except Exception as exc:
         logger.error("portfoy_sifirlama_hatasi: hata=%s", exc)
-        return {"success": False, "error": str(exc)}
+        raise HTTPException(status_code=500, detail=f"Portföy sıfırlanamadı: {exc}") from exc
 
 
 # =====================================================
@@ -486,7 +494,7 @@ async def tax_analysis(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
-    """Vergi analizini döndürdür.
+    """Vergi analizini döndürür.
 
     Args:
         user: Kimliği doğrulanmış kullanıcı.
@@ -572,7 +580,10 @@ async def rebalance_analysis(
         pm = _get_pm()
 
         if not target_weights:
-            return {"message": "target_weights parametresi gerekli (JSON format)."}
+            raise HTTPException(
+                status_code=400,
+                detail="target_weights parametresi gerekli (JSON format).",
+            )
 
         try:
             weights = orjson.loads(target_weights)
@@ -616,7 +627,7 @@ async def rebalance_orders(
         return {
             "orders": orders,
             "total_orders": len(orders),
-            "total_value": sum(o["value"] for o in orders),
+            "total_value": sum(o.get("value", 0.0) for o in orders),
             "turnover_limit": turnover_limit,
         }
     except Exception as exc:
@@ -746,8 +757,8 @@ async def optimize_portfolio(
                 mv = float(p.get("market_value", 0.0))
                 if t and total_val > 0:
                     current_weights[t] = mv / total_val
-        except Exception:
-            pass
+        except Exception as weight_err:
+            logger.warning("mevcut_agirlik_hatasi: hata=%s", weight_err)
 
         res = portfolio_optimizer.optimize(
             tickers=tickers,
@@ -819,7 +830,7 @@ async def portfolio_status(
             "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
             "realized_pnl": summary.get("realized_pnl", 0.0),
             "drawdown_pct": summary.get("max_drawdown_pct", 0.0),
-            "strict_t2": paper_orchestrator.portfolio.strict_t2,
+            "strict_t2": getattr(paper_orchestrator.portfolio, "strict_t2", False),
         }
     except Exception as exc:
         logger.error("portfoy_durum_hatasi: hata=%s", exc)
@@ -922,7 +933,15 @@ async def trigger_auto_rebalance(
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
 
         res = await run_unified_daily_cycle()
-        return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
+        return {
+            "status": "success",
+            "message": "Otonom rebalance tetiklendi.",
+            "details": res,
+            "params_received": {
+                "threshold_pct": body.get("threshold_pct") if body else None,
+                "max_turnover": body.get("max_turnover") if body else None,
+            },
+        }
     except Exception as exc:
         logger.error("oto_rebalance_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Otonom rebalance tetiklenemedi: {exc}") from exc
@@ -968,10 +987,6 @@ async def deposit_funds(
         raise HTTPException(status_code=500, detail=f"Nakit yatırılamadı: {exc}") from exc
 
 
-from ...core.swr_cache import SWRCache
-
-_alpha_signals_cache = SWRCache(ttl_seconds=300)
-
 
 @router.get("/alpha")
 @router.get("/alpha-signals")
@@ -1002,65 +1017,8 @@ async def alpha_signals(
     except Exception as exc:
         logger.warning("alpha_cache_okuma_hatasi: hata=%s", exc)
 
-    def _compute_alpha_live() -> dict[str, Any]:
-        try:
-            from ...core.redis_helper import get_cached as gc
-
-            radar = gc("radar:data") or []
-            if radar:
-                top_items = sorted(radar, key=lambda x: x.get("score", 0), reverse=True)[:5]
-                if len(top_items) >= 5:
-                    return {
-                        "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-                        "active_positions": [
-                            {
-                                "ticker": it.get("symbol"),
-                                "weight": 0.20,
-                                "score": it.get("score", 0.0),
-                                "sector": it.get("sector", "SANAYI"),
-                            }
-                            for it in top_items
-                        ],
-                        "cash_shield_pct": 0.0,
-                        "status": "active",
-                    }
-        except Exception as err:
-            logger.warning("alpha_hesaplama_hatasi: hata=%s", err)
-
-        try:
-            from ...scanner.bist_ml_scanner import bist_ml_scanner
-
-            opps = bist_ml_scanner.scan_all_opportunities(limit=5)
-            if opps and len(opps) >= 1:
-                weight_each = round(1.0 / len(opps), 4)
-                return {
-                    "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-                    "active_positions": [
-                        {
-                            "ticker": opp.get("symbol") or opp.get("ticker"),
-                            "weight": weight_each,
-                            "score": float(opp.get("score", 0.0)),
-                            "sector": opp.get("sector", "SANAYI"),
-                        }
-                        for opp in opps
-                    ],
-                    "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(opps)) * 100.0, 1),
-                    "status": "active",
-                    "source": "ml_scanner_live",
-                }
-        except Exception as scan_err:
-            logger.warning("alpha_scanner_hatasi: hata=%s", scan_err)
-
-        return {
-            "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
-            "active_positions": [],
-            "cash_shield_pct": 100.0,
-            "status": "unavailable",
-            "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında korunuyor.",
-        }
-
     loop = asyncio.get_running_loop()
-    res = await loop.run_in_executor(None, _compute_alpha_live)
+    res = await loop.run_in_executor(None, _hesapla_alpha_canli)
 
     _alpha_signals_cache.set(res)
 
@@ -1070,3 +1028,68 @@ async def alpha_signals(
         logger.warning("alpha_cache_yazma_hatasi: hata=%s", exc)
 
     return res
+
+
+def _hesapla_alpha_canli() -> dict[str, Any]:
+    """Canlı alpha sinyallerini hesaplar.
+
+    Öncelik sırası: Redis cache → radar verisi → ML scanner → nakit kalkanı.
+
+    Returns:
+        dict: Alpha sinyalleri ve durum bilgisi.
+    """
+    try:
+        from ...core.redis_helper import get_cached as gc
+
+        radar = gc("radar:data") or []
+        if radar:
+            top_items = sorted(radar, key=lambda x: x.get("score", 0), reverse=True)[:5]
+            if len(top_items) >= 5:
+                return {
+                    "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
+                    "active_positions": [
+                        {
+                            "ticker": it.get("symbol"),
+                            "weight": 0.20,
+                            "score": it.get("score", 0.0),
+                            "sector": it.get("sector", "SANAYI"),
+                        }
+                        for it in top_items
+                    ],
+                    "cash_shield_pct": 0.0,
+                    "status": "active",
+                }
+    except Exception as err:
+        logger.warning("alpha_hesaplama_hatasi: hata=%s", err)
+
+    try:
+        from ...scanner.bist_ml_scanner import bist_ml_scanner
+
+        opps = bist_ml_scanner.scan_all_opportunities(limit=5)
+        if opps and len(opps) >= 1:
+            weight_each = round(1.0 / len(opps), 4)
+            return {
+                "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
+                "active_positions": [
+                    {
+                        "ticker": opp.get("symbol") or opp.get("ticker"),
+                        "weight": weight_each,
+                        "score": float(opp.get("score", 0.0)),
+                        "sector": opp.get("sector", "SANAYI"),
+                    }
+                    for opp in opps
+                ],
+                "cash_shield_pct": round(max(0.0, 1.0 - weight_each * len(opps)) * 100.0, 1),
+                "status": "active",
+                "source": "ml_scanner_live",
+            }
+    except Exception as scan_err:
+        logger.warning("alpha_scanner_hatasi: hata=%s", scan_err)
+
+    return {
+        "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
+        "active_positions": [],
+        "cash_shield_pct": 100.0,
+        "status": "unavailable",
+        "message": "Canlı sinyal verisi bulunamadı; sermaye %100 nakit kalkanında korunuyor.",
+    }
