@@ -139,7 +139,11 @@ class BenchmarkComparator:
         alpha = (np.mean(excess_sr) - beta * np.mean(excess_br)) * periods_per_year * 100
 
         # Korelasyon ve R-kare
-        correlation = np.corrcoef(sr, br)[0, 1]
+        corr_matrix = np.corrcoef(sr, br)
+        correlation = corr_matrix[0, 1]
+        # Sabit dizi durumunda NaN oluşabilir
+        if np.isnan(correlation):
+            correlation = 0.0
         r_squared = correlation**2
 
         # İzleme hatası
@@ -147,20 +151,19 @@ class BenchmarkComparator:
         tracking_error = np.std(active_returns, ddof=1) * np.sqrt(periods_per_year) * 100
 
         # Bilgi oranı
+        active_std = np.std(active_returns, ddof=1)
         information_ratio = (
-            (np.mean(active_returns) / np.std(active_returns, ddof=1) * np.sqrt(periods_per_year))
-            if np.std(active_returns, ddof=1) > 0
-            else 0
+            (np.mean(active_returns) / active_std * np.sqrt(periods_per_year))
+            if active_std > 0
+            else 0.0
         )
 
         # Göreceli getiri
         relative_return = strategy_total - benchmark_total
 
-        # Yukarı/Aşağı yakalama oranı
+        # Yukarı yakalama: benchmark pozitifken strateji/benchmark oranı
         up_days = br > 0
         down_days = br < 0
-
-        # Yukarı yakalama: benchmark pozitifken strateji/benchmark oranı
         up_mean_br = np.mean(br[up_days]) if up_days.sum() > 0 else 0.0
         up_mean_sr = np.mean(sr[up_days]) if up_days.sum() > 0 else 0.0
         up_capture = (
@@ -169,7 +172,6 @@ class BenchmarkComparator:
             else 0.0
         )
 
-        # Aşağı yakalama: benchmark negatifken strateji/benchmark oranı
         down_mean_br = np.mean(br[down_days]) if down_days.sum() > 0 else 0.0
         down_mean_sr = np.mean(sr[down_days]) if down_days.sum() > 0 else 0.0
         down_capture = (
