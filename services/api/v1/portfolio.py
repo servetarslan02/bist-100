@@ -89,7 +89,7 @@ async def positions(
 
 @router.get("/trades")
 async def trades(
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=500, description="Maksimum işlem sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -142,7 +142,7 @@ async def pnl(
 
 @router.get("/equity-curve")
 async def equity_curve(
-    limit: int = Query(252, ge=1, le=1000),
+    limit: int = Query(252, ge=1, le=1000, description="Maksimum veri noktası"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -362,7 +362,7 @@ async def reset_portfolio_to_cash(
 
 @router.get("/cash-ledger")
 async def cash_ledger(
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=1000, description="Maksimum kayıt sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -390,7 +390,7 @@ async def cash_ledger(
 
 @router.get("/orders")
 async def portfolio_orders(
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=1000, description="Maksimum kayıt sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -415,7 +415,7 @@ async def portfolio_orders(
 @router.get("/position-history")
 async def position_history(
     ticker: str = Query("", description="Hisse filtresi"),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=1000, description="Maksimum kayıt sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -439,7 +439,7 @@ async def position_history(
 
 @router.get("/equity-snapshots")
 async def equity_snapshots(
-    limit: int = Query(252, ge=1, le=1000),
+    limit: int = Query(252, ge=1, le=1000, description="Maksimum kayıt sayısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -467,7 +467,7 @@ async def equity_snapshots(
 
 @router.get("/attribution")
 async def attribution(
-    portfolio_id: int = Query(1),
+    portfolio_id: int = Query(1, description="Portföy tanımlayıcısı"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> dict[str, Any]:
@@ -483,10 +483,16 @@ async def attribution(
     Raises:
         HTTPException: Attribüsyon yapılamazsa 501 hatası döner.
     """
-    raise HTTPException(
-        status_code=501,
-        detail="Factor attribüsyonu için gerçek piyasa verisi servisi gerekli. Henüz bağlı değil.",
-    )
+    try:
+        raise HTTPException(
+            status_code=501,
+            detail="Factor attribüsyonu için gerçek piyasa verisi servisi gerekli. Henüz bağlı değil.",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("attribusyon_hatasi: hata=%s", exc)
+        raise HTTPException(status_code=500, detail="Attribüsyon yapılamadı.") from exc
 
 
 @router.get("/tax")
