@@ -35,7 +35,7 @@ async def run_backtest(
         HTTPException: Backtest çalıştırılamazsa 500 hatası döner.
     """
     try:
-        from ...backtest.engine import BacktestEngine
+        from ...backtest.execution_engine import BacktestEngine
 
         engine = BacktestEngine()
         result = await engine.run(ticker=ticker, period=period, strategy=strategy)
@@ -47,7 +47,7 @@ async def run_backtest(
             "result": result,
         }
     except ImportError:
-        logger.warning("backtest_engine_yuklenemedi: BacktestEngine modülü mevcut değil")
+        logger.warning("backtest_engine_yuklenemedi: execution_engine modülü mevcut değil")
         raise HTTPException(
             status_code=503,
             detail="Backtest motoru şu anda kullanılamıyor.",

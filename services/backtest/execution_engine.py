@@ -1,33 +1,34 @@
 """
-ALPHA BIST — Backtest Engine v1.0
+ALPHA BIST — Execution Engine (T+1 Takas Simülatörü)
 
-Geçmiş veriler üzerinde strateji testi:
-- Historical market data
-- Decision simulation
-- Risk simulation
-- Execution simulation
-- Portfolio tracking
-- Performance metrics
+Dışarıdan verilen alım-satım sinyallerini T+1 takas kurallarına göre simüle eder.
+- Sinyalleri gün sonunda kuyruğa alır, ertesi gün açılış fiyatından execute eder
+- Dinamik slippage (hacim bazlı)
+- Likidite kısıtı (günlük hacmin %10'u)
+- Stop-loss ve trailing stop
+- İşlem günlüğü (ledger) çıktısı
 
-FAZ 12: Backtest Engine
+engine_v4.py ile karıştırmayın:
+- execution_engine: Sinyal → Trade simülasyonu (bu dosya)
+- engine_v4: Feature → Sinyal → Trade tam pipeline (kendi sinyal üretir)
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import numpy as np
-import structlog
 
 from services.core.risk_config import backtest_config
 from services.portfolio.portfolio_manager import CommissionModel
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass
 class BacktestTrade:
-    """Backtest işlem kaydı."""
+    """Tek bir backtest işleminin kaydı."""
 
     trade_id: int
     ticker: str
@@ -42,10 +43,16 @@ class BacktestTrade:
     holding_days: int
     commission: float
 
+    def __repr__(self) -> str:
+        return (
+            f"BacktestTrade(id={self.trade_id}, ticker={self.ticker}, "
+            f"side={self.side}, pnl={self.pnl:.2f}, pnl_pct={self.pnl_pct:.2f}%)"
+        )
+
 
 @dataclass
 class BacktestMetrics:
-    """Backtest performans metrikleri."""
+    """Backtest performans metrikleri (getiri, risk, işlem istatistikleri)."""
 
     total_return_pct: float
     cagr_pct: float
@@ -64,10 +71,17 @@ class BacktestMetrics:
     avg_holding_days: float
     exposure_pct: float
 
+    def __repr__(self) -> str:
+        return (
+            f"BacktestMetrics(return={self.total_return_pct:.2f}%, "
+            f"sharpe={self.sharpe_ratio:.2f}, max_dd={self.max_drawdown_pct:.2f}%, "
+            f"trades={self.total_trades})"
+        )
+
 
 @dataclass
 class BacktestResult:
-    """Backtest sonucu."""
+    """Backtest çalıştırma sonucu (metrikler, işlemler, equity eğrisi)."""
 
     strategy_name: str
     start_date: str
@@ -78,6 +92,14 @@ class BacktestResult:
     trades: list[BacktestTrade]
     equity_curve: list[float]
     drawdown_curve: list[float]
+
+    def __repr__(self) -> str:
+        return (
+            f"BacktestResult(strategy={self.strategy_name}, "
+            f"{self.start_date}→{self.end_date}, "
+            f"capital={self.initial_capital:.0f}→{self.final_capital:.0f}, "
+            f"trades={len(self.trades)})"
+        )
 
 
 class BacktestEngine:
@@ -418,12 +440,27 @@ class BacktestEngine:
         stop_loss_pct: float = 0.07,
         trailing_stop_pct: float = 0.15,
         market_regime: float = 1.0,
-    ) -> Any:
+    ) -> BacktestResult:
+        """Backtest çalıştır.
+
+        Args:
+            strategy_name: Strateji adı
+            signals: Tarih bazlı alım-satım sinyalleri
+            price_data: {ticker: [{date, open, high, low, close, volume}]}
+            initial_capital: Başlangıç sermayesi
+            commission_rate: Komisyon oranı (None ise varsayılan)
+            slippage_pct: Slippage yüzdesi
+            dump_ledger: İşlem günlüğü CSV'ye yazılsın mı
+            stop_loss_pct: Stop-loss eşiği (0.07 = %7)
+            trailing_stop_pct: Trailing stop eşiği
+            market_regime: Piyasa rejim katsayısı
+
+        Returns:
+            BacktestResult: Metrikler, işlemler, equity eğrisi
+        """
         import csv
         import os
         from collections import defaultdict
-
-        """Backtest calistir (CANONICAL ENGINE)."""
         if not signals:
             return BacktestResult(
                 strategy_name,
@@ -607,7 +644,11 @@ class BacktestEngine:
         initial_capital: float,
         exposure_history: list[float] | None = None,
     ) -> BacktestMetrics:
-        """Performans metrikleri hesapla."""
+        """İşlem listesi ve equity eğrisinden performans metrikleri hesapla.
+
+        Hesaplanan metrikler: toplam getiri, CAGR, Sharpe, Sortino, Calmar,
+        max drawdown, kazanma oranı, kâr faktörü, beklenti, toplam masraf.
+        """
         if not trades:
             return BacktestMetrics(
                 total_return_pct=0,
@@ -708,7 +749,11 @@ class BacktestEngine:
         )
 
     def _compute_drawdown_curve(self, equity_curve: list[float]) -> list[float]:
-        """Drawdown eğrisi hesapla."""
+        """Equity eğrisinden drawdown yüzdesi eğrisi hesapla.
+
+        Returns:
+            Her gün için drawdown yüzdesi (0-100 arası).
+        """
         if not equity_curve:
             return []
 
@@ -721,70 +766,7 @@ class BacktestEngine:
         return dd
 
 
-# Singleton
+# Singleton (deprecated — BacktestEngineV4 kullanın)
 backtest_engine = BacktestEngine()
 
 
-# =====================================================
-# Backtest Modül Bağlantıları
-# =====================================================
-def get_backtest_systems() -> dict[str, Any]:
-    """Tüm backtest modüllerini getir."""
-    systems = {}
-    try:
-        from .engine_v4 import BacktestEngineV4
-
-        systems["engine_v4"] = BacktestEngineV4
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="BacktestEngineV4", error=str(e))
-    try:
-        from .enhanced_walk_forward import PurgeEmbargoWalkForward
-
-        systems["enhanced_wf"] = PurgeEmbargoWalkForward
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="PurgeEmbargoWalkForward", error=str(e))
-    try:
-        from .portfolio_sim import PortfolioSimulator
-
-        systems["portfolio_sim"] = PortfolioSimulator
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="PortfolioSimulator", error=str(e))
-    try:
-        from .walk_forward import WalkForwardEngine
-
-        systems["walk_forward"] = WalkForwardEngine
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="WalkForwardEngine", error=str(e))
-    try:
-        from .walk_forward_runner import WalkForwardRunner
-
-        systems["wf_runner"] = WalkForwardRunner
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="WalkForwardRunner", error=str(e))
-    try:
-        from .canonical_adapter import CanonicalBacktestAdapter
-
-        systems["canonical_adapter"] = CanonicalBacktestAdapter
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="CanonicalBacktestAdapter", error=str(e))
-    try:
-        from .persistence import BacktestPersistence
-
-        systems["persistence"] = BacktestPersistence
-    except ImportError:
-        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
-    except Exception as e:
-        logger.warning("Failed to load module", module="BacktestPersistence", error=str(e))
-    return systems

@@ -6,7 +6,7 @@ from typing import Any
 
 import polars as pl
 
-from services.backtest.engine import BacktestEngine
+from services.backtest.execution_engine import BacktestEngine
 from services.backtest.walk_forward import WalkForwardEngine
 from services.core.alpha_engine import AlphaEngine
 from services.core.risk_manager import RiskManager

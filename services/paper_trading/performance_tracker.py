@@ -14,7 +14,7 @@ Gunluk performans metrikleri:
 - IC / ICIR
 - Top-K spread
 
-Mevcut services.backtest.engine.BacktestMetrics'i extend eder.
+Mevcut services.backtest.execution_engine.BacktestMetrics'i extend eder.
 Gunluk incremental hesaplama yapar (tum veriyi her gun bastan hesaplamaz).
 """
 

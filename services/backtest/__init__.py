@@ -12,6 +12,13 @@ Nihai backtest sistemi modülleri:
 - deflated_sharpe: Deflated Sharpe Ratio & çoklu test düzeltmesi
 - benchmark: Benchmark karşılaştırma motoru
 - scanner_parity: Backtest-scanner parite garantisi
+- execution_engine: T+1 takas simülatörü (sinyal → trade)
+- engine_v4: V4 backtest motoru (feature → sinyal → trade, full pipeline)
+- walk_forward: Walk-forward doğrulama motoru
+- walk_forward_engine: Walk-forward motor V5 (gelişmiş)
+- enhanced_walk_forward: Purge/embargo walk-forward
+- backtest_enhancements: T+1 takas, piyasa etkisi, likidite kontrolleri
+- canonical_adapter: Feature'lardan canonical score üretimi
 """
 
 # Mevcut modüller
@@ -45,6 +52,7 @@ from .deterministic import (
     idempotency_guard,
 )
 from .engine_v4 import BacktestConfig, BacktestEngineV4
+from .execution_engine import BacktestEngine, BacktestMetrics, BacktestResult, BacktestTrade
 from .event_replay import (
     AuditRecord,
     EnhancedReplayEngine,
@@ -104,11 +112,44 @@ from .transaction_costs import (
 )
 from .walk_forward_runner import WalkForwardBacktestRunner
 
+# Faz 6: Eksik Modüller (isim çakışmaları alias ile çözüldü)
+from .backtest_enhancements import (
+    BacktestEnhancements,
+    CorporateAction,
+    backtest_enhancements,
+)
+from .canonical_adapter import (
+    BacktestCanonicalAdapter as CanonicalAdapter,
+    backtest_canonical_adapter,
+)
+from .enhanced_walk_forward import (
+    PurgeEmbargoWalkForward,
+    WalkForwardFold as EnhancedWalkForwardFold,
+    WalkForwardResult as EnhancedWalkForwardResult,
+)
+from .walk_forward import (
+    WalkForwardEngine,
+    WalkForwardFold,
+    WalkForwardResult,
+)
+from .walk_forward_engine import (
+    FoldConfig,
+    FoldMetrics,
+    FoldSnapshot,
+    FoldStatus,
+    WalkForwardEngineV5,
+    WalkForwardResult as WalkForwardResultV5,
+)
+
 __all__ = [
     # Mevcut
     "PortfolioSimulatorV3",
     "BacktestEngineV4",
     "BacktestConfig",
+    "BacktestEngine",
+    "BacktestMetrics",
+    "BacktestResult",
+    "BacktestTrade",
     "BacktestPersistence",
     "WalkForwardBacktestRunner",
     # Faz 1
@@ -170,4 +211,22 @@ __all__ = [
     "ParityReport",
     "parity_checker",
     "feature_version_lock",
+    # Faz 6: Eksik Modüller
+    "BacktestEnhancements",
+    "CorporateAction",
+    "backtest_enhancements",
+    "CanonicalAdapter",
+    "backtest_canonical_adapter",
+    "PurgeEmbargoWalkForward",
+    "EnhancedWalkForwardFold",
+    "EnhancedWalkForwardResult",
+    "WalkForwardEngine",
+    "WalkForwardFold",
+    "WalkForwardResult",
+    "FoldConfig",
+    "FoldMetrics",
+    "FoldSnapshot",
+    "FoldStatus",
+    "WalkForwardEngineV5",
+    "WalkForwardResultV5",
 ]

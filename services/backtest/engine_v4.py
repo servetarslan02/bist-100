@@ -30,12 +30,12 @@ try:
     import polars as pl
 except ImportError:
     pl = None
-import structlog
+import logging
 
 from .persistence import backtest_persistence
 from .portfolio_sim import PortfolioSimulatorV3
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 # =====================================================
@@ -60,7 +60,7 @@ class BacktestConfig:
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sözlük formatında döndürür."""
         return {
             "initial_capital": self.initial_capital,
             "lookback_days": self.lookback_days,
@@ -96,7 +96,7 @@ class BacktestMetrics:
     max_drawdown_duration_days: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sözlük formatında döndürür."""
         return {k: round(v, 4) if isinstance(v, float) else v for k, v in self.__dict__.items()}
 
 
@@ -122,7 +122,7 @@ class BacktestResultV4:
     persisted: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sözlük formatında döndürür."""
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -151,14 +151,14 @@ class FeatureCache:
     """Ticker bazında feature cache."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Feature cache başlatır."""
         self._cache: dict[str, dict[str, Any]] = {}
         self._date_cache: dict[str, str] = {}
         self._hits = 0
         self._misses = 0
 
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
-        """Otomatik eklendi."""
+        """Cache'den değer döndürür (bulunamazsa None)."""
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             self._hits += 1
             return self._cache[ticker]
@@ -166,12 +166,12 @@ class FeatureCache:
         return None
 
     def set(self, ticker: str, date: str, features: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Değeri cache'e kaydeder."""
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
     def clear(self) -> Any:
-        """Otomatik eklendi."""
+        """Cache'i temizler."""
         self._cache.clear()
         self._date_cache.clear()
         self._hits = 0
@@ -179,7 +179,7 @@ class FeatureCache:
 
     @property
     def hit_rate(self) -> float:
-        """Otomatik eklendi."""
+        """Cache hit oranını döndürür."""
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
@@ -188,19 +188,19 @@ class QualityCache:
     """Data quality sonucu cache."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Quality cache başlatır."""
         self._cache: dict[str, tuple[bool, float]] = {}
 
     def get(self, ticker: str) -> tuple[bool, float] | None:
-        """Otomatik eklendi."""
+        """Cache'den değer döndürür (bulunamazsa None)."""
         return self._cache.get(ticker)
 
     def set(self, ticker: str, passed: bool, score: float) -> Any:
-        """Otomatik eklendi."""
+        """Değeri cache'e kaydeder."""
         self._cache[ticker] = (passed, score)
 
     def clear(self) -> Any:
-        """Otomatik eklendi."""
+        """Cache'i temizler."""
         self._cache.clear()
 
 
@@ -1056,7 +1056,7 @@ class BacktestEngineV4:
         """
 
         def _s(v) -> Any:
-            """Otomatik eklendi."""
+            """Skaler değere güvenli dönüştürme."""
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 
         score = 50.0
@@ -1282,7 +1282,7 @@ class BacktestEngineV4:
         cfg: BacktestConfig,
         start_time: float,
     ) -> BacktestResultV4:
-        """Otomatik eklendi."""
+        """İşlevi açıklanacak."""
         return BacktestResultV4(
             run_id=run_id,
             start_date="",
@@ -1308,29 +1308,29 @@ class BacktestEngineV4:
 
 
 class _FallbackCalculator:
-    """Otomatik eklendi."""
+    """Test ortamında yedek implementasyon."""
     def compute_all_features(self, df, mask=None, ticker="") -> Any:
-        """Otomatik eklendi."""
+        """Varsayılan (test) feature seti döndürür."""
         return {"rsi_14": 50, "momentum_20d": 0, "roc_5d": 0, "volume_zscore": 0}
 
 
 class _FallbackMask:
-    """Otomatik eklendi."""
+    """Test ortamında yedek implementasyon."""
     def compute_mask(self, *args, **kwargs) -> Any:
-        """Otomatik eklendi."""
+        """Boş tradability maskesi döndürür."""
         class _M:
-            """Otomatik eklendi."""
+            """İşlevi açıklanacak."""
             mask = None
 
         return _M()
 
 
 class _FallbackQuality:
-    """Otomatik eklendi."""
+    """Test ortamında yedek implementasyon."""
     def full_quality_check(self, df, ticker="") -> Any:
-        """Otomatik eklendi."""
+        """Varsayılan (geçerli) quality sonucu döndürür."""
         class _Q:
-            """Otomatik eklendi."""
+            """İşlevi açıklanacak."""
             passed = True
             quality_score = 80.0
 

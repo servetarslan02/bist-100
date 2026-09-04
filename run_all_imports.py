@@ -115,7 +115,8 @@ ALL_MODULES = [
     "services.ml.rl_agent",
     "services.ml.qlib_integration",
     # Backtest/Agents/Scanner/Scheduler/Simulation/API/MarketState (24)
-    "services.backtest.engine",
+    "services.backtest.execution_engine",
+    "services.backtest.engine_v4",
     "services.backtest.walk_forward",
     "services.backtest.enhanced_walk_forward",
     "services.agents.agent_system",

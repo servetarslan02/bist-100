@@ -21,9 +21,7 @@ logger.info("=" * 80)
 
 # 1. TEST: Backtest T+1 Open Execution & Intraday Stop
 logger.info("\n[TEST 1] Backtest Motoru: T+1 Açılış İcrası ve Gün İçi Stop-Loss Kanıtı...")
-from services.backtest.engine import BacktestEngine
-
-engine = BacktestEngine()
+from services.backtest.execution_engine import BacktestEngine
 mock_prices = {
     "THYAO": [
         {"date": "2026-01-01", "open": 100.0, "high": 102.0, "low": 99.0, "close": 101.0, "volume": 1000000},
@@ -44,6 +42,7 @@ mock_signals = [
     {"date": "2026-01-01", "ticker": "THYAO", "action": "BUY", "confidence": 0.85, "price": 101.0, "weight": 0.20}
 ]
 
+engine = BacktestEngine()
 res = engine.run_backtest("T1_TEST", mock_signals, mock_prices, initial_capital=100000, stop_loss_pct=0.07)
 
 # Check execution date
