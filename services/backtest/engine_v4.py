@@ -59,6 +59,59 @@ class BacktestConfig:
     historical_repository: Any = None  # HistoricalDataRepository instance
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
+    # Legacy skor ağırlıkları (feature contract ile parametrize)
+    score_weights: dict[str, Any] | None = None  # None → varsayılan ağırlıklar
+
+    @staticmethod
+    def default_score_weights() -> dict[str, Any]:
+        """Varsayılan skor ağırlıklarını döndürür.
+
+        Her bileşen için:
+        - feature: Feature adı
+        - neutral_min / neutral_max: Nötr bölge sınırları
+        - scale: Nötr dışındaki her birim için skor katkısı
+        - max_contribution: Maksimum puan katkısı (±)
+
+        Returns:\            Varsayılan ağırlık sözlüğü
+        """
+        return {
+            "base_score": 50.0,
+            "components": [
+                {
+                    "feature": "rsi_14",
+                    "default": 50,
+                    "neutral_min": 40,
+                    "neutral_max": 60,
+                    "scale": 0.25,
+                    "max_contribution": 10,
+                },
+                {
+                    "feature": "momentum_20d",
+                    "default": 0,
+                    "neutral_min": None,
+                    "neutral_max": None,
+                    "scale": 200,
+                    "max_contribution": 10,
+                },
+                {
+                    "feature": "roc_5d",
+                    "default": 0,
+                    "neutral_min": None,
+                    "neutral_max": None,
+                    "scale": 1.5,
+                    "max_contribution": 7.5,
+                },
+                {
+                    "feature": "volume_zscore",
+                    "default": 0,
+                    "neutral_min": None,
+                    "neutral_max": None,
+                    "scale": 3,
+                    "max_contribution": 6,
+                },
+            ],
+        }
+
     def __repr__(self) -> str:
         """BacktestConfig okunabilir temsili."""
         return (
@@ -85,6 +138,7 @@ class BacktestConfig:
             "min_quality_score": self.min_quality_score,
             "use_canonical_scoring": self.use_canonical_scoring,
             "regime": self.regime,
+            "score_weights": self.score_weights,
         }
 
 
@@ -1144,39 +1198,44 @@ class BacktestEngineV4:
     def _compute_score_legacy(self, features: dict[str, Any]) -> float:
         """Legacy skor — normalize edilmiş ağırlıklar.
 
-        Her bileşen ±5-10 puan aralığına normalize edilir:
+        Ağırlıklar BacktestConfig.score_weights ile parametrize edilebilir.
+        None ise varsayılan ağırlıklar kullanılır.
+
+        Varsayılan bileşenler:
         - RSI (0-100): ±10 puan (eşik 40/60)
         - momentum_20d (ondalık, tipik ±0.05): ×200 → ±10 puan
         - roc_5d (%, tipik ±5): ×1.5 → ±7.5 puan
         - volume_zscore (z, tipik ±2): ×3 → ±6 puan
 
         Skor aralığı: ~25-75 (normal), 0-100 (aşırı durumlar)
+
+        Returns:
+            0-100 arası skor
         """
 
         def _s(v) -> Any:
             """Skaler değere güvenli dönüştürme."""
             return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 
-        score = 50.0
+        weights = self._config.score_weights or BacktestConfig.default_score_weights()
+        score = weights.get("base_score", 50.0)
 
-        # RSI: 40-60 arası nötr, dışı ±10 puan
-        rsi = _s(features.get("rsi_14", 50))
-        if rsi > 60:
-            score += min((rsi - 60) * 0.25, 10)  # 60→+0, 100→+10
-        elif rsi < 40:
-            score -= min((40 - rsi) * 0.25, 10)  # 40→-0, 0→-10
+        for comp in weights.get("components", []):
+            feature_name = comp["feature"]
+            default = comp.get("default", 0)
+            neutral_min = comp.get("neutral_min")
+            neutral_max = comp.get("neutral_max")
+            scale = comp.get("scale", 1)
+            max_contrib = comp.get("max_contribution", 10)
 
-        # Momentum 20d (ondalık): ×200 → ±10 puan
-        mom20 = _s(features.get("momentum_20d", 0))
-        score += max(-10, min(10, mom20 * 200))
+            value = _s(features.get(feature_name, default))
 
-        # ROC 5d (%): ×1.5 → ±7.5 puan
-        roc5 = _s(features.get("roc_5d", 0))
-        score += max(-7.5, min(7.5, roc5 * 1.5))
-
-        # Volume z-score: ×3 → ±6 puan
-        vz = _s(features.get("volume_zscore", 0))
-        score += max(-6, min(6, vz * 3))
+            if neutral_min is not None and value < neutral_min:
+                score -= min((neutral_min - value) * abs(scale), max_contrib)
+            elif neutral_max is not None and value > neutral_max:
+                score += min((value - neutral_max) * abs(scale), max_contrib)
+            elif neutral_min is None and neutral_max is None:
+                score += max(-max_contrib, min(max_contrib, value * scale))
 
         return max(0, min(100, score))
 
