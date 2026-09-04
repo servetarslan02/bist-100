@@ -1133,7 +1133,7 @@ class WalkForwardEngineV5:
                     "volume_zscore": float((volume[-1] - np.mean(volume[-20:])) / (np.std(volume[-20:]) + 1e-10))
                     if len(volume) > 20
                     else 0.0,
-                    "atr_pct": float(np.mean(np.abs(np.diff(close[-15:]))) / c * 100.0) if len(close) > 14 else 0.0,
+                    "atr_pct": float(np.mean(np.abs(np.diff(close[-15:]))) / c * 100.0) if len(close) > 14 else 0.0,  # Basitleştirilmiş ATR (close-to-close, true range değil)
                     "bb_position": self._bb_position(close),
                     "price_vs_sma20": (c / np.mean(close[-20:]) - 1.0) * 100.0 if len(close) >= 20 else 0.0,
                     "price_vs_sma50": (c / np.mean(close[-50:]) - 1.0) * 100.0 if len(close) >= 50 else 0.0,

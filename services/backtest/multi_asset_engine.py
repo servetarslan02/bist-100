@@ -549,9 +549,12 @@ class MultiAssetBacktestEngine:
             std_return = np.std(returns)
             sharpe = (avg_return / std_return * np.sqrt(252)) if std_return > 0 else 0
 
-            # Sortino
+            # Sortino (semi-deviation: sqrt(mean(x^2)), std değil)
             downside_returns = [r for r in returns if r < 0]
-            downside_std = np.std(downside_returns) if len(downside_returns) > 1 else std_return
+            if len(downside_returns) > 0:
+                downside_std = float(np.sqrt(np.mean(np.array(downside_returns) ** 2)))
+            else:
+                downside_std = std_return
             sortino = (avg_return / downside_std * np.sqrt(252)) if downside_std > 0 else 0
         else:
             sharpe = sortino = 0

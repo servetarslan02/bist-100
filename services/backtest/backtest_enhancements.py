@@ -211,7 +211,7 @@ class BacktestEnhancements:
         temporary_impact = self.market_impact_coefficient * np.sqrt(participation_rate) * 100
 
         # Permanent impact (kalıcı — fiyat kalıcı olarak etkilenir)
-        permanent_impact = self.market_impact_coefficient * participation_rate / 2 * 100
+        permanent_impact = (self.market_impact_coefficient * participation_rate / 2) * 100
 
         total_impact = temporary_impact + permanent_impact
 
