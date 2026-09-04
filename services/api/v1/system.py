@@ -21,7 +21,7 @@ router = APIRouter()
 
 
 def _get_system_resources() -> dict[str, Any]:
-    """psutil uzerinden gercek CPU, RAM ve Disk kullanimini olcer."""
+    """psutil üzerinden gerçek CPU, RAM ve Disk kullanımını ölçer."""
     try:
         if psutil:
             vm = psutil.virtual_memory()
@@ -92,14 +92,13 @@ async def get_server_time() -> dict[str, Any]:
 @router.get("/status")
 @router.get("/health")
 async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
-    """Sistem durumu — mikroservis saglik ve canlilik kontrolu."""
+    """Sistem durumu — mikroservis sağlık ve canlılık kontrolü."""
     services = {}
 
     # PostgreSQL
     try:
         from ...core.database import pg_fetchval
 
-        time.time()
         ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if ok else "unhealthy"
     except Exception as e:
@@ -121,11 +120,11 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
     try:
         from ...core.database import ch_execute
 
-        # NOT: ch_execute senkron/blocking bir HTTP cagrisi yapiyor. Dogrudan
-        # await edilmeden (yani ana event loop'u bloke ederek) cagrilirsa
-        # ClickHouse'un yanit suresi boyunca TUM API (diger tum kullanicilar
-        # ve tum diger sayfa istekleri dahil) donuyordu — run_in_executor'a
-        # tasindi ki thread pool'da calisip event loop'u serbest biraksin.
+        # NOT: ch_execute senkron/blocking bir HTTP çağrısı yapıyor. Doğrudan
+        # await edilmeden (yani ana event loop'u bloke ederek) çağrılırsa
+        # ClickHouse'un yanıt süresi boyunca TÜM API (diğer tüm kullanıcılar
+        # ve tüm diğer sayfa istekleri dahil) donuyordu — run_in_executor'a
+        # taşındı ki thread pool'da çalışıp event loop'u serbest bıraksın.
         loop = asyncio.get_running_loop()
         res = await loop.run_in_executor(None, ch_execute, "SELECT 1")
         services["clickhouse"] = "healthy" if len(res.result_rows) > 0 else "unhealthy"
@@ -133,11 +132,10 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         logger.warning("clickhouse_saglik_kontrol_hatasi: hata=%s", str(e))
         services["clickhouse"] = "unhealthy"
 
-    # Core Mikroservisler
-    # Core mikroservisler — sadece bağlantı varsa healthy
+    # Core Mikroservisler — bağlantı yoksa "unknown" olarak işaretle
     for svc_name in ["nats", "intelligence_engine", "risk_parity_engine",
                      "scanner_pipeline", "portfolio_manager", "ml_learning_worker"]:
-        services.setdefault(svc_name, "healthy")
+        services.setdefault(svc_name, "unknown")
 
     all_healthy = all(v == "healthy" for v in services.values())
     resources = _get_system_resources()
@@ -151,12 +149,14 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         {"label": "Taranan Enstrüman Havuzu", "value": "629+ Aktif BİST Hissesi (Dinamik Otomatik Keşif)"},
     ]
 
+    cpu_val = resources["cpu_pct"] if resources["cpu_pct"] is not None else "N/A"
+    mem_used = f"{resources['memory_used_mb']:,}" if resources["memory_used_mb"] is not None else "N/A"
+    mem_total = f"{resources['memory_total_mb']:,}" if resources["memory_total_mb"] is not None else "N/A"
+    mem_pct = f"{resources['memory_pct']:.1f}" if resources["memory_pct"] is not None else "N/A"
+
     pipeline_stats = [
-        {"label": "Aktif CPU Kullanımı", "value": f"%{resources['cpu_pct']:.1f}"},
-        {
-            "label": "Aktif Bellek (RAM)",
-            "value": f"{resources['memory_used_mb']:,} MB / {resources['memory_total_mb']:,} MB (%{resources['memory_pct']:.1f})",
-        },
+        {"label": "Aktif CPU Kullanımı", "value": f"%{cpu_val}"},
+        {"label": "Aktif Bellek (RAM)", "value": f"{mem_used} MB / {mem_total} MB (%{mem_pct})"},
         {"label": "İç Gecikme (Latency)", "value": "Ölçülüyor"},
         {"label": "Düşen Paket (Drop Rate)", "value": "Ölçülüyor"},
         {"label": "Veri Kaynakları", "value": "Borsa İstanbul, Yahoo Finance, TCMB EVDS, KAP"},
@@ -183,9 +183,9 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     try:
         from ...core.database import ch_execute
 
-        # NOT: ch_execute blocking oldugu icin run_in_executor'a alindi — yoksa
-        # bu iki sorgu suresince (network+ClickHouse round-trip) ana event loop
-        # bloklanir ve TUM diger API istekleri (dolayisiyla siteye tiklamalar) donar.
+        # NOT: ch_execute blocking olduğu için run_in_executor'a alındı — yoksa
+        # bu iki sorgu süresince (network+ClickHouse round-trip) ana event loop
+        # bloklanır ve TÜM diğer API istekleri (dolayısıyla siteye tıklamalar) donar.
         loop = asyncio.get_running_loop()
         t0 = time.time()
         res = await loop.run_in_executor(
@@ -207,7 +207,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         for row in t_res.result_rows:
             ch_tables.append({"name": str(row[0]), "rows": f"{row[1]:,} Satır", "size": str(row[2])})
     except Exception as e:
-        logger.debug("clickhouse_size_query_failed", error=str(e))
+        logger.debug("clickhouse_size_query_failed: error=%s", str(e))
 
     if not ch_tables:
         ch_tables = []
@@ -237,7 +237,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
             pg_total_rows += cnt
             pg_tables.append({"name": str(r["table_name"]), "rows": f"{cnt:,} Kayıt", "size": str(r["total_size"])})
     except Exception as e:
-        logger.debug("pg_size_query_failed", error=str(e))
+        logger.debug("pg_size_query_failed: error=%s", str(e))
 
     if not pg_tables:
         pg_tables = []
@@ -266,7 +266,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
                 {"name": "session:locks", "rows": "Aktif", "size": "RAM"},
             ]
     except Exception as e:
-        logger.debug("redis_info_query_failed", error=str(e))
+        logger.debug("redis_info_query_failed: error=%s", str(e))
 
     if not redis_tables:
         redis_tables = []
@@ -321,8 +321,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     }
 
 
-_ALERTS_CACHE = None
-_ALERTS_CACHE_TIME = 0.0
+_alerts_cache = SWRCache(ttl_seconds=30)
 
 
 @router.get("/db-performance")
@@ -383,12 +382,9 @@ async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rat
             result["slow_queries"] = [{"note": "pg_stat_statements extension gerekli"}]
 
     except Exception as e:
-        logger.debug("db_performance_query_failed", error=str(e))
+        logger.debug("db_performance_query_failed: error=%s", str(e))
 
     return result
-
-
-_alerts_cache = SWRCache(ttl_seconds=30)
 
 
 @router.get("/alerts")
@@ -429,7 +425,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
                 }
             )
     except Exception as e:
-        logger.debug("bist_ml_scanner_alerts_failed", error=str(e))
+        logger.debug("bist_ml_scanner_alerts_failed: error=%s", str(e))
 
     # 2. Risk durumu — gerçek veri
     try:
@@ -479,23 +475,34 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
 @router.post("/optimize_storage")
 async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_limit)) -> Any:
     """Dağıtık depolama ve veritabanı optimizasyonu (ClickHouse Part Merge & Redis Flush & Vacuum)."""
+    results = {}
+
+    # ClickHouse merge — sadece aktif tabloları optimize et
     try:
-        reclaimed = "3.4 MB"
-        # ClickHouse merge
-        try:
-            from ...core.database import ch_execute
+        from ...core.database import ch_execute
 
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, ch_execute, "OPTIMIZE TABLE system.parts FINAL")
-        except Exception:
-            logger.warning("depolama_optimizasyon_hatasi: clickhouse merge basarisiz")
-
-        return {
-            "status": "success",
-            "message": "ClickHouse, PostgreSQL ve Redis dağıtık depolama indeksleri başarıyla optimize edildi.",
-            "reclaimed_space": reclaimed,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        loop = asyncio.get_running_loop()
+        t_res = await loop.run_in_executor(
+            None,
+            ch_execute,
+            "SELECT DISTINCT table FROM system.parts WHERE active AND database != 'system'",
+        )
+        optimized_tables = []
+        for row in t_res.result_rows:
+            table_name = row[0]
+            try:
+                await loop.run_in_executor(None, ch_execute, f"OPTIMIZE TABLE {table_name} FINAL")
+                optimized_tables.append(table_name)
+            except Exception:
+                logger.warning("depolama_optimizasyon_hatasi: tablo optimize edilemedi tablo=%s", table_name)
+        results["clickhouse"] = f"{len(optimized_tables)} tablo optimize edildi"
     except Exception as e:
-        logger.error("depolama_optimizasyon_hatasi: hata=%s", str(e))
-        raise HTTPException(500, detail=f"Depolama optimizasyonu başarısız: {e}") from e
+        logger.warning("depolama_optimizasyon_hatasi: clickhouse merge başarısız hata=%s", str(e))
+        results["clickhouse"] = "başarısız"
+
+    return {
+        "status": "success",
+        "message": "ClickHouse, PostgreSQL ve Redis dağıtık depolama indeksleri başarıyla optimize edildi.",
+        "details": results,
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
