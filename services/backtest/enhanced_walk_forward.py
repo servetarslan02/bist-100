@@ -485,7 +485,9 @@ class PurgeEmbargoWalkForward:
     def _deflated_sharpe(self, sharpes: list[float], n_trials: int) -> float:
         """Deflated Sharpe Oranı — overfitting tespiti.
 
-        Backtest sayısı arttıkça Sharpe'ın güvenilirliği düşer.
+        Bailey & López de Prado (2014) formülünü kullanır.
+        Basitleştirilmiş sqrt(2·ln(N)) yaklaşımı yerine,
+        Euler-Mascheroni sabiti ile Düzeltilmiş beklenen max Sharpe hesaplar.
 
         Args:
             sharpes: Her fold'ın Sharpe değeri
@@ -497,18 +499,27 @@ class PurgeEmbargoWalkForward:
         if not sharpes or n_trials < 2:
             return 0.0
 
-        observed_sharpe = np.mean(sharpes)
-        sharpe_std = np.std(sharpes)
+        observed_sharpe = float(np.mean(sharpes))
 
+        # Bailey & López de Prado (2014), Denklem 5-6:
+        # E[max Z_1..Z_N] ≈ (1-γ)·Φ⁻¹(1-1/N) + γ·Φ⁻¹(1-1/(N·e))
+        from scipy.stats import norm as _norm
+
+        euler_mascheroni = 0.5772156649
+        n = n_trials
+
+        expected_max_z = (
+            (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n)
+            + euler_mascheroni * _norm.ppf(1 - 1.0 / (n * np.e))
+        )
+
+        # Sharpe standart hatası
+        sharpe_std = float(np.std(sharpes))
         if sharpe_std == 0:
             return 0.0
 
-        # Expected maximum Sharpe under null hypothesis
-        # E[max(SR)] ≈ sqrt(2 * log(n_trials))
-        expected_max = np.sqrt(2 * np.log(n_trials))
-
-        # Deflated Sharpe
-        deflated = (observed_sharpe - expected_max) / sharpe_std if sharpe_std > 0 else 0
+        # Deflated Sharpe = (SR_observed - E[max_SR]) / Std[SR]
+        deflated = (observed_sharpe - expected_max_z) / sharpe_std
 
         return float(deflated)
 
