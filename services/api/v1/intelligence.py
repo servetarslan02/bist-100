@@ -73,7 +73,7 @@ async def get_decisions(
         dict: Karar listesi ve sayısı.
     """
     try:
-        from ...scanner.alpha_engine import alpha_engine
+        from ...scanner.alpha_scanner import alpha_scanner as alpha_engine
 
         results = alpha_engine.get_latest_results(limit=limit) if hasattr(alpha_engine, "get_latest_results") else []
         return {
