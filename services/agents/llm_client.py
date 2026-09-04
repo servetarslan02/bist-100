@@ -28,9 +28,9 @@ from typing import Any
 
 import aiohttp
 import orjson
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass

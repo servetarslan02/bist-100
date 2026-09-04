@@ -16,9 +16,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-import structlog
+import logging
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class CircuitState(StrEnum):

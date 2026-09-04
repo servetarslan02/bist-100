@@ -18,11 +18,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-import structlog
+import logging
 
 from .agent_system import AgentResult, AgentRole
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class ConflictSeverity(StrEnum):

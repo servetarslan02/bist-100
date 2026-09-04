@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import orjson
-import structlog
+import logging
 
 # Import at module level to avoid repeated import cost and circular import risk
 try:
@@ -34,7 +34,7 @@ except ImportError:
         return True
 
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass

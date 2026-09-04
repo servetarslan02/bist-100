@@ -15,15 +15,13 @@ import asyncio
 import hashlib
 import re
 import time
-import uuid
-from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 import orjson
-import structlog
+import logging
 
 from .llm_client import (
     BaseLLMClient,
@@ -43,7 +41,7 @@ from .schemas import (
     validate_agent_output,
 )
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 class AgentRole(StrEnum):

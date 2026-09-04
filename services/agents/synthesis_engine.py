@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import structlog
+import logging
 
 from .agent_memory import AgentMemory
 from .agent_system import AgentResult, AgentRole
@@ -28,7 +28,7 @@ from .debate_engine import DebateResult
 from .llm_client import BaseLLMClient
 from .prompts import PromptFactory
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass

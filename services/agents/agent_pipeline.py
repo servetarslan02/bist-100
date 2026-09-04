@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
+import logging
 
 from .agent_memory import AgentMemory, MemoryConsolidator
 from .agent_system import AgentRole, AgentResult, AgentTask, BaseAgent
@@ -39,7 +39,7 @@ from .risk_assessor import RiskAssessment, RiskAssessor
 from .self_evaluator import MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 @dataclass

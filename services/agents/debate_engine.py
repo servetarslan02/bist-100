@@ -22,12 +22,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import structlog
+import logging
 
 from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .llm_client import BaseLLMClient
 
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 def _truncate_at_sentence(text: str, max_len: int) -> str:
