@@ -45,7 +45,7 @@
 | 22 | `v1/risk.py` | 37 | ✅ Düzeltildi |
 | 23 | `v1/scanner.py` | 21 | ✅ Düzeltildi |
 | 24 | `v1/sse.py` | 8 | ✅ Düzeltildi |
-| 25 | `v1/system.py` | — | ⏳ Bekliyor |
+| 25 | `v1/system.py` | 19 | ✅ Düzeltildi |
 | 26 | `v1/viop.py` | — | ⏳ Bekliyor |
 | 27 | `v1/ws.py` | — | ⏳ Bekliyor |
 
@@ -529,7 +529,7 @@
 
 | # | Eksik | Neden Yapılmadı |
 |---|-------|-----------------|
-| 1 | `v1/system.py` | Henüz denetlenmedi |
+| 1 | `v1/viop.py` | Henüz denetlenmedi |
 | 2 | `v1/system.py` | Henüz denetlenmedi |
 | 3 | `v1/viop.py` | Henüz denetlenmedi |
 | 4 | `v1/ws.py` | Henüz denetlenmedi |
