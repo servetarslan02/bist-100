@@ -1,9 +1,7 @@
-from typing import Any
-
 """
 Risk API v2.0 — Tüm endpoint'ler gerçek servislere bağlı.
 
-Endpoints:
+Uç noktalar:
 - GET /risk/overview — Genel risk durumu
 - GET /risk/portfolio — Portföy risk metrikleri (VaR/CVaR)
 - GET /risk/var — VaR/CVaR detaylı rapor
@@ -21,13 +19,15 @@ Endpoints:
 - POST /risk/tail-hedge/analyze — Tail hedge analizi
 """
 
+import logging
+from typing import Any
+
 import numpy as np
-import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ..dependencies import check_rate_limit, get_current_user
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -38,63 +38,63 @@ router = APIRouter()
 
 
 def _get_dynamic_limits() -> Any:
-    """Otomatik eklendi."""
+    """Dinamik risk limitleri modülünü döndürür."""
     from ...risk.dynamic_limits import dynamic_limits
 
     return dynamic_limits
 
 
 def _get_drawdown_system() -> Any:
-    """Otomatik eklendi."""
+    """Drawdown yanıt sistemini döndürür."""
     from ...risk.drawdown_response import drawdown_system
 
     return drawdown_system
 
 
 def _get_var_calculator() -> Any:
-    """Otomatik eklendi."""
+    """VaR/CVaR hesaplayıcısını döndürür."""
     from ...risk.var_cvar import var_calculator
 
     return var_calculator
 
 
 def _get_stress_engine() -> Any:
-    """Otomatik eklendi."""
+    """Stres testi motorunu döndürür."""
     from ...risk.stress_test import stress_test_engine
 
     return stress_test_engine
 
 
 def _get_tail_hedger() -> Any:
-    """Otomatik eklendi."""
+    """Tail hedge analizcisini döndürür."""
     from ...risk.tail_hedge import tail_hedger
 
     return tail_hedger
 
 
 def _get_risk_parity() -> Any:
-    """Otomatik eklendi."""
+    """Risk parity optimize edicisini döndürür."""
     from ...risk.risk_parity import risk_parity_optimizer
 
     return risk_parity_optimizer
 
 
 def _get_monitor() -> Any:
-    """Otomatik eklendi."""
+    """Risk izleme modülünü döndürür."""
     from ...risk.monitoring import risk_monitor
 
     return risk_monitor
 
 
 def _get_calibrator() -> Any:
-    """Otomatik eklendi."""
+    """Kalibrasyon modülünü döndürür."""
     from ...risk.calibration import calibrator
 
     return calibrator
 
 
 def _get_position_sizer() -> Any:
-    """Otomatik eklendi."""
+    """Pozisyon boyutlandırma modülünü döndürür."""
     from ...risk.position_sizing import position_sizer
 
     return position_sizer
@@ -103,7 +103,7 @@ def _get_position_sizer() -> Any:
 def _get_live_portfolio_for_risk(requested_value: float | None = None) -> dict[str, Any]:
     """Canlı portföy pozisyonlarını VirtualPortfolio'dan çeker; boşsa fail-closed döner."""
     try:
-        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        from ...paper_trading.paper_orchestrator import paper_orchestrator
 
         vp = paper_orchestrator.portfolio
         raw_positions = getattr(vp, "_positions", {})
@@ -125,8 +125,8 @@ def _get_live_portfolio_for_risk(requested_value: float | None = None) -> dict[s
                         "value": round(w * effective_val, 2),
                         "sector": p.get("sector", "OTHER"),
                         "shares": p.get("quantity", 0),
-                        "adv_tl": 1_000_000_000,
-                        "spread_bps": 6.0,
+                        "adv_tl": float(p.get("adv_tl", 500_000_000)),
+                        "spread_bps": float(p.get("spread_bps", 6.0)),
                     }
                 )
             return {
@@ -289,8 +289,11 @@ async def var_report(
     """VaR/CVaR detaylı rapor — 3 yöntem (parametrik, tarihsel, Monte Carlo)."""
     try:
         calc = _get_var_calculator()
-        np.random.seed(42)
-        returns = np.random.normal(0.0008, 0.015, 252)
+
+        # Gerçek tarihsel getiri verisi
+        returns = _get_historical_returns()
+        if returns is None or len(returns) < 20:
+            raise HTTPException(503, "Tarihsel getiri verisi bulunamadı. VaR hesaplanamaz.")
 
         param_var = calc.calculate_parametric_var(
             returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days
@@ -300,7 +303,7 @@ async def var_report(
                 returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days
             )
             if hasattr(calc, "calculate_historical_var")
-            else param_var * 0.98
+            else param_var
         )
         cvar = (
             calc.calculate_cvar(returns, confidence=confidence, portfolio_value=portfolio_value)
@@ -308,13 +311,24 @@ async def var_report(
             else param_var * 1.35
         )
 
+        # Monte Carlo VaR — gerçek getiri dağılımından
+        rng = np.random.default_rng()
+        mc_sims = 1000
+        sim_returns = rng.normal(
+            float(np.mean(returns)),
+            float(np.std(returns)),
+            size=(mc_sims, holding_days),
+        )
+        sim_portfolios = portfolio_value * np.prod(1.0 + sim_returns, axis=1)
+        mc_var = portfolio_value - float(np.percentile(sim_portfolios, (1 - confidence) * 100))
+
         return {
             "portfolio_value": portfolio_value,
             "confidence": confidence,
             "holding_days": holding_days,
             "parametric_var": round(param_var, 2),
             "historical_var": round(hist_var, 2),
-            "monte_carlo_var": round(param_var * 1.04, 2),
+            "monte_carlo_var": round(mc_var, 2),
             "cvar_95": round(cvar, 2),
             "var_pct": round((param_var / max(1, portfolio_value)) * 100, 2),
         }
@@ -360,7 +374,7 @@ async def portfolio_risk(
 
 @router.get("/liquidity")
 async def liquidity_risk(
-    ticker: str = Query("THYAO", description="Hisse kodu"),
+    ticker: str = Query(..., description="Hisse kodu"),
     order_value: float = Query(50000.0, description="Emir tutarı (TL)"),
     price: float = Query(300.0, description="Hisse fiyatı"),
     adv_tl: float | None = Query(None, description="20G Ortalama Günlük Hacim (TL)"),
@@ -524,16 +538,32 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
             {"key": k, "name": v["name"], "type": "hypothetical"} for k, v in engine.HYPOTHETICAL_SCENARIOS.items()
         ]
 
+        # Tarihsel istatistikler — gerçek veriden
+        daily_returns = _get_historical_returns()
+        if daily_returns is not None and len(daily_returns) > 20:
+            var_95_val = round(float(np.percentile(daily_returns, 5)), 4)
+            tail = daily_returns[daily_returns <= np.percentile(daily_returns, 5)]
+            cvar_95_val = round(float(np.mean(tail)), 4) if len(tail) > 0 else var_95_val
+            expected_ret = round(float(np.mean(daily_returns) * 252), 4)
+            prob_pos = round(float(np.mean(daily_returns > 0)), 3)
+            heat = round(float(np.std(daily_returns) * np.sqrt(252)), 4)
+        else:
+            var_95_val = None
+            cvar_95_val = None
+            expected_ret = None
+            prob_pos = None
+            heat = None
+
         return {
             "scenarios": historical + hypothetical,
             "total": len(historical) + len(hypothetical),
             "historical_count": len(historical),
             "hypothetical_count": len(hypothetical),
-            "var_95": -0.052,
-            "cvar_95": -0.084,
-            "expected_return": 0.038,
-            "prob_positive": 0.64,
-            "portfolio_heat": 0.038,
+            "var_95": var_95_val,
+            "cvar_95": cvar_95_val,
+            "expected_return": expected_ret,
+            "prob_positive": prob_pos,
+            "portfolio_heat": heat,
         }
     except Exception as e:
         logger.error("endpoint_error", error=str(e), exc_info=True)
@@ -1036,13 +1066,12 @@ def _get_historical_returns() -> Any:
             _cached_daily_returns = np.diff(closes) / closes[:-1]
             return _cached_daily_returns
     except Exception:
-        logger.warning("Caught Exception in _get_historical_returns", exc_info=True)
-    _cached_daily_returns = np.random.normal(0.0012, 0.018, 5000)
-    return _cached_daily_returns
+        logger.warning("tarihsel_getiri_hatasi: depodan veri alinamadi")
+    logger.warning("tarihsel_getiri_uyarisi: depodan veri alınamadı, None dönülüyor")
+    return None
 
 
-@router.get("/stress-test")
-@router.post("/stress-test")
+@router.post("/stress-test/quick")
 async def run_stress_test_quick(
     horizon_days: int = Query(30, ge=5, le=252),
     vol_multiplier: float = Query(1.0, ge=0.5, le=3.0),
@@ -1050,7 +1079,7 @@ async def run_stress_test_quick(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ) -> Any:
-    """30-Yıllık BIST Deposu ve Ultra Hızlı Monte Carlo Motoru (<1ms Latency)."""
+    """30 Yıllık BIST Deposu ve Monte Carlo Motoru ile stres testi."""
     try:
         daily_returns = _get_historical_returns()
 
@@ -1112,9 +1141,9 @@ async def run_stress_test_quick(
 
         # 30 Ultra-Crisp Monte Carlo Paths (Initial: ₺100,000)
         initial_val = 100000.0
-        num_paths = 30
-        np.random.seed(1337)
-        raw_shocks = np.random.normal(mean_daily, vol_daily, (num_paths, horizon_days))
+        num_paths = 1000
+        rng = np.random.default_rng()
+        raw_shocks = rng.normal(mean_daily, vol_daily, (num_paths, horizon_days))
 
         # Cumulative paths matrix
         cum_returns = np.cumprod(1.0 + raw_shocks, axis=1)
