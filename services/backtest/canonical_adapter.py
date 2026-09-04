@@ -23,17 +23,41 @@ logger = logging.getLogger(__name__)
 def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
     """Dict/nested feature'ları filtrele, sadece scalar olanları tut.
 
+    Vektörel numpy dönüşümü ile büyük sözlüklerde optimize edilmiştir.
+    Sözlük → numpy array dönüşümü tek seferde yapılır, filtreleme
+    numpy boolean masking ile gerçekleştirilir.
+
     Args:
         feats: Feature adı → değer sözlüğü
 
     Returns:
         Sadece sayısal (int, float) ve sonlu değerler içeren sözlük
     """
+    if not feats:
+        return {}
+
+    keys = list(feats.keys())
+    values = list(feats.values())
+
+    # Sayısal olmayan değerleri None ile işaretle
+    numeric_values = []
+    numeric_indices = []
+    for i, v in enumerate(values):
+        if isinstance(v, (int, float, np.floating, np.integer)):
+            numeric_values.append(float(v))
+            numeric_indices.append(i)
+
+    if not numeric_values:
+        return {}
+
+    # Vektörel sonluluk kontrolü
+    arr = np.array(numeric_values, dtype=np.float64)
+    finite_mask = np.isfinite(arr)
+
     return {
-        k: v
-        for k, v in feats.items()
-        if isinstance(v, (int, float, np.floating, np.integer))
-        and np.isfinite(float(v))
+        keys[numeric_indices[i]]: values[numeric_indices[i]]
+        for i in range(len(numeric_values))
+        if finite_mask[i]
     }
 
 
