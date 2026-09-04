@@ -1,15 +1,15 @@
 """
-ALPHA BIST — Look-Ahead Bias Detector
+ALPHA BIST — Look-Ahead Bias Dedektörü
 
 Tasarım İlkeleri:
-1. Her feature/label/signal için timestamp validation
+1. Her feature/label/signal için timestamp doğrulama
 2. Gelecek veri kullanımı tespiti (data leakage detection)
 3. Feature hesaplama penceresi ile label penceresi çakışma kontrolü
 4. Walk-forward fold sınırlarında leakage guard
 5. Otomatik raporlama ve uyarı sistemi
 
 Referanslar:
-- "Advances in Financial Machine Learning" (Marcos López de Prado) - Ch.7
+- "Advances in Financial Machine Learning" (Marcos López de Prado) - Bölüm 7
 - arXiv Momentum-Gated Framework (2026) - bias prevention protocols
 """
 
@@ -32,7 +32,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BiasViolation:
-    """Tek bir bias ihlali kaydı."""
+    """Tek bir bias ihlali kaydı.
+
+    Her tespit edilen ihlal bu yapı ile raporlanır.
+    Türler: look_ahead, label_leakage, feature_leakage, fold_leakage
+    """
 
     violation_type: str  # look_ahead | label_leakage | feature_leakage | fold_leakage
     severity: str  # critical | warning | info
@@ -41,8 +45,21 @@ class BiasViolation:
     description: str
     data_point: dict[str, Any] | None = None
 
+    def __repr__(self) -> str:
+        """BiasViolation okunabilir temsili."""
+        return (
+            f"BiasViolation("
+            f"type={self.violation_type!r}, "
+            f"severity={self.severity!r}, "
+            f"feature={self.feature_name!r})"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """İhlali sözlük formatında döndürür."""
+        """İhlali sözlük formatında döndürür.
+
+        Returns:
+            İhlal bilgilerini içeren sözlük
+        """
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -54,7 +71,11 @@ class BiasViolation:
 
 @dataclass
 class BiasReport:
-    """Bias tespit raporu."""
+    """Bias tespit raporu.
+
+    Tek bir doğrulama çalıştırmasından çıkan tüm ihlalleri
+    ve istatistikleri tutar.
+    """
 
     total_checks: int = 0
     violations: list[BiasViolation] = field(default_factory=list)
@@ -62,8 +83,22 @@ class BiasReport:
     warning_count: int = 0
     is_clean: bool = True
 
-    def add_violation(self, violation: BiasViolation) -> Any:
-        """Bias ihlalini ekler."""
+    def __repr__(self) -> str:
+        """BiasReport okunabilir temsili."""
+        return (
+            f"BiasReport("
+            f"checks={self.total_checks}, "
+            f"critical={self.critical_count}, "
+            f"warning={self.warning_count}, "
+            f"clean={self.is_clean})"
+        )
+
+    def add_violation(self, violation: BiasViolation) -> None:
+        """Bias ihlalini rapora ekler.
+
+        Args:
+            violation: Eklenacak BiasViolation nesnesi
+        """
         self.violations.append(violation)
         if violation.severity == "critical":
             self.critical_count += 1
@@ -72,7 +107,11 @@ class BiasReport:
             self.warning_count += 1
 
     def to_dict(self) -> dict[str, Any]:
-        """Raporu sözlük formatında döndürür."""
+        """Raporu sözlük formatında döndürür.
+
+        Returns:
+            Rapor istatistiklerini ve ihlalleri içeren sözlük
+        """
         return {
             "total_checks": self.total_checks,
             "violations": [v.to_dict() for v in self.violations],
@@ -93,9 +132,28 @@ class LookAheadBiasDetector:
     4. Data revision - revize edilmiş verinin orijinal tarihte kullanılmaması
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Look-ahead bias dedektörünü başlatır."""
         self.violations: list[BiasViolation] = []
+
+    def __repr__(self) -> str:
+        """LookAheadBiasDetector okunabilir temsili."""
+        critical = sum(1 for v in self.violations if v.severity == "critical")
+        return (
+            f"LookAheadBiasDetector("
+            f"violations={len(self.violations)}, "
+            f"critical={critical})"
+        )
+
+    def _record(self, report: BiasReport, violation: BiasViolation) -> None:
+        """İhlali hem rapora hem dedektör geçmişine kaydeder.
+
+        Args:
+            report: Güncel BiasReport nesnesi
+            violation: Kaydedilecek BiasViolation nesnesi
+        """
+        report.add_violation(violation)
+        self.violations.append(violation)
 
     def validate_feature_timestamps(
         self,
@@ -114,19 +172,26 @@ class LookAheadBiasDetector:
             timestamp_col: Timestamp sütun adı
 
         Returns:
-            BiasReport
+            BiasReport nesnesi
+
+        Raises:
+            TypeError: feature_df Polars DataFrame değilse (pl mevcutsa)
         """
         report = BiasReport()
 
         if timestamp_col not in feature_df.columns:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="look_ahead",
                     severity="critical",
                     timestamp=decision_timestamp,
                     feature_name=feature_name,
-                    description=f"Zaman damgası sütunu '{timestamp_col}' feature verisinde bulunamadı",
-                )
+                    description=(
+                        f"Zaman damgası sütunu '{timestamp_col}' "
+                        f"feature verisinde bulunamadı"
+                    ),
+                ),
             )
             return report
 
@@ -135,16 +200,20 @@ class LookAheadBiasDetector:
         report.total_checks = len(feature_df)
 
         if len(future_data) > 0:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="look_ahead",
                     severity="critical",
                     timestamp=decision_timestamp,
                     feature_name=feature_name,
-                    description=f"Feature, karar anından sonra {len(future_data)} veri noktası içeriyor. "
-                    f"En ileri zaman damgası: {future_data[timestamp_col].max()}",
+                    description=(
+                        f"Feature, karar anından sonra {len(future_data)} "
+                        f"veri noktası içeriyor. "
+                        f"En ileri zaman damgası: {future_data[timestamp_col].max()}"
+                    ),
                     data_point={"future_rows": len(future_data)},
-                )
+                ),
             )
 
         return report
@@ -162,6 +231,16 @@ class LookAheadBiasDetector:
 
         Her veri noktası için, o noktanın window hesaplamasında sadece
         kendisinden önceki verilerin kullanıldığını kontrol eder.
+
+        Args:
+            data: Ham fiyat/veri DataFrame'i
+            window_size: Rolling pencere boyutu
+            feature_name: Kontrol edilen feature adı
+            value_col: Değer sütun adı
+            timestamp_col: Timestamp sütun adı
+
+        Returns:
+            BiasReport nesnesi
         """
         report = BiasReport()
         report.total_checks = len(data)
@@ -185,15 +264,19 @@ class LookAheadBiasDetector:
                 if not np.isnan(actual_mean) and not np.isnan(expected_mean):
                     diff = abs(actual_mean - expected_mean)
                     if diff > 1e-10:
-                        report.add_violation(
+                        self._record(
+                            report,
                             BiasViolation(
                                 violation_type="look_ahead",
                                 severity="critical",
                                 timestamp=data[timestamp_col][i],
                                 feature_name=feature_name,
-                                description=f"Rolling window indeks {i} gelecek veri kullanıyor. "
-                                f"Beklenen: {expected_mean:.4f}, Gerçek: {actual_mean:.4f}",
-                            )
+                                description=(
+                                    f"Rolling window indeks {i} gelecek veri "
+                                    f"kullanıyor. Beklenen: {expected_mean:.4f}, "
+                                    f"Gerçek: {actual_mean:.4f}"
+                                ),
+                            ),
                         )
 
         return report
@@ -212,24 +295,40 @@ class LookAheadBiasDetector:
         Purge = label ve feature arasındaki güvenlik boşluğu
 
         Kural: purge_days >= label_horizon_days (minimum)
+
+        Args:
+            label_horizon_days: Label ufkunun gün sayısı
+            feature_window_days: Feature penceresinin gün sayısı
+            purge_days: Purge boşluğu (gün)
+
+        Returns:
+            BiasReport nesnesi
         """
         report = BiasReport()
         report.total_checks = 1
 
         min_purge = label_horizon_days
         if purge_days < min_purge:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="label_leakage",
                     severity="critical",
                     timestamp=datetime.now(UTC),
                     feature_name="purge_validation",
-                    description=f"Purge günleri ({purge_days}) < label ufku ({label_horizon_days}). "
-                    f"Label sızıntısını önlemek için minimum purge {min_purge} gün olmalıdır.",
-                )
+                    description=(
+                        f"Purge günleri ({purge_days}) < label ufku "
+                        f"({label_horizon_days}). Label sızıntısını önlemek "
+                        f"için minimum purge {min_purge} gün olmalıdır."
+                    ),
+                ),
             )
         else:
-            logger.info("label_feature_hizalama: purge=%s, horizon=%s", purge_days, label_horizon_days)
+            logger.info(
+                "label_feature_hizalama: purge=%s, horizon=%s",
+                purge_days,
+                label_horizon_days,
+            )
 
         return report
 
@@ -249,53 +348,79 @@ class LookAheadBiasDetector:
         2. Purge gap label horizon'dan büyük mü?
         3. Embargo period doğru uygulanmış mı?
         4. Test başlangıcı train bitişinden sonra mı?
+
+        Args:
+            train_end: Eğitim döneminin bitiş tarihi
+            test_start: Test döneminin başlangıç tarihi
+            purge_days: Gerekli purge süresi (gün)
+            embargo_days: Embargo süresi (gün)
+            label_horizon_days: Label ufkunun gün sayısı
+
+        Returns:
+            BiasReport nesnesi
         """
         report = BiasReport()
         report.total_checks = 4
 
         # 1. Test starts after train ends
         if test_start <= train_end:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="fold_leakage",
                     severity="critical",
                     timestamp=train_end,
                     feature_name="fold_boundary",
-                    description=f"Test başlangıcı ({test_start}) <= eğitim bitişi ({train_end}). "
-                    f"Test, eğitim döneminden sonra başlamalıdır.",
-                )
+                    description=(
+                        f"Test başlangıcı ({test_start}) <= eğitim bitişi "
+                        f"({train_end}). Test, eğitim döneminden sonra "
+                        f"başlamalıdır."
+                    ),
+                ),
             )
 
         # 2. Purge gap exists
         actual_gap = (test_start - train_end).days
         if actual_gap < purge_days:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="fold_leakage",
                     severity="critical",
                     timestamp=train_end,
                     feature_name="purge_gap",
-                    description=f"Gerçek boşluk ({actual_gap} gün) < gerekli purge ({purge_days} gün). "
-                    f"Label sızıntısını önlemek için purge boşluğu yetersiz.",
-                )
+                    description=(
+                        f"Gerçek boşluk ({actual_gap} gün) < gerekli purge "
+                        f"({purge_days} gün). Label sızıntısını önlemek için "
+                        f"purge boşluğu yetersiz."
+                    ),
+                ),
             )
 
         # 3. Purge covers label horizon
         if actual_gap < label_horizon_days:
-            report.add_violation(
+            self._record(
+                report,
                 BiasViolation(
                     violation_type="fold_leakage",
                     severity="critical",
                     timestamp=train_end,
                     feature_name="purge_vs_horizon",
-                    description=f"Purge boşluğu ({actual_gap} gün) < label ufku ({label_horizon_days} gün). "
-                    f"Eğitim döneminin label'ı test dönemine sızabilir.",
-                )
+                    description=(
+                        f"Purge boşluğu ({actual_gap} gün) < label ufku "
+                        f"({label_horizon_days} gün). Eğitim döneminin "
+                        f"label'ı test dönemine sızabilir."
+                    ),
+                ),
             )
 
         # 4. Embargo check (informational)
         if embargo_days > 0:
-            logger.info("embargo_suresi: gun=%s, test_baslangic=%s", embargo_days, test_start.isoformat())
+            logger.info(
+                "embargo_suresi: gun=%s, test_baslangic=%s",
+                embargo_days,
+                test_start.isoformat(),
+            )
 
         return report
 
@@ -310,6 +435,14 @@ class LookAheadBiasDetector:
 
         Finansal veriler (özellikle bilanço) zaman içinde revize edilebilir.
         Backtest, veriyi sadece yayınlandığı tarihte biliyor olmalı.
+
+        Args:
+            data: Kontrol edilecek veri DataFrame'i
+            report_date_col: Rapor tarihi sütun adı
+            revision_col: Revizyon sütun adı (None ise kontrol edilmez)
+
+        Returns:
+            BiasReport nesnesi
         """
         report = BiasReport()
 
@@ -323,22 +456,33 @@ class LookAheadBiasDetector:
             # Birden fazla revizyon varsa, sadece ilki kullanılmalı
             for name, group in data.group_by(report_date_col):
                 if len(group) > 1:
-                    report.add_violation(
+                    self._record(
+                        report,
                         BiasViolation(
                             violation_type="look_ahead",
                             severity="warning",
                             timestamp=datetime.now(UTC),
                             feature_name="data_revision",
-                            description=f"Rapor tarihi {name} için birden fazla revizyon bulundu. "
-                            f"Backtest'te sadece ilk (as-reported) versiyon kullanılmalıdır.",
-                            data_point={"report_date": str(name), "revisions": len(group)},
-                        )
+                            description=(
+                                f"Rapor tarihi {name} için birden fazla "
+                                f"revizyon bulundu. Backtest'te sadece ilk "
+                                f"(as-reported) versiyon kullanılmalıdır."
+                            ),
+                            data_point={
+                                "report_date": str(name),
+                                "revisions": len(group),
+                            },
+                        ),
                     )
 
         return report
 
     def get_summary(self) -> dict[str, Any]:
-        """Toplam bias tespit özeti."""
+        """Toplam bias tespit özeti.
+
+        Returns:
+            violation istatistiklerini ve detaylarını içeren sözlük
+        """
         critical = sum(1 for v in self.violations if v.severity == "critical")
         warnings = sum(1 for v in self.violations if v.severity == "warning")
 
@@ -359,14 +503,24 @@ class BiasDetectorMiddleware:
     ve sonuçları raporlar.
     """
 
-    def __init__(self, strict_mode: bool = True):
-        """
+    def __init__(self, strict_mode: bool = True) -> None:
+        """Bias detection middleware'ini başlatır.
+
         Args:
             strict_mode: True ise critical ihlal varsa backtest durdurulur
         """
         self.detector = LookAheadBiasDetector()
         self.strict_mode = strict_mode
         self.enabled = True
+
+    def __repr__(self) -> str:
+        """BiasDetectorMiddleware okunabilir temsili."""
+        return (
+            f"BiasDetectorMiddleware("
+            f"strict={self.strict_mode}, "
+            f"enabled={self.enabled}, "
+            f"violations={len(self.detector.violations)})"
+        )
 
     def pre_scan_check(
         self,
@@ -379,8 +533,15 @@ class BiasDetectorMiddleware:
         """
         Tarama öncesi bias kontrolü.
 
+        Args:
+            available_data: Mevcut veri DataFrame'i
+            decision_timestamp: Karar anı
+            label_horizon_days: Label ufkunun gün sayısı
+            feature_window_days: Feature penceresinin gün sayısı
+            purge_days: Purge boşluğu (gün)
+
         Returns:
-            (is_safe, report): is_safe=True ise devam edilebilir
+            (is_safe, report) çifti. is_safe=True ise devam edilebilir.
         """
         if not self.enabled:
             return True, BiasReport()
@@ -390,7 +551,9 @@ class BiasDetectorMiddleware:
         # 1. Timestamp validation
         for col in available_data.columns:
             if col.endswith("_score") or col.endswith("_feature"):
-                report = self.detector.validate_feature_timestamps(available_data, col, decision_timestamp)
+                report = self.detector.validate_feature_timestamps(
+                    available_data, col, decision_timestamp
+                )
                 combined_report.total_checks += report.total_checks
                 for v in report.violations:
                     combined_report.add_violation(v)
@@ -406,7 +569,10 @@ class BiasDetectorMiddleware:
         is_safe = not (self.strict_mode and combined_report.critical_count > 0)
 
         if not is_safe:
-            logger.error("bias_kontrol_basarisiz: critical=%s", combined_report.critical_count)
+            logger.error(
+                "bias_kontrol_basarisiz: critical=%s",
+                combined_report.critical_count,
+            )
 
         return is_safe, combined_report
 
@@ -418,7 +584,18 @@ class BiasDetectorMiddleware:
         embargo_days: int,
         label_horizon_days: int,
     ) -> tuple[bool, BiasReport]:
-        """Walk-forward fold bias kontrolü."""
+        """Walk-forward fold bias kontrolü.
+
+        Args:
+            train_end: Eğitim döneminin bitiş tarihi
+            test_start: Test döneminin başlangıç tarihi
+            purge_days: Gerekli purge süresi (gün)
+            embargo_days: Embargo süresi (gün)
+            label_horizon_days: Label ufkunun gün sayısı
+
+        Returns:
+            (is_safe, report) çifti. is_safe=True ise devam edilebilir.
+        """
         if not self.enabled:
             return True, BiasReport()
 
