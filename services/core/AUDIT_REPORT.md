@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 3 dosya denetlendi, 19 sorun düzeltildi. Bekleyen dosya: 101
+**Denetim Sonucu:** 4 dosya denetlendi, 23 sorun düzeltildi. Bekleyen dosya: 100
 
 ---
 
@@ -25,6 +25,7 @@
 | 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
+| 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -65,6 +66,18 @@
 | 6 | 4 | Dağınık ve fonksiyon içi `aiohttp` importları vardı | Proje standardı `httpx.AsyncClient` ile birleştirildi, singleton ve güvenli oturum yönetimi sağlandı |
 | 7 | 7 | Modül seviyesinde `__all__` listesi eksikti | `__all__` listesi eklendi (`Alert`, `AlertSeverity`, `AlertingSystem`, sağlayıcılar vb.) |
 | 8 | 4 | Loglar ve hata mesajları İngilizceydi | `ALARM_BILDIRIMI`, `yeni_alarm_olusturuldu`, `alarm_onaylandi` gibi standart Türkçe structlog yapısına geçirildi |
+
+---
+
+## `algo_notification.py` (4. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 3 | `strategy` None veya eksik anahtarlı geldiğinde fail-closed koruması yetersizdi | Girdi doğrulaması, güvenli varsayılanlar ve fallback değerleri eklendi |
+| 2 | 4 | SPK mevzuatına uygun tekil bildirim kimliği ve zaman damgası eksikti | Benzersiz `notification_id` (`uuid4`) ve `timestamp_iso` eklendi |
+| 3 | 7 | Modül seviyesinde `__all__` dışa aktarım listesi yoktu | `__all__ = ["generate_algo_notification"]` eklendi |
+| 4 | 4 | Fonksiyon docstring'i Args/Returns/Raises formatına uygun değildi | Standart Türkçe profesyonel docstring eklendi |
+
 
 
 
