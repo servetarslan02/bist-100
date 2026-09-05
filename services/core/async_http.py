@@ -1,19 +1,19 @@
-"""ALPHA BIST — Async HTTP Client Utility v2.0 (Enterprise-Grade)
+"""ALPHA BIST — Asenkron HTTP İstemci Yardımcısı v2.0 (Enterprise-Grade).
 
-Kurumsal Standartlar:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. MİMARİ:    asyncio.Lock ile session race condition koruması
-2. OPTİMİZASYON: orjson module-level import (her çağrıda re-import yok)
-3. DAYANIKLILIK: Exponential Backoff + Jitter retry, 429 Retry-After desteği
-4. İZLENEBİLİRLİK: OTel span her HTTP isteğinde
-5. GÜVENLİK:  %100 type hint, generic dict
-6. KALİTE:    %100 docstring, context manager desteği
+Yüksek performanslı, dayanıklı ve izlenebilir asenkron HTTP istemcisi:
+- aiohttp ve httpx uyumlu, bağlantı havuzu ve oturum (session) yönetimi
+- Exponential backoff ve jitter ile otomatik yeniden deneme (retry) mekanizması
+- HTTP 429 (Rate Limit) durumunda 'Retry-After' başlığına tam uyum
+- OpenTelemetry span'leri ve Prometheus metrikleri (istek sayısı, gecikme, hata)
+- Async context manager desteği ve thread-safe istemci kayıt defteri (registry)
 """
 
 from __future__ import annotations
 
 import asyncio
 import random
+import threading
+import time
 from typing import Any
 
 import aiohttp
@@ -41,15 +41,7 @@ _http_latency_histogram = meter.create_histogram(
 
 
 class AsyncHTTPClient:
-    """Retry, Jitter Backoff ve OTel izleme özellikli async HTTP istemcisi.
-
-    Args:
-        timeout: İstek zaman aşımı (saniye).
-        max_retries: Maksimum deneme sayısı.
-        base_retry_delay_s: İlk retry bekleme süresi (saniye).
-        max_retry_delay_s: Maksimum retry bekleme süresi (saniye).
-        headers: Varsayılan HTTP başlıkları.
-    """
+    """Yeniden deneme, jitter backoff ve OTel izleme özellikli kurumsal HTTP istemcisi."""
 
     def __init__(
         self,
@@ -59,21 +51,33 @@ class AsyncHTTPClient:
         max_retry_delay_s: float = 30.0,
         headers: dict[str, str] | None = None,
     ) -> None:
-        """Otomatik eklendi."""
-        self._timeout = aiohttp.ClientTimeout(total=timeout, connect=min(5.0, timeout / 3))
+        """Asenkron HTTP istemcisini yapılandırır.
+
+        Args:
+            timeout: Toplam istek zaman aşımı (saniye).
+            max_retries: Maksimum yeniden deneme sayısı.
+            base_retry_delay_s: İlk deneme bekleme süresi tabanı (saniye).
+            max_retry_delay_s: Maksimum bekleme süresi tavanı (saniye).
+            headers: Varsayılan HTTP başlıkları sözlüğü.
+        """
+        self._timeout = aiohttp.ClientTimeout(total=timeout, connect=min(5.0, timeout / 3.0))
         self._max_retries = max_retries
         self._base_retry_delay_s = base_retry_delay_s
         self._max_retry_delay_s = max_retry_delay_s
         self._headers = headers or {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ALPHA-BIST/2.0",
             "Accept": "application/json, text/html, */*",
         }
         self._session: aiohttp.ClientSession | None = None
-        # Race condition önleme: aynı anda birden fazla coroutine session oluşturamaz
         self._session_lock = asyncio.Lock()
 
+    def __repr__(self) -> str:
+        """İstemcinin dize temsili."""
+        status = "acik" if self._session and not self._session.closed else "kapali"
+        return f"<AsyncHTTPClient(oturum='{status}', max_retries={self._max_retries})>"
+
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Singleton aiohttp session döner; kapalıysa yeniden oluşturur."""
+        """Geçerli aiohttp oturumunu döner; kapalıysa kilit korumasıyla yeniden açar."""
         async with self._session_lock:
             if self._session is None or self._session.closed:
                 self._session = aiohttp.ClientSession(
@@ -83,40 +87,38 @@ class AsyncHTTPClient:
         return self._session
 
     def _jitter_delay(self, attempt: int) -> float:
-        """Exponential Backoff + Jitter hesaplar."""
+        """Üstel geri çekilme (exponential backoff) ve rastgele gecikme (jitter) hesaplar."""
         base = min(self._base_retry_delay_s * (2**attempt), self._max_retry_delay_s)
         return base + random.uniform(0, base * 0.2)
 
     async def get_json(self, url: str, params: dict[str, Any] | None = None) -> Any | None:
-        """GET isteği yapar ve JSON response döner.
+        """GET isteği gönderir ve yanıtı JSON formatında ayrıştırarak döner.
 
         Args:
-            url: Hedef URL.
-            params: Query parametreleri.
+            url: İstek yapılacak hedef web adresi.
+            params: İsteğe eklenecek sorgu parametreleri.
 
         Returns:
-            Parse edilmiş JSON verisi veya None (hata durumunda).
+            Any | None: Ayrıştırılmış veri veya başarısızlık durumunda None.
         """
         text = await self.get_text(url, params=params)
         if text:
             try:
                 return orjson.loads(text)
             except Exception as exc:
-                logger.warning("JSON parse hatası", url=url, error=str(exc))
+                logger.warning("http_json_ayristirma_hatasi", url=url, error=str(exc))
         return None
 
     async def get_text(self, url: str, params: dict[str, Any] | None = None) -> str | None:
-        """GET isteği yapar ve metin response döner.
+        """GET isteği gönderir ve yanıt gövdesini düz metin olarak döner.
 
         Args:
-            url: Hedef URL.
-            params: Query parametreleri.
+            url: İstek yapılacak hedef web adresi.
+            params: İsteğe eklenecek sorgu parametreleri.
 
         Returns:
-            Response metni veya None (hata durumunda).
+            str | None: Yanıt metni veya hata durumunda None.
         """
-        import time
-
         for attempt in range(self._max_retries):
             t0 = time.monotonic()
             with tracer.start_as_current_span("http.get") as span:
@@ -133,35 +135,34 @@ class AsyncHTTPClient:
                         if resp.status == 200:
                             return await resp.text()
                         elif resp.status == 429:
-                            # Rate limited — Retry-After başlığını oku
                             wait = float(resp.headers.get("Retry-After", self._jitter_delay(attempt)))
-                            logger.warning("Rate limit aşıldı", url=url, wait_s=wait)
+                            logger.warning("http_istek_siniri_asildi", url=url, bekleme_s=wait)
                             await asyncio.sleep(wait)
                             continue
                         else:
                             logger.warning(
-                                "HTTP hata kodu",
+                                "http_basarisiz_durum_kodu",
                                 url=url,
                                 status=resp.status,
-                                attempt=attempt + 1,
+                                deneme=attempt + 1,
                             )
                             _http_errors_counter.add(1, {"method": "GET", "status": str(resp.status)})
 
                 except TimeoutError:
                     _http_errors_counter.add(1, {"method": "GET", "error": "timeout"})
-                    logger.warning("HTTP zaman aşımı", url=url, attempt=attempt + 1)
+                    logger.warning("http_zaman_asimi", url=url, deneme=attempt + 1)
                 except aiohttp.ClientError as exc:
                     _http_errors_counter.add(1, {"method": "GET", "error": "client_error"})
-                    logger.warning("HTTP istemci hatası", url=url, error=str(exc), attempt=attempt + 1)
+                    logger.warning("http_istemci_hatasi", url=url, error=str(exc), deneme=attempt + 1)
                 except Exception as exc:
                     _http_errors_counter.add(1, {"method": "GET", "error": "unexpected"})
-                    logger.error("HTTP beklenmeyen hata", url=url, error=str(exc))
+                    logger.error("http_beklenmeyen_hata", url=url, error=str(exc))
 
             if attempt < self._max_retries - 1:
                 delay = self._jitter_delay(attempt)
                 await asyncio.sleep(delay)
 
-        logger.error("HTTP isteği başarısız", url=url, max_retries=self._max_retries)
+        logger.error("http_istekleri_tukendi_basarisiz", url=url, deneme_siniri=self._max_retries)
         return None
 
     async def post_json(
@@ -170,18 +171,16 @@ class AsyncHTTPClient:
         data: Any = None,
         json_data: Any = None,
     ) -> Any | None:
-        """POST isteği yapar ve JSON response döner.
+        """POST isteği gönderir ve yanıtı JSON veya metin olarak döndürür.
 
         Args:
-            url: Hedef URL.
-            data: Raw body verisi.
-            json_data: JSON serializable body verisi.
+            url: İstek yapılacak hedef adres.
+            data: Ham gövde verisi (bytes veya str).
+            json_data: Serileştirilecek JSON gövdesi.
 
         Returns:
-            Parse edilmiş response veya None.
+            Any | None: Ayrıştırılmış yanıt verisi veya None.
         """
-        import time
-
         for attempt in range(self._max_retries):
             t0 = time.monotonic()
             with tracer.start_as_current_span("http.post") as span:
@@ -202,12 +201,12 @@ class AsyncHTTPClient:
                             except Exception:
                                 return text
                         else:
-                            logger.warning("POST hata kodu", url=url, status=resp.status)
+                            logger.warning("http_post_hata_kodu", url=url, status=resp.status)
                             _http_errors_counter.add(1, {"method": "POST", "status": str(resp.status)})
 
                 except Exception as exc:
                     _http_errors_counter.add(1, {"method": "POST", "error": "unexpected"})
-                    logger.warning("POST hatası", url=url, error=str(exc), attempt=attempt + 1)
+                    logger.warning("http_post_hatasi", url=url, error=str(exc), deneme=attempt + 1)
 
             if attempt < self._max_retries - 1:
                 delay = self._jitter_delay(attempt)
@@ -216,44 +215,55 @@ class AsyncHTTPClient:
         return None
 
     async def close(self) -> None:
-        """HTTP session'ı kapatır ve belleği temizler."""
+        """Aktif HTTP oturumunu kapatır ve bellek kaynaklarını serbest bırakır."""
         async with self._session_lock:
             if self._session and not self._session.closed:
                 await self._session.close()
                 self._session = None
 
     async def __aenter__(self) -> AsyncHTTPClient:
-        """Otomatik eklendi."""
+        """Asenkron context manager giriş metodu."""
         return self
 
     async def __aexit__(self, *args: Any) -> None:
-        """Otomatik eklendi."""
+        """Asenkron context manager çıkış metodu; oturumu güvenle kapatır."""
         await self.close()
 
 
-# ─── Singleton Registry ───────────────────────────────────────────────────────
+# ─── Singleton Registry (Thread-Safe) ─────────────────────────────────────────
 
 _clients: dict[str, AsyncHTTPClient] = {}
-_registry_lock = asyncio.Lock()
+_registry_lock = threading.Lock()
 
 
 def get_client(name: str, **kwargs: Any) -> AsyncHTTPClient:
-    """Provider bazlı singleton HTTP client döner.
+    """Sağlayıcı veya servis bazlı tekil (singleton) HTTP istemcisi döndürür.
 
     Args:
-        name: Client kimliği (provider adı).
-        **kwargs: AsyncHTTPClient constructor parametreleri.
+        name: İstemciyi tanımlayan tekil anahtar (örn: 'kap_provider').
+        **kwargs: AsyncHTTPClient başlatma parametreleri.
 
     Returns:
-        Mevcut veya yeni oluşturulan AsyncHTTPClient.
+        AsyncHTTPClient: Mevcut veya yeni oluşturulan istemci nesnesi.
     """
-    if name not in _clients:
-        _clients[name] = AsyncHTTPClient(**kwargs)
-    return _clients[name]
+    with _registry_lock:
+        if name not in _clients:
+            _clients[name] = AsyncHTTPClient(**kwargs)
+        return _clients[name]
 
 
 async def close_all_clients() -> None:
-    """Registry'deki tüm HTTP client session'larını kapatır."""
-    for client in list(_clients.values()):
+    """Kayıt defterindeki tüm HTTP istemcilerinin oturumlarını eşzamanlı kapatır."""
+    with _registry_lock:
+        clients_to_close = list(_clients.values())
+        _clients.clear()
+
+    for client in clients_to_close:
         await client.close()
-    _clients.clear()
+
+
+__all__ = [
+    "AsyncHTTPClient",
+    "close_all_clients",
+    "get_client",
+]

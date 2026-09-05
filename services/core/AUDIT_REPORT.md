@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 6 dosya denetlendi, 36 sorun düzeltildi. Bekleyen dosya: 98
+**Denetim Sonucu:** 7 dosya denetlendi, 42 sorun düzeltildi. Bekleyen dosya: 97
 
 ---
 
@@ -28,6 +28,7 @@
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -106,6 +107,20 @@
 | 4 | 4 | Fonksiyon içi dağınık `import pyarrow`, `import polars` çağrıları vardı | Dosya başında temiz, merkezi import yapısına geçirildi |
 | 5 | 2 | `merge_parquet` ve `from_polars` metotlarında boş girdi/None kontrolleri eksikti | Fail-closed sınır kontrolleri (`ValueError`, `FileNotFoundError`) eklendi |
 | 6 | 4 | Log mesajları İngilizceydi (`"Parquet written"`, vb.) | `parquet_dosyasi_yazildi`, `parquet_dosyasi_okundu` gibi Türkçe structlog yapısına geçirildi |
+
+---
+
+## `async_http.py` (7. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metotlara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
+| 2 | 4 | `AsyncHTTPClient` sınıfında `__repr__` metodu yoktu | Oturum durumu ve retry sınırını gösteren `__repr__` eklendi |
+| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["AsyncHTTPClient", "close_all_clients", "get_client"]` eklendi |
+| 4 | 2 | `get_client` singleton registry'de eşzamanlılık koruması (thread-safety) eksikti | `threading.Lock()` ile korumalı hale getirildi |
+| 5 | 4 | Fonksiyon içlerinde gereksiz `import time` tekrarları vardı | Dosya başında standart modül importuna taşındı |
+| 6 | 4 | Log ve hata mesajları İngilizceydi | `http_json_ayristirma_hatasi`, `http_zaman_asimi`, `http_istek_siniri_asildi` gibi Türkçe structlog formatına geçirildi |
+
 
 
 
