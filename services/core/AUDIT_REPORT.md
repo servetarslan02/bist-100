@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 92 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 95 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -31,7 +31,7 @@
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 10 | `base_service.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 13 | `circuit_breaker_metrics.py` | 8 | ✅ Denetlendi, düzeltildi |
@@ -181,6 +181,9 @@
 | 4 | 2 & 3 | Asenkron `asyncio.CancelledError` iptal durumları genel hata bloğuyla karışabiliyor veya kaynaklar kilitli kalabiliyordu | `asyncio.CancelledError` özel bloğuyla loglanıp yeniden fırlatıldı (`re-raise`); `finally` bloğuyla `self._active_requests` her koşulda korumalı düşürüldü |
 | 5 | 4 | `get_health_status()` ve `__repr__` metotlarında aktif istek ve önbellek anahtar sayıları görünmüyordu | Rapor ve metin temsillerine `active_requests` ve `cached_idempotency_keys` alanları eklendi |
 | 6 | 7 | `DEFAULT_SHUTDOWN_TIMEOUT_SECONDS` sabiti tanımlandı ve `__all__` listesine eklendi | Modül dışa aktarımları eksiksiz hale getirildi |
+| 7 | 2 & 3 | Eşzamanlı gelen aynı idempotency anahtarına sahip iki istek aynı anda `get(idempotency_key)` denetiminden geçerek mükerrer sipariş/işlem yürütme (race condition) riski taşıyordu | `_in_flight_idempotency_keys` kümesi ile `in-flight conflict` denetimi eklendi; eşzamanlı çakışan istekler güvenli şekilde reddedildi ve `finally` bloğunda temizlendi |
+| 8 | 2 & 3 | `self._is_shutting_down` denetimi ile `self._active_requests += 1` arasındaki aralıkta `shutdown()` çağrıldığında yarış durumu (race condition) ve kilitlenme riski mevcuttu; ayrıca `threading.Lock` reentrant kilitlenmelere (deadlock) açıktı | `threading.RLock()` mimarisine geçildi; `_is_shutting_down` kontrolü ve sayaç artırımı kilit koruması altına alınarak atomik hale getirildi |
+| 9 | 3 & 6 | Devre kesiciyi dinamik sıfırlama (`reset_circuit_breaker`), önbellek temizleme (`clear_idempotency_cache`), `circuit_breaker` özelliği ve yapılandırılabilir `idempotency_ttl/max_keys` eksikti | `reset_circuit_breaker`, `clear_idempotency_cache`, `circuit_breaker` property'si ve esnek parametreler eklenerek API zenginleştirildi |
 
 ---
 

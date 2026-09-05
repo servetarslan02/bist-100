@@ -26,7 +26,7 @@ from typing import Any, TypeVar
 import orjson
 import structlog
 
-from services.core.circuit_breaker import CircuitBreaker
+from services.core.circuit_breaker import CircuitBreaker, CircuitState
 from services.core.dead_letter_queue import DeadLetterQueue, dead_letter_queue
 from services.core.observability import prometheus_metrics
 
@@ -69,6 +69,9 @@ class BaseAlphaService(ABC):
         enable_circuit_breaker: bool = True,
         max_retries: int = DEFAULT_MAX_RETRIES,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        idempotency_ttl_seconds: float = DEFAULT_IDEMPOTENCY_TTL_SECONDS,
+        idempotency_max_keys: int = DEFAULT_IDEMPOTENCY_MAX_KEYS,
+        dlq: DeadLetterQueue | None = None,
     ) -> None:
         """Temel mikroservis örneğini başlatır.
 
@@ -78,22 +81,34 @@ class BaseAlphaService(ABC):
             enable_circuit_breaker: Circuit Breaker korumasının aktif edilip edilmeyeceği.
             max_retries: Hata durumunda izin verilen maksimum yeniden deneme sayısı.
             backoff_factor: Üstel geri çekilme (exponential backoff) çarpanı.
+            idempotency_ttl_seconds: Tekrarlanan işlem önbellek saklama süresi (saniye).
+            idempotency_max_keys: Tekrarlanan işlem önbelleği maksimum eleman kapasitesi.
+            dlq: İsteğe bağlı özel Dead Letter Queue örneği.
         """
         self.service_name: str = service_name
-        self.timeout_seconds: float = timeout_seconds
-        self.max_retries: int = max_retries
-        self.backoff_factor: float = backoff_factor
+        self.timeout_seconds: float = max(0.001, float(timeout_seconds))
+        self.max_retries: int = max(1, int(max_retries))
+        self.backoff_factor: float = max(0.0, float(backoff_factor))
+        self.idempotency_ttl_seconds: float = max(1.0, float(idempotency_ttl_seconds))
+        self.idempotency_max_keys: int = max(100, int(idempotency_max_keys))
+
         self.is_healthy: bool = True
         self.is_ready: bool = True
         self._is_shutting_down: bool = False
         self._active_requests: int = 0
 
-        self._lock: threading.Lock = threading.Lock()
+        self._lock: threading.RLock = threading.RLock()
         self._circuit_breaker: CircuitBreaker | None = (
             CircuitBreaker(name=service_name) if enable_circuit_breaker else None
         )
-        self._dlq: DeadLetterQueue = dead_letter_queue
+        self._dlq: DeadLetterQueue = dlq or dead_letter_queue
         self._processed_idempotency_keys: dict[str, float] = {}
+        self._in_flight_idempotency_keys: set[str] = set()
+
+    @property
+    def circuit_breaker(self) -> CircuitBreaker | None:
+        """Servise bağlı devre kesici nesnesini döner."""
+        return self._circuit_breaker
 
     @abstractmethod
     async def process_payload(self, validated_input: Any) -> Any:
@@ -135,7 +150,7 @@ class BaseAlphaService(ABC):
         """Standart 6 Aşamalı Servis Yürütme Hattı:
 
         1. Doğrulama (Validation)
-        2. Idempotency Denetimi (Tekrarlanan işlem engelleme)
+        2. Idempotency Denetimi (Eşzamanlı ve geçmiş tekrarlanan işlem engelleme)
         3. Circuit Breaker & Timeout Korumalı Yürütme
         4. Çıktı Biçimlendirme
         5. Hata Yönetimi & DLQ Kaydı
@@ -152,41 +167,56 @@ class BaseAlphaService(ABC):
         Raises:
             ServiceExecutionError: Doğrulama, zaman aşımı veya yürütme başarısız olduğunda.
         """
-        if self._is_shutting_down:
-            raise ServiceExecutionError(f"[{self.service_name}] Servis kapanma sürecinde, yeni istek reddedildi.")
+        corr_id = correlation_id or f"corr_{int(time.time() * 1000)}"
 
         with self._lock:
+            if self._is_shutting_down:
+                raise ServiceExecutionError(f"[{self.service_name}] Servis kapanma sürecinde, yeni istek reddedildi.")
             self._active_requests += 1
+
+            # 1. Idempotency Check (Thread-safe, In-Flight & TTL-guarded)
+            if idempotency_key:
+                now = time.time()
+                if idempotency_key in self._in_flight_idempotency_keys:
+                    self._active_requests = max(0, self._active_requests - 1)
+                    logger.warning(
+                        "concurrent_idempotent_request_rejected",
+                        service=self.service_name,
+                        idempotency_key=idempotency_key,
+                        correlation_id=corr_id,
+                    )
+                    raise ServiceExecutionError(
+                        f"[{self.service_name}] Aynı idempotency anahtarına ({idempotency_key}) sahip bir istek halihazırda yürütülüyor."
+                    )
+
+                # Kapasite temizliği
+                if len(self._processed_idempotency_keys) > self.idempotency_max_keys:
+                    self._processed_idempotency_keys = {
+                        k: v
+                        for k, v in self._processed_idempotency_keys.items()
+                        if now - v < self.idempotency_ttl_seconds
+                    }
+
+                # Tamamlanmış kayıt denetimi
+                recorded_time = self._processed_idempotency_keys.get(idempotency_key)
+                if recorded_time is not None:
+                    if now - recorded_time < self.idempotency_ttl_seconds:
+                        self._active_requests = max(0, self._active_requests - 1)
+                        logger.info(
+                            "idempotent_request_skipped",
+                            service=self.service_name,
+                            idempotency_key=idempotency_key,
+                            correlation_id=corr_id,
+                        )
+                        return {"status": "SKIPPED_IDEMPOTENT", "idempotency_key": idempotency_key}
+                    # Süresi dolmuşsa kaldır ve yeniden işlenmesine izin ver
+                    del self._processed_idempotency_keys[idempotency_key]
+
+                # Eşzamanlı çakışmaları önlemek için aktif olarak işaretle
+                self._in_flight_idempotency_keys.add(idempotency_key)
 
         try:
             start_time = time.perf_counter()
-            corr_id = correlation_id or f"corr_{int(time.time() * 1000)}"
-
-            # 1. Idempotency Check (Thread-safe & TTL-guarded)
-            if idempotency_key:
-                now = time.time()
-                with self._lock:
-                    # Boyut aşımı durumunda eski anahtarları temizle
-                    if len(self._processed_idempotency_keys) > DEFAULT_IDEMPOTENCY_MAX_KEYS:
-                        self._processed_idempotency_keys = {
-                            k: v
-                            for k, v in self._processed_idempotency_keys.items()
-                            if now - v < DEFAULT_IDEMPOTENCY_TTL_SECONDS
-                        }
-
-                    # Tekil anahtar ve TTL denetimi
-                    recorded_time = self._processed_idempotency_keys.get(idempotency_key)
-                    if recorded_time is not None:
-                        if now - recorded_time < DEFAULT_IDEMPOTENCY_TTL_SECONDS:
-                            logger.info(
-                                "idempotent_request_skipped",
-                                service=self.service_name,
-                                idempotency_key=idempotency_key,
-                                correlation_id=corr_id,
-                            )
-                            return {"status": "SKIPPED_IDEMPOTENT", "idempotency_key": idempotency_key}
-                        # Süresi dolmuşsa kaldır ve yeniden işlenmesine izin ver
-                        del self._processed_idempotency_keys[idempotency_key]
 
             # 2. Pre-Execution Circuit Breaker Check (Fail-Fast)
             if self._circuit_breaker and not self._circuit_breaker.can_execute():
@@ -314,6 +344,8 @@ class BaseAlphaService(ABC):
 
         finally:
             with self._lock:
+                if idempotency_key:
+                    self._in_flight_idempotency_keys.discard(idempotency_key)
                 self._active_requests = max(0, self._active_requests - 1)
 
     async def shutdown(self, timeout: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
@@ -324,23 +356,57 @@ class BaseAlphaService(ABC):
         Args:
             timeout: Aktif isteklerin tamamlanması için tanınan maksimum bekleme süresi (sn).
         """
+        with self._lock:
+            self._is_shutting_down = True
+            self.is_ready = False
+            active_at_start = self._active_requests
+
         logger.info(
             "service_graceful_shutdown_initiated",
             service=self.service_name,
-            aktif_istek_sayisi=self._active_requests,
+            aktif_istek_sayisi=active_at_start,
         )
-        self._is_shutting_down = True
-        self.is_ready = False
 
         start = time.time()
-        while self._active_requests > 0 and (time.time() - start) < timeout:
+        while (time.time() - start) < timeout:
+            with self._lock:
+                if self._active_requests <= 0:
+                    break
             await asyncio.sleep(0.05)
+
+        with self._lock:
+            remaining = self._active_requests
 
         logger.info(
             "service_graceful_shutdown_completed",
             service=self.service_name,
-            kalan_istek=self._active_requests,
+            kalan_istek=remaining,
         )
+
+    def clear_idempotency_cache(self) -> int:
+        """Önbellekte saklanan tüm idempotency anahtarlarını temizler.
+
+        Returns:
+            Temizlenen anahtar sayısı.
+        """
+        with self._lock:
+            count = len(self._processed_idempotency_keys)
+            self._processed_idempotency_keys.clear()
+            self._in_flight_idempotency_keys.clear()
+            return count
+
+    def reset_circuit_breaker(self) -> None:
+        """Devre kesiciyi sıfırlayarak kapalı (CLOSED) duruma getirir."""
+        if self._circuit_breaker:
+            with self._circuit_breaker._lock:
+                old_state = self._circuit_breaker.state.value
+                self._circuit_breaker.state = CircuitState.CLOSED
+                self._circuit_breaker.failure_count = 0
+                self._circuit_breaker.half_open_calls = 0
+                self._circuit_breaker._update_telemetry()
+                self._circuit_breaker._persist_to_store()
+            self._circuit_breaker._notify_state_change(old_state, CircuitState.CLOSED.value)
+            self.is_healthy = True
 
     def get_health_status(self) -> dict[str, Any]:
         """Servis sağlık ve hazırlık durum raporunu döner.
@@ -348,18 +414,21 @@ class BaseAlphaService(ABC):
         Returns:
             Sağlık, hazırlık ve devre kesici durumunu özetleyen sözlük.
         """
-        cb_state = self._circuit_breaker.state if self._circuit_breaker else "N/A"
+        cb_state = self._circuit_breaker.state.value if self._circuit_breaker else "N/A"
         with self._lock:
             active_req = self._active_requests
             idempotency_keys_count = len(self._processed_idempotency_keys)
+            in_flight_count = len(self._in_flight_idempotency_keys)
+            shutting_down = self._is_shutting_down
 
         return {
             "service": self.service_name,
             "healthy": self.is_healthy,
-            "ready": self.is_ready and not self._is_shutting_down,
+            "ready": self.is_ready and not shutting_down,
             "circuit_breaker": cb_state,
-            "is_shutting_down": self._is_shutting_down,
+            "is_shutting_down": shutting_down,
             "active_requests": active_req,
+            "in_flight_idempotency_keys": in_flight_count,
             "cached_idempotency_keys": idempotency_keys_count,
         }
 
@@ -367,10 +436,11 @@ class BaseAlphaService(ABC):
         """Servisin durum özet temsilini döner."""
         with self._lock:
             active = self._active_requests
+            shutting_down = self._is_shutting_down
         return (
             f"<{self.__class__.__name__}(servis='{self.service_name}', "
             f"saglikli={self.is_healthy}, hazir={self.is_ready}, "
-            f"aktif_istek={active}, kapaniyor={self._is_shutting_down})>"
+            f"aktif_istek={active}, kapaniyor={shutting_down})>"
         )
 
 
