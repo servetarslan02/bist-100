@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 5 dosya denetlendi, 30 sorun düzeltildi. Bekleyen dosya: 99
+**Denetim Sonucu:** 6 dosya denetlendi, 36 sorun düzeltildi. Bekleyen dosya: 98
 
 ---
 
@@ -27,6 +27,7 @@
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -92,6 +93,20 @@
 | 5 | 4 | E402 ve E501 import sırası ve satır uzunluğu kuralları ihlal ediliyordu | Docstring başa alındı, satır uzunlukları 120 karakter altına çekildi |
 | 6 | 4 | Loglama İngilizceydi ve yapısal değildi | `alpha_engine_model_egitildi`, `alpha_engine_optuna_parametreleri` gibi structlog yapısına geçirildi |
 | 7 | 3 | Gevşek tip tanımları (`exclude_features: list[str] = None`) | `exclude_features: list[str] | None = None` ve kesin dönüş tipleri ile güncellendi |
+
+---
+
+## `arrow_pipeline.py` (6. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metotlara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
+| 2 | 4 | `ArrowPipeline` sınıfında `__repr__` metodu yoktu | `base_path` bilgisini içeren açıklayıcı `__repr__` eklendi |
+| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["ArrowPipeline"]` eklendi |
+| 4 | 4 | Fonksiyon içi dağınık `import pyarrow`, `import polars` çağrıları vardı | Dosya başında temiz, merkezi import yapısına geçirildi |
+| 5 | 2 | `merge_parquet` ve `from_polars` metotlarında boş girdi/None kontrolleri eksikti | Fail-closed sınır kontrolleri (`ValueError`, `FileNotFoundError`) eklendi |
+| 6 | 4 | Log mesajları İngilizceydi (`"Parquet written"`, vb.) | `parquet_dosyasi_yazildi`, `parquet_dosyasi_okundu` gibi Türkçe structlog yapısına geçirildi |
+
 
 
 
