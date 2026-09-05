@@ -1,6 +1,12 @@
+"""ALPHA BIST — Alpha Engine v2.0 (Kurumsal Seviye Alpha Tahmin Motoru).
+
+LightGBM tabanlı alfa sinyali ve aşırı getiri (excess return) tahminleme motoru:
+- Sektör ve piyasa göstergelerine dayalı özellik mühendisliği (feature engineering)
+- BIST hisselerinin ileriye dönük aşırı getiri potansiyelini skorlama
+- CUDA / GPU hızlandırma desteği ile otomatik eğitim ve hiperparametre optimizasyonu
+- Model versiyonlama, parmak izi hash kontrolü ve DuckDB/dosya tabanlı model kalıcılığı
 """
-ALPHA BIST — Alpha Engine v2.0 (Enterprise-Grade)
-"""
+
 from __future__ import annotations
 
 import datetime
@@ -23,8 +29,10 @@ from services.ml.feature_engine import compute_universe_features
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.alpha_engine")
 meter = metrics.get_meter("alpha-bist.alpha_engine")
-def _yf_to_polars(yf_df) -> pl.DataFrame:
-    """yfinance pandas DataFrame'ini Polars'a çevir."""
+
+
+def _yf_to_polars(yf_df: Any) -> pl.DataFrame:
+    """yfinance pandas DataFrame nesnesini Polars DataFrame'e dönüştürür."""
     if yf_df is None or len(yf_df) == 0:
         return pl.DataFrame()
     df = yf_df.reset_index()
@@ -33,24 +41,31 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     return pl.from_pandas(df)
 
 
-def _detect_gpu_cuda() -> Any:
-    """Detect NVIDIA GPU CUDA capability."""
+def _detect_gpu_cuda() -> tuple[bool, str]:
+    """NVIDIA CUDA / GPU donanım hızlandırma desteğini tespit eder."""
     try:
         import torch
 
         if torch.cuda.is_available():
-            return True, torch.cuda.get_device_name(0)
+            return True, str(torch.cuda.get_device_name(0))
     except Exception as exc:
-        logger.debug("GPU/CUDA algılanamadı, CPU kullanılacak", error=str(exc))
+        logger.debug("gpu_cuda_algilanamadi_cpu_kullanilacak", error=str(exc))
     return False, "CPU"
 
 
 class AlphaEngine:
-    def __init__(self, exclude_features: list[str] = None):
+    """BIST hisse evreni için LightGBM tabanlı alfa tahmin ve skorlama motoru."""
+
+    def __init__(self, exclude_features: list[str] | None = None) -> None:
+        """AlphaEngine örneğini başlatır ve varsa kayıtlı modeli diskten yükler.
+
+        Args:
+            exclude_features: Eğitim ve tahminde hariç tutulacak gürültülü öznitelikler.
+        """
         has_gpu, dev_name = _detect_gpu_cuda()
         self.has_gpu = has_gpu
         self.gpu_device_name = dev_name
-        self.params = {
+        self.params: dict[str, Any] = {
             "objective": "regression",
             "metric": "rmse",
             "n_estimators": 100,
@@ -61,22 +76,42 @@ class AlphaEngine:
             "n_jobs": -1,
         }
         if self.has_gpu:
-            logger.info("AlphaEngine configured with GPU acceleration", device=self.gpu_device_name)
-        self.model = None
-        self.features = []
+            logger.info("alpha_engine_gpu_hizlandirma_aktif", cihaz=self.gpu_device_name)
+        self.model: lgb.Booster | None = None
+        self.features: list[str] = []
 
         default_bad_features = ["momentum_accel", "roc_120d", "dist_sma200", "cs_zscore_ret_1d", "roc_5d"]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
-        # Disk üzerindeki model varsa otomatik yükle (max_age_hours=24*30 → 30 günlük model geçerli)
+        # Disk üzerindeki model varsa otomatik yükle (30 günlük model geçerli)
         loaded = self._load_model(max_age_hours=24 * 30)
         if loaded:
-            logger.info("AlphaEngine: disk modeli otomatik yuklendi", features=len(self.features))
+            logger.info("alpha_engine_disk_modeli_yuklendi", ozellik_sayisi=len(self.features))
         else:
-            logger.info("AlphaEngine: egitilmemis (disk modeli yok veya suresi dolmus)")
+            logger.info("alpha_engine_egitilmemis_durumda")
+
+    def __repr__(self) -> str:
+        """AlphaEngine nesnesinin dize temsili."""
+        model_status = "egitilmis" if self.model is not None else "egitilmemis"
+        return f"<AlphaEngine(durum='{model_status}', ozellikler={len(self.features)}, gpu={self.has_gpu})>"
 
     @otel_trace("alpha_engine.fetch_data")
-    def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None) -> Any:
+    def fetch_data(
+        self,
+        start_date: str,
+        end_date: str,
+        tickers: list[str] | None = None,
+    ) -> tuple[dict[str, pl.DataFrame], pl.DataFrame, dict[str, str]]:
+        """BIST hisse evreni ve endeks verilerini çeker ve Polars DataFrame formatına çevirir.
+
+        Args:
+            start_date: Başlangıç tarihi (YYYY-MM-DD).
+            end_date: Bitiş tarihi (YYYY-MM-DD).
+            tickers: Çekilecek hisse kodları listesi (None ise evrendeki tüm hisseler).
+
+        Returns:
+            tuple: (market_data, bm_df, sector_map) verileri.
+        """
         if tickers is None:
             tickers = (
                 bist_universe.BIST_ALL_TICKERS
@@ -116,15 +151,15 @@ class AlphaEngine:
                         except Exception:
                             continue
             except Exception as e:
-                logger.warning(f"AlphaEngine batch download warning (chunk {i}): {e}")
+                logger.warning("alpha_engine_veri_indirme_uyarisi", chunk_index=i, error=str(e))
 
-        # Benchmark
+        # Benchmark verisi
         bm_df = pl.DataFrame()
         try:
             bm_raw = yf.download("XU100.IS", start=start_date, end=end_date, auto_adjust=True, progress=False)
             bm_df = _yf_to_polars(bm_raw.dropna(how="all"))
         except Exception as e:
-            logger.warning(f"Benchmark download warning: {e}")
+            logger.warning("alpha_engine_benchmark_indirme_uyarisi", error=str(e))
 
         return market_data, bm_df, sector_map
 
@@ -136,14 +171,28 @@ class AlphaEngine:
         sector_map: dict[str, str],
         train_start: datetime.datetime,
         train_end: datetime.datetime,
-        snapshot_offsets: list[int] = None,
+        snapshot_offsets: list[int] | None = None,
         forward_days: int = 20,
-    ) -> Any:
+    ) -> tuple[np.ndarray, np.ndarray, list[str]]:
+        """Girdi piyasa verilerinden geçmiş anlık görüntüler alarak eğitim matrisini (X, y) oluşturur.
+
+        Args:
+            market_data: Hisse bazlı geçmiş fiyat verileri.
+            bm_df: BIST 100 endeks verisi.
+            sector_map: Hisse-sektör eşleme tablosu.
+            train_start: Eğitim başlangıç tarihi.
+            train_end: Eğitim bitiş tarihi.
+            snapshot_offsets: Snapshot gün mesafeleri.
+            forward_days: İleriye dönük getiri hedef ufku.
+
+        Returns:
+            tuple: (X öznitelik matrisi, y hedef vektörü, öznitelik isimleri listesi).
+        """
         if snapshot_offsets is None:
             snapshot_offsets = [20, 40, 60, 80]
-        rows = []
-        labels = []
-        all_keys = []
+        rows: list[dict[str, float]] = []
+        labels: list[float] = []
+        all_keys: list[str] = []
 
         for offset in snapshot_offsets:
             t_snap = train_end - datetime.timedelta(days=int(offset))
@@ -152,7 +201,7 @@ class AlphaEngine:
             if t_snap < train_start:
                 continue
 
-            snap_md = {}
+            snap_md: dict[str, pl.DataFrame] = {}
             for t, df in market_data.items():
                 if "Date" in df.columns:
                     sub_df = df.filter((pl.col("Date") >= train_start) & (pl.col("Date") <= t_snap))
@@ -217,16 +266,33 @@ class AlphaEngine:
 
     @otel_trace("alpha_engine.train")
     def train(
-        self, market_data, bm_df, sector_map,
-        train_start_str: str, train_end_str: str,
+        self,
+        market_data: dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
+        sector_map: dict[str, str],
+        train_start_str: str,
+        train_end_str: str,
         optimize: bool = True,
-    ) -> Any:
+    ) -> bool:
+        """LightGBM modelini verilen tarih aralığındaki verilerle eğitir.
+
+        Args:
+            market_data: Hisse fiyat verileri.
+            bm_df: Benchmark endeks verisi.
+            sector_map: Sektör eşleme haritası.
+            train_start_str: Eğitim başlangıcı (YYYY-MM-DD).
+            train_end_str: Eğitim bitişi (YYYY-MM-DD).
+            optimize: Hiperparametre optimizasyonu yapılsın mı.
+
+        Returns:
+            bool: Eğitim başarılı ise True, veri yetersizse False.
+        """
         t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
         t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
 
         if len(X) == 0:
-            logger.error("No training samples generated")
+            logger.error("alpha_engine_egitim_ornekleri_olusturulamadi")
             return False
 
         self.features = feature_names
@@ -237,9 +303,9 @@ class AlphaEngine:
             optimizer = HyperOptimizer(n_trials=20, objective=self.params.get("objective", "regression"))
             best_params = optimizer.optimize(X, y, feature_names)
             self.params.update(best_params)
-            lr = self.params.get('learning_rate', 0)
-            leaves = self.params.get('num_leaves', 0)
-            logger.info(f"Optuna params: lr={lr:.3f}, leaves={leaves}")
+            lr = self.params.get("learning_rate", 0)
+            leaves = self.params.get("num_leaves", 0)
+            logger.info("alpha_engine_optuna_parametreleri", lr=lr, leaves=leaves)
 
         train_params = dict(self.params)
         if train_params.get("objective") == "lambdarank":
@@ -253,19 +319,40 @@ class AlphaEngine:
         except Exception:
             train_params.pop("device", None)
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
-        logger.info(f"Model trained on {len(X)} samples")
+
+        logger.info("alpha_engine_model_egitildi", ornek_sayisi=len(X))
         self._save_model()
         return True
 
     @otel_trace("alpha_engine.predict")
-    def predict(self, market_data, bm_df, sector_map, target_date_str: str) -> Any:
+    def predict(
+        self,
+        market_data: dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
+        sector_map: dict[str, str],
+        target_date_str: str,
+    ) -> list[dict[str, Any]]:
+        """Eğitilmiş model ile hedef tarih için hisse bazlı aşırı getiri skorlarını tahmin eder.
+
+        Args:
+            market_data: Hisse verileri.
+            bm_df: Benchmark endeks verisi.
+            sector_map: Sektör eşleme haritası.
+            target_date_str: Tahmin yapılacak hedef tarih (YYYY-MM-DD).
+
+        Returns:
+            list[dict[str, Any]]: Azalan skor sırasına göre sıralanmış hisse tahmin listesi.
+
+        Raises:
+            ValueError: Model eğitilmemişse veya benchmark verisi yetersizse.
+        """
         if not self.model:
-            raise ValueError("Model not trained")
+            raise ValueError("Model henüz eğitilmemiş veya yüklenememiş.")
 
         target_date = datetime.datetime.strptime(target_date_str, "%Y-%m-%d")
         start_date_dt = target_date - datetime.timedelta(days=400)
 
-        snap_md = {}
+        snap_md: dict[str, pl.DataFrame] = {}
         for t, df in market_data.items():
             if "Date" in df.columns:
                 sub_df = df.filter((pl.col("Date") >= start_date_dt) & (pl.col("Date") <= target_date))
@@ -277,7 +364,7 @@ class AlphaEngine:
         else:
             snap_bm = bm_df
         if len(snap_bm) < 120:
-            raise ValueError("Insufficient benchmark data")
+            raise ValueError("Yetersiz benchmark verisi (en az 120 bar gereklidir).")
 
         features = compute_universe_features(snap_md, snap_bm, sector_map)
 
@@ -286,7 +373,7 @@ class AlphaEngine:
                 for exf in self.exclude_features:
                     feats.pop(exf, None)
 
-        predictions = []
+        predictions: list[dict[str, Any]] = []
         for ticker, feats in features.items():
             if not feats:
                 continue
@@ -298,7 +385,8 @@ class AlphaEngine:
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
 
-    def _save_model(self, path: str = "data/alpha_engine_model.pkl") -> Any:
+    def _save_model(self, path: str = "data/alpha_engine_model.pkl") -> None:
+        """Eğitilmiş modeli ve öznitelik üst verilerini güvenli pickle ile diske kaydeder."""
         if self.model is None:
             return
         try:
@@ -312,11 +400,12 @@ class AlphaEngine:
                 "feature_hash": hashlib.sha256("|".join(sorted(self.features)).encode()).hexdigest()[:16],
             }
             safe_pickle_dump(payload, path)
-            logger.info("AlphaEngine model saved", path=path, features=len(self.features))
+            logger.info("alpha_engine_modeli_kaydedildi", yol=path, ozellik_sayisi=len(self.features))
         except Exception as e:
-            logger.warning("Failed to save AlphaEngine model", error=str(e))
+            logger.warning("alpha_engine_model_kayit_hatasi", error=str(e))
 
     def _load_model(self, path: str = "data/alpha_engine_model.pkl", max_age_hours: int = 24) -> bool:
+        """Model dosyasını doğrular ve geçerli ise belleğe yükler."""
         if not Path(path).exists():
             return False
         try:
@@ -329,25 +418,26 @@ class AlphaEngine:
                 return False
             current_hash = hashlib.sha256("|".join(sorted(payload["features"])).encode()).hexdigest()[:16]
             if current_hash != payload.get("feature_hash"):
-                logger.warning("AlphaEngine feature hash mismatch")
+                logger.warning("alpha_engine_ozellik_hash_uyusmazligi")
                 return False
             self.model = payload["model"]
             self.features = payload["features"]
             self.params = payload["params"]
             self.exclude_features = payload.get("exclude_features", self.exclude_features)
-            logger.info("AlphaEngine model loaded", path=path, features=len(self.features))
+            logger.info("alpha_engine_model_yuklendi", yol=path, ozellik_sayisi=len(self.features))
             return True
         except Exception as e:
-            logger.warning("Failed to load AlphaEngine model", error=str(e))
+            logger.warning("alpha_engine_model_yukleme_hatasi", error=str(e))
             return False
 
     @otel_trace("alpha_engine.run_daily_pipeline")
-    def run_daily_pipeline(self, date: str) -> Any:
+    def run_daily_pipeline(self, date: str) -> list[dict[str, Any]] | None:
+        """Günlük alfa boru hattını (veri çekme -> gerekirse eğitim -> tahmin) çalıştırır."""
         end_date_dt = datetime.datetime.strptime(date, "%Y-%m-%d")
         start_date_dt = end_date_dt - datetime.timedelta(days=400)
 
         if self._load_model():
-            logger.info("Using cached AlphaEngine model")
+            logger.info("alpha_engine_onbellek_modeli_kullaniliyor")
         else:
             market_data, bm_df, sector_map = self.fetch_data(
                 start_date_dt.strftime("%Y-%m-%d"), end_date_dt.strftime("%Y-%m-%d")
@@ -360,3 +450,8 @@ class AlphaEngine:
             start_date_dt.strftime("%Y-%m-%d"), end_date_dt.strftime("%Y-%m-%d")
         )
         return self.predict(market_data, bm_df, sector_map, date)
+
+
+__all__ = [
+    "AlphaEngine",
+]

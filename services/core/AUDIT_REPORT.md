@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 4 dosya denetlendi, 23 sorun düzeltildi. Bekleyen dosya: 100
+**Denetim Sonucu:** 5 dosya denetlendi, 30 sorun düzeltildi. Bekleyen dosya: 99
 
 ---
 
@@ -26,6 +26,7 @@
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
+| 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -77,6 +78,21 @@
 | 2 | 4 | SPK mevzuatına uygun tekil bildirim kimliği ve zaman damgası eksikti | Benzersiz `notification_id` (`uuid4`) ve `timestamp_iso` eklendi |
 | 3 | 7 | Modül seviyesinde `__all__` dışa aktarım listesi yoktu | `__all__ = ["generate_algo_notification"]` eklendi |
 | 4 | 4 | Fonksiyon docstring'i Args/Returns/Raises formatına uygun değildi | Standart Türkçe profesyonel docstring eklendi |
+
+---
+
+## `alpha_engine.py` (5. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 3 | Model başlatmada diskten otomatik yüklenmiyordu (`self.model = None` kalıyordu) | `__init__` içine 30 günlük otomatik model yükleme eklendi |
+| 2 | 4 | `AlphaEngine` sınıfında `__repr__` metodu yoktu | Cihaz, durum ve özellik sayısını bildiren `__repr__` eklendi |
+| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["AlphaEngine"]` eklendi |
+| 4 | 4 | Metot docstring'leri eksik ve yetersizdi | Tüm metotlara (`fetch_data`, `train`, `predict`, vb.) Türkçe profesyonel docstring yazıldı |
+| 5 | 4 | E402 ve E501 import sırası ve satır uzunluğu kuralları ihlal ediliyordu | Docstring başa alındı, satır uzunlukları 120 karakter altına çekildi |
+| 6 | 4 | Loglama İngilizceydi ve yapısal değildi | `alpha_engine_model_egitildi`, `alpha_engine_optuna_parametreleri` gibi structlog yapısına geçirildi |
+| 7 | 3 | Gevşek tip tanımları (`exclude_features: list[str] = None`) | `exclude_features: list[str] | None = None` ve kesin dönüş tipleri ile güncellendi |
+
 
 
 
