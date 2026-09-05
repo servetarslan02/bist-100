@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 13 dosya denetlendi, 80 sorun düzeltildi. Bekleyen dosya: 91
+**Denetim Sonucu:** 14 dosya denetlendi, 86 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -35,6 +35,7 @@
 | 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 13 | `circuit_breaker_metrics.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 14 | `clickhouse_replication_health.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -221,6 +222,19 @@
 | 5 | 2 & 3 | `export_json` döngüsünde `self.get_snapshot(name)` `None` dönerse `None.to_dict()` nedeniyle tüm metrik servisi `AttributeError` ile çöküyordu | `get_all_snapshots()` üzerinden `None` filtreli güvenli liste üretimi sağlandı; `export_orjson_bytes()` ile yüksek performanslı serileştirme eklendi |
 | 6 | 3 & 4 | Yerel `otel_trace` dekoratörü tanımlanmıştı; modül bazlı bağımsız span açılıyordu | Merkezi `from services.core.otel import otel_trace` yapısına geçilerek merkezi telemetri uyumu sağlandı |
 | 7 | 4 & 7 | `CircuitBreakerSnapshot` `@dataclass(slots=True)` yapılmamıştı ve `__repr__` metotları eksikti; modül seviyesinde `__all__` listesi tanımlanmamıştı | `slots=True`, açıklayıcı `__repr__` metotları ve tüm sınıf/sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
+
+---
+
+## `clickhouse_replication_health.py` (14. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | Modül docstring'i `from typing import Any` importundan sonra yer alıyordu (PEP 257 sırası bozuktu) ve metotlarda `"Otomatik eklendi."` docstring'i vardı | Modül docstring'i dosyanın en başına taşındı; tüm placeholder metinler temizlendi ve kurumsal Türkçe docstring'ler yazıldı |
+| 2 | 2 & 3 | `system.replicas` sorgusunda `WHERE database = 'alpha_bist' FORMAT TabSeparated` kullanılıyordu; `FORMAT TabSeparated` Python client'ında native parsing'i bozuyor ve veritabanı adı hardcoded kalıyordu | `FORMAT TabSeparated` kaldırıldı; sorgu `{db:String}` ile parametrik ve güvenli kılındı, `database` argümanı yapılandırılabilir yapıldı |
+| 3 | 2 & 3 | `absolute_delay > 10` ve `queue_size > 100` eşikleri hardcoded magic number olarak tanımlanmıştı; sınır değer kontrolleri (`NaN`, `None`) yapılmıyordu | `DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS` (10s) ve `DEFAULT_MAX_QUEUE_SIZE` (100) sabitleri tanımlandı; `math.isnan` ve `None` guard'ları eklendi |
+| 4 | 2 & 4 | Metrikler `metrics[f"clickhouse_replica_delay_{table}"]` şeklinde tablo adını metrik ismine gömerek Prometheus standartlarını (labels) ihlal ediyordu (metric explosion anti-pattern) | Geriye dönük uyumluluk korunurken, `database` ve `table` etiketlerini (labels) kullanan standart `export_prometheus()` fonksiyonu eklendi |
+| 5 | 4 & 6 | Replika ve rapor verileri düz sözlüklerle yönetiliyordu, tip güvenliği ve dokümantasyon yoktu | `@dataclass(slots=True)` mimarisinde `ReplicaHealthInfo` ve `ReplicationHealthReport` sınıfları ve `__repr__` metotları yazıldı |
+| 6 | 4 & 7 | Yerel `otel_trace` kullanılıyordu ve modül seviyesinde `__all__` listesi yoktu | Merkezi `services.core.otel` import edildi ve tüm model, fonksiyon ve sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
 
 ---
 
