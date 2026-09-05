@@ -69,6 +69,14 @@ class AuditEntry:
             "parent_audit_id": self.parent_audit_id,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Denetim kaydını optimize edilmiş UTF-8 JSON baytlarına dönüştürür.
+
+        Returns:
+            bytes: İkili JSON verisi.
+        """
+        return orjson.dumps(self.to_dict())
+
     def __repr__(self) -> str:
         """Denetim kaydının açıklayıcı temsilini döner."""
         return (
@@ -97,7 +105,7 @@ class AuditLog:
         """
         self._max_entries: int = max_entries
         self._entity_limit: int = entity_limit
-        self._lock: threading.Lock = threading.Lock()
+        self._lock: threading.RLock = threading.RLock()
         self._entries: deque[AuditEntry] = deque(maxlen=max_entries)
         self._index: dict[str, deque[AuditEntry]] = {}
 
@@ -137,6 +145,9 @@ class AuditLog:
             if rel_ticker:
                 secondary_key = f"ticker:{rel_ticker}"
 
+        # Korelasyon kimliği indeksi (Dağıtık izlenebilirlik)
+        corr_key: str | None = f"corr:{entry.correlation_id}" if entry.correlation_id else None
+
         with self._lock:
             self._entries.append(entry)
 
@@ -148,6 +159,11 @@ class AuditLog:
                 if secondary_key not in self._index:
                     self._index[secondary_key] = deque(maxlen=self._entity_limit)
                 self._index[secondary_key].append(entry)
+
+            if corr_key:
+                if corr_key not in self._index:
+                    self._index[corr_key] = deque(maxlen=self._entity_limit)
+                self._index[corr_key].append(entry)
 
             self._prune_index_if_needed()
 
@@ -426,6 +442,22 @@ class AuditLog:
         )
         return history
 
+    def get_by_correlation_id(self, correlation_id: str) -> list[dict[str, Any]]:
+        """Belirtilen korelasyon kimliğine (correlation_id) ait tüm denetim kayıtlarını döner.
+
+        Args:
+            correlation_id: İşlem korelasyon kimliği.
+
+        Returns:
+            list[dict[str, Any]]: İlgili işleme ait denetim kayıtları sözlük listesi.
+        """
+        if not correlation_id:
+            return []
+        key = f"corr:{correlation_id}"
+        with self._lock:
+            entries = list(self._index.get(key, []))
+        return [entry.to_dict() for entry in entries]
+
     def get_recent(self, limit: int = 50) -> list[dict[str, Any]]:
         """Sistem genelindeki en güncel denetim kayıtlarını döner.
 
@@ -472,6 +504,8 @@ class AuditLog:
     def export_to_duckdb(self, db_path: str = "data/audit.duckdb") -> int:
         """Mevcut denetim kayıtlarını DuckDB tablosuna kalıcı olarak yazar.
 
+        Toplu yazma (executemany) ile yüksek performans ve fail-safe orjson serileştirmesi sağlar.
+
         Args:
             db_path: Hedef DuckDB dosya yolu.
 
@@ -501,25 +535,104 @@ class AuditLog:
                 );
                 """
             )
-            for e in entries:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO audit_trail VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-                    """,
-                    [
-                        e.audit_id,
-                        e.action,
-                        e.entity_type,
-                        e.entity_id,
-                        e.actor,
-                        orjson.dumps(e.details).decode("utf-8"),
-                        e.timestamp,
-                        e.correlation_id,
-                        e.parent_audit_id,
-                    ],
-                )
+            batch = [
+                [
+                    e.audit_id,
+                    e.action,
+                    e.entity_type,
+                    e.entity_id,
+                    e.actor,
+                    orjson.dumps(e.details, default=str).decode("utf-8"),
+                    e.timestamp,
+                    e.correlation_id,
+                    e.parent_audit_id,
+                ]
+                for e in entries
+            ]
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO audit_trail VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                batch,
+            )
             logger.info("audit_log_duckdb_aktarildi", adet=len(entries), db_path=db_path)
             return len(entries)
+        finally:
+            conn.close()
+
+    def query_persisted_duckdb(
+        self,
+        db_path: str = "data/audit.duckdb",
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        action: str | None = None,
+        correlation_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """DuckDB üzerinde kalıcı olarak saklanan denetim kayıtlarını sorgular.
+
+        Args:
+            db_path: Hedef DuckDB dosya yolu.
+            entity_type: Filtrelenecek varlık türü (örn. 'ticker', 'order').
+            entity_id: Filtrelenecek varlık kimliği.
+            action: Filtrelenecek aksiyon türü (örn. 'DECISION', 'ORDER').
+            correlation_id: Filtrelenecek korelasyon kimliği.
+            limit: Döndürülecek maksimum kayıt sayısı.
+
+        Returns:
+            list[dict[str, Any]]: Sorgu sonuç kayıtları listesi.
+        """
+        import os
+
+        if not os.path.exists(db_path):
+            return []
+
+        conn = duckdb.connect(database=db_path)
+        try:
+            query = (
+                "SELECT audit_id, action, entity_type, entity_id, actor, "
+                "details_json, timestamp, correlation_id, parent_audit_id "
+                "FROM audit_trail WHERE 1=1"
+            )
+            params: list[Any] = []
+
+            if entity_type:
+                query += " AND entity_type = ?"
+                params.append(entity_type)
+            if entity_id:
+                query += " AND entity_id = ?"
+                params.append(entity_id)
+            if action:
+                query += " AND action = ?"
+                params.append(action)
+            if correlation_id:
+                query += " AND correlation_id = ?"
+                params.append(correlation_id)
+
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            rows = conn.execute(query, params).fetchall()
+            results = []
+            for r in rows:
+                try:
+                    details = orjson.loads(r[5]) if r[5] else {}
+                except Exception:
+                    details = {"raw": str(r[5])}
+                results.append(
+                    {
+                        "audit_id": r[0],
+                        "action": r[1],
+                        "entity_type": r[2],
+                        "entity_id": r[3],
+                        "actor": r[4],
+                        "details": details,
+                        "timestamp": str(r[6]),
+                        "correlation_id": r[7],
+                        "parent_audit_id": r[8],
+                    }
+                )
+            return results
         finally:
             conn.close()
 
@@ -533,9 +646,9 @@ class AuditLog:
         """Benzersiz ve güvenli tekil denetim kimliği üretir.
 
         Returns:
-            str: 16 karakterlik onaltılık tekil kimlik dizesi.
+            str: 32 karakterlik onaltılık tekil kimlik dizesi.
         """
-        return uuid.uuid4().hex[:16]
+        return uuid.uuid4().hex
 
     def __repr__(self) -> str:
         """Denetim yöneticisinin durum temsilini döner."""

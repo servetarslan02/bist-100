@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 98 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 101 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -29,7 +29,7 @@
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 8 | `audit_log.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 8 | ✅ Denetlendi, düzeltildi |
@@ -155,6 +155,9 @@
 | 4 | 2 & 6 | `AuditEntry` çok sayıda üretildiği halde standart `@dataclass` olarak tanımlıydı, yüksek bellek tüketiyordu | `@dataclass(slots=True)` yapılandırmasına geçilerek %40 bellek tasarrufu ve daha hızlı alan erişimi sağlandı |
 | 5 | 3 & 4 | Yerel `otel_trace` dekoratörü yazılmıştı, projenin merkezi OTel altyapısı kullanılmıyordu | `from services.core.otel import otel_trace` merkezi entegrasyonuna geçildi |
 | 6 | 4 & 7 | `__repr__` metotları standart dışıydı; `__all__` listesinde modül sabitleri eksikti | Standart `AuditEntry(...)` ve `AuditLog(...)` `__repr__` metotları yazıldı; `MAX_INDEXED_ENTITIES` sabitler listesine eklendi |
+| 7 | 2 & 3 | Dağıtık izlemede tüm mikroservis çağrılarını ve sipariş akışını birbirine bağlayan `correlation_id` indekslenmiyordu; belirli bir emrin veya sinyalin tüm denetim izini korelasyon kimliğiyle sorgulama imkanı yoktu | `log()` içinde `corr:{correlation_id}` otomatik indeksleme ve `get_by_correlation_id(correlation_id)` sorgu metodu eklendi |
+| 8 | 5 & 6 | `export_to_duckdb` içinde binlerce kayıt tek tek `INSERT` döngüsüyle yazılıyor ($O(N)$ IPC maliyeti) ve serileştirilemeyen tiplerde tüm aktarım çökebiliyordu; ayrıca diske yazılan geçmiş DuckDB kayıtlarını filtreli sorgulama metodu yoktu | `conn.executemany` toplu aktarımı, `orjson.dumps(..., default=str)` hata güvenliği ve `query_persisted_duckdb(...)` kalıcı sorgulama motoru eklendi |
+| 9 | 2 & 4 | `_generate_id` 16 karakter ile (64-bit entropi) yüksek frekanslı BIST emir akışında potansiyel çakışma riski taşıyordu; `threading.Lock` reentrant kilitlenmelere açıktı ve `AuditEntry` ikili serileştirme desteğinden yoksundu | `uuid.uuid4().hex` (128-bit) tekil kimliğe, `threading.RLock()` mimarisine ve `AuditEntry.to_orjson_bytes()` metoduna geçildi |
 
 ---
 
