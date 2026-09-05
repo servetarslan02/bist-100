@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 134 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 15 dosya denetlendi, 144 sorun düzeltildi. Bekleyen dosya: 89
 
 ---
 
@@ -36,6 +36,7 @@
 | 12 | `circuit_breaker.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 13 | `circuit_breaker_metrics.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
+| 15 | `compliance.py` | 10 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -271,6 +272,23 @@
 | 6 | 4 & 7 | Yerel `otel_trace` kullanılıyordu ve modül seviyesinde `__all__` listesi yoktu | Merkezi `services.core.otel` import edildi ve tüm model, fonksiyon ve sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
 | 7 | 2 & 3 | `active_replicas` ve `parts_to_check` kolonları sorgulanmıyor ve incelenmiyordu; kümede düğüm kaybı (node failure) veya bozuk/hasarlı parça oluştuğunda sistem bunu fark edemiyordu | `active_replicas < total_replicas` düğüm kaybı uyarısı ve `parts_to_check > 0` hasarlı parça alarmları eklendi; Prometheus metriklerine dahil edildi |
 | 8 | 2 & 6 | Fonksiyonlar yalnızca senkron/blocking çağrı yapıyordu; FastAPI ve async event loop altında çağrıldığında 15s boyunca loop'u kilitliyordu | `check_replication_health_async`, `export_prometheus_async` ve `is_replication_healthy(_async)` liveness/readiness fonksiyonları eklendi |
+
+---
+
+## `compliance.py` (15. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | Tam 5 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Temizlendi; mevzuat maddeleri (SPK II-15.1, II-26.1, III-52.1) ve Google Python Style içeren detaylı Türkçe docstring'ler yazıldı |
+| 2 | 2 & 3 | `portfolio_value <= 0` durumunda `action="OK"` dönüyordu (fail-open güvenlik açığı) | Fail-closed kuralı uyarınca `portfolio_value <= 0` durumunda `action="BLOCK"`, `violation=True` ile işlem engellendi |
+| 3 | 2 | `math.isnan` ve `math.isinf` taşmaları ile negatif `amount` kontrolleri yoktu | IEEE 754 float guard'ları eklendi; geçersiz sayısal değerler fail-closed olarak bloklandı |
+| 4 | 3 | SPK ortaklık payı bildirimleri portföy büyüklüğü ile şirket sermayesini karıştırıyordu | Gerçek şirket ödenmiş sermayesi (`company_capital`) üzerinden SPK II-15.1 (%5, %10, %15, %20, %25, %33, %50, %67, %95) ve SPK II-26.1 (%50) eşikleri modellendi |
+| 5 | 3 | SPK Yatırım Fonları Tebliği (III-52.1) %10 konsantrasyon sınırı denetlenmiyordu | Fon portföyleri için tek ihraççı paylarında %10 aşımını kesin olarak engelleyen `is_fund` konsantrasyon guard'ı eklendi |
+| 6 | 3 | BIST algoritmik manipülasyon ve orantısız emir iletimine (spoofing/quote stuffing) karşı OTR denetimi yoktu | BIST standartlarında Emir/İşlem Oranı kontrolü (`check_order_to_trade_ratio`) eklendi |
+| 7 | 3 | SPK II-15.1 İçeriden Bilgi Ticareti koruması ve finansal tablo öncesi Sessiz Dönem (Blackout Period) desteği yoktu | Takvim bazlı işlem yasağı tanımlama ve kontrol mekanizması (`register_blackout_period`, `check_insider_trading_window`) eklendi |
+| 8 | 2 | Singleton nesne eşzamanlı erişim koruması (`threading.RLock`) içermiyordu | `self._lock = threading.RLock()` eklendi; takvim, denetim kaydı ve sorgulamalar thread-safe hale getirildi |
+| 9 | 5 & Standart | Yasal denetimlerde zorunlu olan denetim izi (audit trail) kalıcı saklanmıyordu | DuckDB `compliance_audit_log` tablosu, `orjson` serileştirmesi ve sıfır kopyalı Polars ihracı (`export_audit_to_polars`) entegre edildi |
+| 10 | 4 & 7 | Tip güvenli aksiyon enum'ı, `__repr__` ve `__all__` listesi eksikti | `ComplianceAction(StrEnum)`, açıklayıcı `__repr__` metotları ve eksiksiz `__all__` listesi eklendi |
 
 ---
 
