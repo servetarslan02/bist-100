@@ -18,6 +18,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import orjson
 import structlog
 from opentelemetry import trace
 
@@ -69,6 +70,14 @@ class CircuitBreakerEvent:
             "market_phase": self.market_phase,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Olay verilerini yüksek performanslı ikili JSON baytlarına dönüştürür.
+
+        Returns:
+            bytes: UTF-8 kodlu JSON bayt dizisi.
+        """
+        return orjson.dumps(self.to_dict())
+
     def __repr__(self) -> str:
         """Devre kesici olayının okunabilir temsilini döner."""
         return (
@@ -101,7 +110,7 @@ class AutoCircuitBreakerEngine:
         if effective_limit <= 0:
             effective_limit = DEFAULT_EVENT_QUEUE_MAXLEN
 
-        self._lock: threading.Lock = threading.Lock()
+        self._lock: threading.RLock = threading.RLock()
         self._events: deque[CircuitBreakerEvent] = deque(maxlen=effective_limit)
         self._triggered_today: dict[str, list[float]] = {}  # ticker -> [threshold_pct, ...]
         self._bist100_reference: float = 0.0  # Önceki gün kapanış değeri
@@ -144,7 +153,6 @@ class AutoCircuitBreakerEngine:
         with self._lock:
             self._bist100_current = current_price
             ref_price = self._bist100_reference
-            triggered_count = self._ebdks_triggered_today
 
         if ref_price <= 0:
             return None
@@ -159,15 +167,25 @@ class AutoCircuitBreakerEngine:
         # EBDKS: BIST-100 %6 veya daha fazla düşüş
         threshold_pct = bist_session_fsm.EBDKS_THRESHOLD_PCT
         if change_pct <= -threshold_pct:
-            # Bugün zaten tetiklendi mi kontrol et (ilk tetikleme veya ek %2 düşüş)
-            should_trigger = triggered_count == 0 or (
-                triggered_count > 0 and change_pct <= -(threshold_pct + (triggered_count * 2.0))
-            )
+            should_trigger = False
+            with self._lock:
+                current_count = self._ebdks_triggered_today
+                should_trigger = current_count == 0 or (
+                    current_count > 0 and change_pct <= -(threshold_pct + (current_count * 2.0))
+                )
+                if should_trigger:
+                    self._ebdks_triggered_today += 1
 
             if should_trigger:
-                bist_session_fsm.trigger_ebdks(feature_code=feature_code)
-                trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
+                try:
+                    bist_session_fsm.trigger_ebdks(feature_code=feature_code)
+                except Exception as exc:
+                    with self._lock:
+                        self._ebdks_triggered_today = max(0, self._ebdks_triggered_today - 1)
+                    logger.error("ebdks_fsm_tetikleme_hatasi", error=str(exc))
+                    raise
 
+                trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
                 event = CircuitBreakerEvent(
                     ticker="BIST-100",
                     event_type="EBDKS",
@@ -183,8 +201,7 @@ class AutoCircuitBreakerEngine:
 
                 with self._lock:
                     self._events.append(event)
-                    self._ebdks_triggered_today += 1
-                    current_count = self._ebdks_triggered_today
+                    total_count = self._ebdks_triggered_today
 
                 logger.warning(
                     "ebdks_otomatik_tetiklendi",
@@ -192,7 +209,7 @@ class AutoCircuitBreakerEngine:
                     esik=f"%{threshold_pct}",
                     guncel_fiyat=current_price,
                     referans_fiyat=ref_price,
-                    gunluk_tetiklenme_sayisi=current_count,
+                    gunluk_tetiklenme_sayisi=total_count,
                 )
                 return event
 
@@ -243,43 +260,53 @@ class AutoCircuitBreakerEngine:
             normalized_market, bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
         )
 
+        threshold_to_trigger: float | None = None
         with self._lock:
-            triggered_thresholds = list(self._triggered_today.get(ticker, []))
-
-        for threshold in sorted(thresholds):
-            if change_pct <= -threshold and threshold not in triggered_thresholds:
-                # FSM üzerinde hisse devre kesicisini tetikle
-                bist_session_fsm.trigger_circuit_breaker(ticker)
-                trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
-
-                event = CircuitBreakerEvent(
-                    ticker=ticker,
-                    event_type="PAY_BAZINDA",
-                    trigger_price=current_price,
-                    reference_price=reference_price,
-                    change_pct=change_pct,
-                    threshold_pct=threshold,
-                    triggered_at=trigger_time,
-                    duration_minutes=bist_session_fsm.CIRCUIT_BREAKER_DURATION_MINUTES,
-                    market_phase=phase.value,
-                )
-
-                with self._lock:
-                    self._events.append(event)
+            triggered_thresholds = set(self._triggered_today.get(ticker, []))
+            for threshold in sorted(thresholds):
+                if change_pct <= -threshold and threshold not in triggered_thresholds:
                     if ticker not in self._triggered_today:
                         self._triggered_today[ticker] = []
                     self._triggered_today[ticker].append(threshold)
+                    threshold_to_trigger = threshold
+                    break
 
-                logger.warning(
-                    "pay_devre_kesici_tetiklendi",
-                    ticker=ticker,
-                    degisim_yuzdesi=f"{change_pct:.2f}%",
-                    esik=f"%{threshold}",
-                    guncel_fiyat=current_price,
-                    referans_fiyat=reference_price,
-                    pazar_tipi=normalized_market,
-                )
-                return event
+        if threshold_to_trigger is not None:
+            try:
+                bist_session_fsm.trigger_circuit_breaker(ticker)
+            except Exception as exc:
+                with self._lock:
+                    if ticker in self._triggered_today and threshold_to_trigger in self._triggered_today[ticker]:
+                        self._triggered_today[ticker].remove(threshold_to_trigger)
+                logger.error("pay_devre_kesici_fsm_tetikleme_hatasi", ticker=ticker, error=str(exc))
+                raise
+
+            trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
+            event = CircuitBreakerEvent(
+                ticker=ticker,
+                event_type="PAY_BAZINDA",
+                trigger_price=current_price,
+                reference_price=reference_price,
+                change_pct=change_pct,
+                threshold_pct=threshold_to_trigger,
+                triggered_at=trigger_time,
+                duration_minutes=bist_session_fsm.CIRCUIT_BREAKER_DURATION_MINUTES,
+                market_phase=phase.value,
+            )
+
+            with self._lock:
+                self._events.append(event)
+
+            logger.warning(
+                "pay_devre_kesici_tetiklendi",
+                ticker=ticker,
+                degisim_yuzdesi=f"{change_pct:.2f}%",
+                esik=f"%{threshold_to_trigger}",
+                guncel_fiyat=current_price,
+                referans_fiyat=reference_price,
+                pazar_tipi=normalized_market,
+            )
+            return event
 
         return None
 
@@ -293,7 +320,10 @@ class AutoCircuitBreakerEngine:
         Returns:
             bool: Devre kesici aktif ise True, değilse False.
         """
-        return bist_session_fsm.get_phase(ticker=ticker, current_time=current_time) == BISTMarketPhase.CIRCUIT_BREAKER_AUCTION
+        return (
+            bist_session_fsm.get_phase(ticker=ticker, current_time=current_time)
+            == BISTMarketPhase.CIRCUIT_BREAKER_AUCTION
+        )
 
     def is_ebdks_active(self) -> bool:
         """Endekse bağlı devre kesicinin (EBDKS) anlık olarak aktif olup olmadığını döner.
@@ -321,6 +351,20 @@ class AutoCircuitBreakerEngine:
         with self._lock:
             events = list(self._events)
         return [e.to_dict() for e in events]
+
+    def get_events_for_ticker(self, ticker: str) -> list[dict[str, Any]]:
+        """Belirtilen hisse veya endekse ait gerçekleşen devre kesici olaylarını döner.
+
+        Args:
+            ticker: BIST hisse sembolü veya 'BIST-100'.
+
+        Returns:
+            list[dict[str, Any]]: İlgili hisseye ait olaylar listesi.
+        """
+        target = ticker.upper().strip()
+        with self._lock:
+            events = [e.to_dict() for e in self._events if e.ticker.upper().strip() == target]
+        return events
 
     def get_status(self) -> dict[str, Any]:
         """Devre kesici motorunun anlık durum özetini döner.
@@ -359,6 +403,64 @@ class AutoCircuitBreakerEngine:
         with self._lock:
             events = list(self._events)
         return [e.to_dict() for e in reversed(events[-limit:])]
+
+    def export_to_duckdb(self, db_path: str = "data/circuit_breaker_events.duckdb") -> int:
+        """Mevcut devre kesici olaylarını DuckDB tablosuna kalıcı olarak yazar.
+
+        Args:
+            db_path: Hedef DuckDB dosya yolu.
+
+        Returns:
+            int: Veritabanına aktarılan olay sayısı.
+        """
+        import duckdb
+
+        with self._lock:
+            events = list(self._events)
+
+        if not events:
+            return 0
+
+        conn = duckdb.connect(database=db_path)
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS circuit_breaker_events (
+                    ticker VARCHAR NOT NULL,
+                    event_type VARCHAR NOT NULL,
+                    trigger_price DOUBLE NOT NULL,
+                    reference_price DOUBLE NOT NULL,
+                    change_pct DOUBLE NOT NULL,
+                    threshold_pct DOUBLE NOT NULL,
+                    triggered_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    duration_minutes INTEGER NOT NULL,
+                    feature_code VARCHAR,
+                    market_phase VARCHAR NOT NULL
+                );
+                """
+            )
+            for e in events:
+                conn.execute(
+                    """
+                    INSERT INTO circuit_breaker_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    [
+                        e.ticker,
+                        e.event_type,
+                        e.trigger_price,
+                        e.reference_price,
+                        e.change_pct,
+                        e.threshold_pct,
+                        e.triggered_at,
+                        e.duration_minutes,
+                        e.feature_code,
+                        e.market_phase,
+                    ],
+                )
+            logger.info("circuit_breaker_events_duckdb_aktarildi", adet=len(events), db_path=db_path)
+            return len(events)
+        finally:
+            conn.close()
 
     def __repr__(self) -> str:
         """Devre kesici motorunun durum temsilini döner."""

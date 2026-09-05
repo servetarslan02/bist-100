@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 95 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 98 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -30,7 +30,7 @@
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 9 | `auto_circuit_breaker.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 8 | ✅ Denetlendi, düzeltildi |
@@ -168,6 +168,9 @@
 | 4 | 2 & 6 | `CircuitBreakerEvent` çok sık üretilmesine rağmen standart `@dataclass` idi ve bellek tüketimi fazlaydı | `@dataclass(slots=True)` yapılandırmasına geçilerek bellek optimize edildi |
 | 5 | 3 & 7 | Sınıf adı `AutoCircuitBreakerEngine` iken harici servisler veya testler `AutoCircuitBreaker` arayabiliyordu; ayrıca `get_status_summary` ve `get_recent_events` metotları eksikti | `AutoCircuitBreaker = AutoCircuitBreakerEngine` takma adı (alias) eklendi; `get_status_summary`, `get_recent_events` ve `pay_circuit_breakers_triggered` listesi eklendi |
 | 6 | 4 & 7 | Merkezi OTel dekoratörü `services.core.otel` yerine yerel tanımlanmıştı; `VALID_MARKET_TYPES` ve `DEFAULT_MARKET_TYPE` sabitleri eksikti | Merkezi `otel_trace` bağlandı, pazar tipleri (`yildiz`, `ana`, `alt`) normalize edildi ve tüm semboller `__all__` listesine eklendi |
+| 7 | 2 & 3 | Eşzamanlı gelen fiyat güncellemelerinde `check_pay_circuit_breaker` ve `update_bist100_price` içinde eşik kontrolü ile tetikleme arasında yarış durumu (race condition) vardı; aynı eşik iki eşzamanlı tick tarafından çift tetiklenebiliyordu | Eşik denetimi ve anında talep etme (`claim`) işlemleri `with self._lock:` içerisine atomik olarak alındı; FSM çağrısı başarısız olduğunda ise sayaç/eşik geri alma (`rollback`) güvencesi eklendi |
+| 8 | 5 | Gerçekleşen piyasa devre kesici ve EBDKS durdurma olayları yalnızca bellek içi `deque`'te tutuluyordu; sistem yeniden başladığında SPK denetim izi kayboluyordu | `export_to_duckdb()` fonksiyonu eklenerek `duckdb>=1.3.0` ile tüm devre kesici olaylarının kalıcı olarak saklanması ve SPK mevzuat uyumu sağlandı |
+| 9 | 3 & 6 | Belirli bir hisse sembolüne ait devre kesici olaylarını sorgulama fonksiyonu (`get_events_for_ticker`) ve `to_orjson_bytes()` ikili serileştirme desteği eksikti | `get_events_for_ticker(ticker)` ve `to_orjson_bytes()` metotları eklenerek risk ve emir iletim motorlarının sorgu kabiliyeti genişletildi |
 
 ---
 
