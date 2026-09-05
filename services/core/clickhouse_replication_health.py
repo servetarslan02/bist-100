@@ -1,8 +1,11 @@
 """ALPHA BIST — ClickHouse Replikasyon Sağlık İzleyicisi (Replication Health Monitor).
 
 Bu modül, ClickHouse kümesindeki ReplicatedMergeTree tablolarının replikasyon durumunu,
-gecikmelerini (absolute_delay), kuyruk boyutlarını ve salt-okunur (read-only) durumlarını
+gecikmelerini (absolute_delay), kuyruk boyutlarını, aktif replika sayısını (active_replicas),
+hasarlı parça durumunu (parts_to_check) ve salt-okunur (read-only) kilitlenmelerini
 `system.replicas` tablosu üzerinden izler, Prometheus ve JSON formatlarında sunar.
+
+Hem senkron hem de asenkron (event loop dostu) çalıştırma arayüzlerini destekler.
 
 Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.5 (Replication & OLAP Health)
@@ -10,6 +13,7 @@ Referanslar:
 
 from __future__ import annotations
 
+import asyncio
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -34,7 +38,7 @@ DEFAULT_MAX_QUEUE_SIZE: Final[int] = 100
 
 @dataclass(slots=True)
 class ReplicaHealthInfo:
-    """Tek bir tablonun replika durum ve kuyruk bilgileri.
+    """Tek bir tablonun replika durum, kuyruk ve aktif düğüm bilgileri.
 
     Attributes:
         database: Veritabanı adı.
@@ -46,6 +50,8 @@ class ReplicaHealthInfo:
         inserts_in_queue: Kuyruktaki ekleme işlemi sayısı.
         merges_in_queue: Kuyruktaki birleştirme (merge) işlemi sayısı.
         total_replicas: Tanımlı toplam replika adedi.
+        active_replicas: Anlık olarak çalışan ve iletişimde olan aktif replika adedi.
+        parts_to_check: Replikasyonda doğrulanmayı bekleyen / hasarlı parça adedi.
     """
 
     database: str
@@ -57,6 +63,8 @@ class ReplicaHealthInfo:
     inserts_in_queue: int
     merges_in_queue: int
     total_replicas: int
+    active_replicas: int = 1
+    parts_to_check: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Replika verisini serileştirilebilir sözlüğe dönüştürür."""
@@ -70,6 +78,8 @@ class ReplicaHealthInfo:
             "inserts_in_queue": self.inserts_in_queue,
             "merges_in_queue": self.merges_in_queue,
             "total_replicas": self.total_replicas,
+            "active_replicas": self.active_replicas,
+            "parts_to_check": self.parts_to_check,
         }
 
     def __repr__(self) -> str:
@@ -77,7 +87,7 @@ class ReplicaHealthInfo:
         return (
             f"ReplicaHealthInfo(table='{self.table}', leader={self.is_leader}, "
             f"readonly={self.is_readonly}, delay={self.absolute_delay}s, "
-            f"queue={self.queue_size})"
+            f"queue={self.queue_size}, replicas={self.active_replicas}/{self.total_replicas})"
         )
 
 
@@ -123,7 +133,7 @@ def check_replication_health(
     max_absolute_delay: int = DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS,
     max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
 ) -> dict[str, Any]:
-    """ClickHouse sistemindeki tabloların replikasyon sağlık durumunu denetler.
+    """ClickHouse sistemindeki tabloların replikasyon sağlık durumunu senkron olarak denetler.
 
     Args:
         database: Denetlenecek hedef veritabanı.
@@ -139,7 +149,7 @@ def check_replication_health(
     status = "unknown"
 
     try:
-        # system.replicas tablosundan parametrik ve güvenli sorgulama
+        # system.replicas tablosundan active_replicas ve parts_to_check dahil parametrik sorgulama
         query = """
             SELECT
                 database,
@@ -150,7 +160,9 @@ def check_replication_health(
                 queue_size,
                 inserts_in_queue,
                 merges_in_queue,
-                total_replicas
+                total_replicas,
+                active_replicas,
+                parts_to_check
             FROM system.replicas
             WHERE database = {db:String}
         """
@@ -172,6 +184,16 @@ def check_replication_health(
                     inserts_in_queue=int(row[6]) if row[6] is not None and not math.isnan(row[6]) else 0,
                     merges_in_queue=int(row[7]) if row[7] is not None and not math.isnan(row[7]) else 0,
                     total_replicas=int(row[8]) if row[8] is not None and not math.isnan(row[8]) else 0,
+                    active_replicas=(
+                        int(row[9])
+                        if len(row) > 9 and row[9] is not None and not math.isnan(row[9])
+                        else (int(row[8]) if row[8] is not None else 1)
+                    ),
+                    parts_to_check=(
+                        int(row[10])
+                        if len(row) > 10 and row[10] is not None and not math.isnan(row[10])
+                        else 0
+                    ),
                 )
                 replicas.append(replica_info)
 
@@ -185,6 +207,14 @@ def check_replication_health(
                 if replica_info.queue_size > max_queue_size:
                     errors.append(
                         f"{replica_info.table}: Kuyruk boyutu kritik seviyede ({replica_info.queue_size} > {max_queue_size})"
+                    )
+                if replica_info.total_replicas > 1 and replica_info.active_replicas < replica_info.total_replicas:
+                    errors.append(
+                        f"{replica_info.table}: Aktif replika kaybı tespit edildi ({replica_info.active_replicas}/{replica_info.total_replicas})"
+                    )
+                if replica_info.parts_to_check > 0:
+                    errors.append(
+                        f"{replica_info.table}: Hasarlı veya kontrol bekleyen parçalar var ({replica_info.parts_to_check} parça)"
                     )
 
             if not errors:
@@ -208,6 +238,55 @@ def check_replication_health(
         timestamp=now_iso,
     )
     return report.to_dict()
+
+
+async def check_replication_health_async(
+    database: str = DEFAULT_DATABASE,
+    max_absolute_delay: int = DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS,
+    max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
+) -> dict[str, Any]:
+    """ClickHouse replikasyon sağlık durumunu event loop'u bloke etmeden asenkron denetler.
+
+    Args:
+        database: Denetlenecek hedef veritabanı.
+        max_absolute_delay: Uyarı tetikleyecek maksimum gecikme eşiği.
+        max_queue_size: Uyarı tetikleyecek maksimum kuyruk boyutu eşiği.
+
+    Returns:
+        dict[str, Any]: Replikasyon durum raporu sözlüğü.
+    """
+    return await asyncio.to_thread(
+        check_replication_health,
+        database=database,
+        max_absolute_delay=max_absolute_delay,
+        max_queue_size=max_queue_size,
+    )
+
+
+def is_replication_healthy(database: str = DEFAULT_DATABASE) -> bool:
+    """Replikasyonun tamamen sağlıklı (healthy) olup olmadığını döner (Liveness/Readiness probe).
+
+    Args:
+        database: Hedef veritabanı.
+
+    Returns:
+        bool: Sağlıklı ise True, aksi halde False.
+    """
+    report = check_replication_health(database=database)
+    return report.get("status") == "healthy"
+
+
+async def is_replication_healthy_async(database: str = DEFAULT_DATABASE) -> bool:
+    """Asenkron liveness/readiness kontrolü.
+
+    Args:
+        database: Hedef veritabanı.
+
+    Returns:
+        bool: Sağlıklı ise True, aksi halde False.
+    """
+    report = await check_replication_health_async(database=database)
+    return report.get("status") == "healthy"
 
 
 @otel_trace("clickhouse_replication_health.get_replication_metrics")
@@ -236,6 +315,8 @@ def get_replication_metrics(database: str = DEFAULT_DATABASE) -> dict[str, Any]:
         metrics[f"clickhouse_replica_queue_{table}"] = replica.get("queue_size", 0)
         metrics[f"clickhouse_replica_leader_{table}"] = 1 if replica.get("is_leader") else 0
         metrics[f"clickhouse_replica_readonly_{table}"] = 1 if replica.get("is_readonly") else 0
+        metrics[f"clickhouse_replica_active_{table}"] = replica.get("active_replicas", 1)
+        metrics[f"clickhouse_replica_parts_to_check_{table}"] = replica.get("parts_to_check", 0)
 
     return metrics
 
@@ -272,6 +353,10 @@ def export_prometheus(database: str = DEFAULT_DATABASE) -> str:
         "# TYPE clickhouse_replica_is_leader gauge",
         "# HELP clickhouse_replica_is_readonly Replika salt-okunur mu (1=Evet, 0=Hayır)",
         "# TYPE clickhouse_replica_is_readonly gauge",
+        "# HELP clickhouse_replica_active_nodes Aktif replika düğüm sayısı",
+        "# TYPE clickhouse_replica_active_nodes gauge",
+        "# HELP clickhouse_replica_parts_to_check Kontrol bekleyen / hasarlı veri parçası sayısı",
+        "# TYPE clickhouse_replica_parts_to_check gauge",
     ]
 
     for replica in replicas:
@@ -282,13 +367,22 @@ def export_prometheus(database: str = DEFAULT_DATABASE) -> str:
         queue = replica.get("queue_size", 0)
         leader = 1 if replica.get("is_leader") else 0
         readonly = 1 if replica.get("is_readonly") else 0
+        active = replica.get("active_replicas", 1)
+        parts = replica.get("parts_to_check", 0)
 
         lines.append(f"clickhouse_replica_absolute_delay_seconds{{{labels}}} {delay}")
         lines.append(f"clickhouse_replica_queue_size{{{labels}}} {queue}")
         lines.append(f"clickhouse_replica_is_leader{{{labels}}} {leader}")
         lines.append(f"clickhouse_replica_is_readonly{{{labels}}} {readonly}")
+        lines.append(f"clickhouse_replica_active_nodes{{{labels}}} {active}")
+        lines.append(f"clickhouse_replica_parts_to_check{{{labels}}} {parts}")
 
     return "\n".join(lines) + "\n"
+
+
+async def export_prometheus_async(database: str = DEFAULT_DATABASE) -> str:
+    """Asenkron Prometheus metin çıktısı."""
+    return await asyncio.to_thread(export_prometheus, database=database)
 
 
 if __name__ == "__main__":
@@ -304,6 +398,10 @@ __all__: Sequence[str] = [
     "ReplicaHealthInfo",
     "ReplicationHealthReport",
     "check_replication_health",
+    "check_replication_health_async",
     "export_prometheus",
+    "export_prometheus_async",
     "get_replication_metrics",
+    "is_replication_healthy",
+    "is_replication_healthy_async",
 ]

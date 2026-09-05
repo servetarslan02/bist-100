@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 86 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 88 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -35,7 +35,7 @@
 | 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 13 | `circuit_breaker_metrics.py` | 7 | ✅ Denetlendi, düzeltildi |
-| 14 | `clickhouse_replication_health.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -235,6 +235,8 @@
 | 4 | 2 & 4 | Metrikler `metrics[f"clickhouse_replica_delay_{table}"]` şeklinde tablo adını metrik ismine gömerek Prometheus standartlarını (labels) ihlal ediyordu (metric explosion anti-pattern) | Geriye dönük uyumluluk korunurken, `database` ve `table` etiketlerini (labels) kullanan standart `export_prometheus()` fonksiyonu eklendi |
 | 5 | 4 & 6 | Replika ve rapor verileri düz sözlüklerle yönetiliyordu, tip güvenliği ve dokümantasyon yoktu | `@dataclass(slots=True)` mimarisinde `ReplicaHealthInfo` ve `ReplicationHealthReport` sınıfları ve `__repr__` metotları yazıldı |
 | 6 | 4 & 7 | Yerel `otel_trace` kullanılıyordu ve modül seviyesinde `__all__` listesi yoktu | Merkezi `services.core.otel` import edildi ve tüm model, fonksiyon ve sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
+| 7 | 2 & 3 | `active_replicas` ve `parts_to_check` kolonları sorgulanmıyor ve incelenmiyordu; kümede düğüm kaybı (node failure) veya bozuk/hasarlı parça oluştuğunda sistem bunu fark edemiyordu | `active_replicas < total_replicas` düğüm kaybı uyarısı ve `parts_to_check > 0` hasarlı parça alarmları eklendi; Prometheus metriklerine dahil edildi |
+| 8 | 2 & 6 | Fonksiyonlar yalnızca senkron/blocking çağrı yapıyordu; FastAPI ve async event loop altında çağrıldığında 15s boyunca loop'u kilitliyordu | `check_replication_health_async`, `export_prometheus_async` ve `is_replication_healthy(_async)` liveness/readiness fonksiyonları eklendi |
 
 ---
 
