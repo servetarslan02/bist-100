@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 122 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 126 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -24,7 +24,7 @@
 |---|-------|-------|-------|
 | 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
-| 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
+| 3 | `alerting.py` | 12 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 4 | `algo_notification.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 5 | `alpha_engine.py` | 14 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 6 | `arrow_pipeline.py` | 11 | ✅ Denetlendi, düzeltildi |
@@ -76,6 +76,10 @@
 | 6 | 4 | Dağınık ve fonksiyon içi `aiohttp` importları vardı | Proje standardı `httpx.AsyncClient` ile birleştirildi, singleton ve güvenli oturum yönetimi sağlandı |
 | 7 | 7 | Modül seviyesinde `__all__` listesi eksikti | `__all__` listesi eklendi (`Alert`, `AlertSeverity`, `AlertingSystem`, sağlayıcılar vb.) |
 | 8 | 4 | Loglar ve hata mesajları İngilizceydi | `ALARM_BILDIRIMI`, `yeni_alarm_olusturuldu`, `alarm_onaylandi` gibi standart Türkçe structlog yapısına geçirildi |
+| 9 | 2 & 3 | `AlertingSystem` senkron hook'larında `asyncio.Lock` yetersiz kalıyor ve yarış koşuluna açık kalıyordu | `self._lock = threading.RLock()` ile alarmlar ve dedup önbelleği atomik kilit altına alındı |
+| 10 | 2 & 5 | `persist_alert` metodunda paylaşımlı DuckDB bağlantısına eşzamanlı sorgu çalıştırma istisnası riski vardı | `self._lock` kapsamına alınarak `duckdb.ConnectionException` önlendi |
+| 11 | 2 & 3 | `EmailProvider._send_smtp` metodunda SSL/TLS (port 465) ayrımı ve ağ asılı kalmalarına karşı zaman aşımı eksikti | `SMTP_SSL` ve 10s `timeout` koruması eklendi |
+| 12 | 2 & 6 | Sistem alarmlarının izlenmesi ve analitiği için yerel Polars dışa aktarımı yoktu | `export_alerts_to_polars(limit)` metodu ile sıfır kopyalı doğrudan Polars DataFrame üretimi sağlandı |
 
 ---
 

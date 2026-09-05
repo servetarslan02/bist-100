@@ -17,13 +17,17 @@ import hashlib
 import os
 import random
 import smtplib
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.mime.text import MIMEText
 from enum import StrEnum
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    import polars as pl
 
 import httpx
 import orjson
@@ -540,12 +544,18 @@ class EmailProvider:
             return False
 
     def _send_smtp(self, msg: Any) -> None:
-        """SMTP bağlantısı kurup e-postayı iletir."""
-        with smtplib.SMTP(self.smtp_host, self.smtp_port) as s:
-            if self.username:
-                s.starttls()
-                s.login(self.username, self.password)
-            s.send_message(msg)
+        """SMTP bağlantısı kurup e-postayı iletir (SSL/TLS ve 10s zaman aşımı korumalı)."""
+        if self.smtp_port == 465:
+            with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=10.0) as s:
+                if self.username:
+                    s.login(self.username, self.password)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10.0) as s:
+                if self.username:
+                    s.starttls()
+                    s.login(self.username, self.password)
+                s.send_message(msg)
 
     async def close(self) -> None:
         """E-posta sağlayıcısı kaynak temizliği."""
@@ -666,7 +676,7 @@ class AlertingSystem:
         self._alerts: deque[Alert] = deque(maxlen=self._max_alerts)
         self._dedup_window_s = dedup_window_s
         self._dedup_cache: dict[str, float] = {}
-        self._dedup_lock: asyncio.Lock = asyncio.Lock()
+        self._lock = threading.RLock()
         self._router = NotificationRouter()
         self._retry_config = RetryConfig()
         self._notification_log: deque[NotificationResult] = deque(maxlen=1000)
@@ -861,20 +871,22 @@ class AlertingSystem:
 
     def acknowledge_alert(self, fingerprint: str) -> bool:
         """Parmak izi eşleşen aktif alarmı onaylar."""
-        for a in self._alerts:
-            if a.fingerprint == fingerprint and a.is_active:
-                a.acknowledge()
-                logger.info("alarm_onaylandi", fingerprint=fingerprint)
-                return True
+        with self._lock:
+            for a in self._alerts:
+                if a.fingerprint == fingerprint and a.is_active:
+                    a.acknowledge()
+                    logger.info("alarm_onaylandi", fingerprint=fingerprint)
+                    return True
         return False
 
     def resolve_alert(self, fingerprint: str) -> bool:
         """Parmak izi eşleşen aktif alarmı çözüldü olarak işaretler."""
-        for a in self._alerts:
-            if a.fingerprint == fingerprint and a.is_active:
-                a.resolve()
-                logger.info("alarm_cozuldu", fingerprint=fingerprint)
-                return True
+        with self._lock:
+            for a in self._alerts:
+                if a.fingerprint == fingerprint and a.is_active:
+                    a.resolve()
+                    logger.info("alarm_cozuldu", fingerprint=fingerprint)
+                    return True
         return False
 
     def get_alert_by_fingerprint(self, fingerprint: str) -> Alert | None:
@@ -886,9 +898,10 @@ class AlertingSystem:
         Returns:
             Alert | None: Bulunan alarm nesnesi veya None.
         """
-        for a in self._alerts:
-            if a.fingerprint == fingerprint:
-                return a
+        with self._lock:
+            for a in self._alerts:
+                if a.fingerprint == fingerprint:
+                    return a
         return None
 
     def resolve_alerts(self, alert_type: str) -> None:
@@ -901,36 +914,58 @@ class AlertingSystem:
 
     def get_active_alerts(self) -> list[dict[str, Any]]:
         """Mevcut tüm aktif alarmları döner."""
-        return [a.to_dict() for a in self._alerts if a.is_active]
+        with self._lock:
+            return [a.to_dict() for a in self._alerts if a.is_active]
 
     def get_all_alerts(self, limit: int = 100) -> list[dict[str, Any]]:
         """Sistemdeki son alarmları sözlük listesi olarak döner."""
-        return [a.to_dict() for a in list(self._alerts)[-limit:]]
+        with self._lock:
+            return [a.to_dict() for a in list(self._alerts)[-limit:]]
 
     def get_alert_summary(self) -> dict[str, Any]:
         """Sistem alarmlarının istatistiksel özetini döner."""
-        active = [a for a in self._alerts if a.is_active]
-        by_severity: dict[str, int] = {}
-        by_status: dict[str, int] = {}
-        for a in active:
-            by_severity[a.severity] = by_severity.get(a.severity, 0) + 1
-            by_status[a.status] = by_status.get(a.status, 0) + 1
-        return {
-            "total_alerts": len(self._alerts),
-            "active_alerts": len(active),
-            "by_severity": by_severity,
-            "by_status": by_status,
-            "providers": len(self._router.get_all_providers()),
-            "failed_notifications": len(self._failed_notifications),
-        }
+        with self._lock:
+            active = [a for a in self._alerts if a.is_active]
+            by_severity: dict[str, int] = {}
+            by_status: dict[str, int] = {}
+            for a in active:
+                by_severity[a.severity] = by_severity.get(a.severity, 0) + 1
+                by_status[a.status] = by_status.get(a.status, 0) + 1
+            return {
+                "total_alerts": len(self._alerts),
+                "active_alerts": len(active),
+                "by_severity": by_severity,
+                "by_status": by_status,
+                "providers": len(self._router.get_all_providers()),
+                "failed_notifications": len(self._failed_notifications),
+            }
 
     def get_notification_log(self, limit: int = 50) -> list[dict[str, Any]]:
         """Son bildirim denemelerinin geçmiş logunu döner."""
-        return [r.to_dict() for r in list(self._notification_log)[-limit:]]
+        with self._lock:
+            return [r.to_dict() for r in list(self._notification_log)[-limit:]]
 
     def get_failed_notifications(self) -> list[dict[str, Any]]:
         """Başarısız olan bildirim denemelerini listeler."""
-        return [r.to_dict() for r in self._failed_notifications]
+        with self._lock:
+            return [r.to_dict() for r in self._failed_notifications]
+
+    def export_alerts_to_polars(self, limit: int = 1000) -> pl.DataFrame:
+        """Mevcut alarmları analitik ve izleme için Polars DataFrame olarak dışa aktarır.
+
+        Args:
+            limit: Döndürülecek maksimum alarm sayısı.
+
+        Returns:
+            pl.DataFrame: Polars DataFrame nesnesi.
+        """
+        import polars as pl
+
+        with self._lock:
+            data = [a.to_dict() for a in list(self._alerts)[-limit:]]
+        if not data:
+            return pl.DataFrame()
+        return pl.DataFrame(data)
 
     # ─── Silence Yönetimi ─────────────────────────────────────────────────────
 
@@ -1064,30 +1099,31 @@ class AlertingSystem:
         if not self._db:
             return
         try:
-            # Standart DuckDB upsert / replace
-            self._db.execute("DELETE FROM alerts_state WHERE fingerprint = ?", (alert.fingerprint,))
-            self._db.execute(
-                "INSERT INTO alerts_state "
-                "(fingerprint, alert_type, severity, status, message, details, "
-                "timestamp, acknowledged_at, escalated_at, resolved_at, "
-                "escalation_count, notification_status, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    alert.fingerprint,
-                    str(alert.alert_type),
-                    str(alert.severity),
-                    str(alert.status),
-                    alert.message,
-                    orjson.dumps(alert.details).decode(),
-                    alert.timestamp,
-                    alert.acknowledged_at,
-                    alert.escalated_at,
-                    alert.resolved_at,
-                    alert.escalation_count,
-                    alert.notification_status,
-                    time.time(),
-                ),
-            )
+            with self._lock:
+                # Standart DuckDB upsert / replace
+                self._db.execute("DELETE FROM alerts_state WHERE fingerprint = ?", (alert.fingerprint,))
+                self._db.execute(
+                    "INSERT INTO alerts_state "
+                    "(fingerprint, alert_type, severity, status, message, details, "
+                    "timestamp, acknowledged_at, escalated_at, resolved_at, "
+                    "escalation_count, notification_status, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        alert.fingerprint,
+                        str(alert.alert_type),
+                        str(alert.severity),
+                        str(alert.status),
+                        alert.message,
+                        orjson.dumps(alert.details).decode(),
+                        alert.timestamp,
+                        alert.acknowledged_at,
+                        alert.escalated_at,
+                        alert.resolved_at,
+                        alert.escalation_count,
+                        alert.notification_status,
+                        time.time(),
+                    ),
+                )
         except Exception as exc:
             logger.warning("alarm_veritabani_kayit_hatasi", error=str(exc))
 
@@ -1149,16 +1185,17 @@ class AlertingSystem:
             span.set_attribute("alert.severity", alert.severity)
             span.set_attribute("alert.fingerprint", alert.fingerprint)
 
-            if self._is_duplicate(alert):
-                return
+            with self._lock:
+                if self._is_duplicate(alert):
+                    return
 
-            if self._policy.is_silenced(alert.alert_type, alert.fingerprint):
-                alert.notification_status = "silenced"
-                logger.debug("alarm_susturuldu", fp=alert.fingerprint, type=alert.alert_type)
-                return
+                if self._policy.is_silenced(alert.alert_type, alert.fingerprint):
+                    alert.notification_status = "silenced"
+                    logger.debug("alarm_susturuldu", fp=alert.fingerprint, type=alert.alert_type)
+                    return
 
-            self._alerts.append(alert)
-            self._dedup_cache[alert.fingerprint] = time.time()
+                self._alerts.append(alert)
+                self._dedup_cache[alert.fingerprint] = time.time()
 
             _alert_created_counter.add(
                 1,
@@ -1189,13 +1226,14 @@ class AlertingSystem:
     def _is_duplicate(self, alert: Alert) -> bool:
         """Aynı parmak izine sahip alarmın dedup_window_s süresi içinde gelip gelmediğini kontrol eder."""
         now = time.time()
-        # Otomatik bellek sızıntısı koruması: boyut 1000'i aşınca süresi dolanları temizle
-        if len(self._dedup_cache) > 1000:
-            self._dedup_cache = {
-                fp: ts for fp, ts in self._dedup_cache.items() if now - ts < self._dedup_window_s
-            }
-        fp = alert.fingerprint
-        return fp in self._dedup_cache and now - self._dedup_cache[fp] < self._dedup_window_s
+        with self._lock:
+            # Otomatik bellek sızıntısı koruması: boyut 1000'i aşınca süresi dolanları temizle
+            if len(self._dedup_cache) > 1000:
+                self._dedup_cache = {
+                    fp: ts for fp, ts in self._dedup_cache.items() if now - ts < self._dedup_window_s
+                }
+            fp = alert.fingerprint
+            return fp in self._dedup_cache and now - self._dedup_cache[fp] < self._dedup_window_s
 
     async def _notify_all(self, alert: Alert) -> None:
         """Alarmı uygun tüm bildirim kanallarına eşzamanlı iletir."""
