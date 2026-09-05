@@ -171,12 +171,12 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 1 | Modül ve metot docstring'leri eksik parametre detaylarına sahipti | Tamamı Türkçe, sözleşme maddelerini ve Args/Returns/Raises detaylarını içeren standart biçime dönüştürüldü |
-| 2 | 2 | 121. satırda `E501 Line too long (124 > 120)` ruff hatası mevcuttu | Log çağrısı yapısal argümanlarla alt satırlara bölünerek satır uzunluğu kuralına tam uyum sağlandı |
-| 3 | 2 | `_processed_idempotency_keys` sözlüğü asenkron ve çoklu iş parçacığı altında TTL temizliği yaparken boyutu değişebiliyor ve `RuntimeError: dictionary changed size during iteration` riski taşıyordu | `threading.Lock()` ile eşzamanlı erişim koruması sağlandı ve liste kopyası üzerinden güvenli TTL budaması yapıldı |
-| 4 | 2 | Kod yorumunda "Exponential Backoff with Jitter" yazmasına rağmen jitter bulunmuyordu (thundering herd riski) | Gerçek rastgele sapma (`random.uniform(0.0, 0.2 * base_backoff)`) eklenerek tam koruma sağlandı |
-| 5 | 4 | `ServiceExecutionError` ve `BaseAlphaService` sınıflarında `__repr__` metodu yoktu; magic number'lar doğrudan koddaydı | Her iki sınıfa durum özetleyici `__repr__` tanımlandı; tüm eşik ve süreler `DEFAULT_*` sabitlerine bağlandı |
-| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_BACKOFF_FACTOR", "DEFAULT_IDEMPOTENCY_MAX_KEYS", "DEFAULT_IDEMPOTENCY_TTL_SECONDS", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_SECONDS", "BaseAlphaService", "ServiceExecutionError"]` tanımlandı |
+| 1 | 2, 3 & 5 | `self._dlq.push(...)` çağrısı senkron ve eksik/hatalı parametrelerle (`reason=...` gibi olmayan argümanla) çağrılıyordu; her hata durumunda `dlq_push_fallback_failed` patlıyor ve DuckDB DLQ'ya kayıt düşmüyordu | `orjson.dumps(safe_payload)` ile serileştirme yapıldı, `event_id=corr_id`, `error=error_msg` parametreleri düzeltildi ve asenkron `await dlq_res` desteği ile DuckDB DLQ'ya hatasız kayıt sağlandı |
+| 2 | 2 & 3 | Idempotency anahtarları için TTL kontrolü sorgulama anında yapılmıyordu; yalnızca sözlük 5000 anahtarı aştığında temizlik yapılıyordu. Bu sebeple süresi dolmuş işlemler dahi kalıcı olarak atlanıyordu | Sorgulama anında `now - recorded_time < TTL` denetimi eklendi; süresi dolan anahtarlar sözlükten silinerek yeni isteklerin işlenmesi sağlandı |
+| 3 | 2 & 6 | Graceful Shutdown yüzeyseldi; kapanma sinyali geldiğinde o an işlenmekte olan aktif isteklerin bitmesi beklenmiyordu | `self._active_requests` eşzamanlı sayacı ve `DEFAULT_SHUTDOWN_TIMEOUT_SECONDS` (5.0s) bekleme döngüsü ile kurumsal seviyede zarif kapanma sağlandı |
+| 4 | 2 & 3 | Asenkron `asyncio.CancelledError` iptal durumları genel hata bloğuyla karışabiliyor veya kaynaklar kilitli kalabiliyordu | `asyncio.CancelledError` özel bloğuyla loglanıp yeniden fırlatıldı (`re-raise`); `finally` bloğuyla `self._active_requests` her koşulda korumalı düşürüldü |
+| 5 | 4 | `get_health_status()` ve `__repr__` metotlarında aktif istek ve önbellek anahtar sayıları görünmüyordu | Rapor ve metin temsillerine `active_requests` ve `cached_idempotency_keys` alanları eklendi |
+| 6 | 7 | `DEFAULT_SHUTDOWN_TIMEOUT_SECONDS` sabiti tanımlandı ve `__all__` listesine eklendi | Modül dışa aktarımları eksiksiz hale getirildi |
 
 ---
 
