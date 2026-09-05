@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 115 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 122 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -25,7 +25,7 @@
 | 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
-| 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
+| 4 | `algo_notification.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 5 | `alpha_engine.py` | 14 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 6 | `arrow_pipeline.py` | 11 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 10 | ✅ Denetlendi, düzeltildi |
@@ -90,6 +90,10 @@
 | 5 | 4 | Magic string'ler (`"GENERIC_BIST_ALGO"`, `"MEDIUM"` vb.) kod içine serpiştirilmişti | `DEFAULT_*` adlandırmalı modül sabitleri olarak tanımlandı |
 | 6 | 4 | Dataclass ve Store sınıflarında açıklayıcı `__repr__` metotları yoktu | Her iki sınıfa da detaylı `__repr__` metotları eklendi |
 | 7 | 7 | `__all__` listesi eksikti | `AlgoNotification`, `AlgoNotificationStore`, `generate_algo_notification` ve tüm sabitleri içeren eksiksiz liste oluşturuldu |
+| 8 | 2 & 6 | `list_notifications` metodunda DuckDB'nin `.fetchdf()` metodu gizli Pandas bağımlılığı yaratıyordu (GEMINI.md Pandas yasağı) | Yerel tuple/dict ve `.pl()` Polars dönüşümüne geçilerek sıfır Pandas bağımlılığı sağlandı |
+| 9 | 2 & 3 | `AlgoNotificationStore` bağlantı yaşam döngüsü (close, context manager `__enter__`/`__exit__`) eksikti | `close()` ve context manager desteği eklenerek Windows dosya kilitleme ve bellek sızıntıları önlendi |
+| 10 | 4 & 6 | SPK mevzuat denetimi için tekil ID bazlı sorgulama ve strateji/risk seviyesi filtreleme yetenekleri eksikti | `get_notification_by_id` ve parametrik `list_notifications(strategy_name, risk_level)` filtreleri eklendi |
+| 11 | 2 & 6 | Düzenleyici kurumlara raporlanabilir Polars veri çerçevesi dışa aktarımı yoktu | `export_audit_log_to_polars()` metodu ile sıfır kopyalı doğrudan Polars DataFrame ihracı sağlandı |
 
 ---
 

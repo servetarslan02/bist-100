@@ -13,12 +13,15 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import duckdb
 import orjson
 import structlog
 from opentelemetry import trace
+
+if TYPE_CHECKING:
+    import polars as pl
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.algo_notification")
@@ -102,7 +105,8 @@ class AlgoNotificationStore:
             db_path: DuckDB veritabanı dosya yolu veya ':memory:'.
         """
         self._db_path = db_path
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._is_closed = False
         self._conn = duckdb.connect(database=self._db_path)
         self._setup_schema()
 
@@ -133,11 +137,17 @@ class AlgoNotificationStore:
 
         Args:
             notification: Kaydedilecek bildirim nesnesi veya sözlüğü.
-        """
-        data = notification.to_dict() if isinstance(notification, AlgoNotification) else notification
-        params_json = orjson.dumps(data.get("parameters", {})).decode("utf-8")
 
+        Raises:
+            RuntimeError: Veritabanı bağlantısı kapalıysa.
+        """
         with self._lock:
+            if self._is_closed:
+                raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
+
+            data = notification.to_dict() if isinstance(notification, AlgoNotification) else notification
+            params_json = orjson.dumps(data.get("parameters", {})).decode("utf-8")
+
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO spk_algo_notifications (
@@ -162,43 +172,173 @@ class AlgoNotificationStore:
                 ],
             )
 
-    def list_notifications(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Kayıtlı bildirimleri listeler.
+    def get_notification_by_id(self, notification_id: str) -> dict[str, Any] | None:
+        """Belirtilen bildirim kimliğine sahip kaydı döndürür.
 
         Args:
+            notification_id: SPK bildirim ID'si.
+
+        Returns:
+            dict[str, Any] | None: Bildirim kaydı veya bulunamazsa None.
+
+        Raises:
+            RuntimeError: Veritabanı bağlantısı kapalıysa.
+        """
+        with self._lock:
+            if self._is_closed:
+                raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
+
+            cursor = self._conn.execute(
+                """
+                SELECT notification_id, strategy_name, strategy_type, risk_level,
+                       market, description, parameters_json, kill_switch_enabled,
+                       operator, compliance_status, timestamp, timestamp_iso
+                FROM spk_algo_notifications
+                WHERE notification_id = ?
+                LIMIT 1;
+                """,
+                [str(notification_id)],
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                return None
+            cols = [desc[0] for desc in cursor.description]
+            row = dict(zip(cols, rows[0], strict=False))
+            params_raw = row.pop("parameters_json", None)
+            if params_raw and isinstance(params_raw, str):
+                try:
+                    row["parameters"] = orjson.loads(params_raw)
+                except Exception:
+                    row["parameters"] = {}
+            else:
+                row["parameters"] = {}
+            return row
+
+    def list_notifications(
+        self,
+        strategy_name: str | None = None,
+        risk_level: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Kayıtlı bildirimleri filtreleyerek listeler.
+
+        Args:
+            strategy_name: Filtrelenecek strateji adı (opsiyonel).
+            risk_level: Filtrelenecek risk seviyesi (opsiyonel).
             limit: Döndürülecek maksimum kayıt sayısı.
 
         Returns:
             list[dict[str, Any]]: Bildirim kayıtlarının listesi.
+
+        Raises:
+            RuntimeError: Store bağlantısı kapalıysa.
         """
         with self._lock:
-            df = self._conn.execute(
-                """
-                SELECT * FROM spk_algo_notifications
-                ORDER BY timestamp DESC
-                LIMIT ?;
-                """,
-                [limit],
-            ).fetchdf()
+            if self._is_closed:
+                raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
+
+            query = """
+                SELECT notification_id, strategy_name, strategy_type, risk_level,
+                       market, description, parameters_json, kill_switch_enabled,
+                       operator, compliance_status, timestamp, timestamp_iso
+                FROM spk_algo_notifications
+            """
+            conditions: list[str] = []
+            params: list[Any] = []
+
+            if strategy_name:
+                conditions.append("strategy_name = ?")
+                params.append(str(strategy_name))
+            if risk_level:
+                conditions.append("risk_level = ?")
+                params.append(str(risk_level).upper())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY timestamp DESC LIMIT ?;"
+            params.append(int(limit))
+
+            cursor = self._conn.execute(query, params)
+            cols = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
 
         results: list[dict[str, Any]] = []
-        for row in df.to_dict(orient="records"):
-            if "parameters_json" in row and isinstance(row["parameters_json"], str):
+        for r in rows:
+            row = dict(zip(cols, r, strict=False))
+            params_raw = row.pop("parameters_json", None)
+            if params_raw and isinstance(params_raw, str):
                 try:
-                    row["parameters"] = orjson.loads(row["parameters_json"])
+                    row["parameters"] = orjson.loads(params_raw)
                 except Exception:
                     row["parameters"] = {}
+            else:
+                row["parameters"] = {}
             results.append(row)
         return results
 
-    def clear(self) -> None:
-        """Test amaçlı tüm kayıtları siler."""
+    def export_audit_log_to_polars(self, limit: int = 1000) -> pl.DataFrame:
+        """Denetim izi bildirimlerini doğrudan yerel Polars DataFrame olarak dışa aktarır.
+
+        Args:
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Polars DataFrame nesnesi.
+
+        Raises:
+            RuntimeError: Store bağlantısı kapalıysa.
+        """
         with self._lock:
+            if self._is_closed:
+                raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
+            return self._conn.execute(
+                """
+                SELECT notification_id, strategy_name, strategy_type, risk_level,
+                       market, description, parameters_json, kill_switch_enabled,
+                       operator, compliance_status, timestamp, timestamp_iso
+                FROM spk_algo_notifications
+                ORDER BY timestamp DESC
+                LIMIT ?;
+                """,
+                [int(limit)],
+            ).pl()
+
+    def clear(self) -> None:
+        """Test amaçlı tüm kayıtları siler.
+
+        Raises:
+            RuntimeError: Veritabanı bağlantısı kapalıysa.
+        """
+        with self._lock:
+            if self._is_closed:
+                raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
             self._conn.execute("DELETE FROM spk_algo_notifications;")
+
+    def close(self) -> None:
+        """DuckDB veritabanı bağlantısını güvenli biçimde kapatır."""
+        with self._lock:
+            if not self._is_closed:
+                try:
+                    self._conn.close()
+                except Exception as exc:
+                    logger.warning("algo_notification_store_kapatma_hatasi", hata=str(exc))
+                finally:
+                    self._is_closed = True
+
+    def __enter__(self) -> AlgoNotificationStore:
+        """Context manager giriş metodu."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager çıkışında veritabanı bağlantısını otomatik kapatır."""
+        self.close()
 
     def __repr__(self) -> str:
         """Açıklayıcı nesne temsilini döndürür."""
-        return f"AlgoNotificationStore(db_path={self._db_path!r})"
+        status = "kapali" if self._is_closed else "acik"
+        return f"AlgoNotificationStore(db_path={self._db_path!r}, durum={status!r})"
+
 
 
 _default_store: AlgoNotificationStore | None = None
@@ -311,6 +451,15 @@ def generate_algo_notification(
         return notification_dict
 
 
+def reset_default_store() -> None:
+    """Varsayılan global bildirim deposunu kapatır ve sıfırlar."""
+    global _default_store
+    with _store_lock:
+        if _default_store is not None:
+            _default_store.close()
+            _default_store = None
+
+
 __all__ = [
     "DEFAULT_MARKET",
     "DEFAULT_OPERATOR",
@@ -322,5 +471,7 @@ __all__ = [
     "AlgoNotificationStore",
     "generate_algo_notification",
     "get_default_store",
+    "reset_default_store",
 ]
+
 
