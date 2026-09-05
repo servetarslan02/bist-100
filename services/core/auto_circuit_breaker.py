@@ -12,53 +12,30 @@ Referans: Borsa İstanbul Pay Piyasası Prosedürü ve Ağustos 2025 Düzenlemel
 
 from __future__ import annotations
 
-import functools
 import math
 import threading
 from collections import deque
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from opentelemetry import trace
 
 from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
+from services.core.otel import otel_trace
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.auto_circuit_breaker")
 
 DEFAULT_EVENT_QUEUE_MAXLEN: int = 1000
-
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-def otel_trace(span_name: str) -> Callable[[F], F]:
-    """Bir metodu OpenTelemetry span içine alan dekoratör.
-
-    Args:
-        span_name: Oluşturulacak span'in açıklayıcı adı.
-
-    Returns:
-        Dekore edilmiş fonksiyon/metot sarmalayıcısı.
-    """
-
-    def decorator(func: F) -> F:
-        """Hedef fonksiyonu OTel span ile sarmalar."""
-
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Span bağlamı altında fonksiyonu yürütür."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper  # type: ignore[return-value]
-
-    return decorator
+DEFAULT_MARKET_TYPE: str = "ana"
+VALID_MARKET_TYPES: frozenset[str] = frozenset({"yildiz", "ana", "alt"})
 
 
-@dataclass
+@dataclass(slots=True)
 class CircuitBreakerEvent:
     """Devre kesici tetikleme olayı veri modeli."""
 
@@ -77,7 +54,7 @@ class CircuitBreakerEvent:
         """Olay verilerini serileştirilebilir sözlük biçimine dönüştürür.
 
         Returns:
-            Devre kesici olayına ait alanları içeren sözlük.
+            dict[str, Any]: Devre kesici olayına ait alanları içeren sözlük.
         """
         return {
             "ticker": self.ticker,
@@ -95,8 +72,8 @@ class CircuitBreakerEvent:
     def __repr__(self) -> str:
         """Devre kesici olayının okunabilir temsilini döner."""
         return (
-            f"<CircuitBreakerEvent(ticker='{self.ticker}', tip='{self.event_type}', "
-            f"degisim=%{self.change_pct:.2f}, esik=%{self.threshold_pct:.2f})>"
+            f"CircuitBreakerEvent(ticker={self.ticker!r}, tip={self.event_type!r}, "
+            f"degisim=%{self.change_pct:.2f}, esik=%{self.threshold_pct:.2f})"
         )
 
 
@@ -109,14 +86,23 @@ class AutoCircuitBreakerEngine:
     3. Eşik aşıldığında BIST Seans FSM üzerinden otomatik tetikler.
     """
 
-    def __init__(self, queue_limit: int = DEFAULT_EVENT_QUEUE_MAXLEN) -> None:
+    def __init__(
+        self,
+        queue_limit: int = DEFAULT_EVENT_QUEUE_MAXLEN,
+        maxlen: int | None = None,
+    ) -> None:
         """Devre kesici motorunu başlatır.
 
         Args:
             queue_limit: Olay kuyruğunda saklanacak maksimum olay adedi.
+            maxlen: queue_limit ile eşanlamlı opsiyonel parametre.
         """
+        effective_limit = maxlen if maxlen is not None else queue_limit
+        if effective_limit <= 0:
+            effective_limit = DEFAULT_EVENT_QUEUE_MAXLEN
+
         self._lock: threading.Lock = threading.Lock()
-        self._events: deque[CircuitBreakerEvent] = deque(maxlen=queue_limit)
+        self._events: deque[CircuitBreakerEvent] = deque(maxlen=effective_limit)
         self._triggered_today: dict[str, list[float]] = {}  # ticker -> [threshold_pct, ...]
         self._bist100_reference: float = 0.0  # Önceki gün kapanış değeri
         self._bist100_current: float = 0.0
@@ -136,14 +122,21 @@ class AutoCircuitBreakerEngine:
             self._bist100_reference = reference_price
 
     @otel_trace("auto_circuit_breaker.update_bist100_price")
-    def update_bist100_price(self, current_price: float) -> CircuitBreakerEvent | None:
+    def update_bist100_price(
+        self,
+        current_price: float,
+        feature_code: str | None = None,
+        current_time: datetime | None = None,
+    ) -> CircuitBreakerEvent | None:
         """BIST-100 güncel endeks değerini günceller ve EBDKS eşik kontrolü yapar.
 
         Args:
             current_price: Güncel BIST-100 endeks değeri.
+            feature_code: Opsiyonel BIST özellik kodu.
+            current_time: Opsiyonel simülasyon/seans zamanı (varsayılan: anlık Türkiye saati).
 
         Returns:
-            Eşik aşılıp EBDKS tetiklenirse CircuitBreakerEvent, aksi halde None.
+            CircuitBreakerEvent | None: Eşik aşılıp EBDKS tetiklenirse olay nesnesi, aksi halde None.
         """
         if current_price <= 0 or math.isnan(current_price) or math.isinf(current_price):
             return None
@@ -157,25 +150,23 @@ class AutoCircuitBreakerEngine:
             return None
 
         # Piyasa açık değilse kontrol etme
-        phase = bist_session_fsm.get_phase()
+        phase = bist_session_fsm.get_phase(current_time=current_time)
         if phase == BISTMarketPhase.CLOSED:
             return None
 
-        change_pct = ((current_price / ref_price) - 1.0) * 100.0
+        change_pct = round(((current_price / ref_price) - 1.0) * 100.0, 4)
 
         # EBDKS: BIST-100 %6 veya daha fazla düşüş
         threshold_pct = bist_session_fsm.EBDKS_THRESHOLD_PCT
         if change_pct <= -threshold_pct:
             # Bugün zaten tetiklendi mi kontrol et (ilk tetikleme veya ek %2 düşüş)
-            should_trigger = False
-            if triggered_count == 0:
-                should_trigger = True
-            elif triggered_count > 0 and change_pct <= -(threshold_pct + (triggered_count * 2.0)):
-                should_trigger = True
+            should_trigger = triggered_count == 0 or (
+                triggered_count > 0 and change_pct <= -(threshold_pct + (triggered_count * 2.0))
+            )
 
             if should_trigger:
-                feature_code: str | None = None
                 bist_session_fsm.trigger_ebdks(feature_code=feature_code)
+                trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
 
                 event = CircuitBreakerEvent(
                     ticker="BIST-100",
@@ -184,7 +175,7 @@ class AutoCircuitBreakerEngine:
                     reference_price=ref_price,
                     change_pct=change_pct,
                     threshold_pct=threshold_pct,
-                    triggered_at=bist_session_fsm.now_istanbul(),
+                    triggered_at=trigger_time,
                     duration_minutes=bist_session_fsm.EBDKS_DEFAULT_DURATION,
                     feature_code=feature_code,
                     market_phase=phase.value,
@@ -213,7 +204,8 @@ class AutoCircuitBreakerEngine:
         ticker: str,
         current_price: float,
         reference_price: float,
-        market_type: str = "ana",
+        market_type: str = DEFAULT_MARKET_TYPE,
+        current_time: datetime | None = None,
     ) -> CircuitBreakerEvent | None:
         """Hisse payı bazında devre kesici tetikleme kontrolü gerçekleştirir.
 
@@ -222,9 +214,10 @@ class AutoCircuitBreakerEngine:
             current_price: Güncel işlem fiyatı.
             reference_price: İlgili hissenin baz/kapanış referans fiyatı.
             market_type: Pazar segmenti ('yildiz', 'ana', 'alt').
+            current_time: Opsiyonel simülasyon/seans zamanı (varsayılan: anlık Türkiye saati).
 
         Returns:
-            Eşik aşılıp devre kesici devreye girerse CircuitBreakerEvent, aksi halde None.
+            CircuitBreakerEvent | None: Eşik aşılıp devre kesici devreye girerse olay nesnesi, aksi halde None.
         """
         if reference_price <= 0 or current_price <= 0:
             return None
@@ -234,24 +227,30 @@ class AutoCircuitBreakerEngine:
             return None
 
         # Piyasa kapalıysa devre kesici tetiklenmez
-        phase = bist_session_fsm.get_phase()
+        phase = bist_session_fsm.get_phase(ticker=ticker, current_time=current_time)
         if phase == BISTMarketPhase.CLOSED:
             return None
 
-        change_pct = ((current_price / reference_price) - 1.0) * 100.0
+        change_pct = round(((current_price / reference_price) - 1.0) * 100.0, 4)
+
+        # Pazar tipini normalize et
+        normalized_market = market_type.lower().strip() if isinstance(market_type, str) else DEFAULT_MARKET_TYPE
+        if normalized_market not in VALID_MARKET_TYPES:
+            normalized_market = DEFAULT_MARKET_TYPE
 
         # Pazar bazında eşikleri al
         thresholds = bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS.get(
-            market_type, bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
+            normalized_market, bist_session_fsm.CIRCUIT_BREAKER_THRESHOLDS["ana"]
         )
 
         with self._lock:
             triggered_thresholds = list(self._triggered_today.get(ticker, []))
 
-        for threshold in thresholds:
+        for threshold in sorted(thresholds):
             if change_pct <= -threshold and threshold not in triggered_thresholds:
                 # FSM üzerinde hisse devre kesicisini tetikle
                 bist_session_fsm.trigger_circuit_breaker(ticker)
+                trigger_time = current_time if current_time is not None else bist_session_fsm.now_istanbul()
 
                 event = CircuitBreakerEvent(
                     ticker=ticker,
@@ -260,7 +259,7 @@ class AutoCircuitBreakerEngine:
                     reference_price=reference_price,
                     change_pct=change_pct,
                     threshold_pct=threshold,
-                    triggered_at=bist_session_fsm.now_istanbul(),
+                    triggered_at=trigger_time,
                     duration_minutes=bist_session_fsm.CIRCUIT_BREAKER_DURATION_MINUTES,
                     market_phase=phase.value,
                 )
@@ -278,11 +277,31 @@ class AutoCircuitBreakerEngine:
                     esik=f"%{threshold}",
                     guncel_fiyat=current_price,
                     referans_fiyat=reference_price,
-                    pazar_tipi=market_type,
+                    pazar_tipi=normalized_market,
                 )
                 return event
 
         return None
+
+    def is_ticker_in_circuit_breaker(self, ticker: str, current_time: datetime | None = None) -> bool:
+        """Belirtilen hissenin şu an devre kesici seansında olup olmadığını kontrol eder.
+
+        Args:
+            ticker: BIST hisse sembolü.
+            current_time: Opsiyonel simülasyon/seans zamanı (varsayılan: anlık Türkiye saati).
+
+        Returns:
+            bool: Devre kesici aktif ise True, değilse False.
+        """
+        return bist_session_fsm.get_phase(ticker=ticker, current_time=current_time) == BISTMarketPhase.CIRCUIT_BREAKER_AUCTION
+
+    def is_ebdks_active(self) -> bool:
+        """Endekse bağlı devre kesicinin (EBDKS) anlık olarak aktif olup olmadığını döner.
+
+        Returns:
+            bool: EBDKS aktif ise True, değilse False.
+        """
+        return bist_session_fsm.is_ebdks_active()
 
     def reset_daily(self) -> None:
         """Günlük tetikleme sayaçlarını ve EBDKS durumunu sıfırlar (seans sonu çağrılır)."""
@@ -297,7 +316,7 @@ class AutoCircuitBreakerEngine:
         """Günün gerçekleşen tüm devre kesici olaylarını sözlük listesi olarak döner.
 
         Returns:
-            Olayların sözlük listesi.
+            list[dict[str, Any]]: Olayların sözlük listesi.
         """
         with self._lock:
             events = list(self._events)
@@ -307,7 +326,7 @@ class AutoCircuitBreakerEngine:
         """Devre kesici motorunun anlık durum özetini döner.
 
         Returns:
-            EBDKS ve hisse devre kesici metriklerini içeren durum sözlüğü.
+            dict[str, Any]: EBDKS ve hisse devre kesici metriklerini içeren durum sözlüğü.
         """
         with self._lock:
             ref = self._bist100_reference
@@ -319,27 +338,51 @@ class AutoCircuitBreakerEngine:
                 "bist100_current": curr,
                 "bist100_change_pct": change,
                 "pay_circuit_breakers_today": len(self._triggered_today),
+                "pay_circuit_breakers_triggered": list(self._triggered_today.keys()),
                 "total_events_today": len(self._events),
                 "ebdks_active": bist_session_fsm.is_ebdks_active(),
                 "ebdks_late_session": bist_session_fsm.is_ebdks_late_session(),
             }
 
+    # Geriye dönük uyumluluk ve takma ad
+    get_status_summary = get_status
+
+    def get_recent_events(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Son gerçekleşen devre kesici olaylarını getirir.
+
+        Args:
+            limit: Döndürülecek maksimum olay sayısı.
+
+        Returns:
+            list[dict[str, Any]]: En son olayların listesi (yeniden eskiye).
+        """
+        with self._lock:
+            events = list(self._events)
+        return [e.to_dict() for e in reversed(events[-limit:])]
+
     def __repr__(self) -> str:
         """Devre kesici motorunun durum temsilini döner."""
         with self._lock:
             return (
-                f"<AutoCircuitBreakerEngine(ebdks_tetiklenme={self._ebdks_triggered_today}, "
-                f"hisse_sayisi={len(self._triggered_today)}, toplam_olay={len(self._events)})>"
+                f"AutoCircuitBreakerEngine(ebdks_tetiklenme={self._ebdks_triggered_today}, "
+                f"hisse_sayisi={len(self._triggered_today)}, toplam_olay={len(self._events)})"
             )
 
+
+# Kolay kullanım için takma ad (alias)
+AutoCircuitBreaker = AutoCircuitBreakerEngine
 
 # Singleton örneği
 auto_circuit_breaker = AutoCircuitBreakerEngine()
 
 __all__ = [
     "DEFAULT_EVENT_QUEUE_MAXLEN",
+    "DEFAULT_MARKET_TYPE",
+    "VALID_MARKET_TYPES",
+    "AutoCircuitBreaker",
     "AutoCircuitBreakerEngine",
     "CircuitBreakerEvent",
     "auto_circuit_breaker",
     "otel_trace",
 ]
+

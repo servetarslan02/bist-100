@@ -158,12 +158,12 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 1 | 4 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metot ve sınıflara Türkçe, Args/Returns/Raises formatında eksiksiz docstring yazıldı |
-| 2 | 2 | Fiyat ve endeks değişim hesaplamalarında sıfıra bölme, `math.isnan` ve `math.isinf` sayısal sınır kontrolleri eksikti; başlangıçta % -100 değişim anomalisi oluşabiliyordu | `math.isnan` / `math.isinf` ve sıfır/negatif fiyat guard kontrolleri eklendi; başlangıç durumu düzeltildi |
-| 3 | 2 | Singleton `auto_circuit_breaker` örneğinde fiyat güncellemeleri ve olay kayıtları eşzamanlı erişim korumasından (thread-safety) yoksundu | `threading.Lock()` ile tüm mutasyon ve durum okuma işlemleri koruma altına alındı |
-| 4 | 4 | `CircuitBreakerEvent` ve `AutoCircuitBreakerEngine` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve durum yansıtıcı `__repr__` metotları tanımlandı |
-| 5 | 4 | Fonksiyon içindeki `from collections import deque` importu dosya başına taşındı; magic number `DEFAULT_EVENT_QUEUE_MAXLEN` sabitine bağlandı; loglar Türkçe structlog standardına geçirildi | Dosya başı temiz import yapısına geçildi ve yapısal Türkçe loglama sağlandı |
-| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_EVENT_QUEUE_MAXLEN", "AutoCircuitBreakerEngine", "CircuitBreakerEvent", "auto_circuit_breaker", "otel_trace"]` tanımlandı |
+| 1 | 2 & 3 | `is_ticker_in_circuit_breaker` içinde FSM faz kontrolü `BISTMarketPhase.CIRCUIT_BREAKER` olarak çağrılıyordu fakat enum değeri `CIRCUIT_BREAKER_AUCTION` idi; çalışma zamanında `AttributeError` patlatıyordu | `BISTMarketPhase.CIRCUIT_BREAKER_AUCTION` olarak düzeltildi ve `is_ticker_in_circuit_breaker(ticker, current_time)` parametresi eklendi |
+| 2 | 2 & 3 | Piyasa seans dışındayken veya simülasyon/backtest esnasında `bist_session_fsm.get_phase()` her zaman `CLOSED` dönüyor ve devre kesici test/simüle edilemiyordu | `update_bist100_price`, `check_pay_circuit_breaker` ve `is_ticker_in_circuit_breaker` metotlarına opsiyonel `current_time: datetime | None = None` parametresi eklendi; FSM ve olay zamanına aktarıldı |
+| 3 | 2 & 3 | Yüzdesel değişim hesaplamalarında float hassasiyeti (`(0.935 - 1.0) * 100 = -6.500000000000006`) ve sayısal taşmalar guard edilmemişti | `math.isnan` / `math.isinf` guard'ları konuldu ve `change_pct = round(..., 4)` ile deterministik sayısal hassasiyet sağlandı |
+| 4 | 2 & 6 | `CircuitBreakerEvent` çok sık üretilmesine rağmen standart `@dataclass` idi ve bellek tüketimi fazlaydı | `@dataclass(slots=True)` yapılandırmasına geçilerek bellek optimize edildi |
+| 5 | 3 & 7 | Sınıf adı `AutoCircuitBreakerEngine` iken harici servisler veya testler `AutoCircuitBreaker` arayabiliyordu; ayrıca `get_status_summary` ve `get_recent_events` metotları eksikti | `AutoCircuitBreaker = AutoCircuitBreakerEngine` takma adı (alias) eklendi; `get_status_summary`, `get_recent_events` ve `pay_circuit_breakers_triggered` listesi eklendi |
+| 6 | 4 & 7 | Merkezi OTel dekoratörü `services.core.otel` yerine yerel tanımlanmıştı; `VALID_MARKET_TYPES` ve `DEFAULT_MARKET_TYPE` sabitleri eksikti | Merkezi `otel_trace` bağlandı, pazar tipleri (`yildiz`, `ana`, `alt`) normalize edildi ve tüm semboller `__all__` listesine eklendi |
 
 ---
 
