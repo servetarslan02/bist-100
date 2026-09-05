@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
 
@@ -128,6 +129,10 @@ class TraceSpan:
             "error": self.error,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Span verilerini yüksek performanslı orjson ile ikili byte formatında serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
     def __repr__(self) -> str:
         return (
             f"TraceSpan(op='{self.operation}', trace_id='{self.trace_id}', "
@@ -155,6 +160,21 @@ class Trace:
         """Trace altına yeni bir span ekler."""
         self.spans.append(span)
 
+    def get_span(self, span_id: str) -> TraceSpan | None:
+        """Belirtilen kimliğe sahip span'ı bulur."""
+        for s in self.spans:
+            if s.span_id == span_id:
+                return s
+        return None
+
+    @property
+    def root_span(self) -> TraceSpan | None:
+        """Trace'in kök (root) span'ını döndürür (üst kimliği bulunmayan ilk span)."""
+        for s in self.spans:
+            if s.parent_span_id is None:
+                return s
+        return self.spans[0] if self.spans else None
+
     @property
     def total_duration_ms(self) -> float:
         """Trace altındaki tüm span'ların toplam çalışma süresini hesaplar."""
@@ -175,6 +195,44 @@ class Trace:
             "has_error": self.has_error,
             "spans": [s.to_dict() for s in self.spans],
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Trace ve span verilerini orjson ile ikili byte formatında serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
+    def to_polars(self) -> pl.DataFrame:
+        """Trace altındaki span'ları Polars DataFrame formatına dönüştürür."""
+        if not self.spans:
+            return pl.DataFrame(
+                schema={
+                    "trace_id": pl.Utf8,
+                    "span_id": pl.Utf8,
+                    "parent_span_id": pl.Utf8,
+                    "operation": pl.Utf8,
+                    "start_time": pl.Float64,
+                    "end_time": pl.Float64,
+                    "duration_ms": pl.Float64,
+                    "status": pl.Utf8,
+                    "attributes_json": pl.Utf8,
+                    "error": pl.Utf8,
+                }
+            )
+        rows = [
+            {
+                "trace_id": s.trace_id,
+                "span_id": s.span_id,
+                "parent_span_id": s.parent_span_id,
+                "operation": s.operation,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "duration_ms": s.duration_ms,
+                "status": s.status,
+                "attributes_json": orjson.dumps(s.attributes, default=str).decode("utf-8"),
+                "error": s.error,
+            }
+            for s in self.spans
+        ]
+        return pl.DataFrame(rows)
 
     def __repr__(self) -> str:
         return (
@@ -230,15 +288,22 @@ class DistributedTracer:
     def generate_correlation_id(self) -> str:
         """Mevcut bağlamdaki korelasyon kimliğini getirir veya yeni bir kimlik üretir.
 
+        Not: Bağlama kalıcı atama yapmaz; bağlam yönetimi start_span/start_async_span
+        veya set_correlation_id sorumluluğundadır.
+
         Returns:
             str: 16 karakterlik benzersiz korelasyon kimliği.
         """
         current = correlation_id_var.get()
-        if current:
-            return current
-        new_id = uuid.uuid4().hex[:16]
-        correlation_id_var.set(new_id)
-        return new_id
+        return current if current else uuid.uuid4().hex[:16]
+
+    def set_correlation_id(self, corr_id: str) -> contextvars.Token[str | None]:
+        """Korelasyon kimliğini manuel olarak bağlama kaydeder ve geri alma token'ını döner."""
+        return correlation_id_var.set(corr_id)
+
+    def reset_correlation_id(self, token: contextvars.Token[str | None]) -> None:
+        """Korelasyon kimliğini önceki durumuna döndürür."""
+        correlation_id_var.reset(token)
 
     def generate_span_id(self) -> str:
         """Yeni bir span kimliği üretir.
@@ -287,7 +352,11 @@ class DistributedTracer:
 
         try:
             if self._tracer and _OTEL_AVAILABLE:
-                span_kind = SpanKind(kind) if hasattr(SpanKind, "__members__") else None
+                try:
+                    span_kind = SpanKind(kind) if hasattr(SpanKind, "__members__") else None
+                except Exception:
+                    span_kind = getattr(SpanKind, "INTERNAL", None)
+
                 with self._tracer.start_as_current_span(operation, kind=span_kind) as otel_span:
                     otel_span.set_attribute("correlation_id", corr_id)
                     if attributes:
@@ -345,7 +414,11 @@ class DistributedTracer:
 
         try:
             if self._tracer and _OTEL_AVAILABLE:
-                span_kind = SpanKind(kind) if hasattr(SpanKind, "__members__") else None
+                try:
+                    span_kind = SpanKind(kind) if hasattr(SpanKind, "__members__") else None
+                except Exception:
+                    span_kind = getattr(SpanKind, "INTERNAL", None)
+
                 with self._tracer.start_as_current_span(operation, kind=span_kind) as otel_span:
                     otel_span.set_attribute("correlation_id", corr_id)
                     if attributes:
@@ -415,11 +488,11 @@ class DistributedTracer:
                     "end_time": pl.Float64,
                     "duration_ms": pl.Float64,
                     "status": pl.Utf8,
+                    "attributes_json": pl.Utf8,
                     "error": pl.Utf8,
                 }
             )
 
-        # Polars için attributes sözlüğünü sadeleştirelim
         rows = []
         for d in data:
             row = {
@@ -431,6 +504,7 @@ class DistributedTracer:
                 "end_time": d["end_time"],
                 "duration_ms": d["duration_ms"],
                 "status": d["status"],
+                "attributes_json": orjson.dumps(d.get("attributes", {}), default=str).decode("utf-8"),
                 "error": d["error"],
             }
             rows.append(row)
@@ -448,7 +522,21 @@ class DistributedTracer:
         df = self.export_spans_to_polars()
         conn = duckdb.connect(db_path)
         conn.register("df_spans", df)
-        conn.execute("CREATE TABLE IF NOT EXISTS trace_spans AS SELECT * FROM df_spans")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trace_spans (
+                trace_id VARCHAR,
+                span_id VARCHAR,
+                parent_span_id VARCHAR,
+                operation VARCHAR,
+                start_time DOUBLE,
+                end_time DOUBLE,
+                duration_ms DOUBLE,
+                status VARCHAR,
+                attributes_json VARCHAR,
+                error VARCHAR
+            )
+        """)
+        conn.execute("INSERT INTO trace_spans SELECT * FROM df_spans")
         conn.unregister("df_spans")
         return conn
 

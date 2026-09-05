@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 19 dosya denetlendi, 179 sorun düzeltildi. Bekleyen dosya: 85
+**Denetim Sonucu:** 19 dosya denetlendi, 183 sorun düzeltildi. Bekleyen dosya: 85
 
 ---
 
@@ -40,7 +40,7 @@
 | 16 | `config_hot_reload.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 17 | `dead_letter_queue.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 18 | `decision_engine.py` | 9 | ✅ Denetlendi, düzeltildi |
-| 19 | `distributed_tracing.py` | 9 | ✅ Denetlendi, düzeltildi |
+| 19 | `distributed_tracing.py` | 13 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 
 ---
 
@@ -356,6 +356,10 @@
 | 7 | 5 & Standart | Trace kayıtlarının kalıcı analitiği için DuckDB entegrasyonu yoktu | `export_spans_to_duckdb()` fonksiyonu eklenerek DuckDB `trace_spans` tablosuna aktarım sağlandı |
 | 8 | 4 | `TraceSpan`, `Trace` ve `DistributedTracer` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
 | 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı ve `trace_async` ile `TraceSpan` dışa aktarılmıyordu | 9 sembollük eksiksiz `__all__` listesi eklendi ve `services.core.__init__.py` güncellendi |
+| 10 | 2 (2. Tur) | `generate_correlation_id` doğrudan `correlation_id_var.set` çağırıyor ve iç içe span'lerde token takibi yapılmadığı için bağlam sızıntısı (context leak) riski yaratıyordu | `generate_correlation_id` saf sorgulayıcı/üretici haline getirildi; `set_correlation_id(corr_id)` ve `reset_correlation_id(token)` metotları ile tam token kontrolü sağlandı |
+| 11 | 2 & 3 (2. Tur) | `export_spans_to_polars` ve DuckDB ihracı span `attributes` sözlüğünü veri kaybına uğratıyordu | `orjson.dumps(d['attributes'])` ile `attributes_json` sütunu oluşturuldu; hem Polars hem DuckDB analitiğine tam öznitelik desteği kazandırıldı |
+| 12 | 5 (2. Tur) | `export_spans_to_duckdb` metodu `CREATE TABLE IF NOT EXISTS ... AS SELECT * FROM df` mantığı nedeniyle ikinci ve sonraki çağırmalarda yeni span kayıtlarını tabloya eklemiyordu | Standart `CREATE TABLE IF NOT EXISTS` ve `INSERT INTO trace_spans SELECT * FROM df_spans` mimarisine geçilerek çoklu aktarım güvenceye alındı |
+| 13 | 4 & 6 (2. Tur) | `Trace` ve `TraceSpan` sınıflarında GEMINI.md standardı olan `to_orjson_bytes()`, `Trace.to_polars()`, `Trace.root_span` ve `Trace.get_span()` metotları eksikti | Yüksek hızlı serileştirme ve ağ aktarımı için `to_orjson_bytes()` ile zenginleştirilmiş analiz fonksiyonları eklendi |
 
 ---
 
