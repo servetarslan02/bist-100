@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 105 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 110 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -27,7 +27,7 @@
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
-| 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 6 | `arrow_pipeline.py` | 11 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 9 | ✅ Denetlendi, düzeltildi |
@@ -121,6 +121,9 @@
 | 6 | 6 | Polars LazyFrame üzerinde doğrudan tembel tarama (lazy scan) imkanı yoktu | `scan_polars(path: str) -> pl.LazyFrame` metodu eklenerek yüksek performanslı tembel değerlendirme sağlandı |
 | 7 | 4 | `get_metadata` çıktısında sütun isimleri ve şema veri tipleri eksikti | Arrow şeması incelenerek `column_names` ve `schema_types` sözlüğü üst verilere eklendi |
 | 8 | 4 & 7 | `__repr__` standart dışıydı; `__all__` listesinde modül sabitleri (`DEFAULT_*`, `VALID_COMPRESSIONS`) eksikti | Temiz `__repr__` ve tüm sabitleri kapsayan eksiksiz `__all__` listesi tamamlandı |
+| 9 | 2 & 3 | `to_parquet` doğrudan hedef dosyaya yazıyordu; işlem yarıda kesildiğinde veya işletim sistemi çöktüğünde hedef dosya bozuluyor (corrupted Parquet) ve tüm sistem çöküyordu | Geçici dosyaya yazıp ardından `os.replace` ile hedef dosyayı atomik olarak güncelleme mekanizması getirildi |
+| 10 | 2 & 6 | `read_parquet` koşul iteleme (predicate pushdown / row filtering) desteklemiyordu; devasa dosyalarda tüm satırlar belleğe yüklenmek zorunda kalıyordu | `filters` parametresi eklenerek PyArrow C++ seviyesinde filtreleme ve disk okuma optimizasyonu sağlandı |
+| 11 | 5 & 6 | Parquet dosyaları üzerinde doğrudan SQL ile analiz yapabilen DuckDB entegrasyonu yoktu (GEMINI.md DuckDB zorunluluğu) | `query_parquet_with_duckdb(path, sql_query)` metodu eklenerek Parquet dosyaları üzerinden sıfır kopyalama ile vektörize SQL sorguları çalıştırma ve Polars DataFrame üretme yeteneği kazandırıldı; ayrıca `arrow_pipeline` singleton örneği eklendi |
 
 ---
 

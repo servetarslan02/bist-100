@@ -10,9 +10,12 @@ Apache Arrow ve Parquet tabanlı analitik veri işleme ve serileştirme motoru:
 
 from __future__ import annotations
 
+import os
+import uuid
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import duckdb
 import polars as pl
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -21,6 +24,9 @@ import structlog
 from opentelemetry import trace
 
 from services.core.otel import otel_trace
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.arrow_pipeline")
@@ -32,7 +38,7 @@ VALID_COMPRESSIONS = frozenset({"snappy", "gzip", "brotli", "lz4", "zstd", "none
 
 
 class ArrowPipeline:
-    """Apache Arrow ve Parquet formatları arasında kurumsal veri dönüşüm boru hattı."""
+    """Apache Arrow, Parquet ve DuckDB arasında kurumsal analitik veri boru hattı."""
 
     def __init__(self, base_path: str = DEFAULT_BASE_PATH) -> None:
         """Arrow boru hattı çalışma dizinini hazırlar.
@@ -108,7 +114,10 @@ class ArrowPipeline:
         path: str,
         compression: str = DEFAULT_COMPRESSION,
     ) -> str:
-        """Arrow Table veya Polars DataFrame nesnesini Parquet formatında diske yazar.
+        """Arrow Table veya Polars DataFrame nesnesini Parquet formatında atomik olarak diske yazar.
+
+        Yazma işlemi geçici bir dosyaya yapılıp ardından atomik olarak hedefe taşınır; böylece
+        yarıda kesilme veya elektrik/süreç kesintilerinde dosya bozulması (corruption) önlenir.
 
         Args:
             table: Diske yazılacak Arrow Table veya Polars DataFrame nesnesi.
@@ -140,7 +149,15 @@ class ArrowPipeline:
         full_path = self._resolve_path(path)
         full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        pq.write_table(arrow_table, str(full_path), compression=compression)
+        # Atomik yazma koruması: geçici dosyaya yazıp atomik replace yap
+        temp_path = full_path.with_name(f"{full_path.name}.tmp.{uuid.uuid4().hex[:8]}")
+        try:
+            pq.write_table(arrow_table, str(temp_path), compression=compression)
+            os.replace(temp_path, full_path)
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink(missing_ok=True)
+            raise
 
         size_mb = full_path.stat().st_size / (1024 * 1024)
         logger.info(
@@ -155,12 +172,18 @@ class ArrowPipeline:
         return str(full_path)
 
     @otel_trace("arrow_pipeline.read_parquet")
-    def read_parquet(self, path: str, columns: list[str] | None = None) -> pa.Table:
-        """Parquet dosyasını okuyarak Arrow Table döndürür.
+    def read_parquet(
+        self,
+        path: str,
+        columns: list[str] | None = None,
+        filters: Sequence[tuple[str, str, Any]] | list[list[tuple[str, str, Any]]] | None = None,
+    ) -> pa.Table:
+        """Parquet dosyasını sütun ve koşul iteleme (predicate pushdown) ile okuyarak Arrow Table döndürür.
 
         Args:
             path: Okunacak Parquet dosyasının yolu.
             columns: Sadece okunmak istenen sütun isimleri listesi (None = tüm sütunlar).
+            filters: PyArrow filtreleme kriterleri (örn. [("ticker", "=", "EREGL")]).
 
         Returns:
             pa.Table: Okunan Arrow tablosu.
@@ -174,7 +197,7 @@ class ArrowPipeline:
             raise FileNotFoundError(f"Parquet dosyası bulunamadı: {full_path}")
 
         try:
-            table = pq.read_table(str(full_path), columns=columns)
+            table = pq.read_table(str(full_path), columns=columns, filters=filters)
         except Exception as e:
             logger.error("parquet_dosyasi_okuma_hatasi", yol=str(full_path), hata=str(e))
             raise ValueError(f"Parquet dosyası okunamadı veya bozuk: {full_path}") from e
@@ -225,6 +248,40 @@ class ArrowPipeline:
 
         return pl.scan_parquet(str(full_path))
 
+    @otel_trace("arrow_pipeline.query_parquet_with_duckdb")
+    def query_parquet_with_duckdb(
+        self,
+        path: str,
+        sql_query: str = "SELECT * FROM parquet_data",
+    ) -> pl.DataFrame:
+        """DuckDB motoru ile Parquet dosyasını sıfır kopyalama ve vektörize SQL ile sorgular.
+
+        SQL sorgusu içinde hedef Parquet dosyasına `parquet_data` tablosu olarak başvurulur.
+
+        Args:
+            path: Sorgulanacak Parquet dosyasının yolu.
+            sql_query: Çalıştırılacak DuckDB SQL sorgusu (varsayılan: "SELECT * FROM parquet_data").
+
+        Returns:
+            pl.DataFrame: Sorgu sonucu Polars DataFrame olarak döner.
+
+        Raises:
+            FileNotFoundError: Hedef Parquet dosyası mevcut değilse.
+        """
+        full_path = self._resolve_path(path)
+        if not full_path.exists():
+            raise FileNotFoundError(f"Sorgulanacak Parquet dosyası bulunamadı: {full_path}")
+
+        conn = duckdb.connect()
+        try:
+            # parquet_data görünümü oluştur (dosya yolunu güvenle escape et)
+            escaped_path = str(full_path).replace("'", "''")
+            conn.execute(f"CREATE VIEW parquet_data AS SELECT * FROM read_parquet('{escaped_path}');")
+            arrow_result = conn.execute(sql_query).arrow()
+            return pl.from_arrow(arrow_result)
+        finally:
+            conn.close()
+
     @otel_trace("arrow_pipeline.merge_parquet")
     def merge_parquet(
         self,
@@ -270,19 +327,7 @@ class ArrowPipeline:
             # PyArrow eski sürümleri için fallback
             merged = pa.concat_tables(tables, promote=True)
 
-        output_full = self._resolve_path(output_path)
-        output_full.parent.mkdir(parents=True, exist_ok=True)
-
-        pq.write_table(merged, str(output_full), compression=compression)
-
-        logger.info(
-            "parquet_dosyalari_birlestirildi",
-            girdi_sayisi=len(input_paths),
-            cikti=str(output_full),
-            toplam_satir=merged.num_rows,
-            toplam_sutun=merged.num_columns,
-        )
-        return str(output_full)
+        return self.to_parquet(merged, output_path, compression=compression)
 
     @otel_trace("arrow_pipeline.get_metadata")
     def get_metadata(self, path: str) -> dict[str, Any]:
@@ -317,10 +362,14 @@ class ArrowPipeline:
         }
 
 
+# Singleton örneği
+arrow_pipeline = ArrowPipeline()
+
 __all__ = [
     "DEFAULT_BASE_PATH",
     "DEFAULT_COMPRESSION",
     "VALID_COMPRESSIONS",
     "ArrowPipeline",
+    "arrow_pipeline",
 ]
 
