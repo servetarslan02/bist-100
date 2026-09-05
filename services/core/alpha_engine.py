@@ -18,10 +18,10 @@ import structlog
 import yfinance as yf
 from opentelemetry import metrics, trace
 
+from services.core.otel import otel_trace
 from services.core.safe_pickle import safe_pickle_dump, safe_pickle_load
 from services.ingestion.bist_universe import bist_universe
 from services.ml.feature_engine import compute_universe_features
-from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.alpha_engine")
@@ -77,7 +77,7 @@ class AlphaEngine:
             tickers = (
                 bist_universe.BIST_ALL_TICKERS
                 if hasattr(bist_universe, "BIST_ALL_TICKERS") and bist_universe.BIST_ALL_TICKERS
-                else (bist_universe.BIST_100_TICKERS if hasattr(bist_universe, "BIST_100_TICKERS") else [])
+                else []
             )
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
 

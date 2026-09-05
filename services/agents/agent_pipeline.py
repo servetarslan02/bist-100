@@ -16,6 +16,7 @@ Akış:
 FAZ 6: Full Pipeline Integration
 """
 
+import logging
 import os
 import time
 import uuid
@@ -23,12 +24,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-import logging
-
 from .agent_memory import AgentMemory, MemoryConsolidator
-from .agent_system import AgentRole, AgentResult, AgentTask, BaseAgent
+from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient
-from .trace_context import TraceContext
 from .communication_bus import ConflictResolver, Resolution
 from .conflict_detector import ConflictDetector, ConflictReport, ConflictSeverity
 from .debate_engine import DebateEngine, DebateResult
@@ -38,6 +36,7 @@ from .prompts import PromptFactory
 from .risk_assessor import RiskAssessment, RiskAssessor
 from .self_evaluator import MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
+from .trace_context import TraceContext
 
 logger = logging.getLogger(__name__)
 

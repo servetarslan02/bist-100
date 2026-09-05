@@ -25,8 +25,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from ..dependencies import check_rate_limit, get_current_user
 from ...core.swr_cache import SWRCache
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -46,12 +46,12 @@ async def run_backtest(
             "strategy": strategy,
             "result": result,
         }
-    except ImportError:
+    except ImportError as exc:
         logger.warning("backtest_engine_yuklenemedi: execution_engine modülü mevcut değil")
         raise HTTPException(
             status_code=503,
             detail="Backtest motoru şu anda kullanılamıyor.",
-        )
+        ) from exc
     except Exception as exc:
         logger.error("backtest_calistirma_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(
@@ -143,12 +143,12 @@ async def walk_forward(
             "n_folds": n_folds,
             "result": result,
         }
-    except ImportError:
+    except ImportError as exc:
         logger.warning("walk_forward_yuklenemedi: WalkForwardAnalyzer modülü mevcut değil")
         raise HTTPException(
             status_code=503,
             detail="Walk-forward analiz motoru şu anda kullanılamıyor.",
-        )
+        ) from exc
     except Exception as exc:
         logger.error("walk_forward_hatasi: ticker=%s, hata=%s", ticker, exc)
         raise HTTPException(

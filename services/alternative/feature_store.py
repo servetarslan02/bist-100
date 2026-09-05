@@ -244,8 +244,8 @@ class FeatureStore:
         try:
             if self._store_path and (self._manifests or self._feature_values):
                 self.save()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("feature_store_gc_save_failed", error=str(e))
 
     def shutdown(self) -> None:
         """Feature store'u güvenli şekilde kapat ve kaydet."""

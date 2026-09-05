@@ -18,11 +18,10 @@ v2.1 değişiklikleri:
 FAZ 2: Bull/Bear Debate
 """
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
-
-import logging
 
 from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .llm_client import BaseLLMClient

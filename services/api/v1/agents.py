@@ -15,10 +15,10 @@ async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit
 
         agents = [role.value for role in AgentRole]
         return {"agents": agents, "count": len(agents)}
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil")
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil") from exc
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ajan listesi alınamadı: {e}")
+        raise HTTPException(status_code=500, detail=f"Ajan listesi alınamadı: {e}") from e
 
 
 @router.get("/status")
@@ -42,9 +42,9 @@ async def run_agent(agent_name: str = "researcher", user=Depends(get_current_use
 
         result = await agent_system.run(agent_name)
         return {"status": "started", "agent": agent_name, "result": result}
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil")
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Ajan sistemi mevcut değil") from exc
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=f"Ajan bulunamadı: {e}")
+        raise HTTPException(status_code=404, detail=f"Ajan bulunamadı: {e}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ajan çalıştırılamadı: {e}")
+        raise HTTPException(status_code=500, detail=f"Ajan çalıştırılamadı: {e}") from e

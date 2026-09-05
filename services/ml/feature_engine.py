@@ -407,7 +407,7 @@ class FeatureEngine:
                     )
 
         # On-Balance Volume
-        if n >= 20:
+        if n >= 21:
             direction = (close.diff() > 0).cast(pl.Float64) * 2 - 1
             obv = (volume * direction).cum_sum()
             obv_20d_change = (obv[-1] - obv[-21]) / (abs(obv[-21]) + 1)

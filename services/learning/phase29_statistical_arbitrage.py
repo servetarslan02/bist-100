@@ -49,7 +49,7 @@ def adf_pvalue(series) -> Any:
 
 
 def half_life(spread) -> Any:
-    """Otomatik eklendi."""
+    """Fiyat farkı (spread) serisinin yarı ömrünü (mean-reversion hızı) OLS regresyonu ile hesaplar."""
     lag = spread.shift(1).dropna()
     diff = spread.diff().dropna()
     if len(diff) < 20:
@@ -61,36 +61,11 @@ def half_life(spread) -> Any:
 logger.info("\n[1/4] Veri yukleniyor...")
 import yfinance as yf
 
-TICKERS = [
-    "GARAN",
-    "AKBNK",
-    "ISCTR",
-    "YKBNK",
-    "HALKB",
-    "VAKBN",
-    "KCHOL",
-    "SAHOL",
-    "GLYHO",
-    "TUPRS",
-    "AKSEN",
-    "ENJSA",
-    "BIMAS",
-    "MGROS",
-    "SOKM",
-    "TCELL",
-    "TTKOM",
-    "TOASO",
-    "FROTO",
-    "TTRAK",
-    "EREGL",
-    "KRDMD",
-    "OYAKC",
-    "THYAO",
-    "ASELS",
-    "SISE",
-    "EKGYO",
-    "ARCLK",
-]
+from services.ingestion.bist_universe import bist_universe
+
+TICKERS = list(dict.fromkeys(bist_universe.BIST_ALL_TICKERS))
+if not TICKERS:
+    TICKERS = list(bist_universe._updater.get_universe().keys())
 raw = yf.download(
     [f"{t}.IS" for t in TICKERS],
     start="2020-01-01",
@@ -109,29 +84,19 @@ returns = prices.pct_change()
 logger.info(f"   {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
 
 logger.info("\n[2/4] Koentegrasyon taramasi...")
-PAIRS = [
-    ("GARAN", "AKBNK", "Banka"),
-    ("GARAN", "ISCTR", "Banka"),
-    ("GARAN", "YKBNK", "Banka"),
-    ("AKBNK", "ISCTR", "Banka"),
-    ("AKBNK", "YKBNK", "Banka"),
-    ("ISCTR", "YKBNK", "Banka"),
-    ("HALKB", "VAKBN", "Kamu Banka"),
-    ("KCHOL", "SAHOL", "Holding"),
-    ("KCHOL", "GLYHO", "Holding"),
-    ("TOASO", "FROTO", "Otomotiv"),
-    ("TOASO", "TTRAK", "Otomotiv"),
-    ("FROTO", "TTRAK", "Otomotiv"),
-    ("EREGL", "KRDMD", "Demir"),
-    ("EREGL", "OYAKC", "Demir"),
-    ("KRDMD", "OYAKC", "Demir"),
-    ("TCELL", "TTKOM", "Telekom"),
-    ("BIMAS", "MGROS", "Perakende"),
-    ("BIMAS", "SOKM", "Perakende"),
-    ("TUPRS", "AKSEN", "Enerji"),
-    ("TUPRS", "ENJSA", "Enerji"),
-    ("AKSEN", "ENJSA", "Enerji"),
-]
+from itertools import combinations
+
+sector_map = bist_universe.SECTOR_MAP
+sector_to_tickers: dict[str, list[str]] = {}
+for t, sec in sector_map.items():
+    if t in prices.columns and sec:
+        sector_to_tickers.setdefault(sec, []).append(t)
+
+PAIRS = []
+for sec, tks in sector_to_tickers.items():
+    # Ayni sektor icindeki hisse kombinasyonlarini olustur
+    for t1, t2 in combinations(tks[:15], 2):
+        PAIRS.append((t1, t2, sec))
 
 prices_train = prices[prices.index <= "2024-12-31"]
 found = []
@@ -233,8 +198,8 @@ def backtest(t1, t2, hr, pdata, rdata, lookback=60) -> Any:
     }
 
 
-# B&H benchmark
-bh_tks = [t for t in ["GARAN", "AKBNK", "THYAO", "KCHOL", "ISCTR"] if t in returns.columns]
+# B&H benchmark: Mevcut hisselerden en yuksek verili olanlar dinamik secilir
+bh_tks = [t for t in returns.columns if t in sector_map][:5]
 prices_full = prices[prices.index >= "2021-01-01"]
 returns_full = returns[returns.index >= "2021-01-01"]
 bh = returns_full[bh_tks].mean(axis=1)

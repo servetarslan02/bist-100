@@ -13,21 +13,21 @@ engine_v4.py ile karıştırmayın:
 - engine_v4: Feature → Sinyal → Trade tam pipeline (kendi sinyal üretir)
 """
 
-import csv
-import logging
-import os
 import contextlib
+import csv
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import numpy as np
+import structlog
 
 from services.core.risk_config import backtest_config
 from services.portfolio.portfolio_manager import CommissionModel
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Varsayılan sinyal ağırlığı (portföydeki azami pozisyon yüzdesi)
 DEFAULT_SIGNAL_WEIGHT = 0.10
@@ -912,5 +912,15 @@ class BacktestEngine:
 
 # Singleton (kullanımdan kaldırıldı — BacktestEngineV4 kullanın)
 backtest_engine = BacktestEngine()
+
+__all__ = [
+    "BacktestTrade",
+    "BacktestMetrics",
+    "BacktestResult",
+    "BacktestEngine",
+    "backtest_engine",
+    "DEFAULT_SIGNAL_WEIGHT",
+    "DEFAULT_FALLBACK_VOLUME",
+]
 
 

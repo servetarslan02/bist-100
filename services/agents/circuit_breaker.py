@@ -10,13 +10,15 @@ Kurallar:
 - Test başarılı → CLOSED, başarısız → OPEN devam
 """
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import logging
+if TYPE_CHECKING:
+    from .llm_client import LLMResponse
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +235,7 @@ class CircuitBreakerLLMClient:
             else:
                 self._breaker.record_failure()
             return response
-        except Exception as e:
+        except Exception:
             self._breaker.record_failure()
             raise
 

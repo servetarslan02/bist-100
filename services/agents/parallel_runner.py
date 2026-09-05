@@ -15,12 +15,11 @@ FAZ 1: Paralel Çalışma
 """
 
 import asyncio
+import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
-
-import logging
 
 from .agent_system import (
     AgentResult,

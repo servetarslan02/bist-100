@@ -13,6 +13,7 @@ FAZ 3: Agent Memory
 
 import atexit
 import gzip
+import logging
 import threading
 import time
 from collections import deque
@@ -22,7 +23,6 @@ from pathlib import Path
 from typing import Any
 
 import orjson
-import logging
 
 # Import at module level to avoid repeated import cost and circular import risk
 try:
@@ -285,7 +285,6 @@ class MemoryWriteBuffer:
         written = 0
 
         for _key, request in items:
-            success = False
             for attempt in range(self._max_retries):
                 try:
                     target = Path(request.path)
@@ -307,7 +306,6 @@ class MemoryWriteBuffer:
 
                     tmp_path.rename(final_path)
                     written += 1
-                    success = True
                     break
 
                 except Exception as e:
@@ -322,11 +320,10 @@ class MemoryWriteBuffer:
                             attempts=self._max_retries,
                             error=str(e),
                         )
-                        # tmp dosyasını temizle
                         try:
                             tmp_path.unlink(missing_ok=True)
-                        except Exception:
-                            pass
+                        except Exception as unlink_err:
+                            logger.debug("tmp_path_unlink_failed", path=str(tmp_path), error=str(unlink_err))
 
         duration_ms = (time.monotonic() - start) * 1000
         self._metrics.batch_writes += 1

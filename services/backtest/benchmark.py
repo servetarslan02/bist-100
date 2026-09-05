@@ -16,9 +16,17 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_BENCHMARK_NAME: str = "BIST100"
+DEFAULT_PERIODS_PER_YEAR: int = 252
+DEFAULT_RISK_FREE_RATE: float = 0.0
+PERCENT_MULTIPLIER: float = 100.0
 
 
 @dataclass
@@ -85,13 +93,17 @@ class BenchmarkComparator:
     ve risk-ayarlı performans metrikleri hesaplar.
     """
 
+    def __repr__(self) -> str:
+        """BenchmarkComparator okunabilir temsili."""
+        return f"BenchmarkComparator(default_benchmark={DEFAULT_BENCHMARK_NAME}, periods={DEFAULT_PERIODS_PER_YEAR})"
+
     @staticmethod
     def compare(
         strategy_returns: np.ndarray,
         benchmark_returns: np.ndarray,
-        benchmark_name: str = "BIST100",
-        risk_free_rate: float = 0.0,
-        periods_per_year: int = 252,
+        benchmark_name: str = DEFAULT_BENCHMARK_NAME,
+        risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
+        periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
     ) -> BenchmarkComparison:
         """
         Strateji ve benchmark getirilerini karşılaştır.
@@ -275,3 +287,13 @@ class BenchmarkComparator:
 
 # Singleton
 benchmark_comparator = BenchmarkComparator()
+
+__all__ = [
+    "BenchmarkComparison",
+    "BenchmarkComparator",
+    "benchmark_comparator",
+    "DEFAULT_BENCHMARK_NAME",
+    "DEFAULT_PERIODS_PER_YEAR",
+    "DEFAULT_RISK_FREE_RATE",
+    "PERCENT_MULTIPLIER",
+]

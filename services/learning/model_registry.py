@@ -54,8 +54,8 @@ class ModelRegistry:
 
     def _init_default_models(self) -> None:
         """Diskteki eğitilmiş gerçek modelleri dinamik olarak yükle ve metriklerini çıkar."""
-        import os
         from pathlib import Path
+
         import joblib
 
         model_candidates = [
@@ -108,8 +108,8 @@ class ModelRegistry:
             for m in model_memory_store.get_latest_metrics_all_models():
                 if m.get("model_id"):
                     live_store_metrics[m["model_id"].lower()] = m
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("live_store_metrics_fetch_failed", error=str(e))
 
         for m in model_candidates:
             possible_paths = [

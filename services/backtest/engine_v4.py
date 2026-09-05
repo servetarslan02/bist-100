@@ -20,6 +20,7 @@ Optimizasyonlar:
 from __future__ import annotations
 
 import hashlib
+import threading
 import time as _time
 from dataclasses import dataclass
 from typing import Any
@@ -30,12 +31,24 @@ try:
     import polars as pl
 except ImportError:
     pl = None
-import logging
+import structlog
 
 from .persistence import backtest_persistence
 from .portfolio_sim import PortfolioSimulatorV3
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_INITIAL_CAPITAL: float = 100_000.0
+DEFAULT_LOOKBACK_DAYS: int = 120
+DEFAULT_SIGNAL_THRESHOLD: float = 60.0
+DEFAULT_MAX_POSITION_PCT: float = 0.10
+DEFAULT_MAX_POSITIONS: int = 20
+DEFAULT_SLIPPAGE_RATE: float = 0.001
+DEFAULT_MIN_QUALITY_SCORE: float = 70.0
+DEFAULT_REGIME: str = "UNKNOWN"
 
 
 # =====================================================
@@ -47,15 +60,15 @@ logger = logging.getLogger(__name__)
 class BacktestConfig:
     """Backtest konfigürasyonu."""
 
-    initial_capital: float = 100_000.0
-    lookback_days: int = 120
-    signal_threshold: float = 60.0
-    max_position_pct: float = 0.10
-    max_positions: int = 20
-    slippage_rate: float = 0.001
-    min_quality_score: float = 70.0
+    initial_capital: float = DEFAULT_INITIAL_CAPITAL
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS
+    signal_threshold: float = DEFAULT_SIGNAL_THRESHOLD
+    max_position_pct: float = DEFAULT_MAX_POSITION_PCT
+    max_positions: int = DEFAULT_MAX_POSITIONS
+    slippage_rate: float = DEFAULT_SLIPPAGE_RATE
+    min_quality_score: float = DEFAULT_MIN_QUALITY_SCORE
     use_canonical_scoring: bool = False  # True → CanonicalScoringPipeline kullan
-    regime: str = "UNKNOWN"  # Canonical scoring için rejim
+    regime: str = DEFAULT_REGIME  # Canonical scoring için rejim
     historical_repository: Any = None  # HistoricalDataRepository instance
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
@@ -72,7 +85,8 @@ class BacktestConfig:
         - scale: Nötr dışındaki her birim için skor katkısı
         - max_contribution: Maksimum puan katkısı (±)
 
-        Returns:\            Varsayılan ağırlık sözlüğü
+        Returns:
+            dict[str, Any]: Varsayılan ağırlık sözlüğü
         """
         return {
             "base_score": 50.0,
@@ -252,10 +266,14 @@ class FeatureCache:
         self._date_cache: dict[str, str] = {}
         self._hits = 0
         self._misses = 0
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """FeatureCache okunabilir temsili."""
-        return f"FeatureCache(entries={len(self._cache)}, hit_rate={self.hit_rate:.2%})"
+        with self._lock:
+            entries = len(self._cache)
+            hr = self.hit_rate
+        return f"FeatureCache(entries={entries}, hit_rate={hr:.2%})"
 
     def get(self, ticker: str, date: str) -> dict[str, Any] | None:
         """Cache'den değer döndürür.
@@ -267,11 +285,12 @@ class FeatureCache:
         Returns:
             Cache'deki feature sözlüğü veya None
         """
-        if ticker in self._cache and self._date_cache.get(ticker) == date:
-            self._hits += 1
-            return self._cache[ticker]
-        self._misses += 1
-        return None
+        with self._lock:
+            if ticker in self._cache and self._date_cache.get(ticker) == date:
+                self._hits += 1
+                return self._cache[ticker]
+            self._misses += 1
+            return None
 
     def set(self, ticker: str, date: str, features: dict[str, Any]) -> None:
         """Değeri cache'e kaydeder.
@@ -281,15 +300,17 @@ class FeatureCache:
             date: Tarih string'i
             features: Feature sözlüğü
         """
-        self._cache[ticker] = features
-        self._date_cache[ticker] = date
+        with self._lock:
+            self._cache[ticker] = features
+            self._date_cache[ticker] = date
 
     def clear(self) -> None:
         """Cache'i temizler ve sayaçları sıfırlar."""
-        self._cache.clear()
-        self._date_cache.clear()
-        self._hits = 0
-        self._misses = 0
+        with self._lock:
+            self._cache.clear()
+            self._date_cache.clear()
+            self._hits = 0
+            self._misses = 0
 
     @property
     def hit_rate(self) -> float:
@@ -308,10 +329,13 @@ class QualityCache:
     def __init__(self) -> None:
         """Quality cache başlatır."""
         self._cache: dict[str, tuple[bool, float]] = {}
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """QualityCache okunabilir temsili."""
-        return f"QualityCache(entries={len(self._cache)})"
+        with self._lock:
+            entries = len(self._cache)
+        return f"QualityCache(entries={entries})"
 
     def get(self, ticker: str) -> tuple[bool, float] | None:
         """Cache'den değer döndürür.
@@ -322,7 +346,8 @@ class QualityCache:
         Returns:
             (passed, score) çifti veya None
         """
-        return self._cache.get(ticker)
+        with self._lock:
+            return self._cache.get(ticker)
 
     def set(self, ticker: str, passed: bool, score: float) -> None:
         """Değeri cache'e kaydeder.
@@ -332,11 +357,13 @@ class QualityCache:
             passed: Geçti mi?
             score: Kalite skoru
         """
-        self._cache[ticker] = (passed, score)
+        with self._lock:
+            self._cache[ticker] = (passed, score)
 
     def clear(self) -> None:
         """Cache'i temizler."""
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()
 
 
 # =====================================================
@@ -507,8 +534,18 @@ class BacktestEngineV4:
         # Ortak tarih aralığı
         all_dates = set()
         for df in market_data.values():
-            if df is not None and not df.empty:
-                all_dates.update(df.index)
+            if df is None:
+                continue
+            try:
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    if len(df) > 0 and "Date" in df.columns:
+                        all_dates.update(str(d)[:10] for d in df["Date"].to_list())
+                elif hasattr(df, "columns") and "Date" in df.columns and len(df) > 0:
+                    all_dates.update(str(d)[:10] for d in df["Date"])
+                elif hasattr(df, "index") and len(df) > 0:
+                    all_dates.update(str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df.index)
+            except Exception:
+                continue
         sorted_dates = sorted(all_dates)
 
         effective_lookback = max(cfg.lookback_days, 60)
@@ -524,16 +561,25 @@ class BacktestEngineV4:
         # Benchmark fiyatları (XU100)
         benchmark_prices = {}
         benchmark_close_arr = None  # Motor1 relative strength için
-        if benchmark_data is not None and not benchmark_data.empty:
-            for idx in benchmark_data.index:
-                date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
-            if "Close" in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
+        if benchmark_data is not None and len(benchmark_data) > 0:
+            if pl is not None and isinstance(benchmark_data, pl.DataFrame):
+                if "Date" in benchmark_data.columns and "Close" in benchmark_data.columns:
+                    b_dates = [str(d)[:10] for d in benchmark_data["Date"].to_list()]
+                    b_closes = benchmark_data["Close"].to_list()
+                    for d_str, c_val in zip(b_dates, b_closes, strict=False):
+                        if c_val is not None:
+                            benchmark_prices[d_str] = float(c_val)
+                    benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
+            elif hasattr(benchmark_data, "index"):
+                for idx in benchmark_data.index:
+                    date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)[:10]
+                    benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
+                if "Close" in benchmark_data.columns:
+                    benchmark_close_arr = benchmark_data["Close"].to_numpy().astype(float)
 
         # Pre-compute quality cache
         for ticker, df in market_data.items():
-            if df is not None and not df.empty and len(df) >= effective_lookback:
+            if df is not None and len(df) >= effective_lookback:
                 try:
                     quality = self._dq.full_quality_check(df, ticker)
                     self._quality_cache.set(ticker, quality.passed, quality.quality_score)
@@ -758,8 +804,18 @@ class BacktestEngineV4:
         # Ortak tarih aralığı (legacy ile aynı)
         all_dates = set()
         for df in market_data.values():
-            if df is not None and not df.empty:
-                all_dates.update(df.index)
+            if df is None:
+                continue
+            try:
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    if len(df) > 0 and "Date" in df.columns:
+                        all_dates.update(str(d)[:10] for d in df["Date"].to_list())
+                elif hasattr(df, "columns") and "Date" in df.columns and len(df) > 0:
+                    all_dates.update(str(d)[:10] for d in df["Date"])
+                elif hasattr(df, "index") and len(df) > 0:
+                    all_dates.update(str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df.index)
+            except Exception:
+                continue
         sorted_dates = sorted(all_dates)
 
         effective_lookback = max(cfg.lookback_days, 60)
@@ -774,16 +830,22 @@ class BacktestEngineV4:
 
         # Benchmark fiyatları (legacy ile aynı)
         benchmark_prices = {}
-        if benchmark_data is not None and not benchmark_data.empty:
-            for idx in benchmark_data.index:
-                date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
-            if "Close" in benchmark_data.columns:
-                benchmark_data["Close"].to_numpy().astype(float)
+        if benchmark_data is not None and len(benchmark_data) > 0:
+            if pl is not None and isinstance(benchmark_data, pl.DataFrame):
+                if "Date" in benchmark_data.columns and "Close" in benchmark_data.columns:
+                    b_dates = [str(d)[:10] for d in benchmark_data["Date"].to_list()]
+                    b_closes = benchmark_data["Close"].to_list()
+                    for d_str, c_val in zip(b_dates, b_closes, strict=False):
+                        if c_val is not None:
+                            benchmark_prices[d_str] = float(c_val)
+            elif hasattr(benchmark_data, "index"):
+                for idx in benchmark_data.index:
+                    date_str = str(idx.date()) if hasattr(idx, "date") else str(idx)[:10]
+                    benchmark_prices[date_str] = float(benchmark_data.loc[idx, "Close"])
 
         # Pre-compute quality cache (legacy ile aynı)
         for ticker, df in market_data.items():
-            if df is not None and not df.empty and len(df) >= effective_lookback:
+            if df is not None and len(df) >= effective_lookback:
                 try:
                     quality = self._dq.full_quality_check(df, ticker)
                     self._quality_cache.set(ticker, quality.passed, quality.quality_score)
@@ -799,12 +861,28 @@ class BacktestEngineV4:
             self._last_feature_seconds += store.compute_seconds
 
         # Hisse başına O(1) erişim yapıları
-        tinfo: dict[str, tuple[Any, np.ndarray, np.ndarray]] = {}
+        tinfo: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
         for ticker, df in market_data.items():
-            if df is None or df.empty:
+            if df is None or len(df) == 0:
                 continue
-            open_arr = df["Open"].to_numpy() if "Open" in df.columns else df["Close"].to_numpy()
-            tinfo[ticker] = (df.index, open_arr, df["Close"].to_numpy())
+            try:
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    date_arr = (
+                        np.array([str(d)[:10] for d in df["Date"].to_list()])
+                        if "Date" in df.columns
+                        else np.array([])
+                    )
+                elif hasattr(df, "columns") and "Date" in df.columns:
+                    date_arr = np.array([str(d)[:10] for d in df["Date"]])
+                elif hasattr(df, "index"):
+                    date_arr = np.array([str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df.index])
+                else:
+                    continue
+                open_arr = df["Open"].to_numpy() if "Open" in df.columns else df["Close"].to_numpy()
+                close_arr = df["Close"].to_numpy() if "Close" in df.columns else np.array([])
+                tinfo[ticker] = (date_arr, open_arr, close_arr)
+            except Exception:
+                continue
 
         # Ana döngü (legacy kontrol akışının birebir aynası)
         signals_count = 0
@@ -1091,8 +1169,17 @@ class BacktestEngineV4:
             **{k: v for k, v in metrics_dict.items() if k in BacktestMetrics.__dataclass_fields__}
         )
 
-        start_date = str(sorted_dates[effective_lookback].date()) if sorted_dates else ""
-        end_date = str(sorted_dates[-1].date()) if sorted_dates else ""
+        if sorted_dates and len(sorted_dates) > effective_lookback:
+            s_val = sorted_dates[effective_lookback]
+            start_date = str(s_val.date()) if hasattr(s_val, "date") else str(s_val)[:10]
+        else:
+            start_date = (str(sorted_dates[0].date()) if hasattr(sorted_dates[0], "date") else str(sorted_dates[0])[:10]) if sorted_dates else ""
+
+        if sorted_dates:
+            e_val = sorted_dates[-1]
+            end_date = str(e_val.date()) if hasattr(e_val, "date") else str(e_val)[:10]
+        else:
+            end_date = ""
 
         result = BacktestResultV4(
             run_id=run_id,
@@ -1550,3 +1637,21 @@ class _FallbackQuality:
             quality_score = 80.0
 
         return _Quality()
+
+
+__all__ = [
+    "BacktestConfig",
+    "BacktestMetrics",
+    "BacktestResultV4",
+    "FeatureCache",
+    "QualityCache",
+    "BacktestEngineV4",
+    "DEFAULT_INITIAL_CAPITAL",
+    "DEFAULT_LOOKBACK_DAYS",
+    "DEFAULT_SIGNAL_THRESHOLD",
+    "DEFAULT_MAX_POSITION_PCT",
+    "DEFAULT_MAX_POSITIONS",
+    "DEFAULT_SLIPPAGE_RATE",
+    "DEFAULT_MIN_QUALITY_SCORE",
+    "DEFAULT_REGIME",
+]

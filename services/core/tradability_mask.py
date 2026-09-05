@@ -34,10 +34,10 @@ def otel_trace(span_name: str) -> Any:
     """Decorator to wrap a method in an OTel span."""
 
     def decorator(func) -> Any:
-        """Otomatik eklendi."""
+        """Hedef metodu OpenTelemetry span içine sarar."""
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+            """Span başlatır ve hedef fonksiyonu çalıştırır."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 

@@ -21,8 +21,8 @@ class DynamicSectorMap(dict):
             stocks = bist_universe.get_tickers_by_sector(str(key))
             if stocks:
                 return stocks
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("sector_event_lookup_failed", sector=str(key), error=str(e))
         return default if default is not None else []
 
     def items(self) -> Any:

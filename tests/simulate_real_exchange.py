@@ -18,15 +18,15 @@ logger.info("=================================================================")
 
 
 async def main() -> Any:
-    """Otomatik eklendi."""
+    """Uçtan uca otonom borsa motoru simülasyonunu tüm dinamik BIST evreni üzerinde çalıştırır."""
     # Step 1: Alpha Engine & Signal Discovery
     logger.info("\n[1/5] Testing Stock Discovery & Ranking Engine (LambdaRank v3 + Optuna)...")
     from services.core.alpha_engine import AlphaEngine
     from services.ingestion.bist_universe import bist_universe
 
     engine = AlphaEngine()
-    universe = bist_universe.BIST_100_TICKERS[:25]
-    logger.info(f" -> Universe loaded: {len(universe)} BIST-100 tickers")
+    universe = bist_universe.BIST_ALL_TICKERS
+    logger.info(f" -> Universe loaded: {len(universe)} BIST tickers (Tam Dinamik Evren)")
 
     end_date = date.today().strftime("%Y-%m-%d")
     start_date = (pl.Series(end_date) - datetime.timedelta(days=400)).strftime("%Y-%m-%d")

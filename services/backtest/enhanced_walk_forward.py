@@ -20,12 +20,23 @@ Modeli her fold'da YENİDEN EĞİTMEZ.
 Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 
+import warnings
 from dataclasses import dataclass
-import logging
 
 import numpy as np
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_TRAIN_DAYS: int = 252
+DEFAULT_TEST_DAYS: int = 63
+DEFAULT_STEP_DAYS: int = 21
+DEFAULT_PURGE_DAYS: int = 5
+DEFAULT_EMBARGO_DAYS: int = 5
+EULER_MASCHERONI: float = 0.5772156649
 
 
 @dataclass
@@ -525,8 +536,6 @@ class PurgeEmbargoWalkForward:
 
 
 # Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
-import warnings
-
 warnings.warn(
     "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, "
     "walk_forward_engine.WalkForwardEngineV5 kullanın",
@@ -534,3 +543,16 @@ warnings.warn(
     stacklevel=2,
 )
 purge_embargo_wf_engine = PurgeEmbargoWalkForward()
+
+__all__ = [
+    "PurgeEmbargoFold",
+    "PurgeEmbargoResult",
+    "PurgeEmbargoWalkForward",
+    "purge_embargo_wf_engine",
+    "DEFAULT_TRAIN_DAYS",
+    "DEFAULT_TEST_DAYS",
+    "DEFAULT_STEP_DAYS",
+    "DEFAULT_PURGE_DAYS",
+    "DEFAULT_EMBARGO_DAYS",
+    "EULER_MASCHERONI",
+]

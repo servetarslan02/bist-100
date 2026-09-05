@@ -15,7 +15,6 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
 
-
 # Context variable — async-safe
 _trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
 _ticker_var: ContextVar[str] = ContextVar("ticker", default="")

@@ -13,10 +13,19 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import logging
+import structlog
 from scipy import stats
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_BENCHMARK_SHARPE: float = 0.0
+DEFAULT_PERIODS_PER_YEAR: int = 252
+DEFAULT_SKEWNESS: float = 0.0
+DEFAULT_KURTOSIS: float = 3.0
+EULER_MASCHERONI: float = 0.5772156649
 
 
 @dataclass
@@ -80,12 +89,16 @@ class DeflatedSharpeCalculator:
     - Deflated Sharpe, SR'ın "gerçek" istatistiksel anlamlılığını verir
     """
 
+    def __repr__(self) -> str:
+        """DeflatedSharpeCalculator okunabilir temsili."""
+        return "DeflatedSharpeCalculator()"
+
     @staticmethod
     def compute_expected_max_sharpe(
         num_strategies: int,
         num_observations: int,
-        skewness: float = 0.0,
-        kurtosis: float = 3.0,
+        skewness: float = DEFAULT_SKEWNESS,
+        kurtosis: float = DEFAULT_KURTOSIS,
         periods_per_year: int = 1,
     ) -> tuple[float, float]:
         """
@@ -100,26 +113,10 @@ class DeflatedSharpeCalculator:
 
         Returns:
             (expected_max_sharpe, std_max_sharpe) çifti
-
-        Not:
-            periods_per_year: observed_sharpe yıllıklaştırılmışsa
-            (örn. günlük veriden sqrt(252) ile ölçeklenmişse) buraya 252
-            verilmeli — aksi halde expected_max_sr/std_max_sr farklı
-            birimde hesaplanır ve deflated_sharpe ~periods_per_year kat
-            şişer/küçülür. observed_sharpe zaten per-period ise
-            varsayılan 1 kullanılır.
-
-            E[max Z_1..Z_N] hesabı: Bailey & Lopez de Prado (2014),
-            Denklem 5-6 formülü kullanılır. Önceki sqrt(2·ln(N))
-            yaklaşımı Monte Carlo ile doğrulandığında sistematik olarak
-            ~0.13-0.2 düşük çıkıyordu — bu da deflated_sr'ı olduğundan
-            yüksek gösterip DSR'ın asıl amacı olan çoklu-test/şans eseri
-            iyi görünen stratejileri eleme işlevini zayıflatıyordu.
         """
-        # Euler-Mascheroni sabiti
-        euler_mascheroni = 0.5772156649
+        euler_mascheroni = EULER_MASCHERONI
 
-        if num_strategies <= 1:
+        if num_strategies <= 1 or num_observations < 2:
             return 0.0, 1.0
 
         n = num_strategies
@@ -283,13 +280,17 @@ class ProbabilisticSharpeRatio:
     Sharpe'ın istatistiksel olarak sıfırdan farklı olma olasılığını hesaplar.
     """
 
+    def __repr__(self) -> str:
+        """ProbabilisticSharpeRatio okunabilir temsili."""
+        return "ProbabilisticSharpeRatio()"
+
     @staticmethod
     def compute(
         observed_sharpe: float,
-        benchmark_sharpe: float,
-        num_observations: int,
-        skewness: float = 0.0,
-        kurtosis: float = 3.0,
+        benchmark_sharpe: float = DEFAULT_BENCHMARK_SHARPE,
+        num_observations: int = 0,
+        skewness: float = DEFAULT_SKEWNESS,
+        kurtosis: float = DEFAULT_KURTOSIS,
     ) -> float:
         """
         PSR hesapla: P(SR > benchmark_SR).
@@ -307,14 +308,14 @@ class ProbabilisticSharpeRatio:
         if num_observations < 2:
             return 0.0
 
-        # Sharpe'ın standart hatası
-        sr_std = np.sqrt(
-            (1 - skewness * observed_sharpe
-             + (kurtosis - 1) / 4 * observed_sharpe**2)
-            / (num_observations - 1)
-        )
+        # Sharpe'ın standart hatası (negatif varyans guard'ı)
+        variance_term = 1.0 - skewness * observed_sharpe + ((kurtosis - 1.0) / 4.0) * (observed_sharpe**2)
+        if np.isnan(variance_term) or variance_term <= 0.0:
+            return 0.0
 
-        if sr_std <= 0:
+        sr_std = np.sqrt(variance_term / (num_observations - 1))
+
+        if np.isnan(sr_std) or sr_std <= 0.0:
             return 0.0
 
         # Z skoru
@@ -328,8 +329,8 @@ class ProbabilisticSharpeRatio:
     @staticmethod
     def from_returns(
         returns: np.ndarray,
-        benchmark_sharpe: float = 0.0,
-        periods_per_year: int = 252,
+        benchmark_sharpe: float = DEFAULT_BENCHMARK_SHARPE,
+        periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
     ) -> dict[str, Any]:
         """Getiri serisinden PSR hesapla.
 
@@ -372,3 +373,16 @@ class ProbabilisticSharpeRatio:
 # Singleton
 deflated_sharpe = DeflatedSharpeCalculator()
 probabilistic_sharpe = ProbabilisticSharpeRatio()
+
+__all__ = [
+    "DeflatedSharpeResult",
+    "DeflatedSharpeCalculator",
+    "ProbabilisticSharpeRatio",
+    "deflated_sharpe",
+    "probabilistic_sharpe",
+    "DEFAULT_BENCHMARK_SHARPE",
+    "DEFAULT_PERIODS_PER_YEAR",
+    "DEFAULT_SKEWNESS",
+    "DEFAULT_KURTOSIS",
+    "EULER_MASCHERONI",
+]

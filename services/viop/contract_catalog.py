@@ -11,6 +11,7 @@ VIOP sözleşme kataloğu:
 Kaynak: Borsa İstanbul resmi
 """
 
+import calendar
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -19,40 +20,77 @@ import structlog
 
 logger = structlog.get_logger()
 
+__all__ = ["VIOPContract", "OptionContract", "VIOPContractCatalog", "viop_catalog"]
+
 
 @dataclass
 class VIOPContract:
-    """VIOP sözleşmesi."""
+    """VIOP sözleşmesi.
 
-    symbol: str  # Sözleşme kodu (XU030, DOL, GAU)
-    name: str  # Sözleşme adı
-    underlying: str  # Dayanak varlık
-    contract_size: float  # Sözleşme büyüklüğü
-    contract_size_unit: str  # Birim (TL, USD, EUR, gram, ton)
-    tick_size: float  # Minimum fiyat adımı
-    tick_value: float  # Tick değeri (TL)
-    margin_rate: float  # Teminat oranı (%)
-    settlement: str  # Takas yöntemi (nakdi/fiziki)
-    expiry_months: list[int]  # Vade ayları
+    Args:
+        symbol: Sözleşme kodu (XU030, DOL, GAU)
+        name: Sözleşme adı
+        underlying: Dayanak varlık
+        contract_size: Sözleşme büyüklüğü
+        contract_size_unit: Birim (TL, USD, EUR, gram, ton)
+        tick_size: Minimum fiyat adımı
+        tick_value: Tick değeri (TL)
+        margin_rate: Teminat oranı (%)
+        settlement: Takas yöntemi (nakdi/fiziki)
+        expiry_months: Vade ayları
+        exchange: Borsa adı
+        category: Kategori (endeks, döviz, emtia)
+    """
+
+    symbol: str
+    name: str
+    underlying: str
+    contract_size: float
+    contract_size_unit: str
+    tick_size: float
+    tick_value: float
+    margin_rate: float
+    settlement: str
+    expiry_months: list[int]
     exchange: str = "BIST"
-    category: str = ""  # endeks, döviz, emtia
+    category: str = ""
+
+    def __repr__(self) -> str:
+        return f"VIOPContract(symbol={self.symbol!r}, name={self.name!r}, category={self.category!r})"
 
 
 @dataclass
 class OptionContract:
-    """Opsiyon sözleşmesi."""
+    """Opsiyon sözleşmesi.
 
-    symbol: str  # Opsiyon kodu
-    underlying: str  # Dayanak varlık
-    option_type: str  # call / put
-    strike: float  # Kullanım fiyatı
-    expiry: date  # Vade tarihi
-    premium: float = 0.0  # Primi
-    bid: float = 0.0  # Alış
-    ask: float = 0.0  # Satış
-    open_interest: int = 0  # Açık pozisyon
-    volume: int = 0  # Hacim
-    implied_vol: float = 0.0  # Implied volatility
+    Args:
+        symbol: Opsiyon kodu
+        underlying: Dayanak varlık
+        option_type: call / put
+        strike: Kullanım fiyatı
+        expiry: Vade tarihi
+        premium: Primi
+        bid: Alış
+        ask: Satış
+        open_interest: Açık pozisyon
+        volume: Hacim
+        implied_vol: Implied volatility
+    """
+
+    symbol: str
+    underlying: str
+    option_type: str
+    strike: float
+    expiry: date
+    premium: float = 0.0
+    bid: float = 0.0
+    ask: float = 0.0
+    open_interest: int = 0
+    volume: int = 0
+    implied_vol: float = 0.0
+
+    def __repr__(self) -> str:
+        return f"OptionContract(symbol={self.symbol!r}, strike={self.strike}, type={self.option_type!r})"
 
 
 class VIOPContractCatalog:
@@ -70,7 +108,7 @@ class VIOPContractCatalog:
             tick_value=2.50,
             margin_rate=0.15,
             settlement="nakdi",
-            expiry_months=[3, 6, 9, 12],  # Mart, Haziran, Eylül, Aralık
+            expiry_months=[3, 6, 9, 12],
             category="endeks",
         ),
         "XU030D": VIOPContract(
@@ -218,46 +256,57 @@ class VIOPContractCatalog:
 
         Returns:
             Vade tarihleri listesi
+
+        Raises:
+            ValueError: Sözleşme bulunamadığında.
         """
         contract = self.CONTRACTS.get(symbol)
         if not contract:
-            return []
+            logger.error("contract_not_found", symbol=symbol)
+            raise ValueError(f"Sözleşme bulunamadı: {symbol}")
 
         dates = []
         for month in contract.expiry_months:
-            # Son iş günü (basitleştirilmiş — son Cuma)
-            last_day = 28  # Minimum
-            for day in range(31, 27, -1):
-                try:
-                    d = date(year, month, day)
-                    if d.weekday() == 4:  # Cuma
-                        last_day = day
-                        break
-                except ValueError:
-                    continue
-            dates.append(date(year, month, last_day))
+            # Ayın son gününü bul
+            _, last_day_val = calendar.monthrange(year, month)
+
+            found_friday = False
+            for day in range(last_day_val, 24, -1):
+                d = date(year, month, day)
+                if d.weekday() == 4:  # Cuma
+                    dates.append(d)
+                    found_friday = True
+                    break
+
+            if not found_friday:
+                logger.error("friday_not_found", symbol=symbol, year=year, month=month)
+                raise ValueError(f"{year}-{month} ayında cuma günü bulunamadı.")
 
         return sorted(dates)
 
     def get_next_expiry(self, symbol: str) -> date | None:
-        """Bir sonrade vade tarihi.
+        """Bir sonraki vade tarihi.
 
         Args:
             symbol: Sözleşme kodu
 
         Returns:
-            Bir sonraki vade tarihi
+            Bir sonraki vade tarihi veya None
         """
-        today = date.today()
-        dates = self.get_expiry_dates(symbol, today.year)
+        try:
+            today = date.today()
+            dates = self.get_expiry_dates(symbol, today.year)
 
-        for d in dates:
-            if d > today:
-                return d
+            for d in dates:
+                if d > today:
+                    return d
 
-        # Gelecek yıl
-        next_year_dates = self.get_expiry_dates(symbol, today.year + 1)
-        return next_year_dates[0] if next_year_dates else None
+            # Gelecek yıl
+            next_year_dates = self.get_expiry_dates(symbol, today.year + 1)
+            return next_year_dates[0] if next_year_dates else None
+        except ValueError as e:
+            logger.warning("get_next_expiry_failed", symbol=symbol, error=str(e))
+            return None
 
     def calculate_margin(self, symbol: str, quantity: int, price: float) -> float:
         """Teminat hesapla.
@@ -269,10 +318,14 @@ class VIOPContractCatalog:
 
         Returns:
             Teminat (TL)
+
+        Raises:
+            ValueError: Sözleşme bulunamadığında.
         """
         contract = self.CONTRACTS.get(symbol)
         if not contract:
-            return 0.0
+            logger.error("margin_calculation_failed_no_contract", symbol=symbol)
+            raise ValueError(f"Sözleşme bulunamadı: {symbol}")
 
         notional = quantity * price * contract.contract_size
         return notional * contract.margin_rate
@@ -288,10 +341,14 @@ class VIOPContractCatalog:
 
         Returns:
             K/Z (TL)
+
+        Raises:
+            ValueError: Sözleşme bulunamadığında.
         """
         contract = self.CONTRACTS.get(symbol)
         if not contract:
-            return 0.0
+            logger.error("pnl_calculation_failed_no_contract", symbol=symbol)
+            raise ValueError(f"Sözleşme bulunamadı: {symbol}")
 
         return quantity * (exit_price - entry_price) * contract.contract_size
 
@@ -302,7 +359,7 @@ class VIOPContractCatalog:
             symbol: Sözleşme kodu
 
         Returns:
-            Sözleşme sözlüğü
+            Sözleşme sözlüğü veya None
         """
         contract = self.CONTRACTS.get(symbol)
         if not contract:

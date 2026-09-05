@@ -541,8 +541,11 @@ class DataQualityChecker:
                 # Gap kontrolü (> 5 gün)
                 if total_rows > 1:
                     try:
-                        date_diffs = df[date_col].diff().dt.total_days()
-                        large_gaps = (date_diffs > 5).sum()
+                        date_series = df[date_col]
+                        if date_series.dtype in (pl.Utf8, pl.String):
+                            date_series = date_series.str.to_date(strict=False)
+                        date_diffs = date_series.diff().dt.total_days()
+                        large_gaps = int((date_diffs > 5).sum() or 0)
                         if large_gaps > 0:
                             issues.append(
                                 QualityIssue(
@@ -552,7 +555,7 @@ class DataQualityChecker:
                                 )
                             )
                     except Exception:
-                        logger.error("Exception caught", exc_info=True)
+                        logger.debug("Zaman aralığı fark kontrolü yapılamadı (tarih tipi ayrıştırılamadı)")
 
             # Eksik değer kontrolü
             for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low", "volume", "Volume"]:

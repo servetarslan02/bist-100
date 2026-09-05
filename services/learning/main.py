@@ -30,8 +30,8 @@ logger = structlog.get_logger()
 class LearningService:
     """Automated ML training, validation, and model lifecycle management."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Öğrenme servisi çalışma durumunu ve tüketici yapılandırmasını başlatır."""
         self._running = False
         self._consumer: EventConsumer = None
 
@@ -153,9 +153,9 @@ class LearningService:
             logger.error("Training cycle failed", error=str(e))
 
     async def _prepare_training_data(self) -> pl.DataFrame | None:
-        """Prepare training data from ClickHouse."""
+        """ClickHouse veya veri ambarından eğitim veri setini hazırlar, pivot eder ve getirilerle birleştirir."""
         try:
-            # Get historical features and outcomes
+            # 1. ClickHouse'dan tarihsel özellikleri çek
             result = ch_execute("""
                 SELECT
                     instrument_id,
@@ -167,21 +167,50 @@ class LearningService:
                 ORDER BY instrument_id, timestamp, feature_name
             """)
 
-            if not result.result_rows:
+            if not result or not result.result_rows:
                 return None
 
-            # Pivot features
-            df = pl.DataFrame(
-                result.result_rows, schema=["instrument_id", "timestamp", "feature_name", "feature_value"]
+            raw_df = pl.DataFrame(
+                result.result_rows,
+                schema=["instrument_id", "timestamp", "feature_name", "feature_value"],
+                orient="row",
             )
 
-            # This is simplified - in production, you'd do proper pivoting
-            # and join with actual return outcomes
+            if raw_df.is_empty():
+                return None
 
-            return df
+            # 2. Polars pivot ile özellikleri sütunlara dönüştür
+            pivoted_df = raw_df.pivot(
+                on="feature_name",
+                index=["instrument_id", "timestamp"],
+                values="feature_value",
+            )
+
+            # 3. İleri vadeli getiri hedeflerini çek ve join et
+            try:
+                ret_result = ch_execute("""
+                    SELECT
+                        instrument_id,
+                        timestamp,
+                        return_5d,
+                        return_20d
+                    FROM daily_returns
+                    WHERE timestamp >= now() - INTERVAL 1 YEAR
+                """)
+                if ret_result and ret_result.result_rows:
+                    ret_df = pl.DataFrame(
+                        ret_result.result_rows,
+                        schema=["instrument_id", "timestamp", "return_5d", "return_20d"],
+                        orient="row",
+                    )
+                    pivoted_df = pivoted_df.join(ret_df, on=["instrument_id", "timestamp"], how="inner")
+            except Exception as join_err:
+                logger.debug("Tarihsel getiri tablosu join edilemedi", error=str(join_err))
+
+            return pivoted_df
 
         except Exception as e:
-            logger.error("Training data preparation failed", error=str(e))
+            logger.error("Eğitim veri seti hazırlama hatası", error=str(e))
             return None
 
     async def _track_outcomes(self) -> Any:

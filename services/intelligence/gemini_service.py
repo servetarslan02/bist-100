@@ -8,6 +8,7 @@ Equipped with real-time financial tools:
 """
 
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -167,34 +168,20 @@ def call_gemini(prompt: str, system_instruction: str | None = None) -> str:
     tool_context = []
     prompt_upper = prompt.upper()
 
-    KNOWN_TICKERS = [
-        "THYAO",
-        "ASELS",
-        "GARAN",
-        "AKBNK",
-        "ISCTR",
-        "YKBNK",
-        "KCHOL",
-        "SAHOL",
-        "TUPRS",
-        "EREGL",
-        "BIMAS",
-        "FROTO",
-        "PGSUS",
-        "SISE",
-        "ASTOR",
-        "TCELL",
-    ]
-    for t in KNOWN_TICKERS:
-        if t in prompt_upper:
-            m = tool_get_stock_metrics(t)
-            mc = tool_run_monte_carlo_forecast(t, days=20, current_price=m["price_tl"])
-            tool_context.append(
-                f"[CANLI SİSTEM VERİSİ - {t}]: Fiyat=₺{m['price_tl']}, Günlük Değişim=%{m['daily_change_pct']}, 14G RSI={m['rsi_14']}, F/K={m['pe_ratio']}, PD/DD={m['pb_ratio']}, Destek=₺{m['support_level']}, Direnç=₺{m['resistance_level']}"
-            )
-            tool_context.append(
-                f"[CANLI MONTE CARLO - {t} (20 Günlük)]: Beklenen Fiyat=₺{mc['expected_price']}, En Kötü %5=₺{mc['p5_worst_case']}, En İyi %95=₺{mc['p95_best_case']}, Kâr Olasılığı=%{mc['prob_profit_pct']}"
-            )
+    from services.ingestion.bist_universe import bist_universe
+
+    all_bist_tickers = set(bist_universe.BIST_ALL_TICKERS)
+    candidate_tokens = [tok for tok in dict.fromkeys(re.findall(r"\b[A-Z]{3,6}\b", prompt_upper)) if tok in all_bist_tickers]
+
+    for t in candidate_tokens:
+        m = tool_get_stock_metrics(t)
+        mc = tool_run_monte_carlo_forecast(t, days=20, current_price=m["price_tl"])
+        tool_context.append(
+            f"[CANLI SİSTEM VERİSİ - {t}]: Fiyat=₺{m['price_tl']}, Günlük Değişim=%{m['daily_change_pct']}, 14G RSI={m['rsi_14']}, F/K={m['pe_ratio']}, PD/DD={m['pb_ratio']}, Destek=₺{m['support_level']}, Direnç=₺{m['resistance_level']}"
+        )
+        tool_context.append(
+            f"[CANLI MONTE CARLO - {t} (20 Günlük)]: Beklenen Fiyat=₺{mc['expected_price']}, En Kötü %5=₺{mc['p5_worst_case']}, En İyi %95=₺{mc['p95_best_case']}, Kâr Olasılığı=%{mc['prob_profit_pct']}"
+        )
 
     if "MAKRO" in prompt_upper or "PİYASA" in prompt_upper or "BORSA" in prompt_upper or "BIST" in prompt_upper:
         macro = tool_get_bist_macro_state()

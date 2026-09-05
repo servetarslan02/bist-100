@@ -379,8 +379,11 @@ async def ohlcv(
         data = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
         if data is None or (hasattr(data, "is_empty") and data.is_empty()) or len(data) == 0:
             raise HTTPException(status_code=404, detail=f"{ticker} için veri bulunamadı.")
-        if hasattr(data, "to_pandas"):
-            records = data.to_pandas().tail(100).to_dict(orient="records")
+        if hasattr(data, "iter_rows"):
+            records = [
+                {k: (str(v)[:10] if k == "Date" else v) for k, v in row.items()}
+                for row in data.tail(100).iter_rows(named=True)
+            ]
         elif hasattr(data, "to_dict"):
             records = data.tail(100).to_dict(orient="records")
         else:
@@ -424,7 +427,6 @@ async def live_intel_analysis(
     meta = BILINEN_SIRKETLER.get(sym, {"name": f"{sym} Şirket Grubu", "sector": "BIST Sanayi & Ticaret"})
 
     try:
-        import pandas as pd
         import polars as pl
 
         from ...data.data_source import data_source
@@ -432,47 +434,43 @@ async def live_intel_analysis(
         raw_chart = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
         raw_daily = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
 
-        def _to_pandas_df(d: Any) -> Any:
-            """Veri kaynağını pandas DataFrame'e dönüştürür.
-
-            Args:
-                d: Polars DataFrame, pandas DataFrame veya None.
-
-            Returns:
-                pd.DataFrame veya None.
-            """
+        def _clean_polars_df(d: Any) -> pl.DataFrame | None:
+            """Veri kaynağını standardize edilmiş Polars DataFrame'e dönüştürür."""
             if d is None:
                 return None
-            if isinstance(d, pl.DataFrame):
-                if d.is_empty():
-                    return pd.DataFrame()
-                d = d.to_pandas()
-            if isinstance(d, pd.DataFrame) and not d.empty and "Date" in d.columns:
-                d["Date"] = pd.to_datetime(d["Date"])
-                d = d.set_index("Date")
-            return d
+            if hasattr(d, "to_pandas") and not isinstance(d, pl.DataFrame):
+                try:
+                    d = pl.from_pandas(d)
+                except Exception as e:
+                    logger.debug("from_pandas_failed", error=str(e))
+            if isinstance(d, pl.DataFrame) and not d.is_empty():
+                if "Date" in d.columns:
+                    d = d.sort("Date")
+                return d
+            return None
 
-        df_chart = _to_pandas_df(raw_chart)
-        df = _to_pandas_df(raw_daily)
+        df_chart = _clean_polars_df(raw_chart)
+        df = _clean_polars_df(raw_daily)
 
-        if df is None or df.empty or len(df) < 2:
+        if df is None or df.is_empty() or len(df) < 2:
             df = df_chart
 
-        if df is None or df.empty or len(df) < 2:
+        if df is None or df.is_empty() or len(df) < 2:
             raise HTTPException(
                 status_code=503,
                 detail=f"{ticker} için fiyat verisi alınamadı.",
             )
 
-        closes_clean = df["Close"].dropna()
-        if len(closes_clean) < 2:
+        df = df.drop_nulls(subset=["Close", "Open", "High", "Low"])
+        if len(df) < 2:
             raise HTTPException(
                 status_code=503,
                 detail=f"{ticker} için yeterli veri yok.",
             )
 
-        latest_price = round(float(closes_clean.iloc[-1]), 2)
-        prev_price = round(float(closes_clean.iloc[-2]), 2)
+        closes_list = [float(c) for c in df["Close"].to_list()]
+        latest_price = round(closes_list[-1], 2)
+        prev_price = round(closes_list[-2], 2)
         change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if prev_price else 0.0
 
         # Redis canlı tick senkronizasyonu
@@ -488,31 +486,39 @@ async def live_intel_analysis(
         except Exception as exc:
             logger.warning("canli_tick_hatasi: ticker=%s, hata=%s", sym, exc)
 
-        closes_list = closes_clean.tolist()
         rsi_14 = _hesapla_rsi(closes_list)
         sma_20 = _hesapla_sma(closes_list, 20)
         sma_50 = _hesapla_sma(closes_list, 50)
-        support = round(float(df["Low"].dropna().tail(20).min()), 2)
-        resistance = round(float(df["High"].dropna().tail(20).max()), 2)
-        atr_14 = round(float(df["High"].dropna().tail(14).subtract(df["Low"].dropna().tail(14)).mean()), 2)
+
+        lows_20 = [float(x) for x in df["Low"].tail(20).to_list()]
+        highs_20 = [float(x) for x in df["High"].tail(20).to_list()]
+        support = round(min(lows_20), 2) if lows_20 else latest_price
+        resistance = round(max(highs_20), 2) if highs_20 else latest_price
+
+        highs_14 = df["High"].tail(14)
+        lows_14 = df["Low"].tail(14)
+        atr_14 = round(float((highs_14 - lows_14).mean() or 0.0), 2)
+
         macd_val, sig_val, macd_signal = _hesapla_macd(closes_list)
         recommendation, rec_text, rec_score = _hesapla_oneri(rsi_14, latest_price, sma_20, support)
 
         # Mum grafikleri
-        target_df = df_chart if df_chart is not None and not df_chart.empty else df
+        target_df = df_chart if df_chart is not None and not df_chart.is_empty() else df
         candles: list[dict[str, Any]] = []
-        if target_df is not None and not target_df.empty:
-            sorted_clean_df = target_df.dropna(subset=["Open", "High", "Low", "Close"]).copy()
-            sorted_clean_df = sorted_clean_df[~sorted_clean_df.index.duplicated(keep="first")].sort_index()
-            for idx, row in sorted_clean_df.tail(120).iterrows():
-                date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx).split("T")[0]
+        if target_df is not None and not target_df.is_empty():
+            sorted_clean_df = target_df.drop_nulls(subset=["Open", "High", "Low", "Close"])
+            if "Date" in sorted_clean_df.columns:
+                sorted_clean_df = sorted_clean_df.sort("Date")
+            for row in sorted_clean_df.tail(120).iter_rows(named=True):
+                dt_val = row.get("Date")
+                date_str = str(dt_val)[:10] if dt_val is not None else ""
                 candles.append({
                     "time": date_str,
                     "open": round(float(row["Open"]), 2),
                     "high": round(float(row["High"]), 2),
                     "low": round(float(row["Low"]), 2),
                     "close": round(float(row["Close"]), 2),
-                    "volume": int(row.get("Volume", 100000)),
+                    "volume": int(row.get("Volume") or 100000),
                 })
 
         # Mum formasyonları

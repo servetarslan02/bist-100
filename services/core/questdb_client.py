@@ -24,12 +24,8 @@ import socket
 from datetime import UTC, datetime
 from typing import Any
 
+import orjson
 import structlog
-
-try:
-    import orjson
-except ImportError:
-    orjson = None
 
 try:
     import httpx
@@ -243,7 +239,7 @@ class QuestDBClient:
                     timeout=30.0,
                 )
                 if resp.status_code == 200:
-                    data = resp.json()
+                    data = orjson.loads(resp.content)
                     columns = [col["name"] for col in data.get("columns", [])]
                     rows = data.get("dataset", [])
                     return [dict(zip(columns, row, strict=False)) for row in rows]
@@ -326,6 +322,9 @@ class QuestDBClient:
 
         logger.info("QuestDB tables ensured")
         return True
+
+    def __repr__(self) -> str:
+        return f"<QuestDBClient host={self._host} ilp_port={self._ilp_port} http_port={self._http_port}>"
 
 
 # Singleton

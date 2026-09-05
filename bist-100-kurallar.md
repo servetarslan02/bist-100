@@ -13,6 +13,7 @@
 4. **Test sayısı veya dosya sayısı başarı kanıtı değildir.** `assert ... or True` tarzı sahte assertion yasaktır.
 5. **Sır (secret) kaynak kodunda tutulmaz.** Şifre, token, API anahtarı asla repoya commit edilmez.
 6. **Gerçek para ile işlem bu projenin hedefi değildir.** Yıllar süren sanal doğrulama olmadan bu sınır aşılmaz.
+7. **Standart `json` ve `sqlite3` kesinlikle kullanılmaz.** Serileştirmede daima `orjson`, yerel veritabanı, durum yönetimi ve analitikte daima `duckdb` kullanılır.
 
 ---
 
@@ -96,42 +97,44 @@
 
 ---
 
-## 🔍 BACKTEST DENETİM KURALLARI
+## 🔍 KOD VE SERVİS DENETİM KURALLARI (AUDIT RULES)
 
-> `services/backtest/AUDIT_REPORT.md` dosyasından çıkarılmıştır.
-> Her backtest dosyası bu kurallara göre denetlenir.
+> Tüm mikroservisler (`services/*/AUDIT_REPORT.md`) ve kod tabanında geçerli olan bağlayıcı denetim kuralları:
 
-### 1. Mock / Sahte Veri — Kesinlikle Yasak
+### 1. Mock / Sahte / Placeholder Veri — Kesinlikle Yasak
 - Test verisi, hardcoded değer, statik JSON, placeholder data **production kodunda olmayacak**
-- `"Otomatik eklendi"` docstring'leri yasaktır — her docstring açıklayıcı ve anlamlı olacak
-- `pass` ile boş fonksiyon gövdesi yasaktır
+- `"Otomatik eklendi"` docstring'leri yasaktır — her docstring açıklayıcı, amacını belirten, Args/Returns/Raises içeren ve **Türkçe** olacak
+- `pass` ile boş bırakılmış fonksiyon/metot gövdesi yasaktır
 
-### 2. Tüm Hatalar Düzeltilecek
+### 2. Kapsamlı Hata, Eşzamanlılık ve Sınır Kontrolleri
 - Boundary hatası, dead code, exception yutma, yanlış veri kaynağı, bypass, tutarsızlık — sistemi bozan her şey düzeltilir
-- `except: pass` gibi sessiz yutma yasaktır
+- Polars null değerleri (`np.isnan(None)`), sıfıra bölme (`ZeroDivisionError`) ve `NaN`, `Inf` sayısal taşmaları guard altına alınır
+- Paylaşılan state veya bağlantı tutan sınıflarda eşzamanlı erişim güvenliği (`threading.Lock` / `asyncio.Lock`) zorunludur
 
-### 3. Eksik Fonksiyonellik Tamamlanacak
+### 3. Eksik Fonksiyonellik ve Fail-Closed İlkesi
 - Eksik parametre, eksik loglama, eksik fallback, eksik validasyon tespit edilen her eksik tamamlanır
+- Hatalar asla sessizce yutulamaz (`except: pass` yasaktır). Hata loglandıktan sonra uygun istisna (`raise ... from e`) fırlatılır
+- Tüm parametre ve dönüş tiplerinde eksiksiz `type annotation` (`None`, `Tuple[...]`, `Any` yerine spesifik tipler) belirtilir
 
-### 4. Kod Profesyonel Olacak
+### 4. Kod Profesyonel Olacak ve Log Mimarisi
 - Her docstring açıklayıcı ve **Türkçe**
-- Her dataclass'ta `__repr__` metodu olacak
-- Return type annotation doğru olacak
-- Gereksiz import olmayacak
-- Değişken isimleri anlamlı olacak
-- Structlog yerine standart `logging` kullanılacak
+- Her dataclass ve veri modelinde `__repr__` metodu olacak
+- Fonksiyon içi gereksiz import'lar dosya başına taşınacak
+- **Loglama Mimarisi:** Sistem genelinde (Web, API, Backtest, ML, Core, Risk vb.) birincil loglayıcı olarak **`structlog`** (`logger = structlog.get_logger(__name__)`) kullanılacak
+- Log mesajları ve hata metinleri Türkçe olacak
+- Magic number'lar yerine isimlendirilmiş `DEFAULT_*` sabitleri kullanılacak
 
-### 5. Düzeltme Sonrası Kontrol
-- Syntax kontrolü yapılacak (`python -c "import ..."`)
-- Import zinciri kontrolü yapılacak
+### 5. Düzeltme Sonrası Canlı Doğrulama (Smoke/Execution Test)
+- Yalnızca sözdizimi veya `import` kontrolü yetmez
+- Düzenlenen dosyanın temel işlevlerini fiilen çalıştıran mikro bir test (`uv run python -c "..."` veya pytest) ve `ruff check` ile doğrulanacak
 
-### 6. Geliştirme Önerileri Verilecek
-- Eksik değil ama geliştirilebilecek her alan için öneri sunulacak
+### 6. Geliştirme Önerileri ve Proaktif İyileştirme
+- Eksik değil ama geliştirilebilecek (Polars vektörizasyonu, bellek/performans) her alan için öneri sunulacak ve faydalı olanlar sisteme kazandırılacak
 
-### 7. Mimari Tutarlılık
-- İsim çakışmaları önlemek için sınıflar yeniden adlandırılabilir
-- Motor isimleri amacına uygun olmalı (ör. `engine.py` → `execution_engine.py`)
-- `__all__` listesi eksiksiz ve güncel olacak
+### 7. Mimari Tutarlılık, Dışa Aktarım ve Göç (Migration) Takibi
+- Modül seviyesinde `__all__` listesi eksiksiz ve güncel olacak
+- Yeniden adlandırılan sınıf/fonksiyonlar için tüm repo taranıp çağıran noktalar güncellenecek ve audit raporuna "Migration" olarak işlenecek
+
 
 ---
 

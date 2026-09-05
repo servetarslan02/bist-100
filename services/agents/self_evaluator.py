@@ -19,12 +19,11 @@ v2.1 değişiklikleri:
 FAZ 5: Self-Evaluation
 """
 
+import logging
 import statistics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-
-import logging
 
 from .agent_memory import AgentMemory
 

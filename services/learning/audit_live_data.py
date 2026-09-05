@@ -7,13 +7,17 @@ ALPHA BIST — Canlı Piyasa ve Model Denetim Kanıtı
 from services.scanner.bist_ml_scanner import BistMLScanner
 
 
-def audit() -> None:
-    """Otomatik dokumantasyon."""
+def audit(sample_size: int = 15) -> None:
+    """Canlı TradingView ve BIST tarayıcı verilerinden dinamik evren örneklemini denetler ve metrikleri raporlar."""
     s = BistMLScanner()
     items = s._fetch_live_scanner_data()
     item_map = {it['name']: it for it in items}
 
-    check_tickers = ['KLGYO', 'YKBNK', 'GLRYH', 'ETYAT', 'HKTM', 'KGYO', 'THYAO', 'TUPRS', 'TRENJ']
+    from services.ingestion.bist_universe import bist_universe
+
+    all_bist = bist_universe.BIST_ALL_TICKERS
+    available_tickers = [sym for sym in all_bist if sym in item_map]
+    check_tickers = available_tickers[:sample_size] if available_tickers else list(item_map.keys())[:sample_size]
     logger.info('=== GERÇEK PİYASA VERİSİ DENETİM KANITI (CANLI API ÇIKTISI) ===')
     logger.info(f"{'HİSSE':<7} | {'FİYAT':<8} | {'DEĞİŞİM':<8} | {'RVOL':<6} | {'ATR (%)':<8} | {'F/K':<7} | {'PD/DD':<7} | {'ROE (%)':<8} | {'NET MARJ (%)':<12}")
     logger.info('-' * 95)

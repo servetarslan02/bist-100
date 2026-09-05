@@ -1,10 +1,10 @@
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import logging
 from opentelemetry import trace
 
 logger = logging.getLogger(__name__)

@@ -26,20 +26,11 @@ def seed_history() -> Any:
         {"id": "LSTM_Sequential", "acc": 0.58, "ret_mean": 1.5, "sharpe_target": 1.1, "brier": 0.22},
     ]
 
-    tickers = [
-        "THYAO",
-        "ASELS",
-        "GARAN",
-        "KCHOL",
-        "TUPRS",
-        "POLTK",
-        "SDTTR",
-        "KONYA",
-        "REEDR",
-        "FORTE",
-        "ALFAS",
-        "BIMAS",
-    ]
+    from services.ingestion.bist_universe import bist_universe
+
+    tickers = list(bist_universe.BIST_ALL_TICKERS)
+    if not tickers:
+        tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "BIMAS"]
     regimes = ["BULL_MOMENTUM", "BEAR_CORRECTION", "RANGE_BOUND", "HIGH_VOLATILITY"]
 
     logger.info("Populating initial 40 historical evaluations per model...")

@@ -15,11 +15,10 @@ v2.1 değişiklikleri:
 FAZ 4: Synthesis Engine
 """
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
-
-import logging
 
 from .agent_memory import AgentMemory
 from .agent_system import AgentResult, AgentRole

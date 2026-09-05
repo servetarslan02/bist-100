@@ -22,6 +22,12 @@ Nihai backtest sistemi modülleri:
 """
 
 # Mevcut modüller
+# Faz 6: Ek Modüller
+from .backtest_enhancements import (
+    BacktestEnhancements,
+    CorporateAction,
+    backtest_enhancements,
+)
 from .benchmark import (
     BenchmarkComparator,
     BenchmarkComparison,
@@ -34,6 +40,12 @@ from .bias_detector import (
     BiasReport,
     BiasViolation,
     LookAheadBiasDetector,
+)
+from .canonical_adapter import (
+    BacktestCanonicalAdapter as CanonicalAdapter,
+)
+from .canonical_adapter import (
+    backtest_canonical_adapter,
 )
 
 # Faz 4: Deflated Sharpe & Benchmark
@@ -52,7 +64,11 @@ from .deterministic import (
     idempotency_guard,
 )
 from .engine_v4 import BacktestConfig, BacktestEngineV4
-from .execution_engine import BacktestEngine, BacktestMetrics, BacktestResult, BacktestTrade
+from .enhanced_walk_forward import (
+    PurgeEmbargoFold,
+    PurgeEmbargoResult,
+    PurgeEmbargoWalkForward,
+)
 from .event_replay import (
     AuditRecord,
     EnhancedReplayEngine,
@@ -61,6 +77,7 @@ from .event_replay import (
     SystemState,
     enhanced_replay,
 )
+from .execution_engine import BacktestEngine, BacktestMetrics, BacktestResult, BacktestTrade
 
 # Faz 3: Çoklu Varlık, Event Replay, Deterministik
 from .multi_asset_engine import (
@@ -109,23 +126,6 @@ from .transaction_costs import (
     TransactionCostEngine,
     bist_transaction_cost,
 )
-from .walk_forward_runner import WalkForwardBacktestRunner
-
-# Faz 6: Ek Modüller
-from .backtest_enhancements import (
-    BacktestEnhancements,
-    CorporateAction,
-    backtest_enhancements,
-)
-from .canonical_adapter import (
-    BacktestCanonicalAdapter as CanonicalAdapter,
-    backtest_canonical_adapter,
-)
-from .enhanced_walk_forward import (
-    PurgeEmbargoFold,
-    PurgeEmbargoResult,
-    PurgeEmbargoWalkForward,
-)
 from .walk_forward import (
     WalkForwardEngine,
     WalkForwardFold,
@@ -139,8 +139,17 @@ from .walk_forward_engine import (
     WalkForwardEngineV5,
     WalkForwardResultV5,
 )
+from .walk_forward_runner import (
+    FoldBacktestResult,
+    WalkForwardBacktestResult,
+    WalkForwardBacktestRunner,
+    walk_forward_runner,
+)
+
+__version__ = "2.0.0"
 
 __all__ = [
+    "__version__",
     # Mevcut
     "PortfolioSimulatorV3",
     "BacktestEngineV4",
@@ -151,6 +160,9 @@ __all__ = [
     "BacktestTrade",
     "BacktestPersistence",
     "WalkForwardBacktestRunner",
+    "WalkForwardBacktestResult",
+    "FoldBacktestResult",
+    "walk_forward_runner",
     # Faz 1
     "LookAheadBiasDetector",
     "BiasDetectorMiddleware",

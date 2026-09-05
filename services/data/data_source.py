@@ -46,6 +46,7 @@ class DataSourceManager:
         self._sources = {
             "warehouse": WarehouseSource(),
             "local": LocalParquetSource(cache_dir),
+            "tradingview": TradingViewSource(),
             "yahoo": YahooFinanceSource(),
             "bist": BISTSource(),
         }
@@ -76,7 +77,7 @@ class DataSourceManager:
         """
         # Önce cache kontrol et
         if source_priority is None:
-            source_priority = ["warehouse", "local", "yahoo", "bist"]
+            source_priority = ["warehouse", "local", "tradingview", "yahoo", "bist"]
         if self.use_cache:
             cached = self._load_from_cache(ticker, interval)
             if cached is not None and not cached.is_empty():
@@ -576,12 +577,21 @@ class LocalParquetSource:
             return None
 
 
-class WarehouseSource:
-    """30 Yıllık SQLite Veri Deposundan (bist_30y_warehouse.db) anlık OHLCV çeker."""
+class TradingViewSource:
+    """TradingView Scanner API üzerinden canlı ve son seans OHLCV verisi çeker."""
 
-    def __init__(self, db_path: str = "data/bist_30y_warehouse.db"):
-        """Otomatik eklendi."""
-        self.db_path = Path(db_path)
+    def __init__(self, timeout: float = 10.0):
+        """TradingView kaynak istemcisini başlatır."""
+        self.timeout = timeout
+        self.url = "https://scanner.tradingview.com/turkey/scan"
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+
+    def __repr__(self) -> str:
+        return f"<TradingViewSource(url='{self.url}', timeout={self.timeout}s)>"
 
     def fetch(
         self,
@@ -591,22 +601,106 @@ class WarehouseSource:
         period: str = "2y",
         interval: str = "1d",
     ) -> pl.DataFrame | None:
-        """Otomatik eklendi."""
+        """TradingView'den hissenin anlık veya son gün OHLCV mumunu çeker.
+
+        Args:
+            ticker: Hisse sembolü (örn. THYAO veya THYAO.IS).
+            start_date: Başlangıç tarihi filtresi (opsiyonel).
+            end_date: Bitiş tarihi filtresi (opsiyonel).
+            period: Veri periyodu.
+            interval: Bar aralığı.
+
+        Returns:
+            pl.DataFrame | None: Tek satırlık canlı bar veya hata durumunda None.
+        """
+        sym = ticker.upper().replace(".IS", "").strip()
+        payload = {
+            "filter": [{"left": "name", "operation": "match", "right": sym}],
+            "options": {"lang": "tr"},
+            "symbols": {"query": {"types": []}},
+            "columns": ["name", "open", "high", "low", "close", "volume"],
+            "range": [0, 1],
+        }
+        try:
+            with httpx.Client(timeout=self.timeout, headers=self.headers) as client:
+                resp = client.post(self.url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    rows = data.get("data", [])
+                    if not rows:
+                        return None
+                    d = rows[0].get("d", [])
+                    if len(d) >= 6 and d[4] is not None and float(d[4]) > 0:
+                        today = datetime.now(UTC).strftime("%Y-%m-%d")
+                        close = float(d[4])
+                        open_p = float(d[1]) if d[1] is not None else close
+                        high = float(d[2]) if d[2] is not None else close
+                        low = float(d[3]) if d[3] is not None else close
+                        vol = int(d[5]) if d[5] is not None else 0
+
+                        return pl.DataFrame(
+                            {
+                                "Date": [today],
+                                "Open": [open_p],
+                                "High": [high],
+                                "Low": [low],
+                                "Close": [close],
+                                "Volume": [vol],
+                            }
+                        )
+        except Exception as e:
+            logger.debug("TradingViewSource fetch failed", ticker=sym, error=str(e))
+        return None
+
+
+class WarehouseSource:
+    """Tarihsel DuckDB Veri Deposundan (bist_30y_warehouse.duckdb / .db) anlık OHLCV çeker."""
+
+    def __init__(self, db_path: str = "data/bist_30y_warehouse.duckdb") -> None:
+        """DuckDB veri deposu yolunu tanımlar."""
+        self.db_path = Path(db_path)
+        # Geriye dönük uyumluluk: .duckdb yoksa .db yolunu kontrol et
+        if not self.db_path.exists():
+            legacy_path = Path("data/bist_30y_warehouse.db")
+            if legacy_path.exists():
+                self.db_path = legacy_path
+
+    def fetch(
+        self,
+        ticker: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        period: str = "2y",
+        interval: str = "1d",
+    ) -> pl.DataFrame | None:
+        """Tarihsel veri deposundan hisse veya endeks OHLCV barlarını Polars DataFrame olarak getirir.
+
+        Args:
+            ticker: Hisse veya endeks sembolü (örn. THYAO, XU100).
+            start_date: Başlangıç tarihi filtresi (opsiyonel).
+            end_date: Bitiş tarihi filtresi (opsiyonel).
+            period: Veri periyodu (varsayılan: 2y).
+            interval: Bar aralığı (varsayılan: 1d).
+
+        Returns:
+            Sıralanmış OHLCV Polars DataFrame veya bulunamazsa None.
+        """
         if not self.db_path.exists():
             return None
-        import sqlite3
+
+        import duckdb
 
         sym = ticker.upper().replace(".IS", "").strip()
         try:
-            conn = sqlite3.connect(str(self.db_path))
+            conn = duckdb.connect(str(self.db_path), read_only=True)
             tbl = "benchmark_xu100" if sym in ["XU100", "^XU100", "BIST100"] else "stock_candles"
 
             if tbl == "benchmark_xu100":
                 query = "SELECT Date, Open, High, Low, Close, Volume FROM benchmark_xu100"
-                df = pl.read_database(query, conn)
+                df = conn.execute(query).pl()
             else:
                 query = "SELECT Date, Open, High, Low, Close, Volume FROM stock_candles WHERE symbol = ? OR symbol = ?"
-                df = pl.read_database(query, conn, execute_options={"parameters": (sym, f"{sym}.IS")})
+                df = conn.execute(query, [sym, f"{sym}.IS"]).pl()
             conn.close()
 
             if df.is_empty():
@@ -622,6 +716,9 @@ class WarehouseSource:
         except Exception as e:
             logger.warning("WarehouseSource fetch failed", ticker=ticker, error=str(e))
             return None
+
+    def __repr__(self) -> str:
+        return f"<WarehouseSource db_path={self.db_path} engine=DuckDB>"
 
 
 # Singleton

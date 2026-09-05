@@ -31,70 +31,12 @@ logger.info("=" * 75)
 
 import yfinance as yf
 
-TICKERS = [
-    "THYAO",
-    "GARAN",
-    "AKBNK",
-    "ISCTR",
-    "YKBNK",
-    "KCHOL",
-    "SAHOL",
-    "TUPRS",
-    "ASELS",
-    "BIMAS",
-    "MGROS",
-    "TCELL",
-    "TTKOM",
-    "EREGL",
-    "KRDMD",
-    "SISE",
-    "FROTO",
-    "TOASO",
-    "PGSUS",
-    "TAVHL",
-    "ENKAI",
-    "PETKM",
-    "CCOLA",
-    "HALKB",
-    "VAKBN",
-    "AKSEN",
-    "ENJSA",
-    "ODAS",
-    "ZOREN",
-    "SOKM",
-    "TTRAK",
-    "OYAKC",
-    "ARCLK",
-    "EKGYO",
-    "MPARK",
-    "CIMSA",
-    "AKCNS",
-    "VESTL",
-    "VESBE",
-    "BRSAN",
-    "ISDMR",
-    "TKFEN",
-    "AGHOL",
-    "AEFES",
-    "TSKB",
-    "KLNMA",
-    "ISGYO",
-    "ALGYO",
-    "ULKER",
-    "BANVT",
-    "MAVI",
-    "PKART",
-    "BRISA",
-    "JANTS",
-    "GUBRF",
-    "AFYON",
-    "ADEL",
-    "LOGO",
-    "BURCE",
-    "GLYHO",
-    "DOHOL",
-]
-TICKERS = list(dict.fromkeys(TICKERS))
+from services.ingestion.bist_universe import bist_universe
+
+TICKERS = list(dict.fromkeys(bist_universe.BIST_ALL_TICKERS))
+if not TICKERS:
+    # Eger offline test ortamindaysa universeden yedek dinamik yukle
+    TICKERS = list(bist_universe._updater.get_universe().keys())
 
 logger.info(f"\n[1/4] {len(TICKERS)} hisse yukleniyor...")
 t0 = time.time()

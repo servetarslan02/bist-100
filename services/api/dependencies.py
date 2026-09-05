@@ -5,11 +5,11 @@ FastAPI bağımlılık enjeksiyonu.
 Kimlik doğrulama, hız sınırı, servis çözümleme.
 """
 
+import logging
 import os
 import time
 from typing import Any
 
-import logging
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 

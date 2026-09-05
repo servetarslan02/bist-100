@@ -27,23 +27,7 @@ class TestAgentsInit:
     def test_all_imports_work(self):
         """Tüm eager import'lar başarılı olmalı."""
         from services.agents import (
-            AgentMemory,
-            AgentPipelineOrchestrator,
-            AgentResult,
             AgentRole,
-            AgentSelfEvaluator,
-            AgentTask,
-            BaseAgent,
-            CircuitBreaker,
-            CircuitBreakerLLMClient,
-            CircuitState,
-            ConflictDetector,
-            DebateEngine,
-            MultiAgentEvaluator,
-            ParallelAgentRunner,
-            RiskAssessor,
-            SynthesisEngine,
-            TraceContext,
             __version__,
         )
         assert AgentRole is not None
@@ -61,6 +45,7 @@ class TestAgentMemory:
     def test_no_typo_in_docstring(self):
         """retry_delay satırında fazla n harfi olmamalı."""
         import inspect
+
         from services.agents.agent_memory import MemoryWriteBuffer
 
         source = inspect.getsource(MemoryWriteBuffer.__init__)
@@ -69,15 +54,16 @@ class TestAgentMemory:
 
     def test_write_buffer_metrics_to_dict_has_docstring(self):
         import inspect
+
         from services.agents.agent_memory import WriteBufferMetrics
 
         source = inspect.getsource(WriteBufferMetrics.to_dict)
-        tree = inspect.getsource(WriteBufferMetrics.to_dict)
         # Docstring var mı?
         assert '"""' in source or "'''" in source
 
     def test_should_save_fallback_has_docstring(self):
         import inspect
+
         from services.agents import agent_memory
 
         source = inspect.getsource(agent_memory)
@@ -192,6 +178,7 @@ class TestCircuitBreaker:
 
     def test_stats_to_dict_has_docstring(self):
         import inspect
+
         from services.agents.circuit_breaker import CircuitBreakerStats
 
         source = inspect.getsource(CircuitBreakerStats.to_dict)
@@ -238,6 +225,7 @@ class TestAgentSystem:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.agent_system import BaseAgent
 
         source = inspect.getsource(BaseAgent)
@@ -292,6 +280,7 @@ class TestAgentPipeline:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.agent_pipeline import AgentPipelineOrchestrator
 
         source = inspect.getsource(AgentPipelineOrchestrator)
@@ -327,6 +316,7 @@ class TestCommunicationBus:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.communication_bus import AgentCommunicationBus
 
         source = inspect.getsource(AgentCommunicationBus)
@@ -343,6 +333,7 @@ class TestConflictDetector:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.conflict_detector import ConflictDetector
 
         source = inspect.getsource(ConflictDetector)
@@ -359,6 +350,7 @@ class TestDebateEngine:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.debate_engine import DebateEngine
 
         source = inspect.getsource(DebateEngine)
@@ -375,6 +367,7 @@ class TestLLMClient:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.llm_client import BaseLLMClient
 
         source = inspect.getsource(BaseLLMClient)
@@ -391,6 +384,7 @@ class TestParallelRunner:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.parallel_runner import ParallelAgentRunner
 
         source = inspect.getsource(ParallelAgentRunner)
@@ -407,6 +401,7 @@ class TestRiskAssessor:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.risk_assessor import RiskAssessor
 
         source = inspect.getsource(RiskAssessor)
@@ -423,6 +418,7 @@ class TestSelfEvaluator:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.self_evaluator import AgentSelfEvaluator
 
         source = inspect.getsource(AgentSelfEvaluator)
@@ -439,6 +435,7 @@ class TestSynthesisEngine:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.synthesis_engine import SynthesisEngine
 
         source = inspect.getsource(SynthesisEngine)
@@ -455,6 +452,7 @@ class TestTraceContext:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.agents.trace_context import TraceContext
 
         source = inspect.getsource(TraceContext)

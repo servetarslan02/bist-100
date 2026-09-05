@@ -1,13 +1,12 @@
 from typing import Any
 
-"""
-ALPHA BIST — Learning Loop v2.0 (SQLite Persistence)
+"""ALPHA BIST — Learning Loop v2.0 (DuckDB Persistence)
 
 Kendi kendine öğrenme döngüsü:
 Prediction → Outcome → Error → Attribution → Feature drift →
 Regime drift → Model decay → Retrain → OOS → Champion/Reject
 
-v2.0: SQLite tabanlı persistence — restart sonrası kaybolmaz
+v2.0: DuckDB tabanlı persistence — restart sonrası kaybolmaz
 """
 
 from collections import deque
@@ -48,10 +47,10 @@ class LearningState:
 
 
 class LearningLoop:
-    """Otonom öğrenme döngüsü — SQLite persistence ile."""
+    """Otonom öğrenme döngüsü — DuckDB persistence ile."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Öğrenme döngüsünü ve geçmiş kuyruklarını başlatır."""
         self._state = LearningState()
         self._prediction_history: deque = deque(maxlen=5000)
         self._outcome_history: deque = deque(maxlen=5000)
@@ -59,7 +58,7 @@ class LearningLoop:
         self._restore_from_db()
 
     def _restore_from_db(self) -> Any:
-        """Restart sonrası state'i SQLite'dan geri yükle."""
+        """Restart sonrası state'i DuckDB'den geri yükle."""
         try:
             saved = state_store.load_learning_state()
             if not saved:
@@ -96,7 +95,7 @@ class LearningLoop:
                     self._accuracy_window.append(pred["predicted_direction"] == pred["outcome"].get("actual_direction"))
 
             logger.info(
-                "Learning state restored from SQLite",
+                "Learning state restored from DuckDB",
                 predictions=self._state.total_predictions,
                 accuracy=round(self._state.accuracy, 4),
             )
@@ -104,7 +103,7 @@ class LearningLoop:
             logger.warning("Failed to restore learning state", error=str(e))
 
     def _persist_state(self) -> Any:
-        """State'i SQLite'a kaydet (SSD dostu — batched)."""
+        """State'i DuckDB'ye kaydet (SSD dostu — batched)."""
         try:
             state_dict = {
                 "total_predictions": self._state.total_predictions,
@@ -147,7 +146,7 @@ class LearningLoop:
             self._prediction_history = list(self._prediction_history)[-5000:]
         self._state.total_predictions += 1
 
-        # SQLite'a kaydet
+        # DuckDB'ye kaydet
         state_store.save_prediction(ticker, predicted_direction, predicted_return, confidence, regime, features)
 
     def record_outcome(self, ticker: str, actual_return: float, actual_direction: str, timestamp: str) -> Any:
@@ -200,7 +199,7 @@ class LearningLoop:
         # Model decay kontrolü
         self._check_model_decay()
 
-        # SQLite'a kaydet
+        # DuckDB'ye kaydet
         state_store.update_prediction_outcome(ticker, matching["outcome"])
         self._persist_state()
 
@@ -315,6 +314,10 @@ class LearningLoop:
         except Exception as e:
             logger.error("autonomous_retrain_failed", error=str(e))
             return {"status": "error", "error": str(e)}
+
+
+    def __repr__(self) -> str:
+        return f"<LearningLoop predictions={self._state.total_predictions} accuracy={self._state.accuracy:.3f} engine=DuckDB>"
 
 
 # Singleton

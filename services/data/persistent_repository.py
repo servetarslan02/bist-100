@@ -26,10 +26,10 @@ logger = structlog.get_logger()
 
 
 class PersistentHistoricalRepository(HistoricalDataRepository):
-    """SQLite tabanlı historical repository."""
+    """DuckDB tabanlı historical repository."""
 
-    def __init__(self, db_path: str = "data/historical_data.duckdb"):
-        """Otomatik eklendi."""
+    def __init__(self, db_path: str = "data/historical_data.duckdb") -> None:
+        """DuckDB dosya yolunu ve dizinini hazırlar."""
         self._db_path = db_path
         from pathlib import Path
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -37,7 +37,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         self._init_db()
 
     def _get_conn(self) -> duckdb.DuckDBPyConnection:
-        """Otomatik eklendi."""
+        """Etkin DuckDB bağlantısını döner veya yeni bağlantı oluşturur."""
         if self._conn is None:
             try:
                 self._conn = duckdb.connect(self._db_path)
@@ -376,10 +376,13 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
             conn.commit()
 
     def close(self) -> Any:
-        """Otomatik eklendi."""
+        """Açık DuckDB bağlantısını güvenle kapatır."""
         if self._conn:
             self._conn.close()
             self._conn = None
+
+    def __repr__(self) -> str:
+        return f"<PersistentHistoricalRepository db_path={self._db_path} engine=DuckDB>"
 
 
 # Singleton Instance

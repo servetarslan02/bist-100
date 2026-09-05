@@ -24,6 +24,7 @@ import numpy as np
 import polars as pl
 import structlog
 from opentelemetry import metrics, trace
+
 from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
@@ -411,7 +412,7 @@ class MasterOrchestrator:
 
             # Sync context'ten async çağır
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 alt_features = self._get_thread_pool().submit(
                     asyncio.run,
                     alt_engine.compute_all_features(
@@ -479,7 +480,6 @@ class MasterOrchestrator:
             prices = market_data.get("closes", [])
 
             if len(volumes) > 20:
-                import numpy as np
                 vol_alerts = detector.detect_volume_manipulation(list(volumes), window=20)
                 if vol_alerts:
                     result["manipulation_alert"] = True
@@ -531,7 +531,7 @@ class MasterOrchestrator:
             if reporter:
                 import asyncio
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     health = self._get_thread_pool().submit(
                         asyncio.run, reporter.generate_report()
                     ).result(timeout=10)
@@ -551,7 +551,7 @@ class MasterOrchestrator:
             if pg_check and callable(pg_check):
                 import asyncio
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     result["pg"] = self._get_thread_pool().submit(asyncio.run, pg_check()).result(timeout=10)
                 except RuntimeError:
                     result["pg"] = asyncio.run(pg_check())

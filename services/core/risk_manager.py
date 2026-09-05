@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import structlog
 from opentelemetry import trace
+
 from services.core.otel import otel_trace
 from services.core.risk_config import risk_config
 

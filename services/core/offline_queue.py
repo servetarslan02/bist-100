@@ -7,7 +7,7 @@ ALPHA BIST — Offline Queue v1.0
 Kişisel PC senaryosu:
 - İnternet kesildiğinde üretilen alım/satım sinyalleri kaybolmaz
 - İnternet geldiğinde kuyruktaki tüm event'ler gönderilir
-- SQLite tabanlı — restart sonrası kaybolmaz
+- DuckDB tabanlı — restart sonrası kaybolmaz
 - FIFO sırası korunur
 - TTL ile eski event'ler expire olur
 
@@ -57,7 +57,7 @@ def otel_trace(span_name: str) -> Any:
 
 
 class OfflineQueue:
-    """SQLite tabanlı offline event kuyruğu.
+    """DuckDB tabanlı offline event kuyruğu.
 
     İnternet yokken üretilen event'leri saklar,
     internet gelince otomatik gönderir.
@@ -69,7 +69,7 @@ class OfflineQueue:
         max_entries: int = 10000,
         default_ttl_hours: int = 48,
     ):
-        """Otomatik eklendi."""
+        """Offline kuyruk yöneticisini ve DuckDB dosya dizinini başlatır."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
@@ -86,7 +86,7 @@ class OfflineQueue:
         logger.info("OfflineQueue initialized", db_path=str(self.db_path))
 
     def _init_db(self) -> Any:
-        """SQLite tablolarını oluştur."""
+        """DuckDB tablolarını ve gerekli indeksleri oluşturur."""
         with self._connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS offline_queue (
@@ -109,7 +109,7 @@ class OfflineQueue:
 
     @contextmanager
     def _connect(self) -> Any:
-        """Otomatik eklendi."""
+        """Güvenli DuckDB bağlantısı ve WAL optimizasyonu sağlar."""
         conn = duckdb.connect(str(self.db_path))
         # SSD write reduction: DuckDB WAL ayarları
         try:
@@ -186,13 +186,14 @@ class OfflineQueue:
             self._cleanup_expired()
 
             with self._connect() as conn:
-                rows = conn.execute("""
+                cur = conn.execute("""
                     SELECT * FROM offline_queue
                     ORDER BY priority ASC, created_at ASC
-                """).fetchall()
+                """)
+                cols = [d[0] for d in cur.description] if cur.description else []
+                rows = [dict(zip(cols, r, strict=False)) for r in cur.fetchall()]
 
-                for row in rows:
-                    entry = dict(row)
+                for entry in rows:
                     handler = self._publish_handlers.get(entry["event_type"])
 
                     if handler:
@@ -299,6 +300,10 @@ class OfflineQueue:
             conn.execute("DELETE FROM offline_queue")
             conn.commit()
         return count
+
+
+    def __repr__(self) -> str:
+        return f"<OfflineQueue db_path={self.db_path} max_entries={self._max_entries} engine=DuckDB>"
 
 
 # Singleton

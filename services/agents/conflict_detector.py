@@ -14,11 +14,10 @@ v2.1 değişiklikleri:
 FAZ 2: Conflict Detection
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
-
-import logging
 
 from .agent_system import AgentResult, AgentRole
 

@@ -22,11 +22,12 @@ Referanslar:
 from __future__ import annotations
 
 import hashlib
-import logging
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import orjson
+import structlog
 
 try:
     import polars as pl
@@ -37,7 +38,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_MAX_POSITION_PCT: float = 0.10
+DEFAULT_AUDIT_TRAIL_LIMIT: int = 1000
+GENESIS_HASH: str = "genesis"
 
 
 @dataclass
@@ -218,7 +226,7 @@ class EnhancedReplayEngine:
     Bu sayede kararların tekrarlanabilirliği ve doğruluğu denetlenebilir.
     """
 
-    def __init__(self, max_position_pct: float = 0.10, strict_errors: bool = False) -> None:
+    def __init__(self, max_position_pct: float = DEFAULT_MAX_POSITION_PCT, strict_errors: bool = False) -> None:
         """Event replay motorunu başlatır.
 
         Args:
@@ -228,16 +236,20 @@ class EnhancedReplayEngine:
         """
         self._audit_trail: list[AuditRecord] = []
         self._state_snapshots: list[SystemState] = []
-        self._current_hash: str = "genesis"
+        self._current_hash: str = GENESIS_HASH
         self._max_position_pct: float = max_position_pct
         self._strict_errors: bool = strict_errors
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """EnhancedReplayEngine okunabilir temsili."""
+        with self._lock:
+            audit_len = len(self._audit_trail)
+            snap_len = len(self._state_snapshots)
         return (
             f"EnhancedReplayEngine("
-            f"audit_events={len(self._audit_trail)}, "
-            f"snapshots={len(self._state_snapshots)})"
+            f"audit_events={audit_len}, "
+            f"snapshots={snap_len})"
         )
 
     def create_snapshot(
@@ -617,28 +629,30 @@ class EnhancedReplayEngine:
             event_type: Olay tipi (market_data, trade, decision, state_change)
             data: Olay verisi sözlüğü
         """
-        try:
-            record = AuditRecord(
-                event_id=f"evt_{len(self._audit_trail):06d}",
-                timestamp=timestamp,
-                event_type=event_type,
-                data=data,
-            )
-        except Exception as e:
-            logger.error(
-                "audit_kayit_olusturma_hatasi: event_type=%s, hata=%s",
-                event_type,
-                str(e),
-            )
-            return
-        self._current_hash = record.seal(self._current_hash)
-        self._audit_trail.append(record)
-        if len(self._audit_trail) > 1000:
-            logger.warning(
-                "audit_trail_siniri_asildi: mevcut=%s, kisitlanacak=1000",
-                len(self._audit_trail),
-            )
-            self._audit_trail = self._audit_trail[-1000:]
+        with self._lock:
+            try:
+                record = AuditRecord(
+                    event_id=f"evt_{len(self._audit_trail):06d}",
+                    timestamp=timestamp,
+                    event_type=event_type,
+                    data=data,
+                )
+            except Exception as e:
+                logger.error(
+                    "audit_kayit_olusturma_hatasi: event_type=%s, hata=%s",
+                    event_type,
+                    str(e),
+                )
+                return
+            self._current_hash = record.seal(self._current_hash)
+            self._audit_trail.append(record)
+            if len(self._audit_trail) > DEFAULT_AUDIT_TRAIL_LIMIT:
+                logger.warning(
+                    "audit_trail_siniri_asildi: mevcut=%s, kisitlanacak=%s",
+                    len(self._audit_trail),
+                    DEFAULT_AUDIT_TRAIL_LIMIT,
+                )
+                self._audit_trail = self._audit_trail[-DEFAULT_AUDIT_TRAIL_LIMIT:]
 
     def get_audit_trail(self) -> list[dict[str, Any]]:
         """Audit trail'i döndür.
@@ -646,7 +660,8 @@ class EnhancedReplayEngine:
         Returns:
             Audit kayıtlarının sözlük listesi
         """
-        return [r.to_dict() for r in self._audit_trail]
+        with self._lock:
+            return [r.to_dict() for r in self._audit_trail]
 
     def verify_audit_integrity(self) -> bool:
         """Audit trail bütünlüğünü doğrula.
@@ -654,8 +669,11 @@ class EnhancedReplayEngine:
         Returns:
             True ise zincir bozulmamış
         """
-        prev_hash = "genesis"
-        for record in self._audit_trail:
+        with self._lock:
+            records = list(self._audit_trail)
+
+        prev_hash = GENESIS_HASH
+        for record in records:
             expected_hash = record.compute_hash(prev_hash)
             if record.hash_chain != expected_hash:
                 logger.error(
@@ -669,3 +687,15 @@ class EnhancedReplayEngine:
 
 # Singleton
 enhanced_replay = EnhancedReplayEngine()
+
+__all__ = [
+    "SystemState",
+    "ReplayDecision",
+    "AuditRecord",
+    "ReplaySnapshot",
+    "EnhancedReplayEngine",
+    "enhanced_replay",
+    "DEFAULT_MAX_POSITION_PCT",
+    "DEFAULT_AUDIT_TRAIL_LIMIT",
+    "GENESIS_HASH",
+]

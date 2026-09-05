@@ -13,11 +13,11 @@ Endpoint'ler:
     WS /api/v1/ws/binary   — Binary Protobuf akışı
 """
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
 import orjson
-import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger(__name__)

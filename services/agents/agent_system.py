@@ -13,6 +13,7 @@ FAZ 0: Temel altyapı refactor
 
 import asyncio
 import hashlib
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -21,7 +22,6 @@ from enum import StrEnum
 from typing import Any
 
 import orjson
-import logging
 
 from .llm_client import (
     BaseLLMClient,
@@ -679,12 +679,12 @@ def run_agent_analysis(ticker: str, features: dict, news: list | None = None) ->
                 "Use AgentPipelineOrchestrator.run() directly."
             )
             return result
-        except RuntimeError:
-            pass  # Loop yok, güvenle devam et
+        except RuntimeError as e:
+            logger.debug("no_running_event_loop_sync_safe", error=str(e))
 
         async def _run() -> dict[str, Any]:
             orch = AgentPipelineOrchestrator()
-            pipeline_result = await orch.run(ticker=ticker, features=features)
+            pipeline_result = await orch.run(ticker=ticker, features=features, context=context)
             return pipeline_result.to_dict()
 
         report = asyncio.run(_run())

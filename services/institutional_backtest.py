@@ -9,7 +9,7 @@ from services.ml.hyper_optimizer import HyperOptimizer
 
 
 def run_institutional() -> Any:
-    """Otomatik eklendi."""
+    """Tüm BIST hisse evreni üzerinde kurumsal seviye slippage ve likidite filtreli backtest çalıştırır."""
     logger.info("--- INSTITUTIONAL-GRADE BACKTEST (454 HISSE) ---")
     engine = AlphaEngine()
     engine.params["n_estimators"] = 50

@@ -16,11 +16,7 @@ Bilgisayar kapalı kaldığında (1 gün, 3 gün, 1 hafta fark etmeksizin) siste
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-try:
-    import orjson
-except ImportError:
-    import json as orjson
-
+import orjson
 import structlog
 
 from services.core.market_calendar import MarketCalendar
@@ -90,7 +86,8 @@ class MasterStartupCatchup:
                 logger.info("1/4: Kacirilan seanslar icin piyasa verileri taraniyor (Backfill)...")
                 active_tickers = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
                 from services.ingestion.bist_universe import bist_universe
-                target_tickers = list(set(active_tickers + list(bist_universe.BIST_30_TICKERS)))
+
+                target_tickers = list(set(active_tickers + list(bist_universe.BIST_ALL_TICKERS)))
                 gaps = await backfill_manager.detect_all_gaps(tickers=target_tickers)
                 if gaps:
                     logger.info(f"Hedef veri boslugu tespit edildi ({len(gaps)} adet). Dolduruluyor...")
@@ -146,7 +143,7 @@ class MasterStartupCatchup:
             r_port = int(os.environ.get("REDIS_PORT", 6379))
             r_pass = os.environ.get("REDIS_PASSWORD", "alpha_secure_prod_2026_redis")
             r_conn = redis.Redis(host=r_host, port=r_port, password=r_pass, decode_responses=True)
-            r_conn.set("phase18:predictions", orjson.dumps(fresh_signals).decode() if hasattr(orjson, 'dumps') else orjson.dumps(fresh_signals))
+            r_conn.set("phase18:predictions", orjson.dumps(fresh_signals).decode())
             logger.info(f"Canli Firsatlar tablosu guncellendi ({len(fresh_signals)} hisse).")
         except Exception as sync_err:
             logger.warning(f"Sinyal senkronizasyonunda uyari: {sync_err}")
@@ -155,6 +152,9 @@ class MasterStartupCatchup:
         logger.info("[SUCCESS] MASTER STARTUP CATCH-UP: Tum Sistem Bugune Basariyla Esitlendi!")
         logger.info("================================================================")
         return results
+
+    def __repr__(self) -> str:
+        return "<MasterStartupCatchup>"
 
 
 master_catchup = MasterStartupCatchup()

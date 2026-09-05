@@ -32,12 +32,11 @@ from .agent_memory import (
     MemoryEntry,
     MemoryWriteBuffer,
     SemanticMemory,
-    WriteBufferMetrics,
     WorkingMemory,
+    WriteBufferMetrics,
     get_write_buffer,
 )
 from .agent_pipeline import AgentPipelineOrchestrator, PipelineMetrics, PipelineResult
-from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
 from .agent_system import (
     AgentResult,
     AgentRole,
@@ -48,6 +47,7 @@ from .agent_system import (
     BaseAgent,
     run_agent_analysis,
 )
+from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient, CircuitState
 
 # === Phase 4: Communication + Synthesis ===
 from .communication_bus import (

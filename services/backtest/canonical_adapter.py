@@ -12,12 +12,19 @@ Bu adaptör:
 - Mevcut backtest API'sini bozmaz
 """
 
+import threading
 from typing import Any
 
 import numpy as np
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_REGIME: str = "UNKNOWN"
+DEFAULT_TICKER: str = "BACKTEST"
 
 
 def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
@@ -72,6 +79,7 @@ class BacktestCanonicalAdapter:
         """Canonical adaptörü başlatır."""
         self._scoring = None
         self._decision_engine = None
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """BacktestCanonicalAdapter okunabilir temsili."""
@@ -89,14 +97,15 @@ class BacktestCanonicalAdapter:
         İlk çağrıda canonical_scoring ve decision_engine modüllerini
         yükler. Sonraki çağrılarda mevcut referansları kullanır.
         """
-        if self._scoring is None:
-            from ...core.canonical_scoring import canonical_scoring
+        with self._lock:
+            if self._scoring is None:
+                from services.core.canonical_scoring import canonical_scoring
 
-            self._scoring = canonical_scoring
-        if self._decision_engine is None:
-            from ...core.decision_engine import decision_engine
+                self._scoring = canonical_scoring
+            if self._decision_engine is None:
+                from services.core.decision_engine import decision_engine
 
-            self._decision_engine = decision_engine
+                self._decision_engine = decision_engine
 
     def _apply_feature_parity(
         self,
@@ -127,7 +136,7 @@ class BacktestCanonicalAdapter:
 
         if model_features and all_day_features:
             try:
-                from ...ml.training_validator import prepare_features_for_inference
+                from services.ml.training_validator import prepare_features_for_inference
 
                 clean_features = _scalar_features(features)
                 clean_all = {
@@ -257,3 +266,10 @@ class BacktestCanonicalAdapter:
 
 # Singleton
 backtest_canonical_adapter = BacktestCanonicalAdapter()
+
+__all__ = [
+    "BacktestCanonicalAdapter",
+    "backtest_canonical_adapter",
+    "DEFAULT_REGIME",
+    "DEFAULT_TICKER",
+]

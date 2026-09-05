@@ -4,7 +4,6 @@ services/alternative/ — Audit Düzeltmeleri Test Suite
 Yapılan tüm düzeltmelerin doğru çalıştığını doğrular.
 """
 
-import asyncio
 import sys
 
 import pytest
@@ -80,6 +79,7 @@ class TestBaseRateLimiter:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.base import RateLimiter
 
         source = inspect.getsource(RateLimiter)
@@ -105,6 +105,7 @@ class TestBaseCircuitBreaker:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.base import CircuitBreaker
 
         source = inspect.getsource(CircuitBreaker)
@@ -133,6 +134,7 @@ class TestBaseDataQualityValidator:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.base import DataQualityValidator
 
         source = inspect.getsource(DataQualityValidator)
@@ -201,6 +203,7 @@ class TestBaseAdapter:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.base import BaseAdapter
 
         source = inspect.getsource(BaseAdapter)
@@ -295,6 +298,7 @@ class TestBKMAdapter:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.bkm_adapter import BKMAdapter
 
         source = inspect.getsource(BKMAdapter)
@@ -345,6 +349,7 @@ class TestEksiSozluk:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.eksi_sozluk import EksiSozlukAdapter
 
         source = inspect.getsource(EksiSozlukAdapter)
@@ -353,6 +358,7 @@ class TestEksiSozluk:
     def test_docstrings_turkish(self):
         """Docstring'ler Türkçe olmalı."""
         import inspect
+
         from services.alternative.eksi_sozluk import EksiSozlukAdapter
 
         source = inspect.getsource(EksiSozlukAdapter)
@@ -369,6 +375,7 @@ class TestFeatureEngine:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.feature_engine import AlternativeFeatureEngine
 
         source = inspect.getsource(AlternativeFeatureEngine)
@@ -412,6 +419,7 @@ class TestFeatureEngine:
     def test_lazy_import_in_initialize(self):
         """investing_adapter ve satellite_adapter initialize'da lazy import edilmeli."""
         import inspect
+
         from services.alternative.feature_engine import AlternativeFeatureEngine
 
         source = inspect.getsource(AlternativeFeatureEngine.initialize)
@@ -421,6 +429,7 @@ class TestFeatureEngine:
     def test_no_top_level_investing_import(self):
         """investing_adapter top-level import edilmemeli."""
         import inspect
+
         from services.alternative import feature_engine
 
         source = inspect.getsource(feature_engine)
@@ -441,6 +450,7 @@ class TestFeatureStore:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.feature_store import FeatureStore
 
         source = inspect.getsource(FeatureStore)
@@ -467,6 +477,7 @@ class TestFeatureStore:
     def test_no_cross_module_import(self):
         """services.core.debounce import'u kaldırılmış olmalı."""
         import inspect
+
         from services.alternative.feature_store import FeatureStore
 
         source = inspect.getsource(FeatureStore)
@@ -483,6 +494,7 @@ class TestGoogleTrends:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.google_trends import GoogleTrendsAdapter
 
         source = inspect.getsource(GoogleTrendsAdapter)
@@ -499,6 +511,7 @@ class TestInvestingAdapter:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.investing_adapter import InvestingAdapter
 
         source = inspect.getsource(InvestingAdapter)
@@ -507,6 +520,7 @@ class TestInvestingAdapter:
     def test_variable_names_meaningful(self):
         """Değişken isimleri anlamlı olmalı (p, n, t değil)."""
         import inspect
+
         from services.alternative.investing_adapter import InvestingAdapter
 
         source = inspect.getsource(InvestingAdapter._basic_sentiment)
@@ -516,6 +530,7 @@ class TestInvestingAdapter:
 
     def test_docstrings_turkish(self):
         import inspect
+
         from services.alternative.investing_adapter import InvestingAdapter
 
         source = inspect.getsource(InvestingAdapter._basic_sentiment)
@@ -557,6 +572,7 @@ class TestKariyerNet:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.kariyer_net import KariyerNetAdapter
 
         source = inspect.getsource(KariyerNetAdapter)
@@ -574,6 +590,7 @@ class TestLLMSentiment:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.llm_sentiment import LLMSentimentAnalyzer
 
         source = inspect.getsource(LLMSentimentAnalyzer)
@@ -589,6 +606,7 @@ class TestLLMSentiment:
     def test_no_duplicate_negative_words(self):
         """Negatif kelime listesinde duplicate olmamalı."""
         import inspect
+
         from services.alternative.llm_sentiment import LLMSentimentAnalyzer
 
         source = inspect.getsource(LLMSentimentAnalyzer._keyword_analyze)
@@ -599,6 +617,7 @@ class TestLLMSentiment:
     def test_analyze_batch_return_type(self):
         """analyze_batch Exception dönebilir."""
         import inspect
+
         from services.alternative.llm_sentiment import LLMSentimentAnalyzer
 
         sig = inspect.signature(LLMSentimentAnalyzer.analyze_batch)
@@ -617,6 +636,7 @@ class TestReconciliation:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.reconciliation import ReconciliationReport
 
         source = inspect.getsource(ReconciliationReport)
@@ -625,6 +645,7 @@ class TestReconciliation:
     def test_no_dead_code(self):
         """_compute_consensus sadece bir kez çağrılmalı (dead code kaldırıldı)."""
         import inspect
+
         from services.alternative.reconciliation import CrossSourceReconciler
 
         source = inspect.getsource(CrossSourceReconciler.reconcile)
@@ -633,6 +654,7 @@ class TestReconciliation:
     def test_no_unused_category_param(self):
         """_compute_consensus'te category parametresi olmamalı."""
         import inspect
+
         from services.alternative.reconciliation import CrossSourceReconciler
 
         sig = inspect.signature(CrossSourceReconciler._compute_consensus)
@@ -649,6 +671,7 @@ class TestSatelliteAdapter:
 
     def test_no_placeholder_docstring(self):
         import inspect
+
         from services.alternative.satellite_adapter import SatelliteAdapter
 
         source = inspect.getsource(SatelliteAdapter)
@@ -666,6 +689,7 @@ class TestSatelliteAdapter:
     def test_no_unused_bbox_to_wkt(self):
         """_bbox_to_wkt çağrılmamalı (kullanılmayan return kaldırıldı)."""
         import inspect
+
         from services.alternative.satellite_adapter import SatelliteAdapter
 
         source = inspect.getsource(SatelliteAdapter._fetch_ndvi)

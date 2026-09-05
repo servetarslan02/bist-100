@@ -553,6 +553,7 @@ async def pg_fetchval(query: str, *args: Any) -> Any:
 _ch_local = threading.local()
 _ch_healthy: bool = False
 _ch_lock: asyncio.Lock = asyncio.Lock()
+_ch_thread_lock: threading.Lock = threading.Lock()
 
 
 def get_ch_client() -> Any:

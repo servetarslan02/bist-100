@@ -11,14 +11,23 @@ Backtest motoru geliştirmeleri:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_MAX_PARTICIPATION_RATE: float = 0.10  # ADV'nin %10'u
+DEFAULT_MARKET_IMPACT_COEFF: float = 0.1      # Square-root impact katsayısı
+DEFAULT_MIN_ADV_THRESHOLD: float = 1_000_000.0  # 1M TL minimum hacim
+DEFAULT_MIN_POST_IPO_DAYS: int = 30           # Halka arz sonrası min gün
 
 
 @dataclass
@@ -91,9 +100,9 @@ class BacktestEnhancements:
 
     def __init__(
         self,
-        max_participation_rate: float = 0.10,  # ADV'nin %10'u
-        market_impact_coefficient: float = 0.1,
-        min_adv_threshold: float = 1_000_000,  # TL
+        max_participation_rate: float = DEFAULT_MAX_PARTICIPATION_RATE,
+        market_impact_coefficient: float = DEFAULT_MARKET_IMPACT_COEFF,
+        min_adv_threshold: float = DEFAULT_MIN_ADV_THRESHOLD,
     ):
         """Backtest geliştirmelerini başlatır."""
         self.max_participation_rate = max_participation_rate
@@ -102,6 +111,15 @@ class BacktestEnhancements:
         self._delisted_stocks: dict[str, str] = {}  # ticker → delist_date
         self._ipo_dates: dict[str, str] = {}  # ticker → ipo_date
         self._corporate_actions: list[CorporateAction] = []
+        self._lock = threading.Lock()
+
+    def __repr__(self) -> str:
+        """BacktestEnhancements nesnesini okunabilir formatta döndürür."""
+        return (
+            f"BacktestEnhancements(max_participation={self.max_participation_rate:.1%}, "
+            f"min_adv={self.min_adv_threshold:,.0f} TL, delisted={len(self._delisted_stocks)}, "
+            f"ipos={len(self._ipo_dates)}, actions={len(self._corporate_actions)})"
+        )
 
     # T+1 TAKAS
 
@@ -238,7 +256,8 @@ class BacktestEnhancements:
             ticker: Hisse kodu
             delist_date: Delist tarihi (YYYY-MM-DD)
         """
-        self._delisted_stocks[ticker] = delist_date
+        with self._lock:
+            self._delisted_stocks[ticker] = delist_date
         logger.info("delisted_kaydedildi: ticker=%s, tarih=%s", ticker, delist_date)
 
     def is_delisted(self, ticker: str, date: str) -> bool:
@@ -251,7 +270,8 @@ class BacktestEnhancements:
         Returns:
             Delisted mi?
         """
-        delist_date = self._delisted_stocks.get(ticker)
+        with self._lock:
+            delist_date = self._delisted_stocks.get(ticker)
         if delist_date is None:
             return False
 
@@ -271,14 +291,15 @@ class BacktestEnhancements:
             ticker: Hisse kodu
             ipo_date: IPO tarihi (YYYY-MM-DD)
         """
-        self._ipo_dates[ticker] = ipo_date
+        with self._lock:
+            self._ipo_dates[ticker] = ipo_date
         logger.info("ipo_kaydedildi: ticker=%s, tarih=%s", ticker, ipo_date)
 
     def is_post_ipo(
         self,
         ticker: str,
         date: str,
-        min_days: int = 30,
+        min_days: int = DEFAULT_MIN_POST_IPO_DAYS,
     ) -> bool:
         """IPO'dan sonra yeterli gün geçti mi?
 
@@ -290,7 +311,8 @@ class BacktestEnhancements:
         Returns:
             Yeterli gün geçti mi?
         """
-        ipo_date = self._ipo_dates.get(ticker)
+        with self._lock:
+            ipo_date = self._ipo_dates.get(ticker)
         if ipo_date is None:
             return True  # IPO kaydı yoksa işlem yapılabilir
 
@@ -306,7 +328,8 @@ class BacktestEnhancements:
 
     def register_corporate_action(self, action: CorporateAction) -> None:
         """Şirket olayı kaydet."""
-        self._corporate_actions.append(action)
+        with self._lock:
+            self._corporate_actions.append(action)
         logger.info("sirket_olayi_kaydedildi: ticker=%s, tip=%s, tarih=%s", action.ticker, action.action_type, action.ex_date)
 
     def get_corporate_actions(
@@ -331,8 +354,11 @@ class BacktestEnhancements:
         except ValueError:
             return []
 
+        with self._lock:
+            actions_snapshot = list(self._corporate_actions)
+
         result: list[CorporateAction] = []
-        for action in self._corporate_actions:
+        for action in actions_snapshot:
             if action.ticker != ticker:
                 continue
 
@@ -361,6 +387,10 @@ class BacktestEnhancements:
         Returns:
             Düzeltilmiş fiyat
         """
+        if np.isnan(price) or price <= 0.0:
+            return 0.0
+        if np.isnan(dividend) or dividend <= 0.0:
+            return price
         return max(0.0, price - dividend)
 
     def adjust_for_split(
@@ -377,7 +407,11 @@ class BacktestEnhancements:
         Returns:
             Düzeltilmiş fiyat
         """
-        return price / ratio if ratio > 0 else price
+        if np.isnan(price) or price <= 0.0:
+            return 0.0
+        if np.isnan(ratio) or ratio <= 0.0:
+            return price
+        return price / ratio
 
     # LİKİDİTE KONTROLÜ
 
@@ -397,7 +431,7 @@ class BacktestEnhancements:
         Returns:
             (is_liquid, reason)
         """
-        if adv < self.min_adv_threshold:
+        if np.isnan(adv) or adv < self.min_adv_threshold:
             return False, f"ADV ({adv:,.0f}) minimum eşiğin ({self.min_adv_threshold:,.0f}) altında"
 
         participation = trade_size / adv if adv > 0 else 1.0
@@ -412,14 +446,27 @@ class BacktestEnhancements:
 
     def get_summary(self) -> dict[str, Any]:
         """Geliştirme özetini döndürür."""
-        return {
-            "delisted_stocks": len(self._delisted_stocks),
-            "ipo_dates": len(self._ipo_dates),
-            "corporate_actions": len(self._corporate_actions),
-            "max_participation_rate": self.max_participation_rate,
-            "min_adv_threshold": self.min_adv_threshold,
-        }
+        with self._lock:
+            return {
+                "delisted_stocks": len(self._delisted_stocks),
+                "ipo_dates": len(self._ipo_dates),
+                "corporate_actions": len(self._corporate_actions),
+                "max_participation_rate": self.max_participation_rate,
+                "min_adv_threshold": self.min_adv_threshold,
+            }
 
 
 # Singleton
 backtest_enhancements = BacktestEnhancements()
+
+__all__ = [
+    "CorporateAction",
+    "ExecutionResult",
+    "MarketImpact",
+    "BacktestEnhancements",
+    "backtest_enhancements",
+    "DEFAULT_MAX_PARTICIPATION_RATE",
+    "DEFAULT_MARKET_IMPACT_COEFF",
+    "DEFAULT_MIN_ADV_THRESHOLD",
+    "DEFAULT_MIN_POST_IPO_DAYS",
+]

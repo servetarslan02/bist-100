@@ -28,7 +28,7 @@ class LearningPipeline:
         trust_engine: ModelTrustEngine | None = None,
         fusion_engine: SignalFusionEngine | None = None,
     ):
-        """Otomatik eklendi."""
+        """Öğrenme boru hattını bellek deposu, güven motoru ve füzyon motoru ile ilklendirir."""
         self.store = memory_store or ModelMemoryStore()
         self.trust_engine = trust_engine or ModelTrustEngine()
         self.fusion_engine = fusion_engine or SignalFusionEngine()
@@ -288,3 +288,6 @@ class LearningPipeline:
         except Exception as e:
             logger.warning("check_and_catchup_failed", error=str(e))
             return {"status": "error", "error": str(e)}
+
+    def __repr__(self) -> str:
+        return f"<LearningPipeline registered_models={len(self.registered_models)}>"

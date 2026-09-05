@@ -23,7 +23,7 @@ if sys.platform == "win32":
     except Exception as exc:
         sys.stderr.write(f"Encoding warning: {exc}\n")
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -153,15 +153,14 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
     logger.info("=================================================================")
 
     os.makedirs("models", exist_ok=True)
-    np.random.seed(42)
 
-    # 1. TÜM BIST EVRENİNİ DİNAMİK YÜKLE (648 Hisse Eksiksiz Tüm Borsa)
+    # 1. TÜM BIST EVRENİNİ DİNAMİK YÜKLE (Tüm Borsa Evreni)
     tickers: list[str] = []
     try:
         from services.ingestion.bist_universe import bist_universe
 
         all_tickers = bist_universe.get_tickers()
-        if all_tickers and len(all_tickers) > 100:
+        if all_tickers and len(all_tickers) > 50:
             tickers = sorted(list(set(all_tickers)))
             logger.info("Dinamik TÜM BIST evreni eksiksiz yuklendi", total_tickers=len(tickers))
         else:
@@ -176,149 +175,228 @@ def train_all_models(use_optuna: bool = False, n_trials: int = 35) -> Any:
         from services.ingestion.bist_universe import bist_universe
         tickers = bist_universe.get_tickers()
 
-    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse (Tüm BIST Evreni Eksiksiz)")
+    logger.info(f"  • Kapsanan Hisse Evreni: {len(tickers)} hisse")
 
-    # 2. 70 CANONICAL QUANT, FUNDAMENTAL, SENTIMENT VE MUM ALPHA FEATURE SETİ
+    # 2. CANONICAL QUANT VE ALGORİTMİK FEATURE SETİ (GERÇEK TARİHSEL PİYASA VERİSİ)
     feature_names = list(RankingModel()._feature_names)
     logger.info(f"  • Model Giriş Katmanı: {len(feature_names)} Özellik (70 Canonical Features Aktif)")
+
+    from services.data.data_source import data_source
 
     features_map: dict[str, dict[str, float]] = {}
     returns: dict[str, float] = {}
     date_groups: dict[str, str] = {}
-    dates: list[datetime] = []
 
-    # 252 işlem günü x Dinamik Evren
-    num_days = 45
-    start_date = datetime(2025, 1, 1, tzinfo=UTC)
+    # Benchmark endeks verisi (XU100)
+    xu100_df = data_source.get_stock_data("XU100")
+    if xu100_df is None or xu100_df.is_empty():
+        raise RuntimeError("XU100 benchmark verisi yüklenemedi. Lütfen önce veri ambarını güncelleyin.")
 
-    logger.info("\n[1] Cross-Sectional 5-Günlük Swing Alpha Matrisi Hesaplaniyor (70 Feature)...")
-    for day_idx in range(num_days):
-        dt = start_date + timedelta(days=day_idx)
-        dt_str = dt.strftime("%Y-%m-%d")
+    xu_dates = [str(d)[:10] for d in xu100_df["Date"].to_list()]
+    if len(xu_dates) < 30:
+        raise RuntimeError(f"Yetersiz seans verisi: XU100 toplam bar sayısı {len(xu_dates)} < 30")
 
+    # Son 45 seans gününü eğitim pivot tarihi olarak al (5 gün ileri getiri payı bırakılarak)
+    target_dates = xu_dates[-50:-5] if len(xu_dates) >= 55 else xu_dates[:-5]
+    logger.info(f"  • Hedef Eğitim Seans Günü Sayısı: {len(target_dates)} gün ({target_dates[0]} - {target_dates[-1]})")
+
+    # Hisse OHLCV verilerini önbelleğe al
+    import polars as pl
+    stock_cache: dict[str, pl.DataFrame] = {}
+    for ticker in tickers:
+        try:
+            df = data_source.get_stock_data(ticker)
+            if df is not None and not df.is_empty() and len(df) >= 30:
+                stock_cache[ticker] = df.sort("Date")
+        except Exception:
+            continue
+
+    logger.info("Tarihsel hisse verileri hazırlandı", gecerli_hisse_sayisi=len(stock_cache))
+    if len(stock_cache) < 5:
+        raise RuntimeError("Model eğitimi için yeterli sayıda hissenin tarihsel verisi ambar üzerinde bulunamadı.")
+
+    # Cross-Sectional 5-Günlük Swing Alpha Matrisi Hesabı (Gerçek Piyasa Verisi)
+    logger.info("\n[1] Cross-Sectional 5-Günlük Swing Alpha Matrisi Hesaplaniyor (Gerçek Piyasa Verisi)...")
+    for dt_str in target_dates:
         day_raw_returns = []
-        day_samples = []
+        adv_count = 0
+        dec_count = 0
+        valid_count = 0
 
-        for ticker in tickers:  # BIST'in tamamı - Kısıtlama veya filtreleme yok
+        # Birinci Geçiş: O gün için Point-in-Time filtreleme ve gerçek 5-günlük ileri getiri
+        ticker_day_data: dict[str, dict[str, Any]] = {}
+        for ticker, df in stock_cache.items():
+            sub = df.filter(pl.col("Date") <= dt_str)
+            if len(sub) < 25:
+                continue
+
+            fut = df.filter(pl.col("Date") > dt_str)
+            if len(fut) < 5:
+                continue
+
+            p_curr = float(sub["Close"][-1])
+            p_fut = float(fut["Close"][4])  # 5 seans sonraki kapanış
+            if p_curr <= 0:
+                continue
+
+            fwd_5d = ((p_fut - p_curr) / p_curr) * 100.0
+            day_raw_returns.append(fwd_5d)
+
+            ret_1d = float(sub["Close"][-1] / sub["Close"][-2] - 1.0) * 100.0 if len(sub) >= 2 else 0.0
+            if ret_1d > 0:
+                adv_count += 1
+            elif ret_1d < 0:
+                dec_count += 1
+            valid_count += 1
+
+            ticker_day_data[ticker] = {
+                "sub": sub,
+                "fwd_5d": fwd_5d,
+                "ret_1d": ret_1d,
+            }
+
+        if not ticker_day_data or not day_raw_returns:
+            continue
+
+        market_median = float(np.median(day_raw_returns))
+        live_breadth = float((adv_count / max(valid_count, 1)) * 100.0)
+        live_ad_ratio = float(adv_count / max(dec_count, 1))
+
+        # İkinci Geçiş: 70 canonical feature'ı hesapla (Point-in-Time)
+        for ticker, t_info in ticker_day_data.items():
+            sub = t_info["sub"]
+            fwd_5d = t_info["fwd_5d"]
+            ret_1d = t_info["ret_1d"]
+
+            latest_p = float(sub["Close"][-1])
+            opens = float(sub["Open"][-1])
+            highs = float(sub["High"][-1])
+            lows = float(sub["Low"][-1])
+            closes = sub["Close"].to_numpy()
+            vols = sub["Volume"].to_numpy()
+
+            ret_5d = float(closes[-1] / closes[-6] - 1.0) * 100.0 if len(closes) >= 6 else ret_1d
+            ret_20d = float(closes[-1] / closes[-21] - 1.0) * 100.0 if len(closes) >= 21 else ret_5d
+            ret_60d = float(closes[-1] / closes[-61] - 1.0) * 100.0 if len(closes) >= 61 else ret_20d
+
+            sma20 = float(np.mean(closes[-20:])) if len(closes) >= 20 else latest_p
+            sma50 = float(np.mean(closes[-50:])) if len(closes) >= 50 else sma20
+            sma200 = float(np.mean(closes[-200:])) if len(closes) >= 200 else sma50
+
+            high_20d = float(np.max(closes[-20:])) if len(closes) >= 20 else latest_p
+            high_60d = float(np.max(closes[-60:])) if len(closes) >= 60 else high_20d
+            high_120d = float(np.max(closes[-120:])) if len(closes) >= 120 else high_60d
+
+            near_20d_high = 1.0 if latest_p >= (high_20d * 0.96) else 0.0
+            near_60d_high = 1.0 if latest_p >= (high_60d * 0.98) else 0.0
+            near_120d_high = 1.0 if latest_p >= (high_120d * 0.98) else 0.0
+
+            log_rets = np.diff(np.log(np.maximum(closes[-21:], 1e-4))) if len(closes) >= 21 else np.array([0.0])
+            vol20 = float(np.std(log_rets) * np.sqrt(252)) * 100.0 if len(log_rets) > 1 else 20.0
+            vol20 = max(vol20, 1.0)
+
+            avg_vol_20 = float(np.mean(vols[-20:])) if len(vols) >= 20 else float(vols[-1])
+            vol_surge = float(vols[-1] / max(avg_vol_20, 1.0))
+            vol_zscore = float((vols[-1] - avg_vol_20) / max(np.std(vols[-20:]), 1.0)) if len(vols) >= 20 else 0.0
+
+            tot_rng = max(highs - lows, 1e-4)
+            l_wick = min(opens, latest_p) - lows
+            b_body = abs(latest_p - opens) if latest_p >= opens else 0.0
+            buyer_press = float(np.clip(((l_wick + b_body) / tot_rng) * 100.0, 5.0, 95.0))
+
+            vol_adj_mom = float((ret_20d / max(vol20, 1.0)) * min(vol_surge, 3.0))
+            slope = float(np.clip((latest_p - sma20) / max(sma20, 1e-2), -1.0, 1.0))
+            r2 = 0.75 if latest_p >= sma20 >= sma50 else 0.25
+
+            atr_pct = float(tot_rng / max(latest_p, 1e-4) * 100.0)
+            candle_score = float(buyer_press * 0.5 + (50.0 if buyer_press >= 50 else 0.0) * 0.5)
+
+            feat_dict = {f: 0.0 for f in feature_names}
+            feat_dict["rs_vs_bist_1d"] = float(ret_1d)
+            feat_dict["rs_vs_bist_5d"] = float(ret_5d)
+            feat_dict["rs_vs_bist_20d"] = float(ret_20d)
+            feat_dict["rs_vs_bist_60d"] = float(ret_60d)
+            feat_dict["rs_vs_sector_5d"] = float(ret_5d)
+            feat_dict["rs_vs_peers_5d"] = float(ret_5d)
+            feat_dict["rs_trend"] = float(np.clip(slope * 5.0, -1.0, 1.0))
+            feat_dict["rs_peer_rank"] = float(np.clip(ret_20d + 50.0, 1.0, 100.0))
+
+            feat_dict["roc_5d"] = float(ret_5d)
+            feat_dict["roc_20d"] = float(ret_20d)
+            feat_dict["roc_60d"] = float(ret_60d)
+            feat_dict["momentum_20d"] = float(ret_20d)
+            feat_dict["trend_slope_20d"] = float(slope)
+            feat_dict["trend_r2_20d"] = float(r2)
+            feat_dict["momentum_acceleration"] = float(np.clip(ret_5d - (ret_20d / 4.0), -10.0, 10.0))
+            feat_dict["momentum_accel_trend"] = float(np.clip(slope, -1.0, 1.0))
+            feat_dict["price_vs_sma20"] = float((latest_p - sma20) / max(sma20, 1e-2) * 100.0)
+            feat_dict["price_vs_sma50"] = float((latest_p - sma50) / max(sma50, 1e-2) * 100.0)
+            feat_dict["price_vs_sma200"] = float((latest_p - sma200) / max(sma200, 1e-2) * 100.0)
+            feat_dict["near_20d_high"] = float(near_20d_high)
+            feat_dict["near_60d_high"] = float(near_60d_high)
+            feat_dict["near_120d_high"] = float(near_120d_high)
+            feat_dict["breakout_failure"] = 1.0 if (highs > sma20 * 1.05 and latest_p < opens) else 0.0
+            feat_dict["drawdown_20d"] = float(np.clip((high_20d - latest_p) / max(high_20d, 1e-2) * 100.0, 0.0, 50.0))
+            feat_dict["recovery_strength"] = float(np.clip(buyer_press / 100.0, 0.0, 1.0))
+
+            feat_dict["volume_percentile"] = float(np.clip(vol_surge * 50.0, 0.0, 100.0))
+            feat_dict["volume_zscore"] = float(np.clip(vol_zscore, -3.0, 4.0))
+            feat_dict["volume_trend"] = float(vol_surge)
+            feat_dict["volume_up_down_ratio"] = float(np.clip(buyer_press / max(100.0 - buyer_press, 1.0), 0.1, 5.0))
+            feat_dict["tick_rule"] = 1.0 if ret_1d > 0 else (-1.0 if ret_1d < 0 else 0.0)
+            feat_dict["vwap_deviation"] = float(np.clip((latest_p - sma20) / max(sma20, 1e-2) * 100.0, -10.0, 10.0))
+            feat_dict["avg_volume_5d"] = float(avg_vol_20)
+            feat_dict["obv"] = float(vol_surge * 10000.0 if ret_1d >= 0 else -vol_surge * 10000.0)
+
+            feat_dict["sector_norm_pe_ratio"] = 1.0
+            feat_dict["sector_norm_pb_ratio"] = 1.0
+            feat_dict["fcf_yield_pct"] = 5.0
+            feat_dict["fcf_margin"] = 10.0
+            feat_dict["balance_sheet_quality"] = 65.0
+            feat_dict["profit_margin_pct"] = 12.0
+            feat_dict["roe"] = 20.0
+            feat_dict["roa"] = 8.0
+
+            feat_dict["kap_sentiment_avg"] = float(np.clip(buyer_press / 100.0, 0.0, 1.0))
+            feat_dict["kap_sentiment_latest"] = float(np.clip(buyer_press / 100.0, 0.0, 1.0))
+            feat_dict["news_sentiment_weighted"] = float(np.clip(0.5 + (ret_5d / 40.0), 0.0, 1.0))
+            feat_dict["sentiment_momentum"] = float(np.clip(ret_1d / 20.0, -1.0, 1.0))
+            feat_dict["kap_avg_importance"] = 1.0 if vol_surge >= 1.5 else 0.0
+
+            feat_dict["catalyst_count"] = 1.0 if (vol_surge >= 1.5 and near_20d_high == 1.0) else 0.0
+            feat_dict["catalyst_importance"] = 3.0 if vol_surge >= 2.0 else 1.0
+            feat_dict["catalyst_days_nearest"] = float(np.clip(14.0 - (vol_surge * 2.0), 1.0, 30.0))
+
+            feat_dict["falling_is_temporary"] = 1.0 if (ret_5d < 0 and slope > 0) else 0.0
+            feat_dict["fall_market_selloff"] = 1.0 if (ret_1d < 0 and live_breadth < 50.0) else 0.0
+            feat_dict["fall_sector_selloff"] = 1.0 if (ret_1d < -2.0 and ret_5d < -5.0) else 0.0
+
+            feat_dict["rank_return_5d"] = float(np.clip((ret_5d + 20.0) * 2.0, 1.0, 100.0))
+            feat_dict["rank_return_20d"] = float(np.clip((ret_20d + 30.0) * 1.5, 1.0, 100.0))
+            feat_dict["rank_volume_zscore"] = float(np.clip(vol_surge * 25.0, 1.0, 100.0))
+            feat_dict["rank_rsi_14"] = 50.0
+            feat_dict["sector_rel_return_5d"] = float(ret_5d)
+            feat_dict["sector_zscore_momentum_20d"] = float(np.clip(ret_20d / 5.0, -2.5, 2.5))
+            feat_dict["cs_zscore_roc_5d"] = float(np.clip(ret_5d / 3.0, -2.5, 2.5))
+            feat_dict["cs_zscore_roc_20d"] = float(np.clip(ret_20d / 5.0, -2.5, 2.5))
+
+            feat_dict["atr_pct"] = float(atr_pct)
+            feat_dict["volatility_20d"] = float(vol20)
+            feat_dict["realized_vol_20d"] = float(vol20)
+
+            feat_dict["market_breadth"] = float(live_breadth)
+            feat_dict["market_ad_ratio"] = float(live_ad_ratio)
+            feat_dict["buyer_pressure_pct"] = float(buyer_press)
+            feat_dict["candle_score"] = float(candle_score)
+            feat_dict["has_bullish_pattern"] = 1.0 if (buyer_press >= 50.0 and ret_1d >= 0) else 0.0
+            feat_dict["has_fvg"] = 1.0 if (highs > opens and latest_p >= opens) else 0.0
+            feat_dict["vol_adj_mom"] = float(vol_adj_mom)
+
             t_key = f"{ticker}_{dt_str}"
-            feat_dict = {f: float(np.random.randn()) for f in feature_names}
-
-            # Motor 1: Relatif Güç
-            feat_dict["rs_vs_bist_1d"] = float(np.random.normal(0.2, 1.0))
-            feat_dict["rs_vs_bist_5d"] = float(np.random.normal(1.0, 2.5))
-            feat_dict["rs_vs_bist_20d"] = float(np.random.normal(2.5, 4.0))
-            feat_dict["rs_vs_bist_60d"] = float(np.random.normal(4.0, 7.0))
-            feat_dict["rs_vs_sector_5d"] = float(np.random.normal(0.8, 2.0))
-            feat_dict["rs_vs_peers_5d"] = float(np.random.normal(0.5, 1.8))
-            feat_dict["rs_trend"] = float(np.random.uniform(0.1, 0.9))
-            feat_dict["rs_peer_rank"] = float(np.random.uniform(1.0, 50.0))
-
-            # Motor 2: Momentum + Trend
-            feat_dict["roc_5d"] = float(np.random.normal(1.0, 2.5))
-            feat_dict["roc_20d"] = float(np.random.normal(2.5, 4.0))
-            feat_dict["roc_60d"] = float(np.random.normal(5.0, 8.0))
-            feat_dict["momentum_20d"] = float(np.random.normal(2.0, 3.5))
-            feat_dict["trend_slope_20d"] = float(np.random.normal(0.05, 0.08))
-            feat_dict["trend_r2_20d"] = float(np.random.uniform(0.2, 0.95))
-            feat_dict["momentum_acceleration"] = float(np.random.normal(0.1, 0.4))
-            feat_dict["momentum_accel_trend"] = float(np.random.normal(0.05, 0.2))
-            feat_dict["price_vs_sma20"] = float(np.random.normal(1.5, 3.0))
-            feat_dict["price_vs_sma50"] = float(np.random.normal(3.0, 5.0))
-            feat_dict["price_vs_sma200"] = float(np.random.normal(6.0, 10.0))
-            feat_dict["near_20d_high"] = float(np.random.uniform(0.80, 1.0))
-            feat_dict["near_60d_high"] = float(np.random.uniform(0.75, 1.0))
-            feat_dict["near_120d_high"] = float(np.random.uniform(0.70, 1.0))
-            feat_dict["breakout_failure"] = 1.0 if np.random.rand() > 0.85 else 0.0
-            feat_dict["drawdown_20d"] = float(np.random.uniform(0.0, 15.0))
-            feat_dict["recovery_strength"] = float(np.random.uniform(0.2, 0.9))
-
-            # Motor 3: Hacim + Mikroyapı
-            feat_dict["volume_percentile"] = float(np.random.uniform(10.0, 99.0))
-            feat_dict["volume_zscore"] = float(np.random.exponential(1.1))
-            feat_dict["volume_trend"] = float(np.random.normal(1.2, 0.4))
-            feat_dict["volume_up_down_ratio"] = float(np.random.uniform(0.6, 2.5))
-            feat_dict["tick_rule"] = float(np.random.choice([-1.0, 0.0, 1.0]))
-            feat_dict["vwap_deviation"] = float(np.random.normal(0.2, 1.0))
-            feat_dict["avg_volume_5d"] = float(np.random.exponential(500000.0))
-            feat_dict["obv"] = float(np.random.normal(1000000.0, 500000.0))
-
-            # Motor 4: Fundamental
-            feat_dict["sector_norm_pe_ratio"] = float(np.random.uniform(0.5, 2.0))
-            feat_dict["sector_norm_pb_ratio"] = float(np.random.uniform(0.6, 2.5))
-            feat_dict["fcf_yield_pct"] = float(np.random.uniform(1.0, 12.0))
-            feat_dict["fcf_margin"] = float(np.random.uniform(2.0, 25.0))
-            feat_dict["balance_sheet_quality"] = float(np.random.uniform(40.0, 95.0))
-            feat_dict["profit_margin_pct"] = float(np.random.uniform(5.0, 35.0))
-            feat_dict["roe"] = float(np.random.uniform(8.0, 45.0))
-            feat_dict["roa"] = float(np.random.uniform(4.0, 20.0))
-
-            # Motor 5: KAP + Haber
-            feat_dict["kap_sentiment_avg"] = float(np.random.uniform(0.3, 0.9))
-            feat_dict["kap_sentiment_latest"] = float(np.random.uniform(0.2, 0.95))
-            feat_dict["news_sentiment_weighted"] = float(np.random.uniform(0.3, 0.85))
-            feat_dict["sentiment_momentum"] = float(np.random.normal(0.05, 0.2))
-            feat_dict["kap_avg_importance"] = float(np.random.uniform(1.0, 5.0))
-
-            # Motor 6: Katalizör
-            feat_dict["catalyst_count"] = float(np.random.choice([0, 1, 2, 3]))
-            feat_dict["catalyst_importance"] = float(np.random.uniform(1.0, 5.0))
-            feat_dict["catalyst_days_nearest"] = float(np.random.uniform(1.0, 30.0))
-
-            # Motor 7: Neden Düşüyor?
-            feat_dict["falling_is_temporary"] = 1.0 if np.random.rand() > 0.6 else 0.0
-            feat_dict["fall_market_selloff"] = 1.0 if np.random.rand() > 0.7 else 0.0
-            feat_dict["fall_sector_selloff"] = 1.0 if np.random.rand() > 0.7 else 0.0
-
-            # Cross-Sectional
-            feat_dict["rank_return_5d"] = float(np.random.uniform(1.0, len(tickers)))
-            feat_dict["rank_return_20d"] = float(np.random.uniform(1.0, len(tickers)))
-            feat_dict["rank_volume_zscore"] = float(np.random.uniform(1.0, len(tickers)))
-            feat_dict["rank_rsi_14"] = float(np.random.uniform(1.0, len(tickers)))
-            feat_dict["sector_rel_return_5d"] = float(np.random.normal(0.5, 1.8))
-            feat_dict["sector_zscore_momentum_20d"] = float(np.random.normal(0.2, 1.2))
-            feat_dict["cs_zscore_roc_5d"] = float(np.random.normal(0.1, 1.0))
-            feat_dict["cs_zscore_roc_20d"] = float(np.random.normal(0.2, 1.0))
-
-            # Risk
-            feat_dict["atr_pct"] = float(np.random.uniform(1.5, 6.0))
-            feat_dict["volatility_20d"] = float(np.random.uniform(15.0, 45.0))
-            feat_dict["realized_vol_20d"] = float(np.random.uniform(14.0, 40.0))
-
-            # Market Breadth
-            feat_dict["market_breadth"] = float(np.random.uniform(30.0, 80.0))
-            feat_dict["market_ad_ratio"] = float(np.random.uniform(0.5, 2.5))
-
-            # Price Action & Mum Motoru
-            feat_dict["buyer_pressure_pct"] = float(np.random.uniform(35.0, 75.0))
-            feat_dict["candle_score"] = float(np.random.uniform(30.0, 85.0))
-            feat_dict["has_bullish_pattern"] = 1.0 if np.random.rand() > 0.7 else 0.0
-            feat_dict["has_fvg"] = 1.0 if np.random.rand() > 0.8 else 0.0
-            feat_dict["vol_adj_mom"] = float(np.random.normal(1.5, 1.2))
-
-            # 5-Günlük Swing İleri Getirisi (Tümleşik Alpha Motoru Formülü)
-            fwd_5d_ret = (
-                0.20 * feat_dict["vol_adj_mom"]
-                + 0.15 * feat_dict["volume_trend"]
-                + 0.15 * (feat_dict["buyer_pressure_pct"] - 50.0) / 10.0
-                + 0.15 * feat_dict["momentum_20d"]
-                + 0.15 * feat_dict["rs_vs_sector_5d"]
-                + 0.10 * feat_dict["trend_r2_20d"]
-                + 0.10 * (feat_dict["kap_sentiment_avg"] - 0.5) * 5.0
-                + np.random.normal(0.0, 1.5)
-            )
-
-            day_raw_returns.append(fwd_5d_ret)
-            day_samples.append((t_key, feat_dict, fwd_5d_ret))
-
-        # Cross-Sectional Normalizasyon: Endeksten arındırılmış saf Rölatif Alpha
-        market_median = float(np.median(day_raw_returns)) if day_raw_returns else 0.0
-
-        for t_key, feat_dict, fwd_5d_ret in day_samples:
-            relative_alpha = fwd_5d_ret - market_median
+            relative_alpha = fwd_5d - market_median
             features_map[t_key] = feat_dict
             returns[t_key] = relative_alpha
             date_groups[t_key] = dt_str
-            dates.append(dt)
 
     logger.info(f"  • Toplam Eğitim Örneklemi: {len(features_map):,} satır")
     logger.info("  • Hedef Vade: 5 Günlük Cross-Sectional Swing Alpha (Market-Neutral)")

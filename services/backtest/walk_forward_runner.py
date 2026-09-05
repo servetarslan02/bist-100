@@ -20,21 +20,74 @@ KURAL: Tahmin modeli / skor formülü DEĞİŞTİRİLMEZ — engine ne üretiyor
 from __future__ import annotations
 
 import hashlib
+import math
+import threading
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Any
 
 import numpy as np
+import structlog
 
 try:
     import polars as pl
 except ImportError:
     pl = None
-import structlog
 
 from .engine_v4 import BacktestConfig, BacktestEngineV4, BacktestResultV4
 from .walk_forward_engine import WalkForwardEngineV5 as WalkForwardEngine
 
-logger = structlog.get_logger()
+# ============================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ & VARSAYILAN DEĞERLER)
+# ============================================================================
+DEFAULT_PURGE_DAYS: int = 5
+DEFAULT_EMBARGO_DAYS: int = 5
+DEFAULT_TRAIN_DAYS: int = 252
+DEFAULT_TEST_DAYS: int = 63
+DEFAULT_STEP_DAYS: int = 21
+
+logger = structlog.get_logger(__name__)
+
+
+def _filter_polars_by_date(df: pl.DataFrame, end_date: str) -> pl.DataFrame:
+    """Polars DataFrame'i end_date tarihine göre (<= end_date) güvenle filtreler.
+
+    Date, Datetime ve String sütun tiplerini destekler; tip uyuşmazlığı hatalarını önler.
+    """
+    if "Date" not in df.columns:
+        return df
+    dtype = df["Date"].dtype
+    if dtype in (pl.Date, pl.Datetime):
+        end_d = date.fromisoformat(end_date[:10])
+        if dtype == pl.Date:
+            return df.filter(pl.col("Date") <= end_d)
+        else:
+            end_dt = datetime.combine(end_d, datetime.max.time())
+            return df.filter(pl.col("Date") <= end_dt)
+    else:
+        return df.filter(pl.col("Date").cast(pl.String).str.slice(0, 10) <= end_date[:10])
+
+
+def _filter_polars_by_range(df: pl.DataFrame, start_date: str, end_date: str) -> pl.DataFrame:
+    """Polars DataFrame'i start_date ile end_date aralığına göre güvenle filtreler.
+
+    Date, Datetime ve String sütun tiplerini destekler; tip uyuşmazlığı hatalarını önler.
+    """
+    if "Date" not in df.columns:
+        return df
+    dtype = df["Date"].dtype
+    if dtype in (pl.Date, pl.Datetime):
+        start_d = date.fromisoformat(start_date[:10])
+        end_d = date.fromisoformat(end_date[:10])
+        if dtype == pl.Date:
+            return df.filter((pl.col("Date") >= start_d) & (pl.col("Date") <= end_d))
+        else:
+            start_dt = datetime.combine(start_d, datetime.min.time())
+            end_dt = datetime.combine(end_d, datetime.max.time())
+            return df.filter((pl.col("Date") >= start_dt) & (pl.col("Date") <= end_dt))
+    else:
+        col_str = pl.col("Date").cast(pl.String).str.slice(0, 10)
+        return df.filter((col_str >= start_date[:10]) & (col_str <= end_date[:10]))
 
 
 @dataclass
@@ -67,8 +120,19 @@ class FoldBacktestResult:
     leakage_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Fold sonucunu sözlük formatında döndürür.
+
+        Returns:
+            dict[str, Any]: Fold metrikleri ve pencerelerini içeren sözlük.
+        """
         return {k: v for k, v in self.__dict__.items()}
+
+    def __repr__(self) -> str:
+        return (
+            f"FoldBacktestResult(fold={self.fold_id}, test=[{self.test_start}..{self.test_end}], "
+            f"ret={self.total_return_pct:.2f}%, sharpe={self.sharpe_ratio:.2f}, trades={self.total_trades}, "
+            f"leakage_ok={self.leakage_ok})"
+        )
 
 
 @dataclass
@@ -92,28 +156,64 @@ class WalkForwardBacktestResult:
     summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Toplu walk-forward sonucunu sözlük formatında döndürür.
+
+        Returns:
+            dict[str, Any]: Özet metrikler ve tüm fold detaylarını içeren sözlük.
+        """
         d = {k: v for k, v in self.__dict__.items() if k != "folds"}
         d["folds"] = [f.to_dict() for f in self.folds]
         return d
 
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardBacktestResult(run_id='{self.run_id}', folds={len(self.folds)}/{self.total_folds}, "
+            f"avg_ret={self.avg_test_return_pct:.2f}%, avg_sharpe={self.avg_test_sharpe:.2f}, "
+            f"stability={self.stability_score:.2f}, deflated_sharpe={self.deflated_sharpe:.2f})"
+        )
+
 
 class WalkForwardBacktestRunner:
-    """Engine v4.0 üzerinde purge + embargo korumalı walk-forward backtest."""
+    """Engine v4.0 üzerinde purge + embargo korumalı walk-forward backtest çalıştırıcı."""
 
     def __init__(
         self,
         backtest_config: BacktestConfig | None = None,
-        purge_days: int = 5,
-        embargo_days: int = 5,
-        train_days: int = 252,
-        test_days: int = 63,
-        step_days: int = 21,
+        purge_days: int = DEFAULT_PURGE_DAYS,
+        embargo_days: int = DEFAULT_EMBARGO_DAYS,
+        train_days: int = DEFAULT_TRAIN_DAYS,
+        test_days: int = DEFAULT_TEST_DAYS,
+        step_days: int = DEFAULT_STEP_DAYS,
         use_panel_features: bool = True,
     ):
-        """Otomatik eklendi."""
+        """WalkForwardBacktestRunner başlatıcı.
+
+        Args:
+            backtest_config: Backtest motoru yapılandırması.
+            purge_days: Train ile test arasındaki arınma (purge) gün sayısı.
+            embargo_days: Test sonrasındaki ambargo gün sayısı.
+            train_days: Eğitim penceresi gün sayısı.
+            test_days: Test penceresi gün sayısı.
+            step_days: Fold kaydırma adımı (gün).
+            use_panel_features: Panel çapraz kesit özelliklerin kullanılıp kullanılmayacağı.
+
+        Raises:
+            ValueError: Gün değerleri sınır dışındaysa (train < 1, test < 1, purge < 0 vb.).
+        """
+        if train_days < 1:
+            raise ValueError(f"train_days en az 1 olmalıdır: {train_days}")
+        if test_days < 1:
+            raise ValueError(f"test_days en az 1 olmalıdır: {test_days}")
+        if step_days < 1:
+            raise ValueError(f"step_days en az 1 olmalıdır: {step_days}")
+        if purge_days < 0:
+            raise ValueError(f"purge_days negatif olamaz: {purge_days}")
+        if embargo_days < 0:
+            raise ValueError(f"embargo_days negatif olamaz: {embargo_days}")
+
         self._config = backtest_config or BacktestConfig()
         self._use_panel = use_panel_features
+        self._lock = threading.Lock()
         self._wf = WalkForwardEngine(
             purge_days=purge_days,
             embargo_days=embargo_days,
@@ -122,11 +222,18 @@ class WalkForwardBacktestRunner:
             step_days=step_days,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardBacktestRunner(train={self._wf.train_days}, test={self._wf.test_days}, "
+            f"step={self._wf.step_days}, purge={self._wf.purge_days}, embargo={self._wf.embargo_days}, "
+            f"use_panel={self._use_panel})"
+        )
+
     def run(
         self,
-        market_data: dict[str, pl.DataFrame],
+        market_data: dict[str, Any],
         universe_at_date: list[str] | None = None,
-        benchmark_data: pl.DataFrame | None = None,
+        benchmark_data: Any | None = None,
         run_id: str | None = None,
         persist: bool = True,
     ) -> WalkForwardBacktestResult:
@@ -139,21 +246,37 @@ class WalkForwardBacktestRunner:
             run_id: Base run id (None ise deterministik üretilir)
             persist: Her fold'un sonucunu ayrı run olarak kaydet
         """
-        # Global tarih listesi (engine ile aynı semantik, date-string)
-        all_dates = set()
-        for df in market_data.values():
-            if df is not None and not df.empty:
-                for ts in df.index:
-                    all_dates.add(str(ts.date()) if hasattr(ts, "date") else str(ts))
-        dates = sorted(all_dates)
+        with self._lock:
+            # Global tarih listesi (engine ile aynı semantik, date-string)
+            all_dates: set[str] = set()
+            for df in market_data.values():
+                if df is None:
+                    continue
+                try:
+                    if pl is not None and isinstance(df, pl.DataFrame):
+                        if "Date" in df.columns:
+                            for d in df["Date"].to_list():
+                                all_dates.add(str(d)[:10])
+                    elif hasattr(df, "columns") and "Date" in df.columns:
+                        for d in df["Date"]:
+                            all_dates.add(str(d)[:10])
+                    elif hasattr(df, "index"):
+                        for ts in df.index:
+                            all_dates.add(str(ts.date()) if hasattr(ts, "date") else str(ts)[:10])
+                    elif isinstance(df, dict) and "Date" in df:
+                        for d in df["Date"]:
+                            all_dates.add(str(d)[:10])
+                except Exception:
+                    continue
+            dates = sorted(all_dates)
 
-        if run_id is None:
-            run_id = self._base_run_id(market_data)
+            if run_id is None:
+                run_id = self._base_run_id(market_data)
 
-        folds = self._wf.create_folds(dates)
-        if not folds:
-            logger.warning("No walk-forward folds", dates=len(dates))
-            return self._empty_result(run_id)
+            folds = self._wf.create_folds(dates)
+            if not folds:
+                logger.warning("Walk-forward fold oluşturulamadı: mevcut_tarih_sayısı=%d", len(dates))
+                return self._empty_result(run_id)
 
         fold_results: list[FoldBacktestResult] = []
 
@@ -226,12 +349,12 @@ class WalkForwardBacktestRunner:
             )
 
             logger.info(
-                "Walk-forward fold completed",
-                fold=fold_id,
-                run_id=fold_run_id,
-                trades=r.trades_executed,
-                return_pct=m.total_return_pct,
-                leakage_ok=leakage_ok,
+                "Walk-forward fold tamamlandı: fold=%d, run_id=%s, trades=%d, getiri=%%%.2f, leakage_ok=%s",
+                fold_id,
+                fold_run_id,
+                r.trades_executed,
+                m.total_return_pct,
+                leakage_ok,
             )
 
         return self._aggregate(run_id, fold_results)
@@ -274,14 +397,31 @@ class WalkForwardBacktestRunner:
             return None
 
         # 1) Train window verisini kes
-        train_data: dict[str, pl.DataFrame] = {}
-        ts_start = pl.Series(train_start)
-        ts_end = pl.Series(train_end)
+        train_data: dict[str, Any] = {}
         for ticker, df in pit_data.items():
-            mask = (df.index >= ts_start) & (df.index <= ts_end)
-            df_train = df[mask]
-            if len(df_train) >= self.MIN_BARS_FOR_FEATURES:
-                train_data[ticker] = df_train
+            if df is None:
+                continue
+            try:
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    if len(df) == 0:
+                        continue
+                    df_train = _filter_polars_by_range(df, train_start, train_end)
+                elif hasattr(df, "index"):
+                    if len(df) == 0:
+                        continue
+                    if "Date" in df.columns:
+                        s = df["Date"].astype(str).str.slice(0, 10)
+                        df_train = df[(s >= train_start[:10]) & (s <= train_end[:10])]
+                    else:
+                        idx_s = df.index.astype(str).str.slice(0, 10)
+                        df_train = df[(idx_s >= train_start[:10]) & (idx_s <= train_end[:10])]
+                else:
+                    df_train = df
+
+                if len(df_train) >= self.MIN_BARS_FOR_FEATURES:
+                    train_data[ticker] = df_train
+            except Exception:
+                continue
 
         if len(train_data) < 5:
             return None
@@ -303,7 +443,12 @@ class WalkForwardBacktestRunner:
             if last_feature_idx < first_feature_idx:
                 continue
 
-            close_all = df["Close"].to_numpy()
+            if pl is not None and isinstance(df, pl.DataFrame):
+                close_all = df["Close"].to_numpy() if "Close" in df.columns else np.array([])
+            elif hasattr(df, "columns") and "Close" in df.columns:
+                close_all = df["Close"].to_numpy() if hasattr(df["Close"], "to_numpy") else df["Close"].values
+            else:
+                continue
 
             for idx in range(first_feature_idx, last_feature_idx + 1):
                 df_slice = df[: idx + 1]
@@ -317,8 +462,16 @@ class WalkForwardBacktestRunner:
                     continue
                 forward_ret = (c_t_fwd / c_t - 1.0) * 100.0
 
-                feature_date = df.index[idx]
-                date_str = str(feature_date.date()) if hasattr(feature_date, "date") else str(feature_date)
+                if pl is not None and isinstance(df, pl.DataFrame) and "Date" in df.columns:
+                    date_str = str(df["Date"][idx])[:10]
+                elif hasattr(df, "columns") and "Date" in df.columns:
+                    date_str = str(df["Date"].iloc[idx])[:10]
+                elif hasattr(df, "index"):
+                    feature_date = df.index[idx]
+                    date_str = str(feature_date.date()) if hasattr(feature_date, "date") else str(feature_date)[:10]
+                else:
+                    date_str = f"bar_{idx}"
+
                 sample_key = f"{ticker}::{date_str}"
 
                 if sample_key in features_map:
@@ -331,9 +484,9 @@ class WalkForwardBacktestRunner:
         n_samples = len(features_map)
         if n_samples < self.MIN_TRAINING_SAMPLES:
             logger.warning(
-                "Insufficient training samples for ML, falling back to rule-based",
-                samples=n_samples,
-                min_required=self.MIN_TRAINING_SAMPLES,
+                "ML eğitimi için yetersiz örnek, kural tabanlı yönteme geçiliyor: örnek=%d, asgari=%d",
+                n_samples,
+                self.MIN_TRAINING_SAMPLES,
             )
             return None
 
@@ -352,18 +505,18 @@ class WalkForwardBacktestRunner:
         features_map, clean_stats = training_validator.clean_features(features_map, feature_names)
         if clean_stats["inf_replaced"] > 0 or clean_stats["outliers_clamped"] > 0:
             logger.info(
-                "Feature cleaning applied",
-                inf_replaced=clean_stats["inf_replaced"],
-                outliers_clamped=clean_stats["outliers_clamped"],
+                "Öznitelik temizleme uygulandı: inf_degistirilen=%d, aykiri_baskilanan=%d",
+                clean_stats.get("inf_replaced", 0),
+                clean_stats.get("outliers_clamped", 0),
             )
 
         quality_report = training_validator.validate_dataset(features_map, returns, date_groups, feature_names)
         logger.info(
-            "Training data quality",
-            quality_score=round(quality_report.quality_score, 2),
-            valid_samples=quality_report.valid_samples,
-            unique_tickers=quality_report.unique_tickers,
-            unique_dates=quality_report.unique_dates,
+            "Eğitim veri kalitesi: kalite_skoru=%.2f, gecerli_ornek=%d, hisse_sayisi=%d, tarih_sayisi=%d",
+            quality_report.quality_score,
+            quality_report.valid_samples,
+            quality_report.unique_tickers,
+            quality_report.unique_dates,
         )
 
         # 6) Cross-Sectional Normalization (PIT-safe: sadece aynı tarih snapshot'ı)
@@ -380,12 +533,12 @@ class WalkForwardBacktestRunner:
             all_feature_names = feature_names + cs_feature_names
             all_feature_names = list(dict.fromkeys(all_feature_names))  # Unique, order preserved
             logger.info(
-                "Cross-sectional normalization applied",
-                cs_features=len(cs_feature_names),
-                total_features=len(all_feature_names),
+                "Yatay kesit normalizasyonu uygulandı: cs_oznitelik=%d, toplam_oznitelik=%d",
+                len(cs_feature_names),
+                len(all_feature_names),
             )
         except Exception as e:
-            logger.warning("CS normalization failed, using base features", error=str(e))
+            logger.warning("Yatay kesit normalizasyonu başarısız, temel öznitelikler kullanılacak: hata=%s", str(e))
             all_feature_names = feature_names
 
         # 7) Multi-horizon eğitim (1d, 5d, 20d, 60d)
@@ -410,14 +563,22 @@ class WalkForwardBacktestRunner:
 
             if train_date_end_idx < 10:
                 logger.info(
-                    "Skipping horizon (insufficient dates)", horizon=horizon, n_dates=n_dates, purge=effective_purge
+                    "Ufuk atlandı (yetersiz tarih sayısı): ufuk=%d, tarih_sayisi=%d, purge=%d",
+                    horizon,
+                    n_dates,
+                    effective_purge,
                 )
                 continue
 
             # Bu horizon için target hesapla (sadece features_map'teki sample'lar için)
             horizon_returns: dict[str, float] = {}
             for ticker, df in train_data.items():
-                close_all = df["Close"].to_numpy()
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    close_all = df["Close"].to_numpy() if "Close" in df.columns else np.array([])
+                elif hasattr(df, "columns") and "Close" in df.columns:
+                    close_all = df["Close"].to_numpy() if hasattr(df["Close"], "to_numpy") else df["Close"].values
+                else:
+                    continue
                 n = len(df)
                 first_idx = self.MIN_BARS_FOR_FEATURES - 1
                 last_idx = n - horizon - 1
@@ -426,8 +587,15 @@ class WalkForwardBacktestRunner:
                     c_fwd = close_all[idx + horizon]
                     if c_t <= 0 or not np.isfinite(c_t) or not np.isfinite(c_fwd):
                         continue
-                    feature_date = df.index[idx]
-                    date_str = str(feature_date.date()) if hasattr(feature_date, "date") else str(feature_date)
+                    if pl is not None and isinstance(df, pl.DataFrame) and "Date" in df.columns:
+                        date_str = str(df["Date"][idx])[:10]
+                    elif hasattr(df, "columns") and "Date" in df.columns:
+                        date_str = str(df["Date"].iloc[idx])[:10]
+                    elif hasattr(df, "index"):
+                        feature_date = df.index[idx]
+                        date_str = str(feature_date.date()) if hasattr(feature_date, "date") else str(feature_date)[:10]
+                    else:
+                        date_str = f"bar_{idx}"
                     sample_key = f"{ticker}::{date_str}"
                     if sample_key in features_map and sample_key not in horizon_returns:
                         horizon_returns[sample_key] = (c_fwd / c_t - 1.0) * 100.0
@@ -437,7 +605,11 @@ class WalkForwardBacktestRunner:
             horizon_date_groups = {k: v for k, v in date_groups.items() if k in horizon_returns}
 
             if len(horizon_features) < self.MIN_TRAINING_SAMPLES:
-                logger.info("Skipping horizon (insufficient samples)", horizon=horizon, samples=len(horizon_features))
+                logger.info(
+                    "Ufuk atlandı (yetersiz örnek sayısı): ufuk=%d, ornek_sayisi=%d",
+                    horizon,
+                    len(horizon_features),
+                )
                 continue
 
             config = MLModelConfig(
@@ -460,22 +632,22 @@ class WalkForwardBacktestRunner:
                 multi_model.horizon_models[horizon] = h_model
                 vm = h_model.validation_metrics
                 logger.info(
-                    "Horizon model trained",
-                    horizon=horizon,
-                    samples=h_model.train_samples,
-                    ic=round(vm.get("ic", 0), 4),
-                    confidence=h_model.confidence_score,
+                    "Ufuk modeli eğitildi: ufuk=%d, ornekler=%d, ic=%.4f, guven=%.2f",
+                    horizon,
+                    h_model.train_samples,
+                    vm.get("ic", 0.0),
+                    getattr(h_model, "confidence_score", 0.0),
                 )
 
         if not multi_model.horizon_models:
-            logger.warning("No horizon models trained, falling back to rule-based")
+            logger.warning("Ufuk modelleri eğitilemedi, kural tabanlı yönteme geçiliyor")
             return None
 
         logger.info(
-            "Multi-horizon training complete",
-            horizons=multi_model.available_horizons,
-            primary=multi_model.primary_horizon,
-            total_samples=multi_model.total_train_samples,
+            "Çoklu ufuk eğitimi tamamlandı: ufuklar=%s, birincil=%d, toplam_ornek=%d",
+            multi_model.available_horizons,
+            multi_model.primary_horizon,
+            multi_model.total_train_samples,
         )
 
         # Model metadata'yı DB'ye kaydet (best-effort, crash etmez)
@@ -487,7 +659,7 @@ class WalkForwardBacktestRunner:
             version = f"fold_{train_start}_{train_end}_h{'_'.join(str(h) for h in multi_model.available_horizons)}"
 
             def _save() -> Any:
-                """Otomatik eklendi."""
+                """Eğitilen model metadata'sını asenkron olarak DuckDB havuzuna kaydeder."""
                 import asyncio
 
                 loop = asyncio.new_event_loop()
@@ -504,14 +676,14 @@ class WalkForwardBacktestRunner:
                         )
                     )
                 except Exception as e:
-                    logger.debug("Handled exception", error=str(e), context="walk_forward_runner.py:471")
+                    logger.debug("Model metadata kaydı atlandı: hata=%s", str(e))
                 finally:
                     loop.close()
 
             t = threading.Thread(target=_save, daemon=True)
             t.start()
         except Exception:
-            logger.warning("Caught Exception in _save", exc_info=True)
+            logger.warning("Model metadata asenkron kaydı başlatılamadı", exc_info=True)
 
         return multi_model
 
@@ -533,40 +705,61 @@ class WalkForwardBacktestRunner:
 
     @staticmethod
     def _truncate(
-        market_data: dict[str, pl.DataFrame],
+        market_data: dict[str, Any],
         test_end: str,
-    ) -> dict[str, pl.DataFrame]:
-        """Veriyi test_end'e kadar kes (point-in-time)."""
-        end_ts = pl.Series(test_end)
+    ) -> dict[str, Any]:
+        """Veriyi test_end'e kadar kes (point-in-time).
+
+        Gelecek veriyi fiziksel olarak yok eder. Polars ve Pandas uyumludur.
+
+        Args:
+            market_data: {ticker: DataFrame} sözlüğü.
+            test_end: Kesme tarihi ('YYYY-MM-DD').
+
+        Returns:
+            dict[str, Any]: test_end tarihine kadar filtrelenmiş piyasa verisi.
+        """
         pit = {}
         for ticker, df in market_data.items():
-            if df is None or df.empty:
+            if df is None:
                 continue
-            # Tarih bileşeni test_end'i aşmayan satırlar (timestamp time-of-day
-            # içerse bile test_end günü dahil, sonrası KESİNLİKLE yok)
-            mask = df.index <= end_ts
-            if df.index.has_duplicates is False and df.index.is_monotonic_increasing:
-                cut = df.index.searchsorted(end_ts, side="right")
-                sliced = df[:cut]
-            else:
-                sliced = df[mask]
-            # date-string seviyesinde de garanti
-            if not sliced.empty:
-                last = sliced.index[-1]
-                last_str = str(last.date()) if hasattr(last, "date") else str(last)
-                if last_str > test_end:
-                    sliced = sliced[:-1]
-            if not sliced.empty:
-                pit[ticker] = sliced
+            try:
+                if pl is not None and isinstance(df, pl.DataFrame):
+                    if len(df) == 0:
+                        continue
+                    cut = _filter_polars_by_date(df, test_end)
+                    if len(cut) > 0:
+                        pit[ticker] = cut
+                elif hasattr(df, "index") and hasattr(df, "loc"):
+                    if len(df) == 0:
+                        continue
+                    if "Date" in df.columns:
+                        s = df["Date"].astype(str).str.slice(0, 10)
+                        cut = df[s <= test_end[:10]]
+                    else:
+                        idx_s = df.index.astype(str).str.slice(0, 10)
+                        cut = df[idx_s <= test_end[:10]]
+                    if len(cut) > 0:
+                        pit[ticker] = cut
+                elif isinstance(df, dict) and "Date" in df:
+                    dates = df["Date"]
+                    indices = [i for i, d in enumerate(dates) if str(d)[:10] <= test_end[:10]]
+                    if indices:
+                        pit[ticker] = {k: [v[i] for i in indices] for k, v in df.items()}
+                else:
+                    pit[ticker] = df
+            except Exception as e:
+                logger.debug("Truncate hatası, ticker=%s, error=%s", ticker, str(e))
+                continue
         return pit
 
     @staticmethod
     def _verify_fold(
-        fold: dict[str, Any],
+        fold: Any,
         result: BacktestResultV4,
-        pit_data: dict[str, pl.DataFrame],
+        pit_data: dict[str, Any],
         test_end: str,
-    ) -> tuple:
+    ) -> tuple[bool, list[str]]:
         """Fold leakage doğrulaması.
 
         Kontroller:
@@ -575,6 +768,15 @@ class WalkForwardBacktestRunner:
         3. PIT: hiçbir hissenin verisi test_end'i aşmıyor
         4. Trade'ler test penceresi içinde
         5. Equity tarihleri test penceresi içinde
+
+        Args:
+            fold: Fold yapılandırma nesnesi.
+            result: BacktestResultV4 sonucu.
+            pit_data: Test sonuna kadar kesilmiş veri kümesi.
+            test_end: Test bitiş tarihi.
+
+        Returns:
+            tuple[bool, list[str]]: (Doğrulama başarılı mı, hata mesajları listesi).
         """
         errors = []
 
@@ -590,20 +792,35 @@ class WalkForwardBacktestRunner:
 
         # 3. Point-in-time veri kontrolü
         for ticker, df in pit_data.items():
-            last = df.index[-1]
-            last_str = str(last.date()) if hasattr(last, "date") else str(last)
-            if last_str > test_end:
+            last_str = ""
+            if pl is not None and isinstance(df, pl.DataFrame):
+                if "Date" in df.columns and len(df) > 0:
+                    last_str = str(df["Date"][-1])[:10]
+            elif hasattr(df, "index") and len(df) > 0:
+                if "Date" in df.columns:
+                    last_str = str(df["Date"].iloc[-1])[:10]
+                else:
+                    last = df.index[-1]
+                    last_str = str(last.date()) if hasattr(last, "date") else str(last)[:10]
+            elif isinstance(df, dict) and "Date" in df and len(df["Date"]) > 0:
+                last_str = str(df["Date"][-1])[:10]
+
+            if last_str and last_str > test_end:
                 errors.append(f"PIT ihlali: {ticker} verisi {last_str} > {test_end}")
                 break
 
         # 4-5. Trade / equity pencere kontrolü
         for t in result.trades:
-            if not (fold.test_start <= t["date"] <= fold.test_end):
-                errors.append(f"Trade pencere dışı: {t['ticker']} @ {t['date']}")
+            trade_date = t.get("date", "") if isinstance(t, dict) else getattr(t, "date", "")
+            if trade_date and not (fold.test_start <= trade_date <= fold.test_end):
+                ticker_name = t.get("ticker", "") if isinstance(t, dict) else getattr(t, "ticker", "")
+                errors.append(f"Trade pencere dışı: {ticker_name} @ {trade_date}")
                 break
+
         for s in result.equity_curve:
-            if not (fold.test_start <= s["date"] <= fold.test_end):
-                errors.append(f"Equity pencere dışı: {s['date']}")
+            curve_date = s.get("date", "") if isinstance(s, dict) else getattr(s, "date", "")
+            if curve_date and not (fold.test_start <= curve_date <= fold.test_end):
+                errors.append(f"Equity pencere dışı: {curve_date}")
                 break
 
         return len(errors) == 0, errors
@@ -617,16 +834,28 @@ class WalkForwardBacktestRunner:
         run_id: str,
         folds: list[FoldBacktestResult],
     ) -> WalkForwardBacktestResult:
-        """Otomatik eklendi."""
-        returns = [f.total_return_pct for f in folds]
-        sharpes = [f.sharpe_ratio for f in folds]
-        sortinos = [f.sortino_ratio for f in folds]
-        dds = [f.max_drawdown_pct for f in folds]
-        wins = [f.win_rate_pct for f in folds]
+        """Tüm fold sonuçlarını toplulaştırıp özet metrikleri hesaplar.
 
-        mean_ret = float(np.mean(returns))
-        std_ret = float(np.std(returns))
-        stability = max(0.0, 1.0 - std_ret / (abs(mean_ret) + 0.01))
+        Args:
+            run_id: Birleşik yürütme kimliği.
+            folds: Tamamlanan ve doğrulanan fold sonuçları listesi.
+
+        Returns:
+            WalkForwardBacktestResult: Ortalama Sharpe, stabilite skoru, deflated Sharpe
+            ve fold özetlerini içeren sonuç nesnesi.
+        """
+        if not folds:
+            return self._empty_result(run_id)
+
+        returns = [f.total_return_pct for f in folds if math.isfinite(f.total_return_pct)]
+        sharpes = [f.sharpe_ratio for f in folds if math.isfinite(f.sharpe_ratio)]
+        sortinos = [f.sortino_ratio for f in folds if math.isfinite(f.sortino_ratio)]
+        dds = [f.max_drawdown_pct for f in folds if math.isfinite(f.max_drawdown_pct)]
+        wins = [f.win_rate_pct for f in folds if math.isfinite(f.win_rate_pct)]
+
+        mean_ret = float(np.mean(returns)) if returns else 0.0
+        std_ret = float(np.std(returns)) if len(returns) > 1 else 0.0
+        stability = max(0.0, 1.0 - std_ret / (abs(mean_ret) + 0.01)) if math.isfinite(std_ret) else 0.0
 
         # Deflated Sharpe (v5.0 — scipy tabanlı, skewness/kurtosis düzeltmeli)
         try:
@@ -638,25 +867,26 @@ class WalkForwardBacktestRunner:
         except ImportError:
             _sk, _kt = 0.0, 3.0
         deflated = self._wf._deflated_sharpe(
-            float(np.mean(sharpes)),
+            float(np.mean(sharpes)) if sharpes else 0.0,
             max(sum(f.total_scans for f in folds), 1),
             len(folds),
             skewness=_sk,
             kurtosis=_kt,
         )
+        safe_deflated = float(deflated) if math.isfinite(deflated) else 0.0
 
         return WalkForwardBacktestResult(
             run_id=run_id,
             total_folds=len(folds),
             avg_test_return_pct=round(mean_ret, 4),
-            avg_test_sharpe=round(float(np.mean(sharpes)), 4),
-            avg_test_sortino=round(float(np.mean(sortinos)), 4),
-            avg_test_max_drawdown_pct=round(float(np.mean(dds)), 4),
-            avg_win_rate_pct=round(float(np.mean(wins)), 4),
+            avg_test_sharpe=round(float(np.mean(sharpes)), 4) if sharpes else 0.0,
+            avg_test_sortino=round(float(np.mean(sortinos)), 4) if sortinos else 0.0,
+            avg_test_max_drawdown_pct=round(float(np.mean(dds)), 4) if dds else 0.0,
+            avg_win_rate_pct=round(float(np.mean(wins)), 4) if wins else 0.0,
             stability_score=round(stability, 4),
-            worst_fold_return_pct=round(float(min(returns)), 4),
-            best_fold_return_pct=round(float(max(returns)), 4),
-            deflated_sharpe=round(float(deflated), 4),
+            worst_fold_return_pct=round(float(min(returns)), 4) if returns else 0.0,
+            best_fold_return_pct=round(float(max(returns)), 4) if returns else 0.0,
+            deflated_sharpe=round(safe_deflated, 4),
             total_trades=sum(f.total_trades for f in folds),
             all_leakage_ok=all(f.leakage_ok for f in folds),
             folds=folds,
@@ -671,8 +901,15 @@ class WalkForwardBacktestRunner:
             },
         )
 
-    def _base_run_id(self, market_data: dict[str, pl.DataFrame]) -> str:
-        """Otomatik eklendi."""
+    def _base_run_id(self, market_data: dict[str, Any]) -> str:
+        """Piyasa verisi evreni ve yapılandırmaya göre deterministik run_id üretir.
+
+        Args:
+            market_data: Ticker verilerini içeren sözlük.
+
+        Returns:
+            str: 12 karakterlik benzersiz sha256 özet kimliği.
+        """
         tickers = sorted(market_data.keys())
         wf_cfg = (
             self._wf.purge_days,
@@ -685,21 +922,46 @@ class WalkForwardBacktestRunner:
         return hashlib.sha256(hash_input.encode()).hexdigest()[:12]
 
     def _empty_result(self, run_id: str) -> WalkForwardBacktestResult:
-        """Otomatik eklendi."""
+        """Fold oluşturulamaması durumunda boş walk-forward sonucunu döndürür.
+
+        Args:
+            run_id: Yürütme kimliği.
+
+        Returns:
+            WalkForwardBacktestResult: Sıfırlanmış boş sonuç nesnesi.
+        """
         return WalkForwardBacktestResult(
             run_id=run_id,
             total_folds=0,
-            avg_test_return_pct=0,
-            avg_test_sharpe=0,
-            avg_test_sortino=0,
-            avg_test_max_drawdown_pct=0,
-            avg_win_rate_pct=0,
-            stability_score=0,
-            worst_fold_return_pct=0,
-            best_fold_return_pct=0,
-            deflated_sharpe=0,
+            avg_test_return_pct=0.0,
+            avg_test_sharpe=0.0,
+            avg_test_sortino=0.0,
+            avg_test_max_drawdown_pct=0.0,
+            avg_win_rate_pct=0.0,
+            stability_score=0.0,
+            worst_fold_return_pct=0.0,
+            best_fold_return_pct=0.0,
+            deflated_sharpe=0.0,
             total_trades=0,
             all_leakage_ok=True,
             folds=[],
             summary={},
         )
+
+
+# ============================================================================
+# SINGLETON VE DIŞA AKTARIM
+# ============================================================================
+walk_forward_runner: WalkForwardBacktestRunner = WalkForwardBacktestRunner()
+
+__all__ = [
+    "DEFAULT_EMBARGO_DAYS",
+    "DEFAULT_PURGE_DAYS",
+    "DEFAULT_STEP_DAYS",
+    "DEFAULT_TEST_DAYS",
+    "DEFAULT_TRAIN_DAYS",
+    "FoldBacktestResult",
+    "WalkForwardBacktestResult",
+    "WalkForwardBacktestRunner",
+    "walk_forward_runner",
+]

@@ -41,10 +41,16 @@ class FundamentalProvider:
             logger.warning("Fundamental fetch timeout", timeout=timeout)
             return None
 
+    def __repr__(self) -> str:
+        return f"<FundamentalProvider(primary='tradingview', backups=['kap', 'yfinance'], cache_size={len(self._cache)})>"
+
     async def fetch_fundamentals(self, ticker: str) -> dict[str, Any] | None:
         """Ana fundamental veri çekme fonksiyonu (async).
 
-        Önce yfinance'dan dener, başarısız olursa KAP'tan dener.
+        ÖNCELİK SIRASI:
+        1. BİRİNCİL: TradingView Scanner API (Canlı rasyolar, çarpanlar ve finansallar)
+        2. YEDEK 1: KAP (Resmi finansal tablolar ve çeyreklik bilançolar)
+        3. YEDEK 2: yfinance (Alternatif global yedek)
         """
         # Cache kontrolü
         cached = self._cache.get(ticker)
@@ -53,23 +59,110 @@ class FundamentalProvider:
             if cached_time and (datetime.now(UTC).timestamp() - cached_time) < self._cache_ttl_seconds:
                 return cached
 
-        # yfinance'dan çek
-        result = await self._fetch_from_yfinance(ticker)
+        # 1. BİRİNCİL: TradingView'den çek
+        result = await self._fetch_from_tradingview(ticker)
         if result:
             result["_cached_at"] = datetime.now(UTC).timestamp()
-            result["_source"] = "yfinance"
+            result["_source"] = "tradingview_primary"
             self._cache[ticker] = result
             return result
 
-        # KAP'tan çek
+        # 2. YEDEK 1: KAP'tan çek
         result = await self._fetch_from_kap(ticker)
         if result:
             result["_cached_at"] = datetime.now(UTC).timestamp()
-            result["_source"] = "kap"
+            result["_source"] = "kap_backup"
             self._cache[ticker] = result
             return result
 
-        logger.warning("No fundamental data found", ticker=ticker)
+        # 3. YEDEK 2: yfinance'dan çek
+        result = await self._fetch_from_yfinance(ticker)
+        if result:
+            result["_cached_at"] = datetime.now(UTC).timestamp()
+            result["_source"] = "yfinance_backup"
+            self._cache[ticker] = result
+            return result
+
+        logger.warning("No fundamental data found across all sources", ticker=ticker)
+        return None
+
+    async def _fetch_from_tradingview(self, ticker: str) -> dict[str, Any] | None:
+        """TradingView Scanner API üzerinden hissenin birincil temel analiz rasyolarını çeker (async)."""
+        sym = ticker.upper().replace(".IS", "").strip()
+        cols = [
+            "name",
+            "description",
+            "close",
+            "market_cap_basic",
+            "price_earnings_ttm",
+            "price_book_fq",
+            "dividend_yield_recent",
+            "return_on_equity_fq",
+            "return_on_assets_fq",
+            "debt_to_equity_fq",
+            "total_debt_fq",
+            "total_revenue_fq",
+            "ebitda",
+        ]
+        payload = {
+            "filter": [{"left": "name", "operation": "match", "right": sym}],
+            "options": {"lang": "tr"},
+            "symbols": {"query": {"types": []}},
+            "columns": cols,
+            "range": [0, 1],
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post("https://scanner.tradingview.com/turkey/scan", json=payload, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    rows = data.get("data", [])
+                    if rows:
+                        d = rows[0].get("d", [])
+                        raw = dict(zip(cols, d, strict=False))
+                        pe = raw.get("price_earnings_ttm")
+                        return {
+                            "ticker": sym,
+                            "fetch_date": datetime.now(UTC).isoformat(),
+                            "source": "tradingview",
+                            "market_cap": raw.get("market_cap_basic"),
+                            "pe_ratio": float(pe) if pe is not None else None,
+                            "forward_pe": None,
+                            "pb_ratio": float(raw.get("price_book_fq")) if raw.get("price_book_fq") is not None else None,
+                            "ps_ratio": None,
+                            "ev_ebitda": None,
+                            "ev_revenue": None,
+                            "dividend_yield": float(raw.get("dividend_yield_recent")) if raw.get("dividend_yield_recent") is not None else None,
+                            "earnings_yield": (1.0 / float(pe)) if (pe is not None and float(pe) > 0) else None,
+                            "fcf_yield": None,
+                            "gross_margin": None,
+                            "ebitda_margin": None,
+                            "operating_margin": None,
+                            "profit_margin": None,
+                            "roe": float(raw.get("return_on_equity_fq")) if raw.get("return_on_equity_fq") is not None else None,
+                            "roa": float(raw.get("return_on_assets_fq")) if raw.get("return_on_assets_fq") is not None else None,
+                            "revenue_growth": None,
+                            "earnings_growth": None,
+                            "revenue": float(raw.get("total_revenue_fq")) if raw.get("total_revenue_fq") is not None else None,
+                            "net_income": None,
+                            "ebitda": float(raw.get("ebitda")) if raw.get("ebitda") is not None else None,
+                            "total_debt": float(raw.get("total_debt_fq")) if raw.get("total_debt_fq") is not None else None,
+                            "total_cash": None,
+                            "total_assets": None,
+                            "total_equity": None,
+                            "current_ratio": None,
+                            "debt_to_equity": float(raw.get("debt_to_equity_fq")) if raw.get("debt_to_equity_fq") is not None else None,
+                            "quick_ratio": None,
+                        }
+        except Exception as exc:
+            logger.debug("TradingView fundamental fetch error", ticker=sym, error=str(exc))
         return None
 
     async def _fetch_from_yfinance(self, ticker: str) -> dict[str, Any] | None:

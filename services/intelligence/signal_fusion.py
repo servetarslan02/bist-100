@@ -108,25 +108,25 @@ class SignalFusionEngine:
         "RECOVERY": {"fundamental": 0.22, "valuation": 0.18, "sentiment": 0.12, "ai": 0.15},
     }
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(self) -> None:
+        """Sinyal füzyon motorunu ve DuckDB durum deposundan uyarlanabilir ağırlıkları başlatır."""
         self._adaptive_weights: dict[str, float] = {}
         self._restore_weights()
 
     def _restore_weights(self) -> Any:
-        """Restart sonrası ağırlıkları SQLite'dan geri yükle."""
+        """Restart sonrası ağırlıkları DuckDB'den geri yükle."""
         try:
             from services.core.state_store import state_store
 
             saved = state_store.load_fusion_weights()
             if saved:
                 self._adaptive_weights = saved
-                logger.info("Fusion weights restored from SQLite", weights=len(saved))
+                logger.info("Fusion weights restored from DuckDB", weights=len(saved))
         except Exception as e:
             logger.debug("Fusion weights restore skipped", error=str(e))
 
     def _persist_weights(self) -> Any:
-        """Ağırlıkları SQLite'a kaydet."""
+        """Ağırlıkları DuckDB'ye kaydet."""
         try:
             from services.core.state_store import state_store
 
@@ -365,6 +365,9 @@ class SignalFusionEngine:
 
         passed = len(warnings) == 0
         return passed, warnings
+
+    def __repr__(self) -> str:
+        return f"<SignalFusionEngine adaptive_weights={len(self._adaptive_weights)} engine=DuckDB>"
 
 
 # Singleton

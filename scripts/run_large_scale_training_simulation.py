@@ -115,30 +115,11 @@ def run_large_scale_simulation() -> Any:
         },
     }
 
-    tickers = [
-        "THYAO",
-        "ASELS",
-        "GARAN",
-        "KCHOL",
-        "TUPRS",
-        "PGSUS",
-        "FROTO",
-        "BIMAS",
-        "AKBNK",
-        "SISE",
-        "ENJSA",
-        "ASTOR",
-        "POLTK",
-        "SDTTR",
-        "KONYA",
-        "REEDR",
-        "FORTE",
-        "ALFAS",
-        "SAHOL",
-        "CCOLA",
-        "TCELL",
-        "MGROS",
-    ]
+    from services.ingestion.bist_universe import bist_universe
+
+    tickers = list(bist_universe.BIST_ALL_TICKERS)
+    if not tickers:
+        tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "PGSUS", "BIMAS"]
 
     total_per_model = 1000
     all_batch_records = []

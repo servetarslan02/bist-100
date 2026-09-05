@@ -19,12 +19,12 @@ Referanslar:
 from __future__ import annotations
 
 import hashlib
-import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import structlog
 
 try:
     import polars as pl
@@ -34,7 +34,7 @@ except ImportError:
 from .bias_detector import BiasDetectorMiddleware, LookAheadBiasDetector
 from .transaction_costs import TransactionCostEngine, bist_transaction_cost
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -649,3 +649,15 @@ class MultiAssetBacktestEngine:
         )
 
         return result
+
+
+# Singleton
+multi_asset_engine = MultiAssetBacktestEngine()
+
+__all__ = [
+    "SectorExposure",
+    "MultiAssetConfig",
+    "MultiAssetResult",
+    "MultiAssetBacktestEngine",
+    "multi_asset_engine",
+]

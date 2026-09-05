@@ -19,6 +19,7 @@ NOT: Bu dosya CANONICAL üretim giriş noktasıdır.
 """
 
 import asyncio
+import logging
 import os
 import time
 import uuid as _uuid
@@ -28,20 +29,17 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.gzip import GZipMiddleware
-
-import logging
 from fastapi.responses import Response as FastAPIResponse
 from opentelemetry import trace
+from starlette.middleware.gzip import GZipMiddleware
 
-from ..core.database import check_db_health, init_databases
-from ..core.otel import setup_telemetry
-from .rate_limiter import rate_limiter
-from .v1 import v1_router
-from ..core.otel import otel_trace
 from ..core.alerting import alerting
+from ..core.database import check_db_health, init_databases
 from ..core.monitoring import portfolio_monitor
 from ..core.monitoring_security import extract_api_key, extract_bearer_token, monitoring_auth
+from ..core.otel import otel_trace, setup_telemetry
+from .rate_limiter import rate_limiter
+from .v1 import v1_router
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")

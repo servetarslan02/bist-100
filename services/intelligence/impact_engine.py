@@ -111,10 +111,17 @@ class ImpactEngine:
     """Event → Asset Impact Propagation Engine."""
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """Olay-Varlık yayılım motorunu başlatır ve dinamik BIST evren sektör haritasını yükler."""
         self.rules = PROPAGATION_RULES
-        self._instrument_sector_map: dict[str, list[str]] = {}
-        self._sector_stocks: dict[str, list[int]] = {}
+        self._instrument_sector_map: dict[str, str] = {}
+        self._sector_stocks: dict[str, list[str]] = {}
+        try:
+            from services.ingestion.bist_universe import bist_universe
+
+            if bist_universe.SECTOR_MAP:
+                self.load_sector_map(bist_universe.SECTOR_MAP)
+        except Exception:
+            pass
 
     def load_sector_map(self, instrument_sector: dict[str, str]) -> Any:
         """Load instrument → sector mapping."""
@@ -218,8 +225,8 @@ class ImpactEngine:
                         }
                     )
 
-            elif rule.target in ["TUPRS", "THYAO", "PETKM", "AKBNK", "GARAN", "YKBNK"]:
-                # Specific stock
+            elif rule.target in self._instrument_sector_map or (len(rule.target) in (4, 5) and rule.target.isalpha()):
+                # Dinamik tek hisse hedefi (Tüm BIST hisseleri için geçerli)
                 affected.append(
                     {
                         "ticker": rule.target,

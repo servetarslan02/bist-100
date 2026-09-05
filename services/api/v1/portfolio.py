@@ -8,8 +8,8 @@ from typing import Any
 import orjson
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
-from ..dependencies import check_rate_limit, get_current_user
 from ...core.swr_cache import SWRCache
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = logging.getLogger(__name__)
 

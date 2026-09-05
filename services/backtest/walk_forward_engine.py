@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -78,12 +79,12 @@ logger = structlog.get_logger(__name__)
 # CONSTANTS
 # ============================================================================
 
-MIN_TRAINING_SAMPLES = 5
-MIN_TEST_SAMPLES = 1
-MIN_FOLDS_FOR_VALIDATION = 3
-STABILITY_THRESHOLD = 0.6
-IC_SIGNIFICANCE_THRESHOLD = 0.03
-MAX_PURGE_RATIO = 0.3  # purge / train_max
+MIN_TRAINING_SAMPLES: int = 5
+MIN_TEST_SAMPLES: int = 1
+MIN_FOLDS_FOR_VALIDATION: int = 3
+STABILITY_THRESHOLD: float = 0.6
+IC_SIGNIFICANCE_THRESHOLD: float = 0.03
+MAX_PURGE_RATIO: float = 0.3  # purge / train_max
 
 
 # ============================================================================
@@ -101,6 +102,9 @@ class FoldStatus(StrEnum):
     FAILED = "failed"
     SKIPPED = "skipped"
 
+    def __repr__(self) -> str:
+        return f"FoldStatus.{self.name}"
+
 
 class RegimeType(StrEnum):
     """Piyasa rejimi."""
@@ -112,6 +116,9 @@ class RegimeType(StrEnum):
     LOW_VOLATILITY = "LOW_VOLATILITY"
     UNKNOWN = "UNKNOWN"
 
+    def __repr__(self) -> str:
+        return f"RegimeType.{self.name}"
+
 
 # ============================================================================
 # PROTOCOLS (Interface Contracts)
@@ -121,21 +128,46 @@ class RegimeType(StrEnum):
 class ModelProtocol(Protocol):
     """Model interface — her fold'da eğitilen model bu arayüzü implemente etmeli."""
 
-    def fit(self, X: np.ndarray, y: np.ndarray, **kwargs) -> None:
-        """Otomatik eklendi."""
-        pass
+    def fit(self, X: np.ndarray, y: np.ndarray, **kwargs: Any) -> None:
+        """
+        Modeli eğitim matrisi (X) ve hedef değişken dizisi (y) ile eğitir.
+
+        Args:
+            X: Öznitelik girdi matrisi [örnek_sayısı, öznitelik_sayısı].
+            y: Hedef getiri veya sınıf etiketi dizisi [örnek_sayısı].
+            **kwargs: Ek model eğitim parametreleri (ör: sample_weight).
+        """
+        ...
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """Otomatik eklendi."""
-        pass
+        """
+        Girdi öznitelik matrisi için model tahmin skorlarını veya beklenen getirileri üretir.
+
+        Args:
+            X: Sınama öznitelik matrisi [örnek_sayısı, öznitelik_sayısı].
+
+        Returns:
+            np.ndarray: Model tahmin dizisi.
+        """
+        ...
 
     def get_feature_importance(self) -> dict[str, float]:
-        """Otomatik eklendi."""
-        pass
+        """
+        Modelin öznitelik önem düzeylerini döndürür.
+
+        Returns:
+            dict[str, float]: Öznitelik adı ve bağıl önem skoru eşleşmesi.
+        """
+        ...
 
     def get_params(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
-        pass
+        """
+        Modelin yapılandırma ve hiperparametre sözlüğünü döndürür.
+
+        Returns:
+            dict[str, Any]: Model hiperparametreleri.
+        """
+        ...
 
 
 class FeatureCalculatorProtocol(Protocol):
@@ -147,8 +179,18 @@ class FeatureCalculatorProtocol(Protocol):
         ticker: str,
         as_of_date: str,
     ) -> dict[str, float]:
-        """Otomatik eklendi."""
-        pass
+        """
+        Belirtilen hisse ve referans tarihi için hesaplanan öznitelikleri döndürür.
+
+        Args:
+            data: Piyasa verisi sözlüğü {ticker: dataframe/dict}.
+            ticker: Hisse sembolü.
+            as_of_date: Referans kesim tarihi (YYYY-AA-GG).
+
+        Returns:
+            dict[str, float]: Hesaplanan öznitelik adı ve değeri sözlüğü.
+        """
+        ...
 
 
 # ============================================================================
@@ -170,6 +212,13 @@ class FoldConfig:
     embargo_start: str
     embargo_end: str
     expanding_window: bool = True
+
+    def __repr__(self) -> str:
+        return (
+            f"FoldConfig(id={self.fold_id}, train={self.train_start}..{self.train_end}, "
+            f"purge={self.purge_start}..{self.purge_end}, test={self.test_start}..{self.test_end}, "
+            f"embargo={self.embargo_start}..{self.embargo_end}, expanding={self.expanding_window})"
+        )
 
 
 @dataclass
@@ -222,6 +271,12 @@ class FoldMetrics:
     # Rejim
     regime: str = "UNKNOWN"
     regime_confidence: float = 0.0
+
+    def __repr__(self) -> str:
+        return (
+            f"FoldMetrics(ret={self.total_return:.2%}, sharpe={self.sharpe_ratio:.2f}, "
+            f"max_dd={self.max_drawdown:.2%}, win_rate={self.win_rate:.2%}, ic={self.ic:.3f}, regime={self.regime!r})"
+        )
 
 
 @dataclass
@@ -282,7 +337,12 @@ class FoldSnapshot:
         return d
 
     def _metrics_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """
+        Katman performans metriklerini JSON uyumlu sözlük biçiminde derler.
+
+        Returns:
+            dict[str, Any]: Yuvarlanmış metrik göstergeleri sözlüğü.
+        """
         m = self.metrics
         d = {
             "total_return": round(m.total_return, 4),
@@ -308,13 +368,28 @@ class FoldSnapshot:
 
     @staticmethod
     def _days_between(d1: str, d2: str) -> int:
-        """Otomatik eklendi."""
+        """
+        İki ISO tarih dizesi (YYYY-AA-GG) arasındaki gün farkını hesaplar.
+
+        Args:
+            d1: Başlangıç tarihi.
+            d2: Bitiş tarihi.
+
+        Returns:
+            int: Gün farkı (tarih geçersizse 0).
+        """
         try:
             dt1 = datetime.strptime(d1, "%Y-%m-%d")
             dt2 = datetime.strptime(d2, "%Y-%m-%d")
             return (dt2 - dt1).days
         except (ValueError, TypeError):
             return 0
+
+    def __repr__(self) -> str:
+        return (
+            f"FoldSnapshot(id={self.fold_config.fold_id}, status={self.status.value}, "
+            f"samples={self.train_samples}/{self.test_samples}, sharpe={self.metrics.sharpe_ratio:.2f})"
+        )
 
 
 @dataclass
@@ -415,6 +490,13 @@ class WalkForwardResultV5:
         """Tüm fold'larda leakage kontrolü geçti mi?"""
         return all(f.status == FoldStatus.COMPLETED for f in self.folds if f.status != FoldStatus.SKIPPED)
 
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardResultV5(run_id={self.run_id!r}, folds={self.completed_folds}/{self.total_folds}, "
+            f"avg_ret={self.avg_test_return:.2%}, avg_sharpe={self.avg_test_sharpe:.2f}, "
+            f"stability={self.stability_score:.2f}, deflated_sharpe={self.deflated_sharpe:.2f})"
+        )
+
 
 # ============================================================================
 # WALK-FORWARD ENGINE
@@ -454,8 +536,27 @@ class WalkForwardEngineV5:
         random_seed: int = 42,
         forward_days: int = 5,
         use_detailed_costs: bool = True,
-    ):
-        """Otomatik eklendi."""
+    ) -> None:
+        """
+        WalkForwardEngineV5 motorunu yapılandırır ve sınır parametrelerini doğrular.
+
+        Args:
+            purge_days: Eğitim ile test penceresi arasındaki aralık gün sayısı (>= 0).
+            embargo_days: Test penceresi ile sonraki eğitim arasındaki aralık gün sayısı (>= 0).
+            train_days: Asgari eğitim penceresi gün sayısı (>= 60).
+            test_days: Sınama penceresi gün sayısı (>= 5).
+            step_days: Pencerelerin ileri kaydırılma periyodu (>= 1).
+            expanding_window: True ise genişleyen pencere, False ise kayan pencere.
+            transaction_cost_pct: İşlem maliyet oranı [0.0, 0.1).
+            risk_free_rate: Yıllık risksiz faiz oranı (varsayılan: %40).
+            n_bootstrap: Sharpe güven aralığı için bootstrap örnekleme sayısı.
+            random_seed: Tekrarlanabilirlik için rastgelelik tohumu.
+            forward_days: İleriye dönük etiketleme ufku gün sayısı.
+            use_detailed_costs: Gerçekçi BIST detaylı işlem maliyeti modeli kullanılsın mı.
+
+        Raises:
+            ValueError: Parametreler izin verilen sınırların dışındaysa.
+        """
         # Parametre doğrulama
         if purge_days < 0:
             raise ValueError(f"purge_days >= 0 olmalı, aldım: {purge_days}")
@@ -470,22 +571,23 @@ class WalkForwardEngineV5:
         if not 0.0 <= transaction_cost_pct < 0.1:
             raise ValueError(f"transaction_cost_pct [0, 0.1) aralığında olmalı, aldım: {transaction_cost_pct}")
 
-        self.purge_days = purge_days
-        self.embargo_days = embargo_days
-        self.train_days = train_days
-        self.test_days = test_days
-        self.step_days = step_days
-        self.expanding_window = expanding_window
-        self.transaction_cost_pct = transaction_cost_pct
-        self.risk_free_rate = risk_free_rate
-        self.n_bootstrap = n_bootstrap
-        self.random_seed = random_seed
-        self.forward_days = forward_days
+        self.purge_days: int = purge_days
+        self.embargo_days: int = embargo_days
+        self.train_days: int = train_days
+        self.test_days: int = test_days
+        self.step_days: int = step_days
+        self.expanding_window: bool = expanding_window
+        self.transaction_cost_pct: float = transaction_cost_pct
+        self.risk_free_rate: float = risk_free_rate
+        self.n_bootstrap: int = n_bootstrap
+        self.random_seed: int = random_seed
+        self.forward_days: int = forward_days
 
-        self._rng = np.random.RandomState(random_seed)
+        self._rng: np.random.RandomState = np.random.RandomState(random_seed)
+        self._lock: threading.Lock = threading.Lock()
 
         # Transaction cost engine (BIST'e özgü detaylı model)
-        self.use_detailed_costs = use_detailed_costs and _has_detailed_costs
+        self.use_detailed_costs: bool = use_detailed_costs and _has_detailed_costs
         if self.use_detailed_costs:
             self._cost_engine = bist_transaction_cost
         else:
@@ -519,6 +621,13 @@ class WalkForwardEngineV5:
             detailed_costs=self.use_detailed_costs,
             champion_challenger=_has_champion_challenger,
             degradation_monitor=_has_degradation_monitor,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"WalkForwardEngineV5(purge={self.purge_days}, embargo={self.embargo_days}, "
+            f"train={self.train_days}, test={self.test_days}, step={self.step_days}, "
+            f"expanding={self.expanding_window}, cost_pct={self.transaction_cost_pct:.5f})"
         )
 
     # ========================================================================
@@ -766,7 +875,12 @@ class WalkForwardEngineV5:
             # 5. Test döneminde tahmin üret
             snapshot.status = FoldStatus.TESTING
             test_data = self._extract_window(pit_data, fold_config.test_start, fold_config.test_end)
-            test_features, _ = self._compute_features(test_data, feature_calculator, fold_config.test_end)
+            test_feature_window = self._extract_window(pit_data, fold_config.train_start, fold_config.test_start)
+            test_features, _ = self._compute_features(
+                test_feature_window if test_feature_window else test_data,
+                feature_calculator,
+                fold_config.test_start,
+            )
             snapshot.test_samples = len(test_features)
 
             if len(test_features) < MIN_TEST_SAMPLES:
@@ -957,7 +1071,7 @@ class WalkForwardEngineV5:
 
             return self._compute_with_calculator(filtered_data, real_calc, as_of_date)
         except ImportError:
-            logger.error("Exception caught", exc_info=True)
+            logger.debug("Harici feature calculator bulunamadı, dahili basit özellik seti kullanılacak")
 
         # Fallback: dahili basit feature seti
         return self._compute_builtin_features(filtered_data, as_of_date)
@@ -1039,6 +1153,7 @@ class WalkForwardEngineV5:
 
                 if features:
                     features["ticker"] = ticker
+                    features.setdefault("date", as_of_date)
                     samples.append(features)
                     feature_names_set.update(k for k in features if k not in ("ticker", "date"))
             except Exception:
@@ -1124,6 +1239,7 @@ class WalkForwardEngineV5:
 
                 features = {
                     "ticker": ticker,
+                    "date": as_of_date,
                     "roc_5d": (close[-1] / close[-6] - 1.0) * 100.0 if len(close) > 5 else 0.0,
                     "roc_20d": (close[-1] / close[-21] - 1.0) * 100.0 if len(close) > 20 else 0.0,
                     "momentum_20d": (close[-1] / close[-21] - 1.0) * 100.0 if len(close) > 20 else 0.0,
@@ -1224,7 +1340,7 @@ class WalkForwardEngineV5:
             y = self._extract_targets(train_features)
 
             if len(X) >= MIN_TRAINING_SAMPLES and len(y) >= MIN_TRAINING_SAMPLES:
-                config = MLModelConfig(num_boost_round=50, early_stopping_rounds=5, random_state=fold_seed)
+                config = MLModelConfig(num_boost_round=50, early_stopping_rounds=5)
                 trainer = LightGBMTrainer(config)
                 # LightGBMTrainer.train dict-based input bekler
                 features_map = {f"sample_{i}": f for i, f in enumerate(train_features)}
@@ -1235,7 +1351,7 @@ class WalkForwardEngineV5:
                     version = self._model_version(model, train_features)
                     return model, version
         except ImportError:
-            logger.error("Exception caught", exc_info=True)
+            logger.debug("LightGBMTrainer modülü bulunamadı, kural tabanlı fallback kullanılacak")
         except Exception as e:
             logger.warning("LightGBM trainer başarısız, rule-based fallback", error=str(e))
 
@@ -1353,8 +1469,8 @@ class WalkForwardEngineV5:
                     end_dt = _dt.strptime(test_end, "%Y-%m-%d")
                     if (end_dt - pred_dt).days < forward_days:
                         continue  # Bu prediction leakage riski taşıyor
-                except (ValueError, TypeError):
-                    logger.error("Exception caught", exc_info=True)
+                except (ValueError, TypeError) as e:
+                    logger.debug("Tarih ayrıştırma hatası", date=date, test_end=test_end, error=str(e))
 
             if ticker not in test_data:
                 outcomes.append({"ticker": ticker, "date": date, "actual_return": 0.0, "is_correct": False})
@@ -1749,8 +1865,8 @@ class WalkForwardEngineV5:
                     closes = ticker_data.get(col, [])
                     if closes:
                         return float(closes[-1]) if isinstance(closes, list) else float(closes)
-        except (IndexError, KeyError, TypeError, ValueError):
-            logger.error("Exception caught", exc_info=True)
+        except (IndexError, KeyError, TypeError, ValueError) as e:
+            logger.debug("Hisse kapanış fiyatı okunamadı", ticker=ticker, error=str(e))
         return 0.0
 
     def _track_fold_performance(self, fold_id: int, metrics: FoldMetrics, model_version: str) -> None:
@@ -2019,8 +2135,10 @@ class WalkForwardEngineV5:
             regime = detect_regime(test_data)
             if regime and regime != "UNKNOWN":
                 return regime
-        except (ImportError, Exception):
-            logger.error("Exception caught", exc_info=True)
+        except ImportError:
+            logger.debug("services.intelligence.regime modülü bulunamadı, sezgisel rejim tespiti kullanılacak")
+        except Exception as e:
+            logger.debug("Rejim tespiti başarısız oldu, sezgisel rejim tespiti kullanılacak", error=str(e))
 
         # Fallback: basit heuristic
         all_returns = []
@@ -2159,8 +2277,8 @@ class WalkForwardEngineV5:
                     "total_promotions": len(cc._champion_history),
                     "total_rejections": len(cc._rejected_challengers),
                 }
-            except Exception:
-                logger.error("Exception caught", exc_info=True)
+            except Exception as e:
+                logger.debug("Champion/challenger özeti derlenemedi", error=str(e))
 
         # Summary
         summary = {
@@ -2332,8 +2450,8 @@ class WalkForwardEngineV5:
 
             from services.core.database import get_db_pool
 
-            async def _save() -> Any:
-                """Otomatik eklendi."""
+            async def _save() -> None:
+                """Veritabanı bağlantı havuzunu edinip walk-forward özetini asenkron kaydeder."""
                 pool = await get_db_pool()
                 if pool is None:
                     return
@@ -2365,8 +2483,8 @@ class WalkForwardEngineV5:
                 _save_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
             else:
                 loop.run_until_complete(_save())
-        except Exception:
-            logger.error("Exception caught", exc_info=True)
+        except Exception as e:
+            logger.debug("Walk-forward DB kaydı gerçekleştirilemedi", error=str(e))
 
     def _persist_to_mlflow(self, result: WalkForwardResultV5) -> None:
         """Walk-forward sonucunu MLflow'a kaydet (best-effort)."""
@@ -2393,11 +2511,19 @@ class WalkForwardEngineV5:
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
                     f.write(orjson.dumps(result.to_dict(), option=orjson.OPT_INDENT_2, default=str).decode())
                     mlflow.log_artifact(f.name, "walk_forward_results")
-        except Exception:
-            logger.error("Exception caught", exc_info=True)
+        except Exception as e:
+            logger.debug("Walk-forward MLflow kaydı gerçekleştirilemedi", error=str(e))
 
     def _empty_result(self, run_id: str) -> WalkForwardResultV5:
-        """Boş sonuç."""
+        """
+        Veri yetersizliği veya hesaplama hatası durumunda sıfırlanmış boş sonuç nesnesi döndürür.
+
+        Args:
+            run_id: Yürütme kimliği.
+
+        Returns:
+            WalkForwardResultV5: Sıfırlanmış boş sonuç nesnesi.
+        """
         return WalkForwardResultV5(
             run_id=run_id,
             total_folds=0,
@@ -2409,7 +2535,34 @@ class WalkForwardEngineV5:
 
 
 # ============================================================================
-# SINGLETON
+# SINGLETON VE GERİYE UYUMLULUK ALIAS'LARI
 # ============================================================================
 
-walk_forward_engine_v5 = WalkForwardEngineV5()
+walk_forward_engine_v5: WalkForwardEngineV5 = WalkForwardEngineV5()
+
+# Geriye dönük uyumluluk alias'ları
+WalkForwardConfig = FoldConfig
+WalkForwardResult = WalkForwardResultV5
+WalkForwardEngine = WalkForwardEngineV5
+
+__all__ = [
+    "FeatureCalculatorProtocol",
+    "FoldConfig",
+    "FoldMetrics",
+    "FoldSnapshot",
+    "FoldStatus",
+    "IC_SIGNIFICANCE_THRESHOLD",
+    "MAX_PURGE_RATIO",
+    "MIN_FOLDS_FOR_VALIDATION",
+    "MIN_TEST_SAMPLES",
+    "MIN_TRAINING_SAMPLES",
+    "ModelProtocol",
+    "RegimeType",
+    "STABILITY_THRESHOLD",
+    "WalkForwardConfig",
+    "WalkForwardEngine",
+    "WalkForwardEngineV5",
+    "WalkForwardResult",
+    "WalkForwardResultV5",
+    "walk_forward_engine_v5",
+]

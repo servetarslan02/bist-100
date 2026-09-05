@@ -7,12 +7,11 @@ Confidence-weighted conflict resolution.
 FAZ 4: Conflict Resolution + Communication
 """
 
+import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-
-import logging
 
 from .agent_system import AgentResult, AgentRole
 

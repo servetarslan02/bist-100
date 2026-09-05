@@ -1,20 +1,20 @@
 """System API — Canlı mikroservis, veritabanı deposu, telemetri ve alarm motoru (100% Gerçek Veri)."""
 
 import asyncio
+import logging
 import time
 from datetime import UTC, datetime
 from typing import Any
 
-import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 try:
     import psutil
 except ImportError:
     psutil = None
 
-from ..dependencies import check_rate_limit, get_current_user
 from ...core.swr_cache import SWRCache
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

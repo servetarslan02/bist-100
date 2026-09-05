@@ -15,7 +15,9 @@
 - **Linter & Formatter:** `ruff` (Line length: 120, target: py312).
 - **Tip Denetleyicisi:** `mypy` (`strict = true`, python 3.12).
 - **Framework & Kütüphaneler:**
-  - Web/API: `FastAPI`, `uvicorn`, `pydantic v2` (`pydantic-settings`), `orjson`.
+  - Web/API: `FastAPI`, `uvicorn`, `pydantic v2` (`pydantic-settings`).
+  - Serileştirme: **`orjson` ZORUNLUDUR** (Standart `json` kütüphanesi YASAKTIR; yüksek hız ve tip güvenliği için `orjson.dumps()`, `orjson.loads()` kullanılır).
+  - Yerel Veritabanı: **`duckdb` ZORUNLUDUR** (`sqlite3` YASAKTIR; yerel durum, DLQ, backtest sonuçları ve önbellek için `duckdb>=1.3.0` kullanılır).
   - Loglama: `structlog` (Windows UTF-8 uyumlu).
   - İletişim: `websockets`, `httpx`, `asyncpg`, `SQLAlchemy 2.0+`.
 
@@ -53,6 +55,9 @@
 4. **Sahte Veri Yasağı:**
    - Sabit (hard-coded) piyasa verisi canlı gözlem gibi sunulamaz. Veri yoksa "eksik/bilinmiyor" olarak işaretlenir.
    - `assert ... or True` gibi sahte test assertion'ları kesinlikle yasaktır.
+5. **Standart `json` ve `sqlite3` Yasağı (`orjson` ve `duckdb` Zorunludur):**
+   - Standart `json` modülü yerine daima `orjson` (`orjson.dumps()`, `orjson.loads()`) kullanılır.
+   - `sqlite3` tamamen terkedilmiştir; yerel veritabanı, durum yönetimi, önbellek ve analitik için daima `duckdb` kullanılır. Hiçbir bileşende SQLite kullanılmaz.
 
 ---
 
@@ -68,6 +73,42 @@ Bana iletilen görevlerde **eksik veya yanlış iş yapılmasını önleyen bağ
    - Parametre tipleri veya dönüş değerleri değiştiriliyorsa, çağıran tüm yerler (`services/` altında) güncellenmelidir.
 3. **Fail-Closed Hata Yönetimi:**
    - `except: pass` veya hatayı sessizce yok sayan `try-except` blokları YASAKTIR.
-   - Hatalar `structlog` ile yapısal olarak loglanmalı, uygun istisna fırlatılmalı veya sistem güvenli moda geçmelidir.
+   - Hatalar `structlog` veya modül standart loglayıcısı ile yapısal olarak loglanmalı, uygun istisna fırlatılmalı veya sistem güvenli moda geçmelidir.
 4. **Doğrulama Refleksi:**
    - Düzenleme tamamlandığında dosyanın sentaksı, import doğruluğu ve ruff kurallarına uyumu teyit edilmelidir.
+
+## 4. 🔍 KOD VE SERVİS DENETİM STANDARTLARI (AUDIT RULES)
+
+> Tüm servislerde (`services/*/AUDIT_REPORT.md`) ve kod tabanında geçerli olan bağlayıcı denetim kuralları:
+
+1. **Mock / Sahte / Placeholder Veri Yasağı:**
+   - Test verisi, hardcoded değer, statik mock JSON veya placeholder data production/service kodunda kesinlikle yer alamaz.
+   - `"Otomatik eklendi."` gibi anlamsız docstring'ler yasaktır; her docstring açıklayıcı, amacını belirten, Args/Returns/Raises içeren ve **Türkçe** olmalıdır.
+   - `pass` ile boş bırakılmış fonksiyon/metot gövdeleri yasaktır.
+2. **Kapsamlı Hata, Eşzamanlılık ve Sınır Kontrolleri:**
+   - Boundary hataları, dead code (ölü kod), sessiz exception yutma, bypass mekanizmaları ve tutarsızlıklar derhal düzeltilmelidir.
+   - Polars null değerleri (`np.isnan(None)` vb. TypeError riski), sıfıra bölme (`ZeroDivisionError`) ve `NaN`, `Inf` sayısal taşmaları guard altına alınmalıdır.
+   - Paylaşılan state veya veritabanı bağlantısı yöneten singleton sınıflarda eşzamanlı erişim güvenliği (`threading.Lock` / `asyncio.Lock`) zorunludur.
+3. **Eksiksiz Fonksiyonellik ve Fail-Closed İlkesi:**
+   - Eksik parametreler, eksik validasyonlar ve eksik fallback mekanizmaları tamamlanmalıdır.
+   - Hatalar asla sessizce yutulamaz (`except: pass` yasaktır). Hata loglandıktan sonra durumuna göre uygun istisna (`raise ... from e`) fırlatılarak sistem güvenli duruma geçmelidir.
+   - Metot ve fonksiyon parametrelerinde ve dönüşlerinde eksiksiz `type annotation` (`None`, `Tuple[...]`, `Any` yerine spesifik tipler) belirtilmelidir.
+4. **Profesyonel Kod, Temizlik ve Loglama Standartları:**
+   - Her veri modeli / dataclass / çekirdek sınıfta mutlaka açıklayıcı bir `__repr__` metodu bulunmalıdır.
+   - Fonksiyon içi gereksiz `import`'lar dosya başına taşınmalı, kullanılmayan import'lar temizlenmelidir.
+   - **Loglama Mimarisi:**
+     - Sistem genelinde (Web, API, Backtest, Quant, ML, Core, Risk vb.) birincil loglayıcı olarak **`structlog`** (`logger = structlog.get_logger(__name__)`) kullanılır.
+     - Yapılandırılmış anahtar-değer parametreleri (`ticker=...`, `fold=...`, `hata=...`) veya biçimlendirilmiş metinler desteklenir.
+     - Log mesajları ve hata metinleri tutarlı ve **Türkçe** olmalıdır.
+     - Magic number'lar (`100000`, `0.10` vb.) yerine açık isimlendirilmiş sabitler (`DEFAULT_*`) kullanılmalıdır.
+5. **Düzeltme Sonrası Canlı Doğrulama (Smoke/Execution Test):**
+   - Yalnızca sözdizimi (`syntax`) veya dosya `import`'u ile yetinilmez.
+   - Düzenlenen dosyanın temel fonksiyonlarını (CRUD, model tahmini, hesaplama vb.) fiilen çalıştıran mikro bir yürütme testi (`uv run python -c "..."` veya pytest) ve `ruff check` çalıştırılarak doğruluk kanıtlanmalıdır.
+6. **Geliştirme Önerileri ve Proaktif İyileştirme:**
+   - Hata veya eksik olmasa dahi performans, bellek, Polars vektörizasyonu veya mimari açıdan sistemi iyileştirebilecek potansiyel alanlar tespit edilip dürüstçe raporlanmalı ve sisteme fayda sağlayanlar hayata geçirilmelidir.
+7. **Mimari Tutarlılık, Modül Dışa Aktarımı ve Göç (Migration) Takibi:**
+   - Modül seviyesinde `__all__` listesi eksiksiz, güncel ve açık olmalıdır.
+   - Yeniden adlandırılan veya imzası değiştirilen sınıf/fonksiyonlar için tüm repo (`grep`) taranmalı, çağıran tüm noktalar güncellenmeli ve audit raporuna "Migration" olarak kaydedilmelidir.
+
+
+

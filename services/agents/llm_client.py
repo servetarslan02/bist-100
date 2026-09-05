@@ -19,6 +19,7 @@ v2.1 değişiklikleri:
 """
 
 import asyncio
+import logging
 import os
 import re
 import time
@@ -28,7 +29,6 @@ from typing import Any
 
 import aiohttp
 import orjson
-import logging
 
 logger = logging.getLogger(__name__)
 

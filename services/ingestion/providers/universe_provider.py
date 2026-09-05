@@ -37,9 +37,9 @@ class StockInfo:
 class LiveUniverseScraper:
     """Canlı kamu ve finans kaynaklarından tüm BIST hisselerini çeker."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        self.timeout = httpx.Timeout(15.0, connect=10.0)
+    def __init__(self, timeout_seconds: float = 15.0):
+        """BIST hisse evreni tarayıcısını yapılandır."""
+        self.timeout = httpx.Timeout(timeout_seconds, connect=10.0)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -50,37 +50,103 @@ class LiveUniverseScraper:
         """Yeni veya havuzlu HTTP client döndür."""
         return httpx.Client(headers=self.headers, timeout=self.timeout, follow_redirects=True)
 
+    def __repr__(self) -> str:
+        return f"<LiveUniverseScraper(primary='tradingview', backups=['mynet', 'bigpara', 'isyatirim'], timeout={self.timeout.read})>"
+
+    def _discover_tradingview(self, client: httpx.Client) -> dict[str, StockInfo]:
+        """TradingView Scanner API üzerinden birincil BIST hisse listesini keşfet.
+
+        Args:
+            client: Yapılandırılmış httpx.Client bağlantısı.
+
+        Returns:
+            dict[str, StockInfo]: TradingView üzerinden çekilen BIST hisseleri.
+        """
+        discovered: dict[str, StockInfo] = {}
+        try:
+            url = "https://scanner.tradingview.com/turkey/scan"
+            payload = {
+                "filter": [],
+                "options": {"lang": "tr"},
+                "symbols": {"query": {"types": []}},
+                "columns": ["name", "description", "close", "market_cap_basic", "sector", "industry"],
+                "sort": {"sortBy": "Value.Traded", "sortOrder": "desc"},
+                "range": [0, 1000],
+            }
+            resp = client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                rows = data.get("data", [])
+                for row in rows:
+                    d = row.get("d", [])
+                    if len(d) < 2:
+                        continue
+                    ticker = str(d[0]).split(":")[-1].strip().upper()
+                    if not (2 <= len(ticker) <= 6) or ticker.isdigit():
+                        continue
+                    name = str(d[1]).strip() if d[1] else ticker
+                    mcap = float(d[3]) if len(d) > 3 and d[3] is not None else 0.0
+                    tv_sector = str(d[4]) if len(d) > 4 and d[4] else ""
+                    tv_industry = str(d[5]) if len(d) > 5 and d[5] else ""
+
+                    discovered[ticker] = StockInfo(
+                        ticker=ticker,
+                        name=name,
+                        sector=self._guess_sector(ticker, name, tv_sector, tv_industry),
+                        sub_sector=tv_industry,
+                        market_cap=mcap,
+                        source="tradingview_primary",
+                    )
+                logger.info("tradingview_primary_universe_discovery_done", count=len(discovered))
+        except Exception as e:
+            logger.warning("tradingview_discovery_failed", error=str(e))
+        return discovered
+
     def discover_all_bist_stocks(self) -> dict[str, StockInfo]:
-        """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfet."""
+        """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfet.
+
+        ÖNCELİK SIRASI:
+        1. BİRİNCİL LİSTE: TradingView Scanner API (Tüm BIST hisseleri tek pakette)
+        2. YEDEK LİSTE: Mynet Finans, Bigpara, İş Yatırım (Eksik veya alternatif hisseler için)
+        """
         discovered: dict[str, StockInfo] = {}
 
         with self._get_client() as client:
-            # 1. Kaynak: Mynet Finans BIST Tam Liste
+            # 1. BİRİNCİL KAYNAK: TradingView Scanner API
+            tv_stocks = self._discover_tradingview(client)
+            if tv_stocks:
+                discovered.update(tv_stocks)
+                logger.info("tradingview_master_universe_set", count=len(discovered))
+
+            # 2. YEDEK LİSTE 1: Mynet Finans BIST Tam Liste
             try:
                 url = "https://finans.mynet.com/borsa/hisseler/"
                 resp = client.get(url)
                 if resp.status_code == 200:
                     matches = re.findall(r'/borsa/hisseler/([a-z0-9]{3,6})-([^/"]+)/', resp.text)
+                    added_count = 0
                     for sym, slug in matches:
                         ticker = sym.upper().strip()
-                        if 2 <= len(ticker) <= 6 and not ticker.isdigit():
+                        if 2 <= len(ticker) <= 6 and not ticker.isdigit() and ticker not in discovered:
                             name = slug.replace("-", " ").title()
                             discovered[ticker] = StockInfo(
                                 ticker=ticker,
                                 name=name,
                                 sector=self._guess_sector(ticker, name),
-                                source="mynet_live",
+                                source="mynet_backup",
                             )
-                    logger.info("mynet_universe_discovery_done", count=len(discovered))
+                            added_count += 1
+                    logger.info("mynet_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
             except Exception as e:
-                logger.debug("mynet_discovery_failed", error=str(e))
+                logger.debug("mynet_backup_discovery_failed", error=str(e))
 
-            # 2. Kaynak: Bigpara Canlı Borsa
+            # 3. YEDEK LİSTE 2: Bigpara Canlı Borsa
             try:
                 url = "https://bigpara.hurriyet.com.tr/borsa/canli-borsa/"
                 resp = client.get(url)
                 if resp.status_code == 200:
                     matches = re.findall(r"/borsa/hisse-fiyatlari/([a-z0-9]+)-detay/", resp.text)
+                    added_count = 0
                     for sym in matches:
                         ticker = sym.upper().strip()
                         if 2 <= len(ticker) <= 6 and not ticker.isdigit() and ticker not in discovered:
@@ -88,18 +154,20 @@ class LiveUniverseScraper:
                                 ticker=ticker,
                                 name=ticker,
                                 sector=self._guess_sector(ticker, ticker),
-                                source="bigpara_live",
+                                source="bigpara_backup",
                             )
-                logger.info("bigpara_universe_discovery_done", total_discovered=len(discovered))
+                            added_count += 1
+                    logger.info("bigpara_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
             except Exception as e:
-                logger.debug("bigpara_discovery_failed", error=str(e))
+                logger.debug("bigpara_backup_discovery_failed", error=str(e))
 
-            # 3. Kaynak: İş Yatırım
+            # 4. YEDEK LİSTE 3: İş Yatırım
             try:
                 url = "https://www.isyatirim.com.tr/tr-tr/analiz/hisse/Sayfalar/default.aspx"
                 resp = client.get(url)
                 if resp.status_code == 200:
                     matches = re.findall(r'value="([A-Z0-9]{3,6})"\s*data-title="([^"]*)"', resp.text)
+                    added_count = 0
                     for ticker, name in matches:
                         ticker = ticker.upper().strip()
                         if 2 <= len(ticker) <= 6 and not ticker.isdigit():
@@ -108,18 +176,52 @@ class LiveUniverseScraper:
                                     ticker=ticker,
                                     name=name or ticker,
                                     sector=self._guess_sector(ticker, name),
-                                    source="isyatirim_live",
+                                    source="isyatirim_backup",
                                 )
-                            elif name and discovered[ticker].name == ticker:
+                                added_count += 1
+                            elif name and (discovered[ticker].name == ticker or not discovered[ticker].name):
                                 discovered[ticker].name = name
-                logger.info("isyatirim_universe_discovery_done", total_discovered=len(discovered))
+                    logger.info("isyatirim_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
             except Exception as e:
-                logger.debug("isyatirim_discovery_failed", error=str(e))
+                logger.debug("isyatirim_backup_discovery_failed", error=str(e))
 
         return discovered
 
-    def _guess_sector(self, ticker: str, name: str) -> str:
-        """Hisse sembolü veya isminden sektörü tahmin et / eşle."""
+    def _guess_sector(
+        self,
+        ticker: str,
+        name: str,
+        tv_sector: str = "",
+        tv_industry: str = "",
+    ) -> str:
+        """Hisse sembolü, şirket adı veya TradingView sektöründen BIST sektörünü eşle."""
+        # 1. TradingView sektör eşlemesi
+        if tv_sector:
+            sec_map = {
+                "Commercial Services": "HIZMET",
+                "Communications": "TELEKOM",
+                "Consumer Durables": "SANAYI",
+                "Consumer Non-Durables": "PERAKENDE",
+                "Consumer Services": "HIZMET",
+                "Distribution Services": "TICARET",
+                "Electronic Technology": "TEKNOLOJI",
+                "Energy Minerals": "ENERJI",
+                "Finance": "BANKACILIK" if any(w in ticker for w in ["BNK", "ISCTR", "GARAN", "AKBNK", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK"]) else "FINANS",
+                "Health Services": "SAGLIK",
+                "Health Technology": "SAGLIK",
+                "Industrial Services": "SANAYI",
+                "Non-Energy Minerals": "MADENCILIK",
+                "Process Industries": "KIMYA",
+                "Producer Manufacturing": "SANAYI",
+                "Retail Trade": "PERAKENDE",
+                "Technology Services": "TEKNOLOJI",
+                "Transportation": "HAVACILIK" if any(w in ticker for w in ["THYAO", "PGSUS", "TAVHL", "CLEBI"]) else "ULASTIRMA",
+                "Utilities": "ENERJI",
+            }
+            if tv_sector in sec_map:
+                return sec_map[tv_sector]
+
+        # 2. Anahtar kelime eşlemesi
         name_u = (name + " " + ticker).upper()
         if any(w in name_u for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]):
             return "BANKACILIK"
@@ -161,7 +263,7 @@ class UniverseAutoUpdater:
     CACHE_TTL_HOURS = 12
 
     def __init__(self):
-        """Otomatik eklendi."""
+        """BIST hisse evreni otomatik güncelleme motorunu başlat."""
         self.scraper = LiveUniverseScraper()
         self._universe: dict[str, StockInfo] = {}
         self._indices: dict[str, list[str]] = {
@@ -169,6 +271,9 @@ class UniverseAutoUpdater:
             "XU030": [],
             "XU050": [],
         }
+
+    def __repr__(self) -> str:
+        return f"<UniverseAutoUpdater(total_stocks={len(self._universe)}, indices={list(self._indices.keys())})>"
 
     def get_universe(self, force_refresh: bool = False) -> dict[str, StockInfo]:
         """Güncel hisse evrenini döndür."""

@@ -258,10 +258,7 @@ class DataQualityValidator:
         # 6. Range check (confidence/score 0-1 veya 0-100)
         for key, val in data.items():
             if isinstance(val, (int, float)):
-                if ("confidence" in key.lower() or "ratio" in key.lower()) and (val < -1 or val > 1.5):
-                    issues.append(f"{key}={val} out of expected range")
-                    checks_failed += 1
-                elif "score" in key.lower() and (val < -50 or val > 150):
+                if ("confidence" in key.lower() or "ratio" in key.lower()) and (val < -1 or val > 1.5) or "score" in key.lower() and (val < -50 or val > 150):
                     issues.append(f"{key}={val} out of expected range")
                     checks_failed += 1
                 else:

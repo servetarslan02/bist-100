@@ -8,7 +8,7 @@ from services.core.alpha_engine import AlphaEngine
 
 
 def run_massive() -> Any:
-    """Otomatik eklendi."""
+    """Tüm BIST hisse evreni üzerinde 5 yıllık walk-forward alfa motoru backtestini çalıştırır."""
     logger.info("--- 454 HISSE 5 YILLIK DEV OTONOM BACKTEST ---")
     engine = AlphaEngine()
     engine.params["n_estimators"] = 50  # slightly faster

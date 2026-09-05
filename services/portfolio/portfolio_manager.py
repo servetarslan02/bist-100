@@ -1374,15 +1374,47 @@ class PortfolioManager:
         # Aday hisseler
         all_tickers = candidate_tickers or list(self._positions.keys())
         if not all_tickers:
-            all_tickers = ["THYAO", "ASELS", "TUPRS", "GARAN", "BIMAS"]
+            from services.ingestion.bist_universe import bist_universe
+
+            all_tickers = list(bist_universe.BIST_ALL_TICKERS)
 
         n_assets = len(all_tickers)
         if returns_matrix is not None and returns_matrix.shape[1] == n_assets:
             returns_mat = np.nan_to_num(returns_matrix, nan=0.0, posinf=0.0, neginf=0.0)
         else:
-            # 60 günlük sentetik/tarihsel getiri matrisi fallback
-            np.random.seed(42)
-            returns_mat = np.random.normal(0.0008, 0.018, size=(60, n_assets))
+            # Gerçek tarihsel getiri matrisi (60 seans günü)
+            real_rets: list[np.ndarray] = []
+            try:
+                from services.data.data_source import data_source
+
+                for sym in all_tickers:
+                    df = data_source.get_stock_data(sym)
+                    if df is not None and not df.is_empty() and len(df) >= 20:
+                        closes = df["Close"].to_numpy()[-61:]
+                        if len(closes) > 1:
+                            r = np.diff(closes) / np.maximum(closes[:-1], 1e-4)
+                            if len(r) < 60:
+                                pad = np.full(60 - len(r), np.mean(r) if len(r) > 0 else 0.0)
+                                r = np.concatenate([pad, r])
+                            else:
+                                r = r[-60:]
+                            real_rets.append(r)
+                        else:
+                            real_rets.append(np.zeros(60))
+                    else:
+                        real_rets.append(np.zeros(60))
+            except Exception as hist_err:
+                logger.warning(
+                    "Portföy optimizasyonu için tarihsel veri çekilemedi, sıfır matrisi uygulanıyor",
+                    error=str(hist_err),
+                )
+                real_rets = [np.zeros(60) for _ in range(n_assets)]
+
+            if len(real_rets) == n_assets:
+                returns_mat = np.column_stack(real_rets)
+            else:
+                returns_mat = np.zeros((60, n_assets))
+            returns_mat = np.nan_to_num(returns_mat, nan=0.0, posinf=0.0, neginf=0.0)
 
         try:
             opt_method = OptimizationMethod(method.upper())

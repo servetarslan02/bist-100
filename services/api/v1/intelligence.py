@@ -109,8 +109,8 @@ async def simulation(
         HTTPException: Fiyat bulunamazsa veya simülasyon başarısız olursa hata döner.
     """
     try:
-        from ...intelligence.advanced_monte_carlo import AdvancedMonteCarloEngine
         from ...core.redis_helper import get_cached
+        from ...intelligence.advanced_monte_carlo import AdvancedMonteCarloEngine
 
         mc = AdvancedMonteCarloEngine()
 
@@ -123,8 +123,8 @@ async def simulation(
             )
 
         # Tarihsel volatilite ve getiri — gerçek veriden hesaplanmalı
-        import yfinance as yf
         import numpy as np
+        import yfinance as yf
 
         sym_is = f"{ticker.upper()}.IS" if not ticker.upper().endswith(".IS") else ticker.upper()
         data = yf.download(sym_is, period="3mo", interval="1d", auto_adjust=True, progress=False)

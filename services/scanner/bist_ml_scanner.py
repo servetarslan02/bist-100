@@ -21,7 +21,7 @@ class BistMLScanner:
     """Canlı ML Ensemble Tarayıcı."""
 
     def __init__(self, models_dir: str = "ml/saved_models"):
-        """Otomatik eklendi."""
+        """Canlı ML Ensemble tarayıcısını başlatır ve kayıtlı modelleri yükler."""
         self.models_dir = Path(models_dir)
         self.models = {}
         self._load_models()

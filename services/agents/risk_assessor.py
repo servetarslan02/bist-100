@@ -14,11 +14,10 @@ v2.1 değişiklikleri:
 FAZ 6: Risk Assessment
 """
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any
-
-import logging
 
 from .agent_system import AgentResult, AgentRole
 from .llm_client import BaseLLMClient

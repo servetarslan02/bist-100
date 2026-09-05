@@ -15,18 +15,23 @@ Referanslar:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import polars as pl
+import structlog
 
-try:
-    import polars as pl
-except ImportError:
-    pl = None
-import logging
+logger = structlog.get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_LABEL_HORIZON_DAYS: int = 5
+DEFAULT_FEATURE_WINDOW_DAYS: int = 20
+DEFAULT_PURGE_DAYS: int = 5
+DEFAULT_ROLLING_TOLERANCE: float = 1e-10
 
 
 @dataclass
@@ -134,13 +139,16 @@ class LookAheadBiasDetector:
     def __init__(self) -> None:
         """Look-ahead bias dedektörünü başlatır."""
         self.violations: list[BiasViolation] = []
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """LookAheadBiasDetector okunabilir temsili."""
-        critical = sum(1 for v in self.violations if v.severity == "critical")
+        with self._lock:
+            critical = sum(1 for v in self.violations if v.severity == "critical")
+            total = len(self.violations)
         return (
             f"LookAheadBiasDetector("
-            f"violations={len(self.violations)}, "
+            f"violations={total}, "
             f"critical={critical})"
         )
 
@@ -152,7 +160,8 @@ class LookAheadBiasDetector:
             violation: Kaydedilecek BiasViolation nesnesi
         """
         report.add_violation(violation)
-        self.violations.append(violation)
+        with self._lock:
+            self.violations.append(violation)
 
     def validate_feature_timestamps(
         self,
@@ -191,8 +200,8 @@ class LookAheadBiasDetector:
             )
             return report
 
-        # Gelecekteki verileri kontrol et
-        future_data = feature_df[feature_df[timestamp_col] > decision_timestamp]
+        # Gelecekteki verileri kontrol et (Polars vektörel filtreleme)
+        future_data = feature_df.filter(pl.col(timestamp_col) > decision_timestamp)
         report.total_checks = len(feature_df)
 
         if len(future_data) > 0:
@@ -624,3 +633,19 @@ class BiasDetectorMiddleware:
 
         is_safe = not (self.strict_mode and report.critical_count > 0)
         return is_safe, report
+
+
+# Singleton
+bias_detector_middleware = BiasDetectorMiddleware()
+
+__all__ = [
+    "BiasViolation",
+    "BiasReport",
+    "LookAheadBiasDetector",
+    "BiasDetectorMiddleware",
+    "bias_detector_middleware",
+    "DEFAULT_LABEL_HORIZON_DAYS",
+    "DEFAULT_FEATURE_WINDOW_DAYS",
+    "DEFAULT_PURGE_DAYS",
+    "DEFAULT_ROLLING_TOLERANCE",
+]

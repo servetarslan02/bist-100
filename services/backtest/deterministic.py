@@ -18,7 +18,7 @@ Referanslar:
 
 import copy
 import hashlib
-import logging
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,8 +26,17 @@ from typing import Any
 
 import numpy as np
 import orjson
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# =====================================================================
+# SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
+# =====================================================================
+DEFAULT_RANDOM_SEED: int = 42
+DEFAULT_TOLERANCE: float = 1e-10
+DEFAULT_MAX_CHECKPOINTS: int = 500
+DEFAULT_KEEP_LAST_CHECKPOINTS: int = 10
 
 
 @dataclass
@@ -92,7 +101,8 @@ class SystemCheckpoint:
             option=orjson.OPT_SORT_KEYS,
             default=str,
         )
-        return hashlib.sha256(content.encode()).hexdigest()[:16]
+        raw_bytes = content if isinstance(content, bytes) else content.encode("utf-8")
+        return hashlib.sha256(raw_bytes).hexdigest()[:16]
 
 
 class DeterministicRecovery:
@@ -112,26 +122,32 @@ class DeterministicRecovery:
         self._storage_path = Path(storage_path) if storage_path else Path(".alpha_checkpoints")
         self._storage_path.mkdir(parents=True, exist_ok=True)
         self._checkpoints: list[SystemCheckpoint] = []
-        self._current_seed: int = 42
+        self._current_seed: int = DEFAULT_RANDOM_SEED
         self._execution_counter: int = 0
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """DeterministicRecovery okunabilir temsili."""
+        with self._lock:
+            cp_count = len(self._checkpoints)
+            seed = self._current_seed
+            counter = self._execution_counter
         return (
             f"DeterministicRecovery("
-            f"checkpoints={len(self._checkpoints)}, "
-            f"seed={self._current_seed}, "
-            f"counter={self._execution_counter})"
+            f"checkpoints={cp_count}, "
+            f"seed={seed}, "
+            f"counter={counter})"
         )
 
-    def set_seed(self, seed: int = 42) -> None:
+    def set_seed(self, seed: int = DEFAULT_RANDOM_SEED) -> None:
         """Random seed ayarla (deterministik sonuçlar için).
 
         Args:
             seed: Ayarlanacak seed değeri
         """
-        self._current_seed = seed
-        np.random.seed(seed)
+        with self._lock:
+            self._current_seed = seed
+            np.random.seed(seed)
         logger.info("random_seed_ayarlandi: seed=%s", seed)
 
     def create_checkpoint(
@@ -470,10 +486,13 @@ class IdempotencyGuard:
     def __init__(self) -> None:
         """İdempotency guard'ı başlatır."""
         self._executed_operations: dict[str, Any] = {}
+        self._lock = threading.Lock()
 
     def __repr__(self) -> str:
         """IdempotencyGuard okunabilir temsili."""
-        return f"IdempotencyGuard(cached={len(self._executed_operations)})"
+        with self._lock:
+            count = len(self._executed_operations)
+        return f"IdempotencyGuard(cached={count})"
 
     def compute_operation_hash(self, operation: str, params: dict[str, Any]) -> str:
         """İşlem hash'i hesapla.
@@ -502,7 +521,8 @@ class IdempotencyGuard:
             True ise işlem daha önce yapılmış
         """
         op_hash = self.compute_operation_hash(operation, params)
-        return op_hash in self._executed_operations
+        with self._lock:
+            return op_hash in self._executed_operations
 
     def record_execution(self, operation: str, params: dict[str, Any], result: Any) -> None:
         """İşlem kaydı yap.
@@ -513,12 +533,13 @@ class IdempotencyGuard:
             result: İşlem sonucu
         """
         op_hash = self.compute_operation_hash(operation, params)
-        self._executed_operations[op_hash] = {
-            "operation": operation,
-            "params": params,
-            "result": result,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        with self._lock:
+            self._executed_operations[op_hash] = {
+                "operation": operation,
+                "params": params,
+                "result": result,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
 
     def get_or_execute(
         self,
@@ -544,11 +565,11 @@ class IdempotencyGuard:
         Returns:
             İşlem sonucu
         """
-        if self.is_already_executed(operation, params):
-            logger.debug("onbellekten_getiriliyor: islem=%s", operation)
-            return self._executed_operations[
-                self.compute_operation_hash(operation, params)
-            ]["result"]
+        op_hash = self.compute_operation_hash(operation, params)
+        with self._lock:
+            if op_hash in self._executed_operations:
+                logger.debug("onbellekten_getiriliyor: islem=%s", operation)
+                return self._executed_operations[op_hash]["result"]
 
         result = func(*args, **kwargs)
         self.record_execution(operation, params, result)
@@ -556,9 +577,22 @@ class IdempotencyGuard:
 
     def clear_cache(self) -> None:
         """Önbelleği temizle."""
-        self._executed_operations.clear()
+        with self._lock:
+            self._executed_operations.clear()
 
 
 # Singleton
 deterministic_recovery = DeterministicRecovery()
 idempotency_guard = IdempotencyGuard()
+
+__all__ = [
+    "SystemCheckpoint",
+    "DeterministicRecovery",
+    "IdempotencyGuard",
+    "deterministic_recovery",
+    "idempotency_guard",
+    "DEFAULT_RANDOM_SEED",
+    "DEFAULT_TOLERANCE",
+    "DEFAULT_MAX_CHECKPOINTS",
+    "DEFAULT_KEEP_LAST_CHECKPOINTS",
+]

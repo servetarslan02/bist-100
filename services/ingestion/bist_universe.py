@@ -17,9 +17,12 @@ class BISTUniverse:
     """BIST hisse evreni — 100% Dinamik Canlı Keşif."""
 
     def __init__(self, use_auto_discovery: bool = True):
-        """Otomatik eklendi."""
+        """BIST hisse evreni dinamik yöneticisini başlatır."""
         self.logger = structlog.get_logger()
         self._updater = universe_updater
+
+    def __repr__(self) -> str:
+        return f"<BISTUniverse(total_tickers={len(self.BIST_ALL_TICKERS)}, primary_source='tradingview')>"
 
     def refresh(self) -> Any:
         """Hisse evrenini canlı kaynaklardan yeniden tara."""

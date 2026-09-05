@@ -148,8 +148,8 @@ class EventScanner:
             for sector in exposed_sectors:
                 stocks = bist_universe.get_tickers_by_sector(sector)
                 affected.update(stocks)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("event_scanner_sector_lookup_failed", error=str(e))
 
         return list(affected)
 

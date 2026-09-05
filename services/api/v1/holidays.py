@@ -107,8 +107,8 @@ def _belirle_kaynak(tatil_tarihi: date, holiday_manager: Any) -> str:
         sudden = holiday_manager.get_sudden_holidays()
         if tatil_tarihi in sudden:
             return "sudden"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("sudden_holiday_lookup_failed", error=str(e))
 
     if (tatil_tarihi.month, tatil_tarihi.day) in ULUSAL_TATILLER:
         return "national"
