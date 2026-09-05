@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 101 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 105 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -28,7 +28,7 @@
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 7 | `async_http.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 9 | ✅ Denetlendi, düzeltildi |
@@ -135,13 +135,9 @@
 | 5 | 3 & 7 | `AsyncHTTPClient` geriye dönük `retry_delay_s` parametresini desteklemiyordu (mevcut testler ve sağlayıcılar `unexpected keyword argument` alıyordu) | `retry_delay_s` parametresi ve `@property` eklendi; tüm ingestion testleri 12/12 başarıya ulaştı |
 | 6 | 3 | `close_all_clients` istemcileri sıralı ve hata korumasız kapatıyordu | `asyncio.gather(*..., return_exceptions=True)` ile tüm istemciler paralel ve güvenle sonlandırılır hale getirildi |
 | 7 | 4 & 7 | `__repr__` standart dışıydı; `__all__` listesinde modül sabitleri eksikti | `AsyncHTTPClient(oturum=..., max_retries=...)` formatında temiz repr yazıldı ve modül sabitleri dışa aktarıldı |
-
-
-
-
-
-
-
+| 8 | 2 & 3 | Yalnızca HTTP 200 durum kodu başarılı sayılıyordu; RESTful servislerin döndüğü `201 Created`, `202 Accepted`, `204 No Content` gibi geçerli 2xx yanıtları hatalı sayılıp döngüde tükeniyordu | `200 <= resp.status < 300` aralığı başarı kabul edildi; `204 No Content` gibi boş gövdeli yanıtlar `{}` dönerek ağ hatalarından (`None`) ayrıştırıldı |
+| 9 | 2 & 3 | `PUT`, `DELETE` ve `PATCH` metotları bulunmuyordu; borsa emir iptali (DELETE), emir revizyonu (PUT/PATCH) ve durum güncelleme işlemleri yapılamıyordu | `put_json`, `delete_json` ve `patch_json` metotları eklenerek tüm HTTP fiilleri merkezi retry/backoff boru hattına (`_request_with_retry`) bağlandı |
+| 10 | 2 & 3 | `_session_lock` tek bir event loop'a bağlanıyordu; çoklu thread veya farklı event loop'lar altında istemci paylaşıldığında `RuntimeError: attached to a different loop` patlıyordu; ayrıca istek başına `headers` ve `ssl_verify` desteği yoktu | Loop kimliğine (`id(loop)`) göre dinamik kilit sözlüğü (`_session_locks`), `ssl_verify` parametresi ve tüm metotlara `headers` parametresi eklendi |
 
 ---
 

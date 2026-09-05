@@ -64,6 +64,7 @@ class AsyncHTTPClient:
         max_retry_delay_s: float = DEFAULT_MAX_RETRY_DELAY_S,
         headers: dict[str, str] | None = None,
         retry_delay_s: float | None = None,
+        ssl_verify: bool = True,
     ) -> None:
         """Asenkron HTTP istemcisini yapılandırır.
 
@@ -73,18 +74,21 @@ class AsyncHTTPClient:
             base_retry_delay_s: İlk deneme bekleme süresi tabanı (saniye).
             max_retry_delay_s: Maksimum bekleme süresi tavanı (saniye).
             headers: Varsayılan HTTP başlıkları sözlüğü.
-            retry_delay_s: Geriye dönük uyumluluk için temel gecikme (base_retry_delay_s yerine geçer).
+            retry_delay_s: Geriye dönük uyumluluk için temel gecikme.
+            ssl_verify: SSL sertifika doğrulamasının yapılıp yapılmayacağı.
         """
         self._timeout = aiohttp.ClientTimeout(total=timeout, connect=min(5.0, timeout / 3.0))
-        self._max_retries = max_retries
+        self._max_retries = max(1, max_retries)
         self._base_retry_delay_s = retry_delay_s if retry_delay_s is not None else base_retry_delay_s
         self._max_retry_delay_s = max_retry_delay_s
+        self._ssl_verify = ssl_verify
         self._headers = headers or {
             "User-Agent": DEFAULT_USER_AGENT,
             "Accept": "application/json, text/html, */*",
         }
         self._session: aiohttp.ClientSession | None = None
-        self._session_lock: asyncio.Lock | None = None
+        self._session_locks: dict[int, asyncio.Lock] = {}
+        self._lock_guard: threading.RLock = threading.RLock()
 
     @property
     def retry_delay_s(self) -> float:
@@ -96,12 +100,18 @@ class AsyncHTTPClient:
         status = "acik" if self._session and not self._session.closed else "kapali"
         return f"AsyncHTTPClient(oturum={status!r}, max_retries={self._max_retries})"
 
-
     def _get_lock(self) -> asyncio.Lock:
-        """O anki aktif event loop'a bağlı asyncio.Lock nesnesini lazy başlatır."""
-        if self._session_lock is None:
-            self._session_lock = asyncio.Lock()
-        return self._session_lock
+        """O anki aktif event loop'a bağlı asyncio.Lock nesnesini thread-safe ve loop-safe döner."""
+        try:
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
+        except RuntimeError:
+            loop_id = 0
+
+        with self._lock_guard:
+            if loop_id not in self._session_locks:
+                self._session_locks[loop_id] = asyncio.Lock()
+            return self._session_locks[loop_id]
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Geçerli aiohttp oturumunu döner; kapalıysa kilit korumasıyla ve orjson ile yeniden açar."""
@@ -112,6 +122,7 @@ class AsyncHTTPClient:
                     limit=100,
                     limit_per_host=20,
                     enable_cleanup_closed=True,
+                    ssl=None if self._ssl_verify else False,
                 )
                 self._session = aiohttp.ClientSession(
                     timeout=self._timeout,
@@ -152,17 +163,124 @@ class AsyncHTTPClient:
         except Exception:
             return default_delay
 
-    async def get_json(self, url: str, params: dict[str, Any] | None = None) -> Any | None:
+    async def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        params: dict[str, Any] | None = None,
+        data: Any = None,
+        json_data: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> str | None:
+        """Tüm HTTP metotları için standart yeniden deneme ve metrik kayıt boru hattı."""
+        upper_method = method.upper().strip()
+
+        for attempt in range(self._max_retries):
+            t0 = time.monotonic()
+            with tracer.start_as_current_span(f"http.{upper_method.lower()}") as span:
+                span.set_attribute("http.url", url)
+                span.set_attribute("http.method", upper_method)
+                span.set_attribute("http.attempt", attempt + 1)
+                try:
+                    session = await self._get_session()
+                    req_kwargs: dict[str, Any] = {"params": params}
+                    if headers:
+                        req_kwargs["headers"] = headers
+                    if data is not None:
+                        req_kwargs["data"] = data
+                    if json_data is not None:
+                        req_kwargs["json"] = json_data
+
+                    async with session.request(upper_method, url, **req_kwargs) as resp:
+                        elapsed = time.monotonic() - t0
+                        _http_latency_histogram.record(elapsed, {"method": upper_method})
+                        _http_requests_counter.add(1, {"method": upper_method, "status": str(resp.status)})
+                        span.set_attribute("http.status_code", resp.status)
+
+                        if 200 <= resp.status < 300:
+                            return await resp.text()
+                        elif resp.status == 429:
+                            default_wait = self._jitter_delay(attempt)
+                            wait = self._parse_retry_after(resp.headers.get("Retry-After"), default_wait)
+                            logger.warning("http_istek_siniri_asildi", method=upper_method, url=url, bekleme_s=wait)
+                            await asyncio.sleep(wait)
+                            continue
+                        else:
+                            logger.warning(
+                                "http_basarisiz_durum_kodu",
+                                method=upper_method,
+                                url=url,
+                                status=resp.status,
+                                deneme=attempt + 1,
+                            )
+                            _http_errors_counter.add(1, {"method": upper_method, "status": str(resp.status)})
+
+                except asyncio.CancelledError:
+                    logger.warning("http_istek_iptal_edildi", method=upper_method, url=url)
+                    raise
+                except TimeoutError:
+                    _http_errors_counter.add(1, {"method": upper_method, "error": "timeout"})
+                    logger.warning("http_zaman_asimi", method=upper_method, url=url, deneme=attempt + 1)
+                except aiohttp.ClientError as exc:
+                    _http_errors_counter.add(1, {"method": upper_method, "error": "client_error"})
+                    logger.warning(
+                        "http_istemci_hatasi",
+                        method=upper_method,
+                        url=url,
+                        hata=str(exc),
+                        deneme=attempt + 1,
+                    )
+                except Exception as exc:
+                    _http_errors_counter.add(1, {"method": upper_method, "error": "unexpected"})
+                    logger.error("http_beklenmeyen_hata", method=upper_method, url=url, hata=str(exc))
+
+            if attempt < self._max_retries - 1:
+                delay = self._jitter_delay(attempt)
+                await asyncio.sleep(delay)
+
+        logger.error(
+            "http_istekleri_tukendi_basarisiz",
+            method=upper_method,
+            url=url,
+            deneme_siniri=self._max_retries,
+        )
+        return None
+
+    async def get_text(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> str | None:
+        """GET isteği gönderir ve yanıt gövdesini düz metin olarak döner.
+
+        Args:
+            url: İstek yapılacak hedef web adresi.
+            params: İsteğe eklenecek sorgu parametreleri.
+            headers: İsteğe özel ek HTTP başlıkları.
+
+        Returns:
+            str | None: Yanıt metni veya hata durumunda None.
+        """
+        return await self._request_with_retry("GET", url, params=params, headers=headers)
+
+    async def get_json(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any | None:
         """GET isteği gönderir ve yanıtı orjson ile ayrıştırarak döner.
 
         Args:
             url: İstek yapılacak hedef web adresi.
             params: İsteğe eklenecek sorgu parametreleri.
+            headers: İsteğe özel ek HTTP başlıkları.
 
         Returns:
             Any | None: Ayrıştırılmış veri veya başarısızlık durumunda None.
         """
-        text = await self.get_text(url, params=params)
+        text = await self.get_text(url, params=params, headers=headers)
         if text:
             try:
                 return orjson.loads(text)
@@ -170,68 +288,12 @@ class AsyncHTTPClient:
                 logger.warning("http_json_ayristirma_hatasi", url=url, hata=str(exc))
         return None
 
-    async def get_text(self, url: str, params: dict[str, Any] | None = None) -> str | None:
-        """GET isteği gönderir ve yanıt gövdesini düz metin olarak döner.
-
-        Args:
-            url: İstek yapılacak hedef web adresi.
-            params: İsteğe eklenecek sorgu parametreleri.
-
-        Returns:
-            str | None: Yanıt metni veya hata durumunda None.
-        """
-        for attempt in range(self._max_retries):
-            t0 = time.monotonic()
-            with tracer.start_as_current_span("http.get") as span:
-                span.set_attribute("http.url", url)
-                span.set_attribute("http.attempt", attempt + 1)
-                try:
-                    session = await self._get_session()
-                    async with session.get(url, params=params) as resp:
-                        elapsed = time.monotonic() - t0
-                        _http_latency_histogram.record(elapsed, {"method": "GET"})
-                        _http_requests_counter.add(1, {"method": "GET", "status": str(resp.status)})
-                        span.set_attribute("http.status_code", resp.status)
-
-                        if resp.status == 200:
-                            return await resp.text()
-                        elif resp.status == 429:
-                            default_wait = self._jitter_delay(attempt)
-                            wait = self._parse_retry_after(resp.headers.get("Retry-After"), default_wait)
-                            logger.warning("http_istek_siniri_asildi", url=url, bekleme_s=wait)
-                            await asyncio.sleep(wait)
-                            continue
-                        else:
-                            logger.warning(
-                                "http_basarisiz_durum_kodu",
-                                url=url,
-                                status=resp.status,
-                                deneme=attempt + 1,
-                            )
-                            _http_errors_counter.add(1, {"method": "GET", "status": str(resp.status)})
-
-                except TimeoutError:
-                    _http_errors_counter.add(1, {"method": "GET", "error": "timeout"})
-                    logger.warning("http_zaman_asimi", url=url, deneme=attempt + 1)
-                except aiohttp.ClientError as exc:
-                    _http_errors_counter.add(1, {"method": "GET", "error": "client_error"})
-                    logger.warning("http_istemci_hatasi", url=url, hata=str(exc), deneme=attempt + 1)
-                except Exception as exc:
-                    _http_errors_counter.add(1, {"method": "GET", "error": "unexpected"})
-                    logger.error("http_beklenmeyen_hata", url=url, hata=str(exc))
-
-            if attempt < self._max_retries - 1:
-                delay = self._jitter_delay(attempt)
-                await asyncio.sleep(delay)
-
-        logger.error("http_istekleri_tukendi_basarisiz", url=url, deneme_siniri=self._max_retries)
-        return None
-
     async def post_json(
         self,
         url: str,
         data: Any = None,
         json_data: Any = None,
+        headers: dict[str, str] | None = None,
     ) -> Any | None:
         """POST isteği gönderir ve yanıtı JSON veya metin olarak döndürür.
 
@@ -239,41 +301,101 @@ class AsyncHTTPClient:
             url: İstek yapılacak hedef adres.
             data: Ham gövde verisi (bytes veya str).
             json_data: Serileştirilecek JSON gövdesi.
+            headers: İsteğe özel ek HTTP başlıkları.
 
         Returns:
             Any | None: Ayrıştırılmış yanıt verisi veya None.
         """
-        for attempt in range(self._max_retries):
-            t0 = time.monotonic()
-            with tracer.start_as_current_span("http.post") as span:
-                span.set_attribute("http.url", url)
-                span.set_attribute("http.attempt", attempt + 1)
-                try:
-                    session = await self._get_session()
-                    async with session.post(url, data=data, json=json_data) as resp:
-                        elapsed = time.monotonic() - t0
-                        _http_latency_histogram.record(elapsed, {"method": "POST"})
-                        _http_requests_counter.add(1, {"method": "POST", "status": str(resp.status)})
-                        span.set_attribute("http.status_code", resp.status)
+        text = await self._request_with_retry("POST", url, data=data, json_data=json_data, headers=headers)
+        if text is not None:
+            if not text.strip():
+                return {}
+            try:
+                return orjson.loads(text)
+            except Exception:
+                return text
+        return None
 
-                        if resp.status < 400:
-                            text = await resp.text()
-                            try:
-                                return orjson.loads(text)
-                            except Exception:
-                                return text
-                        else:
-                            logger.warning("http_post_hata_kodu", url=url, status=resp.status)
-                            _http_errors_counter.add(1, {"method": "POST", "status": str(resp.status)})
+    async def put_json(
+        self,
+        url: str,
+        data: Any = None,
+        json_data: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any | None:
+        """PUT isteği gönderir ve yanıtı JSON veya metin olarak döndürür.
 
-                except Exception as exc:
-                    _http_errors_counter.add(1, {"method": "POST", "error": "unexpected"})
-                    logger.warning("http_post_hatasi", url=url, hata=str(exc), deneme=attempt + 1)
+        Args:
+            url: İstek yapılacak hedef adres.
+            data: Ham gövde verisi (bytes veya str).
+            json_data: Serileştirilecek JSON gövdesi.
+            headers: İsteğe özel ek HTTP başlıkları.
 
-            if attempt < self._max_retries - 1:
-                delay = self._jitter_delay(attempt)
-                await asyncio.sleep(delay)
+        Returns:
+            Any | None: Ayrıştırılmış yanıt verisi veya None.
+        """
+        text = await self._request_with_retry("PUT", url, data=data, json_data=json_data, headers=headers)
+        if text is not None:
+            if not text.strip():
+                return {}
+            try:
+                return orjson.loads(text)
+            except Exception:
+                return text
+        return None
 
+    async def delete_json(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any | None:
+        """DELETE isteği gönderir ve yanıtı JSON veya metin olarak döndürür.
+
+        Args:
+            url: İstek yapılacak hedef adres.
+            params: İsteğe eklenecek sorgu parametreleri.
+            headers: İsteğe özel ek HTTP başlıkları.
+
+        Returns:
+            Any | None: Ayrıştırılmış yanıt verisi veya None.
+        """
+        text = await self._request_with_retry("DELETE", url, params=params, headers=headers)
+        if text is not None:
+            if not text.strip():
+                return {}
+            try:
+                return orjson.loads(text)
+            except Exception:
+                return text
+        return None
+
+    async def patch_json(
+        self,
+        url: str,
+        data: Any = None,
+        json_data: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any | None:
+        """PATCH isteği gönderir ve yanıtı JSON veya metin olarak döndürür.
+
+        Args:
+            url: İstek yapılacak hedef adres.
+            data: Ham gövde verisi (bytes veya str).
+            json_data: Serileştirilecek JSON gövdesi.
+            headers: İsteğe özel ek HTTP başlıkları.
+
+        Returns:
+            Any | None: Ayrıştırılmış yanıt verisi veya None.
+        """
+        text = await self._request_with_retry("PATCH", url, data=data, json_data=json_data, headers=headers)
+        if text is not None:
+            if not text.strip():
+                return {}
+            try:
+                return orjson.loads(text)
+            except Exception:
+                return text
         return None
 
     async def close(self) -> None:
@@ -296,7 +418,7 @@ class AsyncHTTPClient:
 # ─── Singleton Registry (Thread-Safe) ─────────────────────────────────────────
 
 _clients: dict[str, AsyncHTTPClient] = {}
-_registry_lock = threading.Lock()
+_registry_lock = threading.RLock()
 
 
 def get_client(name: str, **kwargs: Any) -> AsyncHTTPClient:
