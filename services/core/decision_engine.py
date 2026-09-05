@@ -1,51 +1,66 @@
+"""ALPHA BIST — Kurumsal Karar Motoru (Decision Engine v3.0).
+
+Bu modül, mikroservislerden, makine öğrenimi modellerinden, piyasa rejimlerinden
+ve teknik/temel analizlerden gelen tüm sinyalleri birleştirerek nihai alım/satım/bekleme
+kararını (BUY, SELL, HOLD, NO_ACTION) üretir:
+
+1. Çok Kaynaklı Kompozit Skorlama (Multi-Source Composite Scoring):
+   - ML Modeli (%20), LLM/Ajan Sistemi (%12), Teknik Analiz (%16), Temel Analiz (%12),
+     Haber Sentimenti (%7), Piyasa Rejimi (%7), Makro Stance (%9), Risk Toleransı (%9)
+     ve Monte Carlo Olasılık Dağılımı (%8).
+2. Rejime Duyarlı Dinamik Eşikler (Regime-Adaptive Thresholds):
+   - Ayı (BEAR/PANIC/CRASH) piyasasında sermaye koruma amaçlı yüksek güven ve skor eşikleri.
+   - Boğa (BULL/TREND) piyasasında trend takip odaklı dengeli eşikler.
+3. BIST Fiyat Adımı (Tick Size) ve ATR Tabanlı Hedef/Zarar-Kes (Stop/Target):
+   - BIST Pay Piyasası işlem yönergesine uygun dinamik fiyat adımı yuvarlaması (`round_to_bist_tick`).
+   - 2.5x ATR dinamik stop mesafesi ve 1:2 Risk/Ödül oranı.
+4. BIST Açığa Satış (Short-Sale) Güvenlik Filtresi:
+   - Mevzuat veya sistem kısıtlamalarına göre açığa satış izni yoksa SHORT yönü güvenli moda alınır.
+5. DuckDB & Polars Karar Denetim İzi (Decision Audit Trail):
+   - Üretilen tüm kararlar kalıcı DuckDB günlüğüne kaydedilir ve Polars DataFrame olarak sunulur.
 """
-ALPHA BIST — Decision Engine v2.0 (Düzeltilmiş)
 
-ATR field'ı eklendi.
-Stop-loss ve target hesaplaması ATR bazlı.
+from __future__ import annotations
 
-FAZ 8: Decision Engine
-"""
-
-import functools
+import math
+import threading
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
+from datetime import UTC, datetime
+from enum import StrEnum
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
+import orjson
+import polars as pl
 import structlog
 from opentelemetry import trace
+
+from services.core.bist_tick_size import round_to_bist_tick
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.decision_engine")
 
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
+# Varsayılan Karar Parametreleri
+DEFAULT_MIN_SCORE: Final[float] = 60.0
+DEFAULT_MIN_CONFIDENCE: Final[float] = 0.65
+DEFAULT_STOP_FALLBACK_PCT: Final[float] = 6.5  # BIST ortalaması için makul stop yüzdesi
+DEFAULT_DECISION_DB_PATH: Final[str] = "data/decision_audit.duckdb"
 
 
-class Action(Enum):
-    """Otomatik eklendi."""
-    BUY = "BUY"
-    SELL = "SELL"
-    HOLD = "HOLD"
-    NO_ACTION = "NO_ACTION"
+class Action(StrEnum):
+    """Karar aksiyon türleri."""
+
+    BUY = "BUY"  # Alım emri
+    SELL = "SELL"  # Satış / Kar realizasyonu veya açığa satış
+    HOLD = "HOLD"  # Mevcut pozisyonu koru
+    NO_ACTION = "NO_ACTION"  # İşlem yapma / Eşiklerin altında
 
 
-@dataclass
+@dataclass(slots=True)
 class DecisionInput:
-    """Karar motoru girdisi (ATR eklendi)."""
+    """Karar motoruna iletilen girdi parametreleri veri modeli."""
 
     ticker: str
     price: float
@@ -57,19 +72,19 @@ class DecisionInput:
     news_sentiment: float = 0.0
     sector: str = ""
     market_cap: float = 0.0
-    # ATR bilgisi
+    # ATR Bilgileri
     atr: float = 0.0
     atr_pct: float = 0.0
-    # Agent sistemi
+    # Ajan ve LLM Sinyalleri
     agent_direction: str = "NEUTRAL"
     agent_confidence: float = 0.0
     agent_score: float = 50.0
-    # Macro sistemi
+    # Makroekonomik Göstergeler
     macro_regime: str = "UNKNOWN"
     macro_stance: float = 0.0  # -1.0 (negatif) ile +1.0 (pozitif)
     macro_confidence: float = 0.0
-    macro_impact: float = 0.0  # Sektör bazlı makro etki
-    # Geriye uyumlu ek alanlar (test_phase10_13)
+    macro_impact: float = 0.0  # Sektörel makro etki
+    # Model Tahminleri ve Simülasyon
     ml_return_5d: float = 0.0
     ml_return_20d: float = 0.0
     spec_score: float = 0.0
@@ -84,15 +99,23 @@ class DecisionInput:
     portfolio_drawdown: float = 0.0
     avg_volume: float = 0.0
     spread_pct: float = 0.0
+    allow_short: bool = False  # BIST açığa satış izni bayrağı
+
+    def __repr__(self) -> str:
+        """Nesnenin okunabilir hata ayıklama temsili."""
+        return (
+            f"DecisionInput(ticker={self.ticker!r}, price={self.price}, "
+            f"regime={self.regime!r}, ml_score={self.ml_score:.1f}, conf={self.ml_confidence:.2f})"
+        )
 
 
-@dataclass
+@dataclass(slots=True)
 class Decision:
-    """Karar çıktısı."""
+    """Karar motoru nihai çıktı veri modeli."""
 
     ticker: str
     action: str  # BUY, SELL, HOLD, NO_ACTION
-    direction: str  # LONG, SHORT
+    direction: str  # LONG, SHORT, NEUTRAL
     confidence: float
     score: float
     reasons: list[str] = field(default_factory=list)
@@ -102,91 +125,272 @@ class Decision:
     position_size: float = 0.0
     time_horizon: str = "1-5D"
     expected_return: float = 0.0
-    conviction: str = "LOW"  # Geriye uyumlu
-    # LLM Ajan Türkçe Açıklama
-    llm_narrative: str = ""  # LLM Agent tarafından üretilen karar özeti
+    conviction: str = "LOW"  # LOW, MEDIUM, HIGH
+    llm_narrative: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serileştirilebilir sözlük temsili üretir."""
+        return {
+            "ticker": self.ticker,
+            "action": self.action,
+            "direction": self.direction,
+            "confidence": round(self.confidence, 4),
+            "score": round(self.score, 2),
+            "reasons": self.reasons,
+            "risks": self.risks,
+            "target_price": self.target_price,
+            "stop_price": self.stop_price,
+            "position_size": self.position_size,
+            "time_horizon": self.time_horizon,
+            "expected_return": self.expected_return,
+            "conviction": self.conviction,
+            "llm_narrative": self.llm_narrative,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+    def __repr__(self) -> str:
+        """Nihai kararın okunabilir dökümü."""
+        return (
+            f"Decision(ticker={self.ticker!r}, action={self.action!r}, "
+            f"direction={self.direction!r}, score={self.score:.1f}, conf={self.confidence:.2f}, "
+            f"target={self.target_price}, stop={self.stop_price})"
+        )
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Float değerleri güvenle dönüştürür; None/NaN/Inf durumlarında default döner."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) or math.isinf(f) else f
+    except (ValueError, TypeError):
+        return default
 
 
 class DecisionEngine:
-    """Karar motoru."""
+    """Kurumsal BIST Karar Motoru (Decision Engine).
 
-    # ATR olmadığında kullanılacak varsayılan stop yüzdesi
-    DEFAULT_STOP_FALLBACK = 6.5  # %6.5 — BIST ortalaması için makul
+    ML modelleri, teknik faktörler, temel rasyolar, makro göstergeler ve Monte Carlo
+    simülasyonlarını dinamik piyasa rejimleri altında sentezler.
+    """
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        self._min_confidence = 0.65
-        self._min_score = 60.0
-        logger.info("DecisionEngine initialized")
+    DEFAULT_STOP_FALLBACK = DEFAULT_STOP_FALLBACK_PCT
+
+    def __init__(
+        self,
+        min_score: float = DEFAULT_MIN_SCORE,
+        min_confidence: float = DEFAULT_MIN_CONFIDENCE,
+        db_path: str = DEFAULT_DECISION_DB_PATH,
+    ) -> None:
+        """DecisionEngine motorunu başlatır.
+
+        Args:
+            min_score: Karar üretimi için gereken asgari kompozit skor.
+            min_confidence: Karar üretimi için gereken asgari model güveni.
+            db_path: Kararların saklanacağı DuckDB veritabanı yolu.
+        """
+        self._min_score = min_score
+        self._min_confidence = min_confidence
+        self._db_path = db_path
+        self._lock = threading.RLock()
+        self._conn: duckdb.DuckDBPyConnection | None = None
+        self._init_db()
+        logger.info("decision_engine_baslatildi", min_score=min_score, min_conf=min_confidence)
+
+    def _init_db(self) -> None:
+        """Kalıcı DuckDB karar denetim tablosunu hazırlar."""
+        try:
+            db_file = Path(self._db_path)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            self._conn = duckdb.connect(str(db_file))
+            with self._lock:
+                self._conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS decision_audit_log (
+                        id BIGINT PRIMARY KEY,
+                        timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                        ticker VARCHAR NOT NULL,
+                        action VARCHAR NOT NULL,
+                        direction VARCHAR NOT NULL,
+                        confidence DOUBLE NOT NULL,
+                        score DOUBLE NOT NULL,
+                        target_price DOUBLE NOT NULL,
+                        stop_price DOUBLE NOT NULL,
+                        expected_return DOUBLE NOT NULL,
+                        conviction VARCHAR NOT NULL,
+                        reasons_json VARCHAR NOT NULL,
+                        risks_json VARCHAR NOT NULL
+                    );
+                    CREATE SEQUENCE IF NOT EXISTS seq_decision_audit_id START 1;
+                    """
+                )
+            logger.info("decision_audit_store_hazirlandi", db_path=self._db_path)
+        except Exception as exc:
+            logger.error("decision_db_baslatma_hatasi", error=str(exc), path=self._db_path)
+            self._conn = None
+
+    def close(self) -> None:
+        """DuckDB bağlantısını kapatır."""
+        with self._lock:
+            if self._conn is not None:
+                try:
+                    self._conn.close()
+                except Exception as exc:
+                    logger.debug("decision_db_kapatma_hatasi", error=str(exc))
+                finally:
+                    self._conn = None
+
+    def _persist_decision(self, dec: Decision) -> None:
+        """Alınan kararı kalıcı DuckDB günlüğüne kaydeder."""
+        if self._conn is None:
+            return
+
+        with self._lock:
+            try:
+                reasons_str = orjson.dumps(dec.reasons).decode("utf-8")
+                risks_str = orjson.dumps(dec.risks).decode("utf-8")
+                self._conn.execute(
+                    """
+                    INSERT INTO decision_audit_log (
+                        id, timestamp, ticker, action, direction, confidence,
+                        score, target_price, stop_price, expected_return,
+                        conviction, reasons_json, risks_json
+                    ) VALUES (
+                        nextval('seq_decision_audit_id'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    );
+                    """,
+                    [
+                        dec.timestamp,
+                        dec.ticker,
+                        dec.action,
+                        dec.direction,
+                        dec.confidence,
+                        dec.score,
+                        dec.target_price,
+                        dec.stop_price,
+                        dec.expected_return,
+                        dec.conviction,
+                        reasons_str,
+                        risks_str,
+                    ],
+                )
+            except Exception as exc:
+                logger.warning("decision_audit_kayit_hatasi", ticker=dec.ticker, error=str(exc))
 
     def _get_dynamic_thresholds(self, regime: str) -> tuple[float, float]:
-        """Piyasa rejimine göre dinamik skor ve güven eşikleri."""
+        """Piyasa rejimine göre dinamik skor ve güven eşiklerini belirler."""
         regime_upper = (regime or "").upper()
-        if "BEAR" in regime_upper or "PANIC" in regime_upper or "CRASH" in regime_upper:
+        if any(r in regime_upper for r in ("BEAR", "PANIC", "CRASH")):
             return 68.0, 0.70  # Ayı piyasasında katı eşik (sermaye koruma)
-        elif "VOLATILE" in regime_upper or "HIGH_VOL" in regime_upper or "SIDEWAYS" in regime_upper:
-            return 63.0, 0.65  # Yatay/oynak piyasada seçici
-        elif "BULL" in regime_upper or "TREND" in regime_upper:
+        elif any(r in regime_upper for r in ("VOLATILE", "HIGH_VOL", "SIDEWAYS")):
+            return 63.0, 0.65  # Yatay veya dalgalı piyasada seçici
+        elif any(r in regime_upper for r in ("BULL", "TREND", "RECOVERY")):
             return 58.0, 0.60  # Boğa piyasasında trend takip
         return self._min_score, self._min_confidence
 
     @otel_trace("decision_engine.make_decision")
-    def make_decision(self, ticker: str, signal: dict, risk_check: dict = None) -> dict:
-        """B18 uyumluluğu için eklenmiş arayüz metodu."""
-        return {
-            "ticker": ticker,
-            "action": signal.get("action", "HOLD"),
-            "target_price": 0.0,
-            "stop_price": 0.0,
-            "confidence": signal.get("confidence", 0.5),
-        }
+    def make_decision(
+        self,
+        ticker: str,
+        signal: dict[str, Any],
+        risk_check: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """B18 ve eski servislerle geriye dönük tam uyumlu karar arayüzü.
+
+        Placeholder değerler yerine sinyalden DecisionInput sentezleyerek
+        gerçek karar motorunu çalıştırır.
+        """
+        price = _safe_float(signal.get("price", signal.get("close", 0.0)))
+        features = signal.get("features", {})
+        inp = DecisionInput(
+            ticker=ticker,
+            price=price,
+            features=features,
+            signals=signal,
+            regime=signal.get("regime", "UNKNOWN"),
+            ml_score=_safe_float(signal.get("score", signal.get("fused_score", 50.0)), 50.0),
+            ml_confidence=_safe_float(signal.get("confidence", signal.get("fused_confidence", 0.5)), 0.5),
+            atr=_safe_float(features.get("atr_14", features.get("atr", 0.0))),
+            atr_pct=_safe_float(features.get("atr_pct", 0.0)),
+            allow_short=bool(signal.get("allow_short", False)),
+        )
+        dec = self.decide(inp)
+        res_dict = dec.to_dict()
+        if risk_check and not risk_check.get("passed", True):
+            res_dict["action"] = Action.HOLD.value
+            res_dict["risks"].append(f"Risk kontrolü engeli: {risk_check.get('reason', 'Bilinmiyor')}")
+        return res_dict
 
     @otel_trace("decision_engine.decide")
     def decide(self, inp: DecisionInput) -> Decision:
-        """Karar ver."""
+        """Nihai işlem kararını fail-closed ve rejime duyarlı olarak üretir."""
+        clean_ticker = (inp.ticker or "").strip().upper()
 
-        # 1. Composite skor hesapla
+        # Sayısal Geçersizlik Koruması
+        if math.isnan(inp.price) or math.isinf(inp.price) or inp.price <= 0:
+            dec = Decision(
+                ticker=clean_ticker,
+                action=Action.NO_ACTION.value,
+                direction="NEUTRAL",
+                confidence=inp.ml_confidence,
+                score=0.0,
+                reasons=[f"Geçersiz veya pozitif olmayan hisse fiyatı: {inp.price}"],
+            )
+            self._persist_decision(dec)
+            return dec
+
+        # 1. Kompozit Skoru Hesapla
         score = self._calculate_composite_score(inp)
 
-        # 2. Rejime duyarlı dinamik eşik kontrolü
+        # 2. Yönü Belirle
+        direction = self._determine_direction(inp)
+
+        # 3. Rejime Duyarlı Simetrik Eşik Kontrolü
         min_score, min_conf = self._get_dynamic_thresholds(inp.regime)
-        if score < min_score or inp.ml_confidence < min_conf:
-            return Decision(
-                ticker=inp.ticker,
-                action="NO_ACTION",
+        max_bearish_score = 100.0 - min_score  # Simetrik ayı eşiği (örn: 100 - 60 = 40.0)
+
+        is_bullish_qualified = direction == "LONG" and score >= min_score and inp.ml_confidence >= min_conf
+        is_bearish_qualified = direction == "SHORT" and score <= max_bearish_score and inp.ml_confidence >= min_conf
+
+        if not (is_bullish_qualified or is_bearish_qualified):
+            dec = Decision(
+                ticker=clean_ticker,
+                action=Action.NO_ACTION.value,
                 direction="NEUTRAL",
                 confidence=inp.ml_confidence,
                 score=score,
                 reasons=[
-                    f"Skor ({score:.1f} < {min_score}) veya güven ({inp.ml_confidence:.2f} < {min_conf}) rejim eşiğinin altında ({inp.regime})"
+                    f"Skor ({score:.1f}) veya güven ({inp.ml_confidence:.2f}) "
+                    f"rejim eşiğini ({inp.regime}: min_bull={min_score}, max_bear={max_bearish_score}, min_conf={min_conf}) karşılamıyor."
                 ],
             )
+            self._persist_decision(dec)
+            return dec
 
-        # 3. Yön belirle
-        direction = self._determine_direction(inp)
-
-        # 4. Action belirle
+        # 4. BIST Açığa Satış Guard'ı ile Aksiyon Belirle
         action = self._determine_action(inp, direction)
 
-        # 5. Stop ve target hesapla (ATR bazlı)
+        # 5. Stop ve Target Hesapla (BIST Tick Size ve ATR Bazlı)
         stop_price, target_price = self._calculate_stop_and_target(inp, direction)
 
-        # 6. Risk kontrolü
+        # 6. Risk Değerlendirmesi
         risks = self._assess_risks(inp)
 
-        # 7. Nedenler
+        # 7. Gerekçeleri Oluştur
         reasons = self._generate_reasons(inp, score)
 
-        # Conviction belirle
-        if score >= 80 and inp.ml_confidence >= 0.8:
+        # 8. Conviction (Kanaat Derecesi)
+        if score >= 80.0 and inp.ml_confidence >= 0.80:
             conviction = "HIGH"
-        elif score >= 60 and inp.ml_confidence >= 0.65:
+        elif score >= 60.0 and inp.ml_confidence >= 0.65:
             conviction = "MEDIUM"
         else:
             conviction = "LOW"
 
-        return Decision(
-            ticker=inp.ticker,
+        dec = Decision(
+            ticker=clean_ticker,
             action=action,
             direction=direction,
             confidence=inp.ml_confidence,
@@ -198,28 +402,18 @@ class DecisionEngine:
             expected_return=self._calculate_expected_return(inp, direction),
             conviction=conviction,
         )
+        self._persist_decision(dec)
+        return dec
 
     def _calculate_composite_score(self, inp: DecisionInput) -> float:
-        """Composite skor hesapla.
-
-        Düzeltmeler (v2.1):
-        1. max() yerine güven-ağırlıklı ortalama (optimistic bias kaldırıldı)
-        2. ML return sinyalleri simetrik (pozitif VE negatif)
-        3. Ağırlıklar toplamı = 1.0 garantisi
-        """
-        # ML skor: max() yerine güven-ağırlıklı ortalama
-        # max() kullanmak systematic bullish bias yaratıyordu:
-        # ml_score=40 (bearish) + spec_score=60 (bullish) → max(40, 54) = 54
-        # Oysa her iki sinyal de dikkate alınmalı
+        """Tüm analitik bileşenleri güven-ağırlıklı ve simetrik harmanlar."""
         if inp.spec_score > 0:
-            # Güven ağırlıklı ortalama: ml_confidence yüksekse ml_score'a daha çok güven
-            ml_weight = max(inp.ml_confidence, 0.5)
+            ml_weight = max(min(inp.ml_confidence, 1.0), 0.5)
             spec_weight = 1.0 - ml_weight
-            ml_component = inp.ml_score * ml_weight + (inp.spec_score * 0.9) * spec_weight
+            ml_component = (inp.ml_score * ml_weight) + ((inp.spec_score * 0.9) * spec_weight)
         else:
             ml_component = inp.ml_score
 
-        # Agent skor: agent_confidence > 0.5 ise ağırlık ver
         agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
 
         components = {
@@ -236,214 +430,182 @@ class DecisionEngine:
 
         total = sum(components.values())
 
-        # ML return sinyalleri — SİMETRİK (pozitif VE negatif)
-        # Eski kod sadece pozitif return'ler için bonus veriyordu → BUY bias
-        if inp.ml_return_5d > 3:
-            total += 5
-        elif inp.ml_return_5d < -3:
-            total -= 5
+        # Simetrik Getiri Bonusu / Cezası
+        if inp.ml_return_5d > 3.0:
+            total += 5.0
+        elif inp.ml_return_5d < -3.0:
+            total -= 5.0
 
-        if inp.ml_return_20d > 8:
-            total += 5
-        elif inp.ml_return_20d < -8:
-            total -= 5
+        if inp.ml_return_20d > 8.0:
+            total += 5.0
+        elif inp.ml_return_20d < -8.0:
+            total -= 5.0
 
-        # Monte Carlo bonus/ceza: sim_expected_return ve sim_prob_positive
-        if inp.sim_expected_return > 0 and inp.sim_prob_positive > 0.6:
-            total += 3  # Pozitif MC beklentisi bonus
-        elif inp.sim_expected_return < 0 and inp.sim_prob_positive < 0.4:
-            total -= 3  # Negatif MC beklentisi ceza
+        # Monte Carlo Bonus / Ceza
+        if inp.sim_expected_return > 0 and inp.sim_prob_positive > 0.60:
+            total += 3.0
+        elif inp.sim_expected_return < 0 and inp.sim_prob_positive < 0.40:
+            total -= 3.0
 
-        return min(100, max(0, total))
+        return min(100.0, max(0.0, total))
 
     def _monte_carlo_score(self, inp: DecisionInput) -> float:
-        """Monte Carlo simülasyon skoru.
-
-        Düşük VaR (düşük risk) = yüksek skor, yüksek VaR = düşük skor.
-        Pozitif expected return ve yüksek prob_positive bonus.
-        """
+        """Monte Carlo simülasyon sonuçlarını puanlar."""
         score = 50.0
-
-        # sim_var_95: negatif getiri yüzdesi (örn -12.5 = %12.5 kayıp riski)
-        # Daha düşük (daha az negatif) VaR = daha iyi
         if inp.sim_var_95 != 0:
-            # VaR negatif gelir (kayıp); mutlak değeri ne kadar küçükse o kadar iyi
             var_abs = abs(inp.sim_var_95)
-            if var_abs < 5:
-                score += 15  # Düşük risk
-            elif var_abs < 10:
-                score += 5
-            elif var_abs > 20:
-                score -= 15  # Yüksek risk
-            elif var_abs > 15:
-                score -= 10
+            if var_abs < 5.0:
+                score += 15.0
+            elif var_abs < 10.0:
+                score += 5.0
+            elif var_abs > 20.0:
+                score -= 15.0
+            elif var_abs > 15.0:
+                score -= 10.0
 
-        # Expected return
-        if inp.sim_expected_return > 3:
-            score += 10
+        if inp.sim_expected_return > 3.0:
+            score += 10.0
         elif inp.sim_expected_return > 0:
-            score += 5
-        elif inp.sim_expected_return < -3:
-            score -= 10
+            score += 5.0
+        elif inp.sim_expected_return < -3.0:
+            score -= 10.0
         elif inp.sim_expected_return < 0:
-            score -= 5
+            score -= 5.0
 
-        # Prob positive
-        if inp.sim_prob_positive > 0.7:
-            score += 10
+        if inp.sim_prob_positive > 0.70:
+            score += 10.0
         elif inp.sim_prob_positive > 0.55:
-            score += 5
-        elif inp.sim_prob_positive < 0.3:
-            score -= 10
+            score += 5.0
+        elif inp.sim_prob_positive < 0.30:
+            score -= 10.0
         elif inp.sim_prob_positive < 0.45:
-            score -= 5
+            score -= 5.0
 
-        return min(100, max(0, score))
+        return min(100.0, max(0.0, score))
 
     def _technical_score(self, inp: DecisionInput) -> float:
-        """Teknik skor."""
+        """Teknik göstergeleri puanlar."""
         f = inp.features
         score = 50.0
 
-        momentum = f.get("momentum_20d", 0)
-        roc = f.get("roc_5d", 0)
-        rsi = f.get("rsi_14", 50)
-        volume = f.get("volume_zscore", 0)
-        bb = f.get("bb_position", 0.5)
+        momentum = _safe_float(f.get("momentum_20d", 0))
+        roc = _safe_float(f.get("roc_5d", 0))
+        rsi = _safe_float(f.get("rsi_14", 50), 50.0)
+        volume = _safe_float(f.get("volume_zscore", 0))
+        bb = _safe_float(f.get("bb_position", 0.5), 0.5)
 
         score += momentum * 0.3
         score += roc * 0.3
-        score += (rsi - 50) * 0.2
+        score += (rsi - 50.0) * 0.2
         score += volume * 0.1
-        score += (bb - 0.5) * 20
+        score += (bb - 0.5) * 20.0
 
-        return min(100, max(0, score))
+        return min(100.0, max(0.0, score))
 
     def _fundamental_score(self, inp: DecisionInput) -> float:
-        """Fundamental skor."""
+        """Temel analiz göstergelerini puanlar."""
         f = inp.features
         score = 50.0
 
-        fundamental = f.get("fundamental_score", 0)
-        pe = f.get("pe_ratio", 15)
-        pb = f.get("pb_ratio", 1.5)
-        roe = f.get("roe", 0)
+        fundamental = _safe_float(f.get("fundamental_score", 0))
+        pe = _safe_float(f.get("pe_ratio", 15), 15.0)
+        pb = _safe_float(f.get("pb_ratio", 1.5), 1.5)
+        roe = _safe_float(f.get("roe", 0))
 
         score += fundamental * 0.4
-        score += (20 - pe) * 1.0  # Düşük PE iyi
-        score += (2 - pb) * 10.0  # Düşük PB iyi
+        score += (20.0 - pe) * 1.0
+        score += (2.0 - pb) * 10.0
         score += roe * 0.2
 
-        return min(100, max(0, score))
+        return min(100.0, max(0.0, score))
 
     def _sentiment_score(self, inp: DecisionInput) -> float:
-        """Sentiment skor."""
-        sentiment = inp.news_sentiment
-        return 50 + sentiment * 50  # -1 to 1 → 0 to 100
+        """Haber ve sosyal medya sentimentini puanlar."""
+        sentiment = min(1.0, max(-1.0, inp.news_sentiment))
+        return 50.0 + (sentiment * 50.0)
 
     def _regime_score(self, inp: DecisionInput) -> float:
-        """Rejim skoru."""
-        regime_scores = {
-            "BULL": 80,
-            "BULL_VOLATILE": 70,
-            "BEAR": 30,
-            "BEAR_VOLATILE": 25,
-            "SIDEWAYS": 50,
-            "SIDEWAYS_VOLATILE": 45,
-            "RECOVERY": 65,
-            "DISTRIBUTION": 35,
-            "ACCUMULATION": 70,
-            "CRASH": 20,
+        """Piyasa rejim puanını belirler."""
+        regime_scores: dict[str, float] = {
+            "BULL": 80.0,
+            "BULL_VOLATILE": 70.0,
+            "BEAR": 30.0,
+            "BEAR_VOLATILE": 25.0,
+            "SIDEWAYS": 50.0,
+            "SIDEWAYS_VOLATILE": 45.0,
+            "RECOVERY": 65.0,
+            "DISTRIBUTION": 35.0,
+            "ACCUMULATION": 70.0,
+            "CRASH": 20.0,
         }
-        return regime_scores.get(inp.regime, 50)
+        return regime_scores.get(inp.regime.upper(), 50.0)
 
     def _risk_score(self, inp: DecisionInput) -> float:
-        """Risk skoru (yüksek = düşük risk = yüksek skor)."""
+        """Risk toleransı ve oynaklık puanını belirler."""
         f = inp.features
         score = 50.0
 
-        # ATR bazlı risk (düşük ATR = düşük risk = yüksek skor)
-        atr_pct = f.get("atr_pct", inp.atr_pct)
+        atr_pct = _safe_float(f.get("atr_pct", inp.atr_pct))
         if atr_pct > 0:
-            score -= atr_pct * 2  # Yüksek volatilite = düşük skor
+            score -= atr_pct * 2.0
 
-        # ADX (trend gücü)
-        adx = f.get("adx", 25)
-        score += (adx - 25) * 0.5
+        adx = _safe_float(f.get("adx", 25), 25.0)
+        score += (adx - 25.0) * 0.5
 
-        # Volume (yüksek hacim = likidite = iyi)
-        volume = f.get("volume_zscore", 0)
+        volume = _safe_float(f.get("volume_zscore", 0))
         score += volume * 0.5
 
-        # Monte Carlo VaR_95 (düşük VaR = düşük risk = yüksek skor)
         if inp.sim_var_95 != 0:
             var_abs = abs(inp.sim_var_95)
-            # VaR yüzdesi ne kadar düşükse risk o kadar düşük
-            score += max(-15, min(10, (10 - var_abs) * 0.8))
+            score += max(-15.0, min(10.0, (10.0 - var_abs) * 0.8))
 
-        return min(100, max(0, score))
+        return min(100.0, max(0.0, score))
 
     def _macro_score(self, inp: DecisionInput) -> float:
-        """Macro skor — makro rejim ve etki."""
+        """Makroekonomik rejim ve sektör etkilerini puanlar."""
         score = 50.0
 
-        # Macro stance (pozitif = yukarı, negatif = aşağı)
         if inp.macro_stance != 0:
-            score += inp.macro_stance * 20  # -20 ile +20 arası
+            score += inp.macro_stance * 20.0
 
-        # Macro confidence (yüksek güven = daha güçlü sinyal)
         if inp.macro_confidence > 0.5:
-            score += inp.macro_stance * 10  # Güvenli sinyalleri güçlendir
+            score += inp.macro_stance * 10.0
 
-        # Macro impact (sektör bazlı etki)
         if inp.macro_impact != 0:
-            score += inp.macro_impact * 15  # Düzeltme: 100→15, aşırı skor bozulması önlendi
+            score += inp.macro_impact * 15.0
 
-        # Macro regime bonusları
-        regime_bonuses = {
-            "EXPANSION": 5,
-            "RISK_ON": 5,
-            "CONTRACTION": -5,
-            "STAGFLATION": -10,
-            "RISK_OFF": -8,
-            "REFLATION": 0,
+        regime_bonuses: dict[str, float] = {
+            "EXPANSION": 5.0,
+            "RISK_ON": 5.0,
+            "CONTRACTION": -5.0,
+            "STAGFLATION": -10.0,
+            "RISK_OFF": -8.0,
+            "REFLATION": 0.0,
         }
-        score += regime_bonuses.get(inp.macro_regime, 0)
+        score += regime_bonuses.get(inp.macro_regime.upper(), 0.0)
 
-        return min(100, max(0, score))
+        return min(100.0, max(0.0, score))
 
     def _determine_direction(self, inp: DecisionInput) -> str:
-        """Yön belirle.
-
-        Düzeltme (v2.1): Eşikler simetrik yapıldı.
-        Eski: RSI > 55 / < 45 (10 puan gap), ML > 60 / < 40 (20 puan gap)
-        Yeni: RSI > 52 / < 48 (4 puan gap), ML > 55 / < 45 (10 puan gap)
-        Neden: Asimetrik eşikler BUY bias yaratıyordu.
-        """
+        """Simetrik ve tarafsız sinyal entegrasyonuyla işlem yönünü belirler."""
         f = inp.features
+        momentum = _safe_float(f.get("momentum_20d", 0))
+        roc = _safe_float(f.get("roc_5d", 0))
+        rsi = _safe_float(f.get("rsi_14", 50), 50.0)
 
-        momentum = f.get("momentum_20d", 0)
-        roc = f.get("roc_5d", 0)
-        rsi = f.get("rsi_14", 50)
+        bullish_signals = sum([
+            momentum > 0,
+            roc > 0,
+            rsi > 52.0,
+            inp.ml_score > 55.0,
+        ])
 
-        # SİMETRİK eşikler (BUY bias kaldırıldı)
-        bullish_signals = sum(
-            [
-                momentum > 0,
-                roc > 0,
-                rsi > 52,  # Eski: 55 → Yeni: 52 (simetrik)
-                inp.ml_score > 55,  # Eski: 60 → Yeni: 55 (simetrik)
-            ]
-        )
-
-        bearish_signals = sum(
-            [
-                momentum < 0,
-                roc < 0,
-                rsi < 48,  # Eski: 45 → Yeni: 48 (simetrik)
-                inp.ml_score < 45,  # Eski: 40 → Yeni: 45 (simetrik)
-            ]
-        )
+        bearish_signals = sum([
+            momentum < 0,
+            roc < 0,
+            rsi < 48.0,
+            inp.ml_score < 45.0,
+        ])
 
         if bullish_signals >= 3:
             return "LONG"
@@ -453,61 +615,72 @@ class DecisionEngine:
         return "HOLD"
 
     def _determine_action(self, inp: DecisionInput, direction: str) -> str:
-        """Action belirle."""
+        """İşlem yönü ve BIST mevzuatına göre nihai aksiyonu belirler."""
         if inp.ml_confidence < self._min_confidence:
-            return "NO_ACTION"
+            return Action.NO_ACTION.value
 
         if direction == "LONG":
-            return "BUY"
+            return Action.BUY.value
         elif direction == "SHORT":
-            return "SELL"
+            # BIST açığa satış izni kontrolü (Fail-Closed)
+            if not inp.allow_short:
+                logger.debug("bist_aciga_satis_engeli_short_hold_yapildi", ticker=inp.ticker)
+                return Action.HOLD.value
+            return Action.SELL.value
 
-        return "HOLD"
+        return Action.HOLD.value
 
-    def _calculate_stop_and_target(self, inp: DecisionInput, direction: str) -> tuple:
-        """Stop ve target hesapla (ATR bazlı)."""
+    def _calculate_stop_and_target(
+        self,
+        inp: DecisionInput,
+        direction: str,
+    ) -> tuple[float, float]:
+        """ATR bazlı dinamik stop ve hedef fiyatları BIST tick size kurallarına göre hesaplar."""
         price = inp.price
         atr = inp.atr
         atr_pct = inp.atr_pct
 
         if price <= 0:
-            return 0, 0
+            return 0.0, 0.0
 
-        # ATR bazlı stop mesafesi (Canonical Strateji Parametreleri: frozen_strategy_engine.py ile senkronize)
+        # Canonical ATR Formülasyonu
         if atr > 0:
-            stop_distance = atr * 2.5  # Canonical: 2.5x ATR
-            stop_pct = (stop_distance / price) * 100
+            stop_distance = atr * 2.5
+            stop_pct = (stop_distance / price) * 100.0
         elif atr_pct > 0:
             stop_pct = atr_pct * 1.5
         else:
-            stop_pct = self.DEFAULT_STOP_FALLBACK  # Config'den okunabilir
+            stop_pct = self.DEFAULT_STOP_FALLBACK
 
-        # Sınırla: min %4.0 (min_atr_pct), max %10.0
+        # Sınırla: minimum %4.0, maksimum %10.0
         stop_pct = max(4.0, min(10.0, stop_pct))
-
-        # Risk/Ödül oranı 1:2
-        target_pct = stop_pct * 2.0
+        target_pct = stop_pct * 2.0  # 1:2 Risk / Getiri oranı
 
         if direction == "LONG":
-            stop_price = price * (1 - stop_pct / 100)
-            target_price = price * (1 + target_pct / 100)
+            raw_stop = price * (1.0 - (stop_pct / 100.0))
+            raw_target = price * (1.0 + (target_pct / 100.0))
         elif direction == "SHORT":
-            stop_price = price * (1 + stop_pct / 100)
-            target_price = price * (1 - target_pct / 100)
+            raw_stop = price * (1.0 + (stop_pct / 100.0))
+            raw_target = price * (1.0 - (target_pct / 100.0))
         else:
             return 0.0, 0.0
 
-        return round(stop_price, 2), round(target_price, 2)
+        # BIST Fiyat Adımı Yuvarlaması (bist_tick_size)
+        valid_stop = round_to_bist_tick(raw_stop)
+        valid_target = round_to_bist_tick(raw_target)
+
+        return valid_stop, valid_target
 
     def _assess_risks(self, inp: DecisionInput) -> list[str]:
-        """Risk değerlendirmesi."""
+        """Karara ilişkin risk faktörlerini tespit eder."""
         risks = []
         f = inp.features
 
-        if f.get("atr_pct", inp.atr_pct) > 5:
+        if _safe_float(f.get("atr_pct", inp.atr_pct)) > 5.0:
             risks.append("Yüksek volatilite")
 
-        if f.get("rsi_14", 50) > 80 or f.get("rsi_14", 50) < 20:
+        rsi = _safe_float(f.get("rsi_14", 50), 50.0)
+        if rsi > 80.0 or rsi < 20.0:
             risks.append("Aşırı alım/satım (RSI)")
 
         if inp.news_sentiment < -0.5:
@@ -516,14 +689,13 @@ class DecisionEngine:
         if inp.ml_confidence < 0.75:
             risks.append("Düşük model güveni")
 
-        # Monte Carlo risk metrikleri
-        if inp.sim_var_95 != 0 and abs(inp.sim_var_95) > 15:
+        if inp.sim_var_95 != 0 and abs(inp.sim_var_95) > 15.0:
             risks.append(f"MC VaR yüksek: %{abs(inp.sim_var_95):.1f}")
 
-        if inp.sim_prob_positive < 0.35:
+        if inp.sim_prob_positive < 0.35 and inp.sim_prob_positive > 0:
             risks.append(f"MC olasılık düşük: %{inp.sim_prob_positive * 100:.0f}")
 
-        if inp.sim_expected_return < -5:
+        if inp.sim_expected_return < -5.0:
             risks.append(f"MC beklenen getiri negatif: %{inp.sim_expected_return:.1f}")
 
         if not risks:
@@ -532,23 +704,23 @@ class DecisionEngine:
         return risks
 
     def _generate_reasons(self, inp: DecisionInput, score: float) -> list[str]:
-        """Karar nedenleri."""
+        """Kararın gerekçelerini metinsel olarak üretir."""
         reasons = []
         f = inp.features
 
-        if f.get("momentum_20d", 0) > 5:
+        if _safe_float(f.get("momentum_20d", 0)) > 5.0:
             reasons.append("Güçlü momentum")
 
-        if f.get("roc_5d", 0) > 3:
+        if _safe_float(f.get("roc_5d", 0)) > 3.0:
             reasons.append("Pozitif kısa vadeli getiri")
 
-        if f.get("volume_zscore", 0) > 1:
+        if _safe_float(f.get("volume_zscore", 0)) > 1.0:
             reasons.append("Yüksek hacim onayı")
 
         if inp.news_sentiment > 0.3:
             reasons.append("Pozitif haber sentimenti")
 
-        if score > 80:
+        if score > 80.0:
             reasons.append("Çok yüksek composite skor")
 
         if not reasons:
@@ -557,14 +729,13 @@ class DecisionEngine:
         return reasons
 
     def _calculate_expected_return(self, inp: DecisionInput, direction: str) -> float:
-        """Çok kaynaklı harmanlanmış beklenen getiri hesapla."""
+        """Çok kaynaklı harmanlanmış beklenen getiri tahmini üretir."""
         if direction not in ("LONG", "SHORT"):
             return 0.0
 
         f = inp.features
-        raw_momentum = (f.get("momentum_20d", 0) + f.get("roc_5d", 0)) / 2.0
+        raw_momentum = (_safe_float(f.get("momentum_20d", 0)) + _safe_float(f.get("roc_5d", 0))) / 2.0
 
-        # Eğer ML ve Monte Carlo modelleri tahmin üretmişse bunları ağırlıklandır
         if inp.ml_return_5d != 0 or inp.sim_expected_return != 0:
             expected = (raw_momentum * 0.3) + (inp.ml_return_5d * 0.4) + (inp.sim_expected_return * 0.3)
         else:
@@ -577,117 +748,113 @@ class DecisionEngine:
 
         return round(float(expected), 2)
 
-    def decide_from_canonical(self, score, price: float = 0) -> Any:
-        """CanonicalScore'tan karar üret.
-
-        Bu, tek canonical karar noktasıdır.
-        Ranking, scoring, risk burada birleşir.
-
-        Args:
-            score: CanonicalScore instance
-            price: Güncel fiyat (stop/target hesaplama için)
-        """
+    def decide_from_canonical(self, score: Any, price: float = 0.0) -> Decision:
+        """CanonicalScore nesnesinden BIST tick kurallarına uygun nihai karar üretir."""
         from services.core.canonical_scoring import CanonicalScore
 
         if not isinstance(score, CanonicalScore):
-            raise TypeError(f"Expected CanonicalScore, got {type(score)}")
+            raise TypeError(f"CanonicalScore bekleniyordu, alınan: {type(score)}")
 
-        # Eşik kontrolü
+        # Eşik Kontrolleri
         if score.confidence < self._min_confidence:
-            return Decision(
+            dec = Decision(
                 ticker=score.ticker,
-                action="NO_ACTION",
+                action=Action.NO_ACTION.value,
                 direction="NEUTRAL",
                 confidence=score.confidence,
                 score=score.opportunity_score,
-                reasons=[f"Confidence çok düşük: {score.confidence:.2f} < {self._min_confidence}"],
+                reasons=[f"Confidence eşik altında: {score.confidence:.2f} < {self._min_confidence}"],
             )
+            self._persist_decision(dec)
+            return dec
 
         if score.opportunity_score < self._min_score:
-            return Decision(
+            dec = Decision(
                 ticker=score.ticker,
-                action="NO_ACTION",
+                action=Action.NO_ACTION.value,
                 direction="NEUTRAL",
                 confidence=score.confidence,
                 score=score.opportunity_score,
                 reasons=[f"Skor eşik altında: {score.opportunity_score:.1f} < {self._min_score}"],
             )
+            self._persist_decision(dec)
+            return dec
 
-        # Yön ve action
         direction = score.direction
         if direction == "NEUTRAL":
-            action = "HOLD"
+            action = Action.HOLD.value
         elif direction == "LONG":
-            action = "BUY"
+            action = Action.BUY.value
         else:
-            action = "SELL"
+            action = Action.SELL.value
 
-        # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
-        if score.risk_score < 30 and action in ("BUY", "SELL"):
-            action = "HOLD"  # Çok riskli — pozisyon açma
+        # Risk Skoru Kontrolü
+        if score.risk_score < 30.0 and action in (Action.BUY.value, Action.SELL.value):
+            action = Action.HOLD.value
             direction = "NEUTRAL"
 
-        # Stop ve Target hesaplama (price verilmişse — ATR bazlı)
+        # BIST Fiyat Adımlı Stop ve Target Hesaplama
         stop_price = 0.0
         target_price = 0.0
-        if price > 0 and action in ("BUY", "SELL"):
-            # ATR varsa kullan, yoksa fallback
-            atr = score.vector.__dict__.get("atr", 0) if hasattr(score.vector, "__dict__") else 0
-            atr_pct = score.vector.__dict__.get("atr_pct", 0) if hasattr(score.vector, "__dict__") else 0
-            if atr and atr > 0:
+        if price > 0 and action in (Action.BUY.value, Action.SELL.value):
+            vec_dict = getattr(score.vector, "__dict__", {})
+            atr = _safe_float(vec_dict.get("atr", 0.0))
+            atr_pct = _safe_float(vec_dict.get("atr_pct", 0.0))
+
+            if atr > 0:
                 stop_distance = atr * 2.5
-                stop_pct = (stop_distance / price) * 100
-            elif atr_pct and atr_pct > 0:
+                stop_pct = (stop_distance / price) * 100.0
+            elif atr_pct > 0:
                 stop_pct = atr_pct * 1.5
             else:
                 stop_pct = self.DEFAULT_STOP_FALLBACK
+
             stop_pct = max(4.0, min(10.0, stop_pct))
             target_pct = stop_pct * 2.0
+
             if direction == "LONG":
-                stop_price = round(price * (1 - stop_pct / 100), 2)
-                target_price = round(price * (1 + target_pct / 100), 2)
+                raw_stop = price * (1.0 - (stop_pct / 100.0))
+                raw_target = price * (1.0 + (target_pct / 100.0))
             elif direction == "SHORT":
-                stop_price = round(price * (1 + stop_pct / 100), 2)
-                target_price = round(price * (1 - target_pct / 100), 2)
+                raw_stop = price * (1.0 + (stop_pct / 100.0))
+                raw_target = price * (1.0 - (target_pct / 100.0))
+            else:
+                raw_stop, raw_target = 0.0, 0.0
+
+            stop_price = round_to_bist_tick(raw_stop) if raw_stop > 0 else 0.0
+            target_price = round_to_bist_tick(raw_target) if raw_target > 0 else 0.0
 
         # Conviction
-        if score.opportunity_score >= 80 and score.confidence >= 0.8:
+        if score.opportunity_score >= 80.0 and score.confidence >= 0.80:
             conviction = "HIGH"
-        elif score.opportunity_score >= 65 and score.confidence >= 0.65:
+        elif score.opportunity_score >= 65.0 and score.confidence >= 0.65:
             conviction = "MEDIUM"
         else:
             conviction = "LOW"
 
-        # Nedenler
+        # Nedenler & Riskler
         reasons = []
         v = score.vector
-        if v.momentum > 65:
+        if getattr(v, "momentum", 0) > 65:
             reasons.append(f"Momentum güçlü: {v.momentum:.0f}")
-        if v.relative_strength > 65:
+        if getattr(v, "relative_strength", 0) > 65:
             reasons.append(f"Relatif güç yüksek: {v.relative_strength:.0f}")
-        if v.fundamental > 65:
+        if getattr(v, "fundamental", 0) > 65:
             reasons.append(f"Fundamental pozitif: {v.fundamental:.0f}")
-        if v.news_sentiment > 65:
+        if getattr(v, "news_sentiment", 0) > 65:
             reasons.append(f"Sentiment olumlu: {v.news_sentiment:.0f}")
-        if v.catalyst > 65:
-            reasons.append(f"Katalizör var: {v.catalyst:.0f}")
-        if v.mean_reversion > 65:
-            reasons.append(f"Mean reversion fırsatı: {v.mean_reversion:.0f}")
         if not reasons:
-            reasons.append("Genel skor eşiği aşıldı")
+            reasons.append("Genel kompozit skor eşiği aşıldı")
 
-        # Riskler
         risks = []
-        if v.risk < 40:
-            risks.append(f"Yüksek risk: {v.risk:.0f}")
-        if v.data_quality < 60:
+        if getattr(v, "risk", 50) < 40:
+            risks.append(f"Yüksek risk faktörü: {v.risk:.0f}")
+        if getattr(v, "data_quality", 100) < 60:
             risks.append(f"Düşük veri kalitesi: {v.data_quality:.0f}")
-        if v.momentum < 35:
-            risks.append(f"Momentum zayıf: {v.momentum:.0f}")
         if not risks:
             risks.append("Belirgin risk tespit edilmedi")
 
-        return Decision(
+        dec = Decision(
             ticker=score.ticker,
             action=action,
             direction=direction,
@@ -699,7 +866,51 @@ class DecisionEngine:
             target_price=target_price,
             conviction=conviction,
         )
+        self._persist_decision(dec)
+        return dec
+
+    def export_decisions_to_polars(self, limit: int = 100) -> pl.DataFrame:
+        """Kalıcı DuckDB karar geçmişini sıfır kopyalı Polars DataFrame olarak dışa aktarır."""
+        if self._conn is None:
+            return pl.DataFrame()
+
+        with self._lock:
+            try:
+                arrow_table = self._conn.execute(
+                    """
+                    SELECT id, timestamp, ticker, action, direction, confidence,
+                           score, target_price, stop_price, expected_return,
+                           conviction, reasons_json, risks_json
+                    FROM decision_audit_log
+                    ORDER BY id DESC
+                    LIMIT ?;
+                    """,
+                    [limit],
+                ).arrow()
+                return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+            except Exception as exc:
+                logger.error("decision_history_polars_hatasi", error=str(exc))
+                return pl.DataFrame()
+
+    def __repr__(self) -> str:
+        """Karar motorunun okunabilir durum temsili."""
+        return (
+            f"DecisionEngine(min_score={self._min_score}, min_conf={self._min_confidence}, "
+            f"db_path={self._db_path!r})"
+        )
 
 
-# Singleton
-decision_engine = DecisionEngine()
+# Global Tekil Nesne (Singleton)
+decision_engine: Final[DecisionEngine] = DecisionEngine()
+
+__all__: Final[list[str]] = [
+    "Action",
+    "DEFAULT_DECISION_DB_PATH",
+    "DEFAULT_MIN_CONFIDENCE",
+    "DEFAULT_MIN_SCORE",
+    "DEFAULT_STOP_FALLBACK_PCT",
+    "Decision",
+    "DecisionEngine",
+    "DecisionInput",
+    "decision_engine",
+]

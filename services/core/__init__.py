@@ -82,6 +82,13 @@ from .compliance import (
 )
 from .config_hot_reload import ConfigChange, ConfigHotReload, SettingsBridge, config_hot_reload, settings_bridge
 from .dead_letter_queue import DeadLetterQueue, DLQEntry, DLQStatus, dead_letter_queue
+from .decision_engine import (
+    Action,
+    Decision,
+    DecisionEngine,
+    DecisionInput,
+    decision_engine,
+)
 from .distributed_tracing import (
     DistributedTracer,
     Span,
@@ -198,6 +205,12 @@ __all__ = [
     "DLQEntry",
     "DLQStatus",
     "dead_letter_queue",
+    # Karar Motoru (Decision Engine)
+    "Action",
+    "Decision",
+    "DecisionEngine",
+    "DecisionInput",
+    "decision_engine",
     # Dağıtık İzleme (Tracing)
     "DistributedTracer",
     "Span",

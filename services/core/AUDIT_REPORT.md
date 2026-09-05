@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 17 dosya denetlendi, 161 sorun düzeltildi. Bekleyen dosya: 87
+**Denetim Sonucu:** 18 dosya denetlendi, 170 sorun düzeltildi. Bekleyen dosya: 86
 
 ---
 
@@ -39,6 +39,7 @@
 | 15 | `compliance.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 16 | `config_hot_reload.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 17 | `dead_letter_queue.py` | 8 | ✅ Denetlendi, düzeltildi |
+| 18 | `decision_engine.py` | 9 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -322,6 +323,22 @@
 | 6 | 5 & Standart | Hem `DeadLetterQueue` hem de `InMemoryDeadLetterQueue` için Polars analiz ihracı yoktu | Sıfır kopyalı `export_to_polars(limit)` fonksiyonları eklendi |
 | 7 | 4 | `DLQEntry`, `DeadLetterQueue` ve `InMemoryDeadLetterQueue` sınıflarında `__repr__` metotları yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
 | 8 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 7 sembollük eksiksiz `__all__` listesi eklendi |
+
+---
+
+## `decision_engine.py` (18. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | 4 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Temizlendi; çok kaynaklı kompozit skorlama ve rejim adaptasyonunu açıklayan Türkçe docstring'ler yazıldı |
+| 2 | 1 | `make_decision` metodu sabit 0.0 stop/target fiyatları dönen bir placeholder durumundaydı | Sinyalden `DecisionInput` sentezleyip gerçek `decide()` sonucunu üreten tam fonksiyonel arayüz haline getirildi |
+| 3 | 2 | Stop ve hedef fiyatlar `round(p, 2)` ile keyfi yuvarlanıyordu ve BIST fiyat adımı kuralını ihlal ediyordu | `services.core.bist_tick_size.round_to_bist_tick` entegrasyonu ile tüm fiyatlar resmi BIST tick boyutuna uyarlandı |
+| 4 | 3 | Karar eşikleri asimetrikti; sadece `score >= 60` kontrolü yapılıp düşüşlerde `score < 60 -> NO_ACTION` denilerek sistemin hiçbir zaman SHORT/SELL üretememe quant hatası vardı | Simetrik ayı eşiği (`score <= 100 - min_score`) mekanizması kurularak iki yönlü işlem kabiliyeti sağlandı |
+| 5 | 3 | BIST Pay Piyasasında açığa satış kısıtlamalarına karşı hiçbir guard yoktu | `allow_short: bool = False` guard'ı eklendi; açığa satış izni yoksa SHORT yönü fail-closed `HOLD` aksiyonuna dönüştürüldü |
+| 6 | 2 | `features` ve sinyallerdeki `None`/`NaN`/`Inf` değerler `TypeError` ve sayısal taşmalara yol açıyordu | `_safe_float` koruyucu fonksiyonu ile tüm sayısal alanlar güvenli hale getirildi |
+| 7 | 5 & Standart | Üretilen kritik alım/satım kararları kalıcı olarak saklanmıyordu | DuckDB `decision_audit_log` tablosu, `orjson` kullanımı ve sıfır kopyalı Polars ihracı (`export_decisions_to_polars`) entegre edildi |
+| 8 | 4 | `DecisionInput`, `Decision` ve `DecisionEngine` sınıflarında `__repr__` ve `to_dict()` metotları yoktu | Açıklayıcı ve okunabilir `__repr__` ve `to_dict()` metotları eklendi |
+| 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı ve `services.core.__init__.py`'de dışa aktarılmıyordu | 9 sembollük eksiksiz `__all__` listesi eklendi ve `__init__.py`'ye 5 ana sembol bağlandı |
 
 ---
 
