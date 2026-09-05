@@ -1,8 +1,8 @@
 # services/core/ — Denetim Raporu
 
-**Tarih:** —  
-**Kapsam:** ? `.py` dosyası  
-**Denetim Sonucu:** — sorun tespit edildi, — düzeltildi
+**Tarih:** 2026-09-05  
+**Kapsam:** 104 `.py` dosyası  
+**Denetim Sonucu:** 1 dosya denetlendi, 4 sorun düzeltildi. Bekleyen dosya: 103
 
 ---
 
@@ -11,7 +11,7 @@
 1. **Mock / Sahte / Placeholder Veri — Kesinlikle Yasak.** Test verisi, hardcoded değer, statik JSON, placeholder data, 'Otomatik eklendi' docstring, pass ile boş fonksiyon gövdesi — production kodunda yer alamaz.
 2. **Kapsamlı Hata, Eşzamanlılık ve Sınır Kontrolleri.** Boundary hataları, dead code, sessiz exception yutma, bypass mekanizmaları düzeltilir. Polars null değerleri, ZeroDivisionError ve NaN/Inf sayısal taşmaları guard altına alınır. Paylaşılan singleton state/bağlantılarda thread-safety (threading.Lock/asyncio.Lock) zorunludur.
 3. **Eksiksiz Fonksiyonellik ve Fail-Closed İlkesi.** Eksik parametre, loglama, fallback ve validasyon tamamlanır. Hatalar asla sessizce yutulamaz (except: pass yasak); loglanıp uygun istisna fırlatılır. Tüm parametre ve dönüşlerde eksiksiz type annotation belirtilir.
-4. **Profesyonel Kod, Temizlik ve Loglama Mimarisi.** Her docstring açıklayıcı, Türkçe ve Args/Returns/Raises içeren formatta olmalıdır. Her dataclass ve veri modelinde __repr__ metodu bulunur. Fonksiyon içi gereksiz importlar dosya başına taşınır. Web/API katmanında structlog, izole quant/motor katmanlarında standart logging kullanılır. Loglar ve hata mesajları Türkçe olmalıdır. Magic number yerine DEFAULT_* sabitleri kullanılır.
+4. **Profesyonel Kod, Temizlik ve Loglama Mimarisi.** Her docstring açıklayıcı, Türkçe ve Args/Returns/Raises içeren formatta olmalıdır. Her dataclass ve veri modelinde __repr__ metodu bulunur. Fonksiyon içi gereksiz importlar dosya başına taşınır. Sistem genelinde (Web, API, Backtest, ML, Core) birincil loglayıcı olarak `structlog` (`logger = structlog.get_logger(__name__)`) kullanılır. Loglar ve hata mesajları Türkçe olmalıdır. Magic number yerine DEFAULT_* sabitleri kullanılır.
 5. **Düzeltme Sonrası Canlı Doğrulama (Smoke/Execution Test).** Yalnızca syntax veya import yetmez; dosyanın ana fonksiyonlarını fiilen çalıştıran mikro test (uv run python -c '...' veya pytest) ve ruff check ile doğruluk kanıtlanmalıdır.
 6. **Geliştirme Önerileri ve Proaktif İyileştirme.** Hata olmasa dahi performans, bellek, Polars optimizasyonu veya mimari açıdan sistemi iyileştirebilecek potansiyel alanlar raporlanmalı ve faydalı olanlar sisteme kazandırılmalıdır.
 7. **Mimari Tutarlılık, Modül Dışa Aktarımı ve Göç (Migration) Takibi.** Modül seviyesinde __all__ listesi eksiksiz ve güncel olmalıdır. İsim/imza değişikliklerinde tüm repo taranıp çağıran noktalar güncellenmeli ve audit raporuna Migration tablosu eklenmelidir.
@@ -22,15 +22,19 @@
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
-| — | — | — | ⏳ Bekliyor |
+| 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
 
 ---
 
-## `<dosya_adı>.py`
+## `__init__.py` (1. dosya)
 
-| # | Sorun | Düzeltme |
-|---|-------|----------|
-| — | — | — |
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 4 | Modül docstring İngilizce ve eksik kapsamlı | Kapsamlı ve Türkçe modül docstring yazıldı |
+| 2 | 7 | `__all__` listesi eksikti; import edilen 20+ sembol listede yoktu | Tüm dışa aktarılan sınıflar, fonksiyonlar ve tekil nesneler `__all__` listesine eklendi (toplam 68 sembol) |
+| 3 | 3 | `DeadLetterQueue` import için try-except ImportError hilesi vardı | `persistent_dlq` wrapper'ı sağlayan sınıf doğrudan import edildi |
+| 4 | 5 | I001 import sıralaması düzensizdi | Ruff standartlarına göre alfabetik ve standart bloklara göre sıralandı |
+
 
 ---
 

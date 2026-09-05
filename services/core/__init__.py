@@ -1,15 +1,20 @@
-"""
-ALPHA BIST — Core Package
+"""ALPHA BIST — Çekirdek (Core) Servis Paketi.
 
-Nihai core modülleri:
-- dead_letter_queue: Başarısız event'ler için DLQ
-- jwt_manager: JWT token yönetimi
-- transaction_helper: Database transaction yardımcısı
-- circuit_breaker_metrics: Circuit breaker metrics export
-- config_hot_reload: Config dosyası hot-reload
-- immutable_audit: Değiştirilemez audit log
-- distributed_tracing: Distributed tracing & correlation ID
-- system_governor: Graceful degradation & feature flags
+Bu paket, platform genelinde kullanılan operasyonel, altyapısal ve finansal
+çekirdek modülleri barındırır:
+- auto_circuit_breaker / circuit_breaker_metrics: Otomatik devre kesici ve metrikleri
+- bist_tick_size / price_limits / tradability_mask: BIST fiyat adımı, tavan/taban ve alım-satım maskeleri
+- compliance / risk_gate: Mevzuat ve risk filtreleri
+- config_hot_reload: Dinamik konfigürasyon izleme ve hot-reload
+- dead_letter_queue: Başarısız olaylar için DuckDB tabanlı kalıcı DLQ
+- distributed_tracing: Dağıtık izleme ve correlation ID yönetimi
+- fee_calculator / tax / settlement / gross_settlement: Komisyon, vergi, takas ve brüt takas hesaplamaları
+- halt_monitor / short_selling: İşlem durdurma ve açığa satış kontrolleri
+- immutable_audit: Değiştirilemez güvenlik ve denetim logu
+- jwt_manager: JWT kimlik ve yetkilendirme yönetimi
+- market_calendar / market_session_fsm: BIST işlem takvimi ve seans durum makinesi
+- system_governor: Zarif bozulma (graceful degradation) ve özellik bayrakları
+- transaction_helper: Veritabanı işlem (transaction) yardımcısı
 """
 
 from .auto_circuit_breaker import AutoCircuitBreakerEngine, CircuitBreakerEvent, auto_circuit_breaker
@@ -17,12 +22,7 @@ from .bist_tick_size import get_bist_tick_size, is_valid_bist_tick, round_to_bis
 from .circuit_breaker_metrics import CircuitBreakerMetricsCollector, CircuitBreakerSnapshot, circuit_breaker_metrics
 from .compliance import ComplianceChecker, compliance_checker
 from .config_hot_reload import ConfigChange, ConfigHotReload, SettingsBridge, config_hot_reload, settings_bridge
-from .dead_letter_queue import DLQEntry, DLQStatus, dead_letter_queue
-
-try:
-    from .dead_letter_queue import DeadLetterQueue
-except ImportError:
-    DeadLetterQueue = type(dead_letter_queue)
+from .dead_letter_queue import DeadLetterQueue, DLQEntry, DLQStatus, dead_letter_queue
 from .distributed_tracing import (
     DistributedTracer,
     Span,
@@ -61,36 +61,38 @@ from .tradability_mask import TradabilityMask, tradability_mask
 from .transaction_helper import TransactionConnection, TransactionHelper, transaction_helper
 
 __all__ = [
-    # DLQ
-    "DeadLetterQueue",
-    "DLQEntry",
-    "DLQStatus",
-    "dead_letter_queue",
-    # JWT
-    "JWTManager",
-    "JWTClaims",
-    "JWTError",
-    "TokenType",
-    "jwt_manager",
-    # Transaction
-    "TransactionHelper",
-    "TransactionConnection",
-    "transaction_helper",
-    # Circuit Breaker Metrics
+    # Devre Kesici ve Metrikler
+    "AutoCircuitBreakerEngine",
+    "CircuitBreakerEvent",
+    "auto_circuit_breaker",
     "CircuitBreakerMetricsCollector",
     "CircuitBreakerSnapshot",
     "circuit_breaker_metrics",
-    # Config Hot-Reload
+    # BIST Fiyat Adımı ve Limitler
+    "get_bist_tick_size",
+    "is_valid_bist_tick",
+    "round_to_bist_tick",
+    "PriceLimitMonitor",
+    "price_limit_monitor",
+    "TradabilityMask",
+    "tradability_mask",
+    # Mevzuat ve Risk
+    "ComplianceChecker",
+    "compliance_checker",
+    "RiskGate",
+    "risk_gate",
+    # Konfigürasyon
     "ConfigHotReload",
     "ConfigChange",
     "config_hot_reload",
     "SettingsBridge",
     "settings_bridge",
-    # Immutable Audit
-    "ImmutableAuditLog",
-    "AuditEntry",
-    "immutable_audit_log",
-    # Distributed Tracing
+    # DLQ (Dead Letter Queue)
+    "DeadLetterQueue",
+    "DLQEntry",
+    "DLQStatus",
+    "dead_letter_queue",
+    # Dağıtık İzleme (Tracing)
     "DistributedTracer",
     "Span",
     "Trace",
@@ -98,11 +100,45 @@ __all__ = [
     "correlation_id_var",
     "span_id_var",
     "trace",
-    # System Governor
+    # Finansal Hesaplamalar (Komisyon, Vergi, Takas)
+    "FeeCalculator",
+    "fee_calculator",
+    "TaxResult",
+    "calculate_tax",
+    "SettlementCalculator",
+    "settlement_calculator",
+    "GrossSettlementMonitor",
+    "gross_settlement_monitor",
+    # Piyasa İzleme ve Açığa Satış
+    "HaltMonitor",
+    "halt_monitor",
+    "ShortSellingMonitor",
+    "short_selling_monitor",
+    # Güvenlik ve Denetim
+    "ImmutableAuditLog",
+    "AuditEntry",
+    "immutable_audit_log",
+    "JWTManager",
+    "JWTClaims",
+    "JWTError",
+    "TokenType",
+    "jwt_manager",
+    # Takvim ve Seans FSM
+    "MarketCalendar",
+    "market_calendar",
+    "MarketSessionStateMachine",
+    "BISTMarketPhase",
+    "bist_session_fsm",
+    "_TZ_ISTANBUL",
+    # Sistem Durumu (Governor)
     "SystemStateGovernor",
     "SystemState",
     "FeatureFlag",
     "StateTransition",
     "HealthCheck",
     "system_governor",
+    # Veritabanı İşlemleri
+    "TransactionHelper",
+    "TransactionConnection",
+    "transaction_helper",
 ]
