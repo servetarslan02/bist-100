@@ -353,6 +353,67 @@ class CircuitBreakerMetricsCollector:
 
         return history_list[-safe_limit:]
 
+    def auto_track_global_registry(self) -> int:
+        """services.core.circuit_breaker registry'sindeki tüm sağlayıcıları otomatik izlemeye alır.
+
+        Returns:
+            int: Yeni izlemeye alınan sağlayıcı sayısı.
+        """
+        try:
+            from services.core.circuit_breaker import _providers, _registry_lock
+
+            with _registry_lock:
+                providers_copy = list(_providers.values())
+
+            added = 0
+            for prov in providers_copy:
+                if prov.name not in self._tracked_breakers:
+                    self.track(prov)
+                    added += 1
+            return added
+        except Exception as exc:
+            logger.debug("auto_track_global_registry_atlandi", error=str(exc))
+            return 0
+
+    async def export_prometheus_async(self) -> str:
+        """Prometheus metriklerini event loop'u bloke etmeden asenkron üretir."""
+        import asyncio
+
+        return await asyncio.to_thread(self.export_prometheus)
+
+    async def export_json_async(self) -> dict[str, Any]:
+        """JSON metriklerini event loop'u bloke etmeden asenkron üretir."""
+        import asyncio
+
+        return await asyncio.to_thread(self.export_json)
+
+    def persist_history_to_duckdb(self) -> int:
+        """Bellekteki durum değişikliği geçmişini DuckDB state_store bileşenine kaydeder.
+
+        Returns:
+            int: Kaydedilen olay sayısı.
+        """
+        try:
+            from services.core.state_store import state_store
+
+            with self._lock:
+                events = list(self._history)
+
+            if not events:
+                return 0
+
+            for ev in events:
+                state_store.save_circuit_state(
+                    name=ev["name"],
+                    state=ev["new_state"],
+                    failure_count=0,
+                    last_failure=ev.get("timestamp"),
+                )
+            return len(events)
+        except Exception as exc:
+            logger.debug("persist_history_to_duckdb_atlandi", error=str(exc))
+            return 0
+
     def clear(self) -> None:
         """Kayıtlı devre kesicileri ve durum tarihçesini temizler (Testler ve sıfırlama için)."""
         with self._lock:

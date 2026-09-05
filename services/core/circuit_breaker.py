@@ -86,6 +86,25 @@ class CircuitBreaker:
     half_open_calls: int = 0
     _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
+    def __post_init__(self) -> None:
+        """Kalıcı durumu yükler ve merkezi metrik toplayıcıya otomatik kaydeder."""
+        self.restore_state()
+        try:
+            from services.core.circuit_breaker_metrics import circuit_breaker_metrics
+
+            circuit_breaker_metrics.track(self)
+        except Exception as exc:
+            logger.debug("circuit_breaker_metrics_track_atlandi", name=self.name, error=str(exc))
+
+    def _notify_state_change(self, old_state: str, new_state: str) -> None:
+        """Metrik toplayıcıya durum değişikliğini bildirir."""
+        try:
+            from services.core.circuit_breaker_metrics import circuit_breaker_metrics
+
+            circuit_breaker_metrics.record_state_change(self.name, old_state, new_state)
+        except Exception as exc:
+            logger.debug("circuit_breaker_state_change_bildirilemedi", name=self.name, error=str(exc))
+
     def _update_telemetry(self) -> None:
         """OpenTelemetry ölçüm göstergelerini günceller."""
         state_val = {CircuitState.CLOSED: 0, CircuitState.HALF_OPEN: 1, CircuitState.OPEN: 2}.get(self.state, 0)
@@ -108,11 +127,15 @@ class CircuitBreaker:
 
     def record_success(self) -> None:
         """Başarılı çağrıyı kaydeder ve durum makinesini günceller."""
+        state_changed = False
+        old_state_str = ""
         with self._lock:
             if self.state == CircuitState.HALF_OPEN:
+                old_state_str = self.state.value
                 self.state = CircuitState.CLOSED
                 self.failure_count = 0
                 self.half_open_calls = 0
+                state_changed = True
                 logger.info("circuit_breaker_kapandi", name=self.name, durum="CLOSED")
             elif self.state == CircuitState.CLOSED:
                 self.failure_count = max(0, self.failure_count - 1)
@@ -121,15 +144,22 @@ class CircuitBreaker:
             self._update_telemetry()
             self._persist_to_store()
 
+        if state_changed:
+            self._notify_state_change(old_state_str, CircuitState.CLOSED.value)
+
     def record_failure(self) -> None:
         """Başarısız çağrıyı kaydeder ve gerekirse devreyi OPEN durumuna geçirir."""
+        state_changed = False
+        old_state_str = ""
         with self._lock:
             self.failure_count += 1
             self.last_failure_time = datetime.now(UTC)
             CB_FAILURES_COUNTER.add(1, {"provider": self.name})
 
             if self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
+                old_state_str = self.state.value
                 self.state = CircuitState.OPEN
+                state_changed = True
                 logger.warning(
                     "circuit_breaker_acildi",
                     name=self.name,
@@ -138,8 +168,10 @@ class CircuitBreaker:
                     esik=self.failure_threshold,
                 )
             elif self.state == CircuitState.HALF_OPEN:
+                old_state_str = self.state.value
                 self.state = CircuitState.OPEN
                 self.half_open_calls = 0
+                state_changed = True
                 logger.warning(
                     "circuit_breaker_yeniden_acildi",
                     name=self.name,
@@ -150,12 +182,16 @@ class CircuitBreaker:
             self._update_telemetry()
             self._persist_to_store()
 
+        if state_changed:
+            self._notify_state_change(old_state_str, CircuitState.OPEN.value)
+
     def can_execute(self) -> bool:
         """Yeni bir çağrı yapılmasına izin verilip verilmeyeceğini denetler.
 
         Returns:
             bool: İstek çalıştırılabilir ise True, engellendiyse False.
         """
+        state_changed = False
         with self._lock:
             if self.state == CircuitState.CLOSED:
                 return True
@@ -166,9 +202,16 @@ class CircuitBreaker:
                     if elapsed >= self.recovery_timeout_seconds:
                         self.state = CircuitState.HALF_OPEN
                         self.half_open_calls = 1
+                        state_changed = True
                         logger.info("circuit_breaker_yari_acik_modda", name=self.name, durum="HALF_OPEN")
-                        return True
-                return False
+                        result = True
+                    else:
+                        result = False
+                else:
+                    result = False
+                if state_changed:
+                    self._notify_state_change(CircuitState.OPEN.value, CircuitState.HALF_OPEN.value)
+                return result
 
             if self.state == CircuitState.HALF_OPEN:
                 if self.half_open_calls < 1:

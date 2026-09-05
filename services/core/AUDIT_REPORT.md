@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 88 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 90 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -33,8 +33,8 @@
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 12 | `circuit_breaker.py` | 7 | ✅ Denetlendi, düzeltildi |
-| 13 | `circuit_breaker_metrics.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 12 | `circuit_breaker.py` | 8 | ✅ Denetlendi, düzeltildi |
+| 13 | `circuit_breaker_metrics.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
 
 ---
@@ -208,6 +208,7 @@
 | 5 | 2 & 3 | `ProtectedProvider` içinde `asyncio.CancelledError` istisnası genel blokta yutuluyordu; ayrıca başarısızlıkta hata fırlatma esnekliği yoktu | `asyncio.CancelledError` yukarı fırlatıldı (`re-raise`); fail-closed prensibi doğrultusunda yapılandırılabilir `raise_on_failure` bayrağı eklendi |
 | 6 | 4 | `CentralStateStore` (DuckDB) kancaları korunurken hata durumunda çökme yaşanmaması için korumalı kilit ve try-catch eklendi | Durum kurtarma ve kaydetme çağrıları hata toleranslı ve asenkron/senkron uyumlu kılındı |
 | 7 | 4 & 7 | `__repr__` metotları eksikti veya standart dışıydı; `__all__` listesinde modül sabitleri (`DEFAULT_*`, `CB_*`) eksikti | Standart `CircuitBreaker`, `RateLimiter`, `ProviderReliability`, `ProtectedProvider` `__repr__` metotları ve eksiksiz `__all__` listesi tanımlandı |
+| 8 | 3 & 7 | Devre kesici durum değişimlerinde merkezi `circuit_breaker_metrics` toplayıcısına bildirim gitmiyordu; metrik toplayıcı unhooked/izole durumdaydı | `__post_init__` ile otomatik izleme (`auto-track`) ve `_notify_state_change` ile durum makinesi geçişlerinde otomatik metrik güncellemesi sağlandı |
 
 ---
 
@@ -222,6 +223,7 @@
 | 5 | 2 & 3 | `export_json` döngüsünde `self.get_snapshot(name)` `None` dönerse `None.to_dict()` nedeniyle tüm metrik servisi `AttributeError` ile çöküyordu | `get_all_snapshots()` üzerinden `None` filtreli güvenli liste üretimi sağlandı; `export_orjson_bytes()` ile yüksek performanslı serileştirme eklendi |
 | 6 | 3 & 4 | Yerel `otel_trace` dekoratörü tanımlanmıştı; modül bazlı bağımsız span açılıyordu | Merkezi `from services.core.otel import otel_trace` yapısına geçilerek merkezi telemetri uyumu sağlandı |
 | 7 | 4 & 7 | `CircuitBreakerSnapshot` `@dataclass(slots=True)` yapılmamıştı ve `__repr__` metotları eksikti; modül seviyesinde `__all__` listesi tanımlanmamıştı | `slots=True`, açıklayıcı `__repr__` metotları ve tüm sınıf/sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
+| 8 | 3 & 6 | Registry üzerindeki mevcut sağlayıcıları otomatik keşfetme, asenkron export (`export_prometheus_async`) ve DuckDB kalıcı durum geçmişi kancası yoktu | `auto_track_global_registry()`, non-blocking async export fonksiyonları ve `persist_history_to_duckdb()` kancası eklendi |
 
 ---
 
