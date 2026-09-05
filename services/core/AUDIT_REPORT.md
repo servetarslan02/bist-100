@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 16 dosya denetlendi, 153 sorun düzeltildi. Bekleyen dosya: 88
+**Denetim Sonucu:** 17 dosya denetlendi, 161 sorun düzeltildi. Bekleyen dosya: 87
 
 ---
 
@@ -38,6 +38,7 @@
 | 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 15 | `compliance.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 16 | `config_hot_reload.py` | 9 | ✅ Denetlendi, düzeltildi |
+| 17 | `dead_letter_queue.py` | 8 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -306,6 +307,21 @@
 | 7 | 3 & 4 | Pydantic Settings güncellemesinde `get_settings = lambda: new_settings` gibi kırılgan lambda ezmesi vardı | Pydantic immutability korunarak atomik referans takası (reference swap) ile güvenli güncelleme sağlandı |
 | 8 | 4 | `ConfigChange`, `ConfigHotReload` ve `SettingsBridge` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
 | 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | Tüm ana sınıflar, sabitler ve singleton'ları içeren eksiksiz `__all__` listesi eklendi |
+
+---
+
+## `dead_letter_queue.py` (17. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | Tam 11 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Temizlendi; mimari dayanıklılık ilkelerini açıklayan detaylı Türkçe docstring'ler yazıldı |
+| 2 | 1 & 3 | `InMemoryDeadLetterQueue.retry_failed` metodu sahte `return 0` içeren içi boş mock durumundaydı | Gerçek üstel geri çekilme (exponential backoff) ve kayıtlı işleyici çağıran fonksiyonel döngü uygulandı |
+| 3 | 2 | `InMemoryDeadLetterQueue` sınıfında hiçbir eşzamanlı erişim koruması yoktu | `self._lock = threading.RLock()` ile thread-safe yapıldı |
+| 4 | 3 | `InMemoryDeadLetterQueue.push` metodu `DLQEntry` dönerken `PersistentDeadLetterQueue.push` `entry_id: str` dönüyordu | İki motor arasında `entry_id: str` dönüş tutarlılığı sağlandı |
+| 5 | 3 & 4 | `get_stats` metodu motorlar arasında farklı anahtarlar döndürüyordu | `by_status`, `pending`, `resolved`, `exhausted` ve yaşam döngüsü metrikleri standartlaştırıldı |
+| 6 | 5 & Standart | Hem `DeadLetterQueue` hem de `InMemoryDeadLetterQueue` için Polars analiz ihracı yoktu | Sıfır kopyalı `export_to_polars(limit)` fonksiyonları eklendi |
+| 7 | 4 | `DLQEntry`, `DeadLetterQueue` ve `InMemoryDeadLetterQueue` sınıflarında `__repr__` metotları yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
+| 8 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 7 sembollük eksiksiz `__all__` listesi eklendi |
 
 ---
 
