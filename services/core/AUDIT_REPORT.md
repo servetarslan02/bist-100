@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 7 dosya denetlendi, 42 sorun düzeltildi. Bekleyen dosya: 97
+**Denetim Sonucu:** 8 dosya denetlendi, 48 sorun düzeltildi. Bekleyen dosya: 96
 
 ---
 
@@ -29,6 +29,7 @@
 | 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -127,6 +128,19 @@
 
 
 
+
+---
+
+## `audit_log.py` (8. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metot ve sınıflara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
+| 2 | 2 | `list(self._entries)[-1000:]` dilimlemesiyle `deque` yapısı bozuluyor ve `_index` içindeki tam sayı indeksler kayarak `IndexError` veya yanlış kayda erişim üretiyordu | Ring buffer `deque` korundu; varlık indeksi doğrudan varlık bazlı sınırlı `deque[AuditEntry]` nesneleriyle yeniden kurgulanarak indeks kayma bug'ı kökten çözüldü |
+| 3 | 2 | Çoklu iş parçacığı veya asenkron ortamlarda denetim kaydı ekleme ve okuma işlemleri eşzamanlılık (thread-safety) korumasından yoksundu | `threading.Lock()` ile tüm mutasyon ve okuma operasyonları guard altına alındı |
+| 4 | 3 | `log()` metodunda `AuditEntry` tür ve zorunlu alan doğrulama kontrolleri (fail-closed) eksikti | `isinstance` ve zorunlu kimlik kontrolü eklenerek geçersiz veri girişleri engellendi |
+| 5 | 4 | `AuditEntry` ve `AuditLog` sınıflarında durum özetleyici `__repr__` ve serileştirme (`to_dict`) eksikti | Açıklayıcı `__repr__` ve `to_dict` metotları uygulandı; magic number'lar `DEFAULT_*` sabitlerine bağlandı; loglar Türkçe structlog standardına geçirildi |
+| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_ENTITY_INDEX_LIMIT", "DEFAULT_MAX_ENTRIES", "AuditEntry", "AuditLog", "audit_log", "otel_trace"]` tanımlandı |
 
 ---
 

@@ -1,21 +1,27 @@
-"""
-ALPHA BIST — Audit Log v1.0
+"""ALPHA BIST — Denetim Kaydı ve Karar İzlenebilirliği (Audit Log) Modülü.
 
-Immutable audit trail:
-- Decision lineage
-- Risk decisions
-- Order/fill tracking
-- State changes
-- Config changes
+Bu modül, sistem genelindeki tüm kritik kararların, risk kontrollerinin, emir/dolum olaylarının
+ve durum değişikliklerinin değişmez (immutable) ve denetlenebilir bir zaman serisi günlüğünü
+(audit trail) tutar.
 
-FAZ 14: Audit Log
+Özellikler:
+- Karar silsilesi (lineage tracking: RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK -> ORDER -> FILL)
+- Risk motoru onay ve red kontrolleri
+- BIST emir ve dolum yaşam döngüsü
+- Sistem ve yapılandırma durumu değişimleri
+- Eşzamanlı (thread-safe) bellek içi halka tamponu (ring buffer) ve varlık indeksi
 """
+
+from __future__ import annotations
 
 import functools
+import threading
 import uuid
+from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 import structlog
 from opentelemetry import metrics, trace
@@ -24,67 +30,129 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.audit_log")
 meter = metrics.get_meter("alpha-bist.audit_log")
 
+DEFAULT_MAX_ENTRIES: int = 5000
+DEFAULT_ENTITY_INDEX_LIMIT: int = 500
 
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+F = TypeVar("F", bound=Callable[..., Any])
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
+
+def otel_trace(span_name: str) -> Callable[[F], F]:
+    """Bir metodu OpenTelemetry span içine alan dekoratör.
+
+    Args:
+        span_name: Oluşturulacak span'in açıklayıcı adı.
+
+    Returns:
+        Dekore edilmiş fonksiyon/metot sarmalayıcısı.
+    """
+
+    def decorator(func: F) -> F:
+        """Hedef fonksiyonu OTel span ile sarmalar."""
+
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            """Span bağlamı altında fonksiyonu yürütür."""
             with tracer.start_as_current_span(span_name):
                 return func(self, *args, **kwargs)
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
 
 @dataclass
 class AuditEntry:
-    """Audit log kaydı (immutable)."""
+    """Değişmez (immutable) denetim kaydı veri modeli."""
 
     audit_id: str
     action: str  # DECISION, RISK_CHECK, ORDER, FILL, STATE_CHANGE, CONFIG_CHANGE
-    entity_type: str  # ticker, portfolio, order, model
+    entity_type: str  # ticker, portfolio, order, model, config
     entity_id: str
     actor: str  # system, decision_engine, risk_engine, user
     details: dict[str, Any]
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     correlation_id: str = ""
-    parent_audit_id: str = ""  # Lineage tracking
+    parent_audit_id: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Denetim kaydını sözlük biçimine dönüştürür.
+
+        Returns:
+            Serileştirilebilir anahtar-değer sözlüğü.
+        """
+        return {
+            "audit_id": self.audit_id,
+            "action": self.action,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "actor": self.actor,
+            "details": self.details,
+            "timestamp": self.timestamp.isoformat(),
+            "correlation_id": self.correlation_id,
+            "parent_audit_id": self.parent_audit_id,
+        }
+
+    def __repr__(self) -> str:
+        """Denetim kaydının açıklayıcı temsilini döner."""
+        return (
+            f"<AuditEntry(id='{self.audit_id}', aksiyon='{self.action}', "
+            f"varlik='{self.entity_type}:{self.entity_id}', aktor='{self.actor}')>"
+        )
 
 
 class AuditLog:
-    """Immutable audit log.
+    """Değişmez denetim kaydı yöneticisi (Audit Log).
 
-    Bir kararın tam zincirini takip edebilmek için:
-    RAW_DATA → FEATURE → SIGNAL → DECISION → RISK → ORDER → FILL
+    Sistemde alınan tüm kararların geriye dönük tam zincirini takip eder:
+    RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK -> ORDER -> FILL
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        from collections import deque
-        self._entries: deque = deque(maxlen=5000)
-        self._index: dict[str, list[int]] = {}  # entity_id → [entry indices]
+    def __init__(
+        self,
+        max_entries: int = DEFAULT_MAX_ENTRIES,
+        entity_limit: int = DEFAULT_ENTITY_INDEX_LIMIT,
+    ) -> None:
+        """Denetim kaydı yöneticisini başlatır.
+
+        Args:
+            max_entries: Sistem genelinde tutulacak maksimum denetim kaydı sayısı.
+            entity_limit: Varlık başına tutulacak maksimum denetim kaydı sayısı.
+        """
+        self._max_entries: int = max_entries
+        self._entity_limit: int = entity_limit
+        self._lock: threading.Lock = threading.Lock()
+        self._entries: deque[AuditEntry] = deque(maxlen=max_entries)
+        self._index: dict[str, deque[AuditEntry]] = {}
 
     @otel_trace("audit_log.log")
-    def log(self, entry: AuditEntry) -> Any:
-        """Audit kaydı ekle (append-only)."""
-        idx = len(self._entries)
-        self._entries.append(entry)
-        if len(self._entries) > 1000:
-            self._entries = list(self._entries)[-1000:]
+    def log(self, entry: AuditEntry) -> None:
+        """Denetim kaydı ekler (yalnızca sona ekleme / append-only).
 
-        # Index güncelle
+        Args:
+            entry: Kaydedilecek AuditEntry nesnesi.
+
+        Raises:
+            ValueError: entry geçerli bir AuditEntry değilse veya eksik alan içeriyorsa.
+        """
+        if not isinstance(entry, AuditEntry):
+            raise ValueError("Kaydedilecek nesne AuditEntry tipinde olmalıdır.")
+        if not entry.audit_id or not entry.action:
+            raise ValueError("AuditEntry 'audit_id' ve 'action' alanları boş olamaz.")
+
         key = f"{entry.entity_type}:{entry.entity_id}"
-        if key not in self._index:
-            self._index[key] = []
-        self._index[key].append(idx)
+
+        with self._lock:
+            self._entries.append(entry)
+            if key not in self._index:
+                self._index[key] = deque(maxlen=self._entity_limit)
+            self._index[key].append(entry)
 
         logger.debug(
-            "Audit log", action=entry.action, entity=f"{entry.entity_type}:{entry.entity_id}", actor=entry.actor
+            "denetim_kaydi_eklendi",
+            aksiyon=entry.action,
+            varlik=key,
+            aktor=entry.actor,
+            audit_id=entry.audit_id,
         )
 
     @otel_trace("audit_log.log_decision")
@@ -97,8 +165,18 @@ class AuditLog:
         reasons: list[str],
         risks: list[str],
         correlation_id: str = "",
-    ) -> Any:
-        """Karar kaydı."""
+    ) -> None:
+        """Model veya kural bazlı karar kaydını günlüğe ekler.
+
+        Args:
+            ticker: BIST hisse sembolü (örn. 'THYAO').
+            action: Alınan karar türü (örn. 'BUY', 'SELL', 'HOLD').
+            direction: Karar yönü ('LONG', 'SHORT', 'NEUTRAL').
+            confidence: Güven skoru (0.0 - 1.0).
+            reasons: Kararın arkasındaki gerekçeler listesi.
+            risks: Tespit edilen risk unsurları listesi.
+            correlation_id: İlişkili işlem korelasyon kimliği.
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -122,10 +200,17 @@ class AuditLog:
         self,
         ticker: str,
         approved: bool,
-        checks: list[dict],
+        checks: list[dict[str, Any]],
         correlation_id: str = "",
-    ) -> Any:
-        """Risk kontrolü kaydı."""
+    ) -> None:
+        """Risk denetim motoru kontrol sonucunu kaydeder.
+
+        Args:
+            ticker: BIST hisse sembolü.
+            approved: Risk kontrollerinden geçip geçmediği bilgisi.
+            checks: Gerçekleştirilen risk parametre kontrolleri detayları.
+            correlation_id: İlişkili işlem korelasyon kimliği.
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -151,8 +236,18 @@ class AuditLog:
         price: float,
         order_type: str,
         correlation_id: str = "",
-    ) -> Any:
-        """Emir kaydı."""
+    ) -> None:
+        """BIST emir iletimi kaydını günlüğe ekler.
+
+        Args:
+            order_id: Tekil BIST emir kimliği.
+            ticker: BIST hisse sembolü.
+            side: Emir yönü ('BUY' / 'SELL').
+            quantity: Emir adedi.
+            price: Emir fiyatı.
+            order_type: Emir tipi ('LIMIT', 'MARKET', vb.).
+            correlation_id: İlişkili işlem korelasyon kimliği.
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -182,8 +277,19 @@ class AuditLog:
         price: float,
         commission: float,
         correlation_id: str = "",
-    ) -> Any:
-        """Dolum kaydı."""
+    ) -> None:
+        """Emir dolum (fill) kaydını günlüğe ekler.
+
+        Args:
+            fill_id: Gerçekleşen dolum kimliği.
+            order_id: İlgili BIST emir kimliği.
+            ticker: BIST hisse sembolü.
+            side: Dolum yönü ('BUY' / 'SELL').
+            quantity: Gerçekleşen dolum adedi.
+            price: Gerçekleşen dolum fiyatı.
+            commission: Ödenen komisyon tutarı.
+            correlation_id: İlişkili işlem korelasyon kimliği.
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -211,8 +317,16 @@ class AuditLog:
         old_value: Any,
         new_value: Any,
         reason: str,
-    ) -> Any:
-        """State değişikliği kaydı."""
+    ) -> None:
+        """Sistem durum değişikliği kaydını günlüğe ekler.
+
+        Args:
+            entity_type: Varlık türü (örn. 'circuit_breaker', 'feed').
+            entity_id: Varlık kimliği.
+            old_value: Değişiklik öncesi durum değeri.
+            new_value: Değişiklik sonrası yeni durum değeri.
+            reason: Durum değişikliğinin gerekçesi.
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -235,8 +349,15 @@ class AuditLog:
         old_value: Any,
         new_value: Any,
         actor: str = "user",
-    ) -> Any:
-        """Config değişikliği kaydı."""
+    ) -> None:
+        """Sistem yapılandırma parametresi değişim kaydını günlüğe ekler.
+
+        Args:
+            config_key: Değiştirilen parametrenin anahtar adı.
+            old_value: Eski yapılandırma değeri.
+            new_value: Yeni yapılandırma değeri.
+            actor: Değişikliği gerçekleştiren aktör (varsayılan: 'user').
+        """
         self.log(
             AuditEntry(
                 audit_id=self._generate_id(),
@@ -256,27 +377,34 @@ class AuditLog:
         entity_type: str,
         entity_id: str,
     ) -> list[dict[str, Any]]:
-        """Entity'nin tüm geçmişini getir."""
-        key = f"{entity_type}:{entity_id}"
-        indices = self._index.get(key, [])
-        return [
-            {
-                "audit_id": self._entries[i].audit_id,
-                "action": self._entries[i].action,
-                "actor": self._entries[i].actor,
-                "details": self._entries[i].details,
-                "timestamp": self._entries[i].timestamp.isoformat(),
-                "correlation_id": self._entries[i].correlation_id,
-            }
-            for i in indices
-        ]
+        """Belirli bir varlığın tüm denetim geçmişini getirir.
 
-    def get_decision_lineage(self, ticker: str) -> list[dict]:
-        """Bir ticker için tam karar zincirini getir."""
+        Args:
+            entity_type: Varlık türü (örn. 'ticker', 'order').
+            entity_id: Varlık tekil kimliği.
+
+        Returns:
+            Varlığa ait denetim kayıtları sözlük listesi.
+        """
+        key = f"{entity_type}:{entity_id}"
+        with self._lock:
+            entries = list(self._index.get(key, []))
+        return [entry.to_dict() for entry in entries]
+
+    def get_decision_lineage(self, ticker: str) -> list[dict[str, Any]]:
+        """Bir hisse sembolü için tam karar silsilesini mantıksal işlem sırasına göre getirir.
+
+        Sıralama: RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK_CHECK -> ORDER -> FILL
+
+        Args:
+            ticker: BIST hisse sembolü.
+
+        Returns:
+            Mantıksal aşama önceliğine göre sıralanmış denetim kayıtları.
+        """
         history = self.get_entity_history("ticker", ticker)
 
-        # Sıralı: RAW_DATA → FEATURE → SIGNAL → DECISION → RISK → ORDER → FILL
-        action_order = {
+        action_order: dict[str, int] = {
             "RAW_DATA": 0,
             "FEATURE": 1,
             "SIGNAL": 2,
@@ -285,12 +413,20 @@ class AuditLog:
             "ORDER": 5,
             "FILL": 6,
         }
-        history.sort(key=lambda x: action_order.get(x["action"], 99))
+        history.sort(key=lambda x: action_order.get(x.get("action", ""), 99))
         return history
 
-    def get_recent(self, limit: int = 50) -> list[dict]:
-        """Son audit kayıtları."""
-        recent = list(self._entries)[-limit:]
+    def get_recent(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Sistem genelindeki en güncel denetim kayıtlarını döner.
+
+        Args:
+            limit: Döndürülecek maksimum kayıt sayısı (varsayılan: 50).
+
+        Returns:
+            Yeniden eskiye doğru sıralı denetim kayıtları özeti.
+        """
+        with self._lock:
+            recent_entries = list(self._entries)[-limit:]
         return [
             {
                 "audit_id": e.audit_id,
@@ -300,25 +436,53 @@ class AuditLog:
                 "actor": e.actor,
                 "timestamp": e.timestamp.isoformat(),
             }
-            for e in reversed(recent)
+            for e in reversed(recent_entries)
         ]
 
     def get_stats(self) -> dict[str, Any]:
-        """Audit istatistikleri."""
-        action_counts = {}
-        for e in self._entries:
-            action_counts[e.action] = action_counts.get(e.action, 0) + 1
+        """Denetim kaydı sistem istatistiklerini hesaplar.
+
+        Returns:
+            Toplam kayıt sayısı, aksiyon dağılımı ve takip edilen varlık sayısını içeren sözlük.
+        """
+        with self._lock:
+            total_entries = len(self._entries)
+            tracked_entities = len(self._index)
+            action_counts: dict[str, int] = {}
+            for e in self._entries:
+                action_counts[e.action] = action_counts.get(e.action, 0) + 1
 
         return {
-            "total_entries": len(self._entries),
+            "total_entries": total_entries,
             "action_counts": action_counts,
-            "tracked_entities": len(self._index),
+            "tracked_entities": tracked_entities,
         }
 
     def _generate_id(self) -> str:
-        """Unique audit ID."""
-        return str(uuid.uuid4())[:16]
+        """Benzersiz ve güvenli tekil denetim kimliği üretir.
+
+        Returns:
+            16 karakterlik onaltılık tekil kimlik dizesi.
+        """
+        return uuid.uuid4().hex[:16]
+
+    def __repr__(self) -> str:
+        """Denetim yöneticisinin durum temsilini döner."""
+        with self._lock:
+            return (
+                f"<AuditLog(toplam_kayit={len(self._entries)}, "
+                f"takip_edilen_varlik={len(self._index)}, max_kapasite={self._max_entries})>"
+            )
 
 
-# Singleton
+# Singleton örneği
 audit_log = AuditLog()
+
+__all__ = [
+    "DEFAULT_ENTITY_INDEX_LIMIT",
+    "DEFAULT_MAX_ENTRIES",
+    "AuditEntry",
+    "AuditLog",
+    "audit_log",
+    "otel_trace",
+]
