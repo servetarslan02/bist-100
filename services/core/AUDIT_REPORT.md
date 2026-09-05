@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 8 dosya denetlendi, 48 sorun düzeltildi. Bekleyen dosya: 96
+**Denetim Sonucu:** 9 dosya denetlendi, 54 sorun düzeltildi. Bekleyen dosya: 95
 
 ---
 
@@ -30,6 +30,7 @@
 | 6 | `arrow_pipeline.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -141,6 +142,19 @@
 | 4 | 3 | `log()` metodunda `AuditEntry` tür ve zorunlu alan doğrulama kontrolleri (fail-closed) eksikti | `isinstance` ve zorunlu kimlik kontrolü eklenerek geçersiz veri girişleri engellendi |
 | 5 | 4 | `AuditEntry` ve `AuditLog` sınıflarında durum özetleyici `__repr__` ve serileştirme (`to_dict`) eksikti | Açıklayıcı `__repr__` ve `to_dict` metotları uygulandı; magic number'lar `DEFAULT_*` sabitlerine bağlandı; loglar Türkçe structlog standardına geçirildi |
 | 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_ENTITY_INDEX_LIMIT", "DEFAULT_MAX_ENTRIES", "AuditEntry", "AuditLog", "audit_log", "otel_trace"]` tanımlandı |
+
+---
+
+## `auto_circuit_breaker.py` (9. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 4 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metot ve sınıflara Türkçe, Args/Returns/Raises formatında eksiksiz docstring yazıldı |
+| 2 | 2 | Fiyat ve endeks değişim hesaplamalarında sıfıra bölme, `math.isnan` ve `math.isinf` sayısal sınır kontrolleri eksikti; başlangıçta % -100 değişim anomalisi oluşabiliyordu | `math.isnan` / `math.isinf` ve sıfır/negatif fiyat guard kontrolleri eklendi; başlangıç durumu düzeltildi |
+| 3 | 2 | Singleton `auto_circuit_breaker` örneğinde fiyat güncellemeleri ve olay kayıtları eşzamanlı erişim korumasından (thread-safety) yoksundu | `threading.Lock()` ile tüm mutasyon ve durum okuma işlemleri koruma altına alındı |
+| 4 | 4 | `CircuitBreakerEvent` ve `AutoCircuitBreakerEngine` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve durum yansıtıcı `__repr__` metotları tanımlandı |
+| 5 | 4 | Fonksiyon içindeki `from collections import deque` importu dosya başına taşındı; magic number `DEFAULT_EVENT_QUEUE_MAXLEN` sabitine bağlandı; loglar Türkçe structlog standardına geçirildi | Dosya başı temiz import yapısına geçildi ve yapısal Türkçe loglama sağlandı |
+| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_EVENT_QUEUE_MAXLEN", "AutoCircuitBreakerEngine", "CircuitBreakerEvent", "auto_circuit_breaker", "otel_trace"]` tanımlandı |
 
 ---
 
