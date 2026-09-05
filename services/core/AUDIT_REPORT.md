@@ -79,10 +79,13 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 3 | `strategy` None veya eksik anahtarlı geldiğinde fail-closed koruması yetersizdi | Girdi doğrulaması, güvenli varsayılanlar ve fallback değerleri eklendi |
-| 2 | 4 | SPK mevzuatına uygun tekil bildirim kimliği ve zaman damgası eksikti | Benzersiz `notification_id` (`uuid4`) ve `timestamp_iso` eklendi |
-| 3 | 7 | Modül seviyesinde `__all__` dışa aktarım listesi yoktu | `__all__ = ["generate_algo_notification"]` eklendi |
-| 4 | 4 | Fonksiyon docstring'i Args/Returns/Raises formatına uygun değildi | Standart Türkçe profesyonel docstring eklendi |
+| 1 | 2 & 3 | `strategy` geçersiz tipte (ör. str, list) geldiğinde sessizce `AttributeError` patlıyordu; docstring'de vaat edilen `ValueError` fırlatılmıyordu | Tip kontrolü eklendi; dict dışı girdilerde açıklayıcı `ValueError` fırlatılarak fail-closed sağlandı |
+| 2 | 2 & 3 | Risk seviyesi kontrolsüzdü, rastgele veya geçersiz string girilebiliyordu | `VALID_RISK_LEVELS` kümesi (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) tanımlandı; geçersiz değerlerde uyarı loguyla `DEFAULT_RISK_LEVEL` fallback'e çekildi |
+| 3 | 1 & 4 | SPK Tebliği III-37.1 standartlarına göre zorunlu parametreler (`market`, `parameters`, `kill_switch_enabled`, `operator`) eksikti | Tüm alanlar `AlgoNotification` dataclass'ına eklendi, dinamik parametreler sözlüğe aktarıldı |
+| 4 | 5 | SPK denetim izi (audit trail) ve geçmiş bildirimlerin yerel veritabanında saklanması mekanizması yoktu | `AlgoNotificationStore` sınıfı ile `duckdb>=1.3.0` ve `orjson` tabanlı thread-safe kalıcı kayıt ve sorgulama eklendi |
+| 5 | 4 | Magic string'ler (`"GENERIC_BIST_ALGO"`, `"MEDIUM"` vb.) kod içine serpiştirilmişti | `DEFAULT_*` adlandırmalı modül sabitleri olarak tanımlandı |
+| 6 | 4 | Dataclass ve Store sınıflarında açıklayıcı `__repr__` metotları yoktu | Her iki sınıfa da detaylı `__repr__` metotları eklendi |
+| 7 | 7 | `__all__` listesi eksikti | `AlgoNotification`, `AlgoNotificationStore`, `generate_algo_notification` ve tüm sabitleri içeren eksiksiz liste oluşturuldu |
 
 ---
 
