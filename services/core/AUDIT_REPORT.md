@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 2 dosya denetlendi, 11 sorun düzeltildi. Bekleyen dosya: 102
+**Denetim Sonucu:** 3 dosya denetlendi, 19 sorun düzeltildi. Bekleyen dosya: 101
 
 ---
 
@@ -24,6 +24,7 @@
 |---|-------|-------|-------|
 | 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -49,6 +50,22 @@
 | 5 | 7 | Modül seviyesinde `__all__` dışa aktarım listesi tanımlanmamıştı | `__all__` listesi eklendi (`AlertPolicy`, `PolicyDiff`, `SilenceRule`, vb.) |
 | 6 | 4 | Log mesajları İngilizceydi ve yapısal değildi (`logger.warning("Policy save failed")`) | Standart Türkçe anahtar-değer structlog formatına geçirildi |
 | 7 | 3 | Eksik ve gevşek tip tanımları (`db=None`, `path=None`, `-> Any`) | `db: Any = None`, `path: str | None = None` ve kesin dönüş tipleri ile güncellendi |
+
+---
+
+## `alerting.py` (3. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 35+ adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm sınıf, metot ve enumlara Türkçe, Args/Returns içeren eksiksiz docstring yazıldı |
+| 2 | 4 | `Alert`, `NotificationResult`, `NotificationRouter`, `AlertingSystem`, sağlayıcı sınıflarında `__repr__` yoktu | Tüm sınıflara açıklayıcı `__repr__` metotları eklendi |
+| 3 | 2 | `self._alerts` bir `deque` iken `list()` dilimleme ile tipi bozuluyordu | `deque(maxlen=self._max_alerts)` yapısı korundu, gereksiz ve tipi bozan `_trim_alerts` list dönüşümü düzeltildi |
+| 4 | 5 | SQLite spesifik `INSERT OR REPLACE` sözdizimi kullanılmıştı | DuckDB uyumlu `DELETE` + `INSERT INTO` desenine geçirildi |
+| 5 | 4 | Windows CP1254 terminalinde `\u2192` (`→`) karakteri `UnicodeEncodeError` patlatıyordu | ASCII `->` ile değiştirildi, Windows terminal çökmesi önlendi |
+| 6 | 4 | Dağınık ve fonksiyon içi `aiohttp` importları vardı | Proje standardı `httpx.AsyncClient` ile birleştirildi, singleton ve güvenli oturum yönetimi sağlandı |
+| 7 | 7 | Modül seviyesinde `__all__` listesi eksikti | `__all__` listesi eklendi (`Alert`, `AlertSeverity`, `AlertingSystem`, sağlayıcılar vb.) |
+| 8 | 4 | Loglar ve hata mesajları İngilizceydi | `ALARM_BILDIRIMI`, `yeni_alarm_olusturuldu`, `alarm_onaylandi` gibi standart Türkçe structlog yapısına geçirildi |
+
 
 
 

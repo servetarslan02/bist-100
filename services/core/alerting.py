@@ -1,18 +1,13 @@
-"""ALPHA BIST — Alerting System v4.0 (Enterprise-Grade)
+"""ALPHA BIST — Alarm Yönetim ve Bildirim Sistemi v4.0 (Enterprise-Grade).
 
-Kurumsal Standartlar:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. MİMARİ:    SOLID. NotificationProvider Protocol ile DI. NotificationRouter
-               bağımsız, AlertingSystem ise router'ı tüketir (SRP).
-2. OPTİMİZASYON: aiohttp.ClientSession per-provider singleton (bellek sızıntısı
-               önleme). get_event_loop() → asyncio.get_running_loop() (depr. düzeltme).
-3. DAYANIKLILIK: Exponential Backoff + Jitter retry her bildirim kanalında.
-               CancelledError propagate edilir (otel crash önleme).
-4. İZLENEBİLİRLİK: OTel span _add_alert, _notify_all, _send_with_retry üzerinde.
-               Prometheus: alert_created_total, notification_sent_total, notification_failed_total.
-5. GÜVENLİK:  %100 type hint. check_lock_metrics shadow name `metrics` → `lm`
-               olarak düzeltildi. asyncio.Lock ile dedup_cache koruma.
-6. KALİTE:    %100 docstring, Türkçe yorum, dataclass field sırası düzeltildi.
+Bu modül, platform genelinde kritik olayların, kural ihlallerinin ve sağlık
+durumu değişikliklerinin tespit edilip bildirim kanallarına (Log, Webhook, Slack,
+Discord, PagerDuty, E-posta) güvenli ve esnek şekilde yönlendirilmesini sağlar:
+- SOLID prensiplerine uygun NotificationProvider Protocol ve NotificationRouter
+- Exponential backoff ve jitter ile dayanıklı bildirim yeniden deneme mekanizması
+- OpenTelemetry span'leri ve Prometheus sayaçları ile tam izlenebilirlik
+- DuckDB kalıcı durum kaydı ile sistem yeniden başlatma sonrası alarm kurtarma
+- Parmak izi (fingerprint) ve süre tabanlı mükerrer alarm engelleme (deduplication)
 """
 
 from __future__ import annotations
@@ -22,11 +17,13 @@ import hashlib
 import os
 import random
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
+import httpx
 import orjson
 import structlog
 from opentelemetry import metrics as otel_metrics
@@ -65,14 +62,16 @@ _notification_retry_counter = meter.create_counter(
 
 
 class AlertSeverity(StrEnum):
-    """Otomatik eklendi."""
+    """Alarm önem derecesi sınıflandırması."""
+
     INFO = "INFO"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
 
 
 class AlertStatus(StrEnum):
-    """Otomatik eklendi."""
+    """Alarm yaşam döngüsü durumları."""
+
     CREATED = "CREATED"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     ESCALATED = "ESCALATED"
@@ -80,7 +79,8 @@ class AlertStatus(StrEnum):
 
 
 class AlertType(StrEnum):
-    """Otomatik eklendi."""
+    """Sistemde tanımlı alarm türleri."""
+
     HEALTH_CHANGE = "health_change"
     INVARIANT_FAILURE = "invariant_failure"
     LOCK_DEADLOCK = "lock_deadlock"
@@ -89,7 +89,7 @@ class AlertType(StrEnum):
     DRAWDOWN_BREACH = "drawdown_breach"
 
 
-# Escalation zaman aşımları — policy yoksa bu fallback kullanılır
+# Escalation zaman aşımları — politika tanımlı değilse bu varsayılan kullanılır
 ESCALATION_TIMEOUT_S: dict[str, int] = {
     AlertType.HEALTH_CHANGE: 300,
     AlertType.INVARIANT_FAILURE: 60,
@@ -105,7 +105,7 @@ ESCALATION_TIMEOUT_S: dict[str, int] = {
 
 @dataclass
 class Alert:
-    """Tek bir alert kaydı — tam lifecycle desteği ile."""
+    """Tek bir alarm kaydı — tam yaşam döngüsü (lifecycle) desteği ile."""
 
     alert_type: str
     severity: str
@@ -121,43 +121,50 @@ class Alert:
     escalation_count: int = 0
 
     def __post_init__(self) -> None:
-        """Otomatik eklendi."""
+        """Parmak izi boşsa otomatik hesaplar."""
         if not self.fingerprint:
             self.fingerprint = self._compute_fingerprint()
 
+    def __repr__(self) -> str:
+        """Alarm kaydının dize temsili."""
+        return (
+            f"<Alert(type='{self.alert_type}', severity='{self.severity}', "
+            f"status='{self.status}', fp='{self.fingerprint}')>"
+        )
+
     def _compute_fingerprint(self) -> str:
-        """Alert için deterministik parmak izi hesaplar."""
+        """Alert için deterministik SHA256 parmak izi hesaplar."""
         key = f"{self.alert_type}:{orjson.dumps(self.details, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
     def acknowledge(self) -> None:
-        """Alert'i onayla — escalation durur."""
+        """Alarmı onaylandı durumuna geçirir; eskalasyon döngüsü durur."""
         self.status = AlertStatus.ACKNOWLEDGED
         self.acknowledged_at = time.time()
 
     def escalate(self, new_severity: str = "CRITICAL") -> None:
-        """Alert'i yükselt."""
+        """Alarmın önem derecesini yükseltir ve eskalasyon sayacını artırır."""
         self.status = AlertStatus.ESCALATED
         self.severity = new_severity
         self.escalated_at = time.time()
         self.escalation_count += 1
 
     def resolve(self) -> None:
-        """Alert'i çöz."""
+        """Alarmı çözüldü olarak işaretler."""
         self.status = AlertStatus.RESOLVED
         self.resolved_at = time.time()
 
     @property
     def is_active(self) -> bool:
-        """Alert hâlâ işlem gerektiriyor mu?"""
+        """Alarmın hâlâ aktif işlem gerektirip gerektirmediğini doğrular."""
         return self.status in (AlertStatus.CREATED, AlertStatus.ACKNOWLEDGED, AlertStatus.ESCALATED)
 
     def timestamp_iso_str(self) -> str:
-        """Otomatik eklendi."""
+        """Alarm zaman damgasını UTC ISO-8601 formatında döndürür."""
         return datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat()
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Alarm nesnesini JSON uyumlu sözlüğe serileştirir."""
         return {
             "alert_type": self.alert_type,
             "severity": self.severity,
@@ -175,7 +182,7 @@ class Alert:
         }
 
     def to_webhook_payload(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Genel webhook entegrasyonları için yük formatı oluşturur."""
         return {
             "event": "alert",
             "alert_type": self.alert_type,
@@ -189,8 +196,8 @@ class Alert:
         }
 
     def to_slack_payload(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
-        color = {"INFO": "#36a64f", "WARNING": "#ff9900", "CRITICAL": "#ff0000"}.get(self.severity, "#999")
+        """Slack bildirimleri için ekli format üretir."""
+        color = {"INFO": "#36a64f", "WARNING": "#ff9900", "CRITICAL": "#ff0000"}.get(self.severity, "#999999")
         return {
             "attachments": [
                 {
@@ -198,8 +205,8 @@ class Alert:
                     "title": f"[{self.severity}] {self.alert_type}",
                     "text": self.message,
                     "fields": [
-                        {"title": "Status", "value": self.status, "short": True},
-                        {"title": "Escalations", "value": str(self.escalation_count), "short": True},
+                        {"title": "Durum", "value": self.status, "short": True},
+                        {"title": "Eskalasyon", "value": str(self.escalation_count), "short": True},
                     ],
                     "ts": int(self.timestamp),
                 }
@@ -207,7 +214,7 @@ class Alert:
         }
 
     def to_discord_payload(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Discord webhook kanalı için embed nesnesi oluşturur."""
         color = {"INFO": 0x36A64F, "WARNING": 0xFF9900, "CRITICAL": 0xFF0000}.get(self.severity, 0x999999)
         return {
             "embeds": [
@@ -216,16 +223,16 @@ class Alert:
                     "description": self.message,
                     "color": color,
                     "fields": [
-                        {"name": "Status", "value": self.status, "inline": True},
-                        {"name": "Escalations", "value": str(self.escalation_count), "inline": True},
+                        {"name": "Durum", "value": self.status, "inline": True},
+                        {"name": "Eskalasyon", "value": str(self.escalation_count), "inline": True},
                     ],
-                    "timestamp": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
+                    "timestamp": self.timestamp_iso_str(),
                 }
             ]
         }
 
     def to_pagerduty_payload(self, routing_key: str = "") -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """PagerDuty Events API v2 formatında yük oluşturur."""
         severity_map = {"INFO": "info", "WARNING": "warning", "CRITICAL": "critical"}
         return {
             "routing_key": routing_key,
@@ -245,23 +252,23 @@ class Alert:
 
 @runtime_checkable
 class NotificationProvider(Protocol):
-    """Bildirim kanalı sözleşmesi — DI hazırlıklı."""
+    """Bildirim kanalları için arayüz (Protocol)."""
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
-        pass
+        """Alarmı ilgili kanala iletir."""
+        ...
 
     def name(self) -> str:
-        """Otomatik eklendi."""
-        pass
+        """Kanal sağlayıcısının tanımlayıcı adını döner."""
+        ...
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
-        pass
+        """Kanalın kabul ettiği minimum önem derecesini döner."""
+        ...
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
-        pass
+        """Bağlantı ve kaynakları temizler."""
+        ...
 
 
 # ─── Provider Implementasyonları ─────────────────────────────────────────────
@@ -269,229 +276,227 @@ class NotificationProvider(Protocol):
 
 @dataclass
 class LogProvider:
-    """Structlog üzerinden alert kaydeder."""
+    """Structlog üzerinden alarmları yapısal loglayan sağlayıcı."""
 
     _name: str = "log"
 
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return f"<LogProvider(name='{self._name}')>"
+
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adını döner."""
         return self._name
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Kabul edilen minimum önem derecesi."""
         return "INFO"
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarmı structlog ile sisteme kaydeder."""
         logger.warning(
-            "ALERT",
-            type=alert.alert_type,
+            "ALARM_BILDIRIMI",
+            alert_type=alert.alert_type,
             severity=alert.severity,
             status=alert.status,
             message=alert.message,
+            fingerprint=alert.fingerprint,
         )
         return True
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
+        """Log sağlayıcısı için kaynak temizliği."""
         return None
 
 
 @dataclass
 class WebhookProvider:
-    """HTTP webhook ile alert gönderir.
-
-    aiohttp.ClientSession tek seferlik oluşturulur (bellek sızıntısı önlenir).
-    """
+    """HTTP POST webhook ile alarm ileten sağlayıcı."""
 
     url: str
     headers: dict[str, str] = field(default_factory=dict)
     timeout: float = 10.0
-    _session: Any = field(default=None, init=False, repr=False)
+    _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return f"<WebhookProvider(url='{self.url[:30]}...')>"
 
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adını döner."""
         return f"webhook:{self.url[:50]}"
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Kabul edilen minimum önem derecesi."""
         return "WARNING"
 
-    async def _get_session(self) -> Any:
-        """Singleton aiohttp session döner."""
-        if self._session is None or self._session.closed:
-            import aiohttp
-
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Yeniden kullanılabilir singleton HTTP istemcisi döner."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarm yükünü belirtilen URL adresine iletir."""
         try:
-            import aiohttp
-
-            session = await self._get_session()
-            async with session.post(
+            client = await self._get_client()
+            resp = await client.post(
                 self.url,
-                data=orjson.dumps(alert.to_webhook_payload()),
+                content=orjson.dumps(alert.to_webhook_payload()),
                 headers={"Content-Type": "application/json", **self.headers},
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
-                return resp.status < 400
+            )
+            return resp.status_code < 400
         except Exception as exc:
-            logger.error("Webhook gönderim hatası", url=self.url, error=str(exc))
+            logger.error("webhook_gonderim_hatasi", url=self.url, error=str(exc))
             return False
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """Açık HTTP oturumunu kapatır."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
 
 @dataclass
 class SlackProvider:
-    """Slack webhook ile alert gönderir."""
+    """Slack Webhook üzerinden alarm ileten sağlayıcı."""
 
     webhook_url: str
     timeout: float = 10.0
-    _session: Any = field(default=None, init=False, repr=False)
+    _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return "<SlackProvider>"
 
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adı."""
         return "slack"
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Minimum önem derecesi."""
         return "CRITICAL"
 
-    async def _get_session(self) -> Any:
-        """Otomatik eklendi."""
-        if self._session is None or self._session.closed:
-            import aiohttp
-
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Slack istemcisi döner."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarmı Slack webhook kanalına iletir."""
         try:
-            import aiohttp
-
-            session = await self._get_session()
-            async with session.post(
+            client = await self._get_client()
+            resp = await client.post(
                 self.webhook_url,
-                data=orjson.dumps(alert.to_slack_payload()),
+                content=orjson.dumps(alert.to_slack_payload()),
                 headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
-                return resp.status < 400
+            )
+            return resp.status_code < 400
         except Exception as exc:
-            logger.error("Slack gönderim hatası", error=str(exc))
+            logger.error("slack_gonderim_hatasi", error=str(exc))
             return False
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """HTTP istemcisini kapatır."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
 
 @dataclass
 class DiscordProvider:
-    """Discord webhook ile alert gönderir."""
+    """Discord Webhook üzerinden zengin içerikli alarm ileten sağlayıcı."""
 
     webhook_url: str
     timeout: float = 10.0
-    _session: Any = field(default=None, init=False, repr=False)
+    _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return "<DiscordProvider>"
 
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adı."""
         return "discord"
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Minimum önem derecesi."""
         return "CRITICAL"
 
-    async def _get_session(self) -> Any:
-        """Otomatik eklendi."""
-        if self._session is None or self._session.closed:
-            import aiohttp
-
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Discord istemcisi döner."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarmı Discord kanalına gönderir."""
         try:
-            import aiohttp
-
-            session = await self._get_session()
-            async with session.post(
+            client = await self._get_client()
+            resp = await client.post(
                 self.webhook_url,
-                data=orjson.dumps(alert.to_discord_payload()),
+                content=orjson.dumps(alert.to_discord_payload()),
                 headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
-                return resp.status < 400
+            )
+            return resp.status_code < 400
         except Exception as exc:
-            logger.error("Discord gönderim hatası", error=str(exc))
+            logger.error("discord_gonderim_hatasi", error=str(exc))
             return False
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """HTTP istemcisini kapatır."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
 
 @dataclass
 class PagerDutyProvider:
-    """PagerDuty Events API v2 ile alert gönderir."""
+    """PagerDuty Events API v2 üzerinden çağrı ve nöbetçi bildirimi ileten sağlayıcı."""
 
     routing_key: str
     timeout: float = 10.0
-    _session: Any = field(default=None, init=False, repr=False)
+    _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return "<PagerDutyProvider>"
 
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adı."""
         return "pagerduty"
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Minimum önem derecesi."""
         return "CRITICAL"
 
-    async def _get_session(self) -> Any:
-        """Otomatik eklendi."""
-        if self._session is None or self._session.closed:
-            import aiohttp
-
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def _get_client(self) -> httpx.AsyncClient:
+        """PagerDuty istemcisi döner."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarmı PagerDuty servisine iletir."""
         try:
-            import aiohttp
-
-            session = await self._get_session()
-            async with session.post(
+            client = await self._get_client()
+            resp = await client.post(
                 "https://events.pagerduty.com/v2/enqueue",
-                data=orjson.dumps(alert.to_pagerduty_payload(self.routing_key)),
+                content=orjson.dumps(alert.to_pagerduty_payload(self.routing_key)),
                 headers={"Content-Type": "application/json"},
-                timeout=aiohttp.ClientTimeout(total=self.timeout),
-            ) as resp:
-                return resp.status < 400
+            )
+            return resp.status_code < 400
         except Exception as exc:
-            logger.error("PagerDuty gönderim hatası", error=str(exc))
+            logger.error("pagerduty_gonderim_hatasi", error=str(exc))
             return False
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """HTTP istemcisini kapatır."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
 
 
 @dataclass
 class EmailProvider:
-    """SMTP üzerinden e-posta ile alert gönderir."""
+    """SMTP protokolü üzerinden e-posta bildirimleri gönderen sağlayıcı."""
 
     to_addresses: list[str] = field(default_factory=list)
     from_address: str = "alerts@alpha-bist.local"
@@ -500,23 +505,29 @@ class EmailProvider:
     username: str = field(default_factory=lambda: os.environ.get("SMTP_USERNAME", ""))
     password: str = field(default_factory=lambda: os.environ.get("SMTP_PASSWORD", ""))
 
+    def __repr__(self) -> str:
+        """Sağlayıcı dize temsili."""
+        return f"<EmailProvider(recipients={len(self.to_addresses)})>"
+
     def name(self) -> str:
-        """Otomatik eklendi."""
+        """Kanal adı."""
         return f"email:{','.join(self.to_addresses[:3])}"
 
     def min_severity(self) -> str:
-        """Otomatik eklendi."""
+        """Minimum önem derecesi."""
         return "CRITICAL"
 
     async def send(self, alert: Alert) -> bool:
-        """Otomatik eklendi."""
+        """Alarmı e-posta olarak gönderir."""
+        if not self.to_addresses:
+            return False
         try:
             from email.mime.text import MIMEText
 
             msg = MIMEText(
-                f"Alert: {alert.alert_type}\nSeverity: {alert.severity}\n"
-                f"Status: {alert.status}\nMessage: {alert.message}\n"
-                f"Details: {orjson.dumps(alert.details, option=orjson.OPT_INDENT_2).decode()}"
+                f"Alarm Türü: {alert.alert_type}\nÖnem: {alert.severity}\n"
+                f"Durum: {alert.status}\nMesaj: {alert.message}\n"
+                f"Detaylar: {orjson.dumps(alert.details, option=orjson.OPT_INDENT_2).decode()}"
             )
             msg["Subject"] = f"[{alert.severity}] ALPHA BIST: {alert.alert_type}"
             msg["From"] = self.from_address
@@ -525,11 +536,11 @@ class EmailProvider:
             await loop.run_in_executor(None, self._send_smtp, msg)
             return True
         except Exception as exc:
-            logger.error("Email gönderim hatası", error=str(exc))
+            logger.error("eposta_gonderim_hatasi", error=str(exc))
             return False
 
     def _send_smtp(self, msg: Any) -> None:
-        """Otomatik eklendi."""
+        """SMTP bağlantısı kurup e-postayı iletir."""
         import smtplib
 
         with smtplib.SMTP(self.smtp_host, self.smtp_port) as s:
@@ -539,7 +550,7 @@ class EmailProvider:
             s.send_message(msg)
 
     async def close(self) -> None:
-        """Otomatik eklendi."""
+        """E-posta sağlayıcısı kaynak temizliği."""
         return None
 
 
@@ -547,42 +558,41 @@ class EmailProvider:
 
 
 class NotificationRouter:
-    """Severity'ye göre uygun provider'ları seçer.
-
-    - INFO   → sadece log
-    - WARNING → log + webhook
-    - CRITICAL → tüm kanallar
-    """
+    """Önem derecesine göre uygun bildirim kanallarını yönlendiren bileşen."""
 
     _SEVERITY_ORDER: dict[str, int] = {"INFO": 0, "WARNING": 1, "CRITICAL": 2}
 
     def __init__(self) -> None:
-        """Otomatik eklendi."""
-        self._providers: list[Any] = []
+        """Yönlendiriciyi başlatır."""
+        self._providers: list[NotificationProvider] = []
 
-    def add_provider(self, provider: Any) -> None:
-        """Provider ekle. Maksimum 100 provider tutulur."""
+    def __repr__(self) -> str:
+        """Yönlendirici dize temsili."""
+        return f"<NotificationRouter(providers={len(self._providers)})>"
+
+    def add_provider(self, provider: NotificationProvider) -> None:
+        """Yeni bir bildirim sağlayıcısı kaydeder (maksimum 100 kanal)."""
         self._providers.append(provider)
         if len(self._providers) > 100:
             self._providers = self._providers[-100:]
 
-    def get_providers_for_severity(self, severity: str) -> list[Any]:
-        """Verilen severity için uygun provider listesi döner."""
+    def get_providers_for_severity(self, severity: str) -> list[NotificationProvider]:
+        """Belirtilen önem derecesine uygun bildirim sağlayıcılarını listeler."""
         target_level = self._SEVERITY_ORDER.get(severity, 0)
         return [p for p in self._providers if self._SEVERITY_ORDER.get(p.min_severity(), 999) <= target_level]
 
     def get_all_providers(self) -> list[str]:
-        """Otomatik eklendi."""
+        """Tüm kayıtlı bildirim kanallarının adlarını döndürür."""
         return [p.name() for p in self._providers]
 
     async def close_all(self) -> None:
-        """Tüm provider'ların session'larını kapat."""
+        """Tüm sağlayıcıların oturumlarını ve bağlantılarını sonlandırır."""
         for provider in self._providers:
             try:
                 await provider.close()
             except Exception as exc:
                 p_name = provider.name() if hasattr(provider, "name") and callable(provider.name) else str(provider)
-                logger.warning("Provider kapatılamadı", provider=p_name, error=str(exc))
+                logger.warning("saglayici_kapatilamadi", provider=p_name, error=str(exc))
 
 
 # ─── Retry Konfigürasyonu ─────────────────────────────────────────────────────
@@ -597,20 +607,31 @@ class RetryConfig:
     max_delay_s: float = 30.0
     backoff_factor: float = 2.0
 
+    def __repr__(self) -> str:
+        """Yeniden deneme ayarları dize temsili."""
+        return f"<RetryConfig(retries={self.max_retries}, factor={self.backoff_factor})>"
+
 
 class NotificationResult:
-    """Tek bir bildirim denemesinin sonucu."""
+    """Tek bir bildirim denemesinin sonucunu temsil eden sınıf."""
 
     def __init__(self, provider_name: str, alert_fingerprint: str) -> None:
-        """Otomatik eklendi."""
+        """Bildirim sonucunu başlatır."""
         self.provider_name = provider_name
         self.alert_fingerprint = alert_fingerprint
         self.attempts: int = 0
         self.success: bool = False
         self.last_error: str | None = None
 
+    def __repr__(self) -> str:
+        """Sonucun dize temsili."""
+        return (
+            f"<NotificationResult(provider='{self.provider_name}', "
+            f"success={self.success}, attempts={self.attempts})>"
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sonuç verisini sözlüğe çevirir."""
         return {
             "provider": self.provider_name,
             "fingerprint": self.alert_fingerprint,
@@ -624,91 +645,92 @@ class NotificationResult:
 
 
 class AlertingSystem:
-    """v4.0 — Enterprise-grade alert lifecycle, OTel, Prometheus, bellek güvenliği.
-
-    Args:
-        max_alerts: Bellekte tutulacak maksimum alert sayısı.
-        dedup_window_s: Aynı fingerprint için minimum tekrar süresi (saniye).
-        db: DuckDB bağlantısı (restart recovery için).
-        dialect: SQL dialect (postgresql | sqlite).
-        policy: AlertPolicy örneği (None ise varsayılan oluşturulur).
-    """
+    """v4.0 — Kurumsal seviye alarm yaşam döngüsü, OTel, DuckDB kalıcılık ve bildirim motoru."""
 
     def __init__(
         self,
         max_alerts: int = 1000,
         dedup_window_s: float = 300.0,
         db: Any = None,
-        dialect: str = "postgresql",
+        dialect: str = "duckdb",
         policy: AlertPolicy | None = None,
     ) -> None:
-        """Otomatik eklendi."""
-        from collections import deque
-        self._alerts: deque = deque(maxlen=2000)
+        """Alarm sistemini başlatır.
+
+        Args:
+            max_alerts: Bellekte tutulacak maksimum alarm sayısı.
+            dedup_window_s: Mükerrer alarm engelleme penceresi süresi (saniye).
+            db: DuckDB bağlantısı (sistem yeniden başlama kurtarması için).
+            dialect: Veritabanı lehçesi (varsayılan: duckdb).
+            policy: Özelleştirilmiş AlertPolicy nesnesi.
+        """
         self._max_alerts = max_alerts
+        self._alerts: deque[Alert] = deque(maxlen=self._max_alerts)
         self._dedup_window_s = dedup_window_s
-        # asyncio.Lock ile dedup_cache race condition önleme
         self._dedup_cache: dict[str, float] = {}
         self._dedup_lock: asyncio.Lock = asyncio.Lock()
         self._router = NotificationRouter()
         self._retry_config = RetryConfig()
-        from collections import deque
-        self._notification_log: deque = deque(maxlen=1000)
-        self._failed_notifications: deque = deque(maxlen=500)
+        self._notification_log: deque[NotificationResult] = deque(maxlen=1000)
+        self._failed_notifications: deque[NotificationResult] = deque(maxlen=500)
         self._db = db
         self._dialect = dialect
         self._policy = policy or AlertPolicy()
 
-        # Değişiklik tespiti için state
+        # Durum izleme alanları
         self._last_health_status: str | None = None
         self._last_lock_deadlock_count: int = 0
         self._last_lock_timeout_count: int = 0
         self._invariant_failure_count: int = 0
 
-        # Arka plan görev referansı
+        # Arka plan eskalasyon görevi
         self._escalation_task: asyncio.Task[None] | None = None
+
+    def __repr__(self) -> str:
+        """Alarm yöneticisinin dize temsili."""
+        return (
+            f"<AlertingSystem(alerts={len(self._alerts)}, "
+            f"active={len(self.get_active_alerts())}, max={self._max_alerts})>"
+        )
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────
 
     def start(self) -> None:
-        """Escalation monitor'ı başlatır."""
+        """Arka plan eskalasyon izleyicisini başlatır."""
         if self._escalation_task is None or self._escalation_task.done():
             try:
                 loop = asyncio.get_running_loop()
                 self._escalation_task = loop.create_task(self._escalation_loop(), name="alerting.escalation")
             except RuntimeError:
-                logger.warning("AlertingSystem.start() event loop dışında çağrıldı")
+                logger.warning("alarm_sistemi_event_loop_disinda_baslatildi")
 
     def stop(self) -> None:
-        """Escalation monitor'ı durdurur."""
+        """Arka plan eskalasyon izleyicisini güvenle durdurur."""
         if self._escalation_task and not self._escalation_task.done():
             self._escalation_task.cancel()
             self._escalation_task = None
 
     async def shutdown(self) -> None:
-        """Tam kapatma — provider session'larını temizler."""
+        """Tüm sistemi kapatır ve sağlayıcı oturumlarını sonlandırır."""
         self.stop()
         await self._router.close_all()
 
     async def _escalation_loop(self) -> None:
-        """Her 30 saniyede aktif alert'leri escalation açısından kontrol eder."""
+        """Periyodik olarak aktif alarmları eskalasyon kurallarına göre denetler."""
         while True:
             try:
-                await asyncio.sleep(30)  # SSD write reduction: 10s → 30s
+                await asyncio.sleep(30.0)
                 await self._check_escalations()
             except asyncio.CancelledError:
-                # Görev iptal edildi — temiz çıkış
                 break
             except Exception as exc:
-                logger.warning("Escalation loop hatası", error=str(exc))
+                logger.warning("eskalasyon_dongusu_hatasi", error=str(exc))
 
     async def _check_escalations(self) -> None:
-        """Aktif alert'leri policy tabanlı escalation kurallarıyla değerlendirir."""
+        """Aktif alarmların zaman aşımı durumlarını kontrol eder ve gerekiyorsa eskalasyon tetikler."""
         now = time.time()
         for alert in list(self._alerts):
-            if not alert.is_active:
-                continue
-            if alert.status == AlertStatus.ACKNOWLEDGED:
+            if not alert.is_active or alert.status == AlertStatus.ACKNOWLEDGED:
                 continue
 
             timeout = self._policy.get_escalation_timeout(alert.alert_type)
@@ -722,7 +744,7 @@ class AlertingSystem:
                     alert.escalate("CRITICAL")
                     _alert_escalated_counter.add(1, {"alert_type": alert.alert_type})
                     logger.warning(
-                        "Alert escalated",
+                        "alarm_eskalasyonu_gerceklesti",
                         fingerprint=alert.fingerprint,
                         type=alert.alert_type,
                         escalation_count=alert.escalation_count,
@@ -731,23 +753,23 @@ class AlertingSystem:
                         loop = asyncio.get_running_loop()
                         loop.create_task(self._notify_all(alert))
                     except RuntimeError as exc:
-                        logger.warning("Alert bildirim döngüsü bulunamadı, bildirim atlandı", error=str(exc))
+                        logger.warning("alarm_bildirim_dongusu_bulunamadi", error=str(exc))
 
     # ─── Provider Yönetimi ────────────────────────────────────────────────────
 
-    def add_provider(self, provider: Any) -> None:
-        """Bildirim kanalı ekler."""
+    def add_provider(self, provider: NotificationProvider) -> None:
+        """Sisteme yeni bir bildirim sağlayıcısı ekler."""
         self._router.add_provider(provider)
-        logger.info("Provider eklendi", name=provider.name(), min_severity=provider.min_severity())
+        logger.info("bildirim_saglayici_eklendi", name=provider.name(), min_severity=provider.min_severity())
 
     def get_providers(self) -> list[str]:
-        """Otomatik eklendi."""
+        """Tüm kayıtlı sağlayıcıların adlarını döndürür."""
         return self._router.get_all_providers()
 
     # ─── Alert Kontrolleri ────────────────────────────────────────────────────
 
     def check_health(self, health_report: dict[str, Any]) -> None:
-        """Sistem sağlığı değişikliğini kontrol eder ve gerekirse alert oluşturur."""
+        """Sistem sağlık durumu değişimlerini inceler ve gerektiğinde alarm üretir."""
         current_status = health_report.get("status", "UNKNOWN")
         if self._last_health_status and self._last_health_status != current_status:
             if current_status in ("DEGRADED", "UNHEALTHY"):
@@ -755,7 +777,7 @@ class AlertingSystem:
                     Alert(
                         alert_type=AlertType.HEALTH_CHANGE,
                         severity="CRITICAL" if current_status == "UNHEALTHY" else "WARNING",
-                        message=f"Health: {self._last_health_status} → {current_status}",
+                        message=f"Sistem Sağlığı: {self._last_health_status} -> {current_status}",
                         details={
                             "previous": self._last_health_status,
                             "current": current_status,
@@ -768,54 +790,51 @@ class AlertingSystem:
                     Alert(
                         alert_type=AlertType.HEALTH_CHANGE,
                         severity="INFO",
-                        message=f"Health düzeldi: {self._last_health_status} → HEALTHY",
+                        message=f"Sistem Sağlığı Düzeldi: {self._last_health_status} -> HEALTHY",
                         details={"previous": self._last_health_status},
                     )
                 )
         self._last_health_status = current_status
 
     def check_invariant(self, invariant_ok: bool, details: dict[str, Any] | None = None) -> None:
-        """Portföy invariant ihlalini kontrol eder."""
+        """Portföy veya sistem değişmezlik (invariant) ihlalini denetler."""
         if not invariant_ok:
             self._invariant_failure_count += 1
             self._add_alert(
                 Alert(
                     alert_type=AlertType.INVARIANT_FAILURE,
                     severity="CRITICAL",
-                    message=f"Portföy invariant ihlali! (toplam: {self._invariant_failure_count})",
+                    message=f"Portföy değişmezlik ihlali! (toplam: {self._invariant_failure_count})",
                     details=details or {},
                 )
             )
 
     def check_negative_cash(self, cash: float) -> None:
-        """Negatif nakit durumunu kontrol eder."""
+        """Portföy nakit bakiyesinin eksiye düşüp düşmediğini kontrol eder."""
         if cash < 0:
             self._add_alert(
                 Alert(
                     alert_type=AlertType.CASH_NEGATIVE,
                     severity="CRITICAL",
-                    message=f"Negatif nakit: {cash:.2f}",
+                    message=f"Negatif nakit tespit edildi: {cash:.2f} TL",
                     details={"cash": cash},
                 )
             )
 
     def check_drawdown(self, drawdown_pct: float, threshold_pct: float = 15.0) -> None:
-        """Drawdown eşiğini kontrol eder."""
+        """Portföy değer kaybının (drawdown) kritik eşiği aşıp aşmadığını kontrol eder."""
         if drawdown_pct > threshold_pct:
             self._add_alert(
                 Alert(
                     alert_type=AlertType.DRAWDOWN_BREACH,
                     severity="CRITICAL",
-                    message=f"Drawdown %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
+                    message=f"Drawdown ihlali: %{drawdown_pct:.1f} > eşik %{threshold_pct:.1f}",
                     details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
                 )
             )
 
     def check_lock_metrics(self, lock_metrics: dict[str, Any]) -> None:
-        """Lock metriklerini kontrol eder; deadlock veya timeout artışında alert oluşturur.
-
-        Not: parametre adı `lm` kullanıldı — `metrics` OTel modülü ile çakışma önlenir.
-        """
+        """Veritabanı ve dağıtık kilit metriklerini kontrol eder (deadlock veya aşırı zaman aşımı)."""
         for key, lm in lock_metrics.items():
             dc: int = lm.get("total_deadlocks_detected", 0)
             tc: int = lm.get("total_timeouts", 0)
@@ -824,7 +843,7 @@ class AlertingSystem:
                     Alert(
                         alert_type=AlertType.LOCK_DEADLOCK,
                         severity="WARNING",
-                        message=f"Lock deadlock: {key}",
+                        message=f"Kilit kilitlenmesi (Deadlock) tespit edildi: {key}",
                         details={"lock_key": key, "total": dc},
                     )
                 )
@@ -834,7 +853,7 @@ class AlertingSystem:
                     Alert(
                         alert_type=AlertType.LOCK_TIMEOUT_SPIKE,
                         severity="WARNING",
-                        message=f"Lock timeout artışı: {key} (toplam: {tc})",
+                        message=f"Kilit zaman aşımı artışı: {key} (toplam: {tc})",
                         details={"lock_key": key, "total": tc},
                     )
                 )
@@ -843,25 +862,25 @@ class AlertingSystem:
     # ─── Alert İşlemleri ──────────────────────────────────────────────────────
 
     def acknowledge_alert(self, fingerprint: str) -> bool:
-        """Alert'i onayla — escalation durur."""
+        """Parmak izi eşleşen aktif alarmı onaylar."""
         for a in self._alerts:
             if a.fingerprint == fingerprint and a.is_active:
                 a.acknowledge()
-                logger.info("Alert onaylandı", fingerprint=fingerprint)
+                logger.info("alarm_onaylandi", fingerprint=fingerprint)
                 return True
         return False
 
     def resolve_alert(self, fingerprint: str) -> bool:
-        """Alert'i çöz."""
+        """Parmak izi eşleşen aktif alarmı çözüldü olarak işaretler."""
         for a in self._alerts:
             if a.fingerprint == fingerprint and a.is_active:
                 a.resolve()
-                logger.info("Alert çözüldü", fingerprint=fingerprint)
+                logger.info("alarm_cozuldu", fingerprint=fingerprint)
                 return True
         return False
 
     def resolve_alerts(self, alert_type: str) -> None:
-        """Verilen tipteki tüm aktif alert'leri çöz."""
+        """Belirtilen tipteki tüm aktif alarmları toplu olarak çözer."""
         for a in self._alerts:
             if a.alert_type == alert_type and a.is_active:
                 a.resolve()
@@ -869,15 +888,15 @@ class AlertingSystem:
     # ─── Sorgular ─────────────────────────────────────────────────────────────
 
     def get_active_alerts(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Mevcut tüm aktif alarmları döner."""
         return [a.to_dict() for a in self._alerts if a.is_active]
 
     def get_all_alerts(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Sistemdeki son alarmları sözlük listesi olarak döner."""
         return [a.to_dict() for a in list(self._alerts)[-limit:]]
 
     def get_alert_summary(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Sistem alarmlarının istatistiksel özetini döner."""
         active = [a for a in self._alerts if a.is_active]
         by_severity: dict[str, int] = {}
         by_status: dict[str, int] = {}
@@ -894,11 +913,11 @@ class AlertingSystem:
         }
 
     def get_notification_log(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Son bildirim denemelerinin geçmiş logunu döner."""
         return [r.to_dict() for r in list(self._notification_log)[-limit:]]
 
     def get_failed_notifications(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Başarısız olan bildirim denemelerini listeler."""
         return [r.to_dict() for r in self._failed_notifications]
 
     # ─── Silence Yönetimi ─────────────────────────────────────────────────────
@@ -907,11 +926,11 @@ class AlertingSystem:
         self,
         alert_type: str | None = None,
         fingerprint: str | None = None,
-        duration_s: float = 3600,
+        duration_s: float = 3600.0,
         reason: str = "",
         created_by: str = "system",
     ) -> dict[str, Any]:
-        """Alert susturma kuralı ekler (DB persist ile)."""
+        """Yeni bir susturma kuralı ekler."""
         rule = self._policy.add_silence(
             alert_type=alert_type,
             fingerprint=fingerprint,
@@ -928,36 +947,24 @@ class AlertingSystem:
         alert_type: str | None = None,
         actor: str = "api",
     ) -> int:
-        """Otomatik eklendi."""
+        """Susturma kuralını kaldırır."""
         return self._policy.remove_silence(fingerprint=fingerprint, alert_type=alert_type, actor=actor, db=self._db)
 
     def get_active_silences(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Mevcut aktif susturma kurallarını listeler."""
         return self._policy.get_active_silences()
 
-    def save_silences(self) -> None:
-        """Otomatik eklendi."""
-        self._policy.save_silences()
-
-    def load_silences(self) -> None:
-        """Otomatik eklendi."""
-        if self._db:
-            self._policy.load_silences_from_db(self._db)
-        else:
-            self._policy.load_silences()
-
-    def get_policy_info(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
-        return self._policy.to_dict()
-
     def reload_policy(self) -> bool:
-        """Otomatik eklendi."""
+        """Politika dosyasını yeniden yükler."""
         return self._policy.reload_if_changed()
 
     def update_policy(
-        self, new_config: dict[str, Any], actor: str = "api", expected_version: int = 0
+        self,
+        new_config: dict[str, Any],
+        actor: str = "api",
+        expected_version: int = 0,
     ) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Alarm politikasını günceller."""
         try:
             return self._policy.update(new_config, actor, expected_version)
         except VersionConflictError as exc:
@@ -969,37 +976,45 @@ class AlertingSystem:
             }
 
     def rollback_policy(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Alarm politikasını önceki bir versiyona geri döndürür."""
         return self._policy.rollback(target_version, actor)
 
     def get_policy_history(self) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Politika geçmişini döner."""
         return self._policy.get_history()
 
     def get_policy_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Politika denetim logunu döner."""
         return self._policy.get_audit_log(limit)
 
-    def batch_add_silences(self, rules: list[dict[str, Any]], created_by: str = "system") -> list[dict[str, Any]]:
-        """Otomatik eklendi."""
+    def batch_add_silences(
+        self,
+        rules: list[dict[str, Any]],
+        created_by: str = "system",
+    ) -> list[dict[str, Any]]:
+        """Toplu susturma kuralları ekler."""
         return self._policy.batch_add_silences(rules, created_by, self._db)
 
-    def batch_remove_silences(self, filters: list[dict[str, str]], actor: str = "api") -> dict[str, int]:
-        """Otomatik eklendi."""
+    def batch_remove_silences(
+        self,
+        filters: list[dict[str, str]],
+        actor: str = "api",
+    ) -> dict[str, int]:
+        """Toplu susturma kurallarını kaldırır."""
         return self._policy.batch_remove_silences(filters, actor, self._db)
 
     def compute_policy_diff(self, new_config: dict[str, Any]) -> Any:
-        """Otomatik eklendi."""
+        """Politika farkını hesaplar."""
         return self._policy.compute_diff(new_config)
 
     def set_policy_webhook(self, urls: list[str]) -> None:
-        """Otomatik eklendi."""
+        """Politika değişiklik webhook URL'lerini tanımlar."""
         self._policy.set_webhook_urls(urls)
 
-    # ─── DB Kalıcılığı ────────────────────────────────────────────────────────
+    # ─── DB Kalıcılığı (DuckDB Uyumlu) ───────────────────────────────────────
 
     async def init_db(self) -> None:
-        """Alert tablosunu oluşturur (DuckDB)."""
+        """Alarm durum tablosunu veritabanında (DuckDB) hazırlar."""
         if not self._db:
             return
         try:
@@ -1019,17 +1034,20 @@ class AlertingSystem:
                 "notification_status TEXT DEFAULT 'pending', "
                 "updated_at REAL)"
             )
-            self._db.commit()
+            if hasattr(self._db, "commit"):
+                self._db.commit()
         except Exception as exc:
-            logger.warning("Alert DB init başarısız", error=str(exc))
+            logger.warning("alarm_veritabani_tablo_olusturma_hatasi", error=str(exc))
 
     async def persist_alert(self, alert: Alert) -> None:
-        """Alert'i DuckDB'ye kaydeder."""
+        """Alarmı DuckDB'ye kaydeder (varsa günceller)."""
         if not self._db:
             return
         try:
+            # Standart DuckDB upsert / replace
+            self._db.execute("DELETE FROM alerts_state WHERE fingerprint = ?", (alert.fingerprint,))
             self._db.execute(
-                "INSERT OR REPLACE INTO alerts_state "
+                "INSERT INTO alerts_state "
                 "(fingerprint, alert_type, severity, status, message, details, "
                 "timestamp, acknowledged_at, escalated_at, resolved_at, "
                 "escalation_count, notification_status, updated_at) "
@@ -1038,7 +1056,7 @@ class AlertingSystem:
                     alert.fingerprint,
                     str(alert.alert_type),
                     str(alert.severity),
-                    alert.status.value if hasattr(alert.status, "value") else str(alert.status),
+                    str(alert.status),
                     alert.message,
                     orjson.dumps(alert.details).decode(),
                     alert.timestamp,
@@ -1050,46 +1068,62 @@ class AlertingSystem:
                     time.time(),
                 ),
             )
-            # SSD write reduction: commit deferred, periodic flush handles it
-            # self._db.commit()
         except Exception as exc:
-            logger.warning("Alert persist başarısız", error=str(exc))
+            logger.warning("alarm_veritabani_kayit_hatasi", error=str(exc))
 
     async def load_from_db(self) -> None:
-        """DB'den aktif alert'leri yükler (restart recovery)."""
+        """Sistem yeniden başladığında açık alarmları DuckDB'den kurtarır."""
         if not self._db:
             return
         try:
             rows = self._db.execute(
-                "SELECT * FROM alerts_state WHERE status IN (?, ?, ?)",
+                "SELECT fingerprint, alert_type, severity, status, message, details, "
+                "timestamp, acknowledged_at, escalated_at, resolved_at, "
+                "escalation_count, notification_status FROM alerts_state "
+                "WHERE status IN (?, ?, ?)",
                 ("CREATED", "ACKNOWLEDGED", "ESCALATED"),
             ).fetchall()
             for row in rows:
+                if isinstance(row, dict):
+                    fp = row["fingerprint"]
+                    at = row["alert_type"]
+                    sev = row["severity"]
+                    st = row["status"]
+                    msg = row.get("message") or ""
+                    dt = orjson.loads(row["details"]) if row.get("details") else {}
+                    ts = row["timestamp"]
+                    ack_at = row.get("acknowledged_at")
+                    esc_at = row.get("escalated_at")
+                    res_at = row.get("resolved_at")
+                    esc_cnt = row.get("escalation_count", 0)
+                    notif_st = row.get("notification_status", "pending")
+                else:
+                    fp, at, sev, st, msg, dt_str, ts, ack_at, esc_at, res_at, esc_cnt, notif_st = row
+                    dt = orjson.loads(dt_str) if dt_str else {}
+
                 alert = Alert(
-                    alert_type=row["alert_type"],
-                    severity=row["severity"],
-                    message=row["message"],
-                    details=orjson.loads(row["details"]) if row["details"] else {},
-                    timestamp=row["timestamp"],
-                    fingerprint=row["fingerprint"],
-                    status=row["status"],
-                    acknowledged_at=row["acknowledged_at"],
-                    escalated_at=row["escalated_at"],
-                    resolved_at=row["resolved_at"],
-                    escalation_count=row["escalation_count"],
-                    notification_status=row["notification_status"],
+                    alert_type=at,
+                    severity=sev,
+                    message=msg,
+                    details=dt,
+                    timestamp=ts,
+                    fingerprint=fp,
+                    status=st,
+                    acknowledged_at=ack_at,
+                    escalated_at=esc_at,
+                    resolved_at=res_at,
+                    escalation_count=esc_cnt,
+                    notification_status=notif_st,
                 )
                 self._alerts.append(alert)
-                if len(self._alerts) > 500:
-                    self._alerts = list(self._alerts)[-500:]
-            logger.info("Alert'ler DB'den yüklendi", count=len(rows))
+            logger.info("alarmlar_veritabanindan_kurtarildi", adet=len(rows))
         except Exception as exc:
-            logger.warning("Alert DB yükleme başarısız", error=str(exc))
+            logger.warning("alarm_veritabanindan_yukleme_hatasi", error=str(exc))
 
     # ─── İç Metotlar ──────────────────────────────────────────────────────────
 
     def _add_alert(self, alert: Alert) -> None:
-        """Alert oluşturur, deduplicate eder, policy kontrolü yapar, bildirir."""
+        """Alarm oluşturur, deduplication uygular, politikayı kontrol eder ve dağıtır."""
         with tracer.start_as_current_span("alerting.add_alert") as span:
             span.set_attribute("alert.type", alert.alert_type)
             span.set_attribute("alert.severity", alert.severity)
@@ -1100,11 +1134,10 @@ class AlertingSystem:
 
             if self._policy.is_silenced(alert.alert_type, alert.fingerprint):
                 alert.notification_status = "silenced"
-                logger.debug("Alert susturuldu", fp=alert.fingerprint, type=alert.alert_type)
+                logger.debug("alarm_susturuldu", fp=alert.fingerprint, type=alert.alert_type)
                 return
 
             self._alerts.append(alert)
-            self._trim_alerts()
             self._dedup_cache[alert.fingerprint] = time.time()
 
             _alert_created_counter.add(
@@ -1115,10 +1148,11 @@ class AlertingSystem:
                 },
             )
             logger.warning(
-                "Alert oluşturuldu",
+                "yeni_alarm_olusturuldu",
                 type=alert.alert_type,
                 severity=alert.severity,
                 fp=alert.fingerprint,
+                mesaj=alert.message,
             )
 
             self._policy.reload_if_changed()
@@ -1130,21 +1164,15 @@ class AlertingSystem:
                 if channels and self._router.get_all_providers():
                     loop.create_task(self._notify_all(alert))
             except RuntimeError:
-                # Event loop dışında çağrıldıysa bildirim atlanır
-                logger.warning("Alert bildirim gönderilemedi — event loop aktif değil")
+                logger.warning("alarm_bildirim_gonderilemedi_event_loop_yok")
 
     def _is_duplicate(self, alert: Alert) -> bool:
-        """Aynı fingerprint son dedup_window_s içinde oluştuysa True döner."""
+        """Aynı parmak izine sahip alarmın dedup_window_s süresi içinde gelip gelmediğini kontrol eder."""
         fp = alert.fingerprint
         return fp in self._dedup_cache and time.time() - self._dedup_cache[fp] < self._dedup_window_s
 
-    def _trim_alerts(self) -> None:
-        """Maksimum alert sayısını aşarsa eskilerini siler."""
-        if len(self._alerts) > self._max_alerts:
-            self._alerts = list(self._alerts)[-self._max_alerts :]
-
     async def _notify_all(self, alert: Alert) -> None:
-        """Alert için tüm uygun provider'lara paralel bildirim gönderir."""
+        """Alarmı uygun tüm bildirim kanallarına eşzamanlı iletir."""
         with tracer.start_as_current_span("alerting.notify_all") as span:
             span.set_attribute("alert.fingerprint", alert.fingerprint)
             span.set_attribute("alert.severity", alert.severity)
@@ -1153,12 +1181,8 @@ class AlertingSystem:
             for provider in providers:
                 result = await self._send_with_retry(provider, alert)
                 self._notification_log.append(result)
-                if len(self._notification_log) > 1000:
-                    self._notification_log = list(self._notification_log)[-1000:]
                 if not result.success:
                     self._failed_notifications.append(result)
-                    if len(self._failed_notifications) > 500:
-                        self._failed_notifications = list(self._failed_notifications)[-500:]
                     alert.notification_status = "failed"
                     _notification_failed_counter.add(1, {"provider": provider.name()})
                 else:
@@ -1167,8 +1191,8 @@ class AlertingSystem:
 
             await self.persist_alert(alert)
 
-    async def _send_with_retry(self, provider: Any, alert: Alert) -> NotificationResult:
-        """Provider'a Exponential Backoff + Jitter ile yeniden dene."""
+    async def _send_with_retry(self, provider: NotificationProvider, alert: Alert) -> NotificationResult:
+        """Belirtilen sağlayıcıya exponential backoff + jitter ile yeniden dener."""
         result = NotificationResult(provider.name(), alert.fingerprint)
         for attempt in range(self._retry_config.max_retries):
             result.attempts += 1
@@ -1176,7 +1200,7 @@ class AlertingSystem:
                 if await provider.send(alert):
                     result.success = True
                     return result
-                result.last_error = "Provider False döndürdü"
+                result.last_error = "Sağlayıcı False yanıtı döndürdü"
             except Exception as exc:
                 result.last_error = str(exc)
 
@@ -1185,7 +1209,6 @@ class AlertingSystem:
                     self._retry_config.base_delay_s * (self._retry_config.backoff_factor**attempt),
                     self._retry_config.max_delay_s,
                 )
-                # Jitter: herd effect önleme
                 delay = base_delay + random.uniform(0, base_delay * 0.2)
                 _notification_retry_counter.add(1, {"provider": provider.name()})
                 await asyncio.sleep(delay)
@@ -1195,3 +1218,22 @@ class AlertingSystem:
 
 # ─── Singleton ────────────────────────────────────────────────────────────────
 alerting = AlertingSystem()
+
+__all__ = [
+    "Alert",
+    "AlertSeverity",
+    "AlertStatus",
+    "AlertType",
+    "AlertingSystem",
+    "DiscordProvider",
+    "EmailProvider",
+    "LogProvider",
+    "NotificationProvider",
+    "NotificationResult",
+    "NotificationRouter",
+    "PagerDutyProvider",
+    "RetryConfig",
+    "SlackProvider",
+    "WebhookProvider",
+    "alerting",
+]
