@@ -18,11 +18,14 @@ BIST Pay Piyasası Fiyat Adımı Kademeleri:
 from __future__ import annotations
 
 import math
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import structlog
 
 from services.core.otel import otel_trace
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = structlog.get_logger(__name__)
 
@@ -232,12 +235,72 @@ def get_bist_tick_count_between(
 
     count = 0
     curr = low
-    while curr < high:
-        tick = get_bist_tick_size(curr, instrument_type)
+    max_steps = 500_000  # Sonsuz döngü koruma limiti
+
+    while curr < high and count < max_steps:
+        tick = max(0.0001, get_bist_tick_size(curr, instrument_type))
         curr = round(curr + tick, 4 if tick < 0.01 else 2)
         count += 1
 
     return count * direction
+
+
+@otel_trace("bist_tick_size.calculate_bist_price_limits")
+def calculate_bist_price_limits(
+    base_price: float,
+    limit_ratio: float = 0.10,
+    instrument_type: str = DEFAULT_INSTRUMENT_TYPE,
+) -> tuple[float, float]:
+    """BIST resmî fiyat marjı (±%10 limit bandı) doğrultusunda geçerli taban ve tavan fiyatlarını hesaplar.
+
+    Tavan fiyat bütçeyi/marjı aşmamak için 'FLOOR' (aşağı) adımına,
+    Taban fiyat ise izin verilen marjın altına inmemek için 'CEIL' (yukarı) adımına yuvarlanır.
+
+    Args:
+        base_price: Baz fiyat / Önceki kapanış fiyatı (TL).
+        limit_ratio: Fiyat marj oranı (Varsayılan %10 = 0.10).
+        instrument_type: Enstrüman kategorisi.
+
+    Returns:
+        tuple[float, float]: (taban_fiyat, tavan_fiyat) ikilisi.
+    """
+    if math.isnan(base_price) or math.isinf(base_price) or base_price <= 0.0:
+        return (0.0, 0.0)
+
+    safe_ratio = max(0.01, min(1.0, limit_ratio))
+
+    raw_lower = base_price * (1.0 - safe_ratio)
+    raw_upper = base_price * (1.0 + safe_ratio)
+
+    # Taban fiyat tabanın altına inemez -> CEIL
+    floor_price = round_to_bist_tick(raw_lower, instrument_type=instrument_type, mode="CEIL")
+    # Tavan fiyat tavanı aşamaz -> FLOOR
+    ceiling_price = round_to_bist_tick(raw_upper, instrument_type=instrument_type, mode="FLOOR")
+
+    # Taban fiyat en az minimum adım kadar olmalıdır
+    min_tick = get_bist_tick_size(0.01, instrument_type=instrument_type)
+    floor_price = max(min_tick, floor_price)
+    ceiling_price = max(floor_price, ceiling_price)
+
+    return (floor_price, ceiling_price)
+
+
+def round_prices_to_bist_ticks(
+    prices: Sequence[float],
+    instrument_type: str = DEFAULT_INSTRUMENT_TYPE,
+    mode: str = "NEAREST",
+) -> list[float]:
+    """Toplu fiyat dizisini BIST fiyat adımlarına hızlıca yuvarlar (Batch Helper).
+
+    Args:
+        prices: Fiyat listesi veya sayı dizisi.
+        instrument_type: Enstrüman kategorisi.
+        mode: Yuvarlama modu.
+
+    Returns:
+        list[float]: Yuvarlanmış fiyatlar listesi.
+    """
+    return [round_to_bist_tick(p, instrument_type=instrument_type, mode=mode) for p in prices]
 
 
 __all__ = [
@@ -246,8 +309,11 @@ __all__ = [
     "SPECIAL_TICK_SIZES",
     "VALID_ROUNDING_MODES",
     "add_bist_ticks",
+    "calculate_bist_price_limits",
     "get_bist_tick_count_between",
     "get_bist_tick_size",
     "is_valid_bist_tick",
+    "round_prices_to_bist_ticks",
     "round_to_bist_tick",
 ]
+

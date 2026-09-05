@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 90 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 92 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -32,7 +32,7 @@
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
-| 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 11 | `bist_tick_size.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 13 | `circuit_breaker_metrics.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
@@ -194,6 +194,8 @@
 | 4 | 2 & 3 | `instrument_type` küçük harfe normalize edilmiyordu (`"WARRANT"` gibi girdiler özel tabloyu ıskalayıp standart stock adımı alıyordu) | `instrument_type.lower().strip()` normalizasyonu sağlandı; `SPECIAL_TICK_SIZES` içine ETF/BYF (0.01 TL) desteği eklendi |
 | 5 | 6 | BIST kademe sınırlarını (ör. 19.99 TL -> 20.00 TL) dinamik atlayarak adım ekleme/çıkarma ve iki fiyat arasındaki kademe farkını hesaplama fonksiyonları eksikti | `add_bist_ticks(price, ticks)` ve `get_bist_tick_count_between(price_from, price_to)` fonksiyonları eklenerek piyasa yapıcı ve emir iletim algoritmalarına kazandırıldı |
 | 6 | 4 & 7 | Fonksiyon docstring'leri eksik ve tek satırdı; yerel tracer yerine merkezi `services.core.otel` entegrasyonu yoktu; `__all__` listesi tanımlanmamıştı | Merkezi `@otel_trace` bağlandı, standart Türkçe docstring'ler yazıldı ve modül sabitleri dahil eksiksiz `__all__` listesi eklendi |
+| 7 | 2 & 3 | `get_bist_tick_count_between` içinde `while curr < high` döngüsünde adımın sıfıra yaklaşması halinde sonsuz döngüye girme (infinite loop / thread lock) riski vardı | `max_steps = 500_000` güvenlik sayacı ve `max(0.0001, tick)` alt sınırı getirilerek döngü güvenliği sağlandı |
+| 8 | 3 & 6 | BIST resmî günlük fiyat marjı (±%10 limit bandı) hesaplamaları için tavan (FLOOR) ve taban (CEIL) yönlü kurumsal hesaplayıcı ve toplu liste yuvarlama fonksiyonu eksikti | `calculate_bist_price_limits` ve `round_prices_to_bist_ticks` yardımcı fonksiyonları eklenerek piyasa yapıcı ve risk motorlarına kazandırıldı |
 
 ---
 
