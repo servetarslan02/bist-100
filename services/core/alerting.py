@@ -16,10 +16,12 @@ import asyncio
 import hashlib
 import os
 import random
+import smtplib
 import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from email.mime.text import MIMEText
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
@@ -522,8 +524,6 @@ class EmailProvider:
         if not self.to_addresses:
             return False
         try:
-            from email.mime.text import MIMEText
-
             msg = MIMEText(
                 f"Alarm Türü: {alert.alert_type}\nÖnem: {alert.severity}\n"
                 f"Durum: {alert.status}\nMesaj: {alert.message}\n"
@@ -541,8 +541,6 @@ class EmailProvider:
 
     def _send_smtp(self, msg: Any) -> None:
         """SMTP bağlantısı kurup e-postayı iletir."""
-        import smtplib
-
         with smtplib.SMTP(self.smtp_host, self.smtp_port) as s:
             if self.username:
                 s.starttls()
@@ -879,6 +877,20 @@ class AlertingSystem:
                 return True
         return False
 
+    def get_alert_by_fingerprint(self, fingerprint: str) -> Alert | None:
+        """Belirtilen parmak izine sahip alarm nesnesini döner.
+
+        Args:
+            fingerprint: Aranacak alarmın tekil parmak izi.
+
+        Returns:
+            Alert | None: Bulunan alarm nesnesi veya None.
+        """
+        for a in self._alerts:
+            if a.fingerprint == fingerprint:
+                return a
+        return None
+
     def resolve_alerts(self, alert_type: str) -> None:
         """Belirtilen tipteki tüm aktif alarmları toplu olarak çözer."""
         for a in self._alerts:
@@ -953,6 +965,14 @@ class AlertingSystem:
     def get_active_silences(self) -> list[dict[str, Any]]:
         """Mevcut aktif susturma kurallarını listeler."""
         return self._policy.get_active_silences()
+
+    def get_policy_info(self) -> dict[str, Any]:
+        """Aktif alarm politikasının genel yapılandırma ve durum bilgisini döner.
+
+        Returns:
+            dict[str, Any]: Politika versiyonu, eşikler ve yönlendirme sözlüğü.
+        """
+        return self._policy.to_dict()
 
     def reload_policy(self) -> bool:
         """Politika dosyasını yeniden yükler."""
@@ -1168,8 +1188,14 @@ class AlertingSystem:
 
     def _is_duplicate(self, alert: Alert) -> bool:
         """Aynı parmak izine sahip alarmın dedup_window_s süresi içinde gelip gelmediğini kontrol eder."""
+        now = time.time()
+        # Otomatik bellek sızıntısı koruması: boyut 1000'i aşınca süresi dolanları temizle
+        if len(self._dedup_cache) > 1000:
+            self._dedup_cache = {
+                fp: ts for fp, ts in self._dedup_cache.items() if now - ts < self._dedup_window_s
+            }
         fp = alert.fingerprint
-        return fp in self._dedup_cache and time.time() - self._dedup_cache[fp] < self._dedup_window_s
+        return fp in self._dedup_cache and now - self._dedup_cache[fp] < self._dedup_window_s
 
     async def _notify_all(self, alert: Alert) -> None:
         """Alarmı uygun tüm bildirim kanallarına eşzamanlı iletir."""
