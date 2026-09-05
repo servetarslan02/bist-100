@@ -93,10 +93,12 @@ from .distributed_tracing import (
     DistributedTracer,
     Span,
     Trace,
+    TraceSpan,
     correlation_id_var,
     distributed_tracer,
     span_id_var,
     trace,
+    trace_async,
 )
 from .fee_calculator import FeeCalculator, fee_calculator
 from .gross_settlement import GrossSettlementMonitor, gross_settlement_monitor
@@ -215,10 +217,12 @@ __all__ = [
     "DistributedTracer",
     "Span",
     "Trace",
+    "TraceSpan",
     "distributed_tracer",
     "correlation_id_var",
     "span_id_var",
     "trace",
+    "trace_async",
     # Finansal Hesaplamalar (Komisyon, Vergi, Takas)
     "FeeCalculator",
     "fee_calculator",

@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 18 dosya denetlendi, 170 sorun düzeltildi. Bekleyen dosya: 86
+**Denetim Sonucu:** 19 dosya denetlendi, 179 sorun düzeltildi. Bekleyen dosya: 85
 
 ---
 
@@ -40,6 +40,7 @@
 | 16 | `config_hot_reload.py` | 9 | ✅ Denetlendi, düzeltildi |
 | 17 | `dead_letter_queue.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 18 | `decision_engine.py` | 9 | ✅ Denetlendi, düzeltildi |
+| 19 | `distributed_tracing.py` | 9 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -339,6 +340,22 @@
 | 7 | 5 & Standart | Üretilen kritik alım/satım kararları kalıcı olarak saklanmıyordu | DuckDB `decision_audit_log` tablosu, `orjson` kullanımı ve sıfır kopyalı Polars ihracı (`export_decisions_to_polars`) entegre edildi |
 | 8 | 4 | `DecisionInput`, `Decision` ve `DecisionEngine` sınıflarında `__repr__` ve `to_dict()` metotları yoktu | Açıklayıcı ve okunabilir `__repr__` ve `to_dict()` metotları eklendi |
 | 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı ve `services.core.__init__.py`'de dışa aktarılmıyordu | 9 sembollük eksiksiz `__all__` listesi eklendi ve `__init__.py`'ye 5 ana sembol bağlandı |
+
+---
+
+## `distributed_tracing.py` (19. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | 5 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Temizlendi; mimari izleme ilkelerini ve kullanım örneklerini açıklayan detaylı Türkçe docstring'ler yazıldı |
+| 2 | 1 & 3 | `class Trace` içi boş `pass` içeren bir placeholder sınıfıydı | Çoklu span yönetimi, toplam süre hesabı, hata analitiği, `to_dict()` ve `__repr__` metotları ile zenginleştirildi |
+| 3 | 1 & 3 | OpenTelemetry kurulu veya aktif olmadığında span'ler `yield None` yapıp tüm trace context'ini yutuyordu | `TraceSpan` yerel modeli geliştirildi; `set_attribute`, `record_exception`, `set_status` ve `finish` ile tam OTel arayüz uyumluluğu sağlandı |
+| 4 | 2 | Context variable token'ları (`correlation_id_var`, `span_id_var`) işlem bitiminde sıfırlanmıyor ve bağlam sızıntısı (context leak) riski taşıyordu | `set()` çağrılarından dönen token'lar `finally` bloğunda `reset(token)` yapılarak bağlam güvenliği garanti altına alındı |
+| 5 | 2 | `DistributedTracer` sınıfında yerel arabellek ve durum operasyonlarında eşzamanlı erişim koruması (thread-safety) yoktu | `self._lock = threading.RLock()` ile reentrant kilit koruması sağlandı |
+| 6 | 5 & Standart | Dağıtık trace kayıtları için Polars DataFrame analitik ihracı yoktu | Sıfır kopyalı `export_spans_to_polars()` fonksiyonu eklendi |
+| 7 | 5 & Standart | Trace kayıtlarının kalıcı analitiği için DuckDB entegrasyonu yoktu | `export_spans_to_duckdb()` fonksiyonu eklenerek DuckDB `trace_spans` tablosuna aktarım sağlandı |
+| 8 | 4 | `TraceSpan`, `Trace` ve `DistributedTracer` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
+| 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı ve `trace_async` ile `TraceSpan` dışa aktarılmıyordu | 9 sembollük eksiksiz `__all__` listesi eklendi ve `services.core.__init__.py` güncellendi |
 
 ---
 
