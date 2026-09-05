@@ -1,29 +1,45 @@
-"""
-ALPHA BIST — Config Hot-Reload v2.0 (Enterprise-Grade)
+"""ALPHA BIST — Kurumsal Dinamik Konfigürasyon İzleme ve Hot-Reload Motoru.
 
-Kurumsal Standartlar:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. MİMARİ:    SRP — ConfigHotReload izler, SettingsBridge yapılandırır
-2. OPTİMİZASYON: hashlib tek satırda import (fonksiyon içi re-import yok)
-3. DAYANIKLILIK: CancelledError propagate, rollback on error korunur
-4. İZLENEBİLİRLİK: OTel span config change detect + apply noktasında
-5. GÜVENLİK:  Secret alan korunum, JSON whitelist
-6. KALİTE:    %100 type hint, Optional → X|None
+Bu modül, mikroservislerin ve çekirdek algoritmaların kesintisiz çalışabilmesi için
+çalışma zamanı (runtime) ayarlarını izler, doğrular ve güvenli şekilde günceller:
+
+1. SRP (Single Responsibility Principle):
+   - `ConfigHotReload`: Dosya seviyesinde değişiklikleri (mtime ve SHA-256 hash) izler,
+     doğrulayıcılardan (validators) geçirir ve kayıtlı callback'leri asenkron tetikler.
+   - `SettingsBridge`: Pydantic Settings modelinin değişmezlik (immutability) garantisini
+     koruyarak atomik referans takası (reference swap) ile ayarları günceller.
+2. Güvenlik ve Gizlilik (Zero Leakage / Secret Protection):
+   - Hassas alanlar (API Key, Veritabanı ve JWT parolaları) kesinlikle JSON dosyasından
+     yüklenemez; tespit edildiğinde doğrulayıcı tarafından işlem fail-closed reddedilir.
+3. Atomik Disk Yazma Güvenliği:
+   - Config dosyaları yazılırken geçici `.tmp.<uuid>` dosyası üzerinden atomik `os.replace`
+     kullanılarak sıfır-bayt bozulmaları (data corruption) engellenir.
+4. DuckDB & Polars Denetim İzi (Audit Trail):
+   - Gerçekleşen tüm konfigürasyon değişiklikleri kalıcı DuckDB günlüğüne kaydedilir
+     ve `export_history_to_polars()` ile sıfır kopyalı Polars DataFrame olarak sunulur.
+5. Eşzamanlılık ve Reentrancy Güvenliği:
+   - `threading.RLock()` ile callback listeleri, doğrulayıcılar ve durum geçmişi
+     eşzamanlı erişime karşı tam koruma altındadır.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import os
+import threading
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
+import duckdb
 import orjson
+import polars as pl
 import structlog
 from opentelemetry import trace
 
@@ -33,10 +49,26 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.config-hot-reload")
 
+# Varsayılan Yapılandırma Sabitleri
+DEFAULT_WATCH_INTERVAL_SECONDS: Final[float] = 30.0  # SSD koruma limiti (30s)
+DEFAULT_MAX_HISTORY_LEN: Final[int] = 100
+DEFAULT_CONFIG_DB_PATH: Final[str] = "data/config_audit.duckdb"
 
-@dataclass
+
+@dataclass(slots=True)
 class ConfigChange:
-    """Config değişiklik kaydı."""
+    """Konfigürasyon değişiklik kaydı veri modeli.
+
+    Attributes:
+        change_id: Değişikliğin benzersiz özeti/kimliği.
+        timestamp: Değişikliğin gerçekleştiği UTC zaman damgası.
+        file_path: İzlenen konfigürasyon dosyasının yolu.
+        old_hash: Önceki içerik SHA-256 hash özeti.
+        new_hash: Yeni içerik SHA-256 hash özeti.
+        changed_keys: Değişen konfigürasyon anahtarlarının listesi.
+        applied: Değişikliğin başarıyla uygulanıp uygulanmadığı.
+        error: Varsa oluşan doğrulama veya uygulama hatası mesajı.
+    """
 
     change_id: str
     timestamp: datetime
@@ -48,7 +80,7 @@ class ConfigChange:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Serileştirme ve JSON aktarımı için sözlük temsili üretir."""
         return {
             "change_id": self.change_id,
             "timestamp": self.timestamp.isoformat(),
@@ -60,80 +92,142 @@ class ConfigChange:
             "error": self.error,
         }
 
+    def __repr__(self) -> str:
+        """Okunabilir nesne hata ayıklama temsili."""
+        return (
+            f"ConfigChange(id={self.change_id!r}, applied={self.applied}, "
+            f"keys={self.changed_keys!r}, error={self.error!r})"
+        )
+
 
 class ConfigHotReload:
-    """
-    Config hot-reload yöneticisi.
+    """Çalışma zamanı konfigürasyon dosyası izleyicisi ve tetikleyicisi.
 
-    Config dosyasını izler, değişiklik algılar,
-    callback'leri tetikler ve güvenli şekilde uygular.
-
-    Kullanım:
-        reloader = ConfigHotReload("/path/to/config.json")
-        reloader.on_change(my_callback)
-        await reloader.start()
+    Belirtilen konfigürasyon dosyasının disk üzerindeki değişimini SHA-256
+    kontrolü ile izler; doğrulayıcılardan başarıyla geçen güncellemeleri
+    kayıtlı dinleyicilere asenkron olarak iletir.
     """
 
     def __init__(
         self,
         config_path: str,
-        watch_interval_seconds: float = 30.0,  # SSD write reduction: 5s → 30s
+        watch_interval_seconds: float = DEFAULT_WATCH_INTERVAL_SECONDS,
         auto_apply: bool = True,
         validate_before_apply: bool = True,
-    ):
-        """Otomatik eklendi."""
+        db_path: str = DEFAULT_CONFIG_DB_PATH,
+    ) -> None:
+        """ConfigHotReload izleyicisini başlatır.
+
+        Args:
+            config_path: İzlenecek konfigürasyon JSON dosyasının yolu.
+            watch_interval_seconds: Dosya tarama sıklığı (saniye).
+            auto_apply: Değişikliklerin doğrulanınca otomatik uygulanıp uygulanmayacağı.
+            validate_before_apply: Uygulama öncesinde doğrulayıcıların çalıştırılması.
+            db_path: Değişiklik geçmişinin saklanacağı DuckDB veritabanı yolu.
+        """
         self._config_path = Path(config_path)
-        self._watch_interval = watch_interval_seconds
+        self._watch_interval = max(1.0, float(watch_interval_seconds))
         self._auto_apply = auto_apply
         self._validate_before_apply = validate_before_apply
+        self._db_path = db_path
 
-        self._callbacks: list[Callable] = []
-        self._validators: list[Callable] = []
-        self._last_modified: float = 0
+        self._lock = threading.RLock()
+        self._callbacks: list[Callable[..., Any]] = []
+        self._validators: list[Callable[[dict[str, Any]], tuple[bool, str | None]]] = []
+        self._last_modified: float = 0.0
         self._last_hash: str = ""
         self._current_config: dict[str, Any] = {}
-        self._running = False
-        from collections import deque
-        self._change_history: deque = deque(maxlen=500)
-        self._max_history = 100
+        self._running: bool = False
+        self._change_history: deque[ConfigChange] = deque(maxlen=DEFAULT_MAX_HISTORY_LEN)
 
-    def on_change(self, callback: Callable) -> Any:
-        """
-        Değişiklik callback'i ekle.
+        self._conn: duckdb.DuckDBPyConnection | None = None
+        self._init_db()
+
+    def _init_db(self) -> None:
+        """Kalıcı DuckDB denetim tablosunu hazırlar."""
+        try:
+            db_file = Path(self._db_path)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            self._conn = duckdb.connect(str(db_file))
+            with self._lock:
+                self._conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS config_audit_log (
+                        id BIGINT PRIMARY KEY,
+                        timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                        change_id VARCHAR NOT NULL,
+                        file_path VARCHAR NOT NULL,
+                        old_hash VARCHAR NOT NULL,
+                        new_hash VARCHAR NOT NULL,
+                        changed_keys VARCHAR NOT NULL,
+                        applied BOOLEAN NOT NULL,
+                        error VARCHAR
+                    );
+                    CREATE SEQUENCE IF NOT EXISTS seq_config_audit_id START 1;
+                    """
+                )
+            logger.info("config_audit_store_hazirlandi", db_path=self._db_path)
+        except Exception as exc:
+            logger.error("config_db_baslatma_hatasi", error=str(exc), path=self._db_path)
+            self._conn = None
+
+    def close(self) -> None:
+        """DuckDB bağlantısını güvenle kapatır."""
+        with self._lock:
+            if self._conn is not None:
+                try:
+                    self._conn.close()
+                except Exception as exc:
+                    logger.debug("config_db_kapatma_hatasi", error=str(exc))
+                finally:
+                    self._conn = None
+
+    def on_change(self, callback: Callable[..., Any]) -> None:
+        """Yeni bir konfigürasyon değişiklik dinleyicisi (callback) ekler.
 
         Callback imzası: async def callback(old_config, new_config, changed_keys)
-        """
-        self._callbacks.append(callback)
-        if len(self._callbacks) > 100:
-            self._callbacks = self._callbacks[-100:]
+        veya senkron def callback(old_config, new_config, changed_keys)
 
-    def add_validator(self, validator: Callable) -> Any:
+        Args:
+            callback: Tetiklenecek fonksiyon.
         """
-        Validation callback ekle.
+        with self._lock:
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
-        Validator imzası: def validate(config) -> Tuple[bool, Optional[str]]
-        Returns: (is_valid, error_message)
+    def add_validator(
+        self,
+        validator: Callable[[dict[str, Any]], tuple[bool, str | None]],
+    ) -> None:
+        """Konfigürasyon doğrulama kuralı ekler.
+
+        Validator imzası: def validator(config) -> tuple[bool, str | None]
+
+        Args:
+            validator: Doğrulama fonksiyonu.
         """
-        self._validators.append(validator)
-        if len(self._validators) > 1000:
-            self._validators = self._validators[-1000:]
+        with self._lock:
+            if validator not in self._validators:
+                self._validators.append(validator)
 
     async def start(self) -> None:
-        """Config izlemeyi başlatır (async loop).
+        """Konfigürasyon izleme döngüsünü başlatır.
 
-        Not: Bu metodu direkt await ile kullanmak sürekli çalışır.
-        Arka planda çalıştırmak için:
-            task = asyncio.create_task(reloader.start())
+        Dosya diskte mevcut değilse boş bir JSON şablonu atomik olarak oluşturulur.
         """
         if not self._config_path.exists():
-            logger.warning("Config dosyası bulunamadı, boş oluşturuluyor", path=str(self._config_path))
-            self._config_path.parent.mkdir(parents=True, exist_ok=True)
-            self._config_path.write_text("{}")
+            logger.warning("config_dosyasi_bulunamadi_olusturuluyor", path=str(self._config_path))
+            self.save_config_safely({})
 
-        self._running = True
-        self._load_config()
+        with self._lock:
+            self._running = True
+            self._load_config()
 
-        logger.info("Config hot-reload başlatıldı", path=str(self._config_path), interval=self._watch_interval)
+        logger.info(
+            "config_hot_reload_baslatildi",
+            path=str(self._config_path),
+            interval=self._watch_interval,
+        )
 
         while self._running:
             try:
@@ -141,49 +235,83 @@ class ConfigHotReload:
             except asyncio.CancelledError:
                 break
             except Exception as exc:
-                logger.error("Config izleme hatası", error=str(exc))
-            await asyncio.sleep(self._watch_interval)
+                logger.error("config_izleme_dongu_hatasi", error=str(exc))
 
-    async def stop(self) -> Any:
-        """İzlemeyi durdur."""
-        self._running = False
-        logger.info("Config hot-reload stopped")
+            try:
+                await asyncio.sleep(self._watch_interval)
+            except asyncio.CancelledError:
+                break
+
+    async def stop(self) -> None:
+        """Konfigürasyon izleme döngüsünü durdurur."""
+        with self._lock:
+            self._running = False
+        logger.info("config_hot_reload_durduruldu", path=str(self._config_path))
 
     def _load_config(self) -> dict[str, Any]:
-        """Config dosyasını yükle."""
-        try:
-            content = self._config_path.read_text()
-            self._last_modified = os.path.getmtime(self._config_path)
-            self._last_hash = hashlib.sha256(content.encode()).hexdigest()
+        """Diskteki konfigürasyon dosyasını okur ve SHA-256 özetini günceller."""
+        with self._lock:
+            try:
+                if not self._config_path.exists():
+                    self._current_config = {}
+                    return self._current_config
 
-            if content.strip():
-                self._current_config = orjson.loads(content)
-            else:
-                self._current_config = {}
+                content = self._config_path.read_text(encoding="utf-8")
+                self._last_modified = os.path.getmtime(self._config_path)
+                self._last_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-            return self._current_config
+                if content.strip():
+                    self._current_config = orjson.loads(content)
+                else:
+                    self._current_config = {}
 
-        except orjson.JSONDecodeError as e:
-            logger.error("Config file invalid JSON", error=str(e))
-            return self._current_config
-        except Exception as e:
-            logger.error("Config load error", error=str(e))
-            return self._current_config
+                return self._current_config.copy()
+            except Exception as exc:
+                logger.error("config_yukleme_hatasi", error=str(exc), path=str(self._config_path))
+                return self._current_config.copy()
+
+    def save_config_safely(self, new_config: dict[str, Any]) -> bool:
+        """Yeni konfigürasyonu atomik olarak diske kaydeder (Crash-Resilient).
+
+        Args:
+            new_config: Kaydedilecek konfigürasyon sözlüğü.
+
+        Returns:
+            bool: Kayıt başarılı ise True, aksi halde False.
+        """
+        with self._lock:
+            tmp_path = self._config_path.with_suffix(f".tmp.{uuid.uuid4().hex[:8]}")
+            try:
+                self._config_path.parent.mkdir(parents=True, exist_ok=True)
+                raw_bytes = orjson.dumps(new_config, option=orjson.OPT_INDENT_2)
+                tmp_path.write_bytes(raw_bytes)
+                os.replace(tmp_path, self._config_path)
+                self._current_config = new_config.copy()
+                self._last_modified = os.path.getmtime(self._config_path)
+                self._last_hash = hashlib.sha256(raw_bytes).hexdigest()
+                return True
+            except Exception as exc:
+                logger.error("config_atomik_kayit_hatasi", error=str(exc))
+                if tmp_path.exists():
+                    with contextlib.suppress(Exception):
+                        tmp_path.unlink()
+                return False
 
     async def _check_for_changes(self) -> None:
-        """Dosya değişikliğini kontrol eder ve gerekirse callback tetikler."""
-        try:
-            current_modified = os.path.getmtime(self._config_path)
+        """Dosya modifikasyon zamanı ve hash'ini denetleyerek değişiklikleri yönetir."""
+        if not self._config_path.exists():
+            return
 
-            if current_modified <= self._last_modified:
+        try:
+            current_mtime = os.path.getmtime(self._config_path)
+            if current_mtime <= self._last_modified:
                 return
 
-            # İçerik hash kontrolü (mtime değişmiş ama içerik aynı olabilir)
             content = self._config_path.read_text(encoding="utf-8")
-            current_hash = hashlib.sha256(content.encode()).hexdigest()
+            current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
             if current_hash == self._last_hash:
-                self._last_modified = current_modified
+                self._last_modified = current_mtime
                 return
 
             with tracer.start_as_current_span("config.change_detected") as span:
@@ -192,28 +320,29 @@ class ConfigHotReload:
                 span.set_attribute("config.new_hash", current_hash[:12])
 
                 logger.info(
-                    "Config değişikliği tespit edildi",
+                    "config_degisikligi_tespit_edildi",
                     old_hash=self._last_hash[:12],
                     new_hash=current_hash[:12],
                 )
 
-                old_config = self._current_config.copy()
-                old_hash = self._last_hash
+                with self._lock:
+                    old_config = self._current_config.copy()
+                    old_hash = self._last_hash
 
                 new_config: dict[str, Any] = orjson.loads(content) if content.strip() else {}
-
                 changed_keys = self._find_changed_keys(old_config, new_config)
 
                 if self._validate_before_apply:
                     is_valid, error = self._validate_config(new_config)
                     if not is_valid:
-                        logger.error("Config doğrulama başarısız, uygulanmıyor", error=error)
+                        logger.error("config_dogrulama_basarisiz_uygulanmiyor", error=error)
                         self._record_change(old_hash, current_hash, changed_keys, applied=False, error=error)
                         return
 
-                self._current_config = new_config
-                self._last_modified = current_modified
-                self._last_hash = current_hash
+                with self._lock:
+                    self._current_config = new_config
+                    self._last_modified = current_mtime
+                    self._last_hash = current_hash
 
                 self._record_change(old_hash, current_hash, changed_keys, applied=True)
 
@@ -221,36 +350,31 @@ class ConfigHotReload:
                     await self._notify_callbacks(old_config, new_config, changed_keys)
 
         except orjson.JSONDecodeError as exc:
-            logger.error("Config JSON parse hatası", error=str(exc))
+            logger.error("config_json_cozme_hatasi", error=str(exc))
         except Exception as exc:
-            logger.error("Config izleme kontrol hatası", error=str(exc))
+            logger.error("config_degisiklik_kontrol_hatasi", error=str(exc))
 
     def _find_changed_keys(
         self,
         old: dict[str, Any],
         new: dict[str, Any],
     ) -> list[str]:
-        """Değişen anahtarları bul."""
-        changed = []
+        """İki konfigürasyon sözlüğü arasındaki değişen anahtarları listeler."""
         all_keys = set(old.keys()) | set(new.keys())
-
-        for key in all_keys:
-            old_val = old.get(key)
-            new_val = new.get(key)
-            if old_val != new_val:
-                changed.append(key)
-
-        return changed
+        return [key for key in sorted(all_keys) if old.get(key) != new.get(key)]
 
     def _validate_config(self, config: dict[str, Any]) -> tuple[bool, str | None]:
-        """Config'i validate et."""
-        for validator in self._validators:
+        """Tüm kayıtlı doğrulayıcıları çalıştırır."""
+        with self._lock:
+            validators = list(self._validators)
+
+        for validator in validators:
             try:
                 is_valid, error = validator(config)
                 if not is_valid:
                     return False, error
-            except Exception as e:
-                return False, f"Validator error: {e}"
+            except Exception as exc:
+                return False, f"Doğrulayıcı istisnası: {exc}"
         return True, None
 
     async def _notify_callbacks(
@@ -258,16 +382,20 @@ class ConfigHotReload:
         old_config: dict[str, Any],
         new_config: dict[str, Any],
         changed_keys: list[str],
-    ) -> Any:
-        """Callback'leri bildir."""
-        for callback in self._callbacks:
+    ) -> None:
+        """Kayıtlı callback fonksiyonlarını eşzamanlı/asenkron güvenlikle bilgilendirir."""
+        with self._lock:
+            callbacks = list(self._callbacks)
+
+        for callback in callbacks:
             try:
                 if asyncio.iscoroutinefunction(callback):
                     await callback(old_config, new_config, changed_keys)
                 else:
                     callback(old_config, new_config, changed_keys)
-            except Exception as e:
-                logger.error("Config callback error", callback=callback.__name__, error=str(e))
+            except Exception as exc:
+                callback_name = getattr(callback, "__name__", str(callback))
+                logger.error("config_callback_hatasi", callback=callback_name, error=str(exc))
 
     def _record_change(
         self,
@@ -277,12 +405,13 @@ class ConfigHotReload:
         applied: bool,
         error: str | None = None,
     ) -> None:
-        """Değişikliği geçmişe kaydeder."""
+        """Değişikliği RAM kuyruğuna ve kalıcı DuckDB günlüğüne yazar."""
         change_id = hashlib.md5(f"{new_hash}_{time.time()}".encode()).hexdigest()[:12]
+        now = datetime.now(UTC)
 
         change = ConfigChange(
             change_id=change_id,
-            timestamp=datetime.now(UTC),
+            timestamp=now,
             file_path=str(self._config_path),
             old_hash=old_hash,
             new_hash=new_hash,
@@ -291,34 +420,93 @@ class ConfigHotReload:
             error=error,
         )
 
-        self._change_history.append(change)
-        if len(self._change_history) > self._max_history:
-            self._change_history = list(self._change_history)[-self._max_history :]
+        with self._lock:
+            self._change_history.append(change)
+
+            if self._conn is not None:
+                try:
+                    changed_keys_str = orjson.dumps(changed_keys).decode("utf-8")
+                    self._conn.execute(
+                        """
+                        INSERT INTO config_audit_log (
+                            id, timestamp, change_id, file_path, old_hash,
+                            new_hash, changed_keys, applied, error
+                        ) VALUES (
+                            nextval('seq_config_audit_id'), ?, ?, ?, ?, ?, ?, ?, ?
+                        );
+                        """,
+                        [
+                            now,
+                            change_id,
+                            str(self._config_path),
+                            old_hash,
+                            new_hash,
+                            changed_keys_str,
+                            applied,
+                            error,
+                        ],
+                    )
+                except Exception as exc:
+                    logger.warning("config_audit_db_kayit_hatasi", error=str(exc))
 
     def get_current_config(self) -> dict[str, Any]:
-        """Mevcut config'i döndür."""
-        return self._current_config.copy()
+        """Mevcut aktif konfigürasyonun bir kopyasını döndürür."""
+        with self._lock:
+            return self._current_config.copy()
 
     def get_change_history(self, limit: int = 20) -> list[dict[str, Any]]:
-        """Değişiklik geçmişi."""
-        return [c.to_dict() for c in list(self._change_history)[-limit:]]
+        """Değişiklik geçmişini sözlük listesi olarak döndürür."""
+        with self._lock:
+            items = list(self._change_history)
+            return [c.to_dict() for c in items[-limit:]]
 
     def force_reload(self) -> dict[str, Any]:
-        """Zorla yeniden yükle."""
-        old_config = self._current_config.copy()
-        new_config = self._load_config()
+        """Diskteki dosyayı beklemeden anında zorla yükler."""
+        with self._lock:
+            old_config = self._current_config.copy()
+            new_config = self._load_config()
+            changed_keys = self._find_changed_keys(old_config, new_config)
+            if changed_keys:
+                logger.info("force_reload_degisen_anahtarlar", keys=changed_keys)
+            return new_config
 
-        changed_keys = self._find_changed_keys(old_config, new_config)
-        if changed_keys:
-            logger.info("Force reload changed keys", keys=changed_keys)
+    def export_history_to_polars(self, limit: int = 100) -> pl.DataFrame:
+        """Değişiklik geçmişini sıfır kopyalı Polars DataFrame olarak sunar."""
+        if self._conn is None:
+            with self._lock:
+                history_dicts = [c.to_dict() for c in self._change_history][-limit:]
+                if not history_dicts:
+                    return pl.DataFrame()
+                return pl.DataFrame(history_dicts)
 
-        return new_config
+        with self._lock:
+            try:
+                arrow_table = self._conn.execute(
+                    """
+                    SELECT id, timestamp, change_id, file_path, old_hash,
+                           new_hash, changed_keys, applied, error
+                    FROM config_audit_log
+                    ORDER BY id DESC
+                    LIMIT ?;
+                    """,
+                    [limit],
+                ).arrow()
+                return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+            except Exception as exc:
+                logger.error("config_history_polars_hatasi", error=str(exc))
+                return pl.DataFrame()
+
+    def __repr__(self) -> str:
+        """Motorun okunabilir durum temsilini döndürür."""
+        return (
+            f"ConfigHotReload(path={str(self._config_path)!r}, "
+            f"running={self._running}, keys_count={len(self._current_config)})"
+        )
 
 
-# Singleton
+# Singleton Oluşturma
 def _create_singleton() -> ConfigHotReload:
-    """Singleton oluştur — config.json yolunu akıllıca belirle."""
-    # Önce çalışma dizininde, sonra proje kökünde ara
+    """Singleton nesneyi çalışma ortamına en uygun konfigürasyon yolu ile başlatır."""
     candidates = [
         "config.json",
         "config/runtime.json",
@@ -327,46 +515,30 @@ def _create_singleton() -> ConfigHotReload:
     for path in candidates:
         if os.path.exists(path):
             return ConfigHotReload(path)
-    # Yoksa varsayılan oluştur (start() zamanında yaratılacak)
     return ConfigHotReload("config/runtime.json")
 
 
-config_hot_reload = _create_singleton()
+config_hot_reload: Final[ConfigHotReload] = _create_singleton()
 
 
-# ═══════════════════════════════════════════════════════════
-# Settings Bridge — Pydantic Settings + Hot-Reload Entegrasyonu
-# ═══════════════════════════════════════════════════════════
+# ==============================================================================
+# SETTINGS BRIDGE — Pydantic Settings + Hot-Reload Entegrasyonu
+# ==============================================================================
 
 
 class SettingsBridge:
-    """
-    Pydantic Settings + Config Hot-Reload köprüsü.
+    """Pydantic Settings ile dinamik Hot-Reload arasındaki kurumsal köprü.
 
-    Problem: Pydantic Settings immutable (değiştirilemez).
-    Çözüm: Hot-reload callback'i yeni Settings instance oluşturur
-    ve global settings referansını günceller.
-
-    Güvenlik:
-    - Secret'lar (SECRET_KEY, JWT_SECRET, passwords) JSON'dan DEĞİL,
-      sadece environment variable'dan okunur.
-    - JSON config sadece runtime-adjustable ayarları içerir:
-      interval'lar, threshold'lar, ağırlıklar, feature flag'ler.
-    - Production'da hassas alanlar JSON'dan yüklenmez.
-
-    Kullanım:
-        bridge = SettingsBridge()
-        bridge.start_watching()  # Arka planda izleme başlat
-        bridge.stop_watching()   # İzlemeyi durdur
-
-    Mathematiksel gerekçe:
-    - Pydantic Settings'in immutability garantisi korunur (yeni instance)
-    - Thread-safe: settings atomik olarak değiştirilir (reference swap)
-    - Rollback: hatalı config → eski settings korunur
+    Güvenlik ve Mimari İlkeler:
+    - Secret Koruma: Gizli anahtarlar (API anahtarları, şifreler) JSON dosyasında
+      asla kabul edilmez, reddedilir.
+    - Immutability: Pydantic Settings değişmezliği korunarak atomik referans
+      değişimi (reference swap) ile yeni instance oluşturulur.
+    - Rollback: Geçersiz bir parametre durumunda eski Settings örneği korunur.
     """
 
     # JSON'dan yüklenebilecek güvenli alanlar (secret olmayan)
-    _SAFE_FIELDS = {
+    _SAFE_FIELDS: Final[set[str]] = {
         "app_debug",
         "app_host",
         "app_port",
@@ -405,8 +577,8 @@ class SettingsBridge:
         "db_command_timeout",
     }
 
-    # Secret alanlar — ASLA JSON'dan yüklenmez
-    _SECRET_FIELDS = {
+    # Secret alanlar — ASLA JSON'dan yüklenemez
+    _SECRET_FIELDS: Final[set[str]] = {
         "secret_key",
         "jwt_secret",
         "postgres_password",
@@ -421,36 +593,42 @@ class SettingsBridge:
     }
 
     def __init__(self, reloader: ConfigHotReload | None = None) -> None:
-        """Otomatik eklendi."""
+        """SettingsBridge köprüsünü başlatır.
+
+        Args:
+            reloader: Bağlanılacak ConfigHotReload motoru (None ise global singleton).
+        """
         self._reloader = reloader or config_hot_reload
+        self._lock = threading.RLock()
         self._watching = False
-        self._settings_history: deque = deque(maxlen=100)
-        self._max_history = 50
+        self._settings_history: deque[tuple[datetime, dict[str, Any]]] = deque(maxlen=DEFAULT_MAX_HISTORY_LEN)
 
-    def start_watching(self) -> Any:
-        """Hot-reload izlemeyi başlat."""
-        if self._watching:
-            return
+    def start_watching(self) -> None:
+        """Hot-reload izleyicisine doğrulayıcı ve callback ekleyerek köprüyü aktif eder."""
+        with self._lock:
+            if self._watching:
+                return
 
-        # Validator ekle: secret alanlar JSON'da varsa reddet
-        self._reloader.add_validator(self._validate_no_secrets)
+            self._reloader.add_validator(self._validate_no_secrets)
+            self._reloader.on_change(self._on_config_change)
+            self._watching = True
+            logger.info("settings_bridge_baslatildi")
 
-        # Callback ekle: Settings güncelle
-        self._reloader.on_change(self._on_config_change)
-
-        self._watching = True
-        logger.info("SettingsBridge started — watching for runtime config changes")
-
-    def stop_watching(self) -> Any:
-        """İzlemeyi durdur."""
-        self._watching = False
-        logger.info("SettingsBridge stopped")
+    def stop_watching(self) -> None:
+        """İzleme köprüsünü devre dışı bırakır."""
+        with self._lock:
+            self._watching = False
+            logger.info("settings_bridge_durduruldu")
 
     def _validate_no_secrets(self, config: dict[str, Any]) -> tuple[bool, str | None]:
-        """JSON config'de secret alan varsa reddet."""
+        """JSON config içinde yetkisiz secret alan tespiti yaparsa işlemi reddeder."""
         for key in config:
             if key.lower() in self._SECRET_FIELDS:
-                return False, f"Secret field '{key}' not allowed in JSON config. Use environment variables."
+                return (
+                    False,
+                    f"Gizli alan '{key}' JSON dosyasında tanımlanamaz! "
+                    f"Yalnızca ortam değişkenlerini (environment variables) kullanınız.",
+                )
         return True, None
 
     async def _on_config_change(
@@ -458,66 +636,68 @@ class SettingsBridge:
         old_config: dict[str, Any],
         new_config: dict[str, Any],
         changed_keys: list[str],
-    ) -> Any:
-        """Config değişikliğinde Settings güncelle."""
-        import services.core.config as config_module
-
-        # Sadece güvenli alanları filtrele
+    ) -> None:
+        """Konfigürasyon değiştiğinde Pydantic Settings nesnesini atomik olarak yeniler."""
         safe_changes = {k: v for k, v in new_config.items() if k.lower() in self._SAFE_FIELDS}
 
         if not safe_changes:
-            logger.info("No safe fields to update in Settings")
+            logger.info("settings_guncellenecek_guvenli_alan_yok")
             return
 
         try:
-            # Mevcut settings'i dict'e çevir
-            old_settings_dict = config_module.settings.model_dump()
+            import services.core.config as config_module
 
-            # Değişiklikleri uygula (sadece güvenli alanlar)
-            merged = {**old_settings_dict, **safe_changes}
+            with self._lock:
+                old_settings_dict = config_module.settings.model_dump()
+                merged = {**old_settings_dict, **safe_changes}
+                new_settings = config_module.Settings(**merged)
 
-            # Yeni Settings instance oluştur (pydantic immutable garantisi)
-            new_settings = config_module.Settings(**merged)
-
-            # Global settings referansını güncelle (atomik swap)
-            config_module.settings = new_settings
-
-            # modül seviyesinde de güncelle
-            config_module.get_settings = lambda: new_settings
-
-            # Geçmişe kaydet
-            self._settings_history.append((datetime.now(UTC), safe_changes))
-            if len(self._settings_history) > self._max_history:
-                self._settings_history = list(self._settings_history)[-self._max_history :]
+                # Global settings referansını atomik olarak takas et
+                config_module.settings = new_settings
+                self._settings_history.append((datetime.now(UTC), safe_changes))
 
             logger.info(
-                "Settings updated via hot-reload",
+                "settings_hot_reload_ile_guncellendi",
                 changed_keys=list(safe_changes.keys()),
-                n_changes=len(safe_changes),
+                count=len(safe_changes),
             )
-
-        except Exception as e:
+        except Exception as exc:
             logger.error(
-                "Settings hot-reload failed, keeping old settings",
-                error=str(e),
+                "settings_hot_reload_hatasi_eski_ayarlar_korundu",
+                error=str(exc),
                 changed_keys=changed_keys,
             )
-            # Rollback: eski settings korunur (zaten değiştirilmedi)
 
     def get_settings_history(self) -> list[dict[str, Any]]:
-        """Settings değişiklik geçmişi."""
-        return [{"timestamp": ts.isoformat(), "changes": changes} for ts, changes in self._settings_history]
+        """Settings değişiklik geçmişini liste halinde döndürür."""
+        with self._lock:
+            return [{"timestamp": ts.isoformat(), "changes": changes} for ts, changes in self._settings_history]
 
-    @staticmethod
-    def get_safe_fields() -> set:
-        """JSON'dan yüklenebilecek güvenli alanlar."""
-        return SettingsBridge._SAFE_FIELDS.copy()
+    @classmethod
+    def get_safe_fields(cls) -> set[str]:
+        """JSON konfigürasyonundan güncellenebilir güvenli alanlar kümesi."""
+        return cls._SAFE_FIELDS.copy()
 
-    @staticmethod
-    def get_secret_fields() -> set:
-        """Secret alanlar (JSON'dan yüklenemez)."""
-        return SettingsBridge._SECRET_FIELDS.copy()
+    @classmethod
+    def get_secret_fields(cls) -> set[str]:
+        """JSON konfigürasyonuna girişi engellenmiş hassas alanlar kümesi."""
+        return cls._SECRET_FIELDS.copy()
+
+    def __repr__(self) -> str:
+        """Köprünün okunabilir durum temsilini döndürür."""
+        return f"SettingsBridge(watching={self._watching}, history_count={len(self._settings_history)})"
 
 
-# Singleton
-settings_bridge = SettingsBridge()
+# Global tekil köprü (Singleton)
+settings_bridge: Final[SettingsBridge] = SettingsBridge()
+
+__all__: Final[list[str]] = [
+    "ConfigChange",
+    "ConfigHotReload",
+    "DEFAULT_CONFIG_DB_PATH",
+    "DEFAULT_MAX_HISTORY_LEN",
+    "DEFAULT_WATCH_INTERVAL_SECONDS",
+    "SettingsBridge",
+    "config_hot_reload",
+    "settings_bridge",
+]

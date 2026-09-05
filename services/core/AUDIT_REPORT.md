@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 15 dosya denetlendi, 144 sorun düzeltildi. Bekleyen dosya: 89
+**Denetim Sonucu:** 16 dosya denetlendi, 153 sorun düzeltildi. Bekleyen dosya: 88
 
 ---
 
@@ -37,6 +37,7 @@
 | 13 | `circuit_breaker_metrics.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 14 | `clickhouse_replication_health.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 15 | `compliance.py` | 10 | ✅ Denetlendi, düzeltildi |
+| 16 | `config_hot_reload.py` | 9 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -289,6 +290,22 @@
 | 8 | 2 | Singleton nesne eşzamanlı erişim koruması (`threading.RLock`) içermiyordu | `self._lock = threading.RLock()` eklendi; takvim, denetim kaydı ve sorgulamalar thread-safe hale getirildi |
 | 9 | 5 & Standart | Yasal denetimlerde zorunlu olan denetim izi (audit trail) kalıcı saklanmıyordu | DuckDB `compliance_audit_log` tablosu, `orjson` serileştirmesi ve sıfır kopyalı Polars ihracı (`export_audit_to_polars`) entegre edildi |
 | 10 | 4 & 7 | Tip güvenli aksiyon enum'ı, `__repr__` ve `__all__` listesi eksikti | `ComplianceAction(StrEnum)`, açıklayıcı `__repr__` metotları ve eksiksiz `__all__` listesi eklendi |
+
+---
+
+## `config_hot_reload.py` (16. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Temizlendi; mimari tasarım ve kullanım örneklerini içeren detaylı Türkçe docstring'ler yazıldı |
+| 2 | 2 | `ConfigHotReload` ve `SettingsBridge` singleton sınıflarında thread-safety yoktu | `self._lock = threading.RLock()` eklendi; callback listesi, doğrulayıcılar ve durum geçmişi reentrant koruma altına alındı |
+| 3 | 2 & 3 | Dosya yazımları doğrudan hedef yola yapılıyordu (`self._config_path.write_text("{}")`), veri bozulması riski vardı | Atomik geçici dosya (`.tmp.<uuid>`) ve `os.replace` mekanizması ile crash-resilient `save_config_safely` fonksiyonu eklendi |
+| 4 | 2 & 4 | `_change_history` ve `_settings_history` deque olarak başlatıldığı halde `list(...)` ile ezilip tip bozulmasına uğruyordu | Deque yapısı ve `maxlen` sınırları korunarak tip çelişkileri giderildi |
+| 5 | 5 & Standart | Konfigürasyon değişiklikleri RAM'de tutuluyor, restart sonrası yasal denetim izi siliniyordu | DuckDB `config_audit_log` tablosu oluşturuldu; SHA-256 hash ve değişen anahtarlar kalıcı olarak kaydedildi |
+| 6 | 5 | Değişiklik geçmişi için Polars entegrasyonu yoktu | Sıfır kopyalı `export_history_to_polars(limit)` fonksiyonu eklendi |
+| 7 | 3 & 4 | Pydantic Settings güncellemesinde `get_settings = lambda: new_settings` gibi kırılgan lambda ezmesi vardı | Pydantic immutability korunarak atomik referans takası (reference swap) ile güvenli güncelleme sağlandı |
+| 8 | 4 | `ConfigChange`, `ConfigHotReload` ve `SettingsBridge` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve okunabilir `__repr__` metotları yazıldı |
+| 9 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | Tüm ana sınıflar, sabitler ve singleton'ları içeren eksiksiz `__all__` listesi eklendi |
 
 ---
 
