@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 10 dosya denetlendi, 60 sorun düzeltildi. Bekleyen dosya: 94
+**Denetim Sonucu:** 11 dosya denetlendi, 66 sorun düzeltildi. Bekleyen dosya: 93
 
 ---
 
@@ -32,6 +32,7 @@
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -177,6 +178,19 @@
 | 4 | 2 & 3 | Asenkron `asyncio.CancelledError` iptal durumları genel hata bloğuyla karışabiliyor veya kaynaklar kilitli kalabiliyordu | `asyncio.CancelledError` özel bloğuyla loglanıp yeniden fırlatıldı (`re-raise`); `finally` bloğuyla `self._active_requests` her koşulda korumalı düşürüldü |
 | 5 | 4 | `get_health_status()` ve `__repr__` metotlarında aktif istek ve önbellek anahtar sayıları görünmüyordu | Rapor ve metin temsillerine `active_requests` ve `cached_idempotency_keys` alanları eklendi |
 | 6 | 7 | `DEFAULT_SHUTDOWN_TIMEOUT_SECONDS` sabiti tanımlandı ve `__all__` listesine eklendi | Modül dışa aktarımları eksiksiz hale getirildi |
+
+---
+
+## `bist_tick_size.py` (11. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & 3 | `round_to_bist_tick` fonksiyonunda `side` parametresi ("BUY", "SELL") yer almasına rağmen kodda hiçbir şekilde kullanılmıyor ve yorumdaki alışta/satışta yönlü yuvarlama vaadi yerine getirilmiyordu | `mode` ("NEAREST", "FLOOR", "CEIL", "SIDE_AWARE") desteği eklendi; alışta bütçeyi aşmamak için taban (`floor`), satışta ucuza gitmemek için tavan (`ceil`) ve genel en yakın adıma yuvarlama tam çalışır hale getirildi |
+| 2 | 2 & 3 | `is_valid_bist_tick` içinde float modulo (`price % tick`) kullanılıyordu; Python'da IEEE 754 kayan nokta anomalisi nedeniyle (ör. `100.10 % 0.10 -> 0.09999999999999432`) geçerli fiyatlar hatalı reddedilebiliyordu | Float modulo terk edildi; `steps = round(price / tick)` ve beklenen fark toleransı yöntemiyle sayısal doğruluk %100 güvenceye alındı |
+| 3 | 2 & 3 | `math.isnan(price)`, `math.isinf(price)` ve `price <= 0` sınır kontrolleri eksikti; `NaN` fiyat geldiğinde `round(nan)` `ValueError` patlatıyordu | Tüm fonksiyonlara sayısal sınır ve `NaN`/`Inf` guard'ları konuldu; geçersiz girdilerde fail-closed güvenli değerler dönüldü |
+| 4 | 2 & 3 | `instrument_type` küçük harfe normalize edilmiyordu (`"WARRANT"` gibi girdiler özel tabloyu ıskalayıp standart stock adımı alıyordu) | `instrument_type.lower().strip()` normalizasyonu sağlandı; `SPECIAL_TICK_SIZES` içine ETF/BYF (0.01 TL) desteği eklendi |
+| 5 | 6 | BIST kademe sınırlarını (ör. 19.99 TL -> 20.00 TL) dinamik atlayarak adım ekleme/çıkarma ve iki fiyat arasındaki kademe farkını hesaplama fonksiyonları eksikti | `add_bist_ticks(price, ticks)` ve `get_bist_tick_count_between(price_from, price_to)` fonksiyonları eklenerek piyasa yapıcı ve emir iletim algoritmalarına kazandırıldı |
+| 6 | 4 & 7 | Fonksiyon docstring'leri eksik ve tek satırdı; yerel tracer yerine merkezi `services.core.otel` entegrasyonu yoktu; `__all__` listesi tanımlanmamıştı | Merkezi `@otel_trace` bağlandı, standart Türkçe docstring'ler yazıldı ve modül sabitleri dahil eksiksiz `__all__` listesi eklendi |
 
 ---
 
