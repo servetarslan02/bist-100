@@ -124,12 +124,13 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metotlara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
-| 2 | 4 | `AsyncHTTPClient` sınıfında `__repr__` metodu yoktu | Oturum durumu ve retry sınırını gösteren `__repr__` eklendi |
-| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["AsyncHTTPClient", "close_all_clients", "get_client"]` eklendi |
-| 4 | 2 | `get_client` singleton registry'de eşzamanlılık koruması (thread-safety) eksikti | `threading.Lock()` ile korumalı hale getirildi |
-| 5 | 4 | Fonksiyon içlerinde gereksiz `import time` tekrarları vardı | Dosya başında standart modül importuna taşındı |
-| 6 | 4 | Log ve hata mesajları İngilizceydi | `http_json_ayristirma_hatasi`, `http_zaman_asimi`, `http_istek_siniri_asildi` gibi Türkçe structlog formatına geçirildi |
+| 1 | 2 & 3 | `self._session_lock = asyncio.Lock()` `__init__` içinde oluşturulduğundan farklı loop/thread çağrılarında `RuntimeError` patlatıyordu | Lazy lock mekanizmasına (`_get_lock`) geçilerek aktif event loop ile tam uyum sağlandı |
+| 2 | 2 & 3 | HTTP 429 `Retry-After` başlığı HTTP-date formatında geldiğinde `float(...)` `ValueError` verip retry mekanizmasını çökertiyordu | RFC 7231 güvenli ayrıştırıcı eklendi; `DEFAULT_MAX_RETRY_DELAY_S` (30s) tavan sınırı getirilerek asılı kalmalar önlendi |
+| 3 | 5 | `aiohttp` varsayılan standart json serileştiricisi kullanıyordu (GEMINI.md Kural 1 & 5 ihlali) | `aiohttp.ClientSession(json_serialize=_orjson_serializer)` ile uçtan uca `orjson` kullanımına geçirildi |
+| 4 | 2 & 6 | TCP bağlantı havuzunda soket sızıntısı (socket leak) koruması yoktu | `TCPConnector(limit=100, limit_per_host=20, enable_cleanup_closed=True)` ile Windows soket yönetimi optimize edildi |
+| 5 | 3 & 7 | `AsyncHTTPClient` geriye dönük `retry_delay_s` parametresini desteklemiyordu (mevcut testler ve sağlayıcılar `unexpected keyword argument` alıyordu) | `retry_delay_s` parametresi ve `@property` eklendi; tüm ingestion testleri 12/12 başarıya ulaştı |
+| 6 | 3 | `close_all_clients` istemcileri sıralı ve hata korumasız kapatıyordu | `asyncio.gather(*..., return_exceptions=True)` ile tüm istemciler paralel ve güvenle sonlandırılır hale getirildi |
+| 7 | 4 & 7 | `__repr__` standart dışıydı; `__all__` listesinde modül sabitleri eksikti | `AsyncHTTPClient(oturum=..., max_retries=...)` formatında temiz repr yazıldı ve modül sabitleri dışa aktarıldı |
 
 
 
