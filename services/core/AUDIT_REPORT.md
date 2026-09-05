@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 130 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 134 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -22,7 +22,7 @@
 
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
-| 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
+| 1 | `__init__.py` | 8 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 2 | `alert_policy.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 3 | `alerting.py` | 12 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 4 | `algo_notification.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
@@ -47,6 +47,10 @@
 | 2 | 7 | `__all__` listesi eksikti; import edilen 20+ sembol listede yoktu | Tüm dışa aktarılan sınıflar, fonksiyonlar ve tekil nesneler `__all__` listesine eklendi (toplam 68 sembol) |
 | 3 | 3 | `DeadLetterQueue` import için try-except ImportError hilesi vardı | `persistent_dlq` wrapper'ı sağlayan sınıf doğrudan import edildi |
 | 4 | 5 | I001 import sıralaması düzensizdi | Ruff standartlarına göre alfabetik ve standart bloklara göre sıralandı |
+| 5 | 7 | **(2. Tur)** Düzeltilen ilk 14 servise ait kritik modeller, alt modüller ve fonksiyonlar eksikti | `alerting`, `alert_policy`, `algo_notification`, `alpha_engine`, `arrow_pipeline`, `async_http`, `audit_log`, `circuit_breaker_metrics`, `clickhouse_replication_health` bileşenlerinin tüm ana sınıfları ve singleton'ları eklendi |
+| 6 | 3 | **(2. Tur)** `CircuitBreakerMetrics` yanlış modülden (`circuit_breaker.py`) import ediliyordu | `circuit_breaker_metrics.py` kaynağından `CircuitBreakerMetricsCollector`, `CircuitBreakerSnapshot`, `circuit_breaker_metrics` doğru şekilde import edildi |
+| 7 | 7 | **(2. Tur)** `__all__` listesi güncel servis mimarisiyle uyuşmuyordu (eksik 41 sembol vardı) | `__all__` listesi eksiksiz 109 sembole çıkarıldı, modül dışa aktarım tutarlılığı sağlandı |
+| 8 | 5 | **(2. Tur)** Mikro import ve canlı sembol doğrulama testi eksikti | `services.core` üzerinden 109 sembolün ve temel model/fonksiyonların canlı import edildiği mikro test başarıyla çalıştırıldı |
 
 ---
 
