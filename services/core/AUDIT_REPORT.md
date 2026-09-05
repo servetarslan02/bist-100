@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 9 dosya denetlendi, 54 sorun düzeltildi. Bekleyen dosya: 95
+**Denetim Sonucu:** 10 dosya denetlendi, 60 sorun düzeltildi. Bekleyen dosya: 94
 
 ---
 
@@ -31,6 +31,7 @@
 | 7 | `async_http.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -155,6 +156,19 @@
 | 4 | 4 | `CircuitBreakerEvent` ve `AutoCircuitBreakerEngine` sınıflarında `__repr__` metodu yoktu | Açıklayıcı ve durum yansıtıcı `__repr__` metotları tanımlandı |
 | 5 | 4 | Fonksiyon içindeki `from collections import deque` importu dosya başına taşındı; magic number `DEFAULT_EVENT_QUEUE_MAXLEN` sabitine bağlandı; loglar Türkçe structlog standardına geçirildi | Dosya başı temiz import yapısına geçildi ve yapısal Türkçe loglama sağlandı |
 | 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_EVENT_QUEUE_MAXLEN", "AutoCircuitBreakerEngine", "CircuitBreakerEvent", "auto_circuit_breaker", "otel_trace"]` tanımlandı |
+
+---
+
+## `base_service.py` (10. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | Modül ve metot docstring'leri eksik parametre detaylarına sahipti | Tamamı Türkçe, sözleşme maddelerini ve Args/Returns/Raises detaylarını içeren standart biçime dönüştürüldü |
+| 2 | 2 | 121. satırda `E501 Line too long (124 > 120)` ruff hatası mevcuttu | Log çağrısı yapısal argümanlarla alt satırlara bölünerek satır uzunluğu kuralına tam uyum sağlandı |
+| 3 | 2 | `_processed_idempotency_keys` sözlüğü asenkron ve çoklu iş parçacığı altında TTL temizliği yaparken boyutu değişebiliyor ve `RuntimeError: dictionary changed size during iteration` riski taşıyordu | `threading.Lock()` ile eşzamanlı erişim koruması sağlandı ve liste kopyası üzerinden güvenli TTL budaması yapıldı |
+| 4 | 2 | Kod yorumunda "Exponential Backoff with Jitter" yazmasına rağmen jitter bulunmuyordu (thundering herd riski) | Gerçek rastgele sapma (`random.uniform(0.0, 0.2 * base_backoff)`) eklenerek tam koruma sağlandı |
+| 5 | 4 | `ServiceExecutionError` ve `BaseAlphaService` sınıflarında `__repr__` metodu yoktu; magic number'lar doğrudan koddaydı | Her iki sınıfa durum özetleyici `__repr__` tanımlandı; tüm eşik ve süreler `DEFAULT_*` sabitlerine bağlandı |
+| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_BACKOFF_FACTOR", "DEFAULT_IDEMPOTENCY_MAX_KEYS", "DEFAULT_IDEMPOTENCY_TTL_SECONDS", "DEFAULT_MAX_RETRIES", "DEFAULT_TIMEOUT_SECONDS", "BaseAlphaService", "ServiceExecutionError"]` tanımlandı |
 
 ---
 
