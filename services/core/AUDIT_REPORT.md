@@ -109,12 +109,14 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metotlara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
-| 2 | 4 | `ArrowPipeline` sınıfında `__repr__` metodu yoktu | `base_path` bilgisini içeren açıklayıcı `__repr__` eklendi |
-| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["ArrowPipeline"]` eklendi |
-| 4 | 4 | Fonksiyon içi dağınık `import pyarrow`, `import polars` çağrıları vardı | Dosya başında temiz, merkezi import yapısına geçirildi |
-| 5 | 2 | `merge_parquet` ve `from_polars` metotlarında boş girdi/None kontrolleri eksikti | Fail-closed sınır kontrolleri (`ValueError`, `FileNotFoundError`) eklendi |
-| 6 | 4 | Log mesajları İngilizceydi (`"Parquet written"`, vb.) | `parquet_dosyasi_yazildi`, `parquet_dosyasi_okundu` gibi Türkçe structlog yapısına geçirildi |
+| 1 | 3 & 4 | Yerel `otel_trace` dekoratörü tanımlanmıştı; global `services.core.otel` entegrasyonu yoktu | Merkezi `from services.core.otel import otel_trace` entegrasyonuna geçilerek DRY ve merkezi span yönetimi sağlandı |
+| 2 | 2 & 3 | `from_polars` ve `to_polars` metotlarında tip kontrolü eksikti (geçersiz tipte sessizce `AttributeError` patlıyordu) | `isinstance(df, pl.DataFrame)` ve `isinstance(table, (pa.Table, pa.RecordBatch))` tip guard'ları ile `TypeError` eklendi |
+| 3 | 2 & 3 | `to_parquet` sadece `pa.Table` kabul ediyordu; geçersiz sıkıştırma algoritmaları pyarrow C-API'de çöküyordu | Hem `pa.Table` hem `pl.DataFrame` desteği sağlandı; `VALID_COMPRESSIONS` kümesiyle `compression` ön kontrolü eklendi |
+| 4 | 2 & 3 | Mutlak dosya yolları (`Path.is_absolute()`) verildiğinde `self.base_path / path` Windows'ta tutarsızlığa yol açabiliyordu | `_resolve_path` yardımcı metodu ile göreli ve mutlak yollar güvenli şekilde standardize edildi |
+| 5 | 2 & 3 | `merge_parquet` şema farklılıklarında (`pa.concat_tables`) doğrudan çöküyordu (Schema Evolution eksikliği) | `pa.concat_tables(tables, promote_options="permissive")` ile geriye dönük ve ileriye dönük şema evrimi desteği getirildi |
+| 6 | 6 | Polars LazyFrame üzerinde doğrudan tembel tarama (lazy scan) imkanı yoktu | `scan_polars(path: str) -> pl.LazyFrame` metodu eklenerek yüksek performanslı tembel değerlendirme sağlandı |
+| 7 | 4 | `get_metadata` çıktısında sütun isimleri ve şema veri tipleri eksikti | Arrow şeması incelenerek `column_names` ve `schema_types` sözlüğü üst verilere eklendi |
+| 8 | 4 & 7 | `__repr__` standart dışıydı; `__all__` listesinde modül sabitleri (`DEFAULT_*`, `VALID_COMPRESSIONS`) eksikti | Temiz `__repr__` ve tüm sabitleri kapsayan eksiksiz `__all__` listesi tamamlandı |
 
 ---
 
