@@ -1,47 +1,62 @@
+"""ALPHA BIST — Kurumsal Circuit Breaker Metrik Toplayıcı ve Prometheus/JSON Dışa Aktarıcısı.
+
+Bu modül, mikroservis ve dış veri sağlayıcı devre kesicilerinin (Circuit Breaker)
+sağlık, durum ve güvenilirlik metriklerini merkezi olarak toplar, Prometheus ve
+orjson formatlarında dışa aktarır (Monitoring / Dashboarding).
+
+Özellikler:
+- Thread-Safe: RLock ile eşzamanlı kayıt, metrik dışa aktarımı ve durum takibi.
+- O(1) Durum Değişiklik Geçmişi: collections.deque(maxlen=...) ile sabit bellek garantisi.
+- Çoklu Sağlayıcı Uyumluluğu: Hem ham CircuitBreaker hem de ProtectedProvider nesnelerinden metrik çekme.
+- Prometheus Standartları: Güvenli label escaping ve geçerli gauge/counter çıktıları.
+- orjson Entegrasyonu: Yüksek performanslı JSON serileştirme.
 """
-ALPHA BIST — Circuit Breaker Metrics Export
 
-Circuit breaker durumunu Prometheus formatında export eder.
-Monitoring dashboard'larında circuit breaker durumu görünür.
+from __future__ import annotations
 
-Referanslar:
-- CORE-NIHAI-SPEC.md - Section 2.5
-"""
-
-import functools
+import math
+import threading
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, Final
 
+import orjson
 import structlog
-from opentelemetry import trace
+
+from services.core.otel import otel_trace
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.circuit_breaker_metrics")
+
+# Varsayılan Yapılandırma Sabitleri
+DEFAULT_MAX_HISTORY: Final[int] = 1000
+DEFAULT_HISTORY_LIMIT: Final[int] = 50
 
 
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-@dataclass
+@dataclass(slots=True)
 class CircuitBreakerSnapshot:
-    """Anlık circuit breaker durumu."""
+    """Belirli bir devre kesicinin anlık durum ve sayaç fotoğrafı.
+
+    Attributes:
+        name: Devre kesicinin tekil adı.
+        state: Anlık devre durumu ("CLOSED", "OPEN", "HALF_OPEN").
+        failure_count: Ardışık başarısızlık sayısı.
+        success_count: Ardışık veya toplam başarı sayısı.
+        failure_threshold: Devreyi OPEN yapan eşik değer.
+        recovery_timeout_seconds: Devrenin HALF_OPEN'a geçmesi için bekleme süresi.
+        last_failure_time: Son başarısızlık zaman damgası (ISO 8601).
+        last_success_time: Son başarı zaman damgası (ISO 8601).
+        total_requests: İşlenen toplam istek sayısı.
+        total_failures: Toplam başarısız istek sayısı.
+        total_successes: Toplam başarılı istek sayısı.
+        uptime_percentage: Çalışabilirlik / başarı yüzdesi (%0.0 - %100.0).
+    """
 
     name: str
-    state: str  # CLOSED, OPEN, HALF_OPEN
+    state: str
     failure_count: int
     success_count: int
     failure_threshold: int
@@ -54,7 +69,15 @@ class CircuitBreakerSnapshot:
     uptime_percentage: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Snapshot verilerini serileştirilebilir bir sözlüğe dönüştürür.
+
+        Returns:
+            dict[str, Any]: JSON uyumlu durum verileri.
+        """
+        safe_uptime = self.uptime_percentage
+        if math.isnan(safe_uptime) or math.isinf(safe_uptime):
+            safe_uptime = 100.0
+
         return {
             "name": self.name,
             "state": self.state,
@@ -67,55 +90,136 @@ class CircuitBreakerSnapshot:
             "total_requests": self.total_requests,
             "total_failures": self.total_failures,
             "total_successes": self.total_successes,
-            "uptime_pct": round(self.uptime_percentage, 2),
+            "uptime_pct": round(min(100.0, max(0.0, safe_uptime)), 2),
         }
+
+    def __repr__(self) -> str:
+        """Snapshot için bilgilendirici metin temsili."""
+        return (
+            f"CircuitBreakerSnapshot(name='{self.name}', state='{self.state}', "
+            f"failures={self.failure_count}/{self.failure_threshold}, "
+            f"uptime={round(self.uptime_percentage, 1)}%)"
+        )
 
 
 class CircuitBreakerMetricsCollector:
-    """
-    Circuit breaker metrics toplayıcı ve export edici.
+    """Merkezi devre kesici metrik toplayıcı ve export yöneticisi.
 
-    Tüm circuit breaker'ların durumunu merkezi olarak izler.
+    Tüm kayıtlı devre kesicilerin durumunu eşzamanlı güvenli (thread-safe)
+    olarak takip eder, durum geçişlerinin tarihçesini tutar ve Prometheus / JSON
+    formatlarında sunar.
     """
 
-    def __init__(self):
-        """Otomatik eklendi."""
-        self._tracked_breakers: dict[str, Any] = {}  # name → CircuitBreaker
-        from collections import deque
-        self._history: deque = deque(maxlen=1000)
-        self._max_history = 1000
+    def __init__(self, max_history: int = DEFAULT_MAX_HISTORY) -> None:
+        """Metrik toplayıcıyı başlatır.
+
+        Args:
+            max_history: Bellekte saklanacak maksimum durum değişikliği sayısı.
+        """
+        self._tracked_breakers: dict[str, Any] = {}
+        self._max_history: int = max(1, max_history)
+        self._history: deque[dict[str, Any]] = deque(maxlen=self._max_history)
+        self._lock: threading.RLock = threading.RLock()
 
     @otel_trace("circuit_breaker_metrics.track")
-    def track(self, breaker: Any) -> Any:
-        """Circuit breaker'ı izleme altına al."""
-        self._tracked_breakers[breaker.name] = breaker
-        logger.debug("Circuit breaker tracked", name=breaker.name)
+    def track(self, breaker: Any) -> None:
+        """Bir devre kesici veya korumalı sağlayıcıyı merkezi izlemeye alır.
 
-    def untrack(self, name: str) -> Any:
-        """İzlemeyi kaldır."""
-        self._tracked_breakers.pop(name, None)
+        Args:
+            breaker: İzlenecek CircuitBreaker veya ProtectedProvider nesnesi.
+        """
+        if not hasattr(breaker, "name"):
+            logger.warning("gecersiz_breaker_izleme_reddedildi", breaker=str(breaker))
+            return
+
+        with self._lock:
+            self._tracked_breakers[breaker.name] = breaker
+
+        logger.debug("circuit_breaker_izlemeye_alindi", name=breaker.name)
+
+    def untrack(self, name: str) -> None:
+        """Devre kesiciyi merkezi izlemeden çıkarır.
+
+        Args:
+            name: İzlemeden çıkarılacak devre kesici adı.
+        """
+        with self._lock:
+            removed = self._tracked_breakers.pop(name, None)
+
+        if removed is not None:
+            logger.debug("circuit_breaker_izlemeden_cikarildi", name=name)
 
     def get_snapshot(self, name: str) -> CircuitBreakerSnapshot | None:
-        """Tek circuit breaker snapshot'ı."""
-        breaker = self._tracked_breakers.get(name)
+        """Belirtilen devre kesicinin anlık sağlık ve metrik görüntüsünü çıkarır.
+
+        Args:
+            name: Devre kesici adı.
+
+        Returns:
+            CircuitBreakerSnapshot | None: Varsa snapshot, yoksa None.
+        """
+        with self._lock:
+            breaker = self._tracked_breakers.get(name)
+
         if not breaker:
             return None
 
-        total_req = getattr(breaker, "_total_requests", 0)
-        total_fail = getattr(breaker, "_total_failures", 0)
-        total_succ = getattr(breaker, "_total_successes", 0)
+        # Farklı nesne modellerinden (CircuitBreaker veya ProtectedProvider) esnek metrik çekme
+        target = getattr(breaker, "circuit", breaker)
 
-        uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
+        # Durum tespiti
+        raw_state = getattr(target, "state", "CLOSED")
+        state_str = raw_state.value if hasattr(raw_state, "value") else str(raw_state)
+
+        failure_count = int(getattr(target, "failure_count", 0))
+        failure_threshold = int(getattr(target, "failure_threshold", 5))
+        recovery_timeout = int(getattr(target, "recovery_timeout_seconds", 30))
+
+        last_fail_raw = getattr(target, "last_failure_time", None)
+        last_failure_time = (
+            last_fail_raw.isoformat()
+            if isinstance(last_fail_raw, datetime)
+            else (str(last_fail_raw) if last_fail_raw else None)
+        )
+
+        last_succ_raw = getattr(target, "last_success_time", None)
+        last_success_time = (
+            last_succ_raw.isoformat()
+            if isinstance(last_succ_raw, datetime)
+            else (str(last_succ_raw) if last_succ_raw else None)
+        )
+
+        # İstek sayaçları (doğrudan veya reliability katmanından)
+        reliability = getattr(breaker, "reliability", None)
+        if reliability is not None and hasattr(reliability, "get_stats"):
+            stats = reliability.get_stats()
+            total_req = int(stats.get("total_calls", 0))
+            total_fail = int(stats.get("total_failures", 0))
+            total_succ = max(0, total_req - total_fail)
+            success_count = total_succ
+        else:
+            total_req = int(getattr(breaker, "_total_requests", getattr(target, "_total_requests", 0)))
+            total_fail = int(getattr(breaker, "_total_failures", getattr(target, "_total_failures", failure_count)))
+            total_succ = int(getattr(breaker, "_total_successes", getattr(target, "_total_successes", 0)))
+            success_count = int(getattr(breaker, "success_count", getattr(target, "half_open_calls", total_succ)))
+
+        if total_req > 0:
+            uptime = (total_succ / total_req) * 100.0
+        else:
+            uptime = 100.0 if failure_count == 0 else 0.0
+
+        if math.isnan(uptime) or math.isinf(uptime):
+            uptime = 100.0
 
         return CircuitBreakerSnapshot(
             name=breaker.name,
-            state=breaker.state.value if hasattr(breaker.state, "value") else str(breaker.state),
-            failure_count=breaker.failure_count,
-            success_count=getattr(breaker, "success_count", 0),
-            failure_threshold=breaker.failure_threshold,
-            recovery_timeout_seconds=breaker.recovery_timeout_seconds,
-            last_failure_time=breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
-            last_success_time=breaker.last_success_time.isoformat() if breaker.last_success_time else None,
+            state=state_str,
+            failure_count=failure_count,
+            success_count=success_count,
+            failure_threshold=failure_threshold,
+            recovery_timeout_seconds=recovery_timeout,
+            last_failure_time=last_failure_time,
+            last_success_time=last_success_time,
             total_requests=total_req,
             total_failures=total_fail,
             total_successes=total_succ,
@@ -123,97 +227,156 @@ class CircuitBreakerMetricsCollector:
         )
 
     def get_all_snapshots(self) -> list[CircuitBreakerSnapshot]:
-        """Tüm circuit breaker snapshot'ları."""
-        return [self.get_snapshot(name) for name in self._tracked_breakers]
+        """Tüm kayıtlı devre kesicilerin snapshot listesini döner.
+
+        Returns:
+            list[CircuitBreakerSnapshot]: Tüm izlenen devre kesicilerin durumları.
+        """
+        with self._lock:
+            names = list(self._tracked_breakers.keys())
+
+        snapshots: list[CircuitBreakerSnapshot] = []
+        for name in names:
+            snap = self.get_snapshot(name)
+            if snap is not None:
+                snapshots.append(snap)
+        return snapshots
 
     @otel_trace("circuit_breaker_metrics.export_prometheus")
     def export_prometheus(self) -> str:
-        """
-        Prometheus formatında metrics export.
+        """Prometheus metin formatında tüm devre kesici metriklerini dışa aktarır.
 
         Returns:
-            Prometheus text format
+            str: Prometheus uyumlu metrik çıktısı.
         """
-        lines = []
+        snapshots = self.get_all_snapshots()
+        lines: list[str] = [
+            "# HELP circuit_breaker_state Circuit breaker durumu (0=CLOSED, 1=HALF_OPEN, 2=OPEN)",
+            "# TYPE circuit_breaker_state gauge",
+            "# HELP circuit_breaker_failures Mevcut ardışık hata sayısı",
+            "# TYPE circuit_breaker_failures gauge",
+            "# HELP circuit_breaker_requests Toplam işlenen istek adedi",
+            "# TYPE circuit_breaker_requests counter",
+            "# HELP circuit_breaker_total_failures Toplam başarısız istek adedi",
+            "# TYPE circuit_breaker_total_failures counter",
+            "# HELP circuit_breaker_uptime_pct Başarı ve çalışabilirlik yüzdesi",
+            "# TYPE circuit_breaker_uptime_pct gauge",
+        ]
 
-        # HELP and TYPE headers
-        lines.append("# HELP circuit_breaker_state Circuit breaker state (0=CLOSED, 1=OPEN, 2=HALF_OPEN)")
-        lines.append("# TYPE circuit_breaker_state gauge")
+        state_map = {"CLOSED": 0, "HALF_OPEN": 1, "OPEN": 2}
 
-        lines.append("# HELP circuit_breaker_failures Total failure count")
-        lines.append("# TYPE circuit_breaker_failures counter")
+        for snap in snapshots:
+            safe_name = snap.name.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "")
+            labels = f'name="{safe_name}"'
+            state_val = state_map.get(snap.state, -1)
 
-        lines.append("# HELP circuit_breaker_requests Total request count")
-        lines.append("# TYPE circuit_breaker_requests counter")
-
-        lines.append("# HELP circuit_breaker_uptime_pct Uptime percentage")
-        lines.append("# TYPE circuit_breaker_uptime_pct gauge")
-
-        for name, breaker in self._tracked_breakers.items():
-            state_value = {"CLOSED": 0, "OPEN": 1, "HALF_OPEN": 2}.get(
-                breaker.state.value if hasattr(breaker.state, "value") else str(breaker.state), -1
-            )
-
-            total_req = getattr(breaker, "_total_requests", 0)
-            getattr(breaker, "_total_failures", 0)
-            total_succ = getattr(breaker, "_total_successes", 0)
-            uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
-
-            labels = f'name="{name}"'
-            lines.append(f"circuit_breaker_state{{{labels}}} {state_value}")
-            lines.append(f"circuit_breaker_failures{{{labels}}} {breaker.failure_count}")
-            lines.append(f"circuit_breaker_requests{{{labels}}} {total_req}")
-            lines.append(f"circuit_breaker_uptime_pct{{{labels}}} {uptime:.2f}")
+            lines.append(f"circuit_breaker_state{{{labels}}} {state_val}")
+            lines.append(f"circuit_breaker_failures{{{labels}}} {snap.failure_count}")
+            lines.append(f"circuit_breaker_requests{{{labels}}} {snap.total_requests}")
+            lines.append(f"circuit_breaker_total_failures{{{labels}}} {snap.total_failures}")
+            lines.append(f"circuit_breaker_uptime_pct{{{labels}}} {snap.uptime_percentage:.2f}")
 
         return "\n".join(lines) + "\n"
 
     def export_json(self) -> dict[str, Any]:
-        """JSON formatında export."""
+        """Tüm metrikleri ve sistem özetini sözlük yapısında döner.
+
+        Returns:
+            dict[str, Any]: JSON uyumlu metrik raporu.
+        """
+        snapshots = self.get_all_snapshots()
+
+        total_count = len(snapshots)
+        closed_count = sum(1 for s in snapshots if s.state == "CLOSED")
+        open_count = sum(1 for s in snapshots if s.state == "OPEN")
+        half_open_count = sum(1 for s in snapshots if s.state == "HALF_OPEN")
+
         return {
             "timestamp": datetime.now(UTC).isoformat(),
-            "circuit_breakers": {name: self.get_snapshot(name).to_dict() for name in self._tracked_breakers},
+            "circuit_breakers": {s.name: s.to_dict() for s in snapshots},
             "summary": {
-                "total": len(self._tracked_breakers),
-                "closed": sum(
-                    1
-                    for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "CLOSED"
-                ),
-                "open": sum(
-                    1
-                    for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "OPEN"
-                ),
-                "half_open": sum(
-                    1
-                    for b in self._tracked_breakers.values()
-                    if (b.state.value if hasattr(b.state, "value") else str(b.state)) == "HALF_OPEN"
-                ),
+                "total": total_count,
+                "closed": closed_count,
+                "open": open_count,
+                "half_open": half_open_count,
+                "healthy_ratio": round(closed_count / total_count, 3) if total_count > 0 else 1.0,
             },
         }
 
+    def export_orjson_bytes(self) -> bytes:
+        """Tüm metrikleri orjson ile yüksek hızlı ikili JSON bayt dizisi olarak üretir.
+
+        Returns:
+            bytes: UTF-8 kodlanmış JSON verisi.
+        """
+        return orjson.dumps(self.export_json())
+
     @otel_trace("circuit_breaker_metrics.record_state_change")
-    def record_state_change(self, name: str, old_state: str, new_state: str) -> Any:
-        """State change kaydet."""
-        entry = {
+    def record_state_change(self, name: str, old_state: str, new_state: str) -> None:
+        """Devre kesicide meydana gelen bir durum geçişini tarihçeye kaydeder.
+
+        Args:
+            name: Devre kesici adı.
+            old_state: Önceki durum ("CLOSED", "OPEN", "HALF_OPEN").
+            new_state: Yeni durum.
+        """
+        entry: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "name": name,
-            "old_state": old_state,
-            "new_state": new_state,
+            "old_state": str(old_state),
+            "new_state": str(new_state),
         }
-        self._history.append(entry)
-        if len(self._history) > 1000:
-            self._history = list(self._history)[-1000:]
 
-        if len(self._history) > self._max_history:
-            self._history = list(self._history)[-self._max_history :]
+        with self._lock:
+            self._history.append(entry)
 
-        logger.info("Circuit breaker state changed", name=name, old=old_state, new=new_state)
+        logger.info(
+            "circuit_breaker_durumu_degisti",
+            name=name,
+            eski_durum=old_state,
+            yeni_durum=new_state,
+        )
 
-    def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
-        """State change geçmişi."""
-        return list(self._history)[-limit:]
+    def get_history(self, limit: int = DEFAULT_HISTORY_LIMIT) -> list[dict[str, Any]]:
+        """Son durum geçişi kayıtlarını döner.
+
+        Args:
+            limit: Döndürülecek maksimum kayıt sayısı.
+
+        Returns:
+            list[dict[str, Any]]: Kronolojik durum değişikliği listesi.
+        """
+        safe_limit = max(1, min(limit, self._max_history))
+        with self._lock:
+            # deque sonundan güvenli kopya alma
+            history_list = list(self._history)
+
+        return history_list[-safe_limit:]
+
+    def clear(self) -> None:
+        """Kayıtlı devre kesicileri ve durum tarihçesini temizler (Testler ve sıfırlama için)."""
+        with self._lock:
+            self._tracked_breakers.clear()
+            self._history.clear()
+
+    def __repr__(self) -> str:
+        """Toplayıcının okunabilir dize temsilini döner."""
+        with self._lock:
+            count = len(self._tracked_breakers)
+            history_len = len(self._history)
+        return (
+            f"CircuitBreakerMetricsCollector(tracked_breakers={count}, "
+            f"history_events={history_len}/{self._max_history})"
+        )
 
 
-# Singleton
-circuit_breaker_metrics = CircuitBreakerMetricsCollector()
+# Global Singleton Örneği
+circuit_breaker_metrics: Final[CircuitBreakerMetricsCollector] = CircuitBreakerMetricsCollector()
+
+__all__: Sequence[str] = [
+    "DEFAULT_HISTORY_LIMIT",
+    "DEFAULT_MAX_HISTORY",
+    "CircuitBreakerMetricsCollector",
+    "CircuitBreakerSnapshot",
+    "circuit_breaker_metrics",
+]

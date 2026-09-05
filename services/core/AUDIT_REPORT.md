@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 12 dosya denetlendi, 73 sorun düzeltildi. Bekleyen dosya: 92
+**Denetim Sonucu:** 13 dosya denetlendi, 80 sorun düzeltildi. Bekleyen dosya: 91
 
 ---
 
@@ -34,6 +34,7 @@
 | 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 12 | `circuit_breaker.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 13 | `circuit_breaker_metrics.py` | 7 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -206,6 +207,20 @@
 | 5 | 2 & 3 | `ProtectedProvider` içinde `asyncio.CancelledError` istisnası genel blokta yutuluyordu; ayrıca başarısızlıkta hata fırlatma esnekliği yoktu | `asyncio.CancelledError` yukarı fırlatıldı (`re-raise`); fail-closed prensibi doğrultusunda yapılandırılabilir `raise_on_failure` bayrağı eklendi |
 | 6 | 4 | `CentralStateStore` (DuckDB) kancaları korunurken hata durumunda çökme yaşanmaması için korumalı kilit ve try-catch eklendi | Durum kurtarma ve kaydetme çağrıları hata toleranslı ve asenkron/senkron uyumlu kılındı |
 | 7 | 4 & 7 | `__repr__` metotları eksikti veya standart dışıydı; `__all__` listesinde modül sabitleri (`DEFAULT_*`, `CB_*`) eksikti | Standart `CircuitBreaker`, `RateLimiter`, `ProviderReliability`, `ProtectedProvider` `__repr__` metotları ve eksiksiz `__all__` listesi tanımlandı |
+
+---
+
+## `circuit_breaker_metrics.py` (13. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & 4 | Metotlarda 4 farklı yerde `"Otomatik eklendi."` şeklinde anlamsız docstring mevcuttu | Tüm anlamsız docstring'ler temizlendi; açıklayıcı, standart Türkçe docstring'ler (Args/Returns) yazıldı |
+| 2 | 2 & 6 | `self._history: deque` tanımlanmış olmasına rağmen `record_state_change` içinde dilimleme yapılarak nesne `list` tipine dönüştürülüyor, `deque` maxlen garantisi kayboluyor ve her çağrıda $O(N)$ bellek/işlemci maliyeti oluşuyordu | Liste dönüşümü ve gereksiz `if`'ler kaldırıldı; `deque(maxlen=self._max_history)` ile saf $O(1)$ sabit zamanlı halka tamponu sağlandı |
+| 3 | 2 & 3 | Singleton toplayıcı sınıfında (`CircuitBreakerMetricsCollector`) thread-safety koruması yoktu; eşzamanlı izleme/raporlama sırasında `RuntimeError: dictionary changed size during iteration` riski vardı | Sınıfa `threading.RLock()` eklendi; tüm ekleme, çıkarma, snapshot alma ve export işlemleri eşzamanlı erişime karşı zırhlandırıldı |
+| 4 | 2 & 3 | Prometheus export metin formatında etiket değerleri (`name="..."`) kaçış karakteri (label escaping) işleminden geçirilmiyordu; isimdeki olası tırnak veya satır sonu Prometheus parser'ını çökertiyordu | `name.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '')` ile tam Prometheus etiket güvenliği sağlandı |
+| 5 | 2 & 3 | `export_json` döngüsünde `self.get_snapshot(name)` `None` dönerse `None.to_dict()` nedeniyle tüm metrik servisi `AttributeError` ile çöküyordu | `get_all_snapshots()` üzerinden `None` filtreli güvenli liste üretimi sağlandı; `export_orjson_bytes()` ile yüksek performanslı serileştirme eklendi |
+| 6 | 3 & 4 | Yerel `otel_trace` dekoratörü tanımlanmıştı; modül bazlı bağımsız span açılıyordu | Merkezi `from services.core.otel import otel_trace` yapısına geçilerek merkezi telemetri uyumu sağlandı |
+| 7 | 4 & 7 | `CircuitBreakerSnapshot` `@dataclass(slots=True)` yapılmamıştı ve `__repr__` metotları eksikti; modül seviyesinde `__all__` listesi tanımlanmamıştı | `slots=True`, açıklayıcı `__repr__` metotları ve tüm sınıf/sabitleri kapsayan eksiksiz `__all__` listesi eklendi |
 
 ---
 
