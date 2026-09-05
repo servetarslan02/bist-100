@@ -6,25 +6,27 @@ ve durum değişikliklerinin değişmez (immutable) ve denetlenebilir bir zaman 
 
 Özellikler:
 - Karar silsilesi (lineage tracking: RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK -> ORDER -> FILL)
-- Risk motoru onay ve red kontrolleri
-- BIST emir ve dolum yaşam döngüsü
-- Sistem ve yapılandırma durumu değişimleri
-- Eşzamanlı (thread-safe) bellek içi halka tamponu (ring buffer) ve varlık indeksi
+- Çift indeksleme ile hisse bazlı emir ve dolumların tam silsile takibi
+- Bellek içi halka tamponu (ring buffer) ve sınırlı indeks boyutuyla bellek sızıntısı koruması
+- DuckDB ve orjson entegrasyonu ile SPK denetim izi kalıcılığı
+- OpenTelemetry span izleme ve thread-safe eşzamanlılık koruması
 """
 
 from __future__ import annotations
 
-import functools
 import threading
 import uuid
 from collections import deque
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any
 
+import duckdb
+import orjson
 import structlog
 from opentelemetry import metrics, trace
+
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.audit_log")
@@ -32,43 +34,18 @@ meter = metrics.get_meter("alpha-bist.audit_log")
 
 DEFAULT_MAX_ENTRIES: int = 5000
 DEFAULT_ENTITY_INDEX_LIMIT: int = 500
-
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-def otel_trace(span_name: str) -> Callable[[F], F]:
-    """Bir metodu OpenTelemetry span içine alan dekoratör.
-
-    Args:
-        span_name: Oluşturulacak span'in açıklayıcı adı.
-
-    Returns:
-        Dekore edilmiş fonksiyon/metot sarmalayıcısı.
-    """
-
-    def decorator(func: F) -> F:
-        """Hedef fonksiyonu OTel span ile sarmalar."""
-
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Span bağlamı altında fonksiyonu yürütür."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper  # type: ignore[return-value]
-
-    return decorator
+MAX_INDEXED_ENTITIES: int = 1000
 
 
-@dataclass
+@dataclass(slots=True)
 class AuditEntry:
     """Değişmez (immutable) denetim kaydı veri modeli."""
 
     audit_id: str
     action: str  # DECISION, RISK_CHECK, ORDER, FILL, STATE_CHANGE, CONFIG_CHANGE
-    entity_type: str  # ticker, portfolio, order, model, config
+    entity_type: str  # ticker, portfolio, order, fill, model, config
     entity_id: str
-    actor: str  # system, decision_engine, risk_engine, user
+    actor: str  # system, decision_engine, risk_engine, user, order_service
     details: dict[str, Any]
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     correlation_id: str = ""
@@ -78,7 +55,7 @@ class AuditEntry:
         """Denetim kaydını sözlük biçimine dönüştürür.
 
         Returns:
-            Serileştirilebilir anahtar-değer sözlüğü.
+            dict[str, Any]: Serileştirilebilir anahtar-değer sözlüğü.
         """
         return {
             "audit_id": self.audit_id,
@@ -95,8 +72,8 @@ class AuditEntry:
     def __repr__(self) -> str:
         """Denetim kaydının açıklayıcı temsilini döner."""
         return (
-            f"<AuditEntry(id='{self.audit_id}', aksiyon='{self.action}', "
-            f"varlik='{self.entity_type}:{self.entity_id}', aktor='{self.actor}')>"
+            f"AuditEntry(id={self.audit_id!r}, aksiyon={self.action!r}, "
+            f"varlik={self.entity_type + ':' + self.entity_id!r}, aktor={self.actor!r})"
         )
 
 
@@ -124,6 +101,18 @@ class AuditLog:
         self._entries: deque[AuditEntry] = deque(maxlen=max_entries)
         self._index: dict[str, deque[AuditEntry]] = {}
 
+    def _prune_index_if_needed(self) -> None:
+        """İndeks sözlüğü kapasiteyi aştığında boşalmış veya en eski anahtarları temizler."""
+        if len(self._index) > MAX_INDEXED_ENTITIES:
+            keys_to_remove = [k for k, v in self._index.items() if len(v) == 0]
+            for k in keys_to_remove:
+                del self._index[k]
+            # Hala fazlaysa en eski anahtarların bir kısmını düşür
+            if len(self._index) > MAX_INDEXED_ENTITIES:
+                overflow_keys = list(self._index.keys())[: len(self._index) - MAX_INDEXED_ENTITIES]
+                for k in overflow_keys:
+                    del self._index[k]
+
     @otel_trace("audit_log.log")
     def log(self, entry: AuditEntry) -> None:
         """Denetim kaydı ekler (yalnızca sona ekleme / append-only).
@@ -141,11 +130,26 @@ class AuditLog:
 
         key = f"{entry.entity_type}:{entry.entity_id}"
 
+        # Emir ve dolum kayıtları için ikincil hisse indeksi (Lineage onarımı)
+        secondary_key: str | None = None
+        if entry.entity_type in {"order", "fill"} and isinstance(entry.details, dict):
+            rel_ticker = entry.details.get("ticker")
+            if rel_ticker:
+                secondary_key = f"ticker:{rel_ticker}"
+
         with self._lock:
             self._entries.append(entry)
+
             if key not in self._index:
                 self._index[key] = deque(maxlen=self._entity_limit)
             self._index[key].append(entry)
+
+            if secondary_key:
+                if secondary_key not in self._index:
+                    self._index[secondary_key] = deque(maxlen=self._entity_limit)
+                self._index[secondary_key].append(entry)
+
+            self._prune_index_if_needed()
 
         logger.debug(
             "denetim_kaydi_eklendi",
@@ -384,7 +388,7 @@ class AuditLog:
             entity_id: Varlık tekil kimliği.
 
         Returns:
-            Varlığa ait denetim kayıtları sözlük listesi.
+            list[dict[str, Any]]: Varlığa ait denetim kayıtları sözlük listesi.
         """
         key = f"{entity_type}:{entity_id}"
         with self._lock:
@@ -392,7 +396,7 @@ class AuditLog:
         return [entry.to_dict() for entry in entries]
 
     def get_decision_lineage(self, ticker: str) -> list[dict[str, Any]]:
-        """Bir hisse sembolü için tam karar silsilesini mantıksal işlem sırasına göre getirir.
+        """Bir hisse sembolü için tam karar silsilesini mantıksal ve kronolojik sırada getirir.
 
         Sıralama: RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK_CHECK -> ORDER -> FILL
 
@@ -400,7 +404,7 @@ class AuditLog:
             ticker: BIST hisse sembolü.
 
         Returns:
-            Mantıksal aşama önceliğine göre sıralanmış denetim kayıtları.
+            list[dict[str, Any]]: Mantıksal aşama önceliğine göre sıralanmış denetim kayıtları.
         """
         history = self.get_entity_history("ticker", ticker)
 
@@ -413,7 +417,13 @@ class AuditLog:
             "ORDER": 5,
             "FILL": 6,
         }
-        history.sort(key=lambda x: action_order.get(x.get("action", ""), 99))
+        history.sort(
+            key=lambda x: (
+                x.get("correlation_id", ""),
+                action_order.get(x.get("action", ""), 99),
+                x.get("timestamp", ""),
+            )
+        )
         return history
 
     def get_recent(self, limit: int = 50) -> list[dict[str, Any]]:
@@ -423,7 +433,7 @@ class AuditLog:
             limit: Döndürülecek maksimum kayıt sayısı (varsayılan: 50).
 
         Returns:
-            Yeniden eskiye doğru sıralı denetim kayıtları özeti.
+            list[dict[str, Any]]: Yeniden eskiye doğru sıralı denetim kayıtları özeti.
         """
         with self._lock:
             recent_entries = list(self._entries)[-limit:]
@@ -435,6 +445,7 @@ class AuditLog:
                 "entity_id": e.entity_id,
                 "actor": e.actor,
                 "timestamp": e.timestamp.isoformat(),
+                "details": e.details,
             }
             for e in reversed(recent_entries)
         ]
@@ -443,7 +454,7 @@ class AuditLog:
         """Denetim kaydı sistem istatistiklerini hesaplar.
 
         Returns:
-            Toplam kayıt sayısı, aksiyon dağılımı ve takip edilen varlık sayısını içeren sözlük.
+            dict[str, Any]: Toplam kayıt sayısı, aksiyon dağılımı ve takip edilen varlık sayısı.
         """
         with self._lock:
             total_entries = len(self._entries)
@@ -458,11 +469,71 @@ class AuditLog:
             "tracked_entities": tracked_entities,
         }
 
+    def export_to_duckdb(self, db_path: str = "data/audit.duckdb") -> int:
+        """Mevcut denetim kayıtlarını DuckDB tablosuna kalıcı olarak yazar.
+
+        Args:
+            db_path: Hedef DuckDB dosya yolu.
+
+        Returns:
+            int: Veritabanına aktarılan kayıt sayısı.
+        """
+        with self._lock:
+            entries = list(self._entries)
+
+        if not entries:
+            return 0
+
+        conn = duckdb.connect(database=db_path)
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_trail (
+                    audit_id VARCHAR PRIMARY KEY,
+                    action VARCHAR NOT NULL,
+                    entity_type VARCHAR NOT NULL,
+                    entity_id VARCHAR NOT NULL,
+                    actor VARCHAR NOT NULL,
+                    details_json VARCHAR,
+                    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                    correlation_id VARCHAR,
+                    parent_audit_id VARCHAR
+                );
+                """
+            )
+            for e in entries:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO audit_trail VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    [
+                        e.audit_id,
+                        e.action,
+                        e.entity_type,
+                        e.entity_id,
+                        e.actor,
+                        orjson.dumps(e.details).decode("utf-8"),
+                        e.timestamp,
+                        e.correlation_id,
+                        e.parent_audit_id,
+                    ],
+                )
+            logger.info("audit_log_duckdb_aktarildi", adet=len(entries), db_path=db_path)
+            return len(entries)
+        finally:
+            conn.close()
+
+    def clear(self) -> None:
+        """Test amaçlı tüm bellek içi denetim kayıtlarını ve indekslerini sıfırlar."""
+        with self._lock:
+            self._entries.clear()
+            self._index.clear()
+
     def _generate_id(self) -> str:
         """Benzersiz ve güvenli tekil denetim kimliği üretir.
 
         Returns:
-            16 karakterlik onaltılık tekil kimlik dizesi.
+            str: 16 karakterlik onaltılık tekil kimlik dizesi.
         """
         return uuid.uuid4().hex[:16]
 
@@ -470,8 +541,8 @@ class AuditLog:
         """Denetim yöneticisinin durum temsilini döner."""
         with self._lock:
             return (
-                f"<AuditLog(toplam_kayit={len(self._entries)}, "
-                f"takip_edilen_varlik={len(self._index)}, max_kapasite={self._max_entries})>"
+                f"AuditLog(toplam_kayit={len(self._entries)}, "
+                f"takip_edilen_varlik={len(self._index)}, max_kapasite={self._max_entries})"
             )
 
 
@@ -481,8 +552,10 @@ audit_log = AuditLog()
 __all__ = [
     "DEFAULT_ENTITY_INDEX_LIMIT",
     "DEFAULT_MAX_ENTRIES",
+    "MAX_INDEXED_ENTITIES",
     "AuditEntry",
     "AuditLog",
     "audit_log",
     "otel_trace",
 ]
+

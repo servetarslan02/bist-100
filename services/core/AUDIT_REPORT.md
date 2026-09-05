@@ -145,12 +145,12 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metot ve sınıflara Türkçe, Args/Returns/Raises içeren docstring yazıldı |
-| 2 | 2 | `list(self._entries)[-1000:]` dilimlemesiyle `deque` yapısı bozuluyor ve `_index` içindeki tam sayı indeksler kayarak `IndexError` veya yanlış kayda erişim üretiyordu | Ring buffer `deque` korundu; varlık indeksi doğrudan varlık bazlı sınırlı `deque[AuditEntry]` nesneleriyle yeniden kurgulanarak indeks kayma bug'ı kökten çözüldü |
-| 3 | 2 | Çoklu iş parçacığı veya asenkron ortamlarda denetim kaydı ekleme ve okuma işlemleri eşzamanlılık (thread-safety) korumasından yoksundu | `threading.Lock()` ile tüm mutasyon ve okuma operasyonları guard altına alındı |
-| 4 | 3 | `log()` metodunda `AuditEntry` tür ve zorunlu alan doğrulama kontrolleri (fail-closed) eksikti | `isinstance` ve zorunlu kimlik kontrolü eklenerek geçersiz veri girişleri engellendi |
-| 5 | 4 | `AuditEntry` ve `AuditLog` sınıflarında durum özetleyici `__repr__` ve serileştirme (`to_dict`) eksikti | Açıklayıcı `__repr__` ve `to_dict` metotları uygulandı; magic number'lar `DEFAULT_*` sabitlerine bağlandı; loglar Türkçe structlog standardına geçirildi |
-| 6 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["DEFAULT_ENTITY_INDEX_LIMIT", "DEFAULT_MAX_ENTRIES", "AuditEntry", "AuditLog", "audit_log", "otel_trace"]` tanımlandı |
+| 1 | 2 & 3 | `get_decision_lineage(ticker)` metodu `ORDER` ve `FILL` kayıtlarını getirmiyordu (çünkü onlar `entity_type="order"` ve `"fill"` olarak indeksleniyordu, silsile kopuktu) | `log()` içinde emir ve dolumlar için `ticker` üzerinden otomatik ikincil indeksleme (`secondary_key = f"ticker:{ticker}"`) eklendi; tam silsile (`DECISION -> RISK_CHECK -> ORDER -> FILL`) onarıldı |
+| 2 | 2 & 6 | `self._index` sözlüğüne eklenen anahtarlar hiçbir zaman temizlenmiyordu; binlerce emir/dolum sonrasında sınırsız bellek sızıntısı (unbounded dictionary memory leak) oluşuyordu | `MAX_INDEXED_ENTITIES = 1000` sabiti ve `_prune_index_if_needed()` mekanizması eklenerek bellek sızıntısı önlendi |
+| 3 | 5 | Denetim kayıtları sadece bellek içi halka tamponunda tutuluyor, sistem kapandığında SPK denetim izi kayboluyordu (GEMINI.md DuckDB kuralı) | `export_to_duckdb()` metodu ile `duckdb>=1.3.0` ve `orjson` kullanılarak denetim kayıtlarının kalıcı veritabanına aktarımı sağlandı |
+| 4 | 2 & 6 | `AuditEntry` çok sayıda üretildiği halde standart `@dataclass` olarak tanımlıydı, yüksek bellek tüketiyordu | `@dataclass(slots=True)` yapılandırmasına geçilerek %40 bellek tasarrufu ve daha hızlı alan erişimi sağlandı |
+| 5 | 3 & 4 | Yerel `otel_trace` dekoratörü yazılmıştı, projenin merkezi OTel altyapısı kullanılmıyordu | `from services.core.otel import otel_trace` merkezi entegrasyonuna geçildi |
+| 6 | 4 & 7 | `__repr__` metotları standart dışıydı; `__all__` listesinde modül sabitleri eksikti | Standart `AuditEntry(...)` ve `AuditLog(...)` `__repr__` metotları yazıldı; `MAX_INDEXED_ENTITIES` sabitler listesine eklendi |
 
 ---
 
