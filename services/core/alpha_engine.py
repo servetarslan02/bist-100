@@ -71,6 +71,13 @@ class AlphaEngine:
         default_bad_features = ["momentum_accel", "roc_120d", "dist_sma200", "cs_zscore_ret_1d", "roc_5d"]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
+        # Disk üzerindeki model varsa otomatik yükle (max_age_hours=24*30 → 30 günlük model geçerli)
+        loaded = self._load_model(max_age_hours=24 * 30)
+        if loaded:
+            logger.info("AlphaEngine: disk modeli otomatik yuklendi", features=len(self.features))
+        else:
+            logger.info("AlphaEngine: egitilmemis (disk modeli yok veya suresi dolmus)")
+
     @otel_trace("alpha_engine.fetch_data")
     def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None) -> Any:
         if tickers is None:

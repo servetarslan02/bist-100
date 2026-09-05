@@ -296,13 +296,99 @@ class UniverseAutoUpdater:
         elif not self._universe:
             self._load_from_cache()
 
-        # 2. Endeks üyeliklerini oluştur
+        # 2. Delisted / erişilemeyen hisseleri filtrele
+        self._filter_delisted_tickers()
+
+        # 3. Endeks üyeliklerini oluştur
         self._refresh_index_compositions()
 
-        # 3. Cache'e kaydet
+        # 4. Cache'e kaydet
         self._save_to_cache()
 
         return self._universe
+
+    def _filter_delisted_tickers(self) -> None:
+        """TradingView Scanner üzerinden aktif olmayan hisseleri evrenden temizle.
+
+        Mantık:
+        - TradingView Scanner tüm aktif BIST hisselerini döndürür (birincil kaynak).
+        - TradingView'de görünmeyen ama backup kaynaklardan (Mynet/Bigpara/İsYatirim)
+          gelen ticker'lar devre dışı/delisted kabul edilip evrenden çıkarılır.
+        - Bu yöntem yfinance'e hiç dokunmaz; tamamen TradingView ekosistemi içinde kalır.
+        """
+        # Eğer TradingView birincil keşfinden hiç ticker gelmediyse filtre yapma
+        tv_tickers: set[str] = {
+            t for t, info in self._universe.items()
+            if info.source == "tradingview_primary"
+        }
+
+        if not tv_tickers:
+            logger.info("delisted_filter_skip: TradingView verisi yok, filtre atlanıyor")
+            return
+
+        # Backup kaynaklardan gelen ama TradingView'de KESİNLİKLE görünmeyen ticker'lar
+        # TradingView, tüm aktif BIST hisselerini döndürür.
+        # Burada bulunmayanlar büyük ihtimalle delisted/suspend.
+        backup_only: list[str] = [
+            t for t, info in self._universe.items()
+            if info.source != "tradingview_primary"
+        ]
+
+        if not backup_only:
+            logger.info("delisted_filter_done: tüm hisseler TradingView doğrulamalı")
+            return
+
+        logger.info("delisted_filter_check", backup_only_count=len(backup_only))
+
+        # TradingView Scanner'a tekrar kısa sorgu — backup ticker'ları gerçekten biliyor mu?
+        removed: list[str] = []
+        try:
+            url = "https://scanner.tradingview.com/turkey/scan"
+            payload = {
+                "filter": [],
+                "options": {"lang": "tr"},
+                "symbols": {"query": {"types": []}},
+                "columns": ["name"],
+                "sort": {"sortBy": "Value.Traded", "sortOrder": "desc"},
+                "range": [0, 1500],  # Tüm BIST evrenini al
+            }
+            with self._get_client() as client:
+                resp = client.post(url, json=payload, timeout=20)
+            if resp.status_code == 200:
+                data = resp.json()
+                tv_all: set[str] = set()
+                for row in data.get("data", []):
+                    d = row.get("d", [])
+                    if d:
+                        raw_sym = str(d[0]).split(":")[-1].strip().upper()
+                        tv_all.add(raw_sym)
+
+                # Backup'tan gelen, TradingView'de hiç görünmeyen ticker'lar → sil
+                for ticker in backup_only:
+                    if ticker not in tv_all:
+                        removed.append(ticker)
+
+                logger.info(
+                    "tradingview_recheck_done",
+                    tv_active_count=len(tv_all),
+                    backup_checked=len(backup_only),
+                    to_remove=len(removed),
+                )
+            else:
+                logger.warning("delisted_filter_tv_api_error", status=resp.status_code)
+        except Exception as e:
+            logger.warning("delisted_filter_tv_error", error=str(e))
+            return
+
+        for ticker in removed:
+            self._universe.pop(ticker, None)
+
+        if removed:
+            logger.info("delisted_tickers_removed", count=len(removed), tickers=removed[:20])
+        else:
+            logger.info("delisted_filter_done_no_removals")
+
+
 
     def _refresh_index_compositions(self) -> Any:
         """BIST 100, BIST 30, BIST 50 endeks üyeliklerini belirle."""
