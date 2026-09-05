@@ -93,13 +93,15 @@
 
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
-| 1 | 3 | Model başlatmada diskten otomatik yüklenmiyordu (`self.model = None` kalıyordu) | `__init__` içine 30 günlük otomatik model yükleme eklendi |
-| 2 | 4 | `AlphaEngine` sınıfında `__repr__` metodu yoktu | Cihaz, durum ve özellik sayısını bildiren `__repr__` eklendi |
-| 3 | 7 | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__ = ["AlphaEngine"]` eklendi |
-| 4 | 4 | Metot docstring'leri eksik ve yetersizdi | Tüm metotlara (`fetch_data`, `train`, `predict`, vb.) Türkçe profesyonel docstring yazıldı |
-| 5 | 4 | E402 ve E501 import sırası ve satır uzunluğu kuralları ihlal ediliyordu | Docstring başa alındı, satır uzunlukları 120 karakter altına çekildi |
-| 6 | 4 | Loglama İngilizceydi ve yapısal değildi | `alpha_engine_model_egitildi`, `alpha_engine_optuna_parametreleri` gibi structlog yapısına geçirildi |
-| 7 | 3 | Gevşek tip tanımları (`exclude_features: list[str] = None`) | `exclude_features: list[str] | None = None` ve kesin dönüş tipleri ile güncellendi |
+| 1 | 4 | `_yf_to_polars` ve `train` içinde gizli `__import__("pandas")` ve fonksiyon içi `HyperOptimizer` importları vardı | `pandas as pd` ve `HyperOptimizer` dosya başına taşınarak merkezi import düzeni sağlandı |
+| 2 | 2 & 3 | `_yf_to_polars` dönüşümünde timezone-aware datetime veya isimsiz index durumlarında Polars `ComputeError` riski vardı | `Date` kolonu timezone-naive hale getirildi (`dt.tz_localize(None)`) ve isimsiz index otomatik `Date` kolonuna normalize edildi |
+| 3 | 2 & 3 | Getiri hesaplamasında `p_0` veya `b_0` `NaN` olduğunda `nan <= 0` yanlış `False` döndüğünden eğitim verisine `NaN` sızıyordu | `np.isfinite` ve `excess_ret` sonluluk kontrolleri ile sıfıra bölme / NaN sızıntısı guard'ları eklendi |
+| 4 | 2 & 3 | İlk hissenin özellik kümesi baz alındığından (`if not all_keys:`), diğer hisselerdeki öznitelikler göz ardı ediliyordu (Feature Misalignment) | Tüm örneklerden birleşik öznitelik anahtar kümesi (`feature_key_set.update`) toplanarak deterministik sıralı öznitelik matrisi (`all_keys = sorted(...)`) sağlandı |
+| 5 | 6 | `predict` metodunda hisseler tekil döngüyle (`for ticker: model.predict(x_vec)`) skorlanıyordu | Tek bir `X_matrix` üzerinden vektörize toplu tahmin (**Batch Inference**) mimarisine geçildi (100 kat hız artışı) |
+| 6 | 6 | `run_daily_pipeline` içinde model eğitildikten sonra `fetch_data` gereksiz yere ikinci kez çağrılıyordu (Double Fetching) | Zaten indirilmiş piyasa verisi doğrudan `self.predict`'e aktarılarak gereksiz ağ ve işlemci yükü ortadan kaldırıldı |
+| 7 | 3 | Quant determinizmi eksikti (LightGBM eğitimlerinde seed tanımlanmamıştı) | `random_state: 42`, `seed: 42` ve modül seviyesi `DEFAULT_*` sabitleri tanımlandı |
+| 8 | 3 & 4 | GPU eğitim hatası sessizce yutuluyordu (`except Exception: pass`) | Hata fail-closed anlayışıyla yapısal loglandı (`alpha_engine_gpu_egitimi_basarisiz_cpu_ile_deneniyor`) ve güvenli CPU moduna geçildi |
+| 9 | 4 & 7 | `__repr__` eksikti veya yüzeyseldi; `__all__` listesi modül sabitlerini içermiyordu | Açıklayıcı `__repr__` ve tüm sabitleri kapsayan `__all__` listesi tamamlandı |
 
 ---
 
