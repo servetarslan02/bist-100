@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import orjson
 import structlog
 from opentelemetry import metrics, trace
@@ -533,6 +534,7 @@ class AlertPolicy:
                 if self._lock_expires > now:
                     return False
                 old_owner = self._lock_owner
+                old_expires = self._lock_expires
                 self._lock_owner = None
                 self._lock_expires = 0.0
                 self._add_audit(
@@ -540,7 +542,7 @@ class AlertPolicy:
                     {
                         "old_owner": old_owner,
                         "new_owner": owner,
-                        "expired_at": self._lock_expires,
+                        "expired_at": old_expires,
                     },
                 )
             self._lock_owner = owner
@@ -670,8 +672,6 @@ class AlertPolicy:
 
     async def _send_webhook(self, url: str, payload: dict[str, Any]) -> bool:
         """Belirtilen URL'ye webhook isteğini HTTP üzerinden güvenli şekilde iletir."""
-        import httpx
-
         last_error: str | None = None
         for attempt in range(WEBHOOK_RETRY_COUNT):
             try:
@@ -953,6 +953,11 @@ class AlertPolicy:
         """
         with self._lock:
             try:
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS alert_silences ("
+                    "alert_type VARCHAR, fingerprint VARCHAR, start_time DOUBLE, "
+                    "end_time DOUBLE, reason VARCHAR, created_by VARCHAR, created_at DOUBLE)"
+                )
                 rows = db.execute(
                     "SELECT alert_type, fingerprint, start_time, end_time, reason, created_by, created_at "
                     "FROM alert_silences WHERE end_time > ?",
@@ -987,6 +992,11 @@ class AlertPolicy:
     def _persist_silence_to_db(self, rule: SilenceRule, db: Any) -> None:
         """Susturma kuralını veritabanına kaydeder (DuckDB uyumlu)."""
         try:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS alert_silences ("
+                "alert_type VARCHAR, fingerprint VARCHAR, start_time DOUBLE, "
+                "end_time DOUBLE, reason VARCHAR, created_by VARCHAR, created_at DOUBLE)"
+            )
             db.execute(
                 "INSERT INTO alert_silences "
                 "(alert_type, fingerprint, start_time, end_time, reason, created_by, created_at) "
