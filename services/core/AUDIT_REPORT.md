@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 110 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 115 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -26,7 +26,7 @@
 | 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
 | 3 | `alerting.py` | 8 | ✅ Denetlendi, düzeltildi |
 | 4 | `algo_notification.py` | 4 | ✅ Denetlendi, düzeltildi |
-| 5 | `alpha_engine.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 5 | `alpha_engine.py` | 14 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 6 | `arrow_pipeline.py` | 11 | ✅ Denetlendi, düzeltildi |
 | 7 | `async_http.py` | 10 | ✅ Denetlendi, düzeltildi |
 | 8 | `audit_log.py` | 9 | ✅ Denetlendi, düzeltildi |
@@ -106,6 +106,12 @@
 | 7 | 3 | Quant determinizmi eksikti (LightGBM eğitimlerinde seed tanımlanmamıştı) | `random_state: 42`, `seed: 42` ve modül seviyesi `DEFAULT_*` sabitleri tanımlandı |
 | 8 | 3 & 4 | GPU eğitim hatası sessizce yutuluyordu (`except Exception: pass`) | Hata fail-closed anlayışıyla yapısal loglandı (`alpha_engine_gpu_egitimi_basarisiz_cpu_ile_deneniyor`) ve güvenli CPU moduna geçildi |
 | 9 | 4 & 7 | `__repr__` eksikti veya yüzeyseldi; `__all__` listesi modül sabitlerini içermiyordu | Açıklayıcı `__repr__` ve tüm sabitleri kapsayan `__all__` listesi tamamlandı |
+| 10 | 2 & 3 | Eşzamanlı arka plan görevlerinde model eğitimi ve tahmin yapılırken yarış koşulu (Race Condition) vardı | `self._lock = threading.RLock()` ile model yükleme, eğitim ve tahmin süreçleri thread-safe kilit altına alındı |
+| 11 | 2 & 3 | `predict` ve `generate_training_samples` içinde kirli veri (`None`, `NaN`, `Inf`, geçersiz tip) `float()` çökmesine yol açabiliyordu | `_safe_float` koruyucu fonksiyonu ile tüm öznitelik okumaları güvenli sayısal değere bağlandı |
+| 12 | 4 & 6 | Model açıklanabilirliği ve öznitelik önem analizleri için metot eksikti | `get_feature_importances(importance_type)` metodu eklenerek 'gain' ve 'split' önem skorları azalan sırada sunuldu |
+| 13 | 5 & 6 | Eğitilen modellerin kurumsal denetim izi ve meta verilerinin yerel veritabanında saklanması yoktu (GEMINI.md DuckDB/orjson kuralı) | `save_model_metadata_to_duckdb` ve `get_model_history_from_duckdb` metotları ile atomik DuckDB kayıt defteri entegre edildi |
+| 14 | 1 & 2 | `generate_training_samples` içinde ileri getiri ufkunun eğitim bitişini aşması (`t_fwd > train_end`) önlenemiyordu (Point-In-Time sızıntısı) | Sıkı Point-In-Time ve purge/embargo zaman serisi guard'ı eklendi; negatif/sıfır `forward_days` için `ValueError` fırlatıldı |
+
 
 ---
 
