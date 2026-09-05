@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 14 dosya denetlendi, 126 sorun düzeltildi. Bekleyen dosya: 90
+**Denetim Sonucu:** 14 dosya denetlendi, 130 sorun düzeltildi. Bekleyen dosya: 90
 
 ---
 
@@ -23,7 +23,7 @@
 | # | Dosya | Sorun | Durum |
 |---|-------|-------|-------|
 | 1 | `__init__.py` | 4 | ✅ Denetlendi, düzeltildi |
-| 2 | `alert_policy.py` | 7 | ✅ Denetlendi, düzeltildi |
+| 2 | `alert_policy.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 3 | `alerting.py` | 12 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 4 | `algo_notification.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 5 | `alpha_engine.py` | 14 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
@@ -61,6 +61,10 @@
 | 5 | 7 | Modül seviyesinde `__all__` dışa aktarım listesi tanımlanmamıştı | `__all__` listesi eklendi (`AlertPolicy`, `PolicyDiff`, `SilenceRule`, vb.) |
 | 6 | 4 | Log mesajları İngilizceydi ve yapısal değildi (`logger.warning("Policy save failed")`) | Standart Türkçe anahtar-değer structlog formatına geçirildi |
 | 7 | 3 | Eksik ve gevşek tip tanımları (`db=None`, `path=None`, `-> Any`) | `db: Any = None`, `path: str | None = None` ve kesin dönüş tipleri ile güncellendi |
+| 8 | 2 & 3 | `AlertPolicy` iç metot zincirlerinde (update -> save_history vb.) `threading.Lock` reentrancy desteklemediği için self-deadlock riski vardı | `_lock = threading.RLock()` ile reentrant güvenli kilit mimarisine geçildi |
+| 9 | 2 & 3 | `_save_to_file` ve `ensure_default_config` doğrudan hedef dosyaya yazıyordu; işlem kesilmesinde bozulma riski mevcuttu | Atomik `.tmp.<uuid>` yazma ve `os.replace` mekanizması getirildi |
+| 10 | 2 & 6 | Politika denetim loglarının analitiği için doğrudan Polars entegrasyonu yoktu | `export_audit_log_to_polars(limit)` metodu ile sıfır kopyalı doğrudan Polars DataFrame üretimi sağlandı |
+| 11 | 4 & 7 | Modül seviyesindeki tüm kritik politika sabitleri (`DEFAULT_POLICY_PATH`, `FALLBACK_*`, `WEBHOOK_*`) dışa aktarılmıyordu | Tüm yapılandırma sabitleri eksiksiz olarak `__all__` listesine bağlandı |
 
 ---
 

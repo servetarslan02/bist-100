@@ -16,10 +16,14 @@ import copy
 import os
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import polars as pl
 
 import httpx
 import orjson
@@ -261,7 +265,7 @@ class AlertPolicy:
     _webhook_urls: list[str] = field(default_factory=list)
     _lock_owner: str | None = None
     _lock_expires: float = 0.0
-    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
     _last_file_save: float = field(default=0.0, init=False, repr=False)
 
     def __repr__(self) -> str:
@@ -1072,6 +1076,23 @@ class AlertPolicy:
         with self._lock:
             return [e.to_dict() for e in self._audit_log[-limit:]]
 
+    def export_audit_log_to_polars(self, limit: int = 500) -> pl.DataFrame:
+        """Denetim günlüğünü Polars DataFrame olarak dışa aktarır.
+
+        Args:
+            limit: Döndürülecek maksimum kayıt sayısı.
+
+        Returns:
+            pl.DataFrame: Polars DataFrame nesnesi.
+        """
+        import polars as pl
+
+        with self._lock:
+            data = [e.to_dict() for e in self._audit_log[-limit:]]
+        if not data:
+            return pl.DataFrame()
+        return pl.DataFrame(data)
+
     # =====================================================
     # INTERNAL
     # =====================================================
@@ -1105,7 +1126,7 @@ class AlertPolicy:
             self._audit_log = self._audit_log[-500:]
 
     def _save_to_file(self) -> None:
-        """Politikayı diske kaydeder (SSD koruması için 30 saniye debounce ile)."""
+        """Politikayı diske atomik olarak kaydeder (SSD koruması ve bozulma engelleme)."""
         if not self._config_path:
             return
         now = time.time()
@@ -1113,9 +1134,12 @@ class AlertPolicy:
             return
         self._last_file_save = now
         try:
-            os.makedirs(os.path.dirname(self._config_path), exist_ok=True)
-            with open(self._config_path, "wb") as f:
-                f.write(orjson.dumps(self.to_dict(), option=orjson.OPT_INDENT_2))
+            target_path = Path(self._config_path)
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = target_path.with_name(f"{target_path.name}.tmp.{uuid.uuid4().hex}")
+            temp_path.write_bytes(orjson.dumps(self.to_dict(), option=orjson.OPT_INDENT_2))
+            os.replace(temp_path, target_path)
+            self._last_modified = os.path.getmtime(self._config_path)
         except Exception as e:
             logger.warning("alarm_politikasi_kayit_hatasi", error=str(e))
 
@@ -1154,14 +1178,26 @@ def ensure_default_config(path: str | None = None) -> None:
         path: Opsiyonel dosya yolu (None ise varsayılan config dizini kullanılır).
     """
     config_path = path or str(DEFAULT_POLICY_PATH)
-    if os.path.exists(config_path):
+    target_path = Path(config_path)
+    if target_path.exists():
         return
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "wb") as f:
-        f.write(orjson.dumps({"version": 1, **AlertPolicy().to_dict()}, option=orjson.OPT_INDENT_2))
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = target_path.with_name(f"{target_path.name}.tmp.{uuid.uuid4().hex}")
+        temp_path.write_bytes(orjson.dumps({"version": 1, **AlertPolicy().to_dict()}, option=orjson.OPT_INDENT_2))
+        os.replace(temp_path, target_path)
+    except Exception as exc:
+        logger.warning("varsayilan_politika_yazilamadi", error=str(exc))
 
 
 __all__ = [
+    "DEFAULT_POLICY_PATH",
+    "FALLBACK_ESCALATION_TIMEOUT_S",
+    "FALLBACK_NOTIFICATION_ROUTING",
+    "FALLBACK_SEVERITY_THRESHOLDS",
+    "MAX_BATCH_SILENCE_SIZE",
+    "WEBHOOK_RETRY_COUNT",
+    "WEBHOOK_RETRY_DELAY_S",
     "AlertPolicy",
     "PolicyAuditEntry",
     "PolicyDiff",
@@ -1169,3 +1205,4 @@ __all__ = [
     "VersionConflictError",
     "ensure_default_config",
 ]
+
