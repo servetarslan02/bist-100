@@ -1,4 +1,4 @@
-"""ALPHA BIST — Denetim Kaydı ve Karar İzlenebilirliği (Audit Log) Modülü.
+"""ALPHA BIST — Denetim Kaydı ve Karar İzlenebilirliği (Audit Log) Modülü (Enterprise-Grade).
 
 Bu modül, sistem genelindeki tüm kritik kararların, risk kontrollerinin, emir/dolum olaylarının
 ve durum değişikliklerinin değişmez (immutable) ve denetlenebilir bir zaman serisi günlüğünü
@@ -8,7 +8,8 @@ ve durum değişikliklerinin değişmez (immutable) ve denetlenebilir bir zaman 
 - Karar silsilesi (lineage tracking: RAW_DATA -> FEATURE -> SIGNAL -> DECISION -> RISK -> ORDER -> FILL)
 - Çift indeksleme ile hisse bazlı emir ve dolumların tam silsile takibi
 - Bellek içi halka tamponu (ring buffer) ve sınırlı indeks boyutuyla bellek sızıntısı koruması
-- DuckDB ve orjson entegrasyonu ile SPK denetim izi kalıcılığı
+- DuckDB ve orjson entegrasyonu ile SPK denetim izi kalıcılığı ve indeksli hızlı sorgulama
+- Polars DataFrame dışa aktarımı ile sıfır kopyalı yüksek başarımlı analitik
 - OpenTelemetry span izleme ve thread-safe eşzamanlılık koruması
 """
 
@@ -19,10 +20,12 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
+from typing import Any, Final
 
 import duckdb
 import orjson
+import polars as pl
 import structlog
 from opentelemetry import metrics, trace
 
@@ -32,9 +35,30 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.audit_log")
 meter = metrics.get_meter("alpha-bist.audit_log")
 
-DEFAULT_MAX_ENTRIES: int = 5000
-DEFAULT_ENTITY_INDEX_LIMIT: int = 500
-MAX_INDEXED_ENTITIES: int = 1000
+# =====================================================
+# YAPILANDIRMA VE DENETİM SABİTLERİ
+# =====================================================
+
+DEFAULT_MAX_ENTRIES: Final[int] = 5000
+DEFAULT_ENTITY_INDEX_LIMIT: Final[int] = 500
+MAX_INDEXED_ENTITIES: Final[int] = 1000
+DEFAULT_AUDIT_DB_PATH: Final[str] = "data/audit.duckdb"
+
+VALID_AUDIT_ACTIONS: Final[frozenset[str]] = frozenset(
+    {
+        "DECISION",
+        "RISK_CHECK",
+        "ORDER",
+        "FILL",
+        "STATE_CHANGE",
+        "CONFIG_CHANGE",
+        "SIGNAL",
+        "FEATURE",
+        "RAW_DATA",
+        "ERROR",
+        "SECURITY",
+    }
+)
 
 
 @dataclass(slots=True)
@@ -75,7 +99,7 @@ class AuditEntry:
         Returns:
             bytes: İkili JSON verisi.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Denetim kaydının açıklayıcı temsilini döner."""
@@ -501,10 +525,58 @@ class AuditLog:
             "tracked_entities": tracked_entities,
         }
 
-    def export_to_duckdb(self, db_path: str = "data/audit.duckdb") -> int:
+    @otel_trace("audit_log.export_to_polars")
+    def export_to_polars(self, limit: int | None = None) -> pl.DataFrame:
+        """Mevcut denetim kayıtlarını Polars DataFrame olarak döner.
+
+        Args:
+            limit: Döndürülecek maksimum kayıt sayısı (None = tümü).
+
+        Returns:
+            pl.DataFrame: Katı şemalı Polars veri çerçevesi.
+        """
+        with self._lock:
+            entries = list(self._entries)
+            if limit is not None and limit > 0:
+                entries = entries[-limit:]
+
+        schema = {
+            "audit_id": pl.String,
+            "action": pl.String,
+            "entity_type": pl.String,
+            "entity_id": pl.String,
+            "actor": pl.String,
+            "details_json": pl.String,
+            "timestamp": pl.String,
+            "correlation_id": pl.String,
+            "parent_audit_id": pl.String,
+        }
+
+        if not entries:
+            return pl.DataFrame([], schema=schema)
+
+        records = [
+            {
+                "audit_id": e.audit_id,
+                "action": e.action,
+                "entity_type": e.entity_type,
+                "entity_id": e.entity_id,
+                "actor": e.actor,
+                "details_json": orjson.dumps(e.details, default=str).decode("utf-8"),
+                "timestamp": e.timestamp.isoformat(),
+                "correlation_id": e.correlation_id,
+                "parent_audit_id": e.parent_audit_id,
+            }
+            for e in entries
+        ]
+        return pl.DataFrame(records, schema=schema)
+
+    @otel_trace("audit_log.export_to_duckdb")
+    def export_to_duckdb(self, db_path: str = DEFAULT_AUDIT_DB_PATH) -> int:
         """Mevcut denetim kayıtlarını DuckDB tablosuna kalıcı olarak yazar.
 
         Toplu yazma (executemany) ile yüksek performans ve fail-safe orjson serileştirmesi sağlar.
+        Performans için varlık, korelasyon ve zaman indeksleri oluşturur.
 
         Args:
             db_path: Hedef DuckDB dosya yolu.
@@ -512,13 +584,16 @@ class AuditLog:
         Returns:
             int: Veritabanına aktarılan kayıt sayısı.
         """
+        target_path = Path(db_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
         with self._lock:
             entries = list(self._entries)
 
         if not entries:
             return 0
 
-        conn = duckdb.connect(database=db_path)
+        conn = duckdb.connect(database=str(target_path))
         try:
             conn.execute(
                 """
@@ -533,6 +608,9 @@ class AuditLog:
                     correlation_id VARCHAR,
                     parent_audit_id VARCHAR
                 );
+                CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_trail (entity_type, entity_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_corr ON audit_trail (correlation_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_trail (timestamp);
                 """
             )
             batch = [
@@ -555,14 +633,15 @@ class AuditLog:
                 """,
                 batch,
             )
-            logger.info("audit_log_duckdb_aktarildi", adet=len(entries), db_path=db_path)
+            logger.info("audit_log_duckdb_aktarildi", adet=len(entries), db_path=str(target_path))
             return len(entries)
         finally:
             conn.close()
 
+    @otel_trace("audit_log.query_persisted_duckdb")
     def query_persisted_duckdb(
         self,
-        db_path: str = "data/audit.duckdb",
+        db_path: str = DEFAULT_AUDIT_DB_PATH,
         entity_type: str | None = None,
         entity_id: str | None = None,
         action: str | None = None,
@@ -582,12 +661,11 @@ class AuditLog:
         Returns:
             list[dict[str, Any]]: Sorgu sonuç kayıtları listesi.
         """
-        import os
-
-        if not os.path.exists(db_path):
+        target_path = Path(db_path)
+        if not target_path.exists():
             return []
 
-        conn = duckdb.connect(database=db_path)
+        conn = duckdb.connect(database=str(target_path))
         try:
             query = (
                 "SELECT audit_id, action, entity_type, entity_id, actor, "
@@ -659,16 +737,216 @@ class AuditLog:
             )
 
 
-# Singleton örneği
-audit_log = AuditLog()
+# Global Singleton örneği
+audit_log: Final[AuditLog] = AuditLog()
 
-__all__ = [
+
+# =====================================================
+# MODÜL DÜZEYİ KOLAYLIK FONKSİYONLARI (CONVENIENCE API)
+# =====================================================
+
+
+def log_decision(
+    ticker: str,
+    action: str,
+    direction: str,
+    confidence: float,
+    reasons: list[str],
+    risks: list[str],
+    correlation_id: str = "",
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Model veya karar motoru kararını günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_decision(
+        ticker=ticker,
+        action=action,
+        direction=direction,
+        confidence=confidence,
+        reasons=reasons,
+        risks=risks,
+        correlation_id=correlation_id,
+    )
+
+
+def log_risk_check(
+    ticker: str,
+    approved: bool,
+    checks: list[dict[str, Any]],
+    correlation_id: str = "",
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Risk denetim sonucunu günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_risk_check(ticker=ticker, approved=approved, checks=checks, correlation_id=correlation_id)
+
+
+def log_order(
+    order_id: str,
+    ticker: str,
+    side: str,
+    quantity: int,
+    price: float,
+    order_type: str,
+    correlation_id: str = "",
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Emir iletimini günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_order(
+        order_id=order_id,
+        ticker=ticker,
+        side=side,
+        quantity=quantity,
+        price=price,
+        order_type=order_type,
+        correlation_id=correlation_id,
+    )
+
+
+def log_fill(
+    fill_id: str,
+    order_id: str,
+    ticker: str,
+    side: str,
+    quantity: int,
+    price: float,
+    commission: float,
+    correlation_id: str = "",
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Emir dolumunu günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_fill(
+        fill_id=fill_id,
+        order_id=order_id,
+        ticker=ticker,
+        side=side,
+        quantity=quantity,
+        price=price,
+        commission=commission,
+        correlation_id=correlation_id,
+    )
+
+
+def log_state_change(
+    entity_type: str,
+    entity_id: str,
+    old_value: Any,
+    new_value: Any,
+    reason: str,
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Sistem durum değişikliğini günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_state_change(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        old_value=old_value,
+        new_value=new_value,
+        reason=reason,
+    )
+
+
+def log_config_change(
+    config_key: str,
+    old_value: Any,
+    new_value: Any,
+    actor: str = "user",
+    logger_inst: AuditLog | None = None,
+) -> None:
+    """Yapılandırma değişikliğini günlüğe kaydeder."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    inst.log_config_change(config_key=config_key, old_value=old_value, new_value=new_value, actor=actor)
+
+
+def get_decision_lineage(ticker: str, logger_inst: AuditLog | None = None) -> list[dict[str, Any]]:
+    """Hisse karar silsilesini döner."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.get_decision_lineage(ticker=ticker)
+
+
+def get_entity_history(
+    entity_type: str, entity_id: str, logger_inst: AuditLog | None = None
+) -> list[dict[str, Any]]:
+    """Varlık denetim geçmişini döner."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.get_entity_history(entity_type=entity_type, entity_id=entity_id)
+
+
+def get_by_correlation_id(correlation_id: str, logger_inst: AuditLog | None = None) -> list[dict[str, Any]]:
+    """Korelasyon kimliğine ait denetim kayıtlarını döner."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.get_by_correlation_id(correlation_id=correlation_id)
+
+
+def get_recent_audits(limit: int = 50, logger_inst: AuditLog | None = None) -> list[dict[str, Any]]:
+    """En son denetim kayıtlarını döner."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.get_recent(limit=limit)
+
+
+def export_audit_to_polars(limit: int | None = None, logger_inst: AuditLog | None = None) -> pl.DataFrame:
+    """Denetim kayıtlarını Polars DataFrame olarak döner."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.export_to_polars(limit=limit)
+
+
+def export_audit_to_duckdb(
+    db_path: str = DEFAULT_AUDIT_DB_PATH, logger_inst: AuditLog | None = None
+) -> int:
+    """Denetim kayıtlarını DuckDB'ye yazar."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.export_to_duckdb(db_path=db_path)
+
+
+def query_persisted_duckdb(
+    db_path: str = DEFAULT_AUDIT_DB_PATH,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    action: str | None = None,
+    correlation_id: str | None = None,
+    limit: int = 100,
+    logger_inst: AuditLog | None = None,
+) -> list[dict[str, Any]]:
+    """Kalıcı DuckDB denetim kayıtlarını sorgular."""
+    inst = logger_inst if logger_inst is not None else audit_log
+    return inst.query_persisted_duckdb(
+        db_path=db_path,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        action=action,
+        correlation_id=correlation_id,
+        limit=limit,
+    )
+
+
+def get_audit_log() -> AuditLog:
+    """Tekil AuditLog örneğini döner."""
+    return audit_log
+
+
+__all__: list[str] = [
+    "DEFAULT_AUDIT_DB_PATH",
     "DEFAULT_ENTITY_INDEX_LIMIT",
     "DEFAULT_MAX_ENTRIES",
     "MAX_INDEXED_ENTITIES",
+    "VALID_AUDIT_ACTIONS",
     "AuditEntry",
     "AuditLog",
     "audit_log",
-    "otel_trace",
+    "export_audit_to_duckdb",
+    "export_audit_to_polars",
+    "get_audit_log",
+    "get_by_correlation_id",
+    "get_decision_lineage",
+    "get_entity_history",
+    "get_recent_audits",
+    "log_config_change",
+    "log_decision",
+    "log_fill",
+    "log_order",
+    "log_risk_check",
+    "log_state_change",
+    "query_persisted_duckdb",
 ]
-

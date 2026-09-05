@@ -17,13 +17,19 @@ GİRDİ DOĞRULAMA -> TEKRAR KORUMASI (IDEMPOTENCY) -> DEVRE KESİCİ & ZAMAN A�
 from __future__ import annotations
 
 import asyncio
+import inspect
 import random
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from collections import deque
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Final, TypeVar
 
+import duckdb
 import orjson
+import polars as pl
 import structlog
 
 from services.core.circuit_breaker import CircuitBreaker, CircuitState
@@ -32,31 +38,78 @@ from services.core.observability import prometheus_metrics
 
 logger = structlog.get_logger(__name__)
 
-DEFAULT_TIMEOUT_SECONDS: float = 30.0
-DEFAULT_MAX_RETRIES: int = 3
-DEFAULT_BACKOFF_FACTOR: float = 0.5
-DEFAULT_IDEMPOTENCY_TTL_SECONDS: float = 3600.0
-DEFAULT_IDEMPOTENCY_MAX_KEYS: int = 5000
-DEFAULT_SHUTDOWN_TIMEOUT_SECONDS: float = 5.0
+DEFAULT_TIMEOUT_SECONDS: Final[float] = 30.0
+DEFAULT_MAX_RETRIES: Final[int] = 3
+DEFAULT_BACKOFF_FACTOR: Final[float] = 0.5
+DEFAULT_IDEMPOTENCY_TTL_SECONDS: Final[float] = 3600.0
+DEFAULT_IDEMPOTENCY_MAX_KEYS: Final[int] = 5000
+DEFAULT_SHUTDOWN_TIMEOUT_SECONDS: Final[float] = 5.0
+DEFAULT_METRICS_DB_PATH: Final[str] = "data/service_metrics.duckdb"
+DEFAULT_EXECUTION_HISTORY_LIMIT: Final[int] = 1000
 
 T = TypeVar("T")
+
+
+@dataclass(slots=True)
+class ServiceExecutionRecord:
+    """Mikroservis çalışma metrik ve izleme kaydı."""
+
+    service_name: str
+    correlation_id: str
+    duration_ms: float
+    success: bool
+    error_type: str | None
+    attempt_count: int
+    timestamp: float
+
+    def to_dict(self) -> dict[str, Any]:
+        """Kayıt alanlarını sözlük biçimine dönüştürür."""
+        return {
+            "service_name": self.service_name,
+            "correlation_id": self.correlation_id,
+            "duration_ms": round(self.duration_ms, 2),
+            "success": self.success,
+            "error_type": self.error_type,
+            "attempt_count": self.attempt_count,
+            "timestamp": self.timestamp,
+        }
+
+    def __repr__(self) -> str:
+        """Kayıt metin temsilini döner."""
+        return (
+            f"ServiceExecutionRecord(servis={self.service_name!r}, "
+            f"korelasyon={self.correlation_id!r}, sure_ms={self.duration_ms:.1f}, "
+            f"basari={self.success})"
+        )
 
 
 class ServiceExecutionError(Exception):
     """Servis yürütme hatası istisnası."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        service_name: str | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
         """İstisna nesnesini başlatır.
 
         Args:
             message: Açıklayıcı hata iletisi.
+            service_name: İsteğe bağlı servis adı.
+            correlation_id: İsteğe bağlı işlem korelasyon kimliği.
         """
         super().__init__(message)
         self.message = message
+        self.service_name = service_name
+        self.correlation_id = correlation_id
 
     def __repr__(self) -> str:
         """İstisnanın okunabilir temsilini döner."""
-        return f"<ServiceExecutionError(mesaj='{self.message}')>"
+        return (
+            f"<ServiceExecutionError(servis={self.service_name!r}, "
+            f"korelasyon={self.correlation_id!r}, mesaj={self.message!r})>"
+        )
 
 
 class BaseAlphaService(ABC):
@@ -104,6 +157,7 @@ class BaseAlphaService(ABC):
         self._dlq: DeadLetterQueue = dlq or dead_letter_queue
         self._processed_idempotency_keys: dict[str, float] = {}
         self._in_flight_idempotency_keys: set[str] = set()
+        self._execution_history: deque[ServiceExecutionRecord] = deque(maxlen=DEFAULT_EXECUTION_HISTORY_LIMIT)
 
     @property
     def circuit_breaker(self) -> CircuitBreaker | None:
@@ -221,7 +275,11 @@ class BaseAlphaService(ABC):
             # 2. Pre-Execution Circuit Breaker Check (Fail-Fast)
             if self._circuit_breaker and not self._circuit_breaker.can_execute():
                 prometheus_metrics.record_error(self.service_name, "circuit_breaker_open")
-                raise ServiceExecutionError(f"[{self.service_name}] Circuit Breaker AÇIK! İstek reddedildi.")
+                raise ServiceExecutionError(
+                    f"[{self.service_name}] Devre Kesici (Circuit Breaker) AÇIK! İstek reddedildi.",
+                    service_name=self.service_name,
+                    correlation_id=corr_id,
+                )
 
             # 3. Validation
             try:
@@ -234,16 +292,25 @@ class BaseAlphaService(ABC):
                     error=str(val_err),
                     correlation_id=corr_id,
                 )
-                raise ServiceExecutionError(f"Doğrulama başarısız: {val_err}") from val_err
+                raise ServiceExecutionError(
+                    f"Doğrulama başarısız: {val_err}",
+                    service_name=self.service_name,
+                    correlation_id=corr_id,
+                ) from val_err
 
             # 4. Processing with Retry, Timeout and Circuit Breaker
             last_exception: Exception | None = None
             for attempt in range(1, self.max_retries + 1):
                 try:
-                    # Circuit Breaker kontrolü
+                    # Circuit Breaker kontrolü - Fail-fast durumunda döngüyü hemen kır
                     if self._circuit_breaker and not self._circuit_breaker.can_execute():
                         prometheus_metrics.record_error(self.service_name, "circuit_breaker_open")
-                        raise ServiceExecutionError(f"[{self.service_name}] Circuit Breaker AÇIK! İstek reddedildi.")
+                        last_exception = ServiceExecutionError(
+                            f"[{self.service_name}] Devre Kesici (Circuit Breaker) AÇIK! İstek reddedildi.",
+                            service_name=self.service_name,
+                            correlation_id=corr_id,
+                        )
+                        break
 
                     # Timeout ile yürüt
                     output = await asyncio.wait_for(
@@ -255,11 +322,23 @@ class BaseAlphaService(ABC):
                     if self._circuit_breaker:
                         self._circuit_breaker.record_success()
 
+                    self.is_healthy = True
                     duration = time.perf_counter() - start_time
+                    duration_ms = duration * 1000.0
                     prometheus_metrics.record_api_call(self.service_name, duration, success=True)
 
-                    if idempotency_key:
-                        with self._lock:
+                    rec = ServiceExecutionRecord(
+                        service_name=self.service_name,
+                        correlation_id=corr_id,
+                        duration_ms=duration_ms,
+                        success=True,
+                        error_type=None,
+                        attempt_count=attempt,
+                        timestamp=time.time(),
+                    )
+                    with self._lock:
+                        self._execution_history.append(rec)
+                        if idempotency_key:
                             self._processed_idempotency_keys[idempotency_key] = time.time()
 
                     return output
@@ -311,12 +390,26 @@ class BaseAlphaService(ABC):
 
             # Tüm denemeler başarısız olduysa DLQ'ya yaz ve istisna fırlat
             duration = time.perf_counter() - start_time
+            duration_ms = duration * 1000.0
             prometheus_metrics.record_api_call(self.service_name, duration, success=False)
+            err_name = last_exception.__class__.__name__ if last_exception else "UnknownError"
+
+            rec = ServiceExecutionRecord(
+                service_name=self.service_name,
+                correlation_id=corr_id,
+                duration_ms=duration_ms,
+                success=False,
+                error_type=err_name,
+                attempt_count=self.max_retries,
+                timestamp=time.time(),
+            )
+            with self._lock:
+                self._execution_history.append(rec)
 
             try:
                 safe_payload = payload if isinstance(payload, (dict, list, str, int, float, bool)) else str(payload)
                 try:
-                    payload_str = orjson.dumps(safe_payload).decode("utf-8")
+                    payload_str = orjson.dumps(safe_payload, default=str).decode("utf-8")
                 except Exception:
                     payload_str = str(safe_payload)
 
@@ -332,14 +425,18 @@ class BaseAlphaService(ABC):
                     retry_count=self.max_retries,
                     max_retries=self.max_retries,
                 )
-                if asyncio.iscoroutine(dlq_res):
+                if inspect.isawaitable(dlq_res):
                     await dlq_res
             except Exception as dlq_err:
                 logger.warning("dlq_push_fallback_failed", service=self.service_name, error=str(dlq_err))
 
-            self.is_healthy = False
+            if self._circuit_breaker and self._circuit_breaker.state == CircuitState.OPEN:
+                self.is_healthy = False
+
             raise ServiceExecutionError(
-                f"[{self.service_name}] Başarısız! {self.max_retries} deneme tükendi: {last_exception}"
+                f"[{self.service_name}] Başarısız! {self.max_retries} deneme tükendi: {last_exception}",
+                service_name=self.service_name,
+                correlation_id=corr_id,
             ) from last_exception
 
         finally:
@@ -377,11 +474,19 @@ class BaseAlphaService(ABC):
         with self._lock:
             remaining = self._active_requests
 
-        logger.info(
-            "service_graceful_shutdown_completed",
-            service=self.service_name,
-            kalan_istek=remaining,
-        )
+        if remaining > 0:
+            logger.warning(
+                "service_graceful_shutdown_timeout_exceeded",
+                service=self.service_name,
+                kalan_istek=remaining,
+                timeout=timeout,
+            )
+        else:
+            logger.info(
+                "service_graceful_shutdown_completed",
+                service=self.service_name,
+                kalan_istek=remaining,
+            )
 
     def clear_idempotency_cache(self) -> int:
         """Önbellekte saklanan tüm idempotency anahtarlarını temizler.
@@ -403,9 +508,12 @@ class BaseAlphaService(ABC):
                 self._circuit_breaker.state = CircuitState.CLOSED
                 self._circuit_breaker.failure_count = 0
                 self._circuit_breaker.half_open_calls = 0
-                self._circuit_breaker._update_telemetry()
-                self._circuit_breaker._persist_to_store()
-            self._circuit_breaker._notify_state_change(old_state, CircuitState.CLOSED.value)
+                if hasattr(self._circuit_breaker, "_update_telemetry"):
+                    self._circuit_breaker._update_telemetry()
+                if hasattr(self._circuit_breaker, "_persist_to_store"):
+                    self._circuit_breaker._persist_to_store()
+            if hasattr(self._circuit_breaker, "_notify_state_change"):
+                self._circuit_breaker._notify_state_change(old_state, CircuitState.CLOSED.value)
             self.is_healthy = True
 
     def get_health_status(self) -> dict[str, Any]:
@@ -414,22 +522,127 @@ class BaseAlphaService(ABC):
         Returns:
             Sağlık, hazırlık ve devre kesici durumunu özetleyen sözlük.
         """
+        cb_open = bool(self._circuit_breaker and self._circuit_breaker.state == CircuitState.OPEN)
+        effective_healthy = self.is_healthy and not cb_open
         cb_state = self._circuit_breaker.state.value if self._circuit_breaker else "N/A"
         with self._lock:
             active_req = self._active_requests
             idempotency_keys_count = len(self._processed_idempotency_keys)
             in_flight_count = len(self._in_flight_idempotency_keys)
             shutting_down = self._is_shutting_down
+            history_count = len(self._execution_history)
 
         return {
             "service": self.service_name,
-            "healthy": self.is_healthy,
-            "ready": self.is_ready and not shutting_down,
+            "healthy": effective_healthy,
+            "ready": self.is_ready and not shutting_down and not cb_open,
             "circuit_breaker": cb_state,
             "is_shutting_down": shutting_down,
             "active_requests": active_req,
             "in_flight_idempotency_keys": in_flight_count,
             "cached_idempotency_keys": idempotency_keys_count,
+            "execution_history_count": history_count,
+        }
+
+    def get_execution_metrics(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Son çalışma kayıtlarını sözlük listesi olarak döner.
+
+        Args:
+            limit: Dönecek maksimum kayıt adedi.
+
+        Returns:
+            Son çalışma kayıtlarının sözlük listesi.
+        """
+        with self._lock:
+            records = list(self._execution_history)[-max(1, limit):]
+        return [r.to_dict() for r in records]
+
+    def export_metrics_to_polars(self) -> pl.DataFrame:
+        """Son çalışma metriklerini Polars DataFrame olarak döner.
+
+        Returns:
+            pl.DataFrame: Metrik tablosu.
+        """
+        with self._lock:
+            records = [r.to_dict() for r in self._execution_history]
+
+        if not records:
+            return pl.DataFrame(
+                schema={
+                    "service_name": pl.Utf8,
+                    "correlation_id": pl.Utf8,
+                    "duration_ms": pl.Float64,
+                    "success": pl.Boolean,
+                    "error_type": pl.Utf8,
+                    "attempt_count": pl.Int64,
+                    "timestamp": pl.Float64,
+                }
+            )
+        return pl.DataFrame(records)
+
+    def export_metrics_to_duckdb(self, db_path: str = DEFAULT_METRICS_DB_PATH) -> int:
+        """Çalışma metriklerini DuckDB veritabanına kaydeder.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+
+        Returns:
+            int: Eklenen kayıt sayısı.
+        """
+        df = self.export_metrics_to_polars()
+        if df.is_empty():
+            return 0
+
+        path_obj = Path(db_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+        with duckdb.connect(str(path_obj)) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS service_execution_logs (
+                    service_name VARCHAR,
+                    correlation_id VARCHAR,
+                    duration_ms DOUBLE,
+                    success BOOLEAN,
+                    error_type VARCHAR,
+                    attempt_count BIGINT,
+                    timestamp DOUBLE
+                )
+                """
+            )
+            conn.register("tmp_metrics_df", df)
+            conn.execute("INSERT INTO service_execution_logs SELECT * FROM tmp_metrics_df")
+            inserted_count = len(df)
+        return inserted_count
+
+    def get_performance_summary(self) -> dict[str, Any]:
+        """Polars vektörizasyonu ile hesaplanmış performans özetini döner.
+
+        Returns:
+            dict: Toplam istek, başarı oranı, ortalama ve %95 persentil gecikme.
+        """
+        df = self.export_metrics_to_polars()
+        if df.is_empty():
+            return {
+                "service_name": self.service_name,
+                "total_executions": 0,
+                "success_rate": 1.0,
+                "avg_duration_ms": 0.0,
+                "p95_duration_ms": 0.0,
+            }
+
+        total = len(df)
+        success_count = df.filter(pl.col("success")).height
+        success_rate = (success_count / total) if total > 0 else 1.0
+        avg_dur = float(df.select(pl.col("duration_ms").mean()).item() or 0.0)
+        p95_dur = float(df.select(pl.col("duration_ms").quantile(0.95)).item() or 0.0)
+
+        return {
+            "service_name": self.service_name,
+            "total_executions": total,
+            "success_rate": round(success_rate, 4),
+            "avg_duration_ms": round(avg_dur, 2),
+            "p95_duration_ms": round(p95_dur, 2),
         }
 
     def __repr__(self) -> str:
@@ -446,11 +659,14 @@ class BaseAlphaService(ABC):
 
 __all__ = [
     "DEFAULT_BACKOFF_FACTOR",
+    "DEFAULT_EXECUTION_HISTORY_LIMIT",
     "DEFAULT_IDEMPOTENCY_MAX_KEYS",
     "DEFAULT_IDEMPOTENCY_TTL_SECONDS",
     "DEFAULT_MAX_RETRIES",
+    "DEFAULT_METRICS_DB_PATH",
     "DEFAULT_SHUTDOWN_TIMEOUT_SECONDS",
     "DEFAULT_TIMEOUT_SECONDS",
     "BaseAlphaService",
     "ServiceExecutionError",
+    "ServiceExecutionRecord",
 ]
