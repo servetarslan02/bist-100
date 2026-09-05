@@ -2,7 +2,7 @@
 
 **Tarih:** 2026-09-05  
 **Kapsam:** 104 `.py` dosyası  
-**Denetim Sonucu:** 11 dosya denetlendi, 66 sorun düzeltildi. Bekleyen dosya: 93
+**Denetim Sonucu:** 12 dosya denetlendi, 73 sorun düzeltildi. Bekleyen dosya: 92
 
 ---
 
@@ -33,6 +33,7 @@
 | 9 | `auto_circuit_breaker.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 10 | `base_service.py` | 6 | ✅ Denetlendi, düzeltildi |
 | 11 | `bist_tick_size.py` | 6 | ✅ Denetlendi, düzeltildi |
+| 12 | `circuit_breaker.py` | 7 | ✅ Denetlendi, düzeltildi |
 
 ---
 
@@ -191,6 +192,20 @@
 | 4 | 2 & 3 | `instrument_type` küçük harfe normalize edilmiyordu (`"WARRANT"` gibi girdiler özel tabloyu ıskalayıp standart stock adımı alıyordu) | `instrument_type.lower().strip()` normalizasyonu sağlandı; `SPECIAL_TICK_SIZES` içine ETF/BYF (0.01 TL) desteği eklendi |
 | 5 | 6 | BIST kademe sınırlarını (ör. 19.99 TL -> 20.00 TL) dinamik atlayarak adım ekleme/çıkarma ve iki fiyat arasındaki kademe farkını hesaplama fonksiyonları eksikti | `add_bist_ticks(price, ticks)` ve `get_bist_tick_count_between(price_from, price_to)` fonksiyonları eklenerek piyasa yapıcı ve emir iletim algoritmalarına kazandırıldı |
 | 6 | 4 & 7 | Fonksiyon docstring'leri eksik ve tek satırdı; yerel tracer yerine merkezi `services.core.otel` entegrasyonu yoktu; `__all__` listesi tanımlanmamıştı | Merkezi `@otel_trace` bağlandı, standart Türkçe docstring'ler yazıldı ve modül sabitleri dahil eksiksiz `__all__` listesi eklendi |
+
+---
+
+## `circuit_breaker.py` (12. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 4 & 7 | Fonksiyon gövdesi içinde gizli `__import__('collections')` kullanımı mevcuttu | Gizli import kaldırıldı; dosya başına temiz `from collections import deque` importu taşındı |
+| 2 | 2 & 6 | `ProviderReliability._results` bir `deque(maxlen=...)` olmasına rağmen kodda dilimleme (`[-self.window_size:]`) ile gereksiz yere `list`'e dönüştürülüyor ve tip bozuluyordu | `deque(maxlen=window_size)` ile O(1) otomatik halka tamponu davranışı garanti edildi; gereksiz dilimleme kaldırıldı |
+| 3 | 2 & 3 | `CircuitBreaker`, `RateLimiter` ve `ProviderReliability` sınıflarında eşzamanlı erişim koruması yoktu veya `threading.Lock` kullanımı `get_stats()` -> `get_score()` iç içe çağrısında reentrant deadlock yaratıyordu | Tüm sınıflara `threading.RLock()` eklendi; reentrant kilitlenme ve half-open durumlarındaki race condition kesin olarak önlendi |
+| 4 | 2 & 3 | `RateLimiter` içinde `refill_rate = 0.0` girildiğinde `ZeroDivisionError` patlama riski vardı | `safe_rate = max(1e-6, self.refill_rate)` sayısal sınır guard'ı ile sıfıra bölme riski bertaraf edildi |
+| 5 | 2 & 3 | `ProtectedProvider` içinde `asyncio.CancelledError` istisnası genel blokta yutuluyordu; ayrıca başarısızlıkta hata fırlatma esnekliği yoktu | `asyncio.CancelledError` yukarı fırlatıldı (`re-raise`); fail-closed prensibi doğrultusunda yapılandırılabilir `raise_on_failure` bayrağı eklendi |
+| 6 | 4 | `CentralStateStore` (DuckDB) kancaları korunurken hata durumunda çökme yaşanmaması için korumalı kilit ve try-catch eklendi | Durum kurtarma ve kaydetme çağrıları hata toleranslı ve asenkron/senkron uyumlu kılındı |
+| 7 | 4 & 7 | `__repr__` metotları eksikti veya standart dışıydı; `__all__` listesinde modül sabitleri (`DEFAULT_*`, `CB_*`) eksikti | Standart `CircuitBreaker`, `RateLimiter`, `ProviderReliability`, `ProtectedProvider` `__repr__` metotları ve eksiksiz `__all__` listesi tanımlandı |
 
 ---
 
