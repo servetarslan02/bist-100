@@ -1,15 +1,12 @@
-from __future__ import annotations
-
-from typing import Any
-
 """
 ALPHA BIST — Alpha Engine v2.0 (Enterprise-Grade)
 """
-
+from __future__ import annotations
 
 import datetime
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -219,7 +216,11 @@ class AlphaEngine:
         return X, y, all_keys
 
     @otel_trace("alpha_engine.train")
-    def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True) -> Any:
+    def train(
+        self, market_data, bm_df, sector_map,
+        train_start_str: str, train_end_str: str,
+        optimize: bool = True,
+    ) -> Any:
         t_start = datetime.datetime.strptime(train_start_str, "%Y-%m-%d")
         t_end = datetime.datetime.strptime(train_end_str, "%Y-%m-%d")
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
@@ -236,9 +237,9 @@ class AlphaEngine:
             optimizer = HyperOptimizer(n_trials=20, objective=self.params.get("objective", "regression"))
             best_params = optimizer.optimize(X, y, feature_names)
             self.params.update(best_params)
-            logger.info(
-                f"Optuna params: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}"
-            )
+            lr = self.params.get('learning_rate', 0)
+            leaves = self.params.get('num_leaves', 0)
+            logger.info(f"Optuna params: lr={lr:.3f}, leaves={leaves}")
 
         train_params = dict(self.params)
         if train_params.get("objective") == "lambdarank":

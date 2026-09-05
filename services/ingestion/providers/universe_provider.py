@@ -41,7 +41,11 @@ class LiveUniverseScraper:
         """BIST hisse evreni tarayıcısını yapılandır."""
         self.timeout = httpx.Timeout(timeout_seconds, connect=10.0)
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
         }
@@ -51,7 +55,12 @@ class LiveUniverseScraper:
         return httpx.Client(headers=self.headers, timeout=self.timeout, follow_redirects=True)
 
     def __repr__(self) -> str:
-        return f"<LiveUniverseScraper(primary='tradingview', backups=['mynet', 'bigpara', 'isyatirim'], timeout={self.timeout.read})>"
+        return (
+            f"<LiveUniverseScraper("
+            f"primary='tradingview', "
+            f"backups=['mynet', 'bigpara', 'isyatirim'], "
+            f"timeout={self.timeout.read})>"
+        )
 
     def _discover_tradingview(self, client: httpx.Client) -> dict[str, StockInfo]:
         """TradingView Scanner API üzerinden birincil BIST hisse listesini keşfet.
@@ -157,7 +166,11 @@ class LiveUniverseScraper:
                                 source="bigpara_backup",
                             )
                             added_count += 1
-                    logger.info("bigpara_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
+                    logger.info(
+                        "bigpara_backup_universe_done",
+                        total_discovered=len(discovered),
+                        newly_added=added_count,
+                    )
             except Exception as e:
                 logger.debug("bigpara_backup_discovery_failed", error=str(e))
 
@@ -181,7 +194,11 @@ class LiveUniverseScraper:
                                 added_count += 1
                             elif name and (discovered[ticker].name == ticker or not discovered[ticker].name):
                                 discovered[ticker].name = name
-                    logger.info("isyatirim_backup_universe_done", total_discovered=len(discovered), newly_added=added_count)
+                    logger.info(
+                        "isyatirim_backup_universe_done",
+                        total_discovered=len(discovered),
+                        newly_added=added_count,
+                    )
             except Exception as e:
                 logger.debug("isyatirim_backup_discovery_failed", error=str(e))
 
@@ -206,7 +223,14 @@ class LiveUniverseScraper:
                 "Distribution Services": "TICARET",
                 "Electronic Technology": "TEKNOLOJI",
                 "Energy Minerals": "ENERJI",
-                "Finance": "BANKACILIK" if any(w in ticker for w in ["BNK", "ISCTR", "GARAN", "AKBNK", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK"]) else "FINANS",
+                "Finance": (
+                    "BANKACILIK"
+                    if any(w in ticker for w in [
+                        "BNK", "ISCTR", "GARAN", "AKBNK",
+                        "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK",
+                    ])
+                    else "FINANS"
+                ),
                 "Health Services": "SAGLIK",
                 "Health Technology": "SAGLIK",
                 "Industrial Services": "SANAYI",
@@ -215,7 +239,11 @@ class LiveUniverseScraper:
                 "Producer Manufacturing": "SANAYI",
                 "Retail Trade": "PERAKENDE",
                 "Technology Services": "TEKNOLOJI",
-                "Transportation": "HAVACILIK" if any(w in ticker for w in ["THYAO", "PGSUS", "TAVHL", "CLEBI"]) else "ULASTIRMA",
+                "Transportation": (
+                    "HAVACILIK"
+                    if any(w in ticker for w in ["THYAO", "PGSUS", "TAVHL", "CLEBI"])
+                    else "ULASTIRMA"
+                ),
                 "Utilities": "ENERJI",
             }
             if tv_sector in sec_map:
@@ -223,7 +251,8 @@ class LiveUniverseScraper:
 
         # 2. Anahtar kelime eşlemesi
         name_u = (name + " " + ticker).upper()
-        if any(w in name_u for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]):
+        _BANK_KEYS = ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]
+        if any(w in name_u for w in _BANK_KEYS):
             return "BANKACILIK"
         if any(w in name_u for w in ["GYO", "GAYRIMENKUL", "KONUT"]):
             return "GAYRIMENKUL"
@@ -231,15 +260,35 @@ class LiveUniverseScraper:
             return "HAVACILIK"
         if any(w in name_u for w in ["SAVUNMA", "ASELS", "SDTTR"]):
             return "SAVUNMA"
-        if any(w in name_u for w in ["YAZILIM", "TEKNOLOJI", "BILISIM", "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET", "REEDR", "BINHO"]):
+        _TECH_KEYS = [
+            "YAZILIM", "TEKNOLOJI", "BILISIM",
+            "KFEIN", "LOGO", "MIATK", "VBTYZ", "ARDYZ", "FONET", "REEDR", "BINHO",
+        ]
+        if any(w in name_u for w in _TECH_KEYS):
             return "TEKNOLOJI"
-        if any(w in name_u for w in ["ENERJI", "ELEKTRIK", "SOLAR", "PETROL", "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR", "CWENE", "YEOTK"]):
+        _ENERGY_KEYS = [
+            "ENERJI", "ELEKTRIK", "SOLAR", "PETROL",
+            "TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR", "CWENE", "YEOTK",
+        ]
+        if any(w in name_u for w in _ENERGY_KEYS):
             return "ENERJI"
-        if any(w in name_u for w in ["DEMIR", "CELIK", "SANAYI", "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA", "AKCNS", "BOBET", "KCAER"]):
+        _SANAY_KEYS = [
+            "DEMIR", "CELIK", "SANAYI",
+            "EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA", "AKCNS", "BOBET", "KCAER",
+        ]
+        if any(w in name_u for w in _SANAY_KEYS):
             return "SANAYI"
-        if any(w in name_u for w in ["HOLDING", "YATIRIM", "KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL", "BERA", "TKFEN"]):
+        _HOLD_KEYS = [
+            "HOLDING", "YATIRIM",
+            "KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL", "BERA", "TKFEN",
+        ]
+        if any(w in name_u for w in _HOLD_KEYS):
             return "HOLDING"
-        if any(w in name_u for w in ["GIDA", "MARKET", "PERAKENDE", "BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM", "AEFES", "TATGD"]):
+        _FOOD_KEYS = [
+            "GIDA", "MARKET", "PERAKENDE",
+            "BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM", "AEFES", "TATGD",
+        ]
+        if any(w in name_u for w in _FOOD_KEYS):
             return "PERAKENDE"
         if any(w in name_u for w in ["OTOMOTIV", "OTO", "FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR", "KARSAN"]):
             return "OTOMOTIV"
