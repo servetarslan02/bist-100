@@ -131,6 +131,18 @@
       "action": "remove",
       "date": "2026-12-31",
       "reason": ""
+    },
+    {
+      "timestamp": "2026-09-06T10:06:58.402938+00:00",
+      "action": "add",
+      "date": "2026-12-31",
+      "reason": "Yılbaşı Arefesi Ek Tatil"
+    },
+    {
+      "timestamp": "2026-09-06T10:06:58.412713+00:00",
+      "action": "remove",
+      "date": "2026-12-31",
+      "reason": "Test temizliği"
     }
   ]
 }

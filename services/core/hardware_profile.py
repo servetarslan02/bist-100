@@ -19,6 +19,8 @@ Temel Yetenekler:
    - Bellek kullanımını güvenli tavanla (512MB - 1024MB) sınırlar.
 6. Polars ve DuckDB Denetim İzi:
    - Donanım özellikleri ve kaynak sınırlarını Polars DataFrame ve DuckDB kalıcı tablosuna aktarır.
+7. Geri Alma ve Yaşam Döngüsü (Context Manager & Rollback):
+   - Ortam değişkenlerini ve öncelik ayarlarını güvenle uygular ve geri alabilir.
 """
 
 from __future__ import annotations
@@ -31,7 +33,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import duckdb
 import orjson
@@ -112,7 +117,28 @@ class HardwareSpecs:
 
     def to_orjson_bytes(self) -> bytes:
         """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HardwareSpecs:
+        """Sözlükten HardwareSpecs nesnesi üretir."""
+        return cls(
+            cpu_cores_logical=int(data.get("cpu_cores_logical", 1)),
+            cpu_cores_physical=int(data.get("cpu_cores_physical", 1)),
+            ram_total_gb=float(data.get("ram_total_gb", 0.0)),
+            ram_available_gb=float(data.get("ram_available_gb", 0.0)),
+            gpu_name=data.get("gpu_name"),
+            gpu_total_vram_mb=float(data.get("gpu_total_vram_mb", 0.0)),
+            gpu_available=bool(data.get("gpu_available", False)),
+            cuda_driver_version=data.get("cuda_driver_version"),
+            ssd_mount=str(data.get("ssd_mount", "/")),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> HardwareSpecs:
+        """JSON verisinden HardwareSpecs nesnesi üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -159,7 +185,30 @@ class ResourceLimits:
 
     def to_orjson_bytes(self) -> bytes:
         """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ResourceLimits:
+        """Sözlükten ResourceLimits nesnesi üretir."""
+        return cls(
+            max_cpu_threads=int(data.get("max_cpu_threads", DEFAULT_MAX_CPU_THREADS)),
+            max_gpu_vram_mb=float(data.get("max_gpu_vram_mb", 0.0)),
+            gpu_vram_fraction=float(data.get("gpu_vram_fraction", 0.0)),
+            max_duckdb_memory_mb=int(
+                data.get("max_duckdb_memory_mb", DEFAULT_MAX_DUCKDB_MEM_LOW_MB)
+            ),
+            max_cache_items=int(data.get("max_cache_items", DEFAULT_MAX_CACHE_ITEMS)),
+            process_priority=str(data.get("process_priority", "BELOW_NORMAL")),
+            ssd_write_limit_mbps=int(
+                data.get("ssd_write_limit_mbps", DEFAULT_SSD_WRITE_LIMIT_MBPS)
+            ),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> ResourceLimits:
+        """JSON verisinden ResourceLimits nesnesi üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -187,6 +236,22 @@ class HardwareResourceManager:
         self.specs: HardwareSpecs = self._detect_hardware()
         self.limits: ResourceLimits = self._calculate_safe_limits()
         self._is_applied: bool = False
+        self._original_env: dict[str, str | None] = {}
+        self._original_nice: int | None = None
+
+    def __enter__(self) -> HardwareResourceManager:
+        """Context manager protokolü desteği ile profili uygula."""
+        self.apply_profile()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışında orijinal ortam değişkenlerini geri yükle."""
+        self.restore_profile()
 
     def _detect_hardware(self) -> HardwareSpecs:
         """Sistem donanımını otomatik tarar ve donanım özelliklerini üretir.
@@ -194,8 +259,8 @@ class HardwareResourceManager:
         Returns:
             HardwareSpecs: Tespit edilen CPU, RAM, GPU ve disk özellikleri.
         """
-        logical_cores = psutil.cpu_count(logical=True) or 8
-        physical_cores = psutil.cpu_count(logical=False) or 4
+        logical_cores = max(1, psutil.cpu_count(logical=True) or 8)
+        physical_cores = max(1, psutil.cpu_count(logical=False) or 4)
         ram = psutil.virtual_memory()
         ram_total_gb = round(ram.total / (1024**3), 2)
         ram_avail_gb = round(ram.available / (1024**3), 2)
@@ -260,9 +325,10 @@ class HardwareResourceManager:
             ResourceLimits: Türetilen güvenli kaynak limitleri.
         """
         # 1. CPU Threading: Çok çekirdekte arka planda maksimum 4, en az 2 thread
+        half_physical = max(1, self.specs.cpu_cores_physical // 2)
         max_cpu_threads = min(
             DEFAULT_MAX_CPU_THREADS,
-            max(DEFAULT_MIN_CPU_THREADS, self.specs.cpu_cores_physical // 2),
+            max(DEFAULT_MIN_CPU_THREADS, half_physical),
         )
 
         # 2. GPU VRAM: RTX 4080 (12GB) gibi bir GPU'da maksimum %25 kota ayır
@@ -286,6 +352,17 @@ class HardwareResourceManager:
             ssd_write_limit_mbps=DEFAULT_SSD_WRITE_LIMIT_MBPS,
         )
 
+    def refresh_hardware_specs(self) -> None:
+        """Donanım özelliklerini tazeleyip limitleri yeniden hesaplar."""
+        with self._lock:
+            self.specs = self._detect_hardware()
+            self.limits = self._calculate_safe_limits()
+            logger.info(
+                "donanim_ozellikleri_tazelendi",
+                ram_available_gb=self.specs.ram_available_gb,
+                gpu_available=self.specs.gpu_available,
+            )
+
     @otel_trace("hardware_profile.apply_profile")
     def apply_profile(self) -> dict[str, Any]:
         """Tüm ortam değişkenlerini ve süreç sınırlarını sisteme uygular.
@@ -296,19 +373,32 @@ class HardwareResourceManager:
         applied_actions: dict[str, Any] = {}
 
         with self._lock:
+            env_keys = [
+                "POLARS_MAX_THREADS",
+                "OMP_NUM_THREADS",
+                "OPENBLAS_NUM_THREADS",
+                "MKL_NUM_THREADS",
+                "NUMEXPR_NUM_THREADS",
+            ]
+            for key in env_keys:
+                if key not in self._original_env:
+                    self._original_env[key] = os.environ.get(key)
+
             # A) CPU Thread Sınırları (NumPy, Polars, OMP, MKL, NumExpr)
             threads_str = str(self.limits.max_cpu_threads)
-            os.environ["POLARS_MAX_THREADS"] = threads_str
-            os.environ["OMP_NUM_THREADS"] = threads_str
-            os.environ["OPENBLAS_NUM_THREADS"] = threads_str
-            os.environ["MKL_NUM_THREADS"] = threads_str
-            os.environ["NUMEXPR_NUM_THREADS"] = threads_str
+            for key in env_keys:
+                os.environ[key] = threads_str
             applied_actions["cpu_threads_set"] = self.limits.max_cpu_threads
 
             # B) Windows Süreç Önceliği (BELOW_NORMAL)
             if sys.platform == "win32":
                 try:
                     p = psutil.Process(os.getpid())
+                    if self._original_nice is None:
+                        try:
+                            self._original_nice = p.nice()
+                        except Exception:
+                            self._original_nice = None
                     p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
                     applied_actions["process_priority"] = "BELOW_NORMAL_PRIORITY_CLASS"
                 except Exception as e:
@@ -352,6 +442,36 @@ class HardwareResourceManager:
             ram_cap=f"{self.limits.max_duckdb_memory_mb}MB",
         )
         return applied_actions
+
+    def restore_profile(self) -> dict[str, Any]:
+        """Uygulanan ortam değişkenlerini ve süreç önceliğini orijinal durumuna döndürür.
+
+        Returns:
+            dict[str, Any]: Geri yüklenen parametrelerin dökümü.
+        """
+        restored: dict[str, Any] = {}
+        with self._lock:
+            for key, val in self._original_env.items():
+                if val is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = val
+                restored[key] = val
+            self._original_env.clear()
+
+            if sys.platform == "win32" and self._original_nice is not None:
+                try:
+                    p = psutil.Process(os.getpid())
+                    p.nice(self._original_nice)
+                    restored["process_priority"] = self._original_nice
+                except Exception as e:
+                    restored["process_priority_restore_error"] = str(e)
+                self._original_nice = None
+
+            self._is_applied = False
+
+        logger.info("donanim_profili_orijinal_durumuna_donduruldu")
+        return restored
 
     def get_optimal_device_for_task(
         self,
@@ -424,22 +544,42 @@ class HardwareResourceManager:
     # ==========================================================================
 
     def export_specs_to_polars(self) -> pl.DataFrame:
-        """Donanım özelliklerini Polars DataFrame olarak dışa aktarır.
+        """Donanım özelliklerini kesin şemalı Polars DataFrame olarak dışa aktarır.
 
         Returns:
             pl.DataFrame: Donanım özelliklerini içeren tek satırlık tablo.
         """
         with self._lock:
-            return pl.DataFrame([self.specs.to_dict()])
+            schema = {
+                "cpu_cores_logical": pl.Int64,
+                "cpu_cores_physical": pl.Int64,
+                "ram_total_gb": pl.Float64,
+                "ram_available_gb": pl.Float64,
+                "gpu_name": pl.Utf8,
+                "gpu_total_vram_mb": pl.Float64,
+                "gpu_available": pl.Boolean,
+                "cuda_driver_version": pl.Utf8,
+                "ssd_mount": pl.Utf8,
+            }
+            return pl.DataFrame([self.specs.to_dict()], schema=schema)
 
     def export_limits_to_polars(self) -> pl.DataFrame:
-        """Hesaplanan kaynak sınırlarını Polars DataFrame olarak dışa aktarır.
+        """Hesaplanan kaynak sınırlarını kesin şemalı Polars DataFrame olarak dışa aktarır.
 
         Returns:
             pl.DataFrame: Güvenli kaynak sınırlarını içeren tek satırlık tablo.
         """
         with self._lock:
-            return pl.DataFrame([self.limits.to_dict()])
+            schema = {
+                "max_cpu_threads": pl.Int64,
+                "max_gpu_vram_mb": pl.Float64,
+                "gpu_vram_fraction": pl.Float64,
+                "max_duckdb_memory_mb": pl.Int64,
+                "max_cache_items": pl.Int64,
+                "process_priority": pl.Utf8,
+                "ssd_write_limit_mbps": pl.Int64,
+            }
+            return pl.DataFrame([self.limits.to_dict()], schema=schema)
 
     def export_to_duckdb(
         self,
@@ -456,13 +596,14 @@ class HardwareResourceManager:
         Raises:
             Exception: DuckDB bağlantı veya yazma hatası durumunda.
         """
-        target_file = Path(db_path)
+        target_file = Path(db_path).resolve()
         target_file.parent.mkdir(parents=True, exist_ok=True)
         now_iso = datetime.now(UTC).isoformat()
+        row_id = uuid.uuid4().hex
 
         with self._lock:
             row = (
-                uuid.uuid4().hex,
+                row_id,
                 now_iso,
                 self.specs.cpu_cores_logical,
                 self.specs.cpu_cores_physical,
@@ -476,8 +617,8 @@ class HardwareResourceManager:
                 self.limits.max_duckdb_memory_mb,
                 self.limits.process_priority,
                 self._is_applied,
-                orjson.dumps(self.specs.to_dict()).decode("utf-8"),
-                orjson.dumps(self.limits.to_dict()).decode("utf-8"),
+                orjson.dumps(self.specs.to_dict(), default=str).decode("utf-8"),
+                orjson.dumps(self.limits.to_dict(), default=str).decode("utf-8"),
             )
 
             with duckdb.connect(str(target_file)) as conn:
@@ -514,8 +655,36 @@ class HardwareResourceManager:
                     row,
                 )
 
-        logger.info("donanim_profil_denetimi_duckdb_kaydedildi", yol=db_path)
+        logger.info("donanim_profil_denetimi_duckdb_kaydedildi", yol=str(target_file), id=row_id)
         return 1
+
+    def query_audit_duckdb(
+        self,
+        db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """Kayıtlı donanım profili denetim geçmişini DuckDB üzerinden Polars olarak çeker.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Döndürülecek maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Donanım profili denetim geçmişi tablosu.
+        """
+        target_file = Path(db_path).resolve()
+        if not target_file.exists():
+            return pl.DataFrame()
+
+        with self._lock:
+            with duckdb.connect(str(target_file), read_only=True) as conn:
+                query = (
+                    "SELECT id, created_at, cpu_logical, cpu_physical, ram_total_gb, ram_avail_gb, "
+                    "gpu_name, gpu_vram_mb, gpu_available, max_cpu_threads, max_gpu_vram_mb, "
+                    "max_duckdb_mem_mb, process_priority, is_applied "
+                    "FROM hardware_resource_audit ORDER BY created_at DESC LIMIT ?"
+                )
+                return conn.execute(query, [limit]).pl()
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -528,10 +697,61 @@ class HardwareResourceManager:
 
 
 # ==============================================================================
-# Global Singleton ve Dışa Aktarımlar
+# Global Singleton ve Yardımcı Modül Fonksiyonları
 # ==============================================================================
 
 hardware_manager: HardwareResourceManager = HardwareResourceManager()
+
+
+def get_hardware_manager() -> HardwareResourceManager:
+    """Global HardwareResourceManager singleton örneğini döndürür."""
+    return hardware_manager
+
+
+def apply_hardware_profile() -> dict[str, Any]:
+    """Sistem ortam değişkenlerine ve süreç önceliğine donanım sınırlarını uygular."""
+    return hardware_manager.apply_profile()
+
+
+def restore_hardware_profile() -> dict[str, Any]:
+    """Ortam değişkenlerini ve süreç önceliğini orijinal durumuna döndürür."""
+    return hardware_manager.restore_profile()
+
+
+def get_optimal_execution_device(batch_size: int, task_type: str = "inference") -> str:
+    """Veri boyutu ve görev tipine göre optimal cihazı ('cuda' veya 'cpu') döner."""
+    return hardware_manager.get_optimal_device_for_task(batch_size=batch_size, task_type=task_type)
+
+
+def get_hardware_status_report() -> dict[str, Any]:
+    """Sistem donanım durumu ve kaynak sınırları raporunu döner."""
+    return hardware_manager.get_status_report()
+
+
+def export_specs_to_polars() -> pl.DataFrame:
+    """Sistem donanım özelliklerini Polars DataFrame olarak döner."""
+    return hardware_manager.export_specs_to_polars()
+
+
+def export_limits_to_polars() -> pl.DataFrame:
+    """Sistem kaynak sınırlarını Polars DataFrame olarak döner."""
+    return hardware_manager.export_limits_to_polars()
+
+
+def export_hardware_profile_to_duckdb(
+    db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH,
+) -> int:
+    """Sistem özelliklerini ve limitlerini DuckDB denetim tablosuna kaydeder."""
+    return hardware_manager.export_to_duckdb(db_path=db_path)
+
+
+def query_hardware_profile_duckdb(
+    db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB üzerindeki donanım kaynak denetim geçmişini Polars DataFrame olarak sorgular."""
+    return hardware_manager.query_audit_duckdb(db_path=db_path, limit=limit)
+
 
 __all__: list[str] = [
     "DEFAULT_HARDWARE_PROFILE_DB_PATH",
@@ -545,5 +765,14 @@ __all__: list[str] = [
     "HardwareResourceManager",
     "HardwareSpecs",
     "ResourceLimits",
+    "apply_hardware_profile",
+    "export_hardware_profile_to_duckdb",
+    "export_limits_to_polars",
+    "export_specs_to_polars",
+    "get_hardware_manager",
+    "get_hardware_status_report",
+    "get_optimal_execution_device",
     "hardware_manager",
+    "query_hardware_profile_duckdb",
+    "restore_hardware_profile",
 ]

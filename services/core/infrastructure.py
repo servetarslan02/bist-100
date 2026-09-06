@@ -37,6 +37,7 @@ from services.core.otel import otel_trace
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
 logger = structlog.get_logger(__name__)
 
@@ -48,6 +49,7 @@ DEFAULT_MAX_CATALYSTS: Final[int] = 500
 DEFAULT_MAX_NOTIFICATIONS: Final[int] = 500
 DEFAULT_MAX_SNAPSHOTS: Final[int] = 100
 DEFAULT_MAX_QUEUE_SIZE: Final[int] = 100
+DEFAULT_INFRASTRUCTURE_MAX_QUEUE_SIZE: Final[int] = DEFAULT_MAX_QUEUE_SIZE
 DEFAULT_MAX_COMPLETED_JOBS: Final[int] = 1000
 DEFAULT_CACHE_TTL_SECONDS: Final[int] = 3600
 DEFAULT_MAX_CACHE_ENTRIES: Final[int] = 5000
@@ -135,7 +137,41 @@ class CatalystEvent:
         Returns:
             bytes: orjson kodlu baytlar.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> CatalystEvent:
+        """Sözlükten CatalystEvent nesnesi türetir.
+
+        Args:
+            d: Model verilerini içeren sözlük.
+
+        Returns:
+            CatalystEvent: Yapılandırılmış model nesnesi.
+        """
+        return cls(
+            catalyst_id=str(d.get("catalyst_id", "")),
+            ticker=str(d.get("ticker", "")),
+            catalyst_type=str(d.get("catalyst_type", "")),
+            date=str(d.get("date", "")),
+            importance=float(d.get("importance", 0.5)),
+            expected_impact=str(d.get("expected_impact", "UNKNOWN")),
+            uncertainty=float(d.get("uncertainty", 0.5)),
+            description=str(d.get("description", "")),
+        )
+
+    @classmethod
+    def from_json(cls, raw: str | bytes) -> CatalystEvent:
+        """JSON metni veya baytlarından CatalystEvent nesnesi türetir.
+
+        Args:
+            raw: JSON dizgisi veya bayt dizisi.
+
+        Returns:
+            CatalystEvent: Çözümlenmiş model nesnesi.
+        """
+        data = orjson.loads(raw)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Türkçe açıklayıcı metin gösterimi.
@@ -196,7 +232,41 @@ class NotificationItem:
         Returns:
             bytes: orjson kodlu baytlar.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> NotificationItem:
+        """Sözlükten NotificationItem nesnesi türetir.
+
+        Args:
+            d: Bildirim verilerini içeren sözlük.
+
+        Returns:
+            NotificationItem: Bildirim modeli nesnesi.
+        """
+        return cls(
+            id=str(d.get("id", "")),
+            category=str(d.get("category", NotificationCategory.SYSTEM.value)),
+            title=str(d.get("title", "")),
+            message=str(d.get("message", "")),
+            severity=str(d.get("severity", "INFO")),
+            data=dict(d.get("data", {})),
+            timestamp=str(d.get("timestamp", datetime.now(UTC).isoformat())),
+            read=bool(d.get("read", False)),
+        )
+
+    @classmethod
+    def from_json(cls, raw: str | bytes) -> NotificationItem:
+        """JSON metni veya baytlarından NotificationItem nesnesi türetir.
+
+        Args:
+            raw: JSON dizgisi veya bayt dizisi.
+
+        Returns:
+            NotificationItem: Çözümlenmiş model nesnesi.
+        """
+        data = orjson.loads(raw)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Türkçe açıklayıcı bildirim gösterimi.
@@ -237,7 +307,35 @@ class SystemSnapshot:
         Returns:
             bytes: JSON baytları.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> SystemSnapshot:
+        """Sözlükten SystemSnapshot nesnesi türetir.
+
+        Args:
+            d: Snapshot verilerini içeren sözlük.
+
+        Returns:
+            SystemSnapshot: Durum anlık görüntüsü nesnesi.
+        """
+        return cls(
+            timestamp=str(d.get("timestamp", datetime.now(UTC).isoformat())),
+            state=dict(d.get("state", {})),
+        )
+
+    @classmethod
+    def from_json(cls, raw: str | bytes) -> SystemSnapshot:
+        """JSON metni veya baytlarından SystemSnapshot nesnesi türetir.
+
+        Args:
+            raw: JSON dizgisi veya bayt dizisi.
+
+        Returns:
+            SystemSnapshot: Çözümlenmiş snapshot nesnesi.
+        """
+        data = orjson.loads(raw)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Türkçe açıklayıcı metin gösterimi.
@@ -295,7 +393,41 @@ class JobItem:
         Returns:
             bytes: orjson kodlu baytlar.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> JobItem:
+        """Sözlükten JobItem nesnesi türetir.
+
+        Args:
+            d: Görev parametre ve durum sözlüğü.
+
+        Returns:
+            JobItem: Görev nesnesi.
+        """
+        return cls(
+            job_id=str(d.get("job_id", "")),
+            job_type=str(d.get("job_type", "")),
+            payload=dict(d.get("payload", {})),
+            priority=str(d.get("priority", "NORMAL")),
+            status=str(d.get("status", "QUEUED")),
+            created_at=str(d.get("created_at", datetime.now(UTC).isoformat())),
+            completed_at=d.get("completed_at"),
+            result=d.get("result"),
+        )
+
+    @classmethod
+    def from_json(cls, raw: str | bytes) -> JobItem:
+        """JSON metni veya baytlarından JobItem nesnesi türetir.
+
+        Args:
+            raw: JSON dizgisi veya bayt dizisi.
+
+        Returns:
+            JobItem: Çözümlenmiş iş nesnesi.
+        """
+        data = orjson.loads(raw)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Türkçe açıklayıcı iş kaydı gösterimi.
@@ -333,6 +465,13 @@ class EventOrchestrator:
             handler: Çağrılacak senkron veya asenkron fonksiyon.
             priority: Yürütme öncelik seviyesi.
         """
+        if not event_type or not isinstance(event_type, str):
+            logger.warning("gecersiz_olay_tipi_kaydi", olay_tipi=event_type)
+            return
+        if not callable(handler):
+            logger.warning("cagrilamaz_dinleyici_kaydi", olay_tipi=event_type)
+            return
+
         with self._lock:
             if event_type not in self._handlers:
                 self._handlers[event_type] = []
@@ -353,6 +492,10 @@ class EventOrchestrator:
             data: Dinleyicilere aktarılacak veri yükü.
             priority: Dağıtım önceliği.
         """
+        if not event_type or not isinstance(event_type, str):
+            logger.warning("gecersiz_olay_dagitimi", olay_tipi=event_type)
+            return
+
         handlers: list[dict[str, Any]] = []
         with self._lock:
             handlers = list(self._handlers.get(event_type, []))
@@ -387,6 +530,34 @@ class EventOrchestrator:
                     olay_tipi=event_type,
                     hata=str(e),
                 )
+
+    def clear(self) -> None:
+        """Kayıtlı tüm dinleyicileri temizler."""
+        with self._lock:
+            self._handlers.clear()
+
+    def get_registered_events(self) -> list[str]:
+        """Kayıtlı olay türlerini döndürür.
+
+        Returns:
+            list[str]: Olay adları listesi.
+        """
+        with self._lock:
+            return list(self._handlers.keys())
+
+    def handler_count(self, event_type: str | None = None) -> int:
+        """Kayıtlı dinleyici sayısını döndürür.
+
+        Args:
+            event_type: Belirli bir olay türü veya None.
+
+        Returns:
+            int: Dinleyici sayısı.
+        """
+        with self._lock:
+            if event_type is not None:
+                return len(self._handlers.get(event_type, []))
+            return sum(len(handlers) for handlers in self._handlers.values())
 
     def __repr__(self) -> str:
         """Orkestratör metin özeti.
@@ -539,6 +710,8 @@ class CatalystEngine:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.is_file() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
@@ -569,6 +742,46 @@ class CatalystEngine:
             return len(df)
         finally:
             con.close()
+
+    @staticmethod
+    def query_catalysts_duckdb(
+        db_path: str | Path | None = None,
+        limit: int = 100,
+        ticker: str | None = None,
+        min_importance: float = 0.0,
+    ) -> pl.DataFrame:
+        """DuckDB bist_catalysts tablosundan Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+            limit: Maksimum kayıt adedi.
+            ticker: Opsiyonel hisse filtresi.
+            min_importance: Minimum önem filtre eşiği.
+
+        Returns:
+            pl.DataFrame: Katalizör veri çerçevesi.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return pl.DataFrame()
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            query = "SELECT * FROM bist_catalysts WHERE importance >= ?"
+            params: list[Any] = [min_importance]
+            if ticker:
+                query += " AND ticker = ?"
+                params.append(ticker)
+            query += " ORDER BY date ASC LIMIT ?"
+            params.append(limit)
+            return con.execute(query, params).pl()
+        finally:
+            con.close()
+
+    def clear(self) -> None:
+        """Hafızadaki tüm katalizörleri temizler."""
+        with self._lock:
+            self._catalysts.clear()
 
     def __repr__(self) -> str:
         """Katalizör motoru metin gösterimi.
@@ -715,6 +928,8 @@ class NotificationSystem:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.is_file() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
@@ -742,6 +957,48 @@ class NotificationSystem:
             return len(df)
         finally:
             con.close()
+
+    @staticmethod
+    def query_notifications_duckdb(
+        db_path: str | Path | None = None,
+        limit: int = 50,
+        category: str | None = None,
+        unread_only: bool = False,
+    ) -> pl.DataFrame:
+        """DuckDB bist_notifications tablosundan Polars DataFrame olarak bildirimleri sorgular.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+            limit: Maksimum kayıt sayısı.
+            category: Opsiyonel bildirim kategorisi.
+            unread_only: Sadece okunmamış bildirimleri getirme bayrağı.
+
+        Returns:
+            pl.DataFrame: Bildirimler veri çerçevesi.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return pl.DataFrame()
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            query = "SELECT * FROM bist_notifications WHERE 1=1"
+            params: list[Any] = []
+            if category:
+                query += " AND category = ?"
+                params.append(category)
+            if unread_only:
+                query += " AND read = FALSE"
+            query += " ORDER BY recorded_at DESC LIMIT ?"
+            params.append(limit)
+            return con.execute(query, params).pl()
+        finally:
+            con.close()
+
+    def clear(self) -> None:
+        """Hafızadaki tüm bildirimleri temizler."""
+        with self._lock:
+            self._notifications.clear()
 
     def __repr__(self) -> str:
         """Bildirim sistemi metin gösterimi.
@@ -982,6 +1239,8 @@ class SnapshotSystem:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.is_file() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
@@ -1005,6 +1264,36 @@ class SnapshotSystem:
             return len(df)
         finally:
             con.close()
+
+    @staticmethod
+    def query_snapshots_duckdb(
+        db_path: str | Path | None = None,
+        limit: int = 50,
+    ) -> pl.DataFrame:
+        """DuckDB bist_system_snapshots tablosundan Polars DataFrame olarak durum kayıtlarını sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı yolu.
+            limit: Maksimum kayıt adedi.
+
+        Returns:
+            pl.DataFrame: Durum görüntüleri veri çerçevesi.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return pl.DataFrame()
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            query = "SELECT * FROM bist_system_snapshots ORDER BY recorded_at DESC LIMIT ?"
+            return con.execute(query, [limit]).pl()
+        finally:
+            con.close()
+
+    def clear(self) -> None:
+        """Hafızadaki tüm durum anlık görüntülerini temizler."""
+        with self._lock:
+            self._snapshots.clear()
 
     def __repr__(self) -> str:
         """Snapshot servisi metin gösterimi.
@@ -1065,7 +1354,11 @@ class CacheSystem:
                 for k in expired_keys:
                     del self._cache[k]
                 if len(self._cache) >= DEFAULT_MAX_CACHE_ENTRIES:
-                    oldest_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k].get("expires_at", 0))[: (len(self._cache) - DEFAULT_MAX_CACHE_ENTRIES + 1)]
+                    excess = len(self._cache) - DEFAULT_MAX_CACHE_ENTRIES + 1
+                    oldest_keys = sorted(
+                        self._cache.keys(),
+                        key=lambda k: self._cache[k].get("expires_at", 0),
+                    )[:excess]
                     for k in oldest_keys:
                         del self._cache[k]
 
@@ -1085,6 +1378,11 @@ class CacheSystem:
         with self._lock:
             self._cache.pop(key, None)
 
+    def clear(self) -> None:
+        """Önbellekteki tüm kayıtları temizler."""
+        with self._lock:
+            self._cache.clear()
+
     @otel_trace("cache_system.get_stats")
     def get_stats(self) -> dict[str, Any]:
         """Önbellek istatistiklerini döndürür.
@@ -1094,6 +1392,19 @@ class CacheSystem:
         """
         with self._lock:
             return {"entries": len(self._cache)}
+
+    def __enter__(self) -> CacheSystem:
+        """Context manager başlangıcı."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışı: önbellek içeriğini temizler."""
+        self.clear()
 
     def __repr__(self) -> str:
         """Önbellek metin gösterimi.
@@ -1304,6 +1615,8 @@ class JobQueue:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.is_file() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
@@ -1332,6 +1645,69 @@ class JobQueue:
             return len(df)
         finally:
             con.close()
+
+    @staticmethod
+    def query_jobs_duckdb(
+        db_path: str | Path | None = None,
+        limit: int = 50,
+        status: str | None = None,
+        job_type: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB bist_job_queue_history tablosundan Polars DataFrame olarak işleri sorgular.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+            limit: Maksimum kayıt sayısı.
+            status: Opsiyonel iş durumu filtresi.
+            job_type: Opsiyonel iş tipi filtresi.
+
+        Returns:
+            pl.DataFrame: İş kuyruğu geçmiş tablosu.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return pl.DataFrame()
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            query = "SELECT * FROM bist_job_queue_history WHERE 1=1"
+            params: list[Any] = []
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            if job_type:
+                query += " AND job_type = ?"
+                params.append(job_type)
+            query += " ORDER BY logged_at DESC LIMIT ?"
+            params.append(limit)
+            return con.execute(query, params).pl()
+        finally:
+            con.close()
+
+    def clear(self) -> None:
+        """Kuyruk, çalışan ve tamamlanan tüm işleri temizler."""
+        with self._lock:
+            self._queue.clear()
+            self._running.clear()
+            self._completed.clear()
+
+    def shutdown(self) -> None:
+        """İş kuyruğunu güvenli biçimde durdurur ve temizler."""
+        self.clear()
+        logger.info("is_kuyrugu_kapatildi")
+
+    def __enter__(self) -> JobQueue:
+        """Context manager girişi."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışı: kuyruğu güvenle durdurur."""
+        self.shutdown()
 
     def __repr__(self) -> str:
         """İş kuyruğu metin gösterimi.
@@ -1457,10 +1833,130 @@ def fail_job(job_id: str, error: str) -> None:
     job_queue.fail(job_id, error=error)
 
 
+def get_event_orchestrator() -> EventOrchestrator:
+    """Merkezi olay yöneticisi tekil örneğini döndürür."""
+    return event_orchestrator
+
+
+def get_catalyst_engine() -> CatalystEngine:
+    """Katalizör motoru tekil örneğini döndürür."""
+    return catalyst_engine
+
+
+def get_notification_system() -> NotificationSystem:
+    """Bildirim sistemi tekil örneğini döndürür."""
+    return notification_system
+
+
+def get_alert_engine() -> AlertEngine:
+    """Alarm motoru tekil örneğini döndürür."""
+    return alert_engine
+
+
+def get_snapshot_system() -> SnapshotSystem:
+    """Sistem durum anlık görüntü servisi tekil örneğini döndürür."""
+    return snapshot_system
+
+
+def get_cache_system() -> CacheSystem:
+    """Önbellek servisi tekil örneğini döndürür."""
+    return cache_system
+
+
+def get_job_queue() -> JobQueue:
+    """İş kuyruğu servisi tekil örneğini döndürür."""
+    return job_queue
+
+
+def query_catalysts_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    ticker: str | None = None,
+    min_importance: float = 0.0,
+) -> pl.DataFrame:
+    """DuckDB üzerinden kayıtlı katalizörleri doğrudan Polars DataFrame olarak sorgular."""
+    return CatalystEngine.query_catalysts_duckdb(
+        db_path=db_path, limit=limit, ticker=ticker, min_importance=min_importance
+    )
+
+
+def query_notifications_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 50,
+    category: str | None = None,
+    unread_only: bool = False,
+) -> pl.DataFrame:
+    """DuckDB üzerinden bildirimleri doğrudan Polars DataFrame olarak sorgular."""
+    return NotificationSystem.query_notifications_duckdb(
+        db_path=db_path, limit=limit, category=category, unread_only=unread_only
+    )
+
+
+def query_snapshots_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 50,
+) -> pl.DataFrame:
+    """DuckDB üzerinden sistem snapshot kayıtlarını doğrudan Polars DataFrame olarak sorgular."""
+    return SnapshotSystem.query_snapshots_duckdb(db_path=db_path, limit=limit)
+
+
+def query_jobs_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 50,
+    status: str | None = None,
+    job_type: str | None = None,
+) -> pl.DataFrame:
+    """DuckDB üzerinden iş kuyruğu geçmişini doğrudan Polars DataFrame olarak sorgular."""
+    return JobQueue.query_jobs_duckdb(
+        db_path=db_path, limit=limit, status=status, job_type=job_type
+    )
+
+
+def export_catalysts_to_polars() -> pl.DataFrame:
+    """Kayıtlı tüm katalizörleri Polars DataFrame formatında dışa aktarır."""
+    return catalyst_engine.export_to_polars()
+
+
+def export_catalysts_to_duckdb(db_path: str | Path | None = None) -> int:
+    """Kayıtlı katalizörleri DuckDB bist_catalysts tablosuna kaydeder."""
+    return catalyst_engine.export_to_duckdb(db_path=db_path)
+
+
+def export_notifications_to_polars() -> pl.DataFrame:
+    """Kayıtlı bildirimleri Polars DataFrame formatında dışa aktarır."""
+    return notification_system.export_to_polars()
+
+
+def export_notifications_to_duckdb(db_path: str | Path | None = None) -> int:
+    """Kayıtlı bildirimleri DuckDB bist_notifications tablosuna kaydeder."""
+    return notification_system.export_to_duckdb(db_path=db_path)
+
+
+def export_snapshots_to_polars() -> pl.DataFrame:
+    """Sistem snapshot kayıtlarını Polars DataFrame formatında dışa aktarır."""
+    return snapshot_system.export_to_polars()
+
+
+def export_snapshots_to_duckdb(db_path: str | Path | None = None) -> int:
+    """Sistem snapshot kayıtlarını DuckDB bist_system_snapshots tablosuna kaydeder."""
+    return snapshot_system.export_to_duckdb(db_path=db_path)
+
+
+def export_jobs_to_polars() -> pl.DataFrame:
+    """İş kuyruğu kayıtlarını Polars DataFrame formatında dışa aktarır."""
+    return job_queue.export_to_polars()
+
+
+def export_jobs_to_duckdb(db_path: str | Path | None = None) -> int:
+    """İş kuyruğu kayıtlarını DuckDB bist_job_queue_history tablosuna kaydeder."""
+    return job_queue.export_to_duckdb(db_path=db_path)
+
+
 __all__: list[str] = [
     "DEFAULT_CACHE_TTL_SECONDS",
     "DEFAULT_DAILY_LOSS_PCT",
     "DEFAULT_INFRASTRUCTURE_AUDIT_DB_PATH",
+    "DEFAULT_INFRASTRUCTURE_MAX_QUEUE_SIZE",
     "DEFAULT_MAX_CACHE_ENTRIES",
     "DEFAULT_MAX_CATALYSTS",
     "DEFAULT_MAX_COMPLETED_JOBS",
@@ -1495,14 +1991,33 @@ __all__: list[str] = [
     "dequeue_job",
     "enqueue_job",
     "event_orchestrator",
+    "export_catalysts_to_duckdb",
+    "export_catalysts_to_polars",
+    "export_jobs_to_duckdb",
+    "export_jobs_to_polars",
+    "export_notifications_to_duckdb",
+    "export_notifications_to_polars",
+    "export_snapshots_to_duckdb",
+    "export_snapshots_to_polars",
     "fail_job",
+    "get_alert_engine",
+    "get_cache_system",
+    "get_catalyst_engine",
+    "get_event_orchestrator",
+    "get_job_queue",
     "get_latest_snapshot",
+    "get_notification_system",
+    "get_snapshot_system",
     "get_upcoming_catalysts",
     "get_unread_notifications",
     "job_queue",
     "mark_notification_read",
     "notification_system",
     "notify",
+    "query_catalysts_duckdb",
+    "query_jobs_duckdb",
+    "query_notifications_duckdb",
+    "query_snapshots_duckdb",
     "snapshot_system",
     "take_snapshot",
 ]

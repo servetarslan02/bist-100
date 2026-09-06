@@ -1,31 +1,47 @@
-"""ALPHA BIST — Database Connections v3.0 (Enterprise-Grade)
+"""ALPHA BIST — Kurumsal Veritabanı ve Bağlantı Havuzu Yöneticisi v3.0 (Enterprise-Grade)
 
-Kurumsal Standartlar:
+Sistem Veritabanı Mimarisi (GEMINI.md Standartları):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. MİMARİ:    SOLID, DI hazırlıklı, global state Lock ile korumalı
-2. OPTİMİZASYON: asyncpg pool min/max tuned, Polars-native CH reader,
-               import time.sleep → asyncio.sleep, _ch_lock → asyncio.Lock
-3. DAYANIKLILIK: Exponential Backoff + Jitter (race condition önleme),
-               ayrı connection hata sınıflandırması, pool refresh
-4. İZLENEBİLİRLİK: OTel span her query üzerinde, Prometheus pool gauge,
-               replica lag histogram
-5. GÜVENLİK:  Strict type hints, query sanitize (args zorunlu)
-6. KALİTE:    %100 docstring, fonksiyon başı type annotation
+1. PostgreSQL + TimescaleDB:
+   - Port: 5432 (Primary / Yazma) & 5433 (Replica / Okuma)
+   - Sürücü: asyncpg, Read/Write ayrımı ve DatabaseRouter
+2. ClickHouse:
+   - Port: 8123 (HTTP) & 9002 (Native)
+   - Sürücü: clickhouse-connect, thread-local client, sıfır kopyalı Arrow -> Polars dönüşümü
+3. DuckDB:
+   - Yerel gömülü (in-process) OLAP ve durum depolama motoru (duckdb>=1.3.0)
+   - Sıfır kopyalı Polars entegrasyonu, 0-byte bozuk dosya guard'ı, thread-safe bağlantı yönetimi
+4. Redis 8 + Sentinel:
+   - Port: 6379 (Redis) & 26379 (Sentinel)
+   - Sürücü: redis.asyncio, High Availability (HA) Sentinel desteği
+5. QuestDB:
+   - ILP / HTTP tick ve orderbook istemcisi
+6. Dayanıklılık ve İzlenebilirlik:
+   - Exponential Backoff + Jitter retry mimarisi
+   - OpenTelemetry (OTel) span ve metrik enstrümantasyonu
+   - Kesintisiz Türkçe loglama (structlog) ve fail-closed hata yönetimi
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import random
 import threading
 import time
-from contextlib import asynccontextmanager
-from typing import Any
+from contextlib import asynccontextmanager, contextmanager
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
+import duckdb
+import polars as pl
 import structlog
 from opentelemetry import metrics, trace
 
-# ─── Opsiyonel sürücüler ──────────────────────────────────────────────────────
+# ─── Opsiyonel Sürücüler ──────────────────────────────────────────────────────
 try:
     import asyncpg
 except ImportError:  # pragma: no cover
@@ -41,8 +57,6 @@ try:
 except ImportError:  # pragma: no cover
     aioredis = None  # type: ignore[assignment]
 
-import polars as pl
-
 from .config import settings
 from .questdb_client import questdb_client
 
@@ -50,9 +64,33 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.database")
 meter = metrics.get_meter("alpha-bist.database")
 
-# ─── Prometheus Metrikleri ────────────────────────────────────────────────────
+# ─── Sabitler ─────────────────────────────────────────────────────────────────
+DEFAULT_MAX_RETRIES: int = 3
+DEFAULT_RETRY_BASE_DELAY: float = 1.0  # saniye
+DEFAULT_REPLICA_LAG_THRESHOLD_SECONDS: float = 5.0
+DEFAULT_DUCKDB_PATH: str = "data/local_state.duckdb"
+
+# ─── OpenTelemetry Metrikleri ─────────────────────────────────────────────────
+_pg_pool: asyncpg.Pool | None = None  # type: ignore[type-arg]
+_pg_replica_pool: asyncpg.Pool | None = None  # type: ignore[type-arg]
+_pg_healthy: bool = False
+_pg_pool_lock: asyncio.Lock = asyncio.Lock()
+_pg_replica_pool_lock: asyncio.Lock = asyncio.Lock()
+
+
+def _observe_pg_pool_size(options: Any = None) -> list[metrics.Observation]:
+    """OpenTelemetry için PostgreSQL bağlantı havuzu boyutunu gözlemler."""
+    if _pg_pool is not None:
+        try:
+            return [metrics.Observation(_pg_pool.get_size(), {"pool": "primary"})]
+        except Exception:
+            return []
+    return []
+
+
 _pg_pool_size_gauge = meter.create_observable_gauge(
     "alpha.db.pg.pool.size",
+    callbacks=[_observe_pg_pool_size],
     description="PostgreSQL connection pool active connections",
 )
 _pg_replica_lag_histogram = meter.create_histogram(
@@ -74,10 +112,6 @@ _db_error_counter = meter.create_counter(
     description="Total database errors",
 )
 
-# ─── Retry Konfigürasyonu ─────────────────────────────────────────────────────
-_MAX_RETRIES: int = 3
-_RETRY_BASE_DELAY: float = 1.0  # saniye
-
 # Bağlantı hatası anahtar kelimeleri — sınıflandırma için
 _CONN_ERROR_KEYWORDS: frozenset[str] = frozenset(
     {
@@ -95,7 +129,14 @@ _CONN_ERROR_KEYWORDS: frozenset[str] = frozenset(
 
 
 def _is_connection_error(exc: Exception) -> bool:
-    """İstisnanın bir bağlantı hatası olup olmadığını kontrol eder."""
+    """İstisnanın bir veritabanı bağlantı hatası olup olmadığını kontrol eder.
+
+    Args:
+        exc: İncelenecek istisna nesnesi.
+
+    Returns:
+        bool: Bağlantı hatası ise True, aksi halde False.
+    """
     msg = str(exc).lower()
     return any(kw in msg for kw in _CONN_ERROR_KEYWORDS)
 
@@ -103,17 +144,17 @@ def _is_connection_error(exc: Exception) -> bool:
 async def _retry_async(
     coro_factory: Any,
     name: str,
-    max_retries: int = _MAX_RETRIES,
+    max_retries: int = DEFAULT_MAX_RETRIES,
 ) -> Any:
-    """Exponential Backoff + Jitter ile async retry mekanizması.
+    """Exponential Backoff ve Jitter ile asenkron yeniden deneme mekanizması.
 
     Args:
-        coro_factory: Her denemede yeni coroutine üreten callable.
+        coro_factory: Her denemede yeni coroutine üreten çağrılabilir nesne.
         name: Log ve metrik etiketi için operasyon adı.
         max_retries: Maksimum yeniden deneme sayısı.
 
     Returns:
-        Başarılı operasyonun sonucu.
+        Any: Başarılı operasyonun sonucu.
 
     Raises:
         Exception: Tüm denemeler başarısız olursa son hata fırlatılır.
@@ -133,16 +174,20 @@ async def _retry_async(
                     or "Name or service not known" in err_msg
                     or "gaierror" in err_msg
                 ):
-                    logger.warning("DB host unresolvable, skipping retries", operation=name, error=err_msg)
+                    logger.warning(
+                        "db_sunucu_adresi_cozulemedi_tekrar_deneme_atlanıyor",
+                        operation=name,
+                        error=err_msg,
+                    )
                     break
 
-                # Jitter: tam backoff yerine rastgele dağılım (herd effect önleme)
-                base = _RETRY_BASE_DELAY * (2**attempt)
+                # Jitter: rastgele zaman kaydırması ile herd effect engellenir
+                base = DEFAULT_RETRY_BASE_DELAY * (2**attempt)
                 jitter = random.uniform(0, base * 0.3)
                 delay = base + jitter
                 _db_retry_counter.add(1, {"operation": name, "attempt": str(attempt + 1)})
                 logger.warning(
-                    "DB operation retry",
+                    "db_operasyonu_tekrar_deneniyor",
                     operation=name,
                     attempt=attempt + 1,
                     delay_seconds=round(delay, 2),
@@ -152,7 +197,7 @@ async def _retry_async(
 
     _db_error_counter.add(1, {"operation": name})
     logger.error(
-        "DB operation failed after all retries",
+        "db_operasyonu_tum_denemelerden_sonra_basarisiz_oldu",
         operation=name,
         attempts=max_retries + 1,
         error=str(last_error),
@@ -160,36 +205,33 @@ async def _retry_async(
     raise last_error  # type: ignore[misc]
 
 
-# ─── PostgreSQL Primary Pool ──────────────────────────────────────────────────
-
-_pg_pool: asyncpg.Pool | None = None  # type: ignore[type-arg]
-_pg_replica_pool: asyncpg.Pool | None = None  # type: ignore[type-arg]
-_pg_healthy: bool = False
-_pg_pool_lock: asyncio.Lock = asyncio.Lock()
-_pg_replica_pool_lock: asyncio.Lock = asyncio.Lock()
-
-# Replica lag eşiği (saniye) — bu değerin üstünde primary'e fallback yapılır
-_REPLICA_LAG_THRESHOLD_SECONDS: float = 5.0
+# ─── PostgreSQL Primary & Replica Pool ────────────────────────────────────────
 
 
 async def get_pg_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
-    """PRIMARY PostgreSQL connection pool döner (yazma operasyonları).
+    """PRIMARY PostgreSQL bağlantı havuzunu döndürür (yazma operasyonları).
 
-    İlk çağrıda pool oluşturur; asyncio.Lock ile race condition engeller.
+    İlk çağrıda havuzu oluşturur; asyncio.Lock ile eşzamanlı erişim yarışını engeller.
+
+    Returns:
+        asyncpg.Pool: PostgreSQL birincil bağlantı havuzu.
+
+    Raises:
+        RuntimeError: asyncpg paketi kurulu değilse.
     """
     global _pg_pool, _pg_healthy
     if asyncpg is None:
-        raise RuntimeError("asyncpg kurulu değil. Komut: uv add asyncpg")
+        raise RuntimeError("asyncpg kurulu değil. Kurulum komutu: uv add asyncpg")
 
     if _pg_pool is not None:
         return _pg_pool
 
     async with _pg_pool_lock:
-        # Double-check: lock beklenirken başkası oluşturmuş olabilir
         if _pg_pool is not None:
             return _pg_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
+            """PostgreSQL havuzunu yapılandırır ve bağlar."""
             return await asyncpg.create_pool(
                 host=settings.postgres_host,
                 port=settings.postgres_port,
@@ -199,14 +241,13 @@ async def get_pg_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
                 min_size=settings.db_pool_min,
                 max_size=settings.db_pool_max,
                 command_timeout=settings.db_command_timeout,
-                # Idle connection'ları temizle — bellek sızıntısı önleme
                 max_inactive_connection_lifetime=300.0,
             )
 
         _pg_pool = await _retry_async(_create, "pg.primary.pool.create")
         _pg_healthy = True
         logger.info(
-            "PostgreSQL primary pool created",
+            "postgresql_primary_havuzu_olusturuldu",
             host=settings.postgres_host,
             min_size=settings.db_pool_min,
             max_size=settings.db_pool_max,
@@ -214,18 +255,27 @@ async def get_pg_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
         return _pg_pool
 
 
-async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
-    """REPLICA PostgreSQL connection pool döner (okuma operasyonları).
+# Geriye dönük uyumluluk takma adı (Backwards Compatibility Alias)
+get_db_pool = get_pg_pool
 
-    Replica tanımlı değilse primary pool'a fallback yapar.
+
+async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
+    """REPLICA PostgreSQL bağlantı havuzunu döndürür (okuma operasyonları).
+
+    Replica tanımlı veya erişilebilir değilse otomatik olarak primary havuza fallback yapar.
+
+    Returns:
+        asyncpg.Pool: PostgreSQL ikincil (okuma) bağlantı havuzu.
+
+    Raises:
+        RuntimeError: asyncpg paketi kurulu değilse.
     """
     global _pg_replica_pool
     if asyncpg is None:
-        raise RuntimeError("asyncpg kurulu değil.")
+        raise RuntimeError("asyncpg kurulu değil. Kurulum komutu: uv add asyncpg")
 
     replica_host: str | None = getattr(settings, "postgres_replica_host", None)
     replica_port: int = getattr(settings, "postgres_replica_port", 5433)
-    # Container içi ağda replica portu 5432'dir; host üzerinde 5433'e bind edilir.
     if replica_host and replica_host not in ("localhost", "127.0.0.1") and replica_port == 5433:
         replica_port = 5432
 
@@ -240,6 +290,7 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
             return _pg_replica_pool
 
         async def _create() -> asyncpg.Pool:  # type: ignore[type-arg]
+            """PostgreSQL ikincil kopya havuzunu oluşturur."""
             return await asyncpg.create_pool(
                 host=replica_host,
                 port=replica_port,
@@ -254,9 +305,9 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
 
         try:
             _pg_replica_pool = await _retry_async(_create, "pg.replica.pool.create")
-            logger.info("PostgreSQL replica pool created", host=replica_host)
+            logger.info("postgresql_replica_havuzu_olusturuldu", host=replica_host)
         except Exception as exc:
-            logger.warning("Replica pool unavailable, using primary for reads", error=str(exc))
+            logger.warning("replica_havuzu_kullanilamiyor_primarye_geciliyor", error=str(exc))
             _pg_replica_pool = await get_pg_pool()
             return _pg_replica_pool
 
@@ -264,10 +315,13 @@ async def get_pg_replica_pool() -> asyncpg.Pool:  # type: ignore[type-arg]
 
 
 async def _check_replica_lag(replica_conn: Any) -> float | None:
-    """Replica lag'ını saniye cinsinden ölçer.
+    """Replica senkronizasyon gecikmesini saniye cinsinden ölçer.
+
+    Args:
+        replica_conn: Ölçüm yapılacak replica bağlantısı.
 
     Returns:
-        Lag süresi (saniye) veya ölçüm başarısızsa None.
+        float | None: Gecikme süresi (saniye) veya hata durumunda None.
     """
     try:
         lag: float | None = await replica_conn.fetchval(
@@ -277,7 +331,7 @@ async def _check_replica_lag(replica_conn: Any) -> float | None:
             _pg_replica_lag_histogram.record(lag)
         return lag
     except Exception as exc:
-        logger.debug("Replica lag check failed", error=str(exc))
+        logger.debug("replica_gecikme_olcumu_yapilamadi", error=str(exc))
         return None
 
 
@@ -285,26 +339,43 @@ async def _check_replica_lag(replica_conn: Any) -> float | None:
 
 
 class DatabaseRouter:
-    """Read/Write ayrımı ile bağlantı yönlendirme.
+    """Read/Write ayrımı ve yük dengeleme ile bağlantı yönlendirici.
 
-    - write() → her zaman primary
-    - read()  → replica (lag < eşik ise), değilse primary fallback
-
-    Her bağlantı üzerine hangi havuzdan geldiği işaretlenir;
-    _release() bu işarete bakarak doğru havuza geri bırakır.
+    - write() -> Daima Primary PostgreSQL havuzunu kullanır.
+    - read()  -> Eşik altındaki gecikmelerde Replica, aksi takdirde Primary kullanır.
     """
 
     _POOL_ATTR: str = "_alpha_pool_type"
 
+    def __init__(self, replica_lag_threshold: float = DEFAULT_REPLICA_LAG_THRESHOLD_SECONDS) -> None:
+        """Başlatıcı.
+
+        Args:
+            replica_lag_threshold: Replica gecikme tolerans eşiği (saniye).
+        """
+        self.replica_lag_threshold = float(replica_lag_threshold)
+
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        return f"<DatabaseRouter lag_threshold={self.replica_lag_threshold}s>"
+
     async def get_write_conn(self) -> Any:
-        """Yazma operasyonları için primary bağlantı döner."""
+        """Yazma operasyonları için primary bağlantı döner.
+
+        Returns:
+            Any: asyncpg bağlantı nesnesi.
+        """
         pool = await get_pg_pool()
         conn = await pool.acquire()
         conn.__dict__[self._POOL_ATTR] = "primary"
         return conn
 
     async def get_read_conn(self) -> Any:
-        """Okuma operasyonları için replica bağlantı döner; lag yüksekse primary."""
+        """Okuma operasyonları için replica bağlantı döner; lag yüksekse primary'e geçer.
+
+        Returns:
+            Any: asyncpg bağlantı nesnesi.
+        """
         replica_host: str | None = getattr(settings, "postgres_replica_host", None)
 
         if not replica_host:
@@ -317,11 +388,11 @@ class DatabaseRouter:
         conn = await pool.acquire()
         lag = await _check_replica_lag(conn)
 
-        if lag is not None and lag >= _REPLICA_LAG_THRESHOLD_SECONDS:
+        if lag is not None and lag >= self.replica_lag_threshold:
             logger.warning(
-                "Replica lag too high, falling back to primary",
+                "replica_gecikmesi_cok_yuksek_primarye_geciliyor",
                 lag_seconds=lag,
-                threshold=_REPLICA_LAG_THRESHOLD_SECONDS,
+                threshold=self.replica_lag_threshold,
             )
             await pool.release(conn)
             pool = await get_pg_pool()
@@ -333,8 +404,8 @@ class DatabaseRouter:
         return conn
 
     @asynccontextmanager
-    async def read(self) -> Any:
-        """Okuma operasyonları için context manager."""
+    async def read(self) -> AsyncGenerator[Any, None]:
+        """Okuma operasyonları için asenkron bağlam yöneticisi."""
         conn = await self.get_read_conn()
         try:
             yield conn
@@ -342,8 +413,8 @@ class DatabaseRouter:
             await self._release(conn)
 
     @asynccontextmanager
-    async def write(self) -> Any:
-        """Yazma operasyonları için context manager."""
+    async def write(self) -> AsyncGenerator[Any, None]:
+        """Yazma operasyonları için asenkron bağlam yöneticisi."""
         conn = await self.get_write_conn()
         try:
             yield conn
@@ -351,8 +422,8 @@ class DatabaseRouter:
             await self._release(conn)
 
     @asynccontextmanager
-    async def write_transaction(self) -> Any:
-        """Transaction destekli yazma operasyonu context manager."""
+    async def write_transaction(self) -> AsyncGenerator[Any, None]:
+        """Transaction destekli yazma operasyonu asenkron bağlam yöneticisi."""
         conn = await self.get_write_conn()
         try:
             async with conn.transaction():
@@ -361,10 +432,10 @@ class DatabaseRouter:
             await self._release(conn)
 
     async def _release(self, conn: Any) -> None:
-        """Bağlantıyı doğru havuza geri bırakır.
+        """Bağlantıyı ait olduğu havuza güvenli şekilde geri bırakır.
 
-        Bağlantı üzerindeki _POOL_ATTR işaretine bakarak replica veya
-        primary havuzuna geri verir. İşaret yoksa primary (güvenli fallback).
+        Args:
+            conn: Serbest bırakılacak bağlantı nesnesi.
         """
         try:
             pool_type: str = conn.__dict__.get(self._POOL_ATTR, "primary")
@@ -376,18 +447,18 @@ class DatabaseRouter:
             pool = await get_pg_pool()
             await pool.release(conn)
         except Exception as exc:
-            logger.warning("Error releasing DB connection", error=str(exc))
+            logger.warning("db_baglantisi_serbest_birakilirken_hata", error=str(exc))
 
 
 # Singleton router
 db_router = DatabaseRouter()
 
 
-# ─── PostgreSQL Helpers ───────────────────────────────────────────────────────
+# ─── PostgreSQL Yardımcıları ──────────────────────────────────────────────────
 
 
 async def close_pg_pool() -> None:
-    """Primary ve replica PostgreSQL pool'larını kapatır."""
+    """Primary ve replica PostgreSQL havuzlarını güvenle kapatır."""
     global _pg_pool, _pg_replica_pool, _pg_healthy
     if _pg_pool:
         await _pg_pool.close()
@@ -396,28 +467,28 @@ async def close_pg_pool() -> None:
         await _pg_replica_pool.close()
         _pg_replica_pool = None
     _pg_healthy = False
-    logger.info("PostgreSQL pools closed")
+    logger.info("postgresql_havuzlari_kapatildi")
 
 
 @asynccontextmanager
-async def get_pg_connection() -> Any:
-    """PRIMARY PostgreSQL bağlantısı için context manager (yazma)."""
+async def get_pg_connection() -> AsyncGenerator[Any, None]:
+    """PRIMARY PostgreSQL bağlantısı için asenkron bağlam yöneticisi."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
         yield conn
 
 
 @asynccontextmanager
-async def get_pg_replica_connection() -> Any:
-    """REPLICA PostgreSQL bağlantısı için context manager (okuma)."""
+async def get_pg_replica_connection() -> AsyncGenerator[Any, None]:
+    """REPLICA PostgreSQL bağlantısı için asenkron bağlam yöneticisi."""
     pool = await get_pg_replica_pool()
     async with pool.acquire() as conn:
         yield conn
 
 
 @asynccontextmanager
-async def get_pg_transaction() -> Any:
-    """Transaction destekli PRIMARY PostgreSQL bağlantısı."""
+async def get_pg_transaction() -> AsyncGenerator[Any, None]:
+    """Transaction destekli PRIMARY PostgreSQL bağlantı bağlamı."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn, conn.transaction():
         yield conn
@@ -426,10 +497,13 @@ async def get_pg_transaction() -> Any:
 async def pg_execute(query: str, *args: Any) -> str:
     """PRIMARY üzerinde yazma sorgusu çalıştırır.
 
-    Bağlantı hatalarında pool yenilenerek yeniden denenir.
-    Her sorgu OTel span ve süre metriği ile izlenir.
+    Args:
+        query: SQL sorgu cümlesi.
+        *args: Sorgu parametreleri.
+
+    Returns:
+        str: İşlem durum sonucu (örn. 'INSERT 0 1').
     """
-    global _pg_pool
     max_retries: int = 2
     with tracer.start_as_current_span("db.pg.execute") as span:
         span.set_attribute("db.system", "postgresql")
@@ -443,28 +517,33 @@ async def pg_execute(query: str, *args: Any) -> str:
                         (time.monotonic() - t0) * 1000,
                         {"db": "postgres", "op": "execute"},
                     )
-                    return result
+                    return str(result)
             except Exception as exc:
                 if attempt < max_retries and _is_connection_error(exc):
                     logger.warning(
-                        "pg_execute connection error, refreshing pool",
+                        "pg_execute_baglanti_hatasi_havuz_yenileniyor",
                         attempt=attempt + 1,
                         error=str(exc),
                     )
                     _db_retry_counter.add(1, {"operation": "pg.execute"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
+                    await asyncio.sleep(DEFAULT_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "execute"})
-                logger.error("pg_execute failed", query=query[:100], error=str(exc))
+                logger.error("pg_execute_basarisiz", query=query[:100], error=str(exc))
                 raise
 
 
 async def pg_fetch(query: str, *args: Any) -> list[Any]:
-    """REPLICA'dan satır listesi çeker.
+    """REPLICA havuzundan satır listesi çeker.
 
-    Bağlantı hatalarında pool yenilenerek yeniden denenir.
+    Args:
+        query: SQL sorgu metni.
+        *args: Sorgu parametreleri.
+
+    Returns:
+        list[Any]: Kayıt listesi.
     """
     max_retries: int = 2
     with tracer.start_as_current_span("db.pg.fetch") as span:
@@ -479,21 +558,29 @@ async def pg_fetch(query: str, *args: Any) -> list[Any]:
                         (time.monotonic() - t0) * 1000,
                         {"db": "postgres", "op": "fetch"},
                     )
-                    return result
+                    return list(result)
             except Exception as exc:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetch"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
+                    await asyncio.sleep(DEFAULT_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetch"})
-                logger.error("pg_fetch failed", query=query[:100], error=str(exc))
+                logger.error("pg_fetch_basarisiz", query=query[:100], error=str(exc))
                 raise
 
 
 async def pg_fetchrow(query: str, *args: Any) -> Any | None:
-    """REPLICA'dan tek satır çeker."""
+    """REPLICA havuzundan tek satır çeker.
+
+    Args:
+        query: SQL sorgu metni.
+        *args: Sorgu parametreleri.
+
+    Returns:
+        Any | None: Bulunan tek kayıt veya None.
+    """
     max_retries: int = 2
     with tracer.start_as_current_span("db.pg.fetchrow") as span:
         span.set_attribute("db.system", "postgresql")
@@ -512,16 +599,24 @@ async def pg_fetchrow(query: str, *args: Any) -> Any | None:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetchrow"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
+                    await asyncio.sleep(DEFAULT_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetchrow"})
-                logger.error("pg_fetchrow failed", query=query[:100], error=str(exc))
+                logger.error("pg_fetchrow_basarisiz", query=query[:100], error=str(exc))
                 raise
 
 
 async def pg_fetchval(query: str, *args: Any) -> Any:
-    """REPLICA'dan tek değer çeker."""
+    """REPLICA havuzundan tek skalar değer çeker.
+
+    Args:
+        query: SQL sorgu metni.
+        *args: Sorgu parametreleri.
+
+    Returns:
+        Any: Skalar değer.
+    """
     max_retries: int = 2
     with tracer.start_as_current_span("db.pg.fetchval") as span:
         span.set_attribute("db.system", "postgresql")
@@ -540,11 +635,11 @@ async def pg_fetchval(query: str, *args: Any) -> Any:
                 if attempt < max_retries and _is_connection_error(exc):
                     _db_retry_counter.add(1, {"operation": "pg.fetchval"})
                     await close_pg_pool()
-                    await asyncio.sleep(_RETRY_BASE_DELAY * (2**attempt))
+                    await asyncio.sleep(DEFAULT_RETRY_BASE_DELAY * (2**attempt))
                     continue
                 span.record_exception(exc)
                 _db_error_counter.add(1, {"db": "postgres", "op": "fetchval"})
-                logger.error("pg_fetchval failed", query=query[:100], error=str(exc))
+                logger.error("pg_fetchval_basarisiz", query=query[:100], error=str(exc))
                 raise
 
 
@@ -552,15 +647,21 @@ async def pg_fetchval(query: str, *args: Any) -> Any:
 
 _ch_local = threading.local()
 _ch_healthy: bool = False
-_ch_lock: asyncio.Lock = asyncio.Lock()
 _ch_thread_lock: threading.Lock = threading.Lock()
 
 
 def get_ch_client() -> Any:
-    """Thread-local ClickHouse istemcisi döner (tamamen thread-safe ve eşzamanlı)."""
+    """Thread-local ClickHouse istemcisi döndürür (tamamen thread-safe).
+
+    Returns:
+        Any: clickhouse_connect istemcisi.
+
+    Raises:
+        RuntimeError: clickhouse-connect kurulu değilse.
+    """
     global _ch_healthy
     if clickhouse_connect is None:
-        raise RuntimeError("clickhouse-connect kurulu değil. Komut: uv add clickhouse-connect")
+        raise RuntimeError("clickhouse-connect kurulu değil. Kurulum komutu: uv add clickhouse-connect")
 
     client = getattr(_ch_local, "client", None)
     if client is None:
@@ -582,39 +683,48 @@ get_clickhouse = get_ch_client
 
 
 def close_ch_client() -> None:
-    """ClickHouse istemcisini kapatır."""
+    """Mevcut iş parçacığındaki ClickHouse istemcisini kapatır."""
     global _ch_healthy
     client = getattr(_ch_local, "client", None)
     if client:
         try:
             client.close()
         except Exception as exc:
-            logger.warning("ClickHouse client close error", error=str(exc))
+            logger.warning("clickhouse_istemcisi_kapatilirken_hata", error=str(exc))
         _ch_local.client = None
     _ch_healthy = False
-    logger.info("ClickHouse client closed")
+    logger.info("clickhouse_istemcisi_kapatildi")
 
 
 def ch_execute(query: str, parameters: dict[str, Any] | None = None) -> Any:
-    """ClickHouse sorgusu çalıştırır — thread-local client ile."""
+    """ClickHouse üzerinde sorgu çalıştırır.
+
+    Args:
+        query: ClickHouse SQL sorgusu.
+        parameters: İsteğe bağlı parametre sözlüğü.
+
+    Returns:
+        Any: ClickHouse sorgu yanıt nesnesi.
+    """
     max_retries: int = 2
     for attempt in range(max_retries + 1):
         try:
-            client = get_ch_client()
-            return client.query(query, parameters=parameters)
+            with _ch_thread_lock:
+                client = get_ch_client()
+                return client.query(query, parameters=parameters)
         except Exception as exc:
             if attempt < max_retries:
                 _ch_local.client = None
-                delay = _RETRY_BASE_DELAY * (attempt + 1) + random.uniform(0, 0.5)
+                delay = DEFAULT_RETRY_BASE_DELAY * (attempt + 1) + random.uniform(0, 0.5)
                 logger.warning(
-                    "ClickHouse query failed, reconnecting",
+                    "clickhouse_sorgusu_basarisiz_yeniden_baglaniliyor",
                     attempt=attempt + 1,
                     delay=round(delay, 2),
                     error=str(exc),
                 )
                 time.sleep(delay)
                 continue
-            logger.error("ClickHouse query failed after retries", error=str(exc))
+            logger.error("clickhouse_sorgusu_tum_denemelerden_sonra_basarisiz", error=str(exc))
             raise
 
 
@@ -623,14 +733,14 @@ def ch_insert(
     data: list[list[Any]],
     column_names: list[str] | None = None,
 ) -> None:
-    """ClickHouse'a toplu veri yazar — reconnect + Jitter backoff ile.
+    """ClickHouse'a toplu veri yazar — yeniden bağlanma ve Jitter ile.
 
     Args:
         table: Hedef tablo adı.
-        data: Satır listesi (her satır değer listesi).
-        column_names: Kolon sırası. None ise tablo sırasını kullanır.
+        data: Satır listesi.
+        column_names: Kolon sırası (varsayılan: None, tablo sırası).
     """
-    global _ch_client, _ch_healthy
+    global _ch_healthy
     max_retries: int = 2
     for attempt in range(max_retries + 1):
         try:
@@ -640,36 +750,119 @@ def ch_insert(
                 return
         except Exception as exc:
             if attempt < max_retries:
-                _ch_client = None
+                _ch_local.client = None
                 _ch_healthy = False
-                delay = _RETRY_BASE_DELAY * (attempt + 1) + random.uniform(0, 0.5)
+                delay = DEFAULT_RETRY_BASE_DELAY * (attempt + 1) + random.uniform(0, 0.5)
                 logger.warning(
-                    "ClickHouse insert failed, reconnecting",
+                    "clickhouse_toplu_yazma_basarisiz_yeniden_baglaniliyor",
                     attempt=attempt + 1,
                     delay=round(delay, 2),
                     error=str(exc),
                 )
                 time.sleep(delay)
                 continue
-            logger.error("ClickHouse insert failed after retries", error=str(exc))
+            logger.error("clickhouse_toplu_yazma_tum_denemelerden_sonra_basarisiz", error=str(exc))
             raise
 
 
 def ch_query_df(query: str, parameters: dict[str, Any] | None = None) -> pl.DataFrame:
-    """ClickHouse sorgusu çalıştırır ve Polars DataFrame döner.
+    """ClickHouse sorgusunu çalıştırır ve sıfır bellek kopyasıyla Polars DataFrame döner.
 
-    pandas → Polars dönüşümü yerine native Polars oluşturma kullanılır
-    (bellek kopyalaması sıfırlanır).
+    Args:
+        query: SQL sorgu cümlesi.
+        parameters: Parametreler sözlüğü.
 
     Returns:
-        Polars DataFrame.
+        pl.DataFrame: Polars DataFrame sonucu.
     """
     with _ch_thread_lock:
         client = get_ch_client()
         result = client.query(query, parameters=parameters)
 
-    # Polars native — pandas köprüsü YOK (bellek kopyası önlenir)
+    # Sıfır kopyalı PyArrow tablosundan Polars oluşturma (Pandas kullanılmaz)
     return pl.from_arrow(result.result_columns_to_arrow())
+
+
+# ─── DuckDB (Yerel Gömülü Veritabanı) ──────────────────────────────────────────
+
+_duckdb_lock = threading.RLock()
+
+
+def get_duckdb_connection(
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    read_only: bool = False,
+) -> duckdb.DuckDBPyConnection:
+    """Thread-safe ve 0-byte bozulma korumalı yerel DuckDB bağlantısı oluşturur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        read_only: Salt okunur mod aktif edilsin mi?
+
+    Returns:
+        duckdb.DuckDBPyConnection: DuckDB bağlantı nesnesi.
+    """
+    path_obj = Path(db_path)
+    if not read_only:
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        if path_obj.exists() and path_obj.stat().st_size == 0:
+            with contextlib.suppress(OSError):
+                path_obj.unlink()
+
+    with _duckdb_lock:
+        conn = duckdb.connect(str(path_obj), read_only=read_only)
+        if not read_only:
+            with contextlib.suppress(Exception):
+                from .duckdb_store import configure_duckdb_wal
+
+                configure_duckdb_wal(conn)
+        return conn
+
+
+@contextmanager
+def get_duckdb(
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    read_only: bool = False,
+) -> Generator[duckdb.DuckDBPyConnection, None, None]:
+    """DuckDB bağlantısı için güvenli context manager.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        read_only: Salt okunur mod.
+
+    Yields:
+        duckdb.DuckDBPyConnection: DuckDB bağlantısı.
+    """
+    conn = get_duckdb_connection(db_path=db_path, read_only=read_only)
+    try:
+        yield conn
+    finally:
+        with contextlib.suppress(Exception):
+            conn.close()
+
+
+def duckdb_query_df(
+    query: str,
+    parameters: list[Any] | None = None,
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+) -> pl.DataFrame:
+    """DuckDB üzerinden sorgu çalıştırır ve doğrudan Polars DataFrame döndürür.
+
+    Args:
+        query: SQL sorgu metni.
+        parameters: Sorgu parametreleri listesi.
+        db_path: DuckDB dosya yolu.
+
+    Returns:
+        pl.DataFrame: Sorgu sonucu Polars DataFrame.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists() or path_obj.stat().st_size == 0:
+        return pl.DataFrame()
+
+    with get_duckdb(db_path=path_obj, read_only=True) as conn:
+        cursor = conn.execute(query, parameters or [])
+        arrow_table = cursor.arrow()
+        return pl.from_arrow(arrow_table)
 
 
 # ─── Redis ────────────────────────────────────────────────────────────────────
@@ -680,13 +873,17 @@ _redis_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def get_redis() -> Any:
-    """Redis bağlantısı döner (Sentinel varsa HA, yoksa direct).
+    """Redis bağlantısı döndürür (Sentinel varsa HA, yoksa doğrudan bağlantı).
 
-    asyncio.Lock ile race condition önlenir.
+    Returns:
+        Any: aioredis istemci nesnesi.
+
+    Raises:
+        RuntimeError: redis paketi kurulu değilse.
     """
     global _redis, _redis_healthy
     if aioredis is None:
-        raise RuntimeError("redis kurulu değil. Komut: uv add redis")
+        raise RuntimeError("redis kurulu değil. Kurulum komutu: uv add redis")
 
     if _redis is not None:
         return _redis
@@ -703,36 +900,42 @@ async def get_redis() -> Any:
                 settings.redis_url,
                 decode_responses=True,
                 max_connections=500,
-                # Socket timeout — bellek leak önleme
                 socket_timeout=5.0,
                 socket_connect_timeout=3.0,
             )
         _redis_healthy = True
-        logger.info("Redis connection created (HA-aware)")
+        logger.info("redis_baglantisi_olusturuldu_ha_uyumlu")
         return _redis
 
 
 async def close_redis() -> None:
-    """Redis bağlantısını kapatır."""
+    """Redis bağlantısını güvenle kapatır."""
     global _redis, _redis_healthy
     if _redis:
         try:
             from .redis_sentinel import close_ha_redis
 
             await close_ha_redis()
-        except Exception:
-            logger.error("Exception caught", exc_info=True)
+        except Exception as exc:
+            logger.warning("ha_redis_kapatilirken_hata", error=str(exc))
         try:
             await _redis.aclose()
         except Exception as exc:
-            logger.warning("Redis close error", error=str(exc))
+            logger.warning("redis_kapatilirken_hata", error=str(exc))
         _redis = None
         _redis_healthy = False
-        logger.info("Redis connection closed")
+        logger.info("redis_baglantisi_kapatildi")
 
 
 async def redis_get(key: str) -> str | None:
-    """Redis'ten değer okur."""
+    """Redis'ten anahtar değerini okur.
+
+    Args:
+        key: Okunacak anahtar.
+
+    Returns:
+        str | None: Değer veya None.
+    """
     with tracer.start_as_current_span("db.redis.get") as span:
         span.set_attribute("db.redis.key", key)
         r = await get_redis()
@@ -740,7 +943,13 @@ async def redis_get(key: str) -> str | None:
 
 
 async def redis_set(key: str, value: str, ex: int | None = None) -> None:
-    """Redis'e değer yazar (opsiyonel TTL ile)."""
+    """Redis'e anahtar ve değer yazar (isteğe bağlı TTL ile).
+
+    Args:
+        key: Yazılacak anahtar.
+        value: Değer.
+        ex: Geçerlilik süresi (saniye).
+    """
     with tracer.start_as_current_span("db.redis.set") as span:
         span.set_attribute("db.redis.key", key)
         r = await get_redis()
@@ -748,52 +957,76 @@ async def redis_set(key: str, value: str, ex: int | None = None) -> None:
 
 
 async def redis_delete(key: str) -> None:
-    """Redis'ten key siler."""
+    """Redis'ten anahtar siler.
+
+    Args:
+        key: Silinecek anahtar adı.
+    """
     r = await get_redis()
     await r.delete(key)
 
 
 async def redis_hgetall(key: str) -> dict[str, str]:
-    """Redis hash'i tamamen okur."""
+    """Redis hash yapısını tamamen okur.
+
+    Args:
+        key: Hash anahtarı.
+
+    Returns:
+        dict[str, str]: Hash haritası.
+    """
     r = await get_redis()
     return await r.hgetall(key)
 
 
 async def redis_hset(key: str, mapping: dict[str, str]) -> None:
-    """Redis hash'e mapping yazar."""
+    """Redis hash yapısına alan haritası yazar.
+
+    Args:
+        key: Hash anahtarı.
+        mapping: Alan-değer çiftleri.
+    """
     r = await get_redis()
     await r.hset(key, mapping=mapping)
 
 
 async def redis_publish(channel: str, message: str) -> None:
-    """Redis Pub/Sub kanalına mesaj yayınlar."""
+    """Redis Pub/Sub kanalına mesaj yayınlar.
+
+    Args:
+        channel: Hedef kanal adı.
+        message: Yayınlanacak metin mesajı.
+    """
     with tracer.start_as_current_span("db.redis.publish") as span:
         span.set_attribute("db.redis.channel", channel)
         r = await get_redis()
         await r.publish(channel, message)
 
 
-# ─── Health Check ─────────────────────────────────────────────────────────────
+# ─── Sağlık Denetimi (Health Check) ───────────────────────────────────────────
 
 
 async def check_db_health() -> dict[str, Any]:
-    """Tüm veritabanı bağlantılarının sağlığını kontrol eder.
+    """Tüm kurumsal veritabanı bağlantılarının canlılık durumunu denetler.
 
     Returns:
-        Her servisi 'healthy' | 'error: ...' | 'disconnected' olarak döner.
+        dict[str, Any]: Servis durumları ('healthy', 'degraded', 'offline', 'error: ...').
     """
     health: dict[str, Any] = {
         "postgres": "unavailable",
         "clickhouse": "unavailable",
         "redis": "unavailable",
         "questdb": "unavailable",
+        "duckdb": "unavailable",
     }
 
     with tracer.start_as_current_span("db.health_check"):
-        # PostgreSQL
+        # 1. PostgreSQL Denetimi
         if _pg_healthy and _pg_pool is not None:
             try:
-                async def _check_pg():
+
+                async def _check_pg() -> tuple[Any, int, int]:
+                    """PostgreSQL canlılığını test eder."""
                     pool = await get_pg_pool()
                     async with pool.acquire() as conn:
                         result = await conn.fetchval("SELECT 1")
@@ -808,12 +1041,14 @@ async def check_db_health() -> dict[str, Any]:
         else:
             health["postgres"] = "offline"
 
-        # ClickHouse
+        # 2. ClickHouse Denetimi
         if _ch_healthy:
             try:
-                def _check_ch():
+
+                def _check_ch() -> bool:
+                    """ClickHouse canlılığını test eder."""
                     res = ch_execute("SELECT 1")
-                    return res.result_rows and res.result_rows[0][0] == 1
+                    return bool(res.result_rows and res.result_rows[0][0] == 1)
 
                 is_ok = await asyncio.wait_for(asyncio.to_thread(_check_ch), timeout=1.0)
                 health["clickhouse"] = "healthy" if is_ok else "degraded"
@@ -822,12 +1057,14 @@ async def check_db_health() -> dict[str, Any]:
         else:
             health["clickhouse"] = "offline"
 
-        # Redis
+        # 3. Redis Denetimi
         if _redis_healthy and _redis is not None:
             try:
-                async def _check_redis():
+
+                async def _check_redis() -> bool:
+                    """Redis canlılığını test eder."""
                     r = await get_redis()
-                    return await r.ping()
+                    return bool(await r.ping())
 
                 pong = await asyncio.wait_for(_check_redis(), timeout=1.0)
                 health["redis"] = "healthy" if pong else "degraded"
@@ -836,25 +1073,33 @@ async def check_db_health() -> dict[str, Any]:
         else:
             health["redis"] = "offline"
 
-        # QuestDB
+        # 4. QuestDB Denetimi
         try:
             health["questdb"] = "healthy" if questdb_client._connected else "disconnected"
         except Exception as exc:
             health["questdb"] = f"error: {str(exc)[:100]}"
 
+        # 5. DuckDB Denetimi
+        try:
+            with get_duckdb(read_only=False) as d_conn:
+                val = d_conn.execute("SELECT 1").fetchone()
+                health["duckdb"] = "healthy" if val and val[0] == 1 else "degraded"
+        except Exception as exc:
+            health["duckdb"] = f"error: {str(exc)[:100]}"
+
     return health
 
 
-# ─── Lifecycle ────────────────────────────────────────────────────────────────
+# ─── Yaşam Döngüsü (Lifecycle) ────────────────────────────────────────────────
 
 _databases_initialized: bool = False
 
 
 async def init_databases(force: bool = False) -> None:
-    """Tüm veritabanı bağlantılarını başlatır.
+    """Tüm veritabanı altyapısını başlatır ve sağlık durumunu raporlar.
 
-    Herhangi bir servis başlatılamazsa diğerlerine devam eder (graceful).
-    Daha önce çalıştırılmışsa ve DB'ler çevrimdışıysa gereksiz yeniden denemeyi atlar.
+    Args:
+        force: Daha önce başlatılmış olsa bile zorla yeniden başlatılsın mı?
     """
     global _pg_healthy, _ch_healthy, _redis_healthy, _databases_initialized
 
@@ -886,23 +1131,71 @@ async def init_databases(force: bool = False) -> None:
     except Exception as exc:
         logger.warning("QuestDB başlatılamadı", error=str(exc))
 
+    # DuckDB yerel depolama başlatması
+    try:
+        with get_duckdb(read_only=False) as d_conn:
+            d_conn.execute("SELECT 1")
+    except Exception as exc:
+        logger.warning("DuckDB başlatılamadı", error=str(exc))
+
     health = await check_db_health()
     for svc, status in health.items():
         if status == "healthy":
-            logger.info("DB health check", service=svc, status="OK")
+            logger.info("db_saglik_kontrolu", service=svc, status="OK")
         elif isinstance(status, str) and status.startswith("error"):
-            logger.warning("DB health check", service=svc, status=status)
+            logger.warning("db_saglik_kontrolu", service=svc, status=status)
 
-    logger.info("Veritabanı başlatma tamamlandı")
+    logger.info("veritabani_baslatma_tamamlandi")
 
 
 async def close_databases() -> None:
-    """Tüm veritabanı bağlantılarını düzgünce kapatır."""
+    """Tüm veritabanı bağlantı havuzlarını ve oturumlarını düzenli şekilde kapatır."""
     await close_pg_pool()
     close_ch_client()
     await close_redis()
     try:
         questdb_client.close()
     except Exception as exc:
-        logger.warning("QuestDB close error", error=str(exc))
-    logger.info("Tüm veritabanı bağlantıları kapatıldı")
+        logger.warning("QuestDB kapatılırken hata", error=str(exc))
+    logger.info("tum_veritabani_baglantilari_kapatildi")
+
+
+__all__ = [
+    "DEFAULT_DUCKDB_PATH",
+    "DEFAULT_MAX_RETRIES",
+    "DEFAULT_REPLICA_LAG_THRESHOLD_SECONDS",
+    "DEFAULT_RETRY_BASE_DELAY",
+    "DatabaseRouter",
+    "ch_execute",
+    "ch_insert",
+    "ch_query_df",
+    "check_db_health",
+    "close_ch_client",
+    "close_databases",
+    "close_pg_pool",
+    "close_redis",
+    "db_router",
+    "duckdb_query_df",
+    "get_ch_client",
+    "get_clickhouse",
+    "get_db_pool",
+    "get_duckdb",
+    "get_duckdb_connection",
+    "get_pg_connection",
+    "get_pg_pool",
+    "get_pg_replica_connection",
+    "get_pg_replica_pool",
+    "get_pg_transaction",
+    "get_redis",
+    "init_databases",
+    "pg_execute",
+    "pg_fetch",
+    "pg_fetchrow",
+    "pg_fetchval",
+    "redis_delete",
+    "redis_get",
+    "redis_hgetall",
+    "redis_hset",
+    "redis_publish",
+    "redis_set",
+]

@@ -122,6 +122,47 @@ class InsiderAlert:
         """
         return orjson.dumps(self.to_dict())
 
+    def to_json(self) -> str:
+        """Alarmı UTF-8 JSON metnine dönüştürür.
+
+        Returns:
+            str: JSON metni.
+        """
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> InsiderAlert:
+        """Sözlük yapısından InsiderAlert nesnesi üretir.
+
+        Args:
+            data: Alarm alanlarını içeren sözlük.
+
+        Returns:
+            InsiderAlert: Oluşturulan alarm nesnesi.
+        """
+        return cls(
+            ticker=str(data["ticker"]).upper(),
+            alert_type=InsiderAlertType(data["alert_type"]),
+            severity=InsiderAlertSeverity(data["severity"]),
+            description=str(data.get("description", "")),
+            z_score=float(data.get("z_score", 0.0)),
+            confidence=float(data.get("confidence", 0.0)),
+            event_date=str(data.get("event_date", "")),
+            detected_at=str(data.get("detected_at", "")),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> InsiderAlert:
+        """JSON dizgisi veya bayt dizisinden InsiderAlert üretir.
+
+        Args:
+            json_str_or_bytes: JSON verisi.
+
+        Returns:
+            InsiderAlert: Çözümlenen model.
+        """
+        return cls.from_dict(orjson.loads(json_str_or_bytes))
+
     def __repr__(self) -> str:
         """Türkçe açıklayıcı metin gösterimi.
 
@@ -171,11 +212,12 @@ class InsiderDetector:
         ticker: str | None = None,
         prices: list[float] | np.ndarray | None = None,
         volumes: list[float] | np.ndarray | None = None,
+        kap_dates: list[str] | None = None,
     ) -> list[InsiderAlert]:
         """KAP açıklaması öncesi olağandışı hacim ve fiyat hareketlerini denetler.
 
         Hem tekil hisse serisi (`ticker`, `volumes`, `prices`) hem de çoklu işlem listesi
-        (`trades`, `volume_history`) parametre imzalarını tam uyumlulukla destekler.
+        (`trades`, `volume_history`, `kap_dates`) parametre imzalarını tam uyumlulukla destekler.
 
         Args:
             trades: İşlem kayıtları listesi [{date, volume, price, ticker}].
@@ -184,12 +226,18 @@ class InsiderDetector:
             ticker: Tekil hisse kodu (orchestrator çağrıları için).
             prices: Kapanış fiyatları serisi.
             volumes: Hacim serisi.
+            kap_dates: KAP duyuru tarihleri listesi (tarih dizgileri).
 
         Returns:
             list[InsiderAlert]: Üretilen içeriden öğrenen ticareti alarmları.
         """
         alerts: list[InsiderAlert] = []
-        events = kap_events if kap_events is not None else []
+        if kap_events is not None:
+            events = list(kap_events)
+        elif kap_dates:
+            events = [{"date": str(d), "ticker": ticker or ""} for d in kap_dates]
+        else:
+            events = []
 
         with self._lock:
             # Durum 1: Tekil hisse vektörel çağrısı (Orchestrator entegrasyonu)
@@ -207,7 +255,7 @@ class InsiderDetector:
 
                 if len(vols_arr) >= DEFAULT_MIN_VOLUME_HISTORY_LEN:
                     raw_z, log_z = self.compute_volume_z_score(vols_arr, use_log=True)
-                    eff_z = raw_z if abs(raw_z) >= abs(log_z) else log_z
+                    eff_z = max(raw_z, log_z)
                     last_vol = float(vols_arr[-1])
                     mean_vol = float(np.mean(vols_arr[:-1])) if len(vols_arr) > 1 else float(np.mean(vols_arr))
 
@@ -267,6 +315,8 @@ class InsiderDetector:
                         continue
 
                     min_date = self._days_before(event_date, DEFAULT_PRE_KAP_DAYS_WINDOW)
+                    if not min_date:
+                        continue
                     pre_kap_trades: list[dict[str, Any]] = []
                     for t in trades:
                         t_ticker = str(t.get("ticker", "")).upper()
@@ -297,7 +347,7 @@ class InsiderDetector:
                             if len(hist_arr) > 0:
                                 sim_vols = np.append(hist_arr, vol)
                                 raw_z, log_z = self.compute_volume_z_score(sim_vols, use_log=True)
-                                eff_z = raw_z if abs(raw_z) >= abs(log_z) else log_z
+                                eff_z = max(raw_z, log_z)
                             else:
                                 eff_z = 0.0
 
@@ -345,6 +395,28 @@ class InsiderDetector:
 
             return alerts
 
+    def detect_insider_trading(
+        self,
+        trades: list[dict[str, Any]] | None = None,
+        kap_events: list[dict[str, Any]] | None = None,
+        volume_history: list[float] | np.ndarray | None = None,
+        *,
+        ticker: str | None = None,
+        prices: list[float] | np.ndarray | None = None,
+        volumes: list[float] | np.ndarray | None = None,
+        kap_dates: list[str] | None = None,
+    ) -> list[InsiderAlert]:
+        """detect_pre_kap_trade için takma ad (alias) metodu."""
+        return self.detect_pre_kap_trade(
+            trades=trades,
+            kap_events=kap_events,
+            volume_history=volume_history,
+            ticker=ticker,
+            prices=prices,
+            volumes=volumes,
+            kap_dates=kap_dates,
+        )
+
     def _classify_z(self, z: float) -> tuple[str | None, str]:
         """Z-skorunu önem seviyesi ve alarm türüne göre sınıflandırır."""
         if z >= self.Z_THRESHOLD_CRITICAL:
@@ -382,7 +454,12 @@ class InsiderDetector:
         # 1. Standart Normal Z-Skoru
         mean_vol = float(np.mean(baseline))
         std_vol = float(np.std(baseline))
-        raw_z = float((last_vol - mean_vol) / std_vol) if std_vol > 0 else 0.0
+        if std_vol > 0:
+            raw_z = float((last_vol - mean_vol) / std_vol)
+        elif last_vol > mean_vol:
+            raw_z = float((last_vol - mean_vol) / max(1.0, mean_vol))
+        else:
+            raw_z = 0.0
 
         # 2. Log-Normal Z-Skoru (Finansal hacim sağa çarpıklık düzeltmesi)
         if use_log:
@@ -390,7 +467,12 @@ class InsiderDetector:
             log_last = float(np.log1p(last_vol))
             log_mean = float(np.mean(log_baseline))
             log_std = float(np.std(log_baseline))
-            log_z = float((log_last - log_mean) / log_std) if log_std > 0 else 0.0
+            if log_std > 0:
+                log_z = float((log_last - log_mean) / log_std)
+            elif log_last > log_mean:
+                log_z = float((log_last - log_mean) / max(0.01, log_mean))
+            else:
+                log_z = 0.0
         else:
             log_z = raw_z
 
@@ -414,12 +496,13 @@ class InsiderDetector:
         arr = np.asarray(prices, dtype=float)
         arr = arr[np.isfinite(arr)]
         arr = arr[arr > 0]
-        if len(arr) < window + 1 or window <= 0:
+        effective_window = min(window, len(arr) - 1)
+        if effective_window <= 0:
             return 0.0
-        window_prices = arr[-(window + 1) :]
-        returns = np.diff(window_prices) / window_prices[:-1]
-        returns = returns[np.isfinite(returns)]
-        return float(np.sum(returns)) if len(returns) > 0 else 0.0
+        window_prices = arr[-(effective_window + 1) :]
+        if window_prices[0] <= 0:
+            return 0.0
+        return float((window_prices[-1] / window_prices[0]) - 1.0)
 
     @otel_trace("insider_detector.detect_price_move_before_kap")
     def detect_price_move_before_kap(
@@ -459,7 +542,7 @@ class InsiderDetector:
                 valid_pre_returns = raw_pre_returns[np.isfinite(raw_pre_returns)]
                 if len(valid_pre_returns) == 0:
                     return alerts
-                cumulative_return = float(np.sum(valid_pre_returns))
+                cumulative_return = float((pre_kap_prices[-1] / pre_kap_prices[0]) - 1.0)
 
                 valid_prices = prices_arr[prices_arr > 0]
                 if len(valid_prices) < 2:
@@ -551,6 +634,8 @@ class InsiderDetector:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_INSIDER_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
@@ -580,6 +665,42 @@ class InsiderDetector:
             con.unregister("alert_arrow")
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    def query_alerts_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB `bist_insider_alerts` tablosundan geçmiş alarmları Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Döndürülecek maksimum kayıt adedi.
+
+        Returns:
+            pl.DataFrame: Alarmların Polars DataFrame karşılığı.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_INSIDER_AUDIT_DB_PATH
+        if not target_path.exists():
+            return self.export_to_polars().head(0)
+        if target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
+            return self.export_to_polars().head(0)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_insider_alerts'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return self.export_to_polars().head(0)
+            return con.execute(
+                "SELECT ticker, alert_type, severity, description, z_score, confidence, event_date, detected_at "
+                "FROM bist_insider_alerts ORDER BY detected_at DESC LIMIT ?",
+                [limit],
+            ).pl()
         finally:
             con.close()
 
@@ -629,6 +750,7 @@ def detect_insider_trading(
     ticker: str | None = None,
     prices: list[float] | np.ndarray | None = None,
     volumes: list[float] | np.ndarray | None = None,
+    kap_dates: list[str] | None = None,
     detector: InsiderDetector | None = None,
 ) -> list[InsiderAlert]:
     """KAP öncesi olağandışı hacim ve fiyat hareketlerini denetler."""
@@ -640,6 +762,7 @@ def detect_insider_trading(
         ticker=ticker,
         prices=prices,
         volumes=volumes,
+        kap_dates=kap_dates,
     )
 
 
@@ -701,6 +824,25 @@ def export_insider_alerts_to_duckdb(
     """
     inst = detector if detector is not None else insider_detector
     return inst.export_to_duckdb(db_path=db_path)
+
+
+def query_insider_alerts_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    detector: InsiderDetector | None = None,
+) -> pl.DataFrame:
+    """DuckDB `bist_insider_alerts` tablosundan alarmları Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        limit: Maksimum kayıt adedi.
+        detector: Dedektör nesnesi.
+
+    Returns:
+        pl.DataFrame: Alarmların Polars DataFrame sonucu.
+    """
+    inst = detector if detector is not None else insider_detector
+    return inst.query_alerts_duckdb(db_path=db_path, limit=limit)
 
 
 def compute_volume_z_score(
@@ -766,4 +908,5 @@ __all__: list[str] = [
     "get_insider_alerts",
     "get_insider_detector",
     "insider_detector",
+    "query_insider_alerts_duckdb",
 ]

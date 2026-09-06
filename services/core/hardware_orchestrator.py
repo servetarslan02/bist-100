@@ -31,7 +31,10 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import duckdb
 import orjson
@@ -58,6 +61,7 @@ logger = structlog.get_logger(__name__)
 DEFAULT_FLUSH_INTERVAL_SEC: float = 5.0
 DEFAULT_MAX_BUFFER_SIZE: int = 5000
 DEFAULT_HARDWARE_AUDIT_DB_PATH: str = "data/hardware_audit.duckdb"
+DEFAULT_PROFILE_CACHE_TTL_SEC: float = 1.0
 
 
 # ==============================================================================
@@ -110,7 +114,36 @@ class HardwareProfile:
 
     def to_orjson_bytes(self) -> bytes:
         """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HardwareProfile:
+        """Sözlükten HardwareProfile nesnesi üretir.
+
+        Args:
+            data: Anahtar-değer donanım profili sözlüğü.
+
+        Returns:
+            HardwareProfile: Örnek nesnesi.
+        """
+        return cls(
+            device_type=str(data.get("device_type", "cpu")),
+            gpu_name=str(data.get("gpu_name", "N/A")),
+            gpu_vram_gb=float(data.get("gpu_vram_gb", 0.0)),
+            cuda_version=data.get("cuda_version"),
+            total_ram_gb=float(data.get("total_ram_gb", 0.0)),
+            available_ram_gb=float(data.get("available_ram_gb", 0.0)),
+            cpu_cores=int(data.get("cpu_cores", 1)),
+            ssd_free_gb=float(data.get("ssd_free_gb", 0.0)),
+            ssd_write_buffer_enabled=bool(data.get("ssd_write_buffer_enabled", False)),
+            timestamp=str(data.get("timestamp", datetime.now(UTC).isoformat())),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> HardwareProfile:
+        """JSON dizesi veya baytından HardwareProfile nesnesi üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -163,6 +196,19 @@ class SSDThrottledWriter:
         )
         self._worker_thread.start()
 
+    def __enter__(self) -> SSDThrottledWriter:
+        """Context manager desteği."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışında güvenli flush ve kapatma."""
+        self.shutdown()
+
     @property
     def is_running(self) -> bool:
         """Yazıcının aktif çalışıp çalışmadığını döner.
@@ -170,7 +216,8 @@ class SSDThrottledWriter:
         Returns:
             bool: Çalışıyorsa True.
         """
-        return self._running
+        with self._lock:
+            return self._running
 
     def enqueue_write(
         self,
@@ -205,14 +252,14 @@ class SSDThrottledWriter:
             target_file = Path(target_path).resolve()
             target_file.parent.mkdir(parents=True, exist_ok=True)
 
-            if is_bytes:
-                with open(target_file, mode) as f:
-                    f.write(data)
-            else:
-                with open(target_file, mode, encoding="utf-8") as f:
-                    f.write(data)
-
             with self._lock:
+                if is_bytes:
+                    with open(target_file, mode) as f:
+                        f.write(data)  # type: ignore[arg-type]
+                else:
+                    with open(target_file, mode, encoding="utf-8") as f:
+                        f.write(data)  # type: ignore[arg-type]
+
                 self._total_bytes_written += len(data)
                 self._total_flushes += 1
         except Exception as e:
@@ -220,7 +267,11 @@ class SSDThrottledWriter:
 
     def _flusher_loop(self) -> None:
         """Arka planda periyodik olarak tamponu diske boşaltan döngü."""
-        while self._running:
+        while True:
+            with self._lock:
+                running = self._running
+            if not running:
+                break
             time.sleep(self.flush_interval_sec)
             self.flush()
 
@@ -245,22 +296,20 @@ class SSDThrottledWriter:
                 target_file.parent.mkdir(parents=True, exist_ok=True)
                 is_bytes = any(isinstance(d, bytes) for d, _ in operations)
 
-                if is_bytes:
-                    combined_bytes = b"".join(
-                        d if isinstance(d, bytes) else str(d).encode("utf-8") for d, _ in operations
-                    )
-                    with open(target_file, "ab") as f:
-                        f.write(combined_bytes)
-                    with self._lock:
+                with self._lock:
+                    if is_bytes:
+                        combined_bytes = b"".join(
+                            d if isinstance(d, bytes) else str(d).encode("utf-8") for d, _ in operations
+                        )
+                        with open(target_file, "ab") as f:
+                            f.write(combined_bytes)
                         self._total_bytes_written += len(combined_bytes)
-                else:
-                    combined_str = "".join(d if isinstance(d, str) else str(d) for d, _ in operations)
-                    with open(target_file, "a", encoding="utf-8") as f:
-                        f.write(combined_str)
-                    with self._lock:
+                    else:
+                        combined_str = "".join(d if isinstance(d, str) else str(d) for d, _ in operations)
+                        with open(target_file, "a", encoding="utf-8") as f:
+                            f.write(combined_str)
                         self._total_bytes_written += len(combined_str.encode("utf-8"))
 
-                with self._lock:
                     self._total_flushes += 1
             except Exception as e:
                 logger.error("ssd_toplu_yazma_hatasi", yol=path, hata=str(e))
@@ -281,7 +330,8 @@ class SSDThrottledWriter:
 
     def shutdown(self) -> None:
         """Yazma kuyruğunu son kez diske yaz ve arka plan iş parçacığını sonlandır."""
-        self._running = False
+        with self._lock:
+            self._running = False
         self.flush()
 
     def __repr__(self) -> str:
@@ -305,22 +355,43 @@ class HardwareOrchestrator:
     CatBoost, XGBoost, LightGBM ve PyTorch için en uygun parametreleri üretir.
     """
 
-    def __init__(self, enable_ssd_writer: bool = True) -> None:
+    def __init__(
+        self,
+        enable_ssd_writer: bool = True,
+        cache_ttl_sec: float = DEFAULT_PROFILE_CACHE_TTL_SEC,
+    ) -> None:
         """HardwareOrchestrator başlatıcı.
 
         Args:
             enable_ssd_writer: SSD tamponlu yazıcısının başlatılıp başlatılmayacağı.
+            cache_ttl_sec: Donanım profili sorgusu önbellek geçerlilik süresi (saniye).
         """
         self._lock = threading.RLock()
         self._device: str = "cpu"
         self._gpu_name: str = "N/A"
         self._vram_gb: float = 0.0
         self._cuda_version: str | None = None
+        self._cache_ttl_sec: float = cache_ttl_sec
+        self._cached_profile: HardwareProfile | None = None
+        self._last_profile_time: float = 0.0
         self._ssd_writer: SSDThrottledWriter | None = (
             SSDThrottledWriter() if enable_ssd_writer else None
         )
 
         self._detect_and_configure_hardware()
+
+    def __enter__(self) -> HardwareOrchestrator:
+        """Context manager protokolü desteği."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışında temizleme ve SSD tamponunu son kez boşaltma."""
+        self.shutdown()
 
     @property
     def ssd_writer(self) -> SSDThrottledWriter:
@@ -348,7 +419,7 @@ class HardwareOrchestrator:
                         )
                         self._cuda_version = torch.version.cuda
 
-                        # RTX 4080 Donanım Hızlandırma Ayarları
+                        # Tensor Core ve TF32 Donanım Hızlandırma Ayarları
                         torch.backends.cuda.matmul.allow_tf32 = True
                         torch.backends.cudnn.allow_tf32 = True
                         torch.backends.cudnn.benchmark = True
@@ -368,7 +439,8 @@ class HardwareOrchestrator:
             self._gpu_name = "N/A"
             self._vram_gb = 0.0
             self._cuda_version = None
-            logger.info("donanim_cpu_ram_modunda", cekirdek=psutil.cpu_count(logical=True))
+            cpu_cores = max(1, psutil.cpu_count(logical=True) or 1)
+            logger.info("donanim_cpu_ram_modunda", cekirdek=cpu_cores)
 
     @property
     def device(self) -> str:
@@ -408,7 +480,7 @@ class HardwareOrchestrator:
             params["devices"] = "0"
         else:
             params["task_type"] = "CPU"
-            cpu_cores = psutil.cpu_count(logical=True) or 4
+            cpu_cores = max(1, psutil.cpu_count(logical=True) or 1)
             params["thread_count"] = max(1, cpu_cores - 2)
         return params
 
@@ -432,7 +504,7 @@ class HardwareOrchestrator:
         else:
             params["tree_method"] = "hist"
             params["device"] = "cpu"
-            cpu_cores = psutil.cpu_count(logical=True) or 4
+            cpu_cores = max(1, psutil.cpu_count(logical=True) or 1)
             params["n_jobs"] = max(1, cpu_cores - 2)
         return params
 
@@ -450,24 +522,61 @@ class HardwareOrchestrator:
             dict[str, Any]: Donanıma uyarlanmış parametre sözlüğü.
         """
         params = custom_params.copy() if custom_params else {}
-        cpu_cores = psutil.cpu_count(logical=True) or 4
+        cpu_cores = max(1, psutil.cpu_count(logical=True) or 1)
         params["n_jobs"] = max(1, cpu_cores - 2)
         return params
 
+    def get_optimal_ml_params(
+        self,
+        framework: str,
+        custom_params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """İlgili makine öğrenmesi kütüphanesi için optimal parametreleri döner.
+
+        Args:
+            framework: Kütüphane adı ('catboost', 'xgboost', 'lightgbm').
+            custom_params: Eklemek veya ezmek istenen parametreler.
+
+        Returns:
+            dict[str, Any]: Yapılandırılmış parametre sözlüğü.
+        """
+        fw = framework.lower().strip()
+        if fw == "catboost":
+            return self.get_catboost_params(custom_params)
+        elif fw == "xgboost":
+            return self.get_xgboost_params(custom_params)
+        elif fw == "lightgbm":
+            return self.get_lightgbm_params(custom_params)
+        else:
+            logger.warning("bilinmeyen_ml_framework_varsayilan_cpu", framework=framework)
+            params = custom_params.copy() if custom_params else {}
+            cpu_cores = max(1, psutil.cpu_count(logical=True) or 1)
+            params.setdefault("n_jobs", max(1, cpu_cores - 2))
+            return params
+
     @otel_trace("hardware_orchestrator.get_hardware_profile")
-    def get_hardware_profile(self) -> HardwareProfile:
-        """Tüm donanım bileşenlerinin anlık durum raporunu döndürür.
+    def get_hardware_profile(self, force_refresh: bool = False) -> HardwareProfile:
+        """Tüm donanım bileşenlerinin anlık durum raporunu döndürür (TTL önbellekli).
+
+        Args:
+            force_refresh: Önbelleği atlayarak taze veri topla.
 
         Returns:
             HardwareProfile: Donanım ve bellek kaynakları profili.
         """
+        now = time.monotonic()
+        with self._lock:
+            if not force_refresh and self._cached_profile is not None:
+                if (now - self._last_profile_time) < self._cache_ttl_sec:
+                    return self._cached_profile
+
         mem = psutil.virtual_memory()
         _, _, free_d = shutil.disk_usage(".")
-        cores = psutil.cpu_count(logical=True) or 1
+        cores = max(1, psutil.cpu_count(logical=True) or 1)
 
         with self._lock:
             buffer_enabled = self._ssd_writer is not None and self._ssd_writer.is_running
-            return HardwareProfile(
+            profile = HardwareProfile(
                 device_type=self._device,
                 gpu_name=self._gpu_name,
                 gpu_vram_gb=self._vram_gb,
@@ -478,15 +587,30 @@ class HardwareOrchestrator:
                 ssd_free_gb=round(free_d / (1024**3), 2),
                 ssd_write_buffer_enabled=buffer_enabled,
             )
+            self._cached_profile = profile
+            self._last_profile_time = now
+            return profile
 
     def export_profile_to_polars(self) -> pl.DataFrame:
-        """Mevcut donanım profilini Polars DataFrame olarak döndürür.
+        """Mevcut donanım profilini kesin şemalı Polars DataFrame olarak döndürür.
 
         Returns:
             pl.DataFrame: Donanım profil verisini içeren tek satırlık tablo.
         """
         profile = self.get_hardware_profile()
-        return pl.DataFrame([profile.to_dict()])
+        schema = {
+            "device_type": pl.Utf8,
+            "gpu_name": pl.Utf8,
+            "gpu_vram_gb": pl.Float64,
+            "cuda_version": pl.Utf8,
+            "total_ram_gb": pl.Float64,
+            "available_ram_gb": pl.Float64,
+            "cpu_cores": pl.Int64,
+            "ssd_free_gb": pl.Float64,
+            "ssd_write_buffer_enabled": pl.Boolean,
+            "timestamp": pl.Utf8,
+        }
+        return pl.DataFrame([profile.to_dict()], schema=schema)
 
     def export_profile_to_duckdb(
         self,
@@ -504,11 +628,12 @@ class HardwareOrchestrator:
             Exception: DuckDB bağlantı veya kayıt hatası durumunda.
         """
         profile = self.get_hardware_profile()
-        target_file = Path(db_path)
+        target_file = Path(db_path).resolve()
         target_file.parent.mkdir(parents=True, exist_ok=True)
 
+        row_id = uuid.uuid4().hex
         row = (
-            uuid.uuid4().hex,
+            row_id,
             profile.device_type,
             profile.gpu_name,
             profile.gpu_vram_gb,
@@ -519,7 +644,7 @@ class HardwareOrchestrator:
             profile.ssd_free_gb,
             profile.ssd_write_buffer_enabled,
             profile.timestamp,
-            orjson.dumps(profile.to_dict()).decode("utf-8"),
+            orjson.dumps(profile.to_dict(), default=str).decode("utf-8"),
         )
 
         with self._lock:
@@ -554,8 +679,47 @@ class HardwareOrchestrator:
                     row,
                 )
 
-        logger.info("donanim_profili_duckdb_aktarildi", yol=db_path)
+        logger.info("donanim_profili_duckdb_aktarildi", yol=str(target_file), id=row_id)
         return 1
+
+    def query_audit_duckdb(
+        self,
+        db_path: str = DEFAULT_HARDWARE_AUDIT_DB_PATH,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """Kayıtlı donanım profillerini DuckDB üzerinden Polars DataFrame olarak çeker.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Döndürülecek maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Donanım denetim geçmişi tablosu.
+        """
+        target_file = Path(db_path).resolve()
+        if not target_file.exists():
+            return pl.DataFrame()
+
+        with self._lock:
+            with duckdb.connect(str(target_file), read_only=True) as conn:
+                query = (
+                    "SELECT id, created_at, device_type, gpu_name, gpu_vram_gb, "
+                    "cuda_version, total_ram_gb, available_ram_gb, cpu_cores, "
+                    "ssd_free_gb, ssd_write_buffer_enabled, timestamp "
+                    "FROM hardware_profile_audit ORDER BY created_at DESC LIMIT ?"
+                )
+                return conn.execute(query, [limit]).pl()
+
+    def flush(self) -> None:
+        """SSD tamponlu yazıcısının bekleyen tüm verilerini diske yazar."""
+        if self._ssd_writer is not None:
+            self._ssd_writer.flush()
+
+    def shutdown(self) -> None:
+        """Tüm arka plan servislerini ve tamponları güvenli sonlandırır."""
+        with self._lock:
+            if self._ssd_writer is not None:
+                self._ssd_writer.shutdown()
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -567,17 +731,85 @@ class HardwareOrchestrator:
 
 
 # ==============================================================================
-# Global Singleton ve Dışa Aktarımlar
+# Global Singleton ve Yardımcı Fonksiyonlar
 # ==============================================================================
 
 hardware_orchestrator: HardwareOrchestrator = HardwareOrchestrator()
+
+
+def get_hardware_orchestrator() -> HardwareOrchestrator:
+    """Global HardwareOrchestrator singleton örneğini döndürür."""
+    return hardware_orchestrator
+
+
+def get_current_hardware_profile(force_refresh: bool = False) -> HardwareProfile:
+    """Sistemin güncel donanım profilini döner."""
+    return hardware_orchestrator.get_hardware_profile(force_refresh=force_refresh)
+
+
+def is_gpu_accelerated() -> bool:
+    """Sistemde aktif GPU hızlandırma bulunup bulunmadığını döner."""
+    return hardware_orchestrator.is_gpu_available()
+
+
+def get_optimal_ml_params(
+    framework: str,
+    custom_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """CatBoost, XGBoost veya LightGBM için optimize edilmiş parametreleri döner."""
+    return hardware_orchestrator.get_optimal_ml_params(framework, custom_params)
+
+
+def enqueue_ssd_write(
+    target_path: str | Path,
+    data: str | bytes,
+    append: bool = True,
+) -> None:
+    """Global SSDThrottledWriter üzerinden RAM tamponlu yazma kuyruğuna ekler."""
+    hardware_orchestrator.ssd_writer.enqueue_write(target_path, data, append)
+
+
+def flush_ssd_writer() -> None:
+    """SSD tamponundaki bekleyen tüm yazma işlemlerini hemen diske boşaltır."""
+    hardware_orchestrator.flush()
+
+
+def export_hardware_profile_to_polars() -> pl.DataFrame:
+    """Mevcut donanım profilini Polars DataFrame olarak döner."""
+    return hardware_orchestrator.export_profile_to_polars()
+
+
+def export_hardware_audit_to_duckdb(
+    db_path: str = DEFAULT_HARDWARE_AUDIT_DB_PATH,
+) -> int:
+    """Mevcut donanım profilini DuckDB denetim tablosuna kaydeder."""
+    return hardware_orchestrator.export_profile_to_duckdb(db_path)
+
+
+def query_hardware_audit_duckdb(
+    db_path: str = DEFAULT_HARDWARE_AUDIT_DB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB üzerindeki donanım denetim geçmişini Polars DataFrame olarak sorgular."""
+    return hardware_orchestrator.query_audit_duckdb(db_path=db_path, limit=limit)
+
 
 __all__: list[str] = [
     "DEFAULT_FLUSH_INTERVAL_SEC",
     "DEFAULT_HARDWARE_AUDIT_DB_PATH",
     "DEFAULT_MAX_BUFFER_SIZE",
+    "DEFAULT_PROFILE_CACHE_TTL_SEC",
     "HardwareOrchestrator",
     "HardwareProfile",
     "SSDThrottledWriter",
+    "enqueue_ssd_write",
+    "export_hardware_audit_to_duckdb",
+    "export_hardware_profile_to_polars",
+    "flush_ssd_writer",
+    "get_current_hardware_profile",
+    "get_hardware_orchestrator",
+    "get_optimal_ml_params",
     "hardware_orchestrator",
+    "is_gpu_accelerated",
+    "query_hardware_audit_duckdb",
 ]

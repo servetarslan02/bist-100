@@ -22,7 +22,10 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import duckdb
 import httpx
@@ -42,6 +45,7 @@ logger = structlog.get_logger(__name__)
 DEFAULT_CHECK_INTERVAL_SECONDS: Final[int] = 300
 DEFAULT_EXPECTED_DATA_INTERVAL_MINUTES: Final[int] = 5
 DEFAULT_MAX_RETRIES: Final[int] = 3
+DEFAULT_HOLIDAY_MAX_RETRIES: Final[int] = DEFAULT_MAX_RETRIES
 DEFAULT_HTTP_TIMEOUT_SECONDS: Final[int] = 15
 DEFAULT_CACHE_SAVE_DEBOUNCE_SECONDS: Final[float] = 60.0
 DEFAULT_MAX_AUDIT_ENTRIES: Final[int] = 1000
@@ -145,7 +149,26 @@ class HolidayInfo:
         Returns:
             bytes: orjson ile kodlanmış bayt dizisi.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HolidayInfo:
+        """Sözlükten HolidayInfo örneği üretir."""
+        d = data.get("date")
+        parsed_date = date.fromisoformat(d) if isinstance(d, str) else d
+        return cls(
+            date=parsed_date,
+            name=str(data.get("name", "")),
+            holiday_type=str(data.get("holiday_type", HolidayType.NATIONAL.value)),
+            is_half_day=bool(data.get("is_half_day", False)),
+            description=str(data.get("description", "")),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> HolidayInfo:
+        """JSON verisinden HolidayInfo örneği üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Kullanıcı dostu Türkçe metin gösterimi.
@@ -192,7 +215,23 @@ class HolidayAuditEntry:
         Returns:
             bytes: orjson kodlu baytlar.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HolidayAuditEntry:
+        """Sözlükten HolidayAuditEntry örneği üretir."""
+        return cls(
+            timestamp=str(data.get("timestamp", datetime.now(UTC).isoformat())),
+            action=str(data.get("action", "unknown")),
+            date=str(data.get("date", "")),
+            reason=str(data.get("reason", "")),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> HolidayAuditEntry:
+        """JSON verisinden HolidayAuditEntry örneği üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Türkçe açıklayıcı metin gösterimi.
@@ -896,6 +935,52 @@ class HolidayManager:
 
         self._load_cache()
 
+    def __enter__(self) -> HolidayManager:
+        """Context manager protokolü desteği."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışında bekleyen tüm denetim ve önbellek verilerini diske yazar."""
+        self.flush()
+
+    def flush(self) -> None:
+        """Bekleyen tatil önbelleğini ve denetim loglarını derhal diske yazar."""
+        with self._lock:
+            self._save_cache(force=True)
+            if self._pending_audit_entries:
+                self._flush_pending_audits()
+
+    def shutdown(self) -> None:
+        """Tüm arka plan servislerini ve tamponları güvenli sonlandırır."""
+        self.flush()
+
+    def _flush_pending_audits(self) -> None:
+        """Bekleyen denetim günlüğü kayıtlarını diske kaydeder."""
+        if not self._pending_audit_entries:
+            return
+        try:
+            if self._audit_file.exists():
+                with open(self._audit_file, "rb") as f:
+                    data = orjson.loads(f.read())
+            else:
+                data = {"entries": []}
+
+            data["entries"].extend(self._pending_audit_entries)
+            self._pending_audit_entries.clear()
+
+            if len(data["entries"]) > DEFAULT_MAX_AUDIT_ENTRIES:
+                data["entries"] = data["entries"][-DEFAULT_MAX_AUDIT_ENTRIES:]
+
+            with open(self._audit_file, "wb") as f:
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+        except Exception as e:
+            logger.debug("denetim_kaydi_yazma_hatasi", hata=str(e))
+
     # -------------------------------------------------
     # SORGULAMA METOTLARI
     # -------------------------------------------------
@@ -1440,6 +1525,67 @@ class HolidayManager:
         finally:
             con.close()
 
+    def query_holidays_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        year: int | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB bist_holidays_audit tablosundaki tatilleri Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            year: Opsiyonel yıl filtresi.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Tatil takvimi tablosu.
+        """
+        target_path = Path(db_path).resolve() if db_path is not None else DEFAULT_HOLIDAY_AUDIT_DB_PATH.resolve()
+        if not target_path.exists():
+            return pl.DataFrame()
+
+        with self._lock:
+            with duckdb.connect(str(target_path), read_only=True) as conn:
+                if year is not None:
+                    query = (
+                        "SELECT date, year, month, day, weekday, name, holiday_type, is_half_day, is_trading_day "
+                        "FROM bist_holidays_audit WHERE year = ? ORDER BY date ASC LIMIT ?"
+                    )
+                    return conn.execute(query, [year, limit]).pl()
+                else:
+                    query = (
+                        "SELECT date, year, month, day, weekday, name, holiday_type, is_half_day, is_trading_day "
+                        "FROM bist_holidays_audit ORDER BY date ASC LIMIT ?"
+                    )
+                    return conn.execute(query, [limit]).pl()
+
+    def query_audit_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB bist_holiday_audit_trail tablosundaki denetim loglarını Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Denetim izi tablosu.
+        """
+        target_path = Path(db_path).resolve() if db_path is not None else DEFAULT_HOLIDAY_AUDIT_DB_PATH.resolve()
+        if not target_path.exists():
+            return pl.DataFrame()
+
+        with self._lock:
+            with duckdb.connect(str(target_path), read_only=True) as conn:
+                query = (
+                    "SELECT timestamp, action, date, reason, logged_at "
+                    "FROM bist_holiday_audit_trail ORDER BY timestamp DESC LIMIT ?"
+                )
+                return conn.execute(query, [limit]).pl()
+
     # -------------------------------------------------
     # İÇ YARDIMCI METOTLAR
     # -------------------------------------------------
@@ -1675,6 +1821,79 @@ def export_holiday_audit_to_duckdb(
     return mgr.export_audit_to_duckdb(db_path=db_path, limit=limit)
 
 
+def query_holidays_duckdb(
+    db_path: str | Path | None = None,
+    year: int | None = None,
+    limit: int = 100,
+    manager: HolidayManager | None = None,
+) -> pl.DataFrame:
+    """DuckDB bist_holidays_audit tablosundan tatil kayıtlarını Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        year: Opsiyonel yıl filtresi.
+        limit: Maksimum kayıt sayısı.
+        manager: HolidayManager örneği.
+
+    Returns:
+        pl.DataFrame: Tatil takvimi tablosu.
+    """
+    mgr = manager if manager is not None else holiday_manager
+    return mgr.query_holidays_duckdb(db_path=db_path, year=year, limit=limit)
+
+
+def query_holiday_audit_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    manager: HolidayManager | None = None,
+) -> pl.DataFrame:
+    """DuckDB bist_holiday_audit_trail tablosundan denetim loglarını Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        limit: Maksimum kayıt sayısı.
+        manager: HolidayManager örneği.
+
+    Returns:
+        pl.DataFrame: Denetim izi tablosu.
+    """
+    mgr = manager if manager is not None else holiday_manager
+    return mgr.query_audit_duckdb(db_path=db_path, limit=limit)
+
+
+def flush_holiday_manager(manager: HolidayManager | None = None) -> None:
+    """HolidayManager önbelleğini ve denetim loglarını diske boşaltır."""
+    mgr = manager if manager is not None else holiday_manager
+    mgr.flush()
+
+
+def is_bist_holiday(
+    d: date | None = None,
+    manager: HolidayManager | None = None,
+) -> bool:
+    """Belirtilen günün BIST tam tatili olup olmadığını doğrular."""
+    mgr = manager if manager is not None else holiday_manager
+    return mgr.is_holiday(d)
+
+
+def is_bist_half_day(
+    d: date | None = None,
+    manager: HolidayManager | None = None,
+) -> bool:
+    """Belirtilen günün BIST yarım seans günü olup olmadığını doğrular."""
+    mgr = manager if manager is not None else holiday_manager
+    return mgr.is_half_day(d)
+
+
+def is_bist_trading_day(
+    d: date | None = None,
+    manager: HolidayManager | None = None,
+) -> bool:
+    """Belirtilen günün BIST işlem günü olup olmadığını doğrular."""
+    mgr = manager if manager is not None else holiday_manager
+    return mgr.is_trading_day(d)
+
+
 # Global Singleton Örneği
 holiday_manager: Final[HolidayManager] = HolidayManager()
 
@@ -1682,6 +1901,7 @@ __all__: list[str] = [
     "DEFAULT_CHECK_INTERVAL_SECONDS",
     "DEFAULT_EXPECTED_DATA_INTERVAL_MINUTES",
     "DEFAULT_HOLIDAY_AUDIT_DB_PATH",
+    "DEFAULT_HOLIDAY_MAX_RETRIES",
     "DEFAULT_HTTP_TIMEOUT_SECONDS",
     "DEFAULT_MAX_AUDIT_ENTRIES",
     "DEFAULT_MAX_RETRIES",
@@ -1706,6 +1926,12 @@ __all__: list[str] = [
     "export_holidays_to_duckdb",
     "export_holidays_to_polars",
     "fetch_bist_holidays_from_web",
+    "flush_holiday_manager",
     "get_holiday_manager",
     "holiday_manager",
+    "is_bist_half_day",
+    "is_bist_holiday",
+    "is_bist_trading_day",
+    "query_holiday_audit_duckdb",
+    "query_holidays_duckdb",
 ]

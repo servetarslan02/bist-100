@@ -3,7 +3,7 @@
 Bu modül, ClickHouse kümesindeki ReplicatedMergeTree tablolarının replikasyon durumunu,
 gecikmelerini (absolute_delay), kuyruk boyutlarını, aktif replika sayısını (active_replicas),
 hasarlı parça durumunu (parts_to_check) ve salt-okunur (read-only) kilitlenmelerini
-`system.replicas` tablosu üzerinden izler, Prometheus ve JSON formatlarında sunar.
+`system.replicas` tablosu üzerinden izler, Prometheus, Polars, DuckDB ve orjson formatlarında sunar.
 
 Hem senkron hem de asenkron (event loop dostu) çalıştırma arayüzlerini destekler.
 
@@ -17,23 +17,72 @@ import asyncio
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
+import orjson
+import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
 
 from .database import ch_execute
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
 logger = structlog.get_logger(__name__)
 
-# Varsayılan Eşik Değerleri ve Sabitler
+# Varsayılan Eşik Değerleri ve Yapılandırma Sabitleri
 DEFAULT_DATABASE: Final[str] = "alpha_bist"
 DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS: Final[int] = 10
 DEFAULT_MAX_QUEUE_SIZE: Final[int] = 100
+DEFAULT_REPLICATION_HEALTH_DB_PATH: Final[str] = "data/replication_health.duckdb"
+VALID_HEALTH_STATUSES: Final[tuple[str, ...]] = (
+    "healthy",
+    "degraded",
+    "no_replicas_found",
+    "error",
+    "unknown",
+)
+STATUS_PROMETHEUS_CODE_MAP: Final[dict[str, int]] = {
+    "healthy": 0,
+    "degraded": 1,
+    "no_replicas_found": 2,
+    "error": 3,
+    "unknown": -1,
+}
+
+
+def _safe_int(val: Any, default: int = 0) -> int:
+    """Değeri güvenli bir şekilde tamsayıya dönüştürür; NaN, Inf veya tip uyuşmazlığında default döner.
+
+    Args:
+        val: Dönüştürülecek ham değer.
+        default: Hata veya eksiklik durumunda dönülecek varsayılan değer.
+
+    Returns:
+        int: Güvenli tamsayı karşılığı.
+    """
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return int(f)
+    except (ValueError, TypeError, OverflowError):
+        return default
+
+
+def _escape_label_value(val: Any) -> str:
+    """Prometheus label değerini standartlara uygun şekilde kaçışlar.
+
+    Args:
+        val: Etiket değeri.
+
+    Returns:
+        str: Kaçışlanmış güvenli metin.
+    """
+    return str(val).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "")
 
 
 @dataclass(slots=True)
@@ -67,7 +116,11 @@ class ReplicaHealthInfo:
     parts_to_check: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        """Replika verisini serileştirilebilir sözlüğe dönüştürür."""
+        """Replika verisini serileştirilebilir sözlüğe dönüştürür.
+
+        Returns:
+            dict[str, Any]: Durum sözlüğü.
+        """
         return {
             "database": self.database,
             "table": self.table,
@@ -110,7 +163,11 @@ class ReplicationHealthReport:
     timestamp: str
 
     def to_dict(self) -> dict[str, Any]:
-        """Sağlık raporunu serileştirilebilir sözlüğe dönüştürür."""
+        """Sağlık raporunu serileştirilebilir sözlüğe dönüştürür.
+
+        Returns:
+            dict[str, Any]: Rapor sözlüğü.
+        """
         return {
             "status": self.status,
             "database": self.database,
@@ -119,12 +176,143 @@ class ReplicationHealthReport:
             "errors": list(self.errors),
         }
 
+    def to_polars(self) -> pl.DataFrame:
+        """Rapordaki replika bilgilerini Polars DataFrame olarak dışa aktarır.
+
+        Returns:
+            pl.DataFrame: Replikasyon verilerini içeren veri çerçevesi.
+        """
+        return export_replicas_to_polars(report=self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Sağlık raporunu orjson ile yüksek hızlı ikili JSON baytlarına dönüştürür.
+
+        Returns:
+            bytes: JSON baytları.
+        """
+        return orjson.dumps(self.to_dict(), option=orjson.OPT_INDENT_2)
+
     def __repr__(self) -> str:
         """Rapor için bilgilendirici metin temsili."""
         return (
             f"ReplicationHealthReport(status='{self.status}', database='{self.database}', "
             f"replicas={len(self.replicas)}, errors={len(self.errors)})"
         )
+
+
+@otel_trace("clickhouse_replication_health.get_replication_report_object")
+def get_replication_report_object(
+    database: str = DEFAULT_DATABASE,
+    max_absolute_delay: int = DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS,
+    max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
+) -> ReplicationHealthReport:
+    """ClickHouse replikasyon sağlık durumunu denetleyip nesne olarak döner.
+
+    Args:
+        database: Denetlenecek hedef veritabanı.
+        max_absolute_delay: Maksimum gecikme eşiği (saniye).
+        max_queue_size: Maksimum işlem kuyruk boyutu.
+
+    Returns:
+        ReplicationHealthReport: Güçlü tipli rapor nesnesi.
+    """
+    safe_db = (database or DEFAULT_DATABASE).strip()
+    safe_max_delay = max(0, _safe_int(max_absolute_delay, DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS))
+    safe_max_queue = max(0, _safe_int(max_queue_size, DEFAULT_MAX_QUEUE_SIZE))
+
+    now_iso = datetime.now(UTC).isoformat()
+    replicas: list[ReplicaHealthInfo] = []
+    errors: list[str] = []
+    status = "unknown"
+
+    try:
+        query = """
+            SELECT
+                database,
+                table,
+                is_leader,
+                is_readonly,
+                absolute_delay,
+                queue_size,
+                inserts_in_queue,
+                merges_in_queue,
+                total_replicas,
+                active_replicas,
+                parts_to_check
+            FROM system.replicas
+            WHERE database = {db:String}
+        """
+
+        result = ch_execute(query, parameters={"db": safe_db})
+        rows = getattr(result, "result_rows", None)
+        if rows is None and isinstance(result, (list, tuple)):
+            rows = result
+
+        if rows:
+            for row in rows:
+                tot_rep = _safe_int(row[8], 0) if len(row) > 8 else 0
+                act_rep = _safe_int(row[9], tot_rep or 1) if len(row) > 9 else (tot_rep or 1)
+                parts = _safe_int(row[10], 0) if len(row) > 10 else 0
+
+                replica_info = ReplicaHealthInfo(
+                    database=str(row[0]) if len(row) > 0 and row[0] is not None else safe_db,
+                    table=str(row[1]) if len(row) > 1 and row[1] is not None else "unknown",
+                    is_leader=bool(row[2]) if len(row) > 2 else False,
+                    is_readonly=bool(row[3]) if len(row) > 3 else False,
+                    absolute_delay=_safe_int(row[4], 0) if len(row) > 4 else 0,
+                    queue_size=_safe_int(row[5], 0) if len(row) > 5 else 0,
+                    inserts_in_queue=_safe_int(row[6], 0) if len(row) > 6 else 0,
+                    merges_in_queue=_safe_int(row[7], 0) if len(row) > 7 else 0,
+                    total_replicas=tot_rep,
+                    active_replicas=act_rep,
+                    parts_to_check=parts,
+                )
+                replicas.append(replica_info)
+
+                # Sağlık ve Eşik Denetimleri
+                if replica_info.absolute_delay > safe_max_delay:
+                    errors.append(
+                        f"{replica_info.table}: Replikasyon gecikmesi yüksek "
+                        f"({replica_info.absolute_delay}s > {safe_max_delay}s)"
+                    )
+                if replica_info.is_readonly:
+                    errors.append(f"{replica_info.table}: Tablo salt-okunur (read-only) modda kilitli")
+                if replica_info.queue_size > safe_max_queue:
+                    errors.append(
+                        f"{replica_info.table}: Kuyruk boyutu kritik seviyede "
+                        f"({replica_info.queue_size} > {safe_max_queue})"
+                    )
+                if replica_info.total_replicas > 1 and replica_info.active_replicas < replica_info.total_replicas:
+                    errors.append(
+                        f"{replica_info.table}: Aktif replika kaybı tespit edildi "
+                        f"({replica_info.active_replicas}/{replica_info.total_replicas})"
+                    )
+                if replica_info.parts_to_check > 0:
+                    errors.append(
+                        f"{replica_info.table}: Hasarlı veya kontrol bekleyen parçalar var "
+                        f"({replica_info.parts_to_check} parça)"
+                    )
+
+            if not errors:
+                status = "healthy"
+            else:
+                status = "degraded"
+        else:
+            status = "no_replicas_found"
+
+    except Exception as exc:
+        status = "error"
+        error_msg = str(exc)
+        errors.append(error_msg)
+        logger.error("clickhouse_replikasyon_saglik_kontrolu_basarisiz", veritabani=safe_db, hata=error_msg)
+
+    return ReplicationHealthReport(
+        status=status,
+        database=safe_db,
+        replicas=replicas,
+        errors=errors,
+        timestamp=now_iso,
+    )
 
 
 @otel_trace("clickhouse_replication_health.check_replication_health")
@@ -143,99 +331,10 @@ def check_replication_health(
     Returns:
         dict[str, Any]: Replikasyon durum raporu sözlüğü (ReplicationHealthReport.to_dict()).
     """
-    now_iso = datetime.now(UTC).isoformat()
-    replicas: list[ReplicaHealthInfo] = []
-    errors: list[str] = []
-    status = "unknown"
-
-    try:
-        # system.replicas tablosundan active_replicas ve parts_to_check dahil parametrik sorgulama
-        query = """
-            SELECT
-                database,
-                table,
-                is_leader,
-                is_readonly,
-                absolute_delay,
-                queue_size,
-                inserts_in_queue,
-                merges_in_queue,
-                total_replicas,
-                active_replicas,
-                parts_to_check
-            FROM system.replicas
-            WHERE database = {db:String}
-        """
-
-        result = ch_execute(query, parameters={"db": database})
-        rows = getattr(result, "result_rows", None)
-        if rows is None and isinstance(result, (list, tuple)):
-            rows = result
-
-        if rows:
-            for row in rows:
-                replica_info = ReplicaHealthInfo(
-                    database=str(row[0]),
-                    table=str(row[1]),
-                    is_leader=bool(row[2]),
-                    is_readonly=bool(row[3]),
-                    absolute_delay=int(row[4]) if row[4] is not None and not math.isnan(row[4]) else 0,
-                    queue_size=int(row[5]) if row[5] is not None and not math.isnan(row[5]) else 0,
-                    inserts_in_queue=int(row[6]) if row[6] is not None and not math.isnan(row[6]) else 0,
-                    merges_in_queue=int(row[7]) if row[7] is not None and not math.isnan(row[7]) else 0,
-                    total_replicas=int(row[8]) if row[8] is not None and not math.isnan(row[8]) else 0,
-                    active_replicas=(
-                        int(row[9])
-                        if len(row) > 9 and row[9] is not None and not math.isnan(row[9])
-                        else (int(row[8]) if row[8] is not None else 1)
-                    ),
-                    parts_to_check=(
-                        int(row[10])
-                        if len(row) > 10 and row[10] is not None and not math.isnan(row[10])
-                        else 0
-                    ),
-                )
-                replicas.append(replica_info)
-
-                # Sağlık ve Eşik Denetimleri
-                if replica_info.absolute_delay > max_absolute_delay:
-                    errors.append(
-                        f"{replica_info.table}: Replikasyon gecikmesi yüksek ({replica_info.absolute_delay}s > {max_absolute_delay}s)"
-                    )
-                if replica_info.is_readonly:
-                    errors.append(f"{replica_info.table}: Tablo salt-okunur (read-only) modda kilitli")
-                if replica_info.queue_size > max_queue_size:
-                    errors.append(
-                        f"{replica_info.table}: Kuyruk boyutu kritik seviyede ({replica_info.queue_size} > {max_queue_size})"
-                    )
-                if replica_info.total_replicas > 1 and replica_info.active_replicas < replica_info.total_replicas:
-                    errors.append(
-                        f"{replica_info.table}: Aktif replika kaybı tespit edildi ({replica_info.active_replicas}/{replica_info.total_replicas})"
-                    )
-                if replica_info.parts_to_check > 0:
-                    errors.append(
-                        f"{replica_info.table}: Hasarlı veya kontrol bekleyen parçalar var ({replica_info.parts_to_check} parça)"
-                    )
-
-            if not errors:
-                status = "healthy"
-            else:
-                status = "degraded"
-        else:
-            status = "no_replicas_found"
-
-    except Exception as exc:
-        status = "error"
-        error_msg = str(exc)
-        errors.append(error_msg)
-        logger.error("clickhouse_replikasyon_saglik_kontrolu_basarisiz", veritabani=database, hata=error_msg)
-
-    report = ReplicationHealthReport(
-        status=status,
+    report = get_replication_report_object(
         database=database,
-        replicas=replicas,
-        errors=errors,
-        timestamp=now_iso,
+        max_absolute_delay=max_absolute_delay,
+        max_queue_size=max_queue_size,
     )
     return report.to_dict()
 
@@ -325,83 +424,327 @@ def get_replication_metrics(database: str = DEFAULT_DATABASE) -> dict[str, Any]:
 def export_prometheus(database: str = DEFAULT_DATABASE) -> str:
     """Replikasyon metriklerini etiketli (labeled) standart Prometheus formatında döner.
 
+    Metrikler Prometheus format standartlarına uygun olarak aynı metrik grubu altında toplanır.
+
+    Args:
+        database: Hedef veritabanı.
+
     Returns:
         str: Prometheus metin formatı çıktısı.
     """
-    health = check_replication_health(database=database)
+    safe_db = (database or DEFAULT_DATABASE).strip()
+    health = check_replication_health(database=safe_db)
     replicas = health.get("replicas", [])
     errors = health.get("errors", [])
-    status = health.get("status", "unknown")
+    status = str(health.get("status", "unknown"))
 
-    status_val = {"healthy": 0, "degraded": 1, "no_replicas_found": 2, "error": 3}.get(status, -1)
+    status_val = STATUS_PROMETHEUS_CODE_MAP.get(status, -1)
+    db_escaped = _escape_label_value(safe_db)
 
     lines: list[str] = [
-        "# HELP clickhouse_replication_status Replikasyon genel durumu (0=HEALTHY, 1=DEGRADED, 2=NO_REPLICAS, 3=ERROR)",
+        "# HELP clickhouse_replication_status Replikasyon genel durumu "
+        "(0=HEALTHY, 1=DEGRADED, 2=NO_REPLICAS, 3=ERROR, -1=UNKNOWN)",
         "# TYPE clickhouse_replication_status gauge",
-        f'clickhouse_replication_status{{database="{database}"}} {status_val}',
+        f'clickhouse_replication_status{{database="{db_escaped}"}} {status_val}',
         "# HELP clickhouse_replica_count İzlenen toplam replika adedi",
         "# TYPE clickhouse_replica_count gauge",
-        f'clickhouse_replica_count{{database="{database}"}} {len(replicas)}',
+        f'clickhouse_replica_count{{database="{db_escaped}"}} {len(replicas)}',
         "# HELP clickhouse_replica_errors Tespit edilen replikasyon hata/uyarı sayısı",
         "# TYPE clickhouse_replica_errors gauge",
-        f'clickhouse_replica_errors{{database="{database}"}} {len(errors)}',
-        "# HELP clickhouse_replica_absolute_delay_seconds Replikasyon mutlak gecikmesi (saniye)",
-        "# TYPE clickhouse_replica_absolute_delay_seconds gauge",
-        "# HELP clickhouse_replica_queue_size Replikasyon işlem kuyruğu boyutu",
-        "# TYPE clickhouse_replica_queue_size gauge",
-        "# HELP clickhouse_replica_is_leader Bu replika lider mi (1=Evet, 0=Hayır)",
-        "# TYPE clickhouse_replica_is_leader gauge",
-        "# HELP clickhouse_replica_is_readonly Replika salt-okunur mu (1=Evet, 0=Hayır)",
-        "# TYPE clickhouse_replica_is_readonly gauge",
-        "# HELP clickhouse_replica_active_nodes Aktif replika düğüm sayısı",
-        "# TYPE clickhouse_replica_active_nodes gauge",
-        "# HELP clickhouse_replica_parts_to_check Kontrol bekleyen / hasarlı veri parçası sayısı",
-        "# TYPE clickhouse_replica_parts_to_check gauge",
+        f'clickhouse_replica_errors{{database="{db_escaped}"}} {len(errors)}',
     ]
 
-    for replica in replicas:
-        table = str(replica.get("table", "unknown")).replace('"', '\\"')
-        labels = f'database="{database}",table="{table}"'
+    if replicas:
+        # Prometheus formatına uygun şekilde metrikleri grup grup ekleme
+        # 1. Delay
+        lines.append("# HELP clickhouse_replica_absolute_delay_seconds Replikasyon mutlak gecikmesi (saniye)")
+        lines.append("# TYPE clickhouse_replica_absolute_delay_seconds gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            delay = _safe_int(replica.get("absolute_delay", 0))
+            lines.append(f'clickhouse_replica_absolute_delay_seconds{{database="{db_escaped}",table="{table}"}} {delay}')
 
-        delay = replica.get("absolute_delay", 0)
-        queue = replica.get("queue_size", 0)
-        leader = 1 if replica.get("is_leader") else 0
-        readonly = 1 if replica.get("is_readonly") else 0
-        active = replica.get("active_replicas", 1)
-        parts = replica.get("parts_to_check", 0)
+        # 2. Queue Size
+        lines.append("# HELP clickhouse_replica_queue_size Replikasyon işlem kuyruğu boyutu")
+        lines.append("# TYPE clickhouse_replica_queue_size gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            queue = _safe_int(replica.get("queue_size", 0))
+            lines.append(f'clickhouse_replica_queue_size{{database="{db_escaped}",table="{table}"}} {queue}')
 
-        lines.append(f"clickhouse_replica_absolute_delay_seconds{{{labels}}} {delay}")
-        lines.append(f"clickhouse_replica_queue_size{{{labels}}} {queue}")
-        lines.append(f"clickhouse_replica_is_leader{{{labels}}} {leader}")
-        lines.append(f"clickhouse_replica_is_readonly{{{labels}}} {readonly}")
-        lines.append(f"clickhouse_replica_active_nodes{{{labels}}} {active}")
-        lines.append(f"clickhouse_replica_parts_to_check{{{labels}}} {parts}")
+        # 3. Is Leader
+        lines.append("# HELP clickhouse_replica_is_leader Bu replika lider mi (1=Evet, 0=Hayır)")
+        lines.append("# TYPE clickhouse_replica_is_leader gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            leader = 1 if replica.get("is_leader") else 0
+            lines.append(f'clickhouse_replica_is_leader{{database="{db_escaped}",table="{table}"}} {leader}')
+
+        # 4. Is Readonly
+        lines.append("# HELP clickhouse_replica_is_readonly Replika salt-okunur mu (1=Evet, 0=Hayır)")
+        lines.append("# TYPE clickhouse_replica_is_readonly gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            readonly = 1 if replica.get("is_readonly") else 0
+            lines.append(f'clickhouse_replica_is_readonly{{database="{db_escaped}",table="{table}"}} {readonly}')
+
+        # 5. Active Nodes
+        lines.append("# HELP clickhouse_replica_active_nodes Aktif replika düğüm sayısı")
+        lines.append("# TYPE clickhouse_replica_active_nodes gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            active = _safe_int(replica.get("active_replicas", 1), 1)
+            lines.append(f'clickhouse_replica_active_nodes{{database="{db_escaped}",table="{table}"}} {active}')
+
+        # 6. Parts to Check
+        lines.append("# HELP clickhouse_replica_parts_to_check Kontrol bekleyen / hasarlı veri parçası sayısı")
+        lines.append("# TYPE clickhouse_replica_parts_to_check gauge")
+        for replica in replicas:
+            table = _escape_label_value(replica.get("table", "unknown"))
+            parts = _safe_int(replica.get("parts_to_check", 0), 0)
+            lines.append(f'clickhouse_replica_parts_to_check{{database="{db_escaped}",table="{table}"}} {parts}')
 
     return "\n".join(lines) + "\n"
 
 
 async def export_prometheus_async(database: str = DEFAULT_DATABASE) -> str:
-    """Asenkron Prometheus metin çıktısı."""
+    """Asenkron Prometheus metin çıktısı.
+
+    Args:
+        database: Hedef veritabanı.
+
+    Returns:
+        str: Prometheus metrik çıktısı.
+    """
     return await asyncio.to_thread(export_prometheus, database=database)
 
 
+def export_replicas_to_polars(
+    report: ReplicationHealthReport | dict[str, Any] | None = None,
+    database: str = DEFAULT_DATABASE,
+) -> pl.DataFrame:
+    """Replika durum verilerini analitik Polars DataFrame olarak dışa aktarır (GEMINI.md Kural 2).
+
+    Args:
+        report: İsteğe bağlı önceden üretilmiş rapor veya sözlük; None ise anlık sorgulanır.
+        database: Hedef veritabanı adı.
+
+    Returns:
+        pl.DataFrame: Replikasyon sağlık metrikleri veri çerçevesi.
+    """
+    if report is None:
+        rep_dict = check_replication_health(database=database)
+    elif isinstance(report, ReplicationHealthReport):
+        rep_dict = report.to_dict()
+    else:
+        rep_dict = report
+
+    replicas = rep_dict.get("replicas", [])
+    timestamp = rep_dict.get("timestamp", datetime.now(UTC).isoformat())
+
+    if not replicas:
+        return pl.DataFrame(
+            schema={
+                "database": pl.Utf8,
+                "table": pl.Utf8,
+                "is_leader": pl.Boolean,
+                "is_readonly": pl.Boolean,
+                "absolute_delay": pl.Int64,
+                "queue_size": pl.Int64,
+                "inserts_in_queue": pl.Int64,
+                "merges_in_queue": pl.Int64,
+                "total_replicas": pl.Int64,
+                "active_replicas": pl.Int64,
+                "parts_to_check": pl.Int64,
+                "timestamp": pl.Utf8,
+            }
+        )
+
+    records: list[dict[str, Any]] = []
+    for r in replicas:
+        records.append(
+            {
+                "database": str(r.get("database", database)),
+                "table": str(r.get("table", "unknown")),
+                "is_leader": bool(r.get("is_leader", False)),
+                "is_readonly": bool(r.get("is_readonly", False)),
+                "absolute_delay": _safe_int(r.get("absolute_delay", 0)),
+                "queue_size": _safe_int(r.get("queue_size", 0)),
+                "inserts_in_queue": _safe_int(r.get("inserts_in_queue", 0)),
+                "merges_in_queue": _safe_int(r.get("merges_in_queue", 0)),
+                "total_replicas": _safe_int(r.get("total_replicas", 0)),
+                "active_replicas": _safe_int(r.get("active_replicas", 1)),
+                "parts_to_check": _safe_int(r.get("parts_to_check", 0)),
+                "timestamp": timestamp,
+            }
+        )
+
+    return pl.DataFrame(records)
+
+
+def export_replication_health_to_duckdb(
+    report: ReplicationHealthReport | dict[str, Any] | None = None,
+    db_path: str | Path = DEFAULT_REPLICATION_HEALTH_DB_PATH,
+    database: str = DEFAULT_DATABASE,
+) -> int:
+    """Replikasyon durumunu DuckDB veritabanında kalıcı olarak saklar (GEMINI.md Kural 5).
+
+    Args:
+        report: İsteğe bağlı rapor nesnesi veya sözlüğü.
+        db_path: DuckDB dosya yolu.
+        database: Hedef veritabanı.
+
+    Returns:
+        int: Kaydedilen replika satır sayısı.
+    """
+    df = export_replicas_to_polars(report=report, database=database)
+    if df.is_empty():
+        return 0
+
+    path_obj = Path(db_path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+    status_str = (
+        report.status
+        if isinstance(report, ReplicationHealthReport)
+        else (report.get("status", "unknown") if isinstance(report, dict) else "unknown")
+    )
+    df = df.with_columns(pl.lit(status_str).alias("status"))
+
+    con = duckdb.connect(str(path_obj))
+    try:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS replication_health_history (
+                database VARCHAR,
+                table_name VARCHAR,
+                is_leader BOOLEAN,
+                is_readonly BOOLEAN,
+                absolute_delay BIGINT,
+                queue_size BIGINT,
+                inserts_in_queue BIGINT,
+                merges_in_queue BIGINT,
+                total_replicas BIGINT,
+                active_replicas BIGINT,
+                parts_to_check BIGINT,
+                timestamp VARCHAR,
+                status VARCHAR
+            )
+            """
+        )
+        con.register("df_temp", df)
+        con.execute(
+            """
+            INSERT INTO replication_health_history
+            SELECT
+                database,
+                "table" AS table_name,
+                is_leader,
+                is_readonly,
+                absolute_delay,
+                queue_size,
+                inserts_in_queue,
+                merges_in_queue,
+                total_replicas,
+                active_replicas,
+                parts_to_check,
+                timestamp,
+                status
+            FROM df_temp
+            """
+        )
+        return len(df)
+    finally:
+        con.close()
+
+
+def query_replication_health_from_duckdb(
+    db_path: str | Path = DEFAULT_REPLICATION_HEALTH_DB_PATH,
+    limit: int = 100,
+    database: str | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan replikasyon geçmişini Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+        database: İsteğe bağlı veritabanı filtresi.
+
+    Returns:
+        pl.DataFrame: Geçmiş kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame()
+
+    con = duckdb.connect(str(path_obj), read_only=True)
+    try:
+        query = "SELECT * FROM replication_health_history"
+        params: list[Any] = []
+        if database:
+            query += " WHERE database = ?"
+            params.append(database)
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(max(1, limit))
+
+        arrow_table = con.execute(query, params).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    except Exception as exc:
+        logger.warning("duckdb_replikasyon_sorgusu_basarisiz", hata=str(exc))
+        return pl.DataFrame()
+    finally:
+        con.close()
+
+
+def export_replication_health_orjson(database: str = DEFAULT_DATABASE) -> bytes:
+    """Replikasyon durumunu orjson ile yüksek hızlı ikili JSON baytlarına dönüştürür.
+
+    Args:
+        database: Hedef veritabanı.
+
+    Returns:
+        bytes: JSON formatında veri baytları.
+    """
+    health = check_replication_health(database=database)
+    return orjson.dumps(health, option=orjson.OPT_INDENT_2)
+
+
+# Modül Seviyesinde Kolaylık ve Takma Adlar (Convenience Aliases)
+export_clickhouse_replication_prometheus = export_prometheus
+export_clickhouse_replication_prometheus_async = export_prometheus_async
+export_clickhouse_replicas_to_polars = export_replicas_to_polars
+export_clickhouse_replication_to_duckdb = export_replication_health_to_duckdb
+query_clickhouse_replication_from_duckdb = query_replication_health_from_duckdb
+
 if __name__ == "__main__":
-    import orjson
-
     _health = check_replication_health()
-    logger.info("clickhouse_replikasyon_raporu", rapor=orjson.dumps(_health, option=orjson.OPT_INDENT_2).decode())
+    logger.info("clickhouse_replikasyon_raporu", rapor=export_replication_health_orjson().decode("utf-8"))
 
-__all__: Sequence[str] = [
+__all__ = [
     "DEFAULT_DATABASE",
     "DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS",
     "DEFAULT_MAX_QUEUE_SIZE",
+    "DEFAULT_REPLICATION_HEALTH_DB_PATH",
+    "STATUS_PROMETHEUS_CODE_MAP",
+    "VALID_HEALTH_STATUSES",
     "ReplicaHealthInfo",
     "ReplicationHealthReport",
     "check_replication_health",
     "check_replication_health_async",
+    "export_clickhouse_replicas_to_polars",
+    "export_clickhouse_replication_prometheus",
+    "export_clickhouse_replication_prometheus_async",
+    "export_clickhouse_replication_to_duckdb",
     "export_prometheus",
     "export_prometheus_async",
+    "export_replicas_to_polars",
+    "export_replication_health_orjson",
+    "export_replication_health_to_duckdb",
     "get_replication_metrics",
+    "get_replication_report_object",
     "is_replication_healthy",
     "is_replication_healthy_async",
+    "query_clickhouse_replication_from_duckdb",
+    "query_replication_health_from_duckdb",
 ]
+

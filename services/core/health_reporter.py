@@ -1,9 +1,9 @@
 """ALPHA BIST — Periyodik Sistem Sağlık ve Bütünlük Raporlayıcı (Health Reporter).
 
 Bu modül, platformun tüm operasyonel bileşenlerinin (İnternet bağlantısı, Downtime takipçisi,
-Veri bütünlüğü doğrulayıcı, DLQ kuyruğu, Offline kuyruk, Backfill motoru, PostgreSQL, ClickHouse
-ve Redis) çalışma durumunu asenkron olarak sorgular, tek bir sağlık raporunda (SystemHealthReport)
-birleştirir; DuckDB ve Polars analitik denetim entegrasyonu sunar.
+Veri bütünlüğü doğrulayıcı, DLQ kuyruğu, Offline kuyruk, Backfill motoru, PostgreSQL, ClickHouse,
+Redis ve Sistem Kaynakları) çalışma durumunu asenkron/senkron olarak sorgular, tek bir sağlık raporunda
+(SystemHealthReport) birleştirir; DuckDB ve Polars analitik denetim entegrasyonu sunar.
 
 Bileşen Sağlık Seviyeleri:
 - "HEALTHY": Tüm sistem bileşenleri tam kapasite çalışıyor, kritik aksaklık veya kuyruk birikmesi yok.
@@ -20,7 +20,10 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import duckdb
 import orjson
@@ -71,6 +74,7 @@ STATUS_DEGRADED: str = "DEGRADED"
 STATUS_UNHEALTHY: str = "UNHEALTHY"
 
 DEFAULT_MAX_HISTORY: int = 100
+DEFAULT_HEALTH_MAX_HISTORY: int = DEFAULT_MAX_HISTORY
 DEFAULT_DOWNTIME_THRESHOLD_SEC: float = 3600.0
 DEFAULT_DLQ_THRESHOLD: int = 100
 DEFAULT_HEALTH_AUDIT_DB_PATH: str = "data/health_audit.duckdb"
@@ -114,7 +118,25 @@ class SystemHealthReport:
 
     def to_orjson_bytes(self) -> bytes:
         """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SystemHealthReport:
+        """Sözlükten SystemHealthReport örneği üretir."""
+        return cls(
+            timestamp=str(data.get("timestamp", datetime.now(UTC).isoformat())),
+            overall_health=str(data.get("overall_health", STATUS_UNHEALTHY)),
+            uptime=dict(data.get("uptime", {})),
+            components=dict(data.get("components", {})),
+            issues=list(data.get("issues", [])),
+            generation_duration_seconds=float(data.get("generation_duration_seconds", 0.0)),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> SystemHealthReport:
+        """JSON verisinden SystemHealthReport örneği üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -148,6 +170,19 @@ class HealthReporter:
         self._last_report: SystemHealthReport | None = None
         self._report_history: deque[SystemHealthReport] = deque(maxlen=max_history)
 
+    def __enter__(self) -> HealthReporter:
+        """Context manager protokolü desteği."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkışı."""
+        pass
+
     def _get_uptime(self) -> dict[str, Any]:
         """Süreç çalışma süresi (uptime) bilgilerini hesaplar.
 
@@ -166,6 +201,22 @@ class HealthReporter:
             logger.warning("uptime_hesaplama_hatasi", hata=str(e))
             return {"seconds": 0.0, "hours": 0.0, "days": 0.0, "error": str(e)}
 
+    def _get_system_metrics(self) -> dict[str, Any]:
+        """İşlemci ve bellek kullanım istatistiklerini hesaplar."""
+        try:
+            proc = psutil.Process()
+            mem = psutil.virtual_memory()
+            return {
+                "process_rss_mb": round(proc.memory_info().rss / (1024 * 1024), 2),
+                "system_ram_total_gb": round(mem.total / (1024**3), 2),
+                "system_ram_available_gb": round(mem.available / (1024**3), 2),
+                "system_ram_percent": mem.percent,
+                "cpu_percent": proc.cpu_percent(interval=None),
+            }
+        except Exception as e:
+            logger.warning("sistem_metrikleri_alinamadi", hata=str(e))
+            return {"error": str(e)}
+
     @otel_trace("health_reporter.generate_report")
     async def generate_report(
         self,
@@ -173,7 +224,7 @@ class HealthReporter:
         pg_pool: Any = None,
         redis_client: Any = None,
     ) -> dict[str, Any]:
-        """Tüm bileşenlerin durumunu toplayıp tam sağlık raporu üretir.
+        """Tüm bileşenlerin durumunu toplayıp tam sağlık raporu üretir (Asenkron).
 
         Args:
             clickhouse_client: Opsiyonel ClickHouse istemci nesnesi.
@@ -187,6 +238,9 @@ class HealthReporter:
         components: dict[str, Any] = {}
         issues: list[str] = []
         overall_health = STATUS_HEALTHY
+
+        # 0. Sistem ve Süreç Metrikleri
+        components["system"] = self._get_system_metrics()
 
         # 1. İnternet ve Borsa Bağlantı Durumu
         if connectivity_monitor is not None:
@@ -365,6 +419,80 @@ class HealthReporter:
         )
         return report_model.to_dict()
 
+    @otel_trace("health_reporter.generate_report_sync")
+    def generate_report_sync(self) -> dict[str, Any]:
+        """Senkron olarak yerel bileşenlerin durumunu toplayıp sağlık raporu üretir.
+
+        Returns:
+            dict[str, Any]: Sistem sağlık raporu sözlüğü.
+        """
+        start_time = time.time()
+        components: dict[str, Any] = {}
+        issues: list[str] = []
+        overall_health = STATUS_HEALTHY
+
+        components["system"] = self._get_system_metrics()
+
+        if connectivity_monitor is not None:
+            try:
+                conn_status = connectivity_monitor.get_status()
+                components["connectivity"] = conn_status
+                conn_state = str(conn_status.get("state", "")).lower()
+                is_offline = bool(getattr(connectivity_monitor, "is_offline", False) or conn_state == "offline")
+                is_degraded = bool(conn_state == "degraded")
+                if is_offline:
+                    overall_health = STATUS_DEGRADED
+                    issues.append("İnternet bağlantısı yok (OFFLINE)")
+                elif is_degraded:
+                    overall_health = STATUS_DEGRADED
+                    issues.append("İnternet bağlantı performansı düşük (DEGRADED)")
+            except Exception as e:
+                components["connectivity"] = {"status": "unknown", "error": str(e)}
+        else:
+            components["connectivity"] = {"status": "not_loaded"}
+
+        if downtime_tracker is not None:
+            try:
+                components["downtime"] = downtime_tracker.get_status()
+                dt_sec = max(0.0, float(downtime_tracker.get_downtime_seconds()))
+                if dt_sec > DEFAULT_DOWNTIME_THRESHOLD_SEC:
+                    overall_health = STATUS_DEGRADED
+                    issues.append(f"Kesinti süresi aşıldı: {dt_sec / 3600:.1f} saat")
+            except Exception as e:
+                components["downtime"] = {"status": "unknown", "error": str(e)}
+        else:
+            components["downtime"] = {"status": "not_loaded"}
+
+        if data_integrity_validator is not None:
+            try:
+                components["data_integrity"] = data_integrity_validator.get_status()
+            except Exception as e:
+                components["data_integrity"] = {"status": "unknown", "error": str(e)}
+        else:
+            components["data_integrity"] = {"status": "not_loaded"}
+
+        if overall_health == STATUS_HEALTHY and issues:
+            overall_health = STATUS_DEGRADED
+
+        duration = round(time.time() - start_time, 3)
+        now_iso = datetime.now(UTC).isoformat()
+        uptime_info = self._get_uptime()
+
+        report_model = SystemHealthReport(
+            timestamp=now_iso,
+            overall_health=overall_health,
+            uptime=uptime_info,
+            components=components,
+            issues=issues,
+            generation_duration_seconds=duration,
+        )
+
+        with self._lock:
+            self._last_report = report_model
+            self._report_history.append(report_model)
+
+        return report_model.to_dict()
+
     def get_last_report(self) -> dict[str, Any] | None:
         """En son üretilen sağlık raporunu sözlük formatında döndürür.
 
@@ -428,16 +556,16 @@ class HealthReporter:
         with self._lock:
             items = list(self._report_history)
 
+        schema = {
+            "timestamp": pl.Utf8,
+            "overall_health": pl.Utf8,
+            "issues_count": pl.Int64,
+            "generation_duration_seconds": pl.Float64,
+            "uptime_seconds": pl.Float64,
+        }
+
         if not items:
-            return pl.DataFrame(
-                schema={
-                    "timestamp": pl.Utf8,
-                    "overall_health": pl.Utf8,
-                    "issues_count": pl.Int64,
-                    "generation_duration_seconds": pl.Float64,
-                    "uptime_seconds": pl.Float64,
-                }
-            )
+            return pl.DataFrame(schema=schema)
 
         rows = []
         for r in items:
@@ -451,7 +579,7 @@ class HealthReporter:
                 }
             )
 
-        return pl.DataFrame(rows)
+        return pl.DataFrame(rows, schema=schema)
 
     def export_to_duckdb(
         self,
@@ -473,22 +601,22 @@ class HealthReporter:
                 return 0
             rep = self._last_report
 
-        target_file = Path(db_path)
+        target_file = Path(db_path).resolve()
         target_file.parent.mkdir(parents=True, exist_ok=True)
+        row_id = uuid.uuid4().hex
 
         row = (
-            uuid.uuid4().hex,
+            row_id,
             rep.timestamp,
             rep.overall_health,
             len(rep.issues),
             rep.generation_duration_seconds,
             float(rep.uptime.get("seconds", 0.0)),
-            orjson.dumps(rep.to_dict()).decode("utf-8"),
+            orjson.dumps(rep.to_dict(), default=str).decode("utf-8"),
         )
 
         with self._lock:
-            conn = duckdb.connect(str(target_file))
-            try:
+            with duckdb.connect(str(target_file)) as conn:
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS system_health_audit (
@@ -511,12 +639,41 @@ class HealthReporter:
                     """,
                     row,
                 )
-                conn.commit()
-            finally:
-                conn.close()
 
-        logger.info("saglik_raporu_duckdb_aktarildi", durum=rep.overall_health, yol=db_path)
+        logger.info(
+            "saglik_raporu_duckdb_aktarildi",
+            durum=rep.overall_health,
+            yol=str(target_file),
+            id=row_id,
+        )
         return 1
+
+    def query_audit_duckdb(
+        self,
+        db_path: str = DEFAULT_HEALTH_AUDIT_DB_PATH,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """Kayıtlı sistem sağlık raporlarını DuckDB üzerinden Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Döndürülecek maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Sistem sağlık denetim geçmişi tablosu.
+        """
+        target_file = Path(db_path).resolve()
+        if not target_file.exists():
+            return pl.DataFrame()
+
+        with self._lock:
+            with duckdb.connect(str(target_file), read_only=True) as conn:
+                query = (
+                    "SELECT id, timestamp, overall_health, issues_count, "
+                    "generation_duration_seconds, uptime_seconds "
+                    "FROM system_health_audit ORDER BY timestamp DESC LIMIT ?"
+                )
+                return conn.execute(query, [limit]).pl()
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -546,7 +703,7 @@ async def generate_health_report(
     pg_pool: Any = None,
     redis_client: Any = None,
 ) -> dict[str, Any]:
-    """Sistem genel sağlık raporunu üretir ve sözlük olarak döner.
+    """Sistem genel sağlık raporunu üretir ve sözlük olarak döner (Asenkron).
 
     Args:
         clickhouse_client: Opsiyonel ClickHouse istemci nesnesi.
@@ -563,6 +720,15 @@ async def generate_health_report(
     )
 
 
+def generate_health_report_sync() -> dict[str, Any]:
+    """Yerel bileşenlerin sağlık durumunu senkron olarak sorgular ve döner.
+
+    Returns:
+        dict[str, Any]: Sistem sağlık raporu sözlüğü.
+    """
+    return health_reporter.generate_report_sync()
+
+
 def get_last_health_report() -> dict[str, Any] | None:
     """En son üretilen sistem sağlık raporunu döner.
 
@@ -570,6 +736,15 @@ def get_last_health_report() -> dict[str, Any] | None:
         dict[str, Any] | None: Son rapor veya None.
     """
     return health_reporter.get_last_report()
+
+
+def get_last_health_report_model() -> SystemHealthReport | None:
+    """En son üretilen sistem sağlık raporu veri modelini döner.
+
+    Returns:
+        SystemHealthReport | None: Son rapor modeli veya None.
+    """
+    return health_reporter.get_last_report_model()
 
 
 def get_health_summary() -> dict[str, Any]:
@@ -602,10 +777,27 @@ def export_health_to_duckdb(db_path: str = DEFAULT_HEALTH_AUDIT_DB_PATH) -> int:
     return health_reporter.export_to_duckdb(db_path=db_path)
 
 
+def query_health_audit_duckdb(
+    db_path: str = DEFAULT_HEALTH_AUDIT_DB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosundaki sağlık kayıtlarını Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB veritabanı yolu.
+        limit: Maksimum kayıt adedi.
+
+    Returns:
+        pl.DataFrame: Rapor denetim kayıtları.
+    """
+    return health_reporter.query_audit_duckdb(db_path=db_path, limit=limit)
+
+
 __all__: list[str] = [
     "DEFAULT_DLQ_THRESHOLD",
     "DEFAULT_DOWNTIME_THRESHOLD_SEC",
     "DEFAULT_HEALTH_AUDIT_DB_PATH",
+    "DEFAULT_HEALTH_MAX_HISTORY",
     "DEFAULT_MAX_HISTORY",
     "STATUS_DEGRADED",
     "STATUS_HEALTHY",
@@ -615,8 +807,11 @@ __all__: list[str] = [
     "export_health_to_duckdb",
     "export_health_to_polars",
     "generate_health_report",
+    "generate_health_report_sync",
     "get_health_reporter",
     "get_health_summary",
     "get_last_health_report",
+    "get_last_health_report_model",
     "health_reporter",
+    "query_health_audit_duckdb",
 ]

@@ -10,6 +10,7 @@ Polars destekli yerel izleme motoru (local tracer) üzerinden kesintisiz çalı�
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import functools
 import threading
@@ -18,10 +19,11 @@ import uuid
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Generator
+    from collections.abc import AsyncGenerator, Callable, Generator
 
 import duckdb
 import orjson
@@ -29,6 +31,11 @@ import polars as pl
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+# Modül Seviyesi Yapılandırma Sabitleri (GEMINI.md Kural 4)
+DEFAULT_SERVICE_NAME: Final[str] = "alpha-bist"
+DEFAULT_BUFFER_SIZE: Final[int] = 1000
+DEFAULT_RECENT_LIMIT: Final[int] = 100
 
 try:
     from opentelemetry import trace as otel_trace
@@ -78,6 +85,7 @@ class TraceSpan:
     operation: str
     parent_span_id: str | None = None
     start_time: float = field(default_factory=time.time)
+    _monotonic_start: float = field(default_factory=time.monotonic, repr=False)
     end_time: float | None = None
     duration_ms: float | None = None
     status: str = "RUNNING"
@@ -107,10 +115,10 @@ class TraceSpan:
             self.error = description
 
     def finish(self) -> None:
-        """Span'ı sonlandırır ve çalışma süresini (duration_ms) hesaplar."""
+        """Span'ı sonlandırır ve çalışma süresini (duration_ms) hassas monotonic saat ile hesaplar."""
         if self.end_time is None:
             self.end_time = time.time()
-            self.duration_ms = max(0.0, (self.end_time - self.start_time) * 1000.0)
+            self.duration_ms = max(0.0, (time.monotonic() - self._monotonic_start) * 1000.0)
             if self.status == "RUNNING":
                 self.status = "OK"
 
@@ -202,21 +210,20 @@ class Trace:
 
     def to_polars(self) -> pl.DataFrame:
         """Trace altındaki span'ları Polars DataFrame formatına dönüştürür."""
+        schema = {
+            "trace_id": pl.Utf8,
+            "span_id": pl.Utf8,
+            "parent_span_id": pl.Utf8,
+            "operation": pl.Utf8,
+            "start_time": pl.Float64,
+            "end_time": pl.Float64,
+            "duration_ms": pl.Float64,
+            "status": pl.Utf8,
+            "attributes_json": pl.Utf8,
+            "error": pl.Utf8,
+        }
         if not self.spans:
-            return pl.DataFrame(
-                schema={
-                    "trace_id": pl.Utf8,
-                    "span_id": pl.Utf8,
-                    "parent_span_id": pl.Utf8,
-                    "operation": pl.Utf8,
-                    "start_time": pl.Float64,
-                    "end_time": pl.Float64,
-                    "duration_ms": pl.Float64,
-                    "status": pl.Utf8,
-                    "attributes_json": pl.Utf8,
-                    "error": pl.Utf8,
-                }
-            )
+            return pl.DataFrame(schema=schema)
         rows = [
             {
                 "trace_id": s.trace_id,
@@ -232,7 +239,7 @@ class Trace:
             }
             for s in self.spans
         ]
-        return pl.DataFrame(rows)
+        return pl.DataFrame(rows, schema=schema)
 
     def __repr__(self) -> str:
         return (
@@ -249,7 +256,11 @@ class DistributedTracer:
     bir halka arabellek (ring buffer) üzerinden DuckDB/Polars ile analitik imkanı sunar.
     """
 
-    def __init__(self, service_name: str = "alpha-bist", buffer_size: int = 1000) -> None:
+    def __init__(
+        self,
+        service_name: str = DEFAULT_SERVICE_NAME,
+        buffer_size: int = DEFAULT_BUFFER_SIZE,
+    ) -> None:
         """Dağıtık izleme yöneticisini başlatır.
 
         Args:
@@ -363,7 +374,7 @@ class DistributedTracer:
                         otel_span.set_attributes(attributes)
                     try:
                         yield otel_span
-                    except Exception as exc:
+                    except BaseException as exc:
                         otel_span.record_exception(exc)
                         otel_span.set_status(Status(StatusCode.ERROR, str(exc)))
                         local_span.record_exception(exc)
@@ -371,14 +382,16 @@ class DistributedTracer:
             else:
                 try:
                     yield local_span
-                except Exception as exc:
+                except BaseException as exc:
                     local_span.record_exception(exc)
                     raise
         finally:
             local_span.finish()
             self._record_local_span(local_span)
-            correlation_id_var.reset(corr_token)
-            span_id_var.reset(span_token)
+            with contextlib.suppress(ValueError):
+                correlation_id_var.reset(corr_token)
+            with contextlib.suppress(ValueError):
+                span_id_var.reset(span_token)
 
     @asynccontextmanager
     async def start_async_span(
@@ -425,7 +438,7 @@ class DistributedTracer:
                         otel_span.set_attributes(attributes)
                     try:
                         yield otel_span
-                    except Exception as exc:
+                    except BaseException as exc:
                         otel_span.record_exception(exc)
                         otel_span.set_status(Status(StatusCode.ERROR, str(exc)))
                         local_span.record_exception(exc)
@@ -433,14 +446,16 @@ class DistributedTracer:
             else:
                 try:
                     yield local_span
-                except Exception as exc:
+                except BaseException as exc:
                     local_span.record_exception(exc)
                     raise
         finally:
             local_span.finish()
             self._record_local_span(local_span)
-            correlation_id_var.reset(corr_token)
-            span_id_var.reset(span_token)
+            with contextlib.suppress(ValueError):
+                correlation_id_var.reset(corr_token)
+            with contextlib.suppress(ValueError):
+                span_id_var.reset(span_token)
 
     def get_current_correlation_id(self) -> str | None:
         """Mevcut bağlamdaki korelasyon kimliğini döndürür."""
@@ -477,21 +492,20 @@ class DistributedTracer:
         with self._lock:
             data = [s.to_dict() for s in self._local_buffer]
 
+        schema = {
+            "trace_id": pl.Utf8,
+            "span_id": pl.Utf8,
+            "parent_span_id": pl.Utf8,
+            "operation": pl.Utf8,
+            "start_time": pl.Float64,
+            "end_time": pl.Float64,
+            "duration_ms": pl.Float64,
+            "status": pl.Utf8,
+            "attributes_json": pl.Utf8,
+            "error": pl.Utf8,
+        }
         if not data:
-            return pl.DataFrame(
-                schema={
-                    "trace_id": pl.Utf8,
-                    "span_id": pl.Utf8,
-                    "parent_span_id": pl.Utf8,
-                    "operation": pl.Utf8,
-                    "start_time": pl.Float64,
-                    "end_time": pl.Float64,
-                    "duration_ms": pl.Float64,
-                    "status": pl.Utf8,
-                    "attributes_json": pl.Utf8,
-                    "error": pl.Utf8,
-                }
-            )
+            return pl.DataFrame(schema=schema)
 
         rows = []
         for d in data:
@@ -508,7 +522,7 @@ class DistributedTracer:
                 "error": d["error"],
             }
             rows.append(row)
-        return pl.DataFrame(rows)
+        return pl.DataFrame(rows, schema=schema)
 
     def export_spans_to_duckdb(self, db_path: str = ":memory:") -> duckdb.DuckDBPyConnection:
         """Span kayıtlarını DuckDB veritabanında 'trace_spans' tablosuna kaydeder.
@@ -519,8 +533,19 @@ class DistributedTracer:
         Returns:
             duckdb.DuckDBPyConnection: DuckDB bağlantı nesnesi.
         """
+        if db_path != ":memory:":
+            db_file = Path(db_path)
+            if db_file.exists() and db_file.stat().st_size == 0:
+                with contextlib.suppress(OSError):
+                    db_file.unlink()
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+
         df = self.export_spans_to_polars()
         conn = duckdb.connect(db_path)
+        with contextlib.suppress(Exception):
+            from services.core.duckdb_store import configure_duckdb_wal
+
+            configure_duckdb_wal(conn)
         conn.register("df_spans", df)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trace_spans (
@@ -540,6 +565,41 @@ class DistributedTracer:
         conn.unregister("df_spans")
         return conn
 
+    def query_spans_duckdb(
+        self,
+        db_path: str = ":memory:",
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB üzerinden geçmiş span kayıtlarını Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            limit: Maksimum döndürülecek kayıt sayısı.
+
+        Returns:
+            pl.DataFrame: Sorgu sonucu Polars DataFrame.
+        """
+        if db_path != ":memory:":
+            db_file = Path(db_path)
+            if not db_file.exists() or db_file.stat().st_size == 0:
+                return pl.DataFrame()
+
+        try:
+            with duckdb.connect(db_path, read_only=True) as conn:
+                tables = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_name = 'trace_spans'"
+                ).fetchall()
+                if not tables:
+                    return pl.DataFrame()
+                arrow_res = conn.execute(
+                    "SELECT * FROM trace_spans ORDER BY start_time DESC LIMIT ?",
+                    [max(1, limit)],
+                ).arrow()
+                return pl.from_arrow(arrow_res)
+        except Exception as exc:
+            logger.error("query_spans_duckdb_hatasi", error=str(exc))
+            return pl.DataFrame()
+
     def __repr__(self) -> str:
         with self._lock:
             buf_len = len(self._local_buffer)
@@ -553,16 +613,32 @@ class DistributedTracer:
 distributed_tracer = DistributedTracer()
 
 
-def trace(operation: str | None = None, attributes: dict[str, Any] | None = None) -> Any:
+def trace(
+    operation: str | Callable[..., Any] | None = None,
+    attributes: dict[str, Any] | None = None,
+) -> Any:
     """Senkron fonksiyonlar için otomatik span başlatan dekoratör.
 
+    Hem `@trace` (parantezsiz) hem de `@trace("op_name")` / `@trace(attributes={...})`
+    kullanımlarını destekler.
+
     Args:
-        operation: İsteğe bağlı span adı (varsayılan: fonksiyon adı).
+        operation: İsteğe bağlı span adı veya doğrudan süslenen fonksiyon.
         attributes: Span nitelikleri sözlüğü.
 
     Returns:
         Dekore edilmiş senkron fonksiyon çağrıcısı.
     """
+    if callable(operation):
+        func = operation
+        op_name = func.__name__
+
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            with distributed_tracer.start_span(op_name, attributes):
+                return func(*args, **kwargs)
+
+        return wrapper
 
     def decorator(func: Any) -> Any:
         op_name = operation or func.__name__
@@ -577,16 +653,32 @@ def trace(operation: str | None = None, attributes: dict[str, Any] | None = None
     return decorator
 
 
-def trace_async(operation: str | None = None, attributes: dict[str, Any] | None = None) -> Any:
+def trace_async(
+    operation: str | Callable[..., Any] | None = None,
+    attributes: dict[str, Any] | None = None,
+) -> Any:
     """Asenkron fonksiyonlar için otomatik span başlatan dekoratör.
 
+    Hem `@trace_async` (parantezsiz) hem de `@trace_async("op_name")`
+    kullanımlarını destekler.
+
     Args:
-        operation: İsteğe bağlı span adı (varsayılan: fonksiyon adı).
+        operation: İsteğe bağlı span adı veya doğrudan süslenen fonksiyon.
         attributes: Span nitelikleri sözlüğü.
 
     Returns:
         Dekore edilmiş asenkron fonksiyon çağrıcısı.
     """
+    if callable(operation):
+        func = operation
+        op_name = func.__name__
+
+        @functools.wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            async with distributed_tracer.start_async_span(op_name, attributes):
+                return await func(*args, **kwargs)
+
+        return wrapper
 
     def decorator(func: Any) -> Any:
         op_name = operation or func.__name__
@@ -601,14 +693,34 @@ def trace_async(operation: str | None = None, attributes: dict[str, Any] | None 
     return decorator
 
 
-__all__ = [
+def export_spans_to_duckdb(db_path: str = ":memory:") -> duckdb.DuckDBPyConnection:
+    """Span kayıtlarını DuckDB veritabanında 'trace_spans' tablosuna aktarır."""
+    return distributed_tracer.export_spans_to_duckdb(db_path)
+
+
+def query_spans_duckdb(db_path: str = ":memory:", limit: int = 100) -> pl.DataFrame:
+    """DuckDB üzerinden span kayıtlarını sorgular."""
+    return distributed_tracer.query_spans_duckdb(db_path, limit)
+
+
+__all__: Final[list[str]] = [
+    # Yapılandırma Sabitleri
+    "DEFAULT_BUFFER_SIZE",
+    "DEFAULT_RECENT_LIMIT",
+    "DEFAULT_SERVICE_NAME",
+    # Modeller ve Sınıflar
     "DistributedTracer",
     "Span",
     "Trace",
     "TraceSpan",
+    # Context Değişkenleri ve Singleton
     "correlation_id_var",
     "distributed_tracer",
     "span_id_var",
+    # Dekoratörler
     "trace",
     "trace_async",
+    # Analitik ve Veritabanı
+    "export_spans_to_duckdb",
+    "query_spans_duckdb",
 ]

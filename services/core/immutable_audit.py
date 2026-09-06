@@ -22,7 +22,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import duckdb
 import orjson
@@ -38,9 +41,14 @@ logger = structlog.get_logger(__name__)
 # =====================================================
 
 DEFAULT_MAX_IN_MEMORY_ENTRIES: Final[int] = 1000
+DEFAULT_IMMUTABLE_MAX_IN_MEMORY_ENTRIES: Final[int] = DEFAULT_MAX_IN_MEMORY_ENTRIES
 DEFAULT_FLUSH_INTERVAL_SECONDS: Final[float] = 60.0
 DEFAULT_BATCH_FLUSH_SIZE: Final[int] = 10
 DEFAULT_AUDIT_DB_PATH: Final[Path] = Path("data/duckdb/alpha_bist_audit.duckdb")
+DEFAULT_IMMUTABLE_AUDIT_DB_PATH: Final[Path] = DEFAULT_AUDIT_DB_PATH
+DEFAULT_AUDIT_TABLE_NAME: Final[str] = "bist_immutable_audit"
+DEFAULT_QUERY_LIMIT: Final[int] = 100
+DEFAULT_IMMUTABLE_QUERY_LIMIT: Final[int] = DEFAULT_QUERY_LIMIT
 GENESIS_HASH: Final[str] = "genesis_block_hash_alpha_bist_v1"
 
 
@@ -112,7 +120,7 @@ class AuditEntry:
             "ip_address": self.ip_address or "",
             "user_agent": self.user_agent or "",
         }
-        content_bytes = orjson.dumps(content_dict, option=orjson.OPT_SORT_KEYS)
+        content_bytes = orjson.dumps(content_dict, option=orjson.OPT_SORT_KEYS, default=str)
         payload = f"{prev}:".encode() + content_bytes
         return hashlib.sha256(payload).hexdigest()[:32]
 
@@ -155,7 +163,55 @@ class AuditEntry:
         Returns:
             bytes: orjson kodlu bayt dizisi.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AuditEntry:
+        """Sözlükten AuditEntry nesnesi oluşturur.
+
+        Args:
+            data: Model verilerini içeren sözlük.
+
+        Returns:
+            AuditEntry: Oluşturulan denetim kaydı örneği.
+        """
+        ts = data.get("timestamp")
+        if isinstance(ts, str):
+            try:
+                ts_parsed = datetime.fromisoformat(ts)
+            except Exception:
+                ts_parsed = datetime.now(UTC)
+        elif isinstance(ts, datetime):
+            ts_parsed = ts
+        else:
+            ts_parsed = datetime.now(UTC)
+
+        return cls(
+            entry_id=str(data.get("entry_id", "")),
+            timestamp=ts_parsed,
+            user_id=str(data.get("user_id", "system")),
+            action=str(data.get("action", AuditAction.EXECUTE.value)),
+            resource_type=str(data.get("resource_type", "unknown")),
+            resource_id=str(data.get("resource_id", "unknown")),
+            details=dict(data.get("details", {})),
+            ip_address=data.get("ip_address"),
+            user_agent=data.get("user_agent"),
+            previous_hash=str(data.get("previous_hash", "")),
+            entry_hash=str(data.get("entry_hash", "")),
+        )
+
+    @classmethod
+    def from_json(cls, json_data: str | bytes) -> AuditEntry:
+        """JSON metni veya bayt dizisinden AuditEntry nesnesi oluşturur.
+
+        Args:
+            json_data: JSON string veya bayt verisi.
+
+        Returns:
+            AuditEntry: Oluşturulan denetim kaydı nesnesi.
+        """
+        parsed = orjson.loads(json_data)
+        return cls.from_dict(parsed)
 
     def __repr__(self) -> str:
         """Açıklayıcı Türkçe metin gösterimi.
@@ -228,7 +284,46 @@ class ComplianceReport:
         Returns:
             bytes: orjson kodlu baytlar.
         """
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ComplianceReport:
+        """Sözlükten ComplianceReport nesnesi oluşturur.
+
+        Args:
+            data: Model verilerini içeren sözlük.
+
+        Returns:
+            ComplianceReport: Oluşturulan uyumluluk raporu.
+        """
+        period = data.get("period", {}) if isinstance(data.get("period"), dict) else {}
+        integrity = data.get("integrity", {}) if isinstance(data.get("integrity"), dict) else {}
+        hash_chain = data.get("hash_chain", {}) if isinstance(data.get("hash_chain"), dict) else {}
+
+        return cls(
+            report_time=str(data.get("report_time", datetime.now(UTC).isoformat())),
+            period_since=str(period.get("since", data.get("period_since", "all_time"))),
+            entries_count=int(period.get("entries_count", data.get("entries_count", 0))),
+            is_valid=bool(integrity.get("is_valid", data.get("is_valid", False))),
+            error=integrity.get("error", data.get("error")),
+            total_verified=int(integrity.get("total_verified", data.get("total_verified", 0))),
+            actions=dict(data.get("actions", {})),
+            user_activity=dict(data.get("user_activity", {})),
+            latest_hash=hash_chain.get("latest", data.get("latest_hash")),
+        )
+
+    @classmethod
+    def from_json(cls, json_data: str | bytes) -> ComplianceReport:
+        """JSON metni veya bayt dizisinden ComplianceReport nesnesi oluşturur.
+
+        Args:
+            json_data: JSON string veya bayt verisi.
+
+        Returns:
+            ComplianceReport: Oluşturulan uyumluluk raporu örneği.
+        """
+        parsed = orjson.loads(json_data)
+        return cls.from_dict(parsed)
 
     def __repr__(self) -> str:
         """Rapor metin gösterimi.
@@ -271,6 +366,24 @@ class ImmutableAuditLog:
         if self._storage_path:
             self._storage_path.parent.mkdir(parents=True, exist_ok=True)
 
+    def __enter__(self) -> ImmutableAuditLog:
+        """Context manager giriş protokolü."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Context manager çıkış protokolü; bekleyen tüm kayıtları diske boşaltır."""
+        self.flush()
+
+    def shutdown(self) -> None:
+        """Denetim günlüğü servisini güvenli şekilde kapatır ve tamponları boşaltır."""
+        self.flush()
+        logger.info("immutable_audit_kapatildi", toplam_islenen=self._total_entries)
+
     @otel_trace("immutable_audit.log")
     def log(
         self,
@@ -296,21 +409,27 @@ class ImmutableAuditLog:
         Returns:
             AuditEntry: Kriptografik olarak mühürlenmiş değiştirilemez kayıt.
         """
+        norm_user_id = user_id.strip() if user_id and user_id.strip() else "system"
+        norm_action = action.strip().upper() if action and action.strip() else AuditAction.EXECUTE.value
+        norm_res_type = resource_type.strip() if resource_type and resource_type.strip() else "unknown"
+        norm_res_id = resource_id.strip() if resource_id and resource_id.strip() else "unknown"
+        safe_details = details if details is not None else {}
+
         with self._lock:
             now = datetime.now(UTC)
-            unique_seed = f"audit_{user_id}_{action}_{resource_type}_{resource_id}_{time.time_ns()}".encode()
+            unique_seed = f"audit_{norm_user_id}_{norm_action}_{norm_res_type}_{norm_res_id}_{time.time_ns()}".encode()
             entry_id = hashlib.sha256(unique_seed).hexdigest()[:16]
 
             entry = AuditEntry(
                 entry_id=entry_id,
                 timestamp=now,
-                user_id=user_id,
-                action=action,
-                resource_type=resource_type,
-                resource_id=resource_id,
-                details=details if details is not None else {},
-                ip_address=ip_address,
-                user_agent=user_agent,
+                user_id=norm_user_id,
+                action=norm_action,
+                resource_type=norm_res_type,
+                resource_id=norm_res_id,
+                details=safe_details,
+                ip_address=ip_address.strip() if ip_address else None,
+                user_agent=user_agent.strip() if user_agent else None,
             )
 
             entry.seal(self._last_hash)
@@ -325,9 +444,9 @@ class ImmutableAuditLog:
             logger.info(
                 "denetim_kaydi_eklendi",
                 entry_id=entry_id,
-                user_id=user_id,
-                islem=action,
-                kaynak=f"{resource_type}:{resource_id}",
+                user_id=norm_user_id,
+                islem=norm_action,
+                kaynak=f"{norm_res_type}:{norm_res_id}",
                 muhur=entry.entry_hash[:12],
             )
 
@@ -531,7 +650,7 @@ class ImmutableAuditLog:
                     "action": e.action,
                     "resource_type": e.resource_type,
                     "resource_id": e.resource_id,
-                    "details_json": orjson.dumps(e.details).decode("utf-8"),
+                    "details_json": orjson.dumps(e.details, default=str).decode("utf-8"),
                     "ip_address": e.ip_address or "",
                     "user_agent": e.user_agent or "",
                     "previous_hash": e.previous_hash,
@@ -561,11 +680,13 @@ class ImmutableAuditLog:
 
         target_path = Path(db_path) if db_path is not None else DEFAULT_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.is_file() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         con = duckdb.connect(str(target_path))
         try:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS bist_immutable_audit (
+            con.execute(f"""
+                CREATE TABLE IF NOT EXISTS {DEFAULT_AUDIT_TABLE_NAME} (
                     entry_id VARCHAR PRIMARY KEY,
                     timestamp TIMESTAMPTZ,
                     user_id VARCHAR,
@@ -582,8 +703,8 @@ class ImmutableAuditLog:
             """)
             arrow_table = df.to_arrow()
             con.register("audit_arrow", arrow_table)
-            con.execute("""
-                INSERT OR REPLACE INTO bist_immutable_audit (
+            con.execute(f"""
+                INSERT OR REPLACE INTO {DEFAULT_AUDIT_TABLE_NAME} (
                     entry_id, timestamp, user_id, action, resource_type,
                     resource_id, details_json, ip_address, user_agent, previous_hash, entry_hash
                 )
@@ -595,6 +716,203 @@ class ImmutableAuditLog:
             con.unregister("audit_arrow")
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    @otel_trace("immutable_audit.query_audit_duckdb")
+    def query_audit_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = DEFAULT_QUERY_LIMIT,
+        user_id: str | None = None,
+        action: str | None = None,
+        resource_type: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB bist_immutable_audit tablosundan denetim kayıtlarını Polars olarak sorgular.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+            limit: Maksimum satır sayısı.
+            user_id: İsteğe bağlı kullanıcı filtresi.
+            action: İsteğe bağlı işlem türü filtresi.
+            resource_type: İsteğe bağlı kaynak türü filtresi.
+
+        Returns:
+            pl.DataFrame: Sorgu sonucu denetim kayıtları.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_AUDIT_DB_PATH
+        schema = {
+            "entry_id": pl.String,
+            "timestamp": pl.Datetime(time_zone="UTC"),
+            "user_id": pl.String,
+            "action": pl.String,
+            "resource_type": pl.String,
+            "resource_id": pl.String,
+            "details_json": pl.String,
+            "ip_address": pl.String,
+            "user_agent": pl.String,
+            "previous_hash": pl.String,
+            "entry_hash": pl.String,
+            "inserted_at": pl.Datetime(time_zone="UTC"),
+        }
+
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return pl.DataFrame(schema=schema)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                f"SELECT count(*) FROM information_schema.tables WHERE table_name = '{DEFAULT_AUDIT_TABLE_NAME}'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return pl.DataFrame(schema=schema)
+
+            query = f"SELECT * FROM {DEFAULT_AUDIT_TABLE_NAME} WHERE 1=1"
+            params: list[Any] = []
+
+            if user_id:
+                query += " AND user_id = ?"
+                params.append(user_id.strip())
+            if action:
+                query += " AND action = ?"
+                params.append(action.strip().upper())
+            if resource_type:
+                query += " AND resource_type = ?"
+                params.append(resource_type.strip())
+
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return con.execute(query, params).pl()
+        except Exception as e:
+            logger.error("duckdb_audit_sorgu_hatasi", dosya=str(target_path), hata=str(e))
+            return pl.DataFrame(schema=schema)
+        finally:
+            con.close()
+
+    @otel_trace("immutable_audit.verify_duckdb_integrity")
+    def verify_duckdb_integrity(
+        self,
+        db_path: str | Path | None = None,
+    ) -> tuple[bool, str | None]:
+        """DuckDB'de depolanan bist_immutable_audit tablosunun zincir bütünlüğünü doğrular.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+
+        Returns:
+            tuple[bool, str | None]: (Bütünlük geçerli ise True, hata mesajı).
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_AUDIT_DB_PATH
+        if not target_path.exists() or (target_path.is_file() and target_path.stat().st_size == 0):
+            return True, None
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                f"SELECT count(*) FROM information_schema.tables WHERE table_name = '{DEFAULT_AUDIT_TABLE_NAME}'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return True, None
+
+            rows = con.execute(
+                f"""
+                SELECT entry_id, timestamp, user_id, action, resource_type,
+                       resource_id, details_json, ip_address, user_agent, previous_hash, entry_hash
+                FROM {DEFAULT_AUDIT_TABLE_NAME}
+                ORDER BY timestamp ASC
+                """
+            ).fetchall()
+
+            if not rows:
+                return True, None
+
+            # Hash zinciri haritası oluştur: previous_hash -> row
+            by_prev_hash: dict[str, Any] = {r[9]: r for r in rows}
+            all_entry_hashes = {r[10] for r in rows}
+            root_candidates = [r for r in rows if r[9] not in all_entry_hashes]
+
+            if not root_candidates:
+                hata = "DuckDB hash zincirinde döngü tespit edildi; kök kayıt bulunamadı."
+                logger.critical("duckdb_denetim_zincir_dongusu", hata=hata)
+                return False, hata
+
+            # Genesis kökü varsa öncelikli seç, yoksa en erken zamanlı kökü seç
+            genesis_roots = [r for r in root_candidates if r[9] == GENESIS_HASH]
+            current_row = genesis_roots[0] if genesis_roots else min(root_candidates, key=lambda x: x[1])
+
+            expected_prev = current_row[9]
+            if genesis_roots and expected_prev != GENESIS_HASH:
+                hata = (
+                    f"DuckDB ilk kaydın Genesis bağı geçersiz (id={current_row[0]}): "
+                    f"beklenen={GENESIS_HASH[:12]}, bulunan={expected_prev[:12]}"
+                )
+                logger.critical("duckdb_denetim_genesis_uyusmazligi", hata=hata)
+                return False, hata
+
+            visited_count = 0
+            while current_row is not None:
+                visited_count += 1
+                entry_id, ts, u_id, act, r_type, r_id, det_json, ip, ua, prev_h, ent_h = current_row
+
+                if prev_h != expected_prev:
+                    hata = (
+                        f"DuckDB hash zinciri {visited_count}. kayıtta bozuldu (id={entry_id}): "
+                        f"beklenen={expected_prev[:12]}, bulunan={prev_h[:12]}"
+                    )
+                    logger.critical("duckdb_denetim_zinciri_bozuldu", index=visited_count, hata=hata)
+                    return False, hata
+
+                try:
+                    details_dict = orjson.loads(det_json) if det_json else {}
+                except Exception:
+                    details_dict = {}
+
+                if hasattr(ts, "astimezone"):
+                    ts_utc = ts.replace(tzinfo=UTC) if ts.tzinfo is None else ts.astimezone(UTC)
+                    ts_iso = ts_utc.isoformat()
+                elif hasattr(ts, "isoformat"):
+                    ts_iso = ts.isoformat()
+                else:
+                    ts_iso = str(ts)
+                content_dict = {
+                    "entry_id": entry_id,
+                    "timestamp": ts_iso,
+                    "user_id": u_id,
+                    "action": act,
+                    "resource_type": r_type,
+                    "resource_id": r_id,
+                    "details": details_dict,
+                    "ip_address": ip or "",
+                    "user_agent": ua or "",
+                }
+                content_bytes = orjson.dumps(content_dict, option=orjson.OPT_SORT_KEYS, default=str)
+                payload = f"{prev_h}:".encode() + content_bytes
+                computed_hash = hashlib.sha256(payload).hexdigest()[:32]
+
+                if ent_h != computed_hash:
+                    hata = (
+                        f"DuckDB kayıt özeti uyuşmazlığı tespit edildi (id={entry_id}): "
+                        f"hesaplanan={computed_hash[:12]}, kayitli={ent_h[:12]}"
+                    )
+                    logger.critical("duckdb_denetim_kayit_ozeti_uyusmuyor", index=visited_count, hata=hata)
+                    return False, hata
+
+                expected_prev = ent_h
+                current_row = by_prev_hash.get(ent_h)
+
+            if visited_count != len(rows):
+                hata = (
+                    f"DuckDB hash zincirinde kopukluk var: {len(rows)} kayıttan yalnızca "
+                    f"{visited_count} adedi zincirlenebildi."
+                )
+                logger.critical("duckdb_denetim_kopuk_zincir", toplam=len(rows), ziyaret=visited_count)
+                return False, hata
+
+            return True, None
+        except Exception as e:
+            logger.error("duckdb_butunluk_dogrulama_hatasi", hata=str(e))
+            return False, str(e)
         finally:
             con.close()
 
@@ -614,17 +932,27 @@ class ImmutableAuditLog:
         if not self._storage_path:
             return
 
-        serialized = entry.to_orjson_bytes() + b"\n"
+        try:
+            serialized = entry.to_orjson_bytes() + b"\n"
+        except Exception as e:
+            logger.error("denetim_kaydi_serilestirme_hatasi", hata=str(e), entry_id=entry.entry_id)
+            return
+
         with self._lock:
             self._pending_entries.append(serialized)
 
             now = time.time()
-            if not force and len(self._pending_entries) < DEFAULT_BATCH_FLUSH_SIZE and (now - self._last_flush < DEFAULT_FLUSH_INTERVAL_SECONDS):
+            if (
+                not force
+                and len(self._pending_entries) < DEFAULT_BATCH_FLUSH_SIZE
+                and (now - self._last_flush < DEFAULT_FLUSH_INTERVAL_SECONDS)
+            ):
                 return
 
+            chunks = self._pending_entries[:]
             try:
                 with open(self._storage_path, "ab") as f:
-                    for chunk in self._pending_entries:
+                    for chunk in chunks:
                         f.write(chunk)
                 self._pending_entries.clear()
                 self._last_flush = now
@@ -635,9 +963,10 @@ class ImmutableAuditLog:
         """Kuyrukta bekleyen tüm denetim kayıtlarını diske boşaltır."""
         with self._lock:
             if self._storage_path and self._pending_entries:
+                chunks = self._pending_entries[:]
                 try:
                     with open(self._storage_path, "ab") as f:
-                        for chunk in self._pending_entries:
+                        for chunk in chunks:
                             f.write(chunk)
                     self._pending_entries.clear()
                     self._last_flush = time.time()
@@ -811,14 +1140,128 @@ def export_audit_to_duckdb(
     return inst.export_to_duckdb(db_path=db_path, limit=limit)
 
 
+def flush_audit_log(log_instance: ImmutableAuditLog | None = None) -> None:
+    """Bekleyen tüm denetim kayıtlarını diske boşaltır.
+
+    Args:
+        log_instance: Denetim motoru nesnesi (None ise singleton).
+    """
+    inst = log_instance if log_instance is not None else immutable_audit_log
+    inst.flush()
+
+
+def query_immutable_audit_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = DEFAULT_QUERY_LIMIT,
+    user_id: str | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+    log_instance: ImmutableAuditLog | None = None,
+) -> pl.DataFrame:
+    """DuckDB'deki değiştirilemez denetim kayıtlarını Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        limit: Maksimum satır sayısı.
+        user_id: İsteğe bağlı kullanıcı filtresi.
+        action: İsteğe bağlı işlem filtresi.
+        resource_type: İsteğe bağlı kaynak tipi filtresi.
+        log_instance: Denetim motoru örneği.
+
+    Returns:
+        pl.DataFrame: Sorgulanan denetim kayıtları tablosu.
+    """
+    inst = log_instance if log_instance is not None else immutable_audit_log
+    return inst.query_audit_duckdb(
+        db_path=db_path,
+        limit=limit,
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+    )
+
+
+def verify_duckdb_integrity(
+    db_path: str | Path | None = None,
+    log_instance: ImmutableAuditLog | None = None,
+) -> tuple[bool, str | None]:
+    """DuckDB'de depolanan denetim zincirinin kriptografik bütünlüğünü doğrular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        log_instance: Denetim motoru örneği.
+
+    Returns:
+        tuple[bool, str | None]: (Bütünlük geçerli ise True, hata mesajı).
+    """
+    inst = log_instance if log_instance is not None else immutable_audit_log
+    return inst.verify_duckdb_integrity(db_path=db_path)
+
+
+def get_audit_stats(
+    log_instance: ImmutableAuditLog | None = None,
+) -> dict[str, Any]:
+    """Denetim günlüğü istatistiklerini döndürür.
+
+    Args:
+        log_instance: Denetim motoru örneği.
+
+    Returns:
+        dict[str, Any]: İstatistikler sözlüğü.
+    """
+    inst = log_instance if log_instance is not None else immutable_audit_log
+    return inst.get_stats()
+
+
+def get_audit_entries(
+    user_id: str | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+    since: datetime | None = None,
+    limit: int = 100,
+    log_instance: ImmutableAuditLog | None = None,
+) -> list[dict[str, Any]]:
+    """Filtrelenmiş denetim kayıtlarını liste olarak döndürür.
+
+    Args:
+        user_id: Kullanıcı filtresi.
+        action: İşlem türü filtresi.
+        resource_type: Kaynak türü filtresi.
+        since: Zaman filtresi.
+        limit: Maksimum kayıt adedi.
+        log_instance: Denetim motoru örneği.
+
+    Returns:
+        list[dict[str, Any]]: Filtrelenmiş kayıtlar.
+    """
+    inst = log_instance if log_instance is not None else immutable_audit_log
+    return inst.get_entries(
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        since=since,
+        limit=limit,
+    )
+
+
+# Modül Alias'ları
+export_immutable_audit_to_duckdb = export_audit_to_duckdb
+export_immutable_audit_to_polars = export_audit_to_polars
+query_audit_duckdb = query_immutable_audit_duckdb
+
 # Global Singleton Örneği
 immutable_audit_log: Final[ImmutableAuditLog] = ImmutableAuditLog()
 
 __all__: list[str] = [
     "DEFAULT_AUDIT_DB_PATH",
+    "DEFAULT_AUDIT_TABLE_NAME",
     "DEFAULT_BATCH_FLUSH_SIZE",
     "DEFAULT_FLUSH_INTERVAL_SECONDS",
+    "DEFAULT_IMMUTABLE_AUDIT_DB_PATH",
+    "DEFAULT_IMMUTABLE_MAX_IN_MEMORY_ENTRIES",
+    "DEFAULT_IMMUTABLE_QUERY_LIMIT",
     "DEFAULT_MAX_IN_MEMORY_ENTRIES",
+    "DEFAULT_QUERY_LIMIT",
     "GENESIS_HASH",
     "AuditAction",
     "AuditEntry",
@@ -826,9 +1269,17 @@ __all__: list[str] = [
     "ImmutableAuditLog",
     "export_audit_to_duckdb",
     "export_audit_to_polars",
+    "export_immutable_audit_to_duckdb",
+    "export_immutable_audit_to_polars",
+    "flush_audit_log",
     "generate_compliance_report",
+    "get_audit_entries",
+    "get_audit_stats",
     "get_immutable_audit_log",
     "immutable_audit_log",
     "log_audit",
+    "query_audit_duckdb",
+    "query_immutable_audit_duckdb",
     "verify_audit_integrity",
+    "verify_duckdb_integrity",
 ]

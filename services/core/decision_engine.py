@@ -17,11 +17,12 @@ kararını (BUY, SELL, HOLD, NO_ACTION) üretir:
 4. BIST Açığa Satış (Short-Sale) Güvenlik Filtresi:
    - Mevzuat veya sistem kısıtlamalarına göre açığa satış izni yoksa SHORT yönü güvenli moda alınır.
 5. DuckDB & Polars Karar Denetim İzi (Decision Audit Trail):
-   - Üretilen tüm kararlar kalıcı DuckDB günlüğüne kaydedilir ve Polars DataFrame olarak sunulur.
+   - Üretilen tüm kararlar kalıcı DuckDB günlüğüne kaydedilir ve doğrudan `.pl()` ile Polars DataFrame olarak sunulur.
 """
 
 from __future__ import annotations
 
+import contextlib
 import math
 import threading
 from dataclasses import dataclass, field
@@ -34,15 +35,15 @@ import duckdb
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
 
 from services.core.bist_tick_size import round_to_bist_tick
+from services.core.canonical_scoring import CanonicalScore
+from services.core.duckdb_store import configure_duckdb_wal
 from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.decision_engine")
 
-# Varsayılan Karar Parametreleri
+# Varsayılan Karar Parametreleri (GEMINI.md Kural 4)
 DEFAULT_MIN_SCORE: Final[float] = 60.0
 DEFAULT_MIN_CONFIDENCE: Final[float] = 0.65
 DEFAULT_STOP_FALLBACK_PCT: Final[float] = 6.5  # BIST ortalaması için makul stop yüzdesi
@@ -56,6 +57,22 @@ class Action(StrEnum):
     SELL = "SELL"  # Satış / Kar realizasyonu veya açığa satış
     HOLD = "HOLD"  # Mevcut pozisyonu koru
     NO_ACTION = "NO_ACTION"  # İşlem yapma / Eşiklerin altında
+
+    @property
+    def is_actionable(self) -> bool:
+        """Aksiyonun fiili bir işlem (al/sat) gerektirip gerektirmediğini belirtir."""
+        return self in (Action.BUY, Action.SELL)
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Float değerleri güvenle dönüştürür; None/NaN/Inf durumlarında default döner."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) or math.isinf(f) else f
+    except (ValueError, TypeError):
+        return default
 
 
 @dataclass(slots=True)
@@ -100,6 +117,34 @@ class DecisionInput:
     avg_volume: float = 0.0
     spread_pct: float = 0.0
     allow_short: bool = False  # BIST açığa satış izni bayrağı
+
+    def __post_init__(self) -> None:
+        """Sayısal alanları NaN/Inf taşmalarına karşı guard altına alır."""
+        self.price = _safe_float(self.price, 0.0)
+        self.ml_score = _safe_float(self.ml_score, 50.0)
+        self.ml_confidence = _safe_float(self.ml_confidence, 0.5)
+        self.news_sentiment = _safe_float(self.news_sentiment, 0.0)
+        self.market_cap = _safe_float(self.market_cap, 0.0)
+        self.atr = _safe_float(self.atr, 0.0)
+        self.atr_pct = _safe_float(self.atr_pct, 0.0)
+        self.agent_confidence = _safe_float(self.agent_confidence, 0.0)
+        self.agent_score = _safe_float(self.agent_score, 50.0)
+        self.macro_stance = _safe_float(self.macro_stance, 0.0)
+        self.macro_confidence = _safe_float(self.macro_confidence, 0.0)
+        self.macro_impact = _safe_float(self.macro_impact, 0.0)
+        self.ml_return_5d = _safe_float(self.ml_return_5d, 0.0)
+        self.ml_return_20d = _safe_float(self.ml_return_20d, 0.0)
+        self.spec_score = _safe_float(self.spec_score, 0.0)
+        self.world_alignment = _safe_float(self.world_alignment, 0.0)
+        self.sim_expected_return = _safe_float(self.sim_expected_return, 0.0)
+        self.sim_var_95 = _safe_float(self.sim_var_95, 0.0)
+        self.sim_prob_positive = _safe_float(self.sim_prob_positive, 0.0)
+        self.ai_confidence = _safe_float(self.ai_confidence, 0.0)
+        self.max_position_pct = _safe_float(self.max_position_pct, 10.0)
+        self.current_position_pct = _safe_float(self.current_position_pct, 0.0)
+        self.portfolio_drawdown = _safe_float(self.portfolio_drawdown, 0.0)
+        self.avg_volume = _safe_float(self.avg_volume, 0.0)
+        self.spread_pct = _safe_float(self.spread_pct, 0.0)
 
     def __repr__(self) -> str:
         """Nesnenin okunabilir hata ayıklama temsili."""
@@ -149,6 +194,10 @@ class Decision:
             "timestamp": self.timestamp.isoformat(),
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Karar çıktısını ikili orjson formatına dönüştürür (GEMINI.md Kural 5)."""
+        return orjson.dumps(self.to_dict(), default=str)
+
     def __repr__(self) -> str:
         """Nihai kararın okunabilir dökümü."""
         return (
@@ -156,17 +205,6 @@ class Decision:
             f"direction={self.direction!r}, score={self.score:.1f}, conf={self.confidence:.2f}, "
             f"target={self.target_price}, stop={self.stop_price})"
         )
-
-
-def _safe_float(val: Any, default: float = 0.0) -> float:
-    """Float değerleri güvenle dönüştürür; None/NaN/Inf durumlarında default döner."""
-    if val is None:
-        return default
-    try:
-        f = float(val)
-        return default if math.isnan(f) or math.isinf(f) else f
-    except (ValueError, TypeError):
-        return default
 
 
 class DecisionEngine:
@@ -203,8 +241,14 @@ class DecisionEngine:
         """Kalıcı DuckDB karar denetim tablosunu hazırlar."""
         try:
             db_file = Path(self._db_path)
+            # Sıfır baytlık bozuk DuckDB dosya kontrolü (Windows çökme koruması)
+            if db_file.exists() and db_file.stat().st_size == 0:
+                with contextlib.suppress(OSError):
+                    db_file.unlink()
+
             db_file.parent.mkdir(parents=True, exist_ok=True)
             self._conn = duckdb.connect(str(db_file))
+            configure_duckdb_wal(self._conn)
             with self._lock:
                 self._conn.execute(
                     """
@@ -244,13 +288,15 @@ class DecisionEngine:
 
     def _persist_decision(self, dec: Decision) -> None:
         """Alınan kararı kalıcı DuckDB günlüğüne kaydeder."""
-        if self._conn is None:
-            return
-
         with self._lock:
+            if self._conn is None:
+                self._init_db()
+            if self._conn is None:
+                return
+
             try:
-                reasons_str = orjson.dumps(dec.reasons).decode("utf-8")
-                risks_str = orjson.dumps(dec.risks).decode("utf-8")
+                reasons_str = orjson.dumps(dec.reasons, default=str).decode("utf-8")
+                risks_str = orjson.dumps(dec.risks, default=str).decode("utf-8")
                 self._conn.execute(
                     """
                     INSERT INTO decision_audit_log (
@@ -297,10 +343,17 @@ class DecisionEngine:
         signal: dict[str, Any],
         risk_check: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """B18 ve eski servislerle geriye dönük tam uyumlu karar arayüzü.
+        """B18 ve harici servislerle tam uyumlu sözlük tabanlı karar arayüzü.
 
-        Placeholder değerler yerine sinyalden DecisionInput sentezleyerek
-        gerçek karar motorunu çalıştırır.
+        Sinyalden DecisionInput sentezleyerek gerçek karar motorunu çalıştırır.
+
+        Args:
+            ticker: Hisse senedi sembolü.
+            signal: Model, rejim ve göstergeleri içeren sinyal sözlüğü.
+            risk_check: İsteğe bağlı risk kontrolü sonucu sözlüğü.
+
+        Returns:
+            dict[str, Any]: Karar çıktısı sözlüğü.
         """
         price = _safe_float(signal.get("price", signal.get("close", 0.0)))
         features = signal.get("features", {})
@@ -309,7 +362,7 @@ class DecisionEngine:
             price=price,
             features=features,
             signals=signal,
-            regime=signal.get("regime", "UNKNOWN"),
+            regime=str(signal.get("regime", "UNKNOWN")),
             ml_score=_safe_float(signal.get("score", signal.get("fused_score", 50.0)), 50.0),
             ml_confidence=_safe_float(signal.get("confidence", signal.get("fused_confidence", 0.5)), 0.5),
             atr=_safe_float(features.get("atr_14", features.get("atr", 0.0))),
@@ -325,7 +378,14 @@ class DecisionEngine:
 
     @otel_trace("decision_engine.decide")
     def decide(self, inp: DecisionInput) -> Decision:
-        """Nihai işlem kararını fail-closed ve rejime duyarlı olarak üretir."""
+        """Nihai işlem kararını fail-closed ve rejime duyarlı olarak üretir.
+
+        Args:
+            inp: Karar girdisi veri modeli.
+
+        Returns:
+            Decision: Nihai karar çıktısı.
+        """
         clean_ticker = (inp.ticker or "").strip().upper()
 
         # Sayısal Geçersizlik Koruması
@@ -369,8 +429,8 @@ class DecisionEngine:
             self._persist_decision(dec)
             return dec
 
-        # 4. BIST Açığa Satış Guard'ı ile Aksiyon Belirle
-        action = self._determine_action(inp, direction)
+        # 4. BIST Açığa Satış Guard'ı ile Aksiyon Belirle (Rejim dinamik eşiği korunur)
+        action = self._determine_action(inp, direction, min_confidence=min_conf)
 
         # 5. Stop ve Target Hesapla (BIST Tick Size ve ATR Bazlı)
         stop_price, target_price = self._calculate_stop_and_target(inp, direction)
@@ -593,11 +653,22 @@ class DecisionEngine:
         roc = _safe_float(f.get("roc_5d", 0))
         rsi = _safe_float(f.get("rsi_14", 50), 50.0)
 
+        # Yüksek güvenli Ajan / AI yön entegrasyonu
+        agent_bull = (
+            (inp.agent_direction.upper() in ("LONG", "BULLISH", "BUY") and inp.agent_confidence >= 0.65)
+            or (inp.ai_direction.upper() in ("LONG", "BULLISH", "BUY") and inp.ai_confidence >= 0.65)
+        )
+        agent_bear = (
+            (inp.agent_direction.upper() in ("SHORT", "BEARISH", "SELL") and inp.agent_confidence >= 0.65)
+            or (inp.ai_direction.upper() in ("SHORT", "BEARISH", "SELL") and inp.ai_confidence >= 0.65)
+        )
+
         bullish_signals = sum([
             momentum > 0,
             roc > 0,
             rsi > 52.0,
             inp.ml_score > 55.0,
+            agent_bull,
         ])
 
         bearish_signals = sum([
@@ -605,6 +676,7 @@ class DecisionEngine:
             roc < 0,
             rsi < 48.0,
             inp.ml_score < 45.0,
+            agent_bear,
         ])
 
         if bullish_signals >= 3:
@@ -614,9 +686,15 @@ class DecisionEngine:
 
         return "HOLD"
 
-    def _determine_action(self, inp: DecisionInput, direction: str) -> str:
+    def _determine_action(
+        self,
+        inp: DecisionInput,
+        direction: str,
+        min_confidence: float | None = None,
+    ) -> str:
         """İşlem yönü ve BIST mevzuatına göre nihai aksiyonu belirler."""
-        if inp.ml_confidence < self._min_confidence:
+        eff_conf = self._min_confidence if min_confidence is None else min_confidence
+        if inp.ml_confidence < eff_conf:
             return Action.NO_ACTION.value
 
         if direction == "LONG":
@@ -653,6 +731,7 @@ class DecisionEngine:
             stop_pct = self.DEFAULT_STOP_FALLBACK
 
         # Sınırla: minimum %4.0, maksimum %10.0
+        stop_pct = _safe_float(stop_pct, self.DEFAULT_STOP_FALLBACK)
         stop_pct = max(4.0, min(10.0, stop_pct))
         target_pct = stop_pct * 2.0  # 1:2 Risk / Getiri oranı
 
@@ -665,9 +744,12 @@ class DecisionEngine:
         else:
             return 0.0, 0.0
 
+        raw_stop = _safe_float(raw_stop, 0.0)
+        raw_target = _safe_float(raw_target, 0.0)
+
         # BIST Fiyat Adımı Yuvarlaması (bist_tick_size)
-        valid_stop = round_to_bist_tick(raw_stop)
-        valid_target = round_to_bist_tick(raw_target)
+        valid_stop = round_to_bist_tick(raw_stop) if raw_stop > 0 else 0.0
+        valid_target = round_to_bist_tick(raw_target) if raw_target > 0 else 0.0
 
         return valid_stop, valid_target
 
@@ -749,9 +831,15 @@ class DecisionEngine:
         return round(float(expected), 2)
 
     def decide_from_canonical(self, score: Any, price: float = 0.0) -> Decision:
-        """CanonicalScore nesnesinden BIST tick kurallarına uygun nihai karar üretir."""
-        from services.core.canonical_scoring import CanonicalScore
+        """CanonicalScore nesnesinden BIST tick kurallarına uygun nihai karar üretir.
 
+        Args:
+            score: CanonicalScore nesnesi.
+            price: Hisse senedi anlık fiyatı.
+
+        Returns:
+            Decision: Üretilen karar nesnesi.
+        """
         if not isinstance(score, CanonicalScore):
             raise TypeError(f"CanonicalScore bekleniyordu, alınan: {type(score)}")
 
@@ -809,6 +897,7 @@ class DecisionEngine:
             else:
                 stop_pct = self.DEFAULT_STOP_FALLBACK
 
+            stop_pct = _safe_float(stop_pct, self.DEFAULT_STOP_FALLBACK)
             stop_pct = max(4.0, min(10.0, stop_pct))
             target_pct = stop_pct * 2.0
 
@@ -821,8 +910,13 @@ class DecisionEngine:
             else:
                 raw_stop, raw_target = 0.0, 0.0
 
-            stop_price = round_to_bist_tick(raw_stop) if raw_stop > 0 else 0.0
-            target_price = round_to_bist_tick(raw_target) if raw_target > 0 else 0.0
+            raw_stop = _safe_float(raw_stop, 0.0)
+            raw_target = _safe_float(raw_target, 0.0)
+
+            valid_stop = round_to_bist_tick(raw_stop) if raw_stop > 0 else 0.0
+            valid_target = round_to_bist_tick(raw_target) if raw_target > 0 else 0.0
+            stop_price = valid_stop
+            target_price = valid_target
 
         # Conviction
         if score.opportunity_score >= 80.0 and score.confidence >= 0.80:
@@ -869,28 +963,80 @@ class DecisionEngine:
         self._persist_decision(dec)
         return dec
 
-    def export_decisions_to_polars(self, limit: int = 100) -> pl.DataFrame:
-        """Kalıcı DuckDB karar geçmişini sıfır kopyalı Polars DataFrame olarak dışa aktarır."""
-        if self._conn is None:
-            return pl.DataFrame()
+    def export_decisions_to_polars(
+        self,
+        ticker: str | None = None,
+        action: Action | str | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """Kalıcı DuckDB karar geçmişini sıfır kopyalı Polars DataFrame olarak dışa aktarır (GEMINI.md Kural 2).
 
+        Args:
+            ticker: İsteğe bağlı hisse filtresi.
+            action: İsteğe bağlı aksiyon filtresi.
+            limit: Maksimum kayıt limiti.
+
+        Returns:
+            pl.DataFrame: Karar kayıtları tablosu.
+        """
+        empty_schema = {
+            "id": pl.Int64,
+            "timestamp": pl.Datetime("us", "UTC"),
+            "ticker": pl.Utf8,
+            "action": pl.Utf8,
+            "direction": pl.Utf8,
+            "confidence": pl.Float64,
+            "score": pl.Float64,
+            "target_price": pl.Float64,
+            "stop_price": pl.Float64,
+            "expected_return": pl.Float64,
+            "conviction": pl.Utf8,
+            "reasons_json": pl.Utf8,
+            "risks_json": pl.Utf8,
+        }
         with self._lock:
+            if self._conn is None:
+                self._init_db()
+            if self._conn is None:
+                return pl.DataFrame(schema=empty_schema)
+
             try:
-                arrow_table = self._conn.execute(
-                    """
+                query = """
                     SELECT id, timestamp, ticker, action, direction, confidence,
                            score, target_price, stop_price, expected_return,
                            conviction, reasons_json, risks_json
                     FROM decision_audit_log
-                    ORDER BY id DESC
-                    LIMIT ?;
-                    """,
-                    [limit],
-                ).arrow()
-                return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+                """
+                conditions: list[str] = []
+                params: list[Any] = []
+
+                if ticker:
+                    conditions.append("ticker = ?")
+                    params.append(str(ticker).upper().strip())
+                if action is not None:
+                    act_val = action.value if isinstance(action, Action) else str(action)
+                    conditions.append("action = ?")
+                    params.append(act_val)
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+                query += " ORDER BY id DESC LIMIT ?"
+                params.append(max(1, limit))
+
+                return self._conn.execute(query, params).pl()
             except Exception as exc:
                 logger.error("decision_history_polars_hatasi", error=str(exc))
-                return pl.DataFrame()
+                return pl.DataFrame(schema=empty_schema)
+
+    def __enter__(self) -> DecisionEngine:
+        """Context manager giriş protokolü."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager çıkış protokolü."""
+        self.close()
+        return None
 
     def __repr__(self) -> str:
         """Karar motorunun okunabilir durum temsili."""
@@ -903,14 +1049,104 @@ class DecisionEngine:
 # Global Tekil Nesne (Singleton)
 decision_engine: Final[DecisionEngine] = DecisionEngine()
 
+
+# ---------------------------------------------------------------------------
+# Modül Seviyesi Kolaylık Fonksiyonları (GEMINI.md Kural 6)
+# ---------------------------------------------------------------------------
+
+
+def get_decision_engine() -> DecisionEngine:
+    """Aktif global DecisionEngine singleton nesnesini döner.
+
+    Returns:
+        DecisionEngine: Aktif karar motoru.
+    """
+    return decision_engine
+
+
+def make_trading_decision(
+    ticker: str,
+    signal: dict[str, Any],
+    risk_check: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Sinyal ve risk verilerinden tek satırda karar sözlüğü üretir.
+
+    Args:
+        ticker: Hisse senedi sembolü.
+        signal: Sinyal verileri sözlüğü.
+        risk_check: İsteğe bağlı risk kontrolü sonucu.
+
+    Returns:
+        dict[str, Any]: Karar çıktısı sözlüğü.
+    """
+    return decision_engine.make_decision(ticker=ticker, signal=signal, risk_check=risk_check)
+
+
+def decide_trade(inp: DecisionInput) -> Decision:
+    """DecisionInput nesnesinden doğrudan nihai Decision nesnesi üretir.
+
+    Args:
+        inp: Karar girdisi nesnesi.
+
+    Returns:
+        Decision: Nihai karar nesnesi.
+    """
+    return decision_engine.decide(inp)
+
+
+def export_decisions_to_polars(
+    ticker: str | None = None,
+    action: Action | str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """Diskteki DuckDB karar günlüğünü Polars DataFrame olarak sunar.
+
+    Args:
+        ticker: İsteğe bağlı hisse filtresi.
+        action: İsteğe bağlı aksiyon filtresi.
+        limit: Maksimum satır limiti.
+
+    Returns:
+        pl.DataFrame: Karar geçmişi tablosu.
+    """
+    return decision_engine.export_decisions_to_polars(ticker=ticker, action=action, limit=limit)
+
+
+def query_decision_audit_duckdb(
+    ticker: str | None = None,
+    action: Action | str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """Diskteki DuckDB karar günlüğünü filtrelenmiş Polars DataFrame olarak sorgular.
+
+    Args:
+        ticker: İsteğe bağlı hisse filtresi.
+        action: İsteğe bağlı aksiyon filtresi.
+        limit: Maksimum satır limiti.
+
+    Returns:
+        pl.DataFrame: Filtrelenmiş karar kayıtları tablosu.
+    """
+    return decision_engine.export_decisions_to_polars(ticker=ticker, action=action, limit=limit)
+
+
 __all__: Final[list[str]] = [
-    "Action",
+    # Sabitler
     "DEFAULT_DECISION_DB_PATH",
     "DEFAULT_MIN_CONFIDENCE",
     "DEFAULT_MIN_SCORE",
     "DEFAULT_STOP_FALLBACK_PCT",
+    # Modeller ve Enumlar
+    "Action",
     "Decision",
     "DecisionEngine",
     "DecisionInput",
+    # Singleton
     "decision_engine",
+    # Kolaylık Fonksiyonları
+    "decide_trade",
+    "export_decisions_to_polars",
+    "get_decision_engine",
+    "make_trading_decision",
+    "query_decision_audit_duckdb",
 ]

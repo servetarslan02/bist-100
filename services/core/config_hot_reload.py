@@ -41,18 +41,25 @@ import duckdb
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+from services.core.otel import otel_trace
+
+try:
+    from opentelemetry import trace
+    tracer: Any = trace.get_tracer("alpha-bist.config-hot-reload")
+except Exception:
+    tracer = None
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.config-hot-reload")
 
 # Varsayılan Yapılandırma Sabitleri
 DEFAULT_WATCH_INTERVAL_SECONDS: Final[float] = 30.0  # SSD koruma limiti (30s)
 DEFAULT_MAX_HISTORY_LEN: Final[int] = 100
 DEFAULT_CONFIG_DB_PATH: Final[str] = "data/config_audit.duckdb"
+DEFAULT_RUNTIME_CONFIG_PATH: Final[str] = "config/runtime.json"
 
 
 @dataclass(slots=True)
@@ -80,17 +87,29 @@ class ConfigChange:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Serileştirme ve JSON aktarımı için sözlük temsili üretir."""
+        """Serileştirme ve JSON aktarımı için sözlük temsili üretir.
+
+        Returns:
+            dict[str, Any]: Değişiklik detayları sözlüğü.
+        """
         return {
             "change_id": self.change_id,
             "timestamp": self.timestamp.isoformat(),
             "file_path": self.file_path,
-            "old_hash": self.old_hash[:12],
-            "new_hash": self.new_hash[:12],
-            "changed_keys": self.changed_keys,
+            "old_hash": self.old_hash[:12] if self.old_hash else "",
+            "new_hash": self.new_hash[:12] if self.new_hash else "",
+            "changed_keys": list(self.changed_keys),
             "applied": self.applied,
             "error": self.error,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Değişiklik nesnesini yüksek hızlı ikili JSON baytlarına dönüştürür.
+
+        Returns:
+            bytes: JSON baytları.
+        """
+        return orjson.dumps(self.to_dict())
 
     def __repr__(self) -> str:
         """Okunabilir nesne hata ayıklama temsili."""
@@ -110,7 +129,7 @@ class ConfigHotReload:
 
     def __init__(
         self,
-        config_path: str,
+        config_path: str = DEFAULT_RUNTIME_CONFIG_PATH,
         watch_interval_seconds: float = DEFAULT_WATCH_INTERVAL_SECONDS,
         auto_apply: bool = True,
         validate_before_apply: bool = True,
@@ -138,10 +157,19 @@ class ConfigHotReload:
         self._last_hash: str = ""
         self._current_config: dict[str, Any] = {}
         self._running: bool = False
+        self._background_task: asyncio.Task[None] | None = None
         self._change_history: deque[ConfigChange] = deque(maxlen=DEFAULT_MAX_HISTORY_LEN)
 
         self._conn: duckdb.DuckDBPyConnection | None = None
         self._init_db()
+
+    def __enter__(self) -> ConfigHotReload:
+        """Context manager giriş protokolü."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager çıkış protokolü ile bağlantıları güvenle kapatır."""
+        self.close()
 
     def _init_db(self) -> None:
         """Kalıcı DuckDB denetim tablosunu hazırlar."""
@@ -195,6 +223,16 @@ class ConfigHotReload:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
+    def remove_callback(self, callback: Callable[..., Any]) -> None:
+        """Kayıtlı bir callback dinleyicisini kaldırır.
+
+        Args:
+            callback: Kaldırılacak fonksiyon.
+        """
+        with self._lock:
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
+
     def add_validator(
         self,
         validator: Callable[[dict[str, Any]], tuple[bool, str | None]],
@@ -210,17 +248,27 @@ class ConfigHotReload:
             if validator not in self._validators:
                 self._validators.append(validator)
 
+    def clear_validators(self) -> None:
+        """Tüm kayıtlı doğrulayıcıları temizler."""
+        with self._lock:
+            self._validators.clear()
+
     async def start(self) -> None:
         """Konfigürasyon izleme döngüsünü başlatır.
 
         Dosya diskte mevcut değilse boş bir JSON şablonu atomik olarak oluşturulur.
         """
+        with self._lock:
+            if self._running:
+                logger.warning("config_hot_reload_zaten_calisiyor", path=str(self._config_path))
+                return
+            self._running = True
+
         if not self._config_path.exists():
             logger.warning("config_dosyasi_bulunamadi_olusturuluyor", path=str(self._config_path))
             self.save_config_safely({})
 
         with self._lock:
-            self._running = True
             self._load_config()
 
         logger.info(
@@ -242,10 +290,30 @@ class ConfigHotReload:
             except asyncio.CancelledError:
                 break
 
+    def start_in_background(self) -> asyncio.Task[None]:
+        """Konfigürasyon izleme döngüsünü asenkron arka plan görevi olarak başlatır.
+
+        Returns:
+            asyncio.Task[None]: Başlatılan arka plan görevi.
+        """
+        with self._lock:
+            if self._background_task is not None and not self._background_task.done():
+                return self._background_task
+            self._background_task = asyncio.create_task(self.start())
+            return self._background_task
+
     async def stop(self) -> None:
         """Konfigürasyon izleme döngüsünü durdurur."""
         with self._lock:
             self._running = False
+            task = self._background_task
+            self._background_task = None
+
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
         logger.info("config_hot_reload_durduruldu", path=str(self._config_path))
 
     def _load_config(self) -> dict[str, Any]:
@@ -307,17 +375,34 @@ class ConfigHotReload:
             if current_mtime <= self._last_modified:
                 return
 
-            content = self._config_path.read_text(encoding="utf-8")
+            try:
+                content = self._config_path.read_text(encoding="utf-8")
+            except (PermissionError, OSError) as lock_exc:
+                logger.warning(
+                    "config_dosyasi_kilitli_sonraki_turda_denenecek",
+                    path=str(self._config_path),
+                    error=str(lock_exc),
+                )
+                return
+
             current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
             if current_hash == self._last_hash:
                 self._last_modified = current_mtime
                 return
 
-            with tracer.start_as_current_span("config.change_detected") as span:
-                span.set_attribute("config.file", str(self._config_path))
-                span.set_attribute("config.old_hash", self._last_hash[:12])
-                span.set_attribute("config.new_hash", current_hash[:12])
+            # OpenTelemetry span yönetimi
+            span_cm = (
+                tracer.start_as_current_span("config.change_detected")
+                if tracer is not None
+                else contextlib.nullcontext()
+            )
+
+            with span_cm as span:
+                if span is not None and hasattr(span, "set_attribute"):
+                    span.set_attribute("config.file", str(self._config_path))
+                    span.set_attribute("config.old_hash", self._last_hash[:12])
+                    span.set_attribute("config.new_hash", current_hash[:12])
 
                 logger.info(
                     "config_degisikligi_tespit_edildi",
@@ -450,18 +535,35 @@ class ConfigHotReload:
                     logger.warning("config_audit_db_kayit_hatasi", error=str(exc))
 
     def get_current_config(self) -> dict[str, Any]:
-        """Mevcut aktif konfigürasyonun bir kopyasını döndürür."""
+        """Mevcut aktif konfigürasyonun bir kopyasını döndürür.
+
+        Returns:
+            dict[str, Any]: Aktif ayarlar sözlüğü.
+        """
         with self._lock:
             return self._current_config.copy()
 
     def get_change_history(self, limit: int = 20) -> list[dict[str, Any]]:
-        """Değişiklik geçmişini sözlük listesi olarak döndürür."""
+        """Değişiklik geçmişini sözlük listesi olarak döndürür.
+
+        Args:
+            limit: Maksimum döndürülecek kayıt sayısı.
+
+        Returns:
+            list[dict[str, Any]]: Geçmiş kayıtları.
+        """
         with self._lock:
             items = list(self._change_history)
-            return [c.to_dict() for c in items[-limit:]]
+            safe_limit = max(0, limit)
+            return [c.to_dict() for c in items[-safe_limit:]]
 
+    @otel_trace("config_hot_reload.force_reload")
     def force_reload(self) -> dict[str, Any]:
-        """Diskteki dosyayı beklemeden anında zorla yükler."""
+        """Diskteki dosyayı beklemeden anında zorla yükler.
+
+        Returns:
+            dict[str, Any]: Yeniden yüklenen konfigürasyon.
+        """
         with self._lock:
             old_config = self._current_config.copy()
             new_config = self._load_config()
@@ -471,30 +573,78 @@ class ConfigHotReload:
             return new_config
 
     def export_history_to_polars(self, limit: int = 100) -> pl.DataFrame:
-        """Değişiklik geçmişini sıfır kopyalı Polars DataFrame olarak sunar."""
+        """Değişiklik geçmişini sıfır kopyalı Polars DataFrame olarak sunar (GEMINI.md Kural 2).
+
+        Args:
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Değişiklik geçmişi veri çerçevesi.
+        """
+        return self.query_audit_duckdb(limit=limit)
+
+    def query_audit_duckdb(
+        self,
+        file_path: str | None = None,
+        applied: bool | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB'de saklanan konfigürasyon denetim izini filtrelenmiş Polars DataFrame olarak döner.
+
+        Args:
+            file_path: İsteğe bağlı dosya yolu filtresi.
+            applied: İsteğe bağlı uygulanma durumu filtresi.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Sorgu sonuçları tablosu.
+        """
+        empty_schema = {
+            "id": pl.Int64,
+            "timestamp": pl.Datetime("us", "UTC"),
+            "change_id": pl.Utf8,
+            "file_path": pl.Utf8,
+            "old_hash": pl.Utf8,
+            "new_hash": pl.Utf8,
+            "changed_keys": pl.Utf8,
+            "applied": pl.Boolean,
+            "error": pl.Utf8,
+        }
+
         if self._conn is None:
             with self._lock:
-                history_dicts = [c.to_dict() for c in self._change_history][-limit:]
+                history_dicts = [c.to_dict() for c in self._change_history][-max(1, limit):]
                 if not history_dicts:
-                    return pl.DataFrame()
+                    return pl.DataFrame(schema=empty_schema)
                 return pl.DataFrame(history_dicts)
 
         with self._lock:
             try:
-                arrow_table = self._conn.execute(
-                    """
+                query = """
                     SELECT id, timestamp, change_id, file_path, old_hash,
                            new_hash, changed_keys, applied, error
                     FROM config_audit_log
-                    ORDER BY id DESC
-                    LIMIT ?;
-                    """,
-                    [limit],
-                ).arrow()
-                return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+                """
+                params: list[Any] = []
+                conditions: list[str] = []
+
+                if file_path:
+                    conditions.append("file_path = ?")
+                    params.append(str(file_path))
+                if applied is not None:
+                    conditions.append("applied = ?")
+                    params.append(bool(applied))
+
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+
+                query += " ORDER BY id DESC LIMIT ?"
+                params.append(max(1, limit))
+
+                return self._conn.execute(query, params).pl()
             except Exception as exc:
                 logger.error("config_history_polars_hatasi", error=str(exc))
-                return pl.DataFrame()
+                return pl.DataFrame(schema=empty_schema)
 
     def __repr__(self) -> str:
         """Motorun okunabilir durum temsilini döndürür."""
@@ -515,7 +665,7 @@ def _create_singleton() -> ConfigHotReload:
     for path in candidates:
         if os.path.exists(path):
             return ConfigHotReload(path)
-    return ConfigHotReload("config/runtime.json")
+    return ConfigHotReload(DEFAULT_RUNTIME_CONFIG_PATH)
 
 
 config_hot_reload: Final[ConfigHotReload] = _create_singleton()
@@ -617,6 +767,9 @@ class SettingsBridge:
     def stop_watching(self) -> None:
         """İzleme köprüsünü devre dışı bırakır."""
         with self._lock:
+            if not self._watching:
+                return
+            self._reloader.remove_callback(self._on_config_change)
             self._watching = False
             logger.info("settings_bridge_durduruldu")
 
@@ -669,18 +822,30 @@ class SettingsBridge:
             )
 
     def get_settings_history(self) -> list[dict[str, Any]]:
-        """Settings değişiklik geçmişini liste halinde döndürür."""
+        """Settings değişiklik geçmişini liste halinde döndürür.
+
+        Returns:
+            list[dict[str, Any]]: Geçmiş kayıtları.
+        """
         with self._lock:
             return [{"timestamp": ts.isoformat(), "changes": changes} for ts, changes in self._settings_history]
 
     @classmethod
     def get_safe_fields(cls) -> set[str]:
-        """JSON konfigürasyonundan güncellenebilir güvenli alanlar kümesi."""
+        """JSON konfigürasyonundan güncellenebilir güvenli alanlar kümesi.
+
+        Returns:
+            set[str]: Güvenli alan adları kümesi.
+        """
         return cls._SAFE_FIELDS.copy()
 
     @classmethod
     def get_secret_fields(cls) -> set[str]:
-        """JSON konfigürasyonuna girişi engellenmiş hassas alanlar kümesi."""
+        """JSON konfigürasyonuna girişi engellenmiş hassas alanlar kümesi.
+
+        Returns:
+            set[str]: Gizli alan adları kümesi.
+        """
         return cls._SECRET_FIELDS.copy()
 
     def __repr__(self) -> str:
@@ -691,13 +856,88 @@ class SettingsBridge:
 # Global tekil köprü (Singleton)
 settings_bridge: Final[SettingsBridge] = SettingsBridge()
 
+
+# ==============================================================================
+# MODÜL SEVİYESİNDE KOLAYLIK VE YARDIMCI FONKSİYONLAR (CONVENIENCE HELPERS)
+# ==============================================================================
+
+def get_current_runtime_config() -> dict[str, Any]:
+    """Aktif çalışma zamanı konfigürasyonunun kopyasını döndürür.
+
+    Returns:
+        dict[str, Any]: Güncel ayarlar sözlüğü.
+    """
+    return config_hot_reload.get_current_config()
+
+
+def save_runtime_config_safely(new_config: dict[str, Any]) -> bool:
+    """Çalışma zamanı konfigürasyonunu diske atomik ve güvenli kaydeder.
+
+    Args:
+        new_config: Kaydedilecek ayarlar sözlüğü.
+
+    Returns:
+        bool: Kayıt başarılı ise True, aksi halde False.
+    """
+    return config_hot_reload.save_config_safely(new_config)
+
+
+def force_reload_runtime_config() -> dict[str, Any]:
+    """Çalışma zamanı konfigürasyonunu beklemeden anında diskten zorla yeniler.
+
+    Returns:
+        dict[str, Any]: Yenilenen ayarlar.
+    """
+    return config_hot_reload.force_reload()
+
+
+def export_config_history_to_polars(limit: int = 100) -> pl.DataFrame:
+    """Konfigürasyon denetim geçmişini Polars DataFrame olarak döner.
+
+    Args:
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Değişiklik geçmişi tablosu.
+    """
+    return config_hot_reload.export_history_to_polars(limit=limit)
+
+
+def query_config_audit_duckdb(
+    file_path: str | None = None,
+    applied: bool | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan konfigürasyon denetim kayıtlarını filtreleyerek döner.
+
+    Args:
+        file_path: Dosya yolu filtresi.
+        applied: Başarıyla uygulanma durumu filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Filtrelenmiş sonuçlar.
+    """
+    return config_hot_reload.query_audit_duckdb(
+        file_path=file_path,
+        applied=applied,
+        limit=limit,
+    )
+
+
 __all__: Final[list[str]] = [
-    "ConfigChange",
-    "ConfigHotReload",
     "DEFAULT_CONFIG_DB_PATH",
     "DEFAULT_MAX_HISTORY_LEN",
+    "DEFAULT_RUNTIME_CONFIG_PATH",
     "DEFAULT_WATCH_INTERVAL_SECONDS",
+    "ConfigChange",
+    "ConfigHotReload",
     "SettingsBridge",
     "config_hot_reload",
+    "export_config_history_to_polars",
+    "force_reload_runtime_config",
+    "get_current_runtime_config",
+    "query_config_audit_duckdb",
+    "save_runtime_config_safely",
     "settings_bridge",
 ]

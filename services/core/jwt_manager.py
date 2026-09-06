@@ -116,6 +116,14 @@ class JWTClaims:
         """
         return orjson.dumps(self.to_dict())
 
+    def to_json(self) -> str:
+        """Claims nesnesini UTF-8 JSON metnine dönüştürür.
+
+        Returns:
+            str: JSON metni.
+        """
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> JWTClaims:
         """Sözlükten JWTClaims nesnesi oluşturur.
@@ -141,6 +149,19 @@ class JWTClaims:
             expires_at=float(data.get("exp", 0.0)),
             jti=str(data.get("jti", "")),
         )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> JWTClaims:
+        """JSON metni veya bayt dizisinden JWTClaims üretir.
+
+        Args:
+            json_str_or_bytes: JSON verisi.
+
+        Returns:
+            JWTClaims: Üretilen nesne.
+        """
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     @property
     def is_expired(self) -> bool:
@@ -603,6 +624,8 @@ class JWTManager:
         """
         target_path = Path(db_path) if db_path is not None else DEFAULT_JWT_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         df = self.export_audit_to_polars()
         if len(df) == 0:
@@ -631,6 +654,41 @@ class JWTManager:
             )
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    def query_audit_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB `bist_jwt_audit_log` tablosundan token denetim kayıtlarını Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: Opsiyonel DuckDB dosya yolu.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Denetim tablosu sonucu.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_JWT_AUDIT_DB_PATH
+        if not target_path.exists():
+            return self.export_audit_to_polars().head(0)
+        if target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
+            return self.export_audit_to_polars().head(0)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_jwt_audit_log'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return self.export_audit_to_polars().head(0)
+            return con.execute(
+                "SELECT * FROM bist_jwt_audit_log ORDER BY issued_at DESC LIMIT ?",
+                [limit],
+            ).pl()
         finally:
             con.close()
 
@@ -664,6 +722,8 @@ class JWTManager:
         """
         target_path = Path(db_path) if db_path is not None else DEFAULT_JWT_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         df = self.export_revoked_to_polars()
         if len(df) == 0:
@@ -690,6 +750,41 @@ class JWTManager:
             )
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    def query_revoked_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB `bist_jwt_revoked_tokens` tablosundan kara liste kayıtlarını Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: Opsiyonel DuckDB dosya yolu.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Kara liste tablosu sonucu.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_JWT_AUDIT_DB_PATH
+        if not target_path.exists():
+            return self.export_revoked_to_polars().head(0)
+        if target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
+            return self.export_revoked_to_polars().head(0)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_jwt_revoked_tokens'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return self.export_revoked_to_polars().head(0)
+            return con.execute(
+                "SELECT * FROM bist_jwt_revoked_tokens ORDER BY revoked_at DESC LIMIT ?",
+                [limit],
+            ).pl()
         finally:
             con.close()
 
@@ -806,6 +901,26 @@ def export_revoked_tokens_to_duckdb(db_path: str | Path | None = None, manager: 
     return inst.export_revoked_to_duckdb(db_path=db_path)
 
 
+def query_jwt_audit_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    manager: JWTManager | None = None,
+) -> pl.DataFrame:
+    """DuckDB tablosundan token denetim kayıtlarını Polars DataFrame olarak sorgular."""
+    inst = manager if manager is not None else jwt_manager
+    return inst.query_audit_duckdb(db_path=db_path, limit=limit)
+
+
+def query_revoked_tokens_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    manager: JWTManager | None = None,
+) -> pl.DataFrame:
+    """DuckDB tablosundan kara liste kayıtlarını Polars DataFrame olarak sorgular."""
+    inst = manager if manager is not None else jwt_manager
+    return inst.query_revoked_duckdb(db_path=db_path, limit=limit)
+
+
 # Global Singleton Örneği
 jwt_manager: Final[JWTManager] = JWTManager()
 
@@ -830,6 +945,8 @@ __all__: list[str] = [
     "get_jwt_manager",
     "is_token_revoked",
     "jwt_manager",
+    "query_jwt_audit_duckdb",
+    "query_revoked_tokens_duckdb",
     "refresh_jwt_token",
     "revoke_jwt_token",
     "rotate_jwt_secret",

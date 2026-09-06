@@ -1,10 +1,51 @@
-"""ALPHA BIST - Data Models & Schemas"""
+"""ALPHA BIST — Veri Modelleri ve Şemalar (Domain Models & Schemas).
+
+Sistem genelinde kullanılan temel Pydantic v2 modelleri, doğrulamalar (invariant validations),
+orjson tabanlı hızlı serileştirme ve finansal veri standartları.
+"""
 
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+import orjson
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# =====================================================
+# Sabitler (Constants)
+# =====================================================
+DEFAULT_INITIAL_CAPITAL: float = 100_000.0
+DEFAULT_VIX_LEVEL: float = 20.0
+DEFAULT_RSI: float = 50.0
+DEFAULT_RISK_APPETITE: float = 0.5
+
+
+class BaseDomainModel(BaseModel):
+    """ALPHA BIST temel veri modeli.
+
+    Tüm domain modelleri için ortak konfigürasyon, orjson serileştirme
+    ve açıklayıcı string temsili sağlar.
+    """
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        populate_by_name=True,
+        validate_assignment=True,
+    )
+
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson ile ikili (bytes) JSON formatına serileştirir."""
+        return orjson.dumps(self.model_dump(mode="json"))
+
+    def to_orjson_str(self) -> str:
+        """Modeli orjson ile UTF-8 JSON metnine serileştirir."""
+        return self.to_orjson_bytes().decode("utf-8")
+
+    def __repr__(self) -> str:
+        """Sınıf adı ve birincil alanları içeren açıklayıcı temsil."""
+        attrs = ", ".join(f"{k}={v!r}" for k, v in list(self.__dict__.items())[:5])
+        return f"{self.__class__.__name__}({attrs})"
+
 
 # =====================================================
 # Enums
@@ -12,14 +53,16 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Direction(StrEnum):
-    """Otomatik eklendi."""
+    """Piyasa pozisyonu veya sinyal yönü (Uzun / Kısa / Nötr)."""
+
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
 
 
 class RiskLevel(StrEnum):
-    """Otomatik eklendi."""
+    """Portföy ve emir risk seviyesi derecelendirmesi."""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -27,7 +70,8 @@ class RiskLevel(StrEnum):
 
 
 class SignalStatus(StrEnum):
-    """Otomatik eklendi."""
+    """Üretilen bir al-sat sinyalinin yaşam döngüsü durumu."""
+
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
     TRIGGERED = "TRIGGERED"
@@ -35,7 +79,8 @@ class SignalStatus(StrEnum):
 
 
 class MarketRegime(StrEnum):
-    """Otomatik eklendi."""
+    """Tespit edilen makro ve mikro piyasa rejimi."""
+
     RISK_ON = "RISK-ON"
     RISK_OFF = "RISK-OFF"
     TRENDING_UP = "TRENDING-UP"
@@ -50,7 +95,8 @@ class MarketRegime(StrEnum):
 
 
 class TimeHorizon(StrEnum):
-    """Otomatik eklendi."""
+    """Tahmin ve pozisyon hedef zaman ufku."""
+
     SHORT = "1-5D"
     MEDIUM = "1-4W"
     LONG = "1-6M"
@@ -58,12 +104,15 @@ class TimeHorizon(StrEnum):
 
 
 # =====================================================
-# Market Data Models
+# Piyasa Veri Modelleri (Market Data Models)
 # =====================================================
 
 
-class MarketTick(BaseModel):
-    """P0-8: Invariant validation eklendi."""
+class MarketTick(BaseDomainModel):
+    """Anlık tekil işlem (tick) verisi.
+
+    Fiyat, hacim ve kalite metriklerini doğrular.
+    """
 
     instrument_id: int
     ticker: str
@@ -78,30 +127,34 @@ class MarketTick(BaseModel):
     @field_validator("price")
     @classmethod
     def _validate_price(cls, v: float) -> float:
-        """Otomatik eklendi."""
+        """Fiyatın kesinlikle pozitif olduğunu doğrular."""
         if v <= 0:
-            raise ValueError(f"Price must be positive, got {v}")
+            raise ValueError(f"Fiyat pozitif olmalıdır, alınan: {v}")
         return v
 
     @field_validator("volume")
     @classmethod
     def _validate_volume(cls, v: int) -> int:
-        """Otomatik eklendi."""
+        """Hacmin negatif olmadığını doğrular."""
         if v < 0:
-            raise ValueError(f"Volume must be non-negative, got {v}")
+            raise ValueError(f"Hacim negatif olamaz, alınan: {v}")
         return v
 
     @field_validator("quality")
     @classmethod
     def _validate_quality(cls, v: float) -> float:
-        """Otomatik eklendi."""
-        if not 0 <= v <= 1:
-            raise ValueError(f"Quality must be in [0,1], got {v}")
+        """Veri kalite skorunun [0, 1] aralığında olduğunu doğrular."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Kalite skoru [0,1] aralığında olmalıdır, alınan: {v}")
         return v
 
 
-class OHLCV(BaseModel):
-    """Otomatik eklendi."""
+class OHLCV(BaseDomainModel):
+    """Bar (mum) verisi.
+
+    Açılış, yüksek, düşük, kapanış fiyatlarının tutarlılığını ve hacmi doğrular.
+    """
+
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -112,9 +165,37 @@ class OHLCV(BaseModel):
     volume: int
     vwap: float | None = None
 
+    @field_validator("open", "high", "low", "close")
+    @classmethod
+    def _validate_positive_prices(cls, v: float) -> float:
+        """OHLC fiyatlarının pozitif olduğunu doğrular."""
+        if v <= 0:
+            raise ValueError(f"OHLC fiyatı pozitif olmalıdır, alınan: {v}")
+        return v
 
-class OrderBookSnapshot(BaseModel):
-    """Otomatik eklendi."""
+    @field_validator("volume")
+    @classmethod
+    def _validate_volume(cls, v: int) -> int:
+        """Hacmin sıfır veya pozitif olduğunu doğrular."""
+        if v < 0:
+            raise ValueError(f"Hacim negatif olamaz, alınan: {v}")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_bar_consistency(self) -> "OHLCV":
+        """Yüksek ve düşük fiyatların açılış ve kapanışla mantıksal uyumunu denetler."""
+        if self.high < self.low:
+            raise ValueError(f"En yüksek fiyat ({self.high}) en düşük fiyattan ({self.low}) küçük olamaz.")
+        if self.high < max(self.open, self.close):
+            raise ValueError(f"En yüksek fiyat ({self.high}) açılış veya kapanıştan düşük olamaz.")
+        if self.low > min(self.open, self.close):
+            raise ValueError(f"En düşük fiyat ({self.low}) açılış veya kapanıştan yüksek olamaz.")
+        return self
+
+
+class OrderBookSnapshot(BaseDomainModel):
+    """Derinlik ve emir defteri (order book) anlık görüntüsü."""
+
     instrument_id: int
     timestamp: datetime
     bid_prices: list[float]
@@ -124,80 +205,92 @@ class OrderBookSnapshot(BaseModel):
     spread: float
     mid_price: float
 
+    @model_validator(mode="after")
+    def _validate_book(self) -> "OrderBookSnapshot":
+        """Alış/satış derinlik dizilerinin boyutlarını ve spread tutarlılığını doğrular."""
+        if len(self.bid_prices) != len(self.bid_volumes):
+            raise ValueError("Alış fiyatları ve hacimleri liste uzunluğu eşleşmelidir.")
+        if len(self.ask_prices) != len(self.ask_volumes):
+            raise ValueError("Satış fiyatları ve hacimleri liste uzunluğu eşleşmelidir.")
+        if self.spread < 0:
+            raise ValueError(f"Spread negatif olamaz, alınan: {self.spread}")
+        if self.mid_price <= 0:
+            raise ValueError(f"Orta fiyat (mid_price) pozitif olmalıdır, alınan: {self.mid_price}")
+        return self
+
 
 # =====================================================
-# Asset State Models
+# Varlık ve Piyasa Durum Modelleri (State Models)
 # =====================================================
 
 
-class AssetState(BaseModel):
-    """Complete state of a single asset.
+class AssetState(BaseDomainModel):
+    """Tek bir hisse senedinin çok boyutlu anlık analitik durumu.
 
-    P0-8: Invariant validation eklendi.
-    Missing != 0 != NaN != Invalid ayrımı korunmalı.
+    Fiyat, hacim, momentum, volatilite, likidite, temel ve ML skorlarını birleştirir.
     """
 
     instrument_id: int
     ticker: str
     timestamp: datetime
 
-    # Price
+    # Fiyat Metrikleri
     price: float = 0.0
     price_change_pct: float = 0.0
     price_change_1d: float = 0.0
     price_change_5d: float = 0.0
     price_change_20d: float = 0.0
 
-    # Volume
+    # Hacim Metrikleri
     volume: int = 0
     volume_avg_20d: int = 0
     volume_zscore: float = 0.0
     volume_ratio: float = 0.0
     unusual_volume: bool = False
 
-    # Momentum
+    # Momentum Metrikleri
     momentum_5d: float = 0.0
     momentum_20d: float = 0.0
     momentum_60d: float = 0.0
     rate_of_change: float = 0.0
 
-    # Volatility
+    # Volatilite Metrikleri
     atr_14: float = 0.0
     realized_vol_5d: float = 0.0
     realized_vol_20d: float = 0.0
     volatility_regime: str = "NORMAL"
     volatility_zscore: float = 0.0
 
-    # Technical
-    rsi_14: float = 50.0
+    # Teknik İndikatörler
+    rsi_14: float = DEFAULT_RSI
     macd_signal: float = 0.0
     adx: float = 0.0
     trend_strength: float = 0.0
 
-    # Relative
+    # Göreceli Güç ve Sıralama
     relative_strength_vs_index: float = 0.0
     relative_strength_vs_sector: float = 0.0
     sector_rank: int = 0
     cross_sectional_rank: int = 0
 
-    # Liquidity
+    # Likidite Metrikleri
     bid_ask_spread: float = 0.0
     amihud_illiquidity: float = 0.0
     turnover_rate: float = 0.0
 
-    # Fundamental
+    # Temel Veriler
     pe_ratio: float | None = None
     pb_ratio: float | None = None
     dividend_yield: float | None = None
 
-    # Event/Sentiment
+    # Olay ve Duyarlılık Metrikleri
     kap_sentiment: float = 0.0
     news_sentiment: float = 0.0
     social_sentiment: float = 0.0
     event_impact: float = 0.0
     days_since_last_event: int = 0
 
-    # ML Scores
+    # Makine Öğrenimi Skorları
     anomaly_score: float = 0.0
     spec_score: float = 0.0
     ml_momentum_score: float = 0.0
@@ -207,18 +300,18 @@ class AssetState(BaseModel):
     ml_return_60d: float = 0.0
     ml_risk_score: float = 0.0
 
-    # Composite
+    # Birleşik Karar Metrikleri
     edge_score: float = 0.0
     confidence: float = 0.0
     risk_level: str = "MEDIUM"
 
-    # Regime
+    # Piyasa Rejimi Uyumu
     regime: str = "NORMAL"
     regime_confidence: float = 0.0
 
 
-class MarketState(BaseModel):
-    """Overall market state."""
+class MarketState(BaseDomainModel):
+    """Piyasanın genel genişliği ve makro rejim durumu."""
 
     timestamp: datetime
     regime: MarketRegime = MarketRegime.RANGE
@@ -229,29 +322,25 @@ class MarketState(BaseModel):
     correlation: float = 0.0
     volatility_regime: str = "NORMAL"
     liquidity_level: str = "NORMAL"
-    risk_appetite: float = 0.5
+    risk_appetite: float = DEFAULT_RISK_APPETITE
     advancing_count: int = 0
     declining_count: int = 0
     unchanged_count: int = 0
 
 
-class WorldState(BaseModel):
-    """Global macro state.
-
-    P0-8: VIX ayrı normalize edilmeli (0-1 state'lerle karışmamalı).
-    0-1 arası state'ler invariant validation ile korunmalı.
-    """
+class WorldState(BaseDomainModel):
+    """Küresel makroekonomik risk ve emtia göstergeleri."""
 
     timestamp: datetime
     geopolitical_risk: float = 0.0
-    global_risk_appetite: float = 0.5
+    global_risk_appetite: float = DEFAULT_RISK_APPETITE
     usd_strength: float = 0.5
     us_rate_pressure: float = 0.5
     commodity_pressure: float = 0.5
     oil_pressure: float = 0.5
     turkey_macro_risk: float = 0.5
-    vix_level: float = 20.0  # RAW VIX (0-100+), 0-1 ile karıştırılmamalı
-    vix_normalized: float = 0.5  # 0-1 arası normalize VIX
+    vix_level: float = DEFAULT_VIX_LEVEL
+    vix_normalized: float = 0.5
     news_shock: float = 0.0
     emerging_market_risk: float = 0.5
 
@@ -267,21 +356,20 @@ class WorldState(BaseModel):
         "emerging_market_risk",
     )
     @classmethod
-    def _validate_01_range(cls, v: float, info) -> float:
-        """Otomatik eklendi."""
-        if not 0 <= v <= 1:
-            # Clamp to [0,1] instead of raising (for robustness)
+    def _validate_01_range(cls, v: float) -> float:
+        """[0, 1] sınırları dışındaki değerleri güvenli aralığa sabitler."""
+        if not 0.0 <= v <= 1.0:
             return max(0.0, min(1.0, v))
         return v
 
 
 # =====================================================
-# Signal Models
+# Sinyal Modelleri (Signal Models)
 # =====================================================
 
 
-class EdgeDecomposition(BaseModel):
-    """Breakdown of why a signal was generated."""
+class EdgeDecomposition(BaseDomainModel):
+    """Üretilen sinyalin alfa bileşenlerinin ayrıntılı dökümü."""
 
     flow_anomaly: float = 0.0
     relative_strength: float = 0.0
@@ -294,13 +382,8 @@ class EdgeDecomposition(BaseModel):
     total: float = 0.0
 
 
-class Signal(BaseModel):
-    """Trading signal.
-
-    P0-8: Invariant validation eklendi.
-    - score, confidence ∈ [0,1] aralığında olmalı
-    - Timestamp timezone-aware
-    """
+class Signal(BaseDomainModel):
+    """Strateji ve modeller tarafından üretilen al-sat işlem sinyali."""
 
     id: int | None = None
     instrument_id: int
@@ -324,27 +407,36 @@ class Signal(BaseModel):
     @field_validator("confidence")
     @classmethod
     def _validate_confidence(cls, v: float) -> float:
-        """Otomatik eklendi."""
-        if not 0 <= v <= 1:
-            raise ValueError(f"Confidence must be in [0,1], got {v}")
+        """Güven skorunun [0, 1] aralığında olduğunu doğrular."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Güven skoru [0,1] aralığında olmalıdır, alınan: {v}")
         return v
 
     @field_validator("score")
     @classmethod
     def _validate_score(cls, v: float) -> float:
-        """Otomatik eklendi."""
-        if not 0 <= v <= 100:
-            raise ValueError(f"Score must be in [0,100], got {v}")
+        """Sinyal puanının [0, 100] aralığında olduğunu doğrular."""
+        if not 0.0 <= v <= 100.0:
+            raise ValueError(f"Sinyal puanı [0,100] aralığında olmalıdır, alınan: {v}")
+        return v
+
+    @field_validator("expected_volatility_pct")
+    @classmethod
+    def _validate_volatility(cls, v: float) -> float:
+        """Beklenen volatilitenin negatif olamayacağını doğrular."""
+        if v < 0:
+            raise ValueError(f"Beklenen volatilite negatif olamaz, alınan: {v}")
         return v
 
 
 # =====================================================
-# Portfolio Models
+# Portföy Modelleri (Portfolio Models)
 # =====================================================
 
 
-class Position(BaseModel):
-    """Otomatik eklendi."""
+class Position(BaseDomainModel):
+    """Portföydeki tekil bir hisse senedi pozisyonu."""
+
     instrument_id: int
     ticker: str
     quantity: int
@@ -356,14 +448,31 @@ class Position(BaseModel):
     weight_pct: float = 0.0
     entry_date: datetime | None = None
 
+    @field_validator("avg_cost")
+    @classmethod
+    def _validate_avg_cost(cls, v: float) -> float:
+        """Ortalama maliyetin negatif olmadığını doğrular."""
+        if v < 0:
+            raise ValueError(f"Ortalama maliyet negatif olamaz, alınan: {v}")
+        return v
 
-class Portfolio(BaseModel):
-    """Otomatik eklendi."""
+    @field_validator("quantity")
+    @classmethod
+    def _validate_quantity(cls, v: int) -> int:
+        """Pozisyon adedinin negatif olmadığını doğrular."""
+        if v < 0:
+            raise ValueError(f"Pozisyon adedi negatif olamaz, alınan: {v}")
+        return v
+
+
+class Portfolio(BaseDomainModel):
+    """Portföyün genel varlık, nakit ve getiri durumu."""
+
     id: int | None = None
     name: str
-    initial_capital: float = 100000
-    current_capital: float = 100000
-    cash_balance: float = 100000
+    initial_capital: float = DEFAULT_INITIAL_CAPITAL
+    current_capital: float = DEFAULT_INITIAL_CAPITAL
+    cash_balance: float = DEFAULT_INITIAL_CAPITAL
     invested_value: float = 0.0
     total_pnl: float = 0.0
     total_return_pct: float = 0.0
@@ -372,12 +481,13 @@ class Portfolio(BaseModel):
 
 
 # =====================================================
-# Prediction & Outcome Models
+# Tahmin ve Sonuç Modelleri (Prediction & Outcome)
 # =====================================================
 
 
-class Prediction(BaseModel):
-    """Otomatik eklendi."""
+class Prediction(BaseDomainModel):
+    """ML modelleri tarafından üretilen ileriye dönük tahmin kaydı."""
+
     id: int | None = None
     model_version_id: int
     instrument_id: int
@@ -391,9 +501,18 @@ class Prediction(BaseModel):
     confidence: float
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    @field_validator("confidence", "probability_positive")
+    @classmethod
+    def _validate_probabilities(cls, v: float) -> float:
+        """Olasılık ve güven değerlerinin [0, 1] aralığında olduğunu doğrular."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"Olasılık/güven değeri [0,1] aralığında olmalıdır, alınan: {v}")
+        return v
 
-class Outcome(BaseModel):
-    """Otomatik eklendi."""
+
+class Outcome(BaseDomainModel):
+    """Gerçekleşen getiri ve tahmin başarımı karşılaştırması."""
+
     prediction_id: int
     actual_return_pct: float
     actual_direction: Direction
@@ -404,24 +523,26 @@ class Outcome(BaseModel):
 
 
 # =====================================================
-# Simulation Models
+# Simülasyon ve Stres Testi Modelleri
 # =====================================================
 
 
-class ScenarioResult(BaseModel):
-    """Otomatik eklendi."""
+class ScenarioResult(BaseDomainModel):
+    """Belirli bir makro/mikro stres senaryosunun simülasyon sonucu."""
+
     scenario_name: str
     market_change_pct: float
     portfolio_impact: dict[str, Any]
     probability: float
 
 
-class SimulationResult(BaseModel):
-    """Otomatik eklendi."""
+class SimulationResult(BaseDomainModel):
+    """Monte Carlo veya tarihsel senaryo simülasyonu genel raporu."""
+
     id: int | None = None
     name: str
     simulation_type: str
-    parameters: dict[str, Any]
+    parameters: dict[str, Any] = Field(default_factory=dict)
     scenarios: list[ScenarioResult] = Field(default_factory=list)
     expected_return: float = 0.0
     expected_drawdown: float = 0.0
@@ -431,12 +552,13 @@ class SimulationResult(BaseModel):
 
 
 # =====================================================
-# Alert Models
+# Uyarı Modelleri (Alert Models)
 # =====================================================
 
 
-class Alert(BaseModel):
-    """Otomatik eklendi."""
+class Alert(BaseDomainModel):
+    """Sistem, risk veya anomali uyarı bildirimi."""
+
     id: int | None = None
     alert_type: str
     severity: RiskLevel
@@ -446,3 +568,32 @@ class Alert(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     acknowledged: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+__all__ = [
+    "DEFAULT_INITIAL_CAPITAL",
+    "DEFAULT_RISK_APPETITE",
+    "DEFAULT_RSI",
+    "DEFAULT_VIX_LEVEL",
+    "Alert",
+    "AssetState",
+    "BaseDomainModel",
+    "Direction",
+    "EdgeDecomposition",
+    "MarketRegime",
+    "MarketState",
+    "MarketTick",
+    "OHLCV",
+    "OrderBookSnapshot",
+    "Outcome",
+    "Portfolio",
+    "Position",
+    "Prediction",
+    "RiskLevel",
+    "ScenarioResult",
+    "Signal",
+    "SignalStatus",
+    "SimulationResult",
+    "TimeHorizon",
+    "WorldState",
+]

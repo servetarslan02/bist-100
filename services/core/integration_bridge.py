@@ -174,6 +174,46 @@ class CircuitBreaker:
                 "recovery_timeout_seconds": self.recovery_timeout_seconds,
             }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Devre kesici durumunu JSON bayt dizisine dönüştürür."""
+        return orjson.dumps(self.to_dict())
+
+    def to_json(self) -> str:
+        """Devre kesici durumunu UTF-8 JSON metnine dönüştürür."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CircuitBreaker:
+        """Sözlükten CircuitBreaker nesnesi üretir.
+
+        Args:
+            data: Devre kesici alanlarını içeren sözlük.
+
+        Returns:
+            CircuitBreaker: Oluşturulan devre kesici nesnesi.
+        """
+        cb = cls(
+            name=str(data["name"]),
+            failure_threshold=int(data.get("threshold", DEFAULT_CIRCUIT_FAILURE_THRESHOLD)),
+            recovery_timeout_seconds=float(data.get("recovery_timeout_seconds", DEFAULT_CIRCUIT_RECOVERY_TIMEOUT_SECONDS)),
+        )
+        cb._state = CircuitState(data.get("state", CircuitState.CLOSED.value))
+        cb._failure_count = int(data.get("failure_count", 0))
+        return cb
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> CircuitBreaker:
+        """JSON metni veya bayt dizisinden CircuitBreaker üretir.
+
+        Args:
+            json_str_or_bytes: JSON verisi.
+
+        Returns:
+            CircuitBreaker: Üretilen nesne.
+        """
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
+
     def __repr__(self) -> str:
         """Devre kesici metin gösterimi."""
         with self._lock:
@@ -229,6 +269,31 @@ class ModuleMetrics:
         """Metrikleri JSON bayt dizisine dönüştürür."""
         return orjson.dumps(self.to_dict())
 
+    def to_json(self) -> str:
+        """Metrikleri UTF-8 JSON metnine dönüştürür."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ModuleMetrics:
+        """Sözlükten ModuleMetrics nesnesi üretir."""
+        m = cls(
+            name=str(data["name"]),
+            total_calls=int(data.get("total_calls", 0)),
+            successful_calls=int(data.get("successful_calls", 0)),
+            failed_calls=int(data.get("failed_calls", 0)),
+            skipped_calls=int(data.get("skipped_calls", 0)),
+            total_latency_ms=float(data.get("avg_latency_ms", 0.0)) * int(data.get("successful_calls", 1)),
+            last_call_time=float(data.get("last_call_time", 0.0)),
+            last_error=str(data.get("last_error", "")),
+        )
+        return m
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> ModuleMetrics:
+        """JSON metni veya bayt dizisinden ModuleMetrics üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
+
     def __repr__(self) -> str:
         """Metrik metin gösterimi."""
         with self._lock:
@@ -264,6 +329,28 @@ class EnhancementResult:
     def to_orjson_bytes(self) -> bytes:
         """Sonucu JSON bayt dizisine dönüştürür."""
         return orjson.dumps(self.to_dict())
+
+    def to_json(self) -> str:
+        """Sonucu UTF-8 JSON metnine dönüştürür."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EnhancementResult:
+        """Sözlükten EnhancementResult nesnesi üretir."""
+        return cls(
+            module=str(data["module"]),
+            success=bool(data["success"]),
+            data=data.get("data"),
+            error=data.get("error"),
+            latency_ms=float(data.get("latency_ms", 0.0)),
+            skipped=bool(data.get("skipped", False)),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> EnhancementResult:
+        """JSON metni veya bayt dizisinden EnhancementResult üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Zenginleştirme sonucu metin gösterimi."""
@@ -315,6 +402,34 @@ class PipelineEnhancementReport:
     def to_orjson_bytes(self) -> bytes:
         """Raporu JSON bayt dizisine dönüştürür."""
         return orjson.dumps(self.to_dict())
+
+    def to_json(self) -> str:
+        """Raporu UTF-8 JSON metnine dönüştürür."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PipelineEnhancementReport:
+        """Sözlükten PipelineEnhancementReport nesnesi üretir."""
+        enhancements = [
+            EnhancementResult.from_dict(e) if isinstance(e, dict) else e
+            for e in data.get("modules", [])
+        ]
+        return cls(
+            ticker=str(data["ticker"]).upper(),
+            correlation_id=str(data["correlation_id"]),
+            enhancements=enhancements,
+            total_latency_ms=float(data.get("total_latency_ms", 0.0)),
+            success_count=int(data.get("success_count", 0)),
+            failure_count=int(data.get("failure_count", 0)),
+            skip_count=int(data.get("skip_count", 0)),
+            created_at=str(data.get("created_at", datetime.now(UTC).isoformat())),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> PipelineEnhancementReport:
+        """JSON metni veya bayt dizisinden PipelineEnhancementReport üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Rapor metin gösterimi."""
@@ -371,6 +486,39 @@ class BridgeConfig:
             "circuit_recovery_timeout": self.circuit_recovery_timeout,
             "log_slow_calls_ms": self.log_slow_calls_ms,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Konfigürasyonu JSON bayt dizisine dönüştürür."""
+        return orjson.dumps(self.to_dict())
+
+    def to_json(self) -> str:
+        """Konfigürasyonu UTF-8 JSON metnine dönüştürür."""
+        return orjson.dumps(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> BridgeConfig:
+        """Sözlükten BridgeConfig nesnesi üretir."""
+        return cls(
+            enable_feature_stability=bool(data.get("enable_feature_stability", True)),
+            enable_calibration_enhanced=bool(data.get("enable_calibration_enhanced", True)),
+            enable_regime_limits=bool(data.get("enable_regime_limits", True)),
+            enable_portfolio_enhancements=bool(data.get("enable_portfolio_enhancements", True)),
+            enable_backtest_enhancements=bool(data.get("enable_backtest_enhancements", True)),
+            enable_event_enhancements=bool(data.get("enable_event_enhancements", True)),
+            enable_degradation_monitor=bool(data.get("enable_degradation_monitor", True)),
+            enable_feature_lineage=bool(data.get("enable_feature_lineage", True)),
+            enable_feature_versioning=bool(data.get("enable_feature_versioning", True)),
+            enable_ensemble_diversity=bool(data.get("enable_ensemble_diversity", True)),
+            circuit_failure_threshold=int(data.get("circuit_failure_threshold", DEFAULT_CIRCUIT_FAILURE_THRESHOLD)),
+            circuit_recovery_timeout=float(data.get("circuit_recovery_timeout", DEFAULT_CIRCUIT_RECOVERY_TIMEOUT_SECONDS)),
+            log_slow_calls_ms=float(data.get("log_slow_calls_ms", DEFAULT_LOG_SLOW_CALLS_MS)),
+        )
+
+    @classmethod
+    def from_json(cls, json_str_or_bytes: str | bytes) -> BridgeConfig:
+        """JSON metni veya bayt dizisinden BridgeConfig üretir."""
+        data = orjson.loads(json_str_or_bytes)
+        return cls.from_dict(data)
 
     def __repr__(self) -> str:
         """Konfigürasyon metin gösterimi."""
@@ -1466,6 +1614,8 @@ class IntegrationBridge:
         """
         target_path = Path(db_path) if db_path is not None else DEFAULT_BRIDGE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         df = self.export_metrics_to_polars()
         if len(df) == 0:
@@ -1500,6 +1650,41 @@ class IntegrationBridge:
             )
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    def query_metrics_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB `bist_integration_bridge_metrics` tablosundan modül metriklerini Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: Opsiyonel DuckDB veritabanı dosya yolu.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Metrik tablosu sonucu.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_BRIDGE_AUDIT_DB_PATH
+        if not target_path.exists():
+            return self.export_metrics_to_polars().head(0)
+        if target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
+            return self.export_metrics_to_polars().head(0)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_integration_bridge_metrics'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return self.export_metrics_to_polars().head(0)
+            return con.execute(
+                "SELECT * FROM bist_integration_bridge_metrics ORDER BY recorded_at DESC LIMIT ?",
+                [limit],
+            ).pl()
         finally:
             con.close()
 
@@ -1551,6 +1736,8 @@ class IntegrationBridge:
         """
         target_path = Path(db_path) if db_path is not None else DEFAULT_BRIDGE_AUDIT_DB_PATH
         target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
 
         df = self.export_reports_to_polars()
         if len(df) == 0:
@@ -1581,6 +1768,41 @@ class IntegrationBridge:
             )
             con.commit()
             return len(df)
+        finally:
+            con.close()
+
+    def query_reports_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB `bist_integration_bridge_reports` tablosundan pipeline raporlarını Polars DataFrame olarak sorgular.
+
+        Args:
+            db_path: Opsiyonel DuckDB veritabanı dosya yolu.
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Rapor tablosu sonucu.
+        """
+        target_path = Path(db_path) if db_path is not None else DEFAULT_BRIDGE_AUDIT_DB_PATH
+        if not target_path.exists():
+            return self.export_reports_to_polars().head(0)
+        if target_path.stat().st_size == 0:
+            target_path.unlink(missing_ok=True)
+            return self.export_reports_to_polars().head(0)
+
+        con = duckdb.connect(str(target_path), read_only=True)
+        try:
+            tbl_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_integration_bridge_reports'"
+            ).fetchone()
+            if not tbl_check or tbl_check[0] == 0:
+                return self.export_reports_to_polars().head(0)
+            return con.execute(
+                "SELECT * FROM bist_integration_bridge_reports ORDER BY created_at DESC LIMIT ?",
+                [limit],
+            ).pl()
         finally:
             con.close()
 
@@ -1743,6 +1965,26 @@ def export_bridge_reports_to_duckdb(
     return inst.export_reports_to_duckdb(db_path=db_path)
 
 
+def query_bridge_metrics_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    bridge: IntegrationBridge | None = None,
+) -> pl.DataFrame:
+    """DuckDB tablosundan modül metriklerini Polars DataFrame olarak sorgular."""
+    inst = bridge if bridge is not None else integration_bridge
+    return inst.query_metrics_duckdb(db_path=db_path, limit=limit)
+
+
+def query_bridge_reports_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 100,
+    bridge: IntegrationBridge | None = None,
+) -> pl.DataFrame:
+    """DuckDB tablosundan pipeline rapor geçmişini Polars DataFrame olarak sorgular."""
+    inst = bridge if bridge is not None else integration_bridge
+    return inst.query_reports_duckdb(db_path=db_path, limit=limit)
+
+
 def get_bridge_report_history(limit: int = 100, bridge: IntegrationBridge | None = None) -> list[dict[str, Any]]:
     """Son üretilen entegrasyon raporlarını döndürür."""
     inst = bridge if bridge is not None else integration_bridge
@@ -1784,6 +2026,8 @@ __all__: list[str] = [
     "get_bridge_report_history",
     "get_integration_bridge",
     "integration_bridge",
+    "query_bridge_metrics_duckdb",
+    "query_bridge_reports_duckdb",
     "record_calibration_data",
     "record_model_outcome",
 ]

@@ -21,7 +21,7 @@ import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import duckdb
 import orjson
@@ -34,20 +34,31 @@ from services.core.otel import otel_trace
 logger = structlog.get_logger(__name__)
 
 # ==============================================================================
-# Standart Mevzuat ve Yapılandırma Sabitleri
+# Standart Mevzuat ve Yapılandırma Sabitleri (GEMINI.md Kural 4)
 # ==============================================================================
 
-DEFAULT_BROKER_RATE: float = 0.0003  # On binde 3 (%0.03)
-DEFAULT_BIST_FEE_RATE: float = 0.000056  # %0.0056 (BIST Pay Piyasası Borsa Payı)
-DEFAULT_VIOP_FEE_RATE: float = 0.00004  # %0.0040 (BIST VİOP Borsa Payı)
-DEFAULT_MKK_FEE_RATE: float = 0.0000109  # %0.00109 (MKK Tescil ve Saklama Payı)
-DEFAULT_BSMV_RATE: float = 0.05  # %5.0 (Komisyon üzerinden BSMV)
-DEFAULT_MIN_COMMISSION: float = 1.0  # Minimum 1.00 TL işlem komisyonu
+DEFAULT_BROKER_RATE: Final[float] = 0.0003  # On binde 3 (%0.03)
+DEFAULT_BIST_FEE_RATE: Final[float] = 0.000056  # %0.0056 (BIST Pay Piyasası Borsa Payı)
+DEFAULT_VIOP_FEE_RATE: Final[float] = 0.00004  # %0.0040 (BIST VİOP Borsa Payı)
+DEFAULT_MKK_FEE_RATE: Final[float] = 0.0000109  # %0.00109 (MKK Tescil ve Saklama Payı)
+DEFAULT_BSMV_RATE: Final[float] = 0.05  # %5.0 (Komisyon üzerinden BSMV)
+DEFAULT_MIN_COMMISSION: Final[float] = 1.0  # Minimum 1.00 TL işlem komisyonu
 
-DEFAULT_FEE_DB_PATH: str = "data/fee_audit.duckdb"
+DEFAULT_FEE_DB_PATH: Final[str] = "data/fee_audit.duckdb"
 
-VALID_SIDES: frozenset[str] = frozenset({"BUY", "SELL", "UNKNOWN"})
-VALID_INSTRUMENT_TYPES: frozenset[str] = frozenset({"equity", "viop", "warrant"})
+VALID_SIDES: Final[frozenset[str]] = frozenset({"BUY", "SELL", "UNKNOWN"})
+VALID_INSTRUMENT_TYPES: Final[frozenset[str]] = frozenset({"equity", "viop", "warrant"})
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Float değerleri güvenle dönüştürür; None/NaN/Inf veya str hatalarında default döner."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) or math.isinf(f) else f
+    except (ValueError, TypeError):
+        return default
 
 
 # ==============================================================================
@@ -98,7 +109,7 @@ class FeeBreakdown:
                 object.__setattr__(self, "net_amount", round(self.amount, 4))
 
     def to_dict(self) -> dict[str, Any]:
-        """Sözlük formatına dönüştür."""
+        """Sözlük formatına dönüştürür."""
         return {
             "amount": round(self.amount, 2),
             "broker_fee": round(self.broker_fee, 4),
@@ -113,8 +124,8 @@ class FeeBreakdown:
         }
 
     def to_orjson_bytes(self) -> bytes:
-        """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        """Yüksek hızlı orjson bayt dizisi serileştirmesi (GEMINI.md Kural 5)."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -148,7 +159,7 @@ class BreakEvenAnalysis:
     estimated_exit_fee: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Sözlük formatına dönüştür."""
+        """Sözlük formatına dönüştürür."""
         return {
             "entry_price": round(self.entry_price, 4),
             "quantity": self.quantity,
@@ -160,8 +171,8 @@ class BreakEvenAnalysis:
         }
 
     def to_orjson_bytes(self) -> bytes:
-        """Yüksek hızlı orjson bayt dizisi serileştirmesi."""
-        return orjson.dumps(self.to_dict())
+        """Yüksek hızlı orjson bayt dizisi serileştirmesi (GEMINI.md Kural 5)."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -279,8 +290,9 @@ class FeeCalculator:
         Returns:
             FeeBreakdown: Tüm maliyet bileşenlerini içeren detaylı döküm.
         """
+        amt = _safe_float(amount, 0.0)
         # Sınır ve sayısal doğrulama (Fail-Closed)
-        if math.isnan(amount) or math.isinf(amount) or amount <= 0.0:
+        if amt <= 0.0:
             return FeeBreakdown(
                 amount=0.0,
                 broker_fee=0.0,
@@ -303,7 +315,7 @@ class FeeCalculator:
             side_norm = "UNKNOWN"
 
         with self._lock:
-            broker_rate = self._get_effective_broker_rate(amount)
+            broker_rate = self._get_effective_broker_rate(amt)
             min_comm = self.min_commission
             bsmv_rate = self.bsmv_rate
 
@@ -315,32 +327,32 @@ class FeeCalculator:
                 mkk_rate = self.mkk_fee_rate
 
         # 1. Broker Komisyonu (Minimum tutar guard'ı ile)
-        raw_broker_fee = amount * broker_rate
+        raw_broker_fee = amt * broker_rate
         broker_fee = round(max(raw_broker_fee, min_comm), 4)
 
         # 2. Borsa İstanbul Borsa Payı
-        bist_fee = round(amount * bist_rate, 4)
+        bist_fee = round(amt * bist_rate, 4)
 
         # 3. MKK Tescil ve Saklama Payı
-        mkk_fee = round(amount * mkk_rate, 4)
+        mkk_fee = round(amt * mkk_rate, 4)
 
         # 4. BSMV (6802 sayılı Kanun gereği yalnızca aracı kurum komisyonu matrahtır)
         bsmv = round(broker_fee * bsmv_rate, 4)
 
         # 5. Toplam Maliyet ve Efektif Oran
         total = round(broker_fee + bist_fee + mkk_fee + bsmv, 4)
-        effective_rate = round((total / amount) * 100.0, 6) if amount > 0.0 else 0.0
+        effective_rate = round((total / amt) * 100.0, 6) if amt > 0.0 else 0.0
 
         # 6. Net Nakit Akışı
         if side_norm == "BUY":
-            net_amount = round(amount + total, 4)
+            net_amount = round(amt + total, 4)
         elif side_norm == "SELL":
-            net_amount = max(0.0, round(amount - total, 4))
+            net_amount = max(0.0, round(amt - total, 4))
         else:
-            net_amount = round(amount, 4)
+            net_amount = round(amt, 4)
 
         return FeeBreakdown(
-            amount=amount,
+            amount=amt,
             broker_fee=broker_fee,
             bist_fee=bist_fee,
             mkk_fee=mkk_fee,
@@ -396,21 +408,17 @@ class FeeCalculator:
         Raises:
             ValueError: Fiyat veya adet sıfır veya negatifse fırlatılır.
         """
-        if (
-            math.isnan(entry_price)
-            or math.isinf(entry_price)
-            or entry_price <= 0.0
-            or math.isnan(quantity)
-            or math.isinf(quantity)
-            or quantity <= 0.0
-        ):
+        e_price = _safe_float(entry_price, 0.0)
+        qty = _safe_float(quantity, 0.0)
+
+        if e_price <= 0.0 or qty <= 0.0:
             raise ValueError(
                 f"Geçersiz giriş parametreleri: entry_price={entry_price}, quantity={quantity}. "
                 "Pozitif ve sonlu değerler girilmelidir."
             )
 
         # 1. Alış maliyet dökümü
-        buy_amount = entry_price * quantity
+        buy_amount = e_price * qty
         entry_fee = self.calculate(amount=buy_amount, side="BUY", instrument_type=instrument_type)
         total_invested = entry_fee.net_amount  # buy_amount + entry_fee.total
 
@@ -430,19 +438,27 @@ class FeeCalculator:
         # Durum A: Oransal komisyon bölgesi (A_sell * broker_rate >= min_comm)
         # Fee_rate_linear = broker_rate * (1 + bsmv_rate) + bist_rate + mkk_rate
         linear_rate = (broker_rate * (1.0 + bsmv_rate)) + bist_rate + mkk_rate
-        a_sell_candidate = total_invested / (1.0 - linear_rate)
+        denominator_a = 1.0 - linear_rate
+        if denominator_a <= 0.0:
+            raise ValueError(f"Aşırı yüksek komisyon/vergi oranı nedeniyle başa baş hesaplanamaz: {linear_rate:.4f}")
+
+        a_sell_candidate = total_invested / denominator_a
 
         if a_sell_candidate * broker_rate >= min_comm:
             break_even_amount = a_sell_candidate
         else:
             # Durum B: Minimum komisyon bölgesi (broker_fee = min_comm)
             # A_sell - [min_comm * (1 + bsmv_rate) + A_sell * (bist_rate + mkk_rate)] = total_invested
-            # A_sell * (1 - bist_rate - mkk_rate) = total_invested + min_comm * (1 + bsmv_rate)
             fixed_fee_part = min_comm * (1.0 + bsmv_rate)
-            break_even_amount = (total_invested + fixed_fee_part) / (1.0 - bist_rate - mkk_rate)
+            denominator_b = 1.0 - bist_rate - mkk_rate
+            if denominator_b <= 0.0:
+                raise ValueError(
+                    f"Aşırı yüksek borsa/MKK oranı nedeniyle başa baş hesaplanamaz: {bist_rate + mkk_rate:.4f}"
+                )
+            break_even_amount = (total_invested + fixed_fee_part) / denominator_b
 
-        raw_break_even_price = break_even_amount / quantity
-        break_even_return_pct = ((raw_break_even_price - entry_price) / entry_price) * 100.0
+        raw_break_even_price = break_even_amount / qty
+        break_even_return_pct = ((raw_break_even_price - e_price) / e_price) * 100.0
 
         # 3. BIST Fiyat Kademe Uyumu
         if round_to_tick and instrument_type == "equity":
@@ -453,14 +469,14 @@ class FeeCalculator:
 
         # 4. Başa baş fiyattaki tahmini çıkış maliyeti
         exit_fee = self.calculate(
-            amount=tick_aligned_price * quantity,
+            amount=tick_aligned_price * qty,
             side="SELL",
             instrument_type=instrument_type,
         )
 
         return BreakEvenAnalysis(
-            entry_price=entry_price,
-            quantity=quantity,
+            entry_price=e_price,
+            quantity=qty,
             entry_fee=entry_fee,
             break_even_price=raw_break_even_price,
             break_even_return_pct=break_even_return_pct,
@@ -493,7 +509,7 @@ class FeeCalculator:
         side_col: str | None = None,
         instrument_col: str | None = None,
     ) -> pl.DataFrame:
-        """Polars DataFrame üzerinde vektörize komisyon ve net tutar hesapla.
+        """Polars DataFrame üzerinde vektörize komisyon ve net tutar hesapla (GEMINI.md Kural 2).
 
         Args:
             df: İşlem verilerini içeren Polars DataFrame.
@@ -514,13 +530,13 @@ class FeeCalculator:
             mkk_rate = self.mkk_fee_rate
             bsmv_rate = self.bsmv_rate
 
-        # Vektörize Polars ifadeleri
+        # Vektörize Polars ifadeleri (Null ve NaN güvenli)
         amt = pl.col(amount_col)
 
-        # Broker komisyonu (minimum komisyon guard'ı ile)
+        # Broker komisyonu (null/NaN/negatif guard'ı ile)
         raw_broker = amt * broker_rate
         broker_fee_expr = (
-            pl.when(amt <= 0.0)
+            pl.when(amt.is_null() | amt.is_nan() | (amt <= 0.0))
             .then(0.0)
             .when(raw_broker < min_comm)
             .then(min_comm)
@@ -528,20 +544,33 @@ class FeeCalculator:
             .alias("broker_fee")
         )
 
-        bist_fee_expr = pl.when(amt <= 0.0).then(0.0).otherwise(amt * bist_rate).alias("bist_fee")
-        mkk_fee_expr = pl.when(amt <= 0.0).then(0.0).otherwise(amt * mkk_rate).alias("mkk_fee")
+        bist_fee_expr = (
+            pl.when(amt.is_null() | amt.is_nan() | (amt <= 0.0))
+            .then(0.0)
+            .otherwise(amt * bist_rate)
+            .alias("bist_fee")
+        )
+        mkk_fee_expr = (
+            pl.when(amt.is_null() | amt.is_nan() | (amt <= 0.0))
+            .then(0.0)
+            .otherwise(amt * mkk_rate)
+            .alias("mkk_fee")
+        )
         bsmv_expr = (broker_fee_expr * bsmv_rate).alias("bsmv")
 
         total_fee_expr = (broker_fee_expr + bist_fee_expr + mkk_fee_expr + bsmv_expr).alias("total_fee")
         effective_rate_expr = (
-            pl.when(amt <= 0.0).then(0.0).otherwise((total_fee_expr / amt) * 100.0).alias("effective_rate")
+            pl.when(amt.is_null() | amt.is_nan() | (amt <= 0.0))
+            .then(0.0)
+            .otherwise((total_fee_expr / amt) * 100.0)
+            .alias("effective_rate")
         )
 
         # Net tutar hesabı
         if side_col and side_col in df.columns:
             side_expr = pl.col(side_col).str.to_uppercase()
             net_amount_expr = (
-                pl.when(amt <= 0.0)
+                pl.when(amt.is_null() | amt.is_nan() | (amt <= 0.0))
                 .then(0.0)
                 .when(side_expr == "BUY")
                 .then(amt + total_fee_expr)
@@ -566,7 +595,7 @@ class FeeCalculator:
         )
 
     def export_breakdowns_to_polars(self, breakdowns: list[FeeBreakdown]) -> pl.DataFrame:
-        """Hesaplanan maliyet dökümlerini sıfır kopyalı Polars DataFrame'e dönüştür.
+        """Hesaplanan maliyet dökümlerini sıfır kopyalı Polars DataFrame'e dönüştür (GEMINI.md Kural 2).
 
         Args:
             breakdowns: FeeBreakdown listesi.
@@ -574,31 +603,30 @@ class FeeCalculator:
         Returns:
             pl.DataFrame: Analitik ve raporlama için optimize edilmiş DataFrame.
         """
+        empty_schema = {
+            "amount": pl.Float64,
+            "broker_fee": pl.Float64,
+            "bist_fee": pl.Float64,
+            "mkk_fee": pl.Float64,
+            "bsmv": pl.Float64,
+            "total": pl.Float64,
+            "effective_rate": pl.Float64,
+            "side": pl.Utf8,
+            "instrument_type": pl.Utf8,
+            "net_amount": pl.Float64,
+        }
         if not breakdowns:
-            return pl.DataFrame(
-                schema={
-                    "amount": pl.Float64,
-                    "broker_fee": pl.Float64,
-                    "bist_fee": pl.Float64,
-                    "mkk_fee": pl.Float64,
-                    "bsmv": pl.Float64,
-                    "total": pl.Float64,
-                    "effective_rate": pl.Float64,
-                    "side": pl.Utf8,
-                    "instrument_type": pl.Utf8,
-                    "net_amount": pl.Float64,
-                }
-            )
+            return pl.DataFrame(schema=empty_schema)
 
         data = [b.to_dict() for b in breakdowns]
-        return pl.DataFrame(data)
+        return pl.DataFrame(data, schema=empty_schema)
 
     def export_to_duckdb(
         self,
         breakdowns: list[FeeBreakdown],
         db_path: str = DEFAULT_FEE_DB_PATH,
     ) -> int:
-        """Maliyet dökümlerini denetim izi için DuckDB tablosuna kaydet.
+        """Maliyet dökümlerini denetim izi için DuckDB tablosuna kaydet (GEMINI.md Kural 5).
 
         Args:
             breakdowns: Kaydedilecek döküm listesi.
@@ -628,7 +656,7 @@ class FeeCalculator:
                     b.side,
                     b.instrument_type,
                     b.net_amount,
-                    orjson.dumps(b.to_dict()).decode("utf-8"),
+                    orjson.dumps(b.to_dict(), default=str).decode("utf-8"),
                 )
             )
 
@@ -666,6 +694,80 @@ class FeeCalculator:
         logger.info("ucret_denetim_kayitlari_duckdb_aktarildi", kaydedilen_adet=len(rows), db_path=db_path)
         return len(rows)
 
+    def query_fee_audit_duckdb(
+        self,
+        db_path: str = DEFAULT_FEE_DB_PATH,
+        side: str | None = None,
+        instrument_type: str | None = None,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB'de saklanan işlem maliyeti denetim izini filtrelenmiş Polars DataFrame olarak döner.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            side: İsteğe bağlı işlem yönü filtresi ("BUY", "SELL").
+            instrument_type: İsteğe bağlı enstrüman filtresi ("equity", "viop").
+            limit: Maksimum satır sayısı.
+
+        Returns:
+            pl.DataFrame: Filtrelenmiş maliyet denetim tablosu.
+        """
+        empty_schema = {
+            "id": pl.Utf8,
+            "created_at": pl.Datetime("us", "UTC"),
+            "amount": pl.Float64,
+            "broker_fee": pl.Float64,
+            "bist_fee": pl.Float64,
+            "mkk_fee": pl.Float64,
+            "bsmv": pl.Float64,
+            "total": pl.Float64,
+            "effective_rate": pl.Float64,
+            "side": pl.Utf8,
+            "instrument_type": pl.Utf8,
+            "net_amount": pl.Float64,
+            "metadata_json": pl.Utf8,
+        }
+        target_file = Path(db_path)
+        if not target_file.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        with self._lock:
+            try:
+                with duckdb.connect(str(target_file), read_only=True) as conn:
+                    query = """
+                        SELECT id, created_at, amount, broker_fee, bist_fee, mkk_fee,
+                               bsmv, total, effective_rate, side, instrument_type,
+                               net_amount, metadata_json
+                        FROM fee_audit_log
+                    """
+                    conditions: list[str] = []
+                    params: list[Any] = []
+                    if side:
+                        conditions.append("side = ?")
+                        params.append(str(side).upper().strip())
+                    if instrument_type:
+                        conditions.append("instrument_type = ?")
+                        params.append(str(instrument_type).lower().strip())
+
+                    if conditions:
+                        query += " WHERE " + " AND ".join(conditions)
+
+                    query += " ORDER BY created_at DESC LIMIT ?"
+                    params.append(max(1, limit))
+
+                    return conn.execute(query, params).pl()
+            except Exception as exc:
+                logger.error("fee_audit_sorgulama_hatasi", error=str(exc))
+                return pl.DataFrame(schema=empty_schema)
+
+    def __enter__(self) -> FeeCalculator:
+        """Context manager giriş protokolü."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager çıkış protokolü."""
+        pass
+
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
         return (
@@ -679,12 +781,170 @@ class FeeCalculator:
 
 
 # ==============================================================================
-# Global Singleton ve Dışa Aktarımlar
+# Global Singleton ve Kolaylık Fonksiyonları (GEMINI.md Kural 6)
 # ==============================================================================
 
 fee_calculator: FeeCalculator = FeeCalculator()
 
-__all__: list[str] = [
+
+def get_fee_calculator() -> FeeCalculator:
+    """Aktif FeeCalculator singleton nesnesini döndürür."""
+    return fee_calculator
+
+
+def calculate_fee(
+    amount: float,
+    side: str = "UNKNOWN",
+    instrument_type: str = "equity",
+) -> FeeBreakdown:
+    """İşlem maliyet dökümünü tek satırda hesaplar.
+
+    Args:
+        amount: İşlem brüt tutarı (TL).
+        side: İşlem yönü ("BUY", "SELL", "UNKNOWN").
+        instrument_type: Enstrüman sınıfı ("equity", "viop", "warrant").
+
+    Returns:
+        FeeBreakdown: Maliyet dökümü.
+    """
+    return fee_calculator.calculate(amount=amount, side=side, instrument_type=instrument_type)
+
+
+def calculate_break_even_price(
+    entry_price: float,
+    quantity: float,
+    instrument_type: str = "equity",
+    round_to_tick: bool = True,
+) -> BreakEvenAnalysis:
+    """Alış pozisyonu için başa baş satış fiyatını hesaplar.
+
+    Args:
+        entry_price: Alış fiyatı (TL).
+        quantity: İşlem adedi (lot).
+        instrument_type: Enstrüman tipi.
+        round_to_tick: BIST fiyat kademesine yuvarlama yapılsın mı.
+
+    Returns:
+        BreakEvenAnalysis: Başa baş analiz sonuçları.
+    """
+    return fee_calculator.calculate_break_even(
+        entry_price=entry_price,
+        quantity=quantity,
+        instrument_type=instrument_type,
+        round_to_tick=round_to_tick,
+    )
+
+
+def calculate_net_cash_flow(
+    amount: float,
+    side: str,
+    instrument_type: str = "equity",
+) -> float:
+    """Yöne göre net nakit akışını döner.
+
+    Args:
+        amount: İşlem brüt tutarı (TL).
+        side: İşlem yönü ("BUY", "SELL").
+        instrument_type: Enstrüman sınıfı.
+
+    Returns:
+        float: Net tutar (TL).
+    """
+    return fee_calculator.calculate_net_amount(amount=amount, side=side, instrument_type=instrument_type)
+
+
+def calculate_polars(
+    df: pl.DataFrame,
+    amount_col: str = "amount",
+    side_col: str | None = None,
+    instrument_col: str | None = None,
+) -> pl.DataFrame:
+    """Polars DataFrame üzerinde vektörize komisyon ve net tutar hesaplar (GEMINI.md Kural 2).
+
+    Args:
+        df: İşlem verilerini içeren Polars DataFrame.
+        amount_col: Tutar kolon adı.
+        side_col: Opsiyonel işlem yönü kolonu ("BUY" / "SELL").
+        instrument_col: Opsiyonel enstrüman kolonu.
+
+    Returns:
+        pl.DataFrame: Komisyon ve maliyet sütunları eklenmiş Polars DataFrame.
+    """
+    return fee_calculator.calculate_polars(
+        df=df,
+        amount_col=amount_col,
+        side_col=side_col,
+        instrument_col=instrument_col,
+    )
+
+
+def calculate_fee_polars(
+    df: pl.DataFrame,
+    amount_col: str = "amount",
+    side_col: str | None = None,
+    instrument_col: str | None = None,
+) -> pl.DataFrame:
+    """calculate_polars için takma ad."""
+    return calculate_polars(df=df, amount_col=amount_col, side_col=side_col, instrument_col=instrument_col)
+
+
+def export_breakdowns_to_polars(breakdowns: list[FeeBreakdown]) -> pl.DataFrame:
+    """export_fees_to_polars için takma ad."""
+    return fee_calculator.export_breakdowns_to_polars(breakdowns)
+
+
+def export_fees_to_polars(breakdowns: list[FeeBreakdown]) -> pl.DataFrame:
+    """Maliyet dökümlerini Polars DataFrame olarak döner.
+
+    Args:
+        breakdowns: Döküm listesi.
+
+    Returns:
+        pl.DataFrame: Polars tablosu.
+    """
+    return fee_calculator.export_breakdowns_to_polars(breakdowns)
+
+
+def export_fees_to_duckdb(breakdowns: list[FeeBreakdown], db_path: str = DEFAULT_FEE_DB_PATH) -> int:
+    """Maliyet dökümlerini DuckDB denetim tablosuna kaydeder.
+
+    Args:
+        breakdowns: Döküm listesi.
+        db_path: DuckDB dosya yolu.
+
+    Returns:
+        int: Kaydedilen kayıt sayısı.
+    """
+    return fee_calculator.export_to_duckdb(breakdowns=breakdowns, db_path=db_path)
+
+
+def query_fee_audit_duckdb(
+    db_path: str = DEFAULT_FEE_DB_PATH,
+    side: str | None = None,
+    instrument_type: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosunu Polars DataFrame olarak sorgular.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        side: İşlem yönü filtresi.
+        instrument_type: Enstrüman sınıfı filtresi.
+        limit: Maksimum satır limiti.
+
+    Returns:
+        pl.DataFrame: Filtrelenmiş maliyet denetim tablosu.
+    """
+    return fee_calculator.query_fee_audit_duckdb(
+        db_path=db_path,
+        side=side,
+        instrument_type=instrument_type,
+        limit=limit,
+    )
+
+
+__all__: Final[list[str]] = [
+    # Sabitler
     "DEFAULT_BIST_FEE_RATE",
     "DEFAULT_BROKER_RATE",
     "DEFAULT_BSMV_RATE",
@@ -694,8 +954,21 @@ __all__: list[str] = [
     "DEFAULT_VIOP_FEE_RATE",
     "VALID_INSTRUMENT_TYPES",
     "VALID_SIDES",
+    # Modeller
     "BreakEvenAnalysis",
     "FeeBreakdown",
     "FeeCalculator",
+    # Singleton
     "fee_calculator",
+    # Kolaylık Fonksiyonları
+    "calculate_break_even_price",
+    "calculate_fee",
+    "calculate_fee_polars",
+    "calculate_net_cash_flow",
+    "calculate_polars",
+    "export_breakdowns_to_polars",
+    "export_fees_to_duckdb",
+    "export_fees_to_polars",
+    "get_fee_calculator",
+    "query_fee_audit_duckdb",
 ]
