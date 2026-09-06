@@ -49,8 +49,9 @@ DEFAULT_CHECKPOINT_THRESHOLD: Final[str] = "4MB"
 DEFAULT_DEBOUNCE_DUCKDB_PATH: Final[str] = "data/debounce_audit.duckdb"
 DEFAULT_DEBOUNCE_AUDIT_TABLE: Final[str] = "bist_debounce_audit"
 
-# SQL Injection Koruması için WAL Parametre Doğrulama Deseni
+# SQL Injection Koruması için WAL ve Tablo Parametre Doğrulama Deseni
 _WAL_PARAM_REGEX: Final[re.Pattern[str]] = re.compile(r"^\d+\s*(?:KB|MB|GB|B)?$", re.IGNORECASE)
+_TABLE_NAME_REGEX: Final[re.Pattern[str]] = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Thread-safe reentrant kilit
 _debounce_lock: Final[threading.RLock] = threading.RLock()
@@ -246,6 +247,10 @@ def export_debounce_to_duckdb(
     Returns:
         int: Eklenen kayıt sayısı.
     """
+    cleaned_table = str(table_name).strip()
+    if not _TABLE_NAME_REGEX.match(cleaned_table):
+        raise ValueError(f"Geçersiz tablo adı: {table_name!r}")
+
     df = export_debounce_metrics_to_polars()
     if df.is_empty():
         return 0
@@ -261,9 +266,9 @@ def export_debounce_to_duckdb(
             configure_duckdb_wal(conn)
             conn.register("df_debounce", df.to_arrow())
             conn.execute(
-                f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_debounce WHERE 1=0"
+                f"CREATE TABLE IF NOT EXISTS {cleaned_table} AS SELECT * FROM df_debounce WHERE 1=0"
             )
-            conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_debounce")
+            conn.execute(f"INSERT INTO {cleaned_table} SELECT * FROM df_debounce")
         return len(df)
     except Exception as e:
         logger.error("export_debounce_to_duckdb_basarisiz", error=str(e))
@@ -283,6 +288,10 @@ def query_debounce_duckdb(
     Returns:
         pl.DataFrame: Sorgu neticesi Polars tablosu.
     """
+    cleaned_table = str(table_name).strip()
+    if not _TABLE_NAME_REGEX.match(cleaned_table):
+        raise ValueError(f"Geçersiz tablo adı: {table_name!r}")
+
     path_obj = Path(db_path)
     if not path_obj.exists() or path_obj.stat().st_size == 0:
         return pl.DataFrame()
@@ -291,12 +300,12 @@ def query_debounce_duckdb(
         with duckdb.connect(str(path_obj), read_only=True) as conn:
             tables = conn.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_name = ?",
-                [table_name],
+                [cleaned_table],
             ).fetchall()
             if not tables:
                 return pl.DataFrame()
 
-            arrow_res = conn.execute(f"SELECT * FROM {table_name}").arrow()
+            arrow_res = conn.execute(f"SELECT * FROM {cleaned_table}").arrow()
             return pl.from_arrow(arrow_res)
     except Exception as e:
         logger.error("query_debounce_duckdb_basarisiz", error=str(e))

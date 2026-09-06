@@ -10,9 +10,12 @@ PostgreSQL ve çevrimdışı yerel DuckDB üzerinde kalıcı olarak saklanması 
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import hashlib
+import os
+import sys
 import threading
 from pathlib import Path
 from typing import Any, Callable, Final
@@ -23,18 +26,32 @@ import polars as pl
 import structlog
 from opentelemetry import trace
 
-from services.core.debounce import configure_duckdb_wal
-
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.model_persistence")
 
 DEFAULT_MODEL_METADATA_DB_PATH: Final[str] = "data/model_metadata.duckdb"
 
-_duckdb_lock = threading.Lock()
+_duckdb_lock: Final[threading.RLock] = threading.RLock()
+
+
+def _has_pg_env() -> bool:
+    """PostgreSQL bağlantısının yapılandırılıp yapılandırılmadığını doğrular."""
+    return bool(
+        "services.core.database" in sys.modules
+        or os.getenv("PG_HOST")
+        or os.getenv("POSTGRES_HOST")
+    )
+
+
+def configure_duckdb_wal(conn: Any) -> None:
+    """DuckDB WAL boyut ve checkpoint ayarlarını SSD koruması için yapılandırır."""
+    with contextlib.suppress(Exception):
+        conn.execute("PRAGMA checkpoint_threshold='4MB'")
+        conn.execute("PRAGMA wal_autocheckpoint='2MB'")
 
 
 def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
+    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal senkron/asenkron izleme dekoratörü.
 
     Args:
         span_name: Üretilecek span için benzersiz izleme adı.
@@ -44,12 +61,21 @@ def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., A
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper
+
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
 
-        return wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -100,10 +126,19 @@ class ModelPersistence:
                 """)
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO model_versions_offline
+                    INSERT INTO model_versions_offline
                     (model_name, version, target_horizon, feature_names_json, cs_features_json,
-                     confidence_score, metrics_json, artifact_path, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     confidence_score, metrics_json, artifact_path, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (model_name, version) DO UPDATE SET
+                        target_horizon = EXCLUDED.target_horizon,
+                        feature_names_json = EXCLUDED.feature_names_json,
+                        cs_features_json = EXCLUDED.cs_features_json,
+                        confidence_score = EXCLUDED.confidence_score,
+                        metrics_json = EXCLUDED.metrics_json,
+                        artifact_path = EXCLUDED.artifact_path,
+                        status = EXCLUDED.status,
+                        created_at = now()
                     """,
                     [
                         model_name,
@@ -174,6 +209,9 @@ class ModelPersistence:
         )
 
         # 2. Aşama: PostgreSQL Merkezi Veritabanı
+        if not _has_pg_env():
+            return None
+
         try:
             from services.core.database import pg_fetchval
 
@@ -245,21 +283,22 @@ class ModelPersistence:
             Model sürüm bilgilerini içeren sözlük veya bulunamazsa None.
         """
         # 1. Aşama: PostgreSQL
-        try:
-            from services.core.database import pg_fetchrow
+        if _has_pg_env():
+            try:
+                from services.core.database import pg_fetchrow
 
-            row = await pg_fetchrow(
-                """SELECT mv.*, m.name as model_name
-                   FROM model_versions mv
-                   JOIN models m ON m.id = mv.model_id
-                   WHERE m.name = $1 AND mv.status = 'CHAMPION'
-                   ORDER BY mv.created_at DESC LIMIT 1""",
-                model_name,
-            )
-            if row:
-                return dict(row)
-        except Exception as e:
-            logger.debug("sampiyon_model_pg_sorgu_hatasi", model=model_name, hata=str(e))
+                row = await pg_fetchrow(
+                    """SELECT mv.*, m.name as model_name
+                       FROM model_versions mv
+                       JOIN models m ON m.id = mv.model_id
+                       WHERE m.name = $1 AND mv.status = 'CHAMPION'
+                       ORDER BY mv.created_at DESC LIMIT 1""",
+                    model_name,
+                )
+                if row:
+                    return dict(row)
+            except Exception as e:
+                logger.debug("sampiyon_model_pg_sorgu_hatasi", model=model_name, hata=str(e))
 
         # 2. Aşama: DuckDB Çevrimdışı Fallback
         target = Path(db_path)
@@ -311,28 +350,29 @@ class ModelPersistence:
         Returns:
             İşlem başarılı ise True, aksi halde False.
         """
-        pg_success = False
+        success = False
 
         # 1. Aşama: PostgreSQL Terfisi
-        try:
-            from services.core.database import pg_execute, pg_fetchval
+        if _has_pg_env():
+            try:
+                from services.core.database import pg_execute, pg_fetchval
 
-            model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", model_name)
-            if model_id is not None:
-                await pg_execute(
-                    """UPDATE model_versions SET status = 'CANDIDATE'
-                       WHERE model_id = $1 AND status = 'CHAMPION'""",
-                    model_id,
-                )
-                await pg_execute(
-                    """UPDATE model_versions SET status = 'CHAMPION', champion_since = NOW()
-                       WHERE model_id = $1 AND version = $2""",
-                    model_id,
-                    version,
-                )
-                pg_success = True
-        except Exception as e:
-            logger.debug("model_sampiyon_pg_terfi_atlandi", model=model_name, version=version, hata=str(e))
+                model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", model_name)
+                if model_id is not None:
+                    await pg_execute(
+                        """UPDATE model_versions SET status = 'CANDIDATE'
+                           WHERE model_id = $1 AND status = 'CHAMPION'""",
+                        model_id,
+                    )
+                    await pg_execute(
+                        """UPDATE model_versions SET status = 'CHAMPION', champion_since = NOW()
+                           WHERE model_id = $1 AND version = $2""",
+                        model_id,
+                        version,
+                    )
+                    success = True
+            except Exception as e:
+                logger.debug("model_sampiyon_pg_terfi_atlandi", model=model_name, version=version, hata=str(e))
 
         # 2. Aşama: DuckDB Yerel Terfisi
         target = Path(db_path)
@@ -348,13 +388,13 @@ class ModelPersistence:
                         "UPDATE model_versions_offline SET status = 'CHAMPION' WHERE model_name = ? AND version = ?",
                         [model_name, version],
                     )
-                    pg_success = True
+                    success = True
             except Exception as exc:
                 logger.debug("model_sampiyon_duckdb_terfi_hatasi", model=model_name, version=version, hata=str(exc))
 
-        if pg_success:
+        if success:
             logger.info("model_sampiyon_yapildi", model=model_name, version=version)
-        return pg_success
+        return success
 
     @staticmethod
     @otel_trace("model_persistence.verify_feature_contract")
@@ -388,6 +428,9 @@ class ModelPersistence:
         Returns:
             Model sürüm sözlükleri listesi.
         """
+        if not _has_pg_env():
+            return []
+
         try:
             from services.core.database import pg_fetch
 
@@ -423,12 +466,12 @@ class ModelPersistence:
             Sürümleri içeren Polars DataFrame.
         """
         empty_schema = {
-            "model_name": pl.Utf8,
-            "version": pl.Utf8,
+            "model_name": pl.String,
+            "version": pl.String,
             "target_horizon": pl.Int32,
             "confidence_score": pl.Float64,
-            "artifact_path": pl.Utf8,
-            "status": pl.Utf8,
+            "artifact_path": pl.String,
+            "status": pl.String,
             "created_at": pl.Datetime("us"),
         }
         target = Path(db_path)
@@ -450,13 +493,127 @@ class ModelPersistence:
             logger.debug("duckdb_model_surumleri_polars_hatasi", hata=str(exc))
             return pl.DataFrame(schema=empty_schema)
 
+    @classmethod
+    @otel_trace("model_persistence.rollback_champion")
+    async def rollback_champion(
+        cls,
+        model_name: str,
+        db_path: str = DEFAULT_MODEL_METADATA_DB_PATH,
+    ) -> tuple[bool, str]:
+        """Canlıda anomali üreten şampiyon modeli geri alıp önceki istikrarlı sürüme döner (Self-Healing / Kural 6).
 
-# Global tekil nesne
+        Args:
+            model_name: Model adı.
+            db_path: Yerel DuckDB yolu.
+
+        Returns:
+            (basarili_mi, aciklama) ikilisi.
+        """
+        # DuckDB üzerinden önceki sürümleri ara
+        target = Path(db_path)
+        if not target.exists() or target.stat().st_size == 0:
+            return False, "Yerel model kayıt defteri bulunamadı"
+
+        try:
+            with _duckdb_lock, duckdb.connect(db_path) as conn:
+                configure_duckdb_wal(conn)
+                # Mevcut şampiyonu bul
+                current = conn.execute(
+                    "SELECT version FROM model_versions_offline WHERE model_name = ? AND status = 'CHAMPION'",
+                    [model_name],
+                ).fetchone()
+                current_ver = current[0] if current else None
+
+                # Bir önceki adayı veya eski şampiyonu bul
+                previous = conn.execute(
+                    """
+                    SELECT version FROM model_versions_offline
+                    WHERE model_name = ? AND status != 'CHAMPION' AND status != 'REJECTED'
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    [model_name],
+                ).fetchone()
+
+                if not previous:
+                    return False, "Geri dönülecek uygun yedek model sürümü bulunamadı"
+
+                prev_ver = previous[0]
+
+                # Mevcut şampiyonu 'REJECTED' yap
+                if current_ver:
+                    conn.execute(
+                        "UPDATE model_versions_offline SET status = 'REJECTED' WHERE model_name = ? AND version = ?",
+                        [model_name, current_ver],
+                    )
+
+                # Önceki sürümü 'CHAMPION' yap
+                conn.execute(
+                    "UPDATE model_versions_offline SET status = 'CHAMPION' WHERE model_name = ? AND version = ?",
+                    [model_name, prev_ver],
+                )
+
+            # PostgreSQL varsa orada da güncelle
+            if _has_pg_env():
+                with contextlib.suppress(Exception):
+                    from services.core.database import pg_execute, pg_fetchval
+
+                model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", model_name)
+                if model_id is not None:
+                    if current_ver:
+                        await pg_execute(
+                            "UPDATE model_versions SET status = 'REJECTED' WHERE model_id = $1 AND version = $2",
+                            model_id,
+                            current_ver,
+                        )
+                    await pg_execute(
+                        "UPDATE model_versions SET status = 'CHAMPION', champion_since = NOW() WHERE model_id = $1 AND version = $2",
+                        model_id,
+                        prev_ver,
+                    )
+
+            logger.warning(
+                "model_otomatik_geri_alindi",
+                model=model_name,
+                eski_hatali_surum=current_ver,
+                yeni_aktif_surum=prev_ver,
+            )
+            return True, f"Model başarıyla {prev_ver} sürümüne geri alındı (önceki: {current_ver})"
+
+        except Exception as exc:
+            logger.error("model_geri_alma_hatasi", model=model_name, hata=str(exc))
+            return False, f"Geri alma işlemi başarısız: {exc}"
+
+    @classmethod
+    def generate_contract_hash(cls, feature_names: list[str]) -> str:
+        """Özellik sözleşmesi için deterministik SHA256 kontrol özeti üretir."""
+        return hashlib.sha256(
+            orjson.dumps(sorted(feature_names), option=orjson.OPT_SORT_KEYS)
+        ).hexdigest()[:16]
+
+
+# Global tekil nesne ve kolaylık fonksiyonları
 model_persistence: Final[ModelPersistence] = ModelPersistence()
+save_model_metadata = ModelPersistence.save_model_metadata
+get_champion_model = ModelPersistence.get_champion_model
+promote_to_champion = ModelPersistence.promote_to_champion
+verify_feature_contract = ModelPersistence.verify_feature_contract
+list_model_versions = ModelPersistence.list_model_versions
+list_model_versions_polars = ModelPersistence.list_model_versions_polars
+rollback_champion = ModelPersistence.rollback_champion
+generate_contract_hash = ModelPersistence.generate_contract_hash
 
 __all__: Final[list[str]] = [
     "DEFAULT_MODEL_METADATA_DB_PATH",
     "ModelPersistence",
+    "configure_duckdb_wal",
+    "generate_contract_hash",
+    "get_champion_model",
+    "list_model_versions",
+    "list_model_versions_polars",
     "model_persistence",
     "otel_trace",
+    "promote_to_champion",
+    "rollback_champion",
+    "save_model_metadata",
+    "verify_feature_contract",
 ]

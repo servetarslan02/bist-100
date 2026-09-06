@@ -601,8 +601,10 @@ from .debounce import (
     configure_duckdb_wal,
     debounced_save,
     export_debounce_metrics_to_polars,
+    export_debounce_to_duckdb,
     get_debounce_stats,
     get_remaining_debounce_time,
+    query_debounce_duckdb,
     reset_debounce,
     should_save,
 )
@@ -632,6 +634,7 @@ from .distributed_tracing import (
     TraceSpan,
     correlation_id_var,
     distributed_tracer,
+    export_spans_to_polars,
     span_id_var,
     trace,
     trace_async,
@@ -641,6 +644,12 @@ from .downtime_tracker import (
     DEFAULT_DOWNTIME_DB_PATH,
     DowntimeTracker,
     downtime_tracker,
+    export_downtime_to_polars,
+    get_downtime_status,
+    query_downtime_duckdb,
+    record_heartbeat,
+    record_shutdown,
+    record_startup,
 )
 from .downtime_tracker import (
     otel_trace as otel_trace_downtime,
@@ -738,6 +747,13 @@ from .event_schema import (
 )
 from .event_schema import (
     otel_trace as otel_trace_event_schema,
+)
+from .feature_store import (
+    DEFAULT_MAX_CACHE_SIZE,
+    FeatureStore,
+    export_feature_stats_to_polars,
+    export_features_to_polars,
+    feature_store,
 )
 from .fee_calculator import (
     DEFAULT_BIST_FEE_RATE,
@@ -1103,6 +1119,30 @@ from .jwt_manager import (
     validate_api_key,
     validate_jwt_token,
 )
+from .logging import (
+    DEFAULT_LOG_LEVEL,
+    NOISY_LOGGERS,
+    export_log_stats_to_polars,
+    get_log_stats,
+    get_logger,
+    setup_logging,
+)
+from .manipulation_detector import (
+    DEFAULT_MANIPULATION_AUDIT_DB_PATH,
+    DEFAULT_PRICE_CLUSTER_WINDOW,
+    DEFAULT_SPOOFING_WINDOW,
+    DEFAULT_VOLUME_WINDOW,
+    DEFAULT_WASH_TRADING_WINDOW,
+    VALID_ALERT_TYPES,
+    VALID_SEVERITIES,
+    ManipulationAlert,
+    ManipulationDetector,
+    alerts_to_polars,
+    export_alerts_to_duckdb,
+    export_manipulation_audit_to_polars,
+    manipulation_detector,
+    query_manipulation_audit_duckdb,
+)
 from .market_calendar import (
     DEFAULT_CALENDAR_LOOKAHEAD_DAYS,
     DEFAULT_CLOSING_END_TIME,
@@ -1146,6 +1186,234 @@ from .market_session_fsm import (
     MarketSessionStateMachine,
     MarketSessionStatus,
     bist_session_fsm,
+)
+from .metrics_math import (
+    DEFAULT_CONFIDENCE_LEVEL,
+    DEFAULT_PERIODS_PER_YEAR,
+    calculate_calmar_ratio,
+    calculate_ic,
+    calculate_max_drawdown,
+    calculate_profit_factor,
+    calculate_rank_ic,
+    calculate_sharpe,
+    calculate_sharpe_ratio,
+    calculate_sortino,
+    calculate_sortino_ratio,
+    calculate_var_cvar,
+    calculate_win_rate,
+    metrics_summary_to_polars,
+)
+from .model_persistence import (
+    DEFAULT_MODEL_METADATA_DB_PATH,
+    ModelPersistence,
+    get_champion_model,
+    list_model_versions,
+    list_model_versions_polars,
+    model_persistence,
+    promote_to_champion,
+    save_model_metadata,
+    verify_feature_contract,
+)
+from .models import (
+    DEFAULT_RISK_APPETITE,
+    DEFAULT_RSI,
+    DEFAULT_VIX_LEVEL,
+    OHLCV,
+    AssetState,
+    BaseDomainModel,
+    Direction,
+    EdgeDecomposition,
+    MarketRegime,
+    MarketState,
+    MarketTick,
+    OrderBookSnapshot,
+    Outcome,
+    Portfolio,
+    Prediction,
+    RiskLevel,
+    ScenarioResult,
+    Signal,
+    SignalStatus,
+    SimulationResult,
+    TimeHorizon,
+    WorldState,
+)
+from .models import (
+    Alert as DomainAlert,
+)
+from .models import (
+    Position as DomainPosition,
+)
+from .monitoring import (
+    DEFAULT_SYNC_INTERVAL_SECONDS,
+    PROMETHEUS_HISTOGRAM_BUCKETS,
+    PortfolioMonitor,
+    portfolio_monitor,
+)
+from .monitoring import (
+    export_metrics_to_polars as export_monitoring_metrics_to_polars,
+)
+from .monitoring_security import (
+    DEFAULT_ADMIN_TOKEN,
+    DEFAULT_JWKS_CACHE_TTL_SECONDS,
+    DEFAULT_MAX_FAILED_ATTEMPTS,
+    DEFAULT_MAX_TRACKED_CLIENTS,
+    DEFAULT_METRICS_TOKEN,
+    DEFAULT_RATE_LIMIT_PER_MINUTE,
+    DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+    ROLE_PERMISSIONS,
+    AuthConfig,
+    AuthManager,
+    AuthProvider,
+    AuthResult,
+    JWTProvider,
+    MonitoringAuth,
+    OAuthProvider,
+    StaticTokenProvider,
+    auth_manager,
+    check_rate_limit,
+    export_security_stats_to_polars,
+    extract_api_key,
+    extract_bearer_token,
+    monitoring_auth,
+    verify_admin_token,
+    verify_metrics_token,
+)
+from .mtls import (
+    DEFAULT_CIPHER_SUITE,
+    DEFAULT_MIN_TLS_VERSION,
+    CertificateManager,
+    MTLSConfig,
+    MTLSContext,
+    MTLSMiddleware,
+    create_mtls_health_endpoint,
+    export_mtls_status_to_polars,
+    get_client_ssl,
+    get_grpc_client_credentials,
+    get_grpc_server_credentials,
+    get_mtls_context,
+    get_mtls_status,
+    get_server_ssl,
+    get_server_ssl_args,
+)
+from .mtls import (
+    DEFAULT_RENEW_BEFORE_DAYS as DEFAULT_MTLS_RENEW_BEFORE_DAYS,
+)
+from .nats_bus import (
+    DEFAULT_DEDUP_CACHE_SIZE as DEFAULT_NATS_DEDUP_CACHE_SIZE,
+)
+from .nats_bus import (
+    DEFAULT_DEDUP_WINDOW_SEC as DEFAULT_NATS_DEDUP_WINDOW_SEC,
+)
+from .nats_bus import (
+    DEFAULT_MAX_AGE_HOURS as DEFAULT_NATS_MAX_AGE_HOURS,
+)
+from .nats_bus import (
+    DEFAULT_MAX_MESSAGES as DEFAULT_NATS_MAX_MESSAGES,
+)
+from .nats_bus import (
+    DEFAULT_MAX_RETRIES as DEFAULT_NATS_MAX_RETRIES,
+)
+from .nats_bus import (
+    DEFAULT_NATS_DLQ_DB_PATH,
+    NATSJetStreamBus,
+    nats_bus,
+)
+from .nats_bus import (
+    EventMessage as NATSEventMessage,
+)
+from .nats_bus import (
+    StreamConfig as NATSStreamConfig,
+)
+from .observability import (
+    DEFAULT_BUCKETS as DEFAULT_OBSERVABILITY_BUCKETS,
+)
+from .observability import (
+    DEFAULT_MAX_CONFIG_VERSIONS,
+    DEFAULT_MAX_TRACE_HISTORY,
+    CostMonitor,
+    PrometheusMetrics,
+    config_manager,
+    cost_monitor,
+    export_observability_metrics_to_polars,
+    performance_monitor,
+    prometheus_metrics,
+)
+from .observability import (
+    ConfigManager as ObservabilityConfigManager,
+)
+from .observability import (
+    DistributedTracing as ObservabilityDistributedTracing,
+)
+from .observability import (
+    HealthChecker as ObservabilityHealthChecker,
+)
+from .observability import (
+    PerformanceMonitor as ObservabilityPerformanceMonitor,
+)
+from .observability import (
+    ResourceMonitor as ObservabilityResourceMonitor,
+)
+from .observability import (
+    distributed_tracing as observability_distributed_tracing,
+)
+from .observability import (
+    health_checker as observability_health_checker,
+)
+from .observability import (
+    resource_monitor as observability_resource_monitor,
+)
+from .offline_queue import (
+    DEFAULT_MAX_ENTRIES as DEFAULT_OFFLINE_MAX_ENTRIES,
+)
+from .offline_queue import (
+    DEFAULT_OFFLINE_DB_PATH,
+    OfflineQueue,
+    export_offline_queue_to_polars,
+    export_offline_stats_to_polars,
+    offline_queue,
+)
+from .offline_queue import (
+    DEFAULT_PRIORITY as DEFAULT_OFFLINE_PRIORITY,
+)
+from .offline_queue import (
+    DEFAULT_TTL_HOURS as DEFAULT_OFFLINE_TTL_HOURS,
+)
+from .offline_queue import (
+    MAX_RETRY_ATTEMPTS as MAX_OFFLINE_RETRY_ATTEMPTS,
+)
+from .otel import (
+    export_telemetry_status_to_polars,
+    otel_trace,
+    setup_telemetry,
+    shutdown_telemetry,
+)
+from .otel import (
+    get_tracer as get_otel_tracer,
+)
+from .persistent_dlq import (
+    export_dlq_stats_to_polars as export_persistent_dlq_stats_to_polars,
+)
+from .persistent_dlq import (
+    export_dlq_to_polars as export_persistent_dlq_to_polars,
+)
+from .persistent_dlq import (
+    persistent_dlq,
+)
+from .pg_replication_health import (
+    DEFAULT_MAX_LAG_BYTES as DEFAULT_PG_MAX_LAG_BYTES,
+)
+from .pg_replication_health import (
+    DEFAULT_MAX_LAG_SECONDS as DEFAULT_PG_MAX_LAG_SECONDS,
+)
+from .pg_replication_health import (
+    check_replication_health as check_pg_replication_health,
+)
+from .pg_replication_health import (
+    export_pg_replication_to_polars,
+)
+from .pg_replication_health import (
+    get_replication_metrics as get_pg_replication_metrics,
 )
 from .price_limits import PriceLimitMonitor, price_limit_monitor
 from .risk_gate import RiskGate, risk_gate
@@ -1660,8 +1928,10 @@ __all__ = [
     "configure_duckdb_wal",
     "debounced_save",
     "export_debounce_metrics_to_polars",
+    "export_debounce_to_duckdb",
     "get_debounce_stats",
     "get_remaining_debounce_time",
+    "query_debounce_duckdb",
     "reset_debounce",
     "should_save",
     # Karar Motoru (Decision Engine)
@@ -1689,6 +1959,7 @@ __all__ = [
     "TraceSpan",
     "distributed_tracer",
     "correlation_id_var",
+    "export_spans_to_polars",
     "span_id_var",
     "trace",
     "trace_async",
@@ -1697,7 +1968,13 @@ __all__ = [
     "DEFAULT_DOWNTIME_DB_PATH",
     "DowntimeTracker",
     "downtime_tracker",
+    "export_downtime_to_polars",
+    "get_downtime_status",
     "otel_trace_downtime",
+    "query_downtime_duckdb",
+    "record_heartbeat",
+    "record_shutdown",
+    "record_startup",
     # DuckDB ve Parquet Analitik Araştırma Motoru (Research Engine)
     "DEFAULT_PARQUET_OUTPUT_DIR",
     "DEFAULT_RESEARCH_BATCH_SIZE",
@@ -1805,6 +2082,12 @@ __all__ = [
     "fee_calculator",
     "get_fee_calculator",
     "query_fee_audit_duckdb",
+    # Özellik Deposu (Feature Store)
+    "DEFAULT_MAX_CACHE_SIZE",
+    "FeatureStore",
+    "export_feature_stats_to_polars",
+    "export_features_to_polars",
+    "feature_store",
     "TaxResult",
     "calculate_tax",
     "SettlementCalculator",
@@ -2155,8 +2438,186 @@ __all__ = [
     "query_snapshots_duckdb",
     "snapshot_system",
     "take_snapshot",
+    # Manipülasyon ve Piyasa Bozucu Eylem Tespiti (SPK VI-104.1)
+    "DEFAULT_MANIPULATION_AUDIT_DB_PATH",
+    "DEFAULT_PRICE_CLUSTER_WINDOW",
+    "DEFAULT_SPOOFING_WINDOW",
+    "DEFAULT_VOLUME_WINDOW",
+    "DEFAULT_WASH_TRADING_WINDOW",
+    "ManipulationAlert",
+    "ManipulationDetector",
+    "VALID_ALERT_TYPES",
+    "VALID_SEVERITIES",
+    "alerts_to_polars",
+    "export_alerts_to_duckdb",
+    "export_manipulation_audit_to_polars",
+    "manipulation_detector",
+    "query_manipulation_audit_duckdb",
+    # Yapısal Loglama (Logging)
+    "NOISY_LOGGERS",
+    "export_log_stats_to_polars",
+    "get_log_stats",
+    "get_logger",
+    "setup_logging",
+    # Finansal ve İstatistiksel Metrikler (Metrics Math)
+    "DEFAULT_CONFIDENCE_LEVEL",
+    "DEFAULT_PERIODS_PER_YEAR",
+    "DEFAULT_RISK_FREE_RATE",
+    "calculate_calmar_ratio",
+    "calculate_ic",
+    "calculate_max_drawdown",
+    "calculate_profit_factor",
+    "calculate_rank_ic",
+    "calculate_sharpe",
+    "calculate_sharpe_ratio",
+    "calculate_sortino",
+    "calculate_sortino_ratio",
+    "calculate_var_cvar",
+    "calculate_win_rate",
+    "metrics_summary_to_polars",
+    # Model Kalıcılık ve Üstveri Yönetimi (Model Persistence)
+    "DEFAULT_MODEL_METADATA_DB_PATH",
+    "ModelPersistence",
+    "get_champion_model",
+    "list_model_versions",
+    "list_model_versions_polars",
+    "model_persistence",
+    "promote_to_champion",
+    "save_model_metadata",
+    "verify_feature_contract",
+    # Temel Veri ve Piyasa Modelleri (Domain Models)
+    "DEFAULT_INITIAL_CAPITAL",
+    "DEFAULT_RISK_APPETITE",
+    "DEFAULT_RSI",
+    "DEFAULT_VIX_LEVEL",
+    "AssetState",
+    "BaseDomainModel",
+    "Direction",
+    "DomainAlert",
+    "DomainPosition",
+    "EdgeDecomposition",
+    "MarketRegime",
+    "MarketState",
+    "MarketTick",
+    "OHLCV",
+    "OrderBookSnapshot",
+    "Outcome",
+    "Portfolio",
+    "Prediction",
+    "RiskLevel",
+    "ScenarioResult",
+    "Signal",
+    "SignalStatus",
+    "SimulationResult",
+    "TimeHorizon",
+    "WorldState",
+    # Portföy ve Kilit İzleme (Monitoring)
+    "DEFAULT_SYNC_INTERVAL_SECONDS",
+    "PROMETHEUS_HISTOGRAM_BUCKETS",
+    "PortfolioMonitor",
+    "export_monitoring_metrics_to_polars",
+    "portfolio_monitor",
+    # İzleme ve API Güvenliği (Monitoring Security)
+    "DEFAULT_ADMIN_TOKEN",
+    "DEFAULT_HTTP_TIMEOUT_SECONDS",
+    "DEFAULT_JWKS_CACHE_TTL_SECONDS",
+    "DEFAULT_MAX_FAILED_ATTEMPTS",
+    "DEFAULT_MAX_TRACKED_CLIENTS",
+    "DEFAULT_METRICS_TOKEN",
+    "DEFAULT_RATE_LIMIT_PER_MINUTE",
+    "DEFAULT_RATE_LIMIT_WINDOW_SECONDS",
+    "ROLE_PERMISSIONS",
+    "AuthConfig",
+    "AuthManager",
+    "AuthProvider",
+    "AuthResult",
+    "JWTProvider",
+    "MonitoringAuth",
+    "OAuthProvider",
+    "StaticTokenProvider",
+    "auth_manager",
+    "check_rate_limit",
+    "export_security_stats_to_polars",
+    "extract_api_key",
+    "extract_bearer_token",
+    "monitoring_auth",
+    "verify_admin_token",
+    "verify_metrics_token",
     # Veritabanı İşlemleri
     "TransactionHelper",
     "TransactionConnection",
     "transaction_helper",
+    # mTLS Servis Ağı
+    "DEFAULT_CIPHER_SUITE",
+    "DEFAULT_MIN_TLS_VERSION",
+    "DEFAULT_MTLS_RENEW_BEFORE_DAYS",
+    "CertificateManager",
+    "MTLSConfig",
+    "MTLSContext",
+    "MTLSMiddleware",
+    "create_mtls_health_endpoint",
+    "export_mtls_status_to_polars",
+    "get_client_ssl",
+    "get_grpc_client_credentials",
+    "get_grpc_server_credentials",
+    "get_mtls_context",
+    "get_mtls_status",
+    "get_server_ssl",
+    "get_server_ssl_args",
+    # NATS JetStream Olay Akışı
+    "DEFAULT_NATS_DEDUP_CACHE_SIZE",
+    "DEFAULT_NATS_DEDUP_WINDOW_SEC",
+    "DEFAULT_NATS_MAX_AGE_HOURS",
+    "DEFAULT_NATS_MAX_MESSAGES",
+    "DEFAULT_NATS_MAX_RETRIES",
+    "DEFAULT_NATS_DLQ_DB_PATH",
+    "NATSEventMessage",
+    "NATSJetStreamBus",
+    "NATSStreamConfig",
+    "nats_bus",
+    # Gözlemlenebilirlik ve Metrikler
+    "DEFAULT_OBSERVABILITY_BUCKETS",
+    "DEFAULT_MAX_CONFIG_VERSIONS",
+    "DEFAULT_MAX_TRACE_HISTORY",
+    "ObservabilityConfigManager",
+    "CostMonitor",
+    "ObservabilityDistributedTracing",
+    "ObservabilityHealthChecker",
+    "ObservabilityPerformanceMonitor",
+    "PrometheusMetrics",
+    "ObservabilityResourceMonitor",
+    "config_manager",
+    "cost_monitor",
+    "observability_distributed_tracing",
+    "export_observability_metrics_to_polars",
+    "observability_health_checker",
+    "performance_monitor",
+    "prometheus_metrics",
+    "observability_resource_monitor",
+    # Çevrimdışı Kuyruk (Offline Queue)
+    "DEFAULT_OFFLINE_MAX_ENTRIES",
+    "DEFAULT_OFFLINE_DB_PATH",
+    "DEFAULT_OFFLINE_PRIORITY",
+    "DEFAULT_OFFLINE_TTL_HOURS",
+    "MAX_OFFLINE_RETRY_ATTEMPTS",
+    "OfflineQueue",
+    "export_offline_queue_to_polars",
+    "export_offline_stats_to_polars",
+    "offline_queue",
+    # OpenTelemetry Dağıtık İzleme
+    "export_telemetry_status_to_polars",
+    "get_otel_tracer",
+    "otel_trace",
+    "setup_telemetry",
+    "shutdown_telemetry",
+    # Kalıcı DLQ
+    "export_persistent_dlq_stats_to_polars",
+    "export_persistent_dlq_to_polars",
+    "persistent_dlq",
+    # PostgreSQL Replikasyon İzleme
+    "DEFAULT_PG_MAX_LAG_BYTES",
+    "DEFAULT_PG_MAX_LAG_SECONDS",
+    "check_pg_replication_health",
+    "export_pg_replication_to_polars",
+    "get_pg_replication_metrics",
 ]

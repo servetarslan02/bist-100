@@ -509,14 +509,27 @@ async def _publish_with_idempotency(event: CanonicalEvent) -> None:
 
 
 _redis_conn: Any = None
+_redis_conn_loop: asyncio.AbstractEventLoop | None = None
 _redis_unavailable: bool = False
 
 
 async def _get_redis() -> Any:
     """Merkezi Redis havuzunu döner veya InMemoryRedis yedeğini sağlar."""
-    global _redis_conn, _redis_unavailable
+    global _redis_conn, _redis_conn_loop, _redis_unavailable
     if _redis_unavailable:
         return InMemoryRedis()
+
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    # Olay döngüsü değişmiş veya kapanmışsa mevcut bağlantıyı yenile
+    if _redis_conn is not None and _redis_conn_loop is not current_loop:
+        _redis_conn = None
+
+    if _redis_conn is not None:
+        return _redis_conn
 
     try:
         from .database import get_redis
@@ -524,17 +537,19 @@ async def _get_redis() -> Any:
         r = await get_redis()
         if r:
             _redis_conn = r
+            _redis_conn_loop = current_loop
             return _redis_conn
     except Exception as exc:
         logger.debug("Veritabanı Redis bağlantısı kurulamadı, bellek içine geçiliyor", error=str(exc))
         _redis_conn = InMemoryRedis()
+        _redis_conn_loop = current_loop
 
     return _redis_conn
 
 
 _pg_unavailable: bool = False
 _published_lock: Final[threading.Lock] = threading.Lock()
-_published_events_in_memory: set[str] = set()
+_published_events_in_memory: dict[str, None] = {}
 
 
 async def _check_and_mark_published(event_id: str) -> bool:
@@ -561,7 +576,7 @@ async def _check_and_mark_published(event_id: str) -> bool:
                 result = await r.set(key, "1", ex=3600, nx=True)
                 if result:
                     with _published_lock:
-                        _published_events_in_memory.add(event_id)
+                        _published_events_in_memory[event_id] = None
                     return True
                 return False
         except Exception as exc:
@@ -580,16 +595,19 @@ async def _check_and_mark_published(event_id: str) -> bool:
                 event_id,
             )
             with _published_lock:
-                _published_events_in_memory.add(event_id)
+                _published_events_in_memory[event_id] = None
             return True
-        except Exception:
+        except Exception as pg_err:
             _pg_unavailable = True
+            logger.debug("pg_idempotency_denetimi_basarisiz_fallback", error=str(pg_err))
 
-    # 3. Bellek içi koruma (fallback)
+    # 3. Bellek içi FIFO koruma (fallback)
     with _published_lock:
-        _published_events_in_memory.add(event_id)
+        _published_events_in_memory[event_id] = None
         if len(_published_events_in_memory) > DEFAULT_MAX_EVENT_HISTORY:
-            _published_events_in_memory = set(list(_published_events_in_memory)[-25000:])
+            # En eski olayları at, en yeni 25000 olayı kronolojik koru (FIFO)
+            surviving = list(_published_events_in_memory.keys())[-25000:]
+            _published_events_in_memory = dict.fromkeys(surviving)
     return True
 
 
@@ -616,8 +634,8 @@ def _record_to_duckdb_ledger(
                     from services.core.debounce import configure_duckdb_wal
 
                     configure_duckdb_wal(conn)
-                except Exception:
-                    pass
+                except Exception as wal_err:
+                    logger.debug("event_ledger_wal_yapilandirma_atlandi", error=str(wal_err))
 
                 conn.execute(
                     """
@@ -635,8 +653,11 @@ def _record_to_duckdb_ledger(
 
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO event_ledger (event_id, event_type, payload, published_at)
+                    INSERT INTO event_ledger (event_id, event_type, payload, published_at)
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT (event_id) DO UPDATE SET
+                        payload = EXCLUDED.payload,
+                        published_at = EXCLUDED.published_at
                 """,
                     (event.event_id, str(event.event_type), payload_str),
                 )
@@ -708,9 +729,9 @@ def export_event_ledger_to_polars(
         Olay kayıtlarını içeren Polars DataFrame.
     """
     empty_schema = {
-        "event_id": pl.Utf8,
-        "event_type": pl.Utf8,
-        "payload": pl.Utf8,
+        "event_id": pl.String,
+        "event_type": pl.String,
+        "payload": pl.String,
         "published_at": pl.Datetime("us", "UTC"),
     }
     target = Path(db_path)
@@ -750,9 +771,9 @@ def query_event_ledger_duckdb(
         Filtrelenmiş olay tablosu.
     """
     empty_schema = {
-        "event_id": pl.Utf8,
-        "event_type": pl.Utf8,
-        "payload": pl.Utf8,
+        "event_id": pl.String,
+        "event_type": pl.String,
+        "payload": pl.String,
         "published_at": pl.Datetime("us", "UTC"),
     }
     target = Path(db_path)
@@ -791,7 +812,7 @@ class EventConsumer:
         self.auto_offset_reset: str = auto_offset_reset
         self._handlers: dict[str, Callable[..., Any]] = {}
         self._running: bool = False
-        self._processed_ids: set[str] = set()
+        self._processed_ids: dict[str, None] = {}
         self._lock: threading.RLock = threading.RLock()
 
     def __repr__(self) -> str:
@@ -840,9 +861,10 @@ class EventConsumer:
                     handler(event)
 
                 with self._lock:
-                    self._processed_ids.add(event.event_id)
+                    self._processed_ids[event.event_id] = None
                     if len(self._processed_ids) > DEFAULT_MAX_EVENT_HISTORY:
-                        self._processed_ids = set(list(self._processed_ids)[-25000:])
+                        surviving = list(self._processed_ids.keys())[-25000:]
+                        self._processed_ids = dict.fromkeys(surviving)
 
                 _events_consumed.add(1, {"group_id": self.group_id})
             except Exception as handler_exc:
@@ -871,11 +893,24 @@ class EventConsumer:
         self._running = False
 
 
+# Geriye dönük uyumluluk takma adı
+EventBus = InternalEventBus
+
+
+def record_event_to_duckdb_ledger(
+    event: CanonicalEvent,
+    db_path: str = DEFAULT_EVENT_LEDGER_DB_PATH,
+) -> None:
+    """Olayı yerel DuckDB kalıcı defterine (Event Ledger) kaydeder."""
+    _record_to_duckdb_ledger(event=event, db_path=db_path)
+
+
 __all__: Final[list[str]] = [
     "CRITICAL_EVENT_TYPES",
     "DEFAULT_EVENT_LEDGER_DB_PATH",
     "DEFAULT_MAX_EVENT_HISTORY",
     "DEFAULT_SUBJECTS",
+    "EventBus",
     "EventConsumer",
     "InMemoryRedis",
     "InternalEventBus",
@@ -885,5 +920,7 @@ __all__: Final[list[str]] = [
     "flush_producer",
     "publish_event",
     "query_event_ledger_duckdb",
+    "record_event_to_duckdb_ledger",
     "subscribe_nats",
 ]
+

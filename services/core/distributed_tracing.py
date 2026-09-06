@@ -698,9 +698,30 @@ def export_spans_to_duckdb(db_path: str = ":memory:") -> duckdb.DuckDBPyConnecti
     return distributed_tracer.export_spans_to_duckdb(db_path)
 
 
-def query_spans_duckdb(db_path: str = ":memory:", limit: int = 100) -> pl.DataFrame:
-    """DuckDB üzerinden span kayıtlarını sorgular."""
-    return distributed_tracer.query_spans_duckdb(db_path, limit)
+def export_spans_to_polars() -> pl.DataFrame:
+    """Yerel arabellekteki span kayıtlarını Polars DataFrame formatına dönüştürür."""
+    return distributed_tracer.export_spans_to_polars()
+
+
+def query_spans_duckdb(
+    db_path: str = ":memory:",
+    trace_id: str | None = None,
+    service_name: str | None = None,
+    min_duration_ms: float | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB üzerindeki span kayıtlarını sorgular."""
+    return distributed_tracer.query_spans_duckdb(
+        db_path=db_path,
+        trace_id=trace_id,
+        service_name=service_name,
+        min_duration_ms=min_duration_ms,
+        limit=limit,
+    )
+
+
+# Geriye dönük uyumluluk takma adı
+tracer: Final[DistributedTracer] = distributed_tracer
 
 
 __all__: Final[list[str]] = [
@@ -717,10 +738,13 @@ __all__: Final[list[str]] = [
     "correlation_id_var",
     "distributed_tracer",
     "span_id_var",
+    "tracer",
     # Dekoratörler
     "trace",
     "trace_async",
     # Analitik ve Veritabanı
     "export_spans_to_duckdb",
+    "export_spans_to_polars",
     "query_spans_duckdb",
 ]
+

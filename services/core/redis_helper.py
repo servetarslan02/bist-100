@@ -1,203 +1,395 @@
-import functools
+"""ALPHA BIST — Redis Yardımcı ve Çok Katmanlı Önbellek Motoru (Redis Helper & Cache).
+
+- Redis L1 Yüksek Hızlı Dağıtık Önbellek
+- In-Memory & DuckDB L2 Kalıcı Güvenli Fallback Önbellek
+- Self-Healing Otomatik Yeniden Bağlanma (Zero-Touch Reconnection)
+- Thread-Safe (RLock) ve Polars/orjson Desteği
+"""
+
+from __future__ import annotations
+
 import os
+import threading
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, Final
 
 import orjson
+import polars as pl
 import structlog
-from opentelemetry import trace
 
-logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.redis_helper")
+if TYPE_CHECKING:
+    import duckdb
 
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    import functools
 
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+    def otel_trace(name: str):
+        """Merkezi OTel tracer bulunamadığında kullanılan yerel fallback dekoratörü."""
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-        return wrapper
+            return wrapper
 
-    return decorator
+        return decorator
 
+logger = structlog.get_logger(__name__)
 
-_redis_client = None
-_redis_available = None
-_mem_cache: dict[str, tuple[float, str]] = {}  # key -> (expiry_ts, json_str)
+DEFAULT_TTL_SEC: Final[int] = 300
+DEFAULT_SOCKET_TIMEOUT_SEC: Final[float] = 1.5
+RECONNECT_INTERVAL_SEC: Final[float] = 5.0
+DEFAULT_MAX_MEM_CACHE_SIZE: Final[int] = 5000
 
+_lock = threading.RLock()
+_redis_client: Any | None = None
+_redis_available: bool = False
+_last_connect_attempt: float = 0.0
 
-def _load_cache() -> dict[str, str]:
-    """Saf in-memory önbellek okuma (Sıfır Disk I/O)."""
-    global _mem_cache
-    now = time.time()
-    valid_cache = {}
-    for k, (exp, val) in list(_mem_cache.items()):
-        if exp > now:
-            valid_cache[k] = val
-        else:
-            _mem_cache.pop(k, None)
-    return valid_cache
+# In-Memory L1 Fallback Cache: key -> (expire_mono: float, json_str: str)
+_mem_cache: dict[str, tuple[float, str]] = {}
+_duckdb_conn: duckdb.DuckDBPyConnection | None = None
 
 
-def _save_cache(data: dict[str, str], ttl: int = 300) -> None:
-    """Saf in-memory önbellek yazma (Sıfır Disk I/O)."""
-    global _mem_cache
-    now = time.time()
-    for k, v in data.items():
-        _mem_cache[k] = (now + ttl, str(v))
+def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
+    """L2 kalıcı önbellek için DuckDB bağlantısını tanımlar ve şemayı kurar."""
+    global _duckdb_conn
+    with _lock:
+        _duckdb_conn = conn
+        try:
+            _duckdb_conn.execute("""
+                CREATE TABLE IF NOT EXISTS redis_l2_cache (
+                    cache_key VARCHAR PRIMARY KEY,
+                    payload_json VARCHAR,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+        except Exception as exc:
+            logger.error("Redis L2 DuckDB şema oluşturma hatası", hata=str(exc))
 
 
-
-def get_client() -> Any:
-    """Otomatik eklendi."""
-    global _redis_client, _redis_available
-    if _redis_available is False:
+def _get_l2_duckdb_cache(key: str) -> Any | None:
+    """DuckDB L2 önbelleğinden geçerli kaydı okur."""
+    if _duckdb_conn is None:
         return None
-    if _redis_client is not None:
-        return _redis_client
-    try:
-        import redis as redis_lib
+    with _lock:
+        try:
+            row = _duckdb_conn.execute(
+                """
+                SELECT payload_json FROM redis_l2_cache
+                WHERE cache_key = ? AND expires_at > CURRENT_TIMESTAMP
+                LIMIT 1
+                """,
+                [key],
+            ).fetchone()
+            if row:
+                return orjson.loads(row[0])
+            # Süresi dolmuş kaydı temizle
+            _duckdb_conn.execute(
+                "DELETE FROM redis_l2_cache WHERE cache_key = ? AND expires_at <= CURRENT_TIMESTAMP",
+                [key],
+            )
+        except Exception as exc:
+            logger.debug("Redis L2 DuckDB önbellek okuma hatası", key=key, hata=str(exc))
+    return None
 
-        host = os.environ.get("REDIS_HOST", "redis")
-        port = int(os.environ.get("REDIS_PORT", "6379"))
-        db = int(os.environ.get("REDIS_DB", "0"))
-        password = os.environ.get("REDIS_PASSWORD", "") or None
-        _redis_client = redis_lib.Redis(
-            host=host,
-            port=port,
-            db=db,
-            password=password,
-            socket_timeout=1,
-            socket_connect_timeout=1,
-            decode_responses=False,
-        )
-        _redis_client.ping()
-        _redis_available = True
-        return _redis_client
-    except Exception:
-        _redis_available = False
-        return None
+
+def _set_l2_duckdb_cache(key: str, data: Any, ttl_sec: int) -> None:
+    """DuckDB L2 önbelleğine kayıt yazar."""
+    if _duckdb_conn is None:
+        return
+    with _lock:
+        try:
+            payload = orjson.dumps(data, default=str).decode("utf-8")
+            _duckdb_conn.execute(
+                """
+                INSERT OR REPLACE INTO redis_l2_cache (cache_key, payload_json, expires_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP + INTERVAL (?) SECOND)
+                """,
+                [key, payload, ttl_sec],
+            )
+        except Exception as exc:
+            logger.debug("Redis L2 DuckDB önbellek yazma hatası", key=key, hata=str(exc))
+
+
+def get_client() -> Any | None:
+    """Thread-safe ve Self-Healing Redis istemcisi döndürür.
+
+    Redis daha önce çökmüş olsa bile RECONNECT_INTERVAL_SEC sonrasında otomatik tekrar dener.
+    """
+    global _redis_client, _redis_available, _last_connect_attempt
+    with _lock:
+        now_mono = time.monotonic()
+
+        # Halihazırda bağlı ve istemci varsa
+        if _redis_client is not None and _redis_available:
+            return _redis_client
+
+        # Reconnect throttling: Son denemenin üzerinden yeterli süre geçmediyse bekle
+        if (now_mono - _last_connect_attempt) < RECONNECT_INTERVAL_SEC:
+            return None
+
+        _last_connect_attempt = now_mono
+
+        try:
+            import redis as redis_lib
+
+            host = os.environ.get("REDIS_HOST", "redis")
+            port = int(os.environ.get("REDIS_PORT", "6379"))
+            db = int(os.environ.get("REDIS_DB", "0"))
+            password = os.environ.get("REDIS_PASSWORD", "") or None
+
+            client = redis_lib.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                socket_timeout=DEFAULT_SOCKET_TIMEOUT_SEC,
+                socket_connect_timeout=DEFAULT_SOCKET_TIMEOUT_SEC,
+                decode_responses=False,
+            )
+            client.ping()
+            _redis_client = client
+            _redis_available = True
+            logger.info("Redis bağlantısı başarıyla kuruldu (Self-Healing)", host=host, port=port, db=db)
+            return _redis_client
+        except Exception as exc:
+            _redis_available = False
+            _redis_client = None
+            logger.warn("Redis bağlantısı kurulamadı, L1/L2 önbelleğe düşülüyor", hata=str(exc))
+            return None
 
 
 @otel_trace("redis_helper.get_cached")
 def get_cached(key: str) -> Any | None:
-    """Otomatik eklendi."""
+    """Önbellekten değer okur (Redis -> Memory L1 -> DuckDB L2 Fallback)."""
     r = get_client()
-    if r is None:
-        now = time.time()
+    if r is not None:
+        try:
+            data = r.get(key)
+            if data:
+                return orjson.loads(data)
+        except Exception as exc:
+            logger.warn("Redis okuma hatası, yerel önbelleğe düşülüyor", key=key, hata=str(exc))
+            with _lock:
+                _redis_available = False
+
+    # In-Memory L1 Kontrolü
+    now_mono = time.monotonic()
+    with _lock:
         if key in _mem_cache:
             exp, val = _mem_cache[key]
-            if exp > now:
-                return orjson.loads(val)
+            if exp > now_mono:
+                try:
+                    return orjson.loads(val)
+                except Exception:
+                    pass
             _mem_cache.pop(key, None)
-        return None
-    try:
-        data = r.get(key)
-        if data:
-            return orjson.loads(data)
-    except Exception:
-        logger.warning("Caught Exception in get_cached", exc_info=True)
-    return None
+
+    # DuckDB L2 Kontrolü
+    return _get_l2_duckdb_cache(key)
 
 
 @otel_trace("redis_helper.set_cached")
-def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
-    """Otomatik eklendi."""
+def set_cached(key: str, data: Any, ttl: int = DEFAULT_TTL_SEC) -> bool:
+    """Önbelleğe değer yazar (Redis + Memory L1 + DuckDB L2)."""
+    payload_str = orjson.dumps(data, default=str).decode("utf-8")
+    now_mono = time.monotonic()
+
+    # Bellek önbelleğine daima yaz (L1)
+    with _lock:
+        _mem_cache[key] = (now_mono + ttl, payload_str)
+        if len(_mem_cache) > DEFAULT_MAX_MEM_CACHE_SIZE:
+            # En eski veya süresi dolanları temizle
+            _cleanup_mem_cache()
+
+    # DuckDB L2 önbelleğe yaz
+    _set_l2_duckdb_cache(key, data, ttl)
+
+    # Redis'e yaz
     r = get_client()
-    if r is None:
-        val_str = orjson.dumps(data, default=str).decode()
-        _mem_cache[key] = (time.time() + ttl, val_str)
-        return True
-    try:
-        r.setex(key, ttl, orjson.dumps(data, default=str).decode())
-        return True
-    except Exception:
-        return False
+    if r is not None:
+        try:
+            r.setex(key, ttl, payload_str)
+            return True
+        except Exception as exc:
+            logger.warn("Redis yazma hatası, yerel önbellek korundu", key=key, hata=str(exc))
+            with _lock:
+                _redis_available = False
+
+    return True
 
 
 @otel_trace("redis_helper.delete_cached")
 def delete_cached(key: str) -> bool:
-    """Otomatik eklendi."""
-    r = get_client()
-    if r is None:
+    """Önbellekten anahtarı tüm katmanlardan siler."""
+    with _lock:
         _mem_cache.pop(key, None)
-        return True
-    try:
-        r.delete(key)
-        return True
-    except Exception:
-        return False
+        if _duckdb_conn is not None:
+            try:
+                _duckdb_conn.execute("DELETE FROM redis_l2_cache WHERE cache_key = ?", [key])
+            except Exception as exc:
+                logger.debug("DuckDB L2 silme hatası", key=key, hata=str(exc))
+
+    r = get_client()
+    if r is not None:
+        try:
+            r.delete(key)
+            return True
+        except Exception as exc:
+            logger.warn("Redis silme hatası", key=key, hata=str(exc))
+            with _lock:
+                _redis_available = False
+
+    return True
 
 
 @otel_trace("redis_helper.mget_cached")
 def mget_cached(keys: list[str]) -> dict[str, Any]:
-    """Çoklu anahtarı pipeline ile tek seferde çeker (Roundtrip tasarrufu)."""
+    """Çoklu anahtarı toplu olarak çeker (Pipeline & Yerel birleştirme)."""
     if not keys:
         return {}
+
+    results: dict[str, Any] = {}
+    missing_keys: list[str] = list(keys)
+
     r = get_client()
-    if r is None:
-        now = time.time()
-        res = {}
-        for k in keys:
-            if k in _mem_cache:
-                exp, val = _mem_cache[k]
-                if exp > now:
+    if r is not None:
+        try:
+            pipe = r.pipeline(transaction=False)
+            for k in keys:
+                pipe.get(k)
+            pipe_results = pipe.execute()
+            for k, val in zip(keys, pipe_results, strict=False):
+                if val is not None:
                     try:
-                        res[k] = orjson.loads(val)
-                    except Exception as json_err:
-                        logger.debug("mget_mem_json_parse_failed", key=k, error=str(json_err))
-                else:
-                    _mem_cache.pop(k, None)
-        return res
-    try:
-        pipe = r.pipeline(transaction=False)
-        for k in keys:
-            pipe.get(k)
-        results = pipe.execute()
-        res = {}
-        for k, v in zip(keys, results, strict=False):
-            if v is not None:
-                try:
-                    res[k] = orjson.loads(v)
-                except Exception as json_err:
-                    logger.debug("mget_redis_json_parse_failed", key=k, error=str(json_err))
-        return res
-    except Exception as e:
-        logger.warning("mget_cached_failed", error=str(e))
-        return {}
+                        results[k] = orjson.loads(val)
+                        missing_keys.remove(k)
+                    except Exception:
+                        pass
+        except Exception as exc:
+            logger.warn("Redis mget pipeline hatası", hata=str(exc))
+            with _lock:
+                _redis_available = False
+
+    # Eksik kalan anahtarları Memory L1 ve DuckDB L2'den tamamla
+    if missing_keys:
+        now_mono = time.monotonic()
+        with _lock:
+            for k in list(missing_keys):
+                if k in _mem_cache:
+                    exp, val = _mem_cache[k]
+                    if exp > now_mono:
+                        try:
+                            results[k] = orjson.loads(val)
+                            missing_keys.remove(k)
+                        except Exception:
+                            pass
+                    else:
+                        _mem_cache.pop(k, None)
+
+        for k in list(missing_keys):
+            val_l2 = _get_l2_duckdb_cache(k)
+            if val_l2 is not None:
+                results[k] = val_l2
+                missing_keys.remove(k)
+
+    return results
 
 
 @otel_trace("redis_helper.mset_cached")
-def mset_cached(mapping: dict[str, Any], ttl: int = 300) -> bool:
-    """Çoklu anahtarı pipeline ile tek seferde yazar."""
+def mset_cached(mapping: dict[str, Any], ttl: int = DEFAULT_TTL_SEC) -> bool:
+    """Çoklu anahtarı toplu yazar (Pipeline & L1/L2 senkronizasyonu)."""
     if not mapping:
         return True
+
+    now_mono = time.monotonic()
+    with _lock:
+        for k, v in mapping.items():
+            payload = orjson.dumps(v, default=str).decode("utf-8")
+            _mem_cache[k] = (now_mono + ttl, payload)
+            _set_l2_duckdb_cache(k, v, ttl)
+
     r = get_client()
-    if r is None:
-        now = time.time()
-        for k, v in mapping.items():
-            payload = orjson.dumps(v, default=str).decode()
-            _mem_cache[k] = (now + ttl, payload)
-        return True
-    try:
-        pipe = r.pipeline(transaction=False)
-        for k, v in mapping.items():
-            payload = orjson.dumps(v, default=str).decode()
-            pipe.setex(k, ttl, payload)
-        pipe.execute()
-        return True
-    except Exception as e:
-        logger.warning("mset_cached_failed", error=str(e))
-        return False
+    if r is not None:
+        try:
+            pipe = r.pipeline(transaction=False)
+            for k, v in mapping.items():
+                payload = orjson.dumps(v, default=str).decode("utf-8")
+                pipe.setex(k, ttl, payload)
+            pipe.execute()
+            return True
+        except Exception as exc:
+            logger.warn("Redis mset pipeline hatası", hata=str(exc))
+            with _lock:
+                _redis_available = False
+
+    return True
+
+
+def _cleanup_mem_cache() -> None:
+    """Süresi dolan bellek önbellek kayıtlarını temizler."""
+    now_mono = time.monotonic()
+    keys_to_del = [k for k, (exp, _) in _mem_cache.items() if exp <= now_mono]
+    for k in keys_to_del:
+        _mem_cache.pop(k, None)
 
 
 def is_available() -> bool:
-    """Otomatik eklendi."""
+    """Redis bağlantısının aktif olup olmadığını belirtir."""
     return get_client() is not None
 
+
+def export_cache_metrics_to_polars() -> pl.DataFrame:
+    """Önbellek metriklerini ve bellek durumunu Polars DataFrame olarak dışa aktarır."""
+    now_mono = time.monotonic()
+    with _lock:
+        records = [
+            {
+                "cache_key": k,
+                "remaining_ttl_sec": max(0.0, exp - now_mono),
+                "payload_size_bytes": len(val),
+                "is_expired": exp <= now_mono,
+            }
+            for k, (exp, val) in _mem_cache.items()
+        ]
+
+    if not records:
+        return pl.DataFrame(
+            schema={
+                "cache_key": pl.Utf8,
+                "remaining_ttl_sec": pl.Float64,
+                "payload_size_bytes": pl.Int64,
+                "is_expired": pl.Boolean,
+            }
+        )
+
+    return pl.DataFrame(records)
+
+
+def reset_memory_cache() -> None:
+    """Bellek önbelleğini sıfırlar (Test ve acil durumlar için)."""
+    with _lock:
+        _mem_cache.clear()
+
+
+__all__ = [
+    "DEFAULT_MAX_MEM_CACHE_SIZE",
+    "DEFAULT_SOCKET_TIMEOUT_SEC",
+    "DEFAULT_TTL_SEC",
+    "RECONNECT_INTERVAL_SEC",
+    "delete_cached",
+    "export_cache_metrics_to_polars",
+    "get_cached",
+    "get_client",
+    "is_available",
+    "mget_cached",
+    "mset_cached",
+    "reset_memory_cache",
+    "set_cached",
+    "set_duckdb_connection",
+]

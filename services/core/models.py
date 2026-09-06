@@ -6,18 +6,19 @@ orjson tabanlı hızlı serileştirme ve finansal veri standartları.
 
 from datetime import UTC, date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final, Self
 
 import orjson
+import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # =====================================================
 # Sabitler (Constants)
 # =====================================================
-DEFAULT_INITIAL_CAPITAL: float = 100_000.0
-DEFAULT_VIX_LEVEL: float = 20.0
-DEFAULT_RSI: float = 50.0
-DEFAULT_RISK_APPETITE: float = 0.5
+DEFAULT_INITIAL_CAPITAL: Final[float] = 100_000.0
+DEFAULT_VIX_LEVEL: Final[float] = 20.0
+DEFAULT_RSI: Final[float] = 50.0
+DEFAULT_RISK_APPETITE: Final[float] = 0.5
 
 
 class BaseDomainModel(BaseModel):
@@ -35,16 +36,39 @@ class BaseDomainModel(BaseModel):
 
     def to_orjson_bytes(self) -> bytes:
         """Modeli orjson ile ikili (bytes) JSON formatına serileştirir."""
-        return orjson.dumps(self.model_dump(mode="json"))
+        return orjson.dumps(self.model_dump(mode="python"), default=str)
 
     def to_orjson_str(self) -> str:
         """Modeli orjson ile UTF-8 JSON metnine serileştirir."""
         return self.to_orjson_bytes().decode("utf-8")
 
+    @classmethod
+    def from_orjson(cls, data: bytes | str | dict[str, Any]) -> Self:
+        """orjson verisinden (bayt, string veya sözlük) model örneği üretir (GEMINI.md Kural 5)."""
+        if isinstance(data, (bytes, str)):
+            parsed = orjson.loads(data)
+        else:
+            parsed = data
+        return cls.model_validate(parsed)
+
+    @classmethod
+    def to_polars(cls, models: list[Self]) -> pl.DataFrame:
+        """Model listesini yüksek performanslı Polars DataFrame'e dönüştürür (GEMINI.md Kural 2)."""
+        if not models:
+            return pl.DataFrame()
+        return pl.DataFrame([m.model_dump(mode="python") for m in models])
+
     def __repr__(self) -> str:
         """Sınıf adı ve birincil alanları içeren açıklayıcı temsil."""
         attrs = ", ".join(f"{k}={v!r}" for k, v in list(self.__dict__.items())[:5])
         return f"{self.__class__.__name__}({attrs})"
+
+
+def models_to_polars(models: list[BaseDomainModel]) -> pl.DataFrame:
+    """Temel etki alanı model listesini Polars DataFrame'e dönüştürür (GEMINI.md Kural 2)."""
+    if not models:
+        return pl.DataFrame()
+    return pl.DataFrame([m.model_dump(mode="python") for m in models])
 
 
 # =====================================================
@@ -143,7 +167,11 @@ class MarketTick(BaseDomainModel):
     @field_validator("quality")
     @classmethod
     def _validate_quality(cls, v: float) -> float:
-        """Veri kalite skorunun [0, 1] aralığında olduğunu doğrular."""
+        """Veri kalite skorunun [0, 1] aralığında olduğunu doğrular (nümerik tolerans korumalı)."""
+        if -1e-6 <= v < 0.0:
+            v = 0.0
+        elif 1.0 < v <= 1.0 + 1e-6:
+            v = 1.0
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Kalite skoru [0,1] aralığında olmalıdır, alınan: {v}")
         return v
@@ -190,6 +218,10 @@ class OHLCV(BaseDomainModel):
             raise ValueError(f"En yüksek fiyat ({self.high}) açılış veya kapanıştan düşük olamaz.")
         if self.low > min(self.open, self.close):
             raise ValueError(f"En düşük fiyat ({self.low}) açılış veya kapanıştan yüksek olamaz.")
+        if self.vwap is not None and (self.vwap < self.low * 0.999 or self.vwap > self.high * 1.001):
+            raise ValueError(
+                f"VWAP ({self.vwap}) barın düşük-yüksek aralığının dışında olamaz ({self.low} - {self.high})."
+            )
         return self
 
 
@@ -216,6 +248,10 @@ class OrderBookSnapshot(BaseDomainModel):
             raise ValueError(f"Spread negatif olamaz, alınan: {self.spread}")
         if self.mid_price <= 0:
             raise ValueError(f"Orta fiyat (mid_price) pozitif olmalıdır, alınan: {self.mid_price}")
+        if self.bid_prices and self.ask_prices and self.bid_prices[0] > self.ask_prices[0]:
+            raise ValueError(
+                f"En iyi alış fiyatı ({self.bid_prices[0]}) en iyi satış fiyatından ({self.ask_prices[0]}) büyük olamaz."
+            )
         return self
 
 
@@ -407,7 +443,11 @@ class Signal(BaseDomainModel):
     @field_validator("confidence")
     @classmethod
     def _validate_confidence(cls, v: float) -> float:
-        """Güven skorunun [0, 1] aralığında olduğunu doğrular."""
+        """Güven skorunun [0, 1] aralığında olduğunu doğrular (nümerik tolerans korumalı)."""
+        if -1e-6 <= v < 0.0:
+            v = 0.0
+        elif 1.0 < v <= 1.0 + 1e-6:
+            v = 1.0
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Güven skoru [0,1] aralığında olmalıdır, alınan: {v}")
         return v
@@ -415,7 +455,11 @@ class Signal(BaseDomainModel):
     @field_validator("score")
     @classmethod
     def _validate_score(cls, v: float) -> float:
-        """Sinyal puanının [0, 100] aralığında olduğunu doğrular."""
+        """Sinyal puanının [0, 100] aralığında olduğunu doğrular (nümerik tolerans korumalı)."""
+        if -1e-5 <= v < 0.0:
+            v = 0.0
+        elif 100.0 < v <= 100.0 + 1e-5:
+            v = 100.0
         if not 0.0 <= v <= 100.0:
             raise ValueError(f"Sinyal puanı [0,100] aralığında olmalıdır, alınan: {v}")
         return v
@@ -464,6 +508,14 @@ class Position(BaseDomainModel):
             raise ValueError(f"Pozisyon adedi negatif olamaz, alınan: {v}")
         return v
 
+    @field_validator("current_price", "market_value")
+    @classmethod
+    def _validate_non_negative_price(cls, v: float) -> float:
+        """Güncel fiyat veya piyasa değerinin negatif olmadığını doğrular."""
+        if v < 0:
+            raise ValueError(f"Fiyat veya piyasa değeri negatif olamaz, alınan: {v}")
+        return v
+
 
 class Portfolio(BaseDomainModel):
     """Portföyün genel varlık, nakit ve getiri durumu."""
@@ -478,6 +530,14 @@ class Portfolio(BaseDomainModel):
     total_return_pct: float = 0.0
     positions: list[Position] = Field(default_factory=list)
     is_paper: bool = True
+
+    @field_validator("initial_capital", "current_capital")
+    @classmethod
+    def _validate_capital(cls, v: float) -> float:
+        """Başlangıç ve güncel sermayenin negatif olamayacağını doğrular."""
+        if v < 0:
+            raise ValueError(f"Sermaye tutarı negatif olamaz, alınan: {v}")
+        return v
 
 
 # =====================================================
@@ -504,7 +564,11 @@ class Prediction(BaseDomainModel):
     @field_validator("confidence", "probability_positive")
     @classmethod
     def _validate_probabilities(cls, v: float) -> float:
-        """Olasılık ve güven değerlerinin [0, 1] aralığında olduğunu doğrular."""
+        """Olasılık ve güven değerlerinin [0, 1] aralığında olduğunu doğrular (nümerik tolerans korumalı)."""
+        if -1e-6 <= v < 0.0:
+            v = 0.0
+        elif 1.0 < v <= 1.0 + 1e-6:
+            v = 1.0
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Olasılık/güven değeri [0,1] aralığında olmalıdır, alınan: {v}")
         return v
@@ -570,7 +634,7 @@ class Alert(BaseDomainModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-__all__ = [
+__all__: Final[list[str]] = [
     "DEFAULT_INITIAL_CAPITAL",
     "DEFAULT_RISK_APPETITE",
     "DEFAULT_RSI",
@@ -596,4 +660,5 @@ __all__ = [
     "SimulationResult",
     "TimeHorizon",
     "WorldState",
+    "models_to_polars",
 ]

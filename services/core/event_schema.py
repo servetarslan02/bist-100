@@ -21,8 +21,10 @@ Kullanım:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
+import math
 import re
 import struct
 import time
@@ -30,7 +32,7 @@ import uuid
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Final
 
 import duckdb
 import orjson
@@ -60,6 +62,9 @@ DEFAULT_EVENT_SCHEMA_DB_PATH: str = "data/event_schema_audit.duckdb"
 def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
 
+    Senkron ve asenkron fonksiyonları otomatik ayırt ederek span yaşam döngüsünü
+    korur.
+
     Args:
         span_name: Üretilecek span için benzersiz izleme adı.
 
@@ -68,12 +73,22 @@ def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., A
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
+        if asyncio.iscoroutinefunction(func):
 
-        return wrapper
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper
+        else:
+
+            @functools.wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name):
+                    return func(*args, **kwargs)
+
+            return sync_wrapper
 
     return decorator
 
@@ -121,7 +136,7 @@ class EventType(IntEnum):
     WORLD_STATE_CHANGED = 37
 
 
-@dataclass
+@dataclass(slots=True)
 class CanonicalEvent:
     """Standart olay formatı — tüm servisler ve mikro mimari bu sözleşmeyi kullanır."""
 
@@ -142,6 +157,9 @@ class CanonicalEvent:
             self.timestamp = int(time.time() * 1000)
         if not self.event_id:
             self.event_id = str(uuid.uuid4())
+        self.ticker = str(self.ticker or "")
+        self.source = str(self.source or "")
+        self.correlation_id = str(self.correlation_id or "")
 
     def __repr__(self) -> str:
         type_name = self.event_type.name if hasattr(self.event_type, "name") else str(self.event_type)
@@ -164,7 +182,22 @@ class CanonicalEvent:
             return False, "Geçersiz timestamp: <= 0"
         if self.version < 1:
             return False, f"Desteklenmeyen şema versiyonu: {self.version}"
+        if self.sequence < 0:
+            return False, f"Geçersiz sequence numarası: {self.sequence}"
+        if math.isnan(self.confidence) or math.isinf(self.confidence) or not (0.0 <= self.confidence <= 1.0):
+            return False, f"Geçersiz confidence skoru (0.0-1.0 aralığında olmalı): {self.confidence}"
         return True, "OK"
+
+    def is_point_in_time(self, cutoff_timestamp_ms: int) -> bool:
+        """Olayın belirtilen geçmiş zaman damgasında geçerli olup olmadığını (PIT) denetler.
+
+        Args:
+            cutoff_timestamp_ms: İzin verilen azami milisaniye zaman damgası.
+
+        Returns:
+            True ise olay geçmişe aittir (veri sızıntısı yoktur), False ise geleceği görür.
+        """
+        return self.timestamp <= cutoff_timestamp_ms
 
     @otel_trace("event_schema.to_json")
     def to_json(self) -> str:
@@ -173,21 +206,11 @@ class CanonicalEvent:
         Returns:
             JSON metni.
         """
-        return orjson.dumps(
-            {
-                "type": self.event_type.value if hasattr(self.event_type, "value") else int(self.event_type),
-                "ticker": self.ticker,
-                "data": self.data,
-                "timestamp": self.timestamp,
-                "source": self.source,
-                "confidence": self.confidence,
-                "sequence": self.sequence,
-                "version": self.version,
-                "correlation_id": self.correlation_id,
-                "event_id": self.event_id,
-            },
-            default=str,
-        ).decode("utf-8")
+        return self.to_orjson_bytes().decode("utf-8")
+
+    def to_orjson_bytes(self) -> bytes:
+        """Olayı doğrudan soket ve pub/sub yayını için UTF-8 ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     @otel_trace("event_schema.to_dict")
     def to_dict(self) -> dict[str, Any]:
@@ -213,6 +236,9 @@ class CanonicalEvent:
     def to_binary(self) -> bytes:
         """Olayı Protobuf uyumlu kompakt ikili (binary) formata çevirir.
 
+        Zarf (envelope) modeli sayesinde `event_id`, `correlation_id`, `sequence`,
+        `version` ve 10 karakterden uzun VIOP sembolleri sıfır kayıpla korunur.
+
         Returns:
             Serileştirilmiş bayt dizisi.
         """
@@ -220,7 +246,18 @@ class CanonicalEvent:
         source_bytes = self.source.encode("utf-8")[:255]
         source_len = len(source_bytes)
 
-        data_json = orjson.dumps(self.data, default=str)[:65535]
+        # Üstveri zarfı (envelope): Olay kimliği, korelasyon ve sıra numarasını tam korur
+        envelope: dict[str, Any] = {
+            "_d": self.data,
+            "_id": self.event_id,
+            "_c": self.correlation_id,
+            "_s": self.sequence,
+            "_v": self.version,
+        }
+        if len(self.ticker) > 10:
+            envelope["_t"] = self.ticker
+
+        data_json = orjson.dumps(envelope, default=str)[:65535]
         data_len = len(data_json)
 
         type_val = self.event_type.value if hasattr(self.event_type, "value") else int(self.event_type)
@@ -313,7 +350,22 @@ class CanonicalEvent:
             offset += source_len
 
             data_raw = binary[offset : offset + data_len]
-            data = orjson.loads(data_raw) if data_raw else {}
+            parsed = orjson.loads(data_raw) if data_raw else {}
+
+            if isinstance(parsed, dict) and "_d" in parsed:
+                data = parsed.get("_d", {})
+                event_id = str(parsed.get("_id", ""))
+                correlation_id = str(parsed.get("_c", ""))
+                sequence = int(parsed.get("_s", 0))
+                version = int(parsed.get("_v", 1))
+                if "_t" in parsed:
+                    ticker = str(parsed["_t"])
+            else:
+                data = parsed if isinstance(parsed, dict) else {}
+                event_id = ""
+                correlation_id = ""
+                sequence = 0
+                version = 1
 
             try:
                 event_type = EventType(type_val)
@@ -327,6 +379,10 @@ class CanonicalEvent:
                 timestamp=timestamp,
                 source=source,
                 confidence=confidence,
+                sequence=sequence,
+                version=version,
+                correlation_id=correlation_id,
+                event_id=event_id,
             )
         except Exception as e:
             logger.error("binary_decode_failed", error=str(e))
@@ -345,7 +401,7 @@ def create_tick_event(
 
     Args:
         ticker: BIST hisse sembolü (ör: 'THYAO').
-        price: Güncel işlem fiyatı.
+        price: Güncel işlem fiyatı (> 0).
         change: Günlük yüzde değişim oranı.
         volume: Toplam işlem hacmi (lot/adet).
         source: Veri kaynağı etiketi.
@@ -353,10 +409,11 @@ def create_tick_event(
     Returns:
         Oluşturulan CanonicalEvent nesnesi.
     """
+    clean_price = max(0.0, float(price))
     return CanonicalEvent(
         event_type=EventType.TICK,
-        ticker=ticker,
-        data={"price": float(price), "change": float(change), "volume": int(volume)},
+        ticker=str(ticker).upper(),
+        data={"price": clean_price, "change": float(change), "volume": max(0, int(volume))},
         source=source,
     )
 
@@ -377,16 +434,20 @@ def create_signal_event(
     Returns:
         Oluşturulan CanonicalEvent nesnesi.
     """
+    clean_direction = str(direction).upper()
+    if clean_direction not in ("BUY", "SELL", "HOLD"):
+        clean_direction = "HOLD"
+
     return CanonicalEvent(
         event_type=EventType.SIGNAL,
-        ticker=ticker,
+        ticker=str(ticker).upper(),
         data={
-            "direction": str(direction),
+            "direction": clean_direction,
             "target": float(target),
             "stop_loss": float(stop_loss),
             "reason": str(reason),
         },
-        confidence=float(confidence),
+        confidence=max(0.0, min(1.0, float(confidence))),
         source="intelligence",
     )
 
@@ -414,11 +475,11 @@ def create_alert_event(
     """
     return CanonicalEvent(
         event_type=EventType.ALERT,
-        ticker=ticker,
+        ticker=str(ticker).upper(),
         data={
             "alert_type": str(alert_type),
             "message": str(message),
-            "severity": str(severity),
+            "severity": str(severity).upper(),
             "value": float(value),
             "threshold": float(threshold),
         },
@@ -441,7 +502,7 @@ def create_regime_event(regime: str, confidence: float, vix: float = 0.0, breadt
     return CanonicalEvent(
         event_type=EventType.REGIME,
         data={"regime": str(regime), "vix": float(vix), "breadth": float(breadth)},
-        confidence=float(confidence),
+        confidence=max(0.0, min(1.0, float(confidence))),
         source="market_state",
     )
 
@@ -482,12 +543,16 @@ def create_order_filled_event(
     Returns:
         Oluşturulan CanonicalEvent nesnesi.
     """
+    clean_side = str(side).upper()
+    if clean_side not in ("BUY", "SELL"):
+        clean_side = "BUY"
+
     return CanonicalEvent(
         event_type=EventType.ORDER_FILLED,
-        ticker=ticker,
+        ticker=str(ticker).upper(),
         data={
             "order_id": str(order_id),
-            "side": str(side),
+            "side": clean_side,
             "price": float(price),
             "quantity": float(quantity),
         },
@@ -500,6 +565,22 @@ def create_order_filled_event(
 # =====================================================
 
 
+def filter_pit_events(
+    events: list[CanonicalEvent],
+    cutoff_timestamp_ms: int,
+) -> list[CanonicalEvent]:
+    """Mask-First prensibiyle (Kural 2) geleceğe ait olayları filtreler (Sıfır Veri Sızıntısı / PIT).
+
+    Args:
+        events: Olay listesi.
+        cutoff_timestamp_ms: İzin verilen azami geçmiş zaman damgası (milisaniye).
+
+    Returns:
+        Yalnızca cutoff_timestamp_ms öncesi veya anındaki olaylar.
+    """
+    return [ev for ev in events if ev.timestamp <= cutoff_timestamp_ms]
+
+
 def events_to_polars(events: list[CanonicalEvent]) -> pl.DataFrame:
     """CanonicalEvent nesneleri listesini vektörize Polars DataFrame yapısına dönüştürür.
 
@@ -509,20 +590,22 @@ def events_to_polars(events: list[CanonicalEvent]) -> pl.DataFrame:
     Returns:
         Olayları yapısal olarak içeren polars.DataFrame nesnesi.
     """
+    schema = {
+        "event_id": pl.String,
+        "type": pl.Int32,
+        "type_name": pl.String,
+        "ticker": pl.String,
+        "timestamp": pl.Int64,
+        "source": pl.String,
+        "confidence": pl.Float64,
+        "sequence": pl.Int64,
+        "version": pl.Int32,
+        "correlation_id": pl.String,
+        "data_json": pl.String,
+    }
+
     if not events:
-        return pl.DataFrame({
-            "event_id": pl.Series(dtype=pl.String),
-            "type": pl.Series(dtype=pl.Int32),
-            "type_name": pl.Series(dtype=pl.String),
-            "ticker": pl.Series(dtype=pl.String),
-            "timestamp": pl.Series(dtype=pl.Int64),
-            "source": pl.Series(dtype=pl.String),
-            "confidence": pl.Series(dtype=pl.Float64),
-            "sequence": pl.Series(dtype=pl.Int64),
-            "version": pl.Series(dtype=pl.Int32),
-            "correlation_id": pl.Series(dtype=pl.String),
-            "data_json": pl.Series(dtype=pl.String),
-        })
+        return pl.DataFrame(schema=schema)
 
     records: list[dict[str, Any]] = []
     for ev in events:
@@ -542,19 +625,6 @@ def events_to_polars(events: list[CanonicalEvent]) -> pl.DataFrame:
             "data_json": orjson.dumps(ev.data, default=str).decode("utf-8"),
         })
 
-    schema = {
-        "event_id": pl.String,
-        "type": pl.Int32,
-        "type_name": pl.String,
-        "ticker": pl.String,
-        "timestamp": pl.Int64,
-        "source": pl.String,
-        "confidence": pl.Float64,
-        "sequence": pl.Int64,
-        "version": pl.Int32,
-        "correlation_id": pl.String,
-        "data_json": pl.String,
-    }
     return pl.DataFrame(records, schema=schema)
 
 
@@ -581,7 +651,8 @@ def events_from_polars(df: pl.DataFrame) -> list[CanonicalEvent]:
         data_json = row.get("data_json", "{}")
         try:
             data = orjson.loads(data_json) if data_json else {}
-        except Exception:
+        except Exception as json_err:
+            logger.debug("events_from_polars_gecersiz_data_json", error=str(json_err), data_json=str(data_json)[:100])
             data = {}
 
         ev = CanonicalEvent(
@@ -647,7 +718,21 @@ def export_events_to_duckdb(
             )
         """)
         conn.register("df_events_view", df.to_arrow())
-        conn.execute(f"INSERT OR REPLACE INTO {table_name} SELECT * FROM df_events_view")
+        conn.execute(f"""
+            INSERT INTO {table_name}
+            SELECT * FROM df_events_view
+            ON CONFLICT (event_id) DO UPDATE SET
+                type = EXCLUDED.type,
+                type_name = EXCLUDED.type_name,
+                ticker = EXCLUDED.ticker,
+                timestamp = EXCLUDED.timestamp,
+                source = EXCLUDED.source,
+                confidence = EXCLUDED.confidence,
+                sequence = EXCLUDED.sequence,
+                version = EXCLUDED.version,
+                correlation_id = EXCLUDED.correlation_id,
+                data_json = EXCLUDED.data_json
+        """)
 
     return df.height
 
@@ -657,7 +742,7 @@ def query_events_duckdb(
     params: list[Any] | None = None,
     db_path: str = DEFAULT_EVENT_SCHEMA_DB_PATH,
 ) -> list[dict[str, Any]]:
-    """Yerel DuckDB olay şeması defteri üzerinde parametrik SQL sorgusu çalıştırır.
+    """Yerel DuckDB olay şeması defteri üzerinde parametrik ve korumalı SQL sorgusu çalıştırır.
 
     Args:
         query: Çalıştırılacak SQL sorgusu.
@@ -666,14 +751,26 @@ def query_events_duckdb(
 
     Returns:
         Sorgu sonuçlarını sözlükler listesi olarak döndürür.
+
+    Raises:
+        ValueError: Sorgu çoklu ifade (;) veya zararlı yorum blokları içeriyorsa.
     """
+    clean_query = query.strip()
+    # SQL Enjeksiyonu ve çoklu ifade koruması
+    if ";" in clean_query.rstrip(";"):
+        raise ValueError("Çoklu SQL ifadeleri yasaktır.")
+    if "--" in clean_query or "/*" in clean_query:
+        raise ValueError("SQL yorum blokları yasaktır.")
+
     target = Path(db_path)
     if not target.exists() or target.stat().st_size == 0:
         return []
 
     try:
         with duckdb.connect(db_path, read_only=True) as conn:
-            cursor = conn.execute(query, params or [])
+            cursor = conn.execute(clean_query, params or [])
+            if cursor.description is None:
+                return []
             cols = [desc[0] for desc in cursor.description]
             return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
     except Exception as exc:
@@ -681,7 +778,7 @@ def query_events_duckdb(
         return []
 
 
-__all__ = [
+__all__: Final[list[str]] = [
     "BINARY_HEADER_FORMAT",
     "BINARY_HEADER_SIZE",
     "CanonicalEvent",
@@ -696,6 +793,9 @@ __all__ = [
     "events_from_polars",
     "events_to_polars",
     "export_events_to_duckdb",
+    "filter_pit_events",
     "otel_trace",
     "query_events_duckdb",
 ]
+
+

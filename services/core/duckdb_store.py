@@ -259,7 +259,8 @@ class DuckDBStore:
             # DuckDB doğrudan çoklu ifade yürütmeyi destekler
             try:
                 conn.execute(script)
-            except Exception:
+            except Exception as script_err:
+                logger.debug("executescript_dogrudan_yurutme_hatasi_ayristiriliyor", error=str(script_err))
                 # İfadeleri ayrıştırarak tek tek deneme yedeği
                 for stmt in script.split(";"):
                     cleaned = stmt.strip()
@@ -267,7 +268,7 @@ class DuckDBStore:
                         conn.execute(cleaned)
 
     def _flush_buffer(self) -> None:
-        """Arabellekte biriken yazma işlemlerini veritabanına aktarır."""
+        """Arabellekte biriken yazma işlemlerini atomik işlem (transaction) ile veritabanına aktarır."""
         with self._lock:
             if not self._write_buffer:
                 return
@@ -275,11 +276,25 @@ class DuckDBStore:
             self._write_buffer.clear()
 
             with self._get_conn() as conn:
-                for query, params in batch:
-                    if params:
-                        conn.execute(query, params)
-                    else:
-                        conn.execute(query)
+                try:
+                    conn.execute("BEGIN TRANSACTION")
+                    for query, params in batch:
+                        if params:
+                            conn.execute(query, params)
+                        else:
+                            conn.execute(query)
+                    conn.execute("COMMIT")
+                except Exception as exc:
+                    with suppress(Exception):
+                        conn.execute("ROLLBACK")
+                    # Başarısız olan sorguları arabelleğe geri koy (fail-closed / sıfır veri kaybı)
+                    self._write_buffer = batch + self._write_buffer
+                    logger.error(
+                        "DuckDB arabellek boşaltma hatası, işlemler geri alındı ve arabelleğe iade edildi",
+                        batch_len=len(batch),
+                        error=str(exc),
+                    )
+                    raise
 
             self._last_flush = time.monotonic()
 
@@ -325,6 +340,10 @@ class DuckDBStore:
     def close(self) -> None:
         """Kaynakları serbest bırakır, tamponu diske yazar ve bağlantıyı kapatır."""
         self._stop_periodic.set()
+        if self._periodic_thread is not None and self._periodic_thread.is_alive():
+            if threading.current_thread() != self._periodic_thread:
+                self._periodic_thread.join(timeout=2.0)
+
         self.flush()
 
         with self._lock:
@@ -420,13 +439,35 @@ except (ValueError, OSError) as sig_err:
 
 # Global tekil örnek
 duckdb_store: Final[DuckDBStore] = DuckDBStore()
+DuckDBStateStore = DuckDBStore
 
-__all__ = [
+
+def fetch_df(query: str, params: Any = ()) -> pl.DataFrame:
+    """SQL sorgusu sonucunu doğrudan sıfır kopyalı Polars DataFrame olarak döner."""
+    return duckdb_store.fetch_df(query=query, params=params)
+
+
+def export_table_to_polars(table: str, limit: int = 1000) -> pl.DataFrame:
+    """Belirtilen tabloyu Polars DataFrame olarak dışa aktarır."""
+    return duckdb_store.export_table_to_polars(table=table, limit=limit)
+
+
+def execute(query: str, params: Any = ()) -> None:
+    """Global DuckDB deposunda yazma sorgusu çalıştırır."""
+    duckdb_store.execute(query=query, params=params)
+
+
+__all__: Final[list[str]] = [
     "DEFAULT_BUFFER_SIZE",
     "DEFAULT_DUCKDB_STORE_PATH",
     "DEFAULT_FLUSH_INTERVAL",
+    "DuckDBStateStore",
     "DuckDBStore",
     "configure_duckdb_wal",
     "duckdb_store",
+    "execute",
+    "export_table_to_polars",
+    "fetch_df",
     "otel_trace",
 ]
+

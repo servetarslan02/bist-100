@@ -175,6 +175,20 @@ def round_to_bist_tick(
     return round(rounded, precision)
 
 
+@otel_trace("bist_tick_size.round_to_valid_tick")
+def round_to_valid_tick(
+    price: float,
+    round_up: bool = False,
+    instrument_type: str = DEFAULT_INSTRUMENT_TYPE,
+) -> float:
+    """Fiyatı geçerli en yakın BIST fiyat adımına (yukarı veya aşağı) yuvarlar.
+
+    price_limits ve diğer modüllerle geriye dönük tam uyumluluk sağlayan alias fonksiyonudur.
+    """
+    mode = "CEIL" if round_up else "FLOOR"
+    return round_to_bist_tick(price, instrument_type=instrument_type, mode=mode)
+
+
 @otel_trace("bist_tick_size.is_valid_bist_tick")
 def is_valid_bist_tick(
     price: float,
@@ -735,4 +749,5 @@ __all__ = [
     "round_polars_series_to_bist_ticks",
     "round_prices_to_bist_ticks",
     "round_to_bist_tick",
+    "round_to_valid_tick",
 ]

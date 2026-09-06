@@ -1,65 +1,100 @@
-"""ALPHA BIST — Risk Gate v1.0
+"""ALPHA BIST — Merkezi Risk Kapısı Motoru (Risk Gate).
 
-Merkezi risk kontrolü — order gönderilmeden önce.
-Fail-safe, fail-closed.
+Merkezi risk kontrolü — her emir piyasaya veya aracı kuruma iletilmeden önce bu kapıdan geçer.
+Fail-safe ve Fail-closed: En ufak belirsizlik veya hata durumunda emir engellenir.
+DuckDB denetim günlüğü, Polars analitiği, orjson serileştirme ve RLock thread-safety içerir.
 """
 
-import functools
-from dataclasses import dataclass
-from typing import Any
+from __future__ import annotations
 
+import threading
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Final
+
+import orjson
+import polars as pl
 import structlog
-from opentelemetry import trace
+
+if TYPE_CHECKING:
+    import duckdb
+
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    import functools
+
+    def otel_trace(name: str):
+        """Merkezi OTel tracer bulunamadığında kullanılan yerel fallback dekoratörü."""
+
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.risk_gate")
 
-
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
-
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
+DEFAULT_MAX_POSITION_PCT: Final[float] = 10.0
+DEFAULT_MAX_PORTFOLIO_EXPOSURE_PCT: Final[float] = 95.0
+DEFAULT_MAX_SINGLE_ORDER_PCT: Final[float] = 5.0
+DEFAULT_MIN_CONFIDENCE: Final[float] = 0.3
+DEFAULT_MAX_DRAWDOWN_PCT: Final[float] = 20.0
+DEFAULT_DAILY_LOSS_LIMIT_PCT: Final[float] = 5.0
+DEFAULT_MACRO_STRESS_THRESHOLD_PCT: Final[float] = -15.0
 
 
 @dataclass
 class RiskDecision:
-    """Otomatik eklendi."""
+    """Emir risk denetim kararı modeli."""
+
     allowed: bool
     reason: str = ""
     checks_passed: int = 0
     checks_failed: int = 0
-    details: dict[str, Any] = None
+    details: dict[str, Any] = field(default_factory=dict)
+    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def __post_init__(self):
-        """Otomatik eklendi."""
-        if self.details is None:
-            self.details = {}
+    def __repr__(self) -> str:
+        return (
+            f"RiskDecision(allowed={self.allowed}, passed={self.checks_passed}, "
+            f"failed={self.checks_failed}, reason='{self.reason}')"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Sözlük formatına dönüştürür."""
+        return {
+            "allowed": self.allowed,
+            "reason": self.reason,
+            "checks_passed": self.checks_passed,
+            "checks_failed": self.checks_failed,
+            "details": self.details,
+            "checked_at": self.checked_at.isoformat(),
+        }
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson bayt dizisine serileştirir."""
+        return orjson.dumps(self.to_dict())
 
 
 class RiskGate:
-    """Merkezi risk gate — order üretiminden önce."""
+    """Merkezi pre-trade risk kontrol motoru (Fail-Closed)."""
 
     def __init__(
         self,
-        max_position_pct: float = 10.0,
-        max_portfolio_exposure_pct: float = 95.0,
-        max_single_order_pct: float = 5.0,
-        min_confidence: float = 0.3,
-        max_drawdown_pct: float = 20.0,
-        daily_loss_limit_pct: float = 5.0,
-        macro_stress_threshold_pct: float = -15.0,
-    ):
-        """Otomatik eklendi."""
+        max_position_pct: float = DEFAULT_MAX_POSITION_PCT,
+        max_portfolio_exposure_pct: float = DEFAULT_MAX_PORTFOLIO_EXPOSURE_PCT,
+        max_single_order_pct: float = DEFAULT_MAX_SINGLE_ORDER_PCT,
+        min_confidence: float = DEFAULT_MIN_CONFIDENCE,
+        max_drawdown_pct: float = DEFAULT_MAX_DRAWDOWN_PCT,
+        daily_loss_limit_pct: float = DEFAULT_DAILY_LOSS_LIMIT_PCT,
+        macro_stress_threshold_pct: float = DEFAULT_MACRO_STRESS_THRESHOLD_PCT,
+        duckdb_conn: duckdb.DuckDBPyConnection | None = None,
+    ) -> None:
+        self._lock = threading.RLock()
         self.max_position_pct = max_position_pct
         self.max_portfolio_exposure_pct = max_portfolio_exposure_pct
         self.max_single_order_pct = max_single_order_pct
@@ -67,8 +102,89 @@ class RiskGate:
         self.max_drawdown_pct = max_drawdown_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.macro_stress_threshold_pct = macro_stress_threshold_pct
-        self._daily_pnl = 0.0
-        self._macro_stress_result = None
+        self._daily_pnl: float = 0.0
+        self._macro_stress_result: dict[str, Any] | None = None
+        self._duckdb_conn = duckdb_conn
+        if self._duckdb_conn is not None:
+            self._init_duckdb_schema()
+
+    def set_duckdb_connection(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Risk kararları arşivi için DuckDB bağlantısını tanımlar."""
+        with self._lock:
+            self._duckdb_conn = conn
+            self._init_duckdb_schema()
+
+    def _init_duckdb_schema(self) -> None:
+        """DuckDB risk karar denetim tablosunu ilklendirir."""
+        if self._duckdb_conn is None:
+            return
+        with self._lock:
+            try:
+                self._duckdb_conn.execute("""
+                    CREATE TABLE IF NOT EXISTS risk_gate_decisions (
+                        id BIGINT,
+                        ticker VARCHAR,
+                        side VARCHAR,
+                        quantity INTEGER,
+                        price DOUBLE,
+                        allowed BOOLEAN,
+                        reason VARCHAR,
+                        checks_passed INTEGER,
+                        checks_failed INTEGER,
+                        details_json VARCHAR,
+                        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE SEQUENCE IF NOT EXISTS seq_risk_gate_decisions START 1;
+                """)
+            except Exception as exc:
+                logger.error("RiskGate DuckDB şema oluşturma hatası", hata=str(exc))
+
+    def _record_decision(
+        self,
+        ticker: str,
+        side: str,
+        quantity: int,
+        price: float,
+        decision: RiskDecision,
+    ) -> None:
+        """Risk kararını DuckDB'ye kaydeder."""
+        if self._duckdb_conn is None:
+            return
+        with self._lock:
+            try:
+                det_json = orjson.dumps(decision.details).decode("utf-8")
+                self._duckdb_conn.execute(
+                    """
+                    INSERT INTO risk_gate_decisions (
+                        id, ticker, side, quantity, price, allowed,
+                        reason, checks_passed, checks_failed, details_json, checked_at
+                    ) VALUES (
+                        nextval('seq_risk_gate_decisions'), ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?
+                    )
+                    """,
+                    [
+                        ticker,
+                        side,
+                        quantity,
+                        price,
+                        decision.allowed,
+                        decision.reason,
+                        decision.checks_passed,
+                        decision.checks_failed,
+                        det_json,
+                        decision.checked_at,
+                    ],
+                )
+            except Exception as exc:
+                logger.debug("RiskGate DuckDB kayıt hatası", ticker=ticker, hata=str(exc))
+
+    def __repr__(self) -> str:
+        with self._lock:
+            return (
+                f"RiskGate(max_pos={self.max_position_pct}%, max_exp={self.max_portfolio_exposure_pct}%, "
+                f"min_conf={self.min_confidence}, daily_pnl={self._daily_pnl:.2f})"
+            )
 
     @otel_trace("risk_gate.check_order")
     def check_order(
@@ -78,7 +194,7 @@ class RiskGate:
         quantity: int,
         price: float,
         portfolio_value: float,
-        current_positions: dict[str, Any],
+        current_positions: dict[str, Any] | None = None,
         model_confidence: float = 0.5,
         market_open: bool = True,
         data_valid: bool = True,
@@ -86,196 +202,250 @@ class RiskGate:
         mc_var_95: float = 0.0,
         mc_cvar_95: float = 0.0,
     ) -> RiskDecision:
-        """Order risk kontrolü."""
-        # Otomatik günlük P&L senkronizasyonu
-        self.sync_daily_pnl()
-        # 1. Devre kesici ve temel kontroller
-        early_exit = self._check_circuit_breakers(circuit_open, ticker, details={})
-        if early_exit:
-            return early_exit
+        """Piyasa emrinin risk denetimini gerçekleştirir (Fail-Closed)."""
+        with self._lock:
+            positions = current_positions or {}
 
-        if not market_open:
-            return RiskDecision(False, "Market closed", 0, 1, {"market": "closed"})
-        if not data_valid:
-            return RiskDecision(False, "Invalid/stale data", 0, 1, {"data": "invalid"})
-        if quantity <= 0 or price <= 0:
-            return RiskDecision(
-                False, f"Invalid order quantity ({quantity}) or price ({price})", 0, 1, {"order": "invalid_parameters"}
-            )
+            # Günlük P&L senkronizasyonu
+            self.sync_daily_pnl()
 
-        checks_passed = 3
-        checks_failed = 0
-        details = {}
-        reasons = []
-        order_value = quantity * price
+            # 1. Devre Kesici Kontrolleri
+            early_exit = self._check_circuit_breakers(circuit_open, ticker)
+            if early_exit:
+                self._record_decision(ticker, side, quantity, price, early_exit)
+                return early_exit
 
-        # 2. Pozisyon ve boyut kontrolleri
-        cp, cf, det, rea = self._check_position_limits(
-            ticker, side, quantity, price, portfolio_value, current_positions, model_confidence
-        )
-        checks_passed += cp
-        checks_failed += cf
-        details.update(det)
-        reasons.extend(rea)
+            # Temel Piyasa ve Parametre Kontrolleri
+            if not market_open:
+                res = RiskDecision(False, "Piyasa kapalı", 0, 1, {"market": "closed"})
+                self._record_decision(ticker, side, quantity, price, res)
+                return res
 
-        # 3. Günlük zarar limiti
-        daily_loss_pct = abs(self._daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0
-        if self._daily_pnl < 0 and daily_loss_pct > self.daily_loss_limit_pct:
-            checks_failed += 1
-            reasons.append(f"Daily loss {daily_loss_pct:.1f}% > {self.daily_loss_limit_pct}%")
-        else:
-            checks_passed += 1
+            if not data_valid:
+                res = RiskDecision(False, "Geçersiz veya bayat piyasa verisi", 0, 1, {"data": "invalid"})
+                self._record_decision(ticker, side, quantity, price, res)
+                return res
 
-        # 4. BIST kuralları
-        cp, cf, det = self._check_bist_rules(ticker, side, price, order_value, portfolio_value, current_positions)
-        checks_passed += cp
-        checks_failed += cf
-        details.update(det)
-        reasons.extend([r for r in [det.get("spk_notification")] if r])
-
-        # 5. Monte Carlo VaR
-        cp, cf, rea = self._check_monte_carlo_var(mc_var_95, mc_cvar_95)
-        checks_passed += cp
-        checks_failed += cf
-        reasons.extend(rea)
-        if mc_var_95 != 0:
-            details["mc_var_95"] = round(mc_var_95, 2)
-        if mc_cvar_95 != 0:
-            details["mc_cvar_95"] = round(mc_cvar_95, 2)
-
-        # 6. Macro stress test
-        if self._macro_stress_result:
-            worst_impact = self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0)
-            if worst_impact < self.macro_stress_threshold_pct:
-                checks_failed += 1
-                reasons.append(
-                    f"Macro stress test: %{abs(worst_impact):.1f} kayıp riski (eşik: %{abs(self.macro_stress_threshold_pct):.0f})"
+            if quantity <= 0 or price <= 0:
+                res = RiskDecision(
+                    False,
+                    f"Geçersiz emir parametreleri: adet={quantity}, fiyat={price}",
+                    0,
+                    1,
+                    {"order": "invalid_parameters"},
                 )
+                self._record_decision(ticker, side, quantity, price, res)
+                return res
+
+            checks_passed = 3
+            checks_failed = 0
+            details: dict[str, Any] = {}
+            reasons: list[str] = []
+            order_value = float(quantity * price)
+
+            # 2. Pozisyon ve Maruziyet Limitleri
+            cp, cf, det, rea = self._check_position_limits(
+                ticker, side, quantity, price, portfolio_value, positions, model_confidence
+            )
+            checks_passed += cp
+            checks_failed += cf
+            details.update(det)
+            reasons.extend(rea)
+
+            # 3. Günlük Zarar Limiti
+            daily_loss_pct = (abs(self._daily_pnl) / portfolio_value * 100.0) if portfolio_value > 0 else 0.0
+            if self._daily_pnl < 0 and daily_loss_pct > self.daily_loss_limit_pct:
+                checks_failed += 1
+                reasons.append(f"Günlük zarar limiti aşıldı: %{daily_loss_pct:.1f} > %{self.daily_loss_limit_pct:.1f}")
             else:
                 checks_passed += 1
-            details["macro_stress_worst"] = worst_impact
 
-        allowed = checks_failed == 0
-        reason = "; ".join(reasons) if reasons else "All checks passed"
-        return RiskDecision(allowed, reason, checks_passed, checks_failed, details)
+            # 4. BIST ve SPK Mevzuat Kuralları
+            cp, cf, det, rea_bist = self._check_bist_rules(ticker, side, price, order_value, portfolio_value, positions)
+            checks_passed += cp
+            checks_failed += cf
+            details.update(det)
+            reasons.extend(rea_bist)
 
-    def _check_circuit_breakers(self, circuit_open: bool, ticker: str, details: dict) -> Any:
-        """Devre kesici ve fiyat limiti kontrolleri."""
+            # 5. Monte Carlo VaR / CVaR Kontrolü
+            cp, cf, rea_mc = self._check_monte_carlo_var(mc_var_95, mc_cvar_95)
+            checks_passed += cp
+            checks_failed += cf
+            reasons.extend(rea_mc)
+            if mc_var_95 != 0.0:
+                details["mc_var_95"] = round(mc_var_95, 2)
+            if mc_cvar_95 != 0.0:
+                details["mc_cvar_95"] = round(mc_cvar_95, 2)
+
+            # 6. Makro Stres Testi
+            if self._macro_stress_result:
+                worst_impact = float(self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0.0))
+                if worst_impact < self.macro_stress_threshold_pct:
+                    checks_failed += 1
+                    reasons.append(
+                        f"Makro stres testi kritik kayıp riski: %{abs(worst_impact):.1f} (Eşik: %{abs(self.macro_stress_threshold_pct):.0f})"
+                    )
+                else:
+                    checks_passed += 1
+                details["macro_stress_worst"] = worst_impact
+
+            allowed = checks_failed == 0
+            reason_str = "; ".join(reasons) if reasons else "Tüm risk denetimleri başarıyla geçti"
+            decision = RiskDecision(allowed, reason_str, checks_passed, checks_failed, details)
+
+            self._record_decision(ticker, side, quantity, price, decision)
+            if not allowed:
+                logger.warn(
+                    "Emir risk kapısı tarafından REDDEDİLDİ",
+                    ticker=ticker,
+                    side=side,
+                    adet=quantity,
+                    fiyat=price,
+                    sebep=reason_str,
+                )
+            return decision
+
+    def _check_circuit_breakers(self, circuit_open: bool, ticker: str) -> RiskDecision | None:
+        """Devre kesici ve tavan/taban sınır kontrollerini yürütür."""
         if circuit_open:
-            return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
+            return RiskDecision(False, "Devre kesici devrede (Circuit breaker OPEN)", 0, 1, {"circuit": "open"})
+
         try:
             from services.core.auto_circuit_breaker import auto_circuit_breaker
 
             if auto_circuit_breaker.get_status().get("ebdks_active", False):
                 return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
-        except Exception:
-            logger.warning("Circuit breaker check failed", exc_info=True)
-        try:
-            from services.core.price_limits import price_limit_monitor
+        except Exception as exc:
+            logger.warn("Devre kesici kontrolü sorgulanamadı", hata=str(exc))
 
-            if price_limit_monitor.get_effective_limit(ticker) == 0.0:
-                details["ipo_no_limit"] = True
-        except Exception:
-            logger.warning("Price limit check failed", exc_info=True)
         return None
 
     def _check_position_limits(
-        self, ticker, side, quantity, price, portfolio_value, current_positions, model_confidence
-    ) -> Any:
-        """Pozisyon boyutu ve confidence kontrolleri."""
+        self,
+        ticker: str,
+        side: str,
+        quantity: int,
+        price: float,
+        portfolio_value: float,
+        current_positions: dict[str, Any],
+        model_confidence: float,
+    ) -> tuple[int, int, dict[str, Any], list[str]]:
+        """Pozisyon büyüklüğü, tekil emir ve portföy maruziyeti limitlerini denetler."""
         passed = failed = 0
-        details = {}
-        reasons = []
+        details: dict[str, Any] = {}
+        reasons: list[str] = []
 
-        current_exposure = sum(p.get("qty", 0) * p.get("avg_cost", 0) for p in current_positions.values())
-        exposure_pct = (current_exposure / portfolio_value * 100) if portfolio_value > 0 else 100
+        pv = max(portfolio_value, 1e-6)
+
+        # Portföy Toplam Maruziyeti
+        current_exposure = sum(
+            float(p.get("qty", 0)) * float(p.get("avg_cost", 0.0)) for p in current_positions.values()
+        )
+        exposure_pct = (current_exposure / pv) * 100.0
         if exposure_pct > self.max_portfolio_exposure_pct:
             failed += 1
-            reasons.append(f"Portfolio exposure {exposure_pct:.1f}% > {self.max_portfolio_exposure_pct}%")
+            reasons.append(f"Portföy maruziyeti %{exposure_pct:.1f} > %{self.max_portfolio_exposure_pct:.1f}")
         else:
             passed += 1
         details["exposure_pct"] = round(exposure_pct, 2)
 
-        order_pct = (quantity * price / portfolio_value * 100) if portfolio_value > 0 else 100
+        # Tekil Emir Boyutu
+        order_pct = (quantity * price / pv) * 100.0
         if order_pct > self.max_single_order_pct:
             failed += 1
-            reasons.append(f"Order size {order_pct:.1f}% > {self.max_single_order_pct}%")
+            reasons.append(f"Emir boyutu %{order_pct:.1f} > %{self.max_single_order_pct:.1f}")
         else:
             passed += 1
         details["order_pct"] = round(order_pct, 2)
 
+        # Tekil Hisse Pozisyon Tavanı
         pos = current_positions.get(ticker, {})
-        existing_qty = pos.get("qty", 0)
+        existing_qty = int(pos.get("qty", 0))
         new_qty = existing_qty + quantity if side == "BUY" else existing_qty - quantity
-        position_pct = (new_qty * price / portfolio_value * 100) if portfolio_value > 0 else 100
+        position_pct = (new_qty * price / pv) * 100.0
         if position_pct > self.max_position_pct:
             failed += 1
-            reasons.append(f"Position {position_pct:.1f}% > {self.max_position_pct}%")
+            reasons.append(f"Hisse pozisyon tavanı %{position_pct:.1f} > %{self.max_position_pct:.1f}")
         else:
             passed += 1
         details["position_pct"] = round(position_pct, 2)
 
+        # Asgari Model Güveni
         if model_confidence < self.min_confidence:
             failed += 1
-            reasons.append(f"Confidence {model_confidence:.2f} < {self.min_confidence}")
+            reasons.append(f"Model güveni {model_confidence:.2f} < {self.min_confidence:.2f}")
         else:
             passed += 1
         details["confidence"] = round(model_confidence, 4)
 
         return passed, failed, details, reasons
 
-    def _check_bist_rules(self, ticker, side, price, order_value, portfolio_value, current_positions) -> Any:
-        """BIST kuralları: açığa satış, halt, SPK uyumluluk."""
+    def _check_bist_rules(
+        self,
+        ticker: str,
+        side: str,
+        price: float,
+        order_value: float,
+        portfolio_value: float,
+        current_positions: dict[str, Any],
+    ) -> tuple[int, int, dict[str, Any], list[str]]:
+        """BIST kuralları: açığa satış, işlem durdurma (halt), SPK uyumluluğu."""
         passed = failed = 0
-        details = {}
-        reasons = []
+        details: dict[str, Any] = {}
+        reasons: list[str] = []
 
         try:
             from services.core.compliance import compliance_checker
             from services.core.halt_monitor import halt_monitor
             from services.core.short_selling import short_selling_monitor
 
+            # Açığa Satış Yasağı Kontrolü
             if side == "SELL" and ticker not in current_positions:
                 ss = short_selling_monitor.can_short_sell(ticker, price, last_trade_price=price)
                 if not ss.allowed:
                     failed += 1
-                    reasons.append(f"Short selling: {ss.reason}")
+                    reasons.append(f"Açığa satış engeli: {ss.reason}")
 
+            # İşlem Durdurma (Halt) Kontrolü
             halt = halt_monitor.check_halt(ticker)
             if halt.halted:
                 failed += 1
-                reasons.append(f"Halted: {halt.reason}")
+                reasons.append(f"Hisse işlemleri durdurulmuş (Halt): {halt.reason}")
 
-            current_pos_pct = 0
-            if ticker in current_positions:
-                pos_val = current_positions[ticker].get("qty", 0) * current_positions[ticker].get("avg_cost", 0)
-                current_pos_pct = pos_val / portfolio_value if portfolio_value > 0 else 0
+            # SPK Mevzuat ve Bildirim Kontrolü
+            current_pos_pct = 0.0
+            if ticker in current_positions and portfolio_value > 0:
+                pos_val = float(current_positions[ticker].get("qty", 0)) * float(
+                    current_positions[ticker].get("avg_cost", 0.0)
+                )
+                current_pos_pct = pos_val / portfolio_value
             comp = compliance_checker.check_spk_compliance(side, ticker, order_value, portfolio_value, current_pos_pct)
             if comp.action == "BLOCK":
                 failed += 1
-                reasons.append(f"SPK: {comp.reason}")
+                reasons.append(f"SPK kuralı engeli: {comp.reason}")
             elif comp.notification_required:
                 details["spk_notification"] = comp.reason
 
             if failed == 0:
                 passed += 1
-        except Exception as e:
-            logger.error("BIST compliance check FAILED — blocking order (fail-closed)", error=str(e))
+        except Exception as exc:
+            # Fail-closed: Mevzuat denetimi sorgulanamazsa işlem kesinlikle durdurulur!
+            logger.error("BIST mevzuat denetimi hatası — emir engelleniyor (Fail-Closed)", hata=str(exc))
             failed += 1
-            reasons.append(f"BIST compliance check error: {e}")
+            reasons.append(f"BIST mevzuat denetim hatası: {exc}")
 
-        return passed, failed, details
+        return passed, failed, details, reasons
 
-    def _check_monte_carlo_var(self, mc_var_95, mc_cvar_95) -> Any:
-        """Monte Carlo VaR/CVaR kontrolü."""
+    def _check_monte_carlo_var(self, mc_var_95: float, mc_cvar_95: float) -> tuple[int, int, list[str]]:
+        """Monte Carlo VaR / CVaR risk tavanı denetimi."""
         passed = failed = 0
-        reasons = []
+        reasons: list[str] = []
         threshold = 15.0
 
-        if mc_var_95 != 0:
+        if mc_var_95 != 0.0:
             var_abs = abs(mc_var_95)
             if var_abs > threshold:
-                reasons.append(f"MC VaR %{var_abs:.1f} > %{threshold:.0f} eşik (risk yüksek)")
+                reasons.append(f"Monte Carlo VaR95 %{var_abs:.1f} > %{threshold:.0f} (Aşırı risk)")
                 failed += 1
             else:
                 passed += 1
@@ -283,52 +453,99 @@ class RiskGate:
         return passed, failed, reasons
 
     @otel_trace("risk_gate.set_macro_stress_result")
-    def set_macro_stress_result(self, stress_result: dict[str, Any]) -> Any:
-        """Macro stres testi sonucunu risk gate'e besle."""
-        self._macro_stress_result = stress_result
+    def set_macro_stress_result(self, stress_result: dict[str, Any]) -> None:
+        """Makro stres testi sonucunu risk kapısına tanımlar."""
+        with self._lock:
+            self._macro_stress_result = stress_result
 
     @otel_trace("risk_gate.check_macro_stress")
-    def check_macro_stress(
-        self,
-        portfolio: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Macro stres testi çalıştır ve sonucu kaydet."""
+    def check_macro_stress(self, portfolio: dict[str, Any]) -> dict[str, Any]:
+        """Makro stres testini tetikler ve sonucunu saklar."""
         try:
             from services.macro.stress_test import macro_stress_test
 
             report = macro_stress_test.get_report(portfolio)
-            self._macro_stress_result = report
+            with self._lock:
+                self._macro_stress_result = report
             return report
-        except Exception as e:
-            return {"error": str(e)}
+        except Exception as exc:
+            logger.warn("Makro stres testi yürütme hatası", hata=str(exc))
+            return {"error": str(exc)}
 
     @otel_trace("risk_gate.update_daily_pnl")
-    def update_daily_pnl(self, pnl: float) -> Any:
-        """Otomatik eklendi."""
-        self._daily_pnl = pnl
+    def update_daily_pnl(self, pnl: float) -> None:
+        """Günlük kâr/zarar değerini günceller."""
+        with self._lock:
+            self._daily_pnl = float(pnl)
 
     @otel_trace("risk_gate.sync_daily_pnl")
-    def sync_daily_pnl(self) -> Any:
-        """PortfolioManager'dan günlük P&L otomatik çek."""
+    def sync_daily_pnl(self) -> None:
+        """PortfolioManager üzerinden günlük P&L değerini otomatik senkronize eder."""
         try:
             from services.portfolio.portfolio_manager import portfolio_manager
 
-            if portfolio_manager:
+            if portfolio_manager is not None:
                 snapshots = portfolio_manager.get_equity_snapshots(limit=2)
                 if len(snapshots) >= 2:
-                    today_equity = snapshots[-1]["total_equity"]
-                    yesterday_equity = snapshots[-2]["total_equity"]
-                    self._daily_pnl = today_equity - yesterday_equity
+                    today_equity = float(snapshots[-1]["total_equity"])
+                    yesterday_equity = float(snapshots[-2]["total_equity"])
+                    with self._lock:
+                        self._daily_pnl = today_equity - yesterday_equity
                 else:
-                    self._daily_pnl = 0.0
-        except Exception as e:
-            logger.debug("Daily PnL sync skipped", error=str(e))
+                    with self._lock:
+                        self._daily_pnl = 0.0
+        except Exception as exc:
+            logger.debug("Günlük PnL senkronizasyonu atlandı", hata=str(exc))
 
     @otel_trace("risk_gate.reset_daily")
-    def reset_daily(self) -> Any:
-        """Otomatik eklendi."""
-        self._daily_pnl = 0.0
+    def reset_daily(self) -> None:
+        """Günlük P&L sayacını sıfırlar."""
+        with self._lock:
+            self._daily_pnl = 0.0
+
+    def export_decisions_to_polars(self) -> pl.DataFrame:
+        """DuckDB üzerindeki risk kararlarını Polars DataFrame olarak dışa aktarır."""
+        if self._duckdb_conn is None:
+            return pl.DataFrame(
+                schema={
+                    "ticker": pl.Utf8,
+                    "side": pl.Utf8,
+                    "quantity": pl.Int64,
+                    "price": pl.Float64,
+                    "allowed": pl.Boolean,
+                    "reason": pl.Utf8,
+                    "checks_passed": pl.Int64,
+                    "checks_failed": pl.Int64,
+                    "checked_at": pl.Datetime("ms"),
+                }
+            )
+
+        with self._lock:
+            try:
+                return self._duckdb_conn.execute(
+                    """
+                    SELECT ticker, side, quantity, price, allowed, reason, checks_passed, checks_failed, checked_at
+                    FROM risk_gate_decisions
+                    ORDER BY id DESC
+                    """
+                ).pl()
+            except Exception as exc:
+                logger.error("DuckDB risk kararları Polars sorgu hatası", hata=str(exc))
+                return pl.DataFrame()
 
 
-# Singleton
+# Global Singleton
 risk_gate = RiskGate()
+
+__all__ = [
+    "DEFAULT_DAILY_LOSS_LIMIT_PCT",
+    "DEFAULT_MACRO_STRESS_THRESHOLD_PCT",
+    "DEFAULT_MAX_DRAWDOWN_PCT",
+    "DEFAULT_MAX_PORTFOLIO_EXPOSURE_PCT",
+    "DEFAULT_MAX_POSITION_PCT",
+    "DEFAULT_MAX_SINGLE_ORDER_PCT",
+    "DEFAULT_MIN_CONFIDENCE",
+    "RiskDecision",
+    "RiskGate",
+    "risk_gate",
+]

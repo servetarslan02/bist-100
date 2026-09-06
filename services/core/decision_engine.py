@@ -885,9 +885,17 @@ class DecisionEngine:
         stop_price = 0.0
         target_price = 0.0
         if price > 0 and action in (Action.BUY.value, Action.SELL.value):
-            vec_dict = getattr(score.vector, "__dict__", {})
-            atr = _safe_float(vec_dict.get("atr", 0.0))
-            atr_pct = _safe_float(vec_dict.get("atr_pct", 0.0))
+            vec = score.vector
+            atr = _safe_float(
+                getattr(vec, "atr", None)
+                or getattr(score, "atr", None)
+                or (vec.get("atr") if isinstance(vec, dict) else 0.0)
+            )
+            atr_pct = _safe_float(
+                getattr(vec, "atr_pct", None)
+                or getattr(score, "atr_pct", None)
+                or (vec.get("atr_pct") if isinstance(vec, dict) else 0.0)
+            )
 
             if atr > 0:
                 stop_distance = atr * 2.5

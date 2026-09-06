@@ -219,6 +219,10 @@ class QualityReport:
 class Expectation(ABC):
     """Veri kalitesi kural taban soyut sınıfı (Expectation Base)."""
 
+    def __repr__(self) -> str:
+        """Kural metin temsili."""
+        return f"<{self.__class__.__name__}>"
+
     @abstractmethod
     def get_name(self) -> str:
         """Kuralın tekil adını döndürür."""
@@ -245,6 +249,10 @@ class ExpectColumnValuesToBePositive(Expectation):
             columns: Pozitif olması gereken sütun isimleri.
         """
         self.columns = columns
+
+    def __repr__(self) -> str:
+        """Kural metin temsili."""
+        return f"<ExpectColumnValuesToBePositive columns={self.columns}>"
 
     def get_name(self) -> str:
         """Kural adı."""
@@ -307,6 +315,10 @@ class ExpectColumnValuesToBePositive(Expectation):
 
 class ExpectOHLCGeometry(Expectation):
     """Bar geometrisini (High >= Low, High >= Open/Close, Low <= Open/Close) denetleyen kural."""
+
+    def __repr__(self) -> str:
+        """Kural metin temsili."""
+        return "<ExpectOHLCGeometry>"
 
     def get_name(self) -> str:
         """Kural adı."""
@@ -384,6 +396,10 @@ class ExpectCircuitBreakerLimits(Expectation):
         """
         self.limit_pct = max(1.0, float(limit_pct))
 
+    def __repr__(self) -> str:
+        """Kural metin temsili."""
+        return f"<ExpectCircuitBreakerLimits limit_pct={self.limit_pct}%>"
+
     def get_name(self) -> str:
         """Kural adı."""
         return f"ExpectCircuitBreakerLimits(limit_pct={self.limit_pct}%)"
@@ -451,6 +467,10 @@ class ExpectVolumeLiquidityProfile(Expectation):
             min_volume: Minimum kabul edilebilir günlük işlem hacmi (lot).
         """
         self.min_volume = max(0.0, float(min_volume))
+
+    def __repr__(self) -> str:
+        """Kural metin temsili."""
+        return f"<ExpectVolumeLiquidityProfile min_vol={self.min_volume:.0f}>"
 
     def get_name(self) -> str:
         """Kural adı."""
@@ -534,6 +554,10 @@ class ExpectationsSuite:
         """
         self.name = name
         self.expectations: list[Expectation] = []
+
+    def __repr__(self) -> str:
+        """ExpectationsSuite metin temsili."""
+        return f"<ExpectationsSuite name='{self.name}' rules_count={len(self.expectations)}>"
 
     def add_expectation(self, exp: Expectation) -> ExpectationsSuite:
         """Pakete yeni bir kural ekler.
@@ -821,6 +845,10 @@ class DataQualityChecker:
             suite: Kural paketi (varsayılan: build_default_financial_suite()).
         """
         self.suite = suite or build_default_financial_suite()
+
+    def __repr__(self) -> str:
+        """DataQualityChecker metin temsili."""
+        return f"<DataQualityChecker suite={self.suite!r}>"
 
     @otel_trace("data_quality.full_quality_check")
     def full_quality_check(self, df: pl.DataFrame, ticker: str = "UNKNOWN") -> QualityReport:

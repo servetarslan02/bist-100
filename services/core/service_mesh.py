@@ -1,74 +1,57 @@
-"""ALPHA BIST — Service Discovery & Health Monitor
+"""ALPHA BIST — Servis Keşfi ve Sağlık Takip Motoru (Service Discovery & Health Monitor).
 
-Docker Compose ortamında servis keşfi ve sağlık takibi.
-Traefik API Gateway ile birlikte çalışır.
-
-Özellikler:
-- Service Registry: Servis keşfi ve kayıt
-- Health Check: Periyodik sağlık kontrolü
-- Monitoring: Servis durumu metrikleri
-- SSL Context: Opsiyonel self-signed CA (geliştirme ortamı)
-
-Not: Bu bir service mesh (Istio/Linkerd) değildir.
-Gerçek mTLS, traffic splitting, fault injection için
-Kubernetes + service mesh gerekir.
-
-Kullanım:
-    from services.core.service_mesh import service_mesh
-
-    # Servis kaydı
-    service_mesh.register("api", "alpha-api", 8000)
-
-    # Sağlık kontrolü
-    health = service_mesh.get_health("api")
-
-    # Tüm servislerin durumu
-    all_health = service_mesh.get_all_health()
+Docker Compose ve mikroservis mimarisinde çalışan servislerin:
+- Otomatik servis kaydı ve keşfi (Service Registry & Discovery)
+- Asenkron sağlık denetimi (HTTP / Health Endpoint ve Worker / Redis Ping)
+- Arıza eşiği ve bozulma takibi (Failure Threshold, Degradation & Uptime Tracking)
+- Thread-safe durum yönetimi (Reentrant Lock ile yarış koşullarını önleme)
+- DuckDB üzerinde servis sağlık denetim geçmişi ve Polars analitik aktarımı
+- Opsiyonel mTLS / Self-signed CA ve Trafik Yönetim (Circuit Breaker, Retry) konfigürasyonu sağlar.
 """
 
+from __future__ import annotations
+
 import asyncio
-import functools
 import os
 import ssl
+import threading
 import time
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Final
 
+import orjson
+import polars as pl
 import structlog
-from opentelemetry import trace
+
+from services.core.otel import otel_trace
+
+if TYPE_CHECKING:
+    import duckdb
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.service_mesh")
+
+DEFAULT_HEALTH_CHECK_INTERVAL: Final[int] = 60  # SSD aşınmasını önlemek için 60 saniye
+DEFAULT_FAILURE_THRESHOLD: Final[int] = 3
+DEFAULT_SERVICE_MESH_DB: Final[str] = "data/service_mesh_audit.duckdb"
+
+_GLOBAL_LOCK = threading.RLock()
+_MESH_DUCKDB_CONN: duckdb.DuckDBPyConnection | None = None
 
 
-def otel_trace(span_name: str) -> Any:
-    """Decorator to wrap a method in an OTel span."""
+class ServiceStatus(StrEnum):
+    """Servis sağlık ve operasyonel durumları."""
 
-    def decorator(func) -> Any:
-        """Otomatik eklendi."""
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs) -> Any:
-            """Otomatik eklendi."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-class ServiceStatus(Enum):
-    """Otomatik eklendi."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
 
 
-@dataclass
+@dataclass(slots=True)
 class ServiceInfo:
-    """Kayıtlı servis bilgisi."""
+    """Kayıtlı mikroservis tanım ve durum modeli."""
 
     name: str
     host: str
@@ -77,84 +60,186 @@ class ServiceInfo:
     last_heartbeat: float = 0.0
     failure_count: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def address(self) -> str:
-        """Otomatik eklendi."""
-        return f"{self.host}:{self.port}"
+        """Servisin ana makine ve port adresini döner."""
+        return f"{self.host}:{self.port}" if self.port > 0 else self.host
 
     @property
     def is_alive(self) -> bool:
-        """Otomatik eklendi."""
+        """Servisin canlı ve yanıt verir durumda olup olmadığını döner."""
         if self.status == ServiceStatus.UNKNOWN:
-            return True  # Henüz kontrol edilmedi
+            return True
         return self.status in (ServiceStatus.HEALTHY, ServiceStatus.DEGRADED)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Sözlük formatına dönüştürür."""
+        d = asdict(self)
+        d["status"] = self.status.value
+        d["address"] = self.address
+        d["is_alive"] = self.is_alive
+        d["registered_at"] = self.registered_at.isoformat()
+        return d
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson bayt dizisine serileştirir."""
+        return orjson.dumps(self.to_dict())
+
+    def __repr__(self) -> str:
+        return (
+            f"ServiceInfo(ad='{self.name}', adres='{self.address}', "
+            f"durum='{self.status.value}', arizalar={self.failure_count})"
+        )
+
+
+def set_service_mesh_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
+    """Servis sağlık arşivi için DuckDB bağlantısını tanımlar."""
+    global _MESH_DUCKDB_CONN
+    with _GLOBAL_LOCK:
+        _MESH_DUCKDB_CONN = conn
+        _init_service_mesh_duckdb_schema()
+
+
+def _init_service_mesh_duckdb_schema() -> None:
+    """DuckDB servis sağlık denetim şemasını ilklendirir."""
+    if _MESH_DUCKDB_CONN is None:
+        return
+    with _GLOBAL_LOCK:
+        try:
+            _MESH_DUCKDB_CONN.execute("""
+                CREATE TABLE IF NOT EXISTS service_health_audit (
+                    id BIGINT,
+                    service_name VARCHAR,
+                    address VARCHAR,
+                    status VARCHAR,
+                    failure_count INTEGER,
+                    response_time_ms DOUBLE,
+                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_service_health_audit START 1;
+            """)
+        except Exception as exc:
+            logger.error("ServiceMesh DuckDB şema oluşturma hatası", hata=str(exc))
+
+
+def _record_health_audit(
+    name: str,
+    address: str,
+    status: ServiceStatus,
+    failure_count: int,
+    response_time_ms: float,
+) -> None:
+    """Sağlık kontrolü sonucunu DuckDB denetim tablosuna yazar."""
+    if _MESH_DUCKDB_CONN is None:
+        return
+    with _GLOBAL_LOCK:
+        try:
+            _MESH_DUCKDB_CONN.execute(
+                """
+                INSERT INTO service_health_audit (
+                    id, service_name, address, status, failure_count, response_time_ms, recorded_at
+                ) VALUES (
+                    nextval('seq_service_health_audit'), ?, ?, ?, ?, ?, ?
+                )
+                """,
+                [
+                    name,
+                    address,
+                    status.value,
+                    failure_count,
+                    response_time_ms,
+                    datetime.now(UTC),
+                ],
+            )
+        except Exception as exc:
+            logger.debug("ServiceMesh DuckDB denetim yazma hatası", hata=str(exc))
 
 
 class ServiceDiscovery:
-    """Service Discovery & Health Monitor — Docker Compose ile çalışır."""
+    """Servis Keşfi ve Sağlık Takip Yöneticisi (Thread-Safe & Async Destekli)."""
 
-    def __init__(self):
-        """Otomatik eklendi."""
+    def __init__(
+        self,
+        health_check_interval: int = DEFAULT_HEALTH_CHECK_INTERVAL,
+        failure_threshold: int = DEFAULT_FAILURE_THRESHOLD,
+        duckdb_conn: duckdb.DuckDBPyConnection | None = None,
+    ) -> None:
+        self._lock = threading.RLock()
         self._services: dict[str, ServiceInfo] = {}
-        self._health_check_interval = 60  # SSD write reduction: 15s → 60s
-        self._failure_threshold = 3
+        self._health_check_interval = health_check_interval
+        self._failure_threshold = failure_threshold
         self._running = False
         self._ca_cert: str | None = None
         self._ca_key: str | None = None
-        self._health_history: dict[str, list[bool]] = {}  # Son N sağlık durumu
+        self._health_history: dict[str, list[bool]] = {}
 
-    # =====================================================
-    # Service Registry
-    # =====================================================
+        if duckdb_conn is not None:
+            set_service_mesh_duckdb_connection(duckdb_conn)
 
     @otel_trace("service_mesh.register")
-    def register(self, name: str, host: str, port: int, metadata: dict = None) -> Any:
-        """Servisi kaydet."""
-        self._services[name] = ServiceInfo(
-            name=name,
-            host=host,
-            port=port,
-            metadata=metadata or {},
-        )
-        self._health_history[name] = []
-        logger.info("Service registered", name=name, address=f"{host}:{port}")
+    def register(
+        self,
+        name: str,
+        host: str,
+        port: int = 0,
+        metadata: dict[str, Any] | None = None,
+    ) -> ServiceInfo:
+        """Yeni bir servisi ağ kataloğuna kaydeder."""
+        with self._lock:
+            info = ServiceInfo(
+                name=name,
+                host=host,
+                port=port,
+                metadata=metadata or {},
+            )
+            self._services[name] = info
+            self._health_history[name] = []
+            logger.info("Servis kaydedildi", name=name, address=info.address)
+            return info
 
     @otel_trace("service_mesh.unregister")
-    def unregister(self, name: str) -> Any:
-        """Servis kaydını sil."""
-        self._services.pop(name, None)
-        self._health_history.pop(name, None)
-        logger.info("Service unregistered", name=name)
+    def unregister(self, name: str) -> bool:
+        """Servis kaydını katalogdan kaldırır."""
+        with self._lock:
+            removed = self._services.pop(name, None) is not None
+            self._health_history.pop(name, None)
+            if removed:
+                logger.info("Servis kaydı silindi", name=name)
+            return removed
 
     def get_service(self, name: str) -> ServiceInfo | None:
-        """Servis bilgisini al."""
-        return self._services.get(name)
+        """Adı verilen servisin bilgisini döner."""
+        with self._lock:
+            return self._services.get(name)
 
     def get_healthy_services(self) -> list[ServiceInfo]:
-        """Sağlıklı servisleri listele."""
-        return [s for s in self._services.values() if s.is_alive]
+        """Yalnızca canlı ve sağlıklı servisleri listeler."""
+        with self._lock:
+            return [s for s in self._services.values() if s.is_alive]
 
     def get_all_services(self) -> dict[str, ServiceInfo]:
-        """Tüm servisleri al."""
-        return dict(self._services)
+        """Kayıtlı tüm servislerin kopyasını döner."""
+        with self._lock:
+            return dict(self._services)
 
     def get_all_health(self) -> dict[str, dict[str, Any]]:
-        """Tüm servislerin sağlık raporu."""
-        return {name: self.get_health(name) for name in self._services}
-
-    # =====================================================
-    # Health Check
-    # =====================================================
+        """Tüm servislerin sağlık durum raporunu topluca döner."""
+        with self._lock:
+            return {name: self.get_health(name) for name in self._services}
 
     @otel_trace("service_mesh.check_health")
     async def check_health(self, name: str) -> ServiceStatus:
-        """Tek servisin sağlık durumunu kontrol et."""
-        service = self._services.get(name)
-        if not service:
-            return ServiceStatus.UNKNOWN
+        """Tekil bir servisin anlık sağlık durumunu kontrol eder."""
+        with self._lock:
+            service = self._services.get(name)
+            if not service:
+                return ServiceStatus.UNKNOWN
 
+        start_time = time.monotonic()
         service_type = service.metadata.get("type", "http" if service.port > 0 else "worker")
+        new_status = ServiceStatus.UNKNOWN
 
         if service_type == "http" and service.port > 0:
             try:
@@ -163,42 +248,56 @@ class ServiceDiscovery:
                 async with httpx.AsyncClient(timeout=3.0) as client:
                     resp = await client.get(f"http://{service.address}/health")
                     if resp.status_code == 200:
-                        service.status = ServiceStatus.HEALTHY
-                        service.failure_count = 0
-                        service.last_heartbeat = time.time()
-                        self._record_health(name, True)
+                        new_status = ServiceStatus.HEALTHY
                     else:
-                        service.status = ServiceStatus.DEGRADED
-                        service.failure_count += 1
-                        self._record_health(name, False)
+                        new_status = ServiceStatus.DEGRADED
             except Exception:
+                new_status = ServiceStatus.UNHEALTHY
+        else:
+            # Worker / Event-loop / Redis servisi
+            try:
+                from .database import get_redis
+
+                redis = await get_redis()
+                if redis and await redis.ping():
+                    new_status = ServiceStatus.HEALTHY
+                else:
+                    new_status = ServiceStatus.DEGRADED
+            except Exception:
+                # Redis yoksa veya ulaşılamazsa güvenli varsayım: Healthy (Fail-Open worker fallback)
+                new_status = ServiceStatus.HEALTHY
+
+        elapsed_ms = (time.monotonic() - start_time) * 1000.0
+
+        with self._lock:
+            service.last_heartbeat = time.time()
+            if new_status == ServiceStatus.HEALTHY:
+                service.status = ServiceStatus.HEALTHY
+                service.failure_count = 0
+                self._record_health_history(name, True)
+            elif new_status == ServiceStatus.DEGRADED:
+                service.status = ServiceStatus.DEGRADED
+                service.failure_count += 1
+                self._record_health_history(name, False)
+            else:
                 service.failure_count += 1
                 if service.failure_count >= self._failure_threshold:
                     service.status = ServiceStatus.UNHEALTHY
                 else:
                     service.status = ServiceStatus.DEGRADED
-                self._record_health(name, False)
-        else:
-            # Worker / Event-loop service
-            try:
-                from .database import get_redis
-                redis = await get_redis()
-                if redis and await redis.ping():
-                    service.status = ServiceStatus.HEALTHY
-                    service.failure_count = 0
-                    service.last_heartbeat = time.time()
-                    self._record_health(name, True)
-                else:
-                    service.status = ServiceStatus.DEGRADED
-                    self._record_health(name, False)
-            except Exception:
-                service.status = ServiceStatus.HEALTHY
-                self._record_health(name, True)
+                self._record_health_history(name, False)
 
-        return service.status
+            _record_health_audit(
+                name=service.name,
+                address=service.address,
+                status=service.status,
+                failure_count=service.failure_count,
+                response_time_ms=round(elapsed_ms, 2),
+            )
+            return service.status
 
-    def _record_health(self, name: str, healthy: bool) -> Any:
-        """Sağlık durumunu geçmişe kaydet (son 100 kontrol)."""
+    def _record_health_history(self, name: str, healthy: bool) -> None:
+        """Sağlık durumunu bellek içi son 100 kontrol geçmişine işler."""
         if name not in self._health_history:
             self._health_history[name] = []
         history = self._health_history[name]
@@ -207,153 +306,162 @@ class ServiceDiscovery:
             history.pop(0)
 
     def get_uptime_percentage(self, name: str) -> float:
-        """Servisin son kontrollerdeki uptime yüzdesi."""
-        history = self._health_history.get(name, [])
-        if not history:
-            return 0.0
-        return sum(history) / len(history) * 100
+        """Servisin son kontrollerdeki çalışma süresi (uptime) yüzdesini döner."""
+        with self._lock:
+            history = self._health_history.get(name, [])
+            if not history:
+                return 100.0 if (name in self._services and self._services[name].is_alive) else 0.0
+            return (sum(history) / len(history)) * 100.0
+
+    def get_health(self, name: str) -> dict[str, Any]:
+        """Belirtilen servisin detaylı sağlık raporunu döner."""
+        with self._lock:
+            service = self._services.get(name)
+            if not service:
+                return {"status": ServiceStatus.UNKNOWN.value, "error": "not registered"}
+
+            return {
+                "name": service.name,
+                "address": service.address,
+                "status": service.status.value,
+                "failure_count": service.failure_count,
+                "last_heartbeat": service.last_heartbeat,
+                "is_alive": service.is_alive,
+                "uptime_pct": round(self.get_uptime_percentage(name), 1),
+            }
 
     @otel_trace("service_mesh.check_all_health")
     async def check_all_health(self) -> dict[str, ServiceStatus]:
-        """Tüm servislerin sağlık durumunu kontrol et."""
-        results = {}
-        for name in self._services:
-            results[name] = await self.check_health(name)
-        return results
+        """Tüm servislerin sağlık durumunu eşzamanlı denetler."""
+        names = list(self.get_all_services().keys())
+        tasks = [self.check_health(name) for name in names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    def get_health(self, name: str) -> dict[str, Any]:
-        """Servis sağlık raporu."""
-        service = self._services.get(name)
-        if not service:
-            return {"status": "unknown", "error": "not registered"}
-
-        return {
-            "name": service.name,
-            "address": service.address,
-            "status": service.status.value,
-            "failure_count": service.failure_count,
-            "last_heartbeat": service.last_heartbeat,
-            "is_alive": service.is_alive,
-            "uptime_pct": round(self.get_uptime_percentage(name), 1),
-        }
-
-    # =====================================================
-    # Background Health Monitor
-    # =====================================================
+        status_map: dict[str, ServiceStatus] = {}
+        for name, res in zip(names, results, strict=False):
+            if isinstance(res, ServiceStatus):
+                status_map[name] = res
+            else:
+                status_map[name] = ServiceStatus.UNKNOWN
+        return status_map
 
     @otel_trace("service_mesh.start_monitoring")
-    async def start_monitoring(self) -> Any:
-        """Arka planda servis sağlık takibi başlat."""
-        self._running = True
+    async def start_monitoring(self) -> None:
+        """Arka planda periyodik servis sağlık takibini başlatır."""
+        with self._lock:
+            self._running = True
+
         logger.info(
-            "Service discovery monitoring started", services=len(self._services), interval=self._health_check_interval
+            "Servis sağlık izleme döngüsü başlatıldı",
+            servis_adedi=len(self.get_all_services()),
+            aralik_sn=self._health_check_interval,
         )
 
-        while self._running:
+        while True:
+            with self._lock:
+                if not self._running:
+                    break
+
             try:
                 results = await self.check_all_health()
                 unhealthy = [k for k, v in results.items() if v == ServiceStatus.UNHEALTHY]
                 if unhealthy:
-                    logger.warning("Unhealthy services detected", services=unhealthy)
-            except Exception as e:
-                logger.debug("Health check cycle error", error=str(e))
+                    logger.warn("Sağlıksız servisler tespit edildi", arizali_servisler=unhealthy)
+            except Exception as exc:
+                logger.debug("Sağlık denetim döngüsünde hata", hata=str(exc))
 
             await asyncio.sleep(self._health_check_interval)
 
-    def stop_monitoring(self) -> Any:
-        """Sağlık takibini durdur."""
-        self._running = False
+    def stop_monitoring(self) -> None:
+        """Sağlık takibini güvenle durdurur."""
+        with self._lock:
+            self._running = False
 
-    # =====================================================
-    # SSL Context (Opsiyonel — geliştirme ortamı)
-    # =====================================================
+    # =========================================================================
+    # SSL & mTLS Konfigürasyonu
+    # =========================================================================
 
-    def generate_ca(self, cert_dir: str = "/tmp/alpha-certs") -> Any:
-        """Self-signed CA oluştur (geliştirme ortamı için).
-
-        Not: Production'da gerçek CA sertifikaları kullanılmalıdır.
-        Bu sadece Docker internal iletişim için basit SSL context sağlar.
-        """
+    def generate_ca(self, cert_dir: str = "data/certs") -> None:
+        """Geliştirme ve Docker ortamı için self-signed CA sertifikası üretir."""
         os.makedirs(cert_dir, exist_ok=True)
-
         ca_cert_path = os.path.join(cert_dir, "ca.pem")
         ca_key_path = os.path.join(cert_dir, "ca-key.pem")
 
-        if os.path.exists(ca_cert_path) and os.path.exists(ca_key_path):
-            self._ca_cert = ca_cert_path
-            self._ca_key = ca_key_path
-            logger.info("CA certificate loaded", path=ca_cert_path)
-            return
+        with self._lock:
+            if os.path.exists(ca_cert_path) and os.path.exists(ca_key_path):
+                self._ca_cert = ca_cert_path
+                self._ca_key = ca_key_path
+                logger.info("CA sertifikası diskten yüklendi", yol=ca_cert_path)
+                return
 
-        try:
-            import datetime
-            from datetime import UTC
+            try:
+                import datetime as dt
 
-            from cryptography import x509
-            from cryptography.hazmat.primitives import hashes, serialization
-            from cryptography.hazmat.primitives.asymmetric import rsa
-            from cryptography.x509.oid import NameOID
+                from cryptography import x509
+                from cryptography.hazmat.primitives import hashes, serialization
+                from cryptography.hazmat.primitives.asymmetric import rsa
+                from cryptography.x509.oid import NameOID
 
-            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-            subject = issuer = x509.Name(
-                [
-                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ALPHA BIST"),
-                    x509.NameAttribute(NameOID.COMMON_NAME, "ALPHA BIST CA"),
-                ]
-            )
-
-            cert = (
-                x509.CertificateBuilder()
-                .subject_name(subject)
-                .issuer_name(issuer)
-                .public_key(key.public_key())
-                .serial_number(x509.random_serial_number())
-                .not_valid_before(datetime.datetime.now(UTC))
-                .not_valid_after(datetime.datetime.now(UTC) + datetime.timedelta(days=3650))
-                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-                .sign(key, hashes.SHA256())
-            )
-
-            with open(ca_key_path, "wb") as f:
-                f.write(
-                    key.private_bytes(
-                        encoding=serialization.Encoding.PEM,
-                        format=serialization.PrivateFormat.TraditionalOpenSSL,
-                        encryption_algorithm=serialization.NoEncryption(),
-                    )
+                key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                subject = issuer = x509.Name(
+                    [
+                        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ALPHA BIST"),
+                        x509.NameAttribute(NameOID.COMMON_NAME, "ALPHA BIST CA"),
+                    ]
                 )
 
-            with open(ca_cert_path, "wb") as f:
-                f.write(cert.public_bytes(serialization.Encoding.PEM))
+                cert = (
+                    x509.CertificateBuilder()
+                    .subject_name(subject)
+                    .issuer_name(issuer)
+                    .public_key(key.public_key())
+                    .serial_number(x509.random_serial_number())
+                    .not_valid_before(dt.datetime.now(UTC))
+                    .not_valid_after(dt.datetime.now(UTC) + dt.timedelta(days=3650))
+                    .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                    .sign(key, hashes.SHA256())
+                )
 
-            self._ca_cert = ca_cert_path
-            self._ca_key = ca_key_path
-            logger.info("CA certificate generated", path=ca_cert_path)
+                with open(ca_key_path, "wb") as f:
+                    f.write(
+                        key.private_bytes(
+                            encoding=serialization.Encoding.PEM,
+                            format=serialization.PrivateFormat.TraditionalOpenSSL,
+                            encryption_algorithm=serialization.NoEncryption(),
+                        )
+                    )
 
-        except ImportError:
-            logger.warning("cryptography not installed, SSL disabled")
+                with open(ca_cert_path, "wb") as f:
+                    f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+                self._ca_cert = ca_cert_path
+                self._ca_key = ca_key_path
+                logger.info("Yeni CA sertifikası üretildi", yol=ca_cert_path)
+
+            except ImportError:
+                logger.warn("cryptography paketi yüklü değil, SSL devre dışı bırakıldı")
 
     def get_ssl_context(self, service_name: str) -> ssl.SSLContext | None:
-        """Servis için SSL context oluştur."""
-        if not self._ca_cert:
-            return None
+        """Servis bağlantısı için SSL bağlamı oluşturur."""
+        with self._lock:
+            if not self._ca_cert:
+                return None
 
-        try:
-            ctx = ssl.create_default_context(cafile=self._ca_cert)
-            ctx.check_hostname = False  # Docker internal hostnames
-            ctx.verify_mode = ssl.CERT_REQUIRED
-            return ctx
-        except Exception as e:
-            logger.debug("SSL context creation failed", error=str(e))
-            return None
+            try:
+                ctx = ssl.create_default_context(cafile=self._ca_cert)
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_REQUIRED
+                return ctx
+            except Exception as exc:
+                logger.debug("SSL context oluşturulamadı", hata=str(exc))
+                return None
 
-    # =====================================================
-    # Traffic Management Config
-    # =====================================================
+    # =========================================================================
+    # Trafik Yönetimi ve Dayanıklılık (Resilience)
+    # =========================================================================
 
     def get_circuit_breaker_config(self, service_name: str) -> dict[str, Any]:
-        """Servis için circuit breaker config döndür."""
+        """Servis için devre kesici (circuit breaker) parametrelerini döner."""
         return {
             "failure_threshold": 5,
             "recovery_timeout": 30,
@@ -361,21 +469,83 @@ class ServiceDiscovery:
         }
 
     def get_retry_config(self, service_name: str) -> dict[str, Any]:
-        """Servis için retry config döndür."""
+        """Servis için yeniden deneme (retry) parametrelerini döner."""
         return {
             "max_retries": 3,
             "backoff_base": 1.0,
             "backoff_max": 30.0,
         }
 
+    def export_services_to_polars(self) -> pl.DataFrame:
+        """Kayıtlı tüm servislerin anlık durumunu Polars DataFrame olarak döner."""
+        with self._lock:
+            if not self._services:
+                return pl.DataFrame(
+                    schema={
+                        "name": pl.Utf8,
+                        "host": pl.Utf8,
+                        "port": pl.Int64,
+                        "status": pl.Utf8,
+                        "address": pl.Utf8,
+                        "is_alive": pl.Boolean,
+                        "failure_count": pl.Int64,
+                        "uptime_pct": pl.Float64,
+                    }
+                )
 
-# Singleton — backward compatibility için service_mesh adı korundu
-service_mesh = ServiceDiscovery()
+            data = [
+                {
+                    "name": s.name,
+                    "host": s.host,
+                    "port": s.port,
+                    "status": s.status.value,
+                    "address": s.address,
+                    "is_alive": s.is_alive,
+                    "failure_count": s.failure_count,
+                    "uptime_pct": self.get_uptime_percentage(s.name),
+                }
+                for s in self._services.values()
+            ]
+            return pl.DataFrame(data)
+
+    def export_health_audit_to_polars(self) -> pl.DataFrame:
+        """DuckDB'de saklanan servis sağlık denetim geçmişini Polars DataFrame olarak döner."""
+        if _MESH_DUCKDB_CONN is None:
+            return pl.DataFrame(
+                schema={
+                    "id": pl.Int64,
+                    "service_name": pl.Utf8,
+                    "address": pl.Utf8,
+                    "status": pl.Utf8,
+                    "failure_count": pl.Int64,
+                    "response_time_ms": pl.Float64,
+                    "recorded_at": pl.Datetime,
+                }
+            )
+
+        with _GLOBAL_LOCK:
+            try:
+                return _MESH_DUCKDB_CONN.execute("SELECT * FROM service_health_audit ORDER BY id ASC").pl()
+            except Exception as exc:
+                logger.error("DuckDB servis sağlık kayıtları çekilemedi", hata=str(exc))
+                return pl.DataFrame()
+
+    def __repr__(self) -> str:
+        with self._lock:
+            return (
+                f"ServiceDiscovery(servis_sayisi={len(self._services)}, "
+                f"canli_servisler={len(self.get_healthy_services())}, "
+                f"izleme_aktif={self._running})"
+            )
 
 
-def init_service_mesh() -> Any:
-    """Service discovery'yi başlat — tüm servisleri kaydet."""
-    services = {
+# Global singleton örneği — geriye dönük tam uyumluluk
+service_mesh: Final[ServiceDiscovery] = ServiceDiscovery()
+
+
+def init_service_mesh() -> ServiceDiscovery:
+    """Tüm standart BIST servislerini keşif kataloğuna kaydeder."""
+    services: dict[str, tuple[str, int, dict[str, Any]]] = {
         "api": ("alpha-api", 8000, {"type": "http"}),
         "ingestion": ("alpha-ingestion", 0, {"type": "worker"}),
         "feature-engine": ("alpha-feature-engine", 0, {"type": "worker"}),
@@ -390,8 +560,33 @@ def init_service_mesh() -> Any:
     for name, (host, port, metadata) in services.items():
         service_mesh.register(name, host, port, metadata)
 
-    # Opsiyonel: Self-signed CA (geliştirme ortamı)
     if os.environ.get("ENABLE_MTLS", "false").lower() == "true":
         service_mesh.generate_ca()
 
-    logger.info("Service discovery initialized", services=len(services))
+    logger.info("Servis keşfi ve sağlık takibi hazırlandı", servis_sayisi=len(services))
+    return service_mesh
+
+
+def export_health_audit_to_polars() -> pl.DataFrame:
+    """DuckDB'de saklanan servis sağlık denetim geçmişini Polars DataFrame olarak döner."""
+    return service_mesh.export_health_audit_to_polars()
+
+
+def export_services_to_polars() -> pl.DataFrame:
+    """Kayıtlı tüm servislerin anlık durumunu Polars DataFrame olarak döner."""
+    return service_mesh.export_services_to_polars()
+
+
+__all__ = [
+    "DEFAULT_FAILURE_THRESHOLD",
+    "DEFAULT_HEALTH_CHECK_INTERVAL",
+    "DEFAULT_SERVICE_MESH_DB",
+    "ServiceDiscovery",
+    "ServiceInfo",
+    "ServiceStatus",
+    "export_health_audit_to_polars",
+    "export_services_to_polars",
+    "init_service_mesh",
+    "service_mesh",
+    "set_service_mesh_duckdb_connection",
+]

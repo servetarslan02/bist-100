@@ -1110,6 +1110,10 @@ def register_dlq_retry_handler(event_type: str, handler: Callable[..., Any]) -> 
     dead_letter_queue.register_retry_handler(event_type, handler)
 
 
+# Geriye dönük uyumluluk takma adı
+persistent_dlq: Final[PersistentDeadLetterQueue | InMemoryDeadLetterQueue] = dead_letter_queue
+
+
 __all__: Final[list[str]] = [
     # Yapılandırma Sabitleri
     "DEFAULT_BASE_BACKOFF_SECONDS",
@@ -1130,6 +1134,7 @@ __all__: Final[list[str]] = [
     "PersistentDLQStatus",
     # Singleton Nesne
     "dead_letter_queue",
+    "persistent_dlq",
     # Kolaylık Fonksiyonları
     "clear_dlq",
     "export_dlq_to_polars",
@@ -1141,3 +1146,4 @@ __all__: Final[list[str]] = [
     "remove_dlq_entry",
     "retry_dlq_failed",
 ]
+

@@ -221,6 +221,8 @@ class DowntimeTracker:
                     )
                 else:
                     # Shutdown kaydı yoksa (ilk çalıştırma veya ani kilitlenme/crash)
+                    calc_shutdown_ts = max(0.0, self._startup_time - self._downtime_seconds)
+                    calc_shutdown_iso = datetime.fromtimestamp(calc_shutdown_ts, tz=UTC).isoformat()
                     conn.execute(
                         """
                         INSERT INTO shutdown_events
@@ -229,8 +231,8 @@ class DowntimeTracker:
                         VALUES (?, ?, ?, ?, ?, ?)
                     """,
                         (
-                            now_iso,
-                            self._startup_time - self._downtime_seconds,
+                            calc_shutdown_iso,
+                            calc_shutdown_ts,
                             now_iso,
                             self._startup_time,
                             self._downtime_seconds,
@@ -255,21 +257,61 @@ class DowntimeTracker:
             else:
                 logger.info("Sistem açılışı tamamlandı", downtime_seconds=round(self._downtime_seconds, 1))
 
+    @otel_trace("downtime_tracker.record_heartbeat")
+    def record_heartbeat(self) -> None:
+        """Sistemin canlı olduğunu belirten periyodik kalp atışı (heartbeat) zaman damgasını kaydeder.
+
+        Beklenmeyen elektrik kesintisi veya işletim sistemi çökmesi durumunda,
+        bir sonraki açılışta gerçek kesinti süresinin doğru hesaplanabilmesini sağlar.
+        """
+        with self._lock:
+            now = time.time()
+            now_iso = datetime.now(UTC).isoformat()
+            self._set_config("last_heartbeat_at", now_iso)
+            self._set_config("last_heartbeat_timestamp", str(now))
+
     def _calculate_downtime(self) -> float:
-        """Son kapanıştan bu yana geçen kesinti süresini saniye cinsinden hesaplar.
+        """Son kapanış veya kalp atışından bu yana geçen kesinti süresini saniye cinsinden hesaplar.
 
         Returns:
             Geçen süre (saniye).
         """
-        # 1. Konfigürasyondan son shutdown zaman damgasını al
-        shutdown_ts = self._get_config("last_shutdown_timestamp")
-        if shutdown_ts:
+        now = time.time()
+
+        # 1. Konfigürasyondan son shutdown ve heartbeat zaman damgalarını al
+        shutdown_ts_str = self._get_config("last_shutdown_timestamp")
+        startup_ts_str = self._get_config("last_startup_timestamp")
+        heartbeat_ts_str = self._get_config("last_heartbeat_timestamp")
+
+        shutdown_ts = 0.0
+        startup_ts = 0.0
+        heartbeat_ts = 0.0
+
+        if shutdown_ts_str:
             try:
-                val = float(shutdown_ts)
-                if val > 0:
-                    return time.time() - val
-            except (ValueError, TypeError) as conv_err:
-                logger.warning("Son shutdown zaman damgası ayrıştırılamadı", error=str(conv_err))
+                shutdown_ts = float(shutdown_ts_str)
+            except (ValueError, TypeError):
+                shutdown_ts = 0.0
+
+        if startup_ts_str:
+            try:
+                startup_ts = float(startup_ts_str)
+            except (ValueError, TypeError):
+                startup_ts = 0.0
+
+        if heartbeat_ts_str:
+            try:
+                heartbeat_ts = float(heartbeat_ts_str)
+            except (ValueError, TypeError):
+                heartbeat_ts = 0.0
+
+        # Eğer son çalışma esnasında graceful shutdown olmadan kapanmışsa (crash),
+        # heartbeat damgası shutdown'dan daha günceldir.
+        most_recent_activity = max(shutdown_ts, heartbeat_ts)
+        if most_recent_activity > 0.0 and startup_ts > 0.0 and most_recent_activity >= startup_ts:
+            return max(0.0, now - most_recent_activity)
+        elif shutdown_ts > 0.0:
+            return max(0.0, now - shutdown_ts)
 
         # 2. Veritabanındaki son shutdown olayını kontrol et
         with self._connect() as conn:
@@ -281,17 +323,20 @@ class DowntimeTracker:
             if row:
                 ts_val = row[0] if isinstance(row, (tuple, list)) else row["shutdown_timestamp"]
                 try:
-                    return time.time() - float(ts_val)
-                except (ValueError, TypeError):
-                    pass
+                    val = float(ts_val)
+                    if val > 0:
+                        return max(0.0, now - val)
+                except (ValueError, TypeError) as conv_err:
+                    logger.warning("shutdown_olayi_zaman_damgasi_gecersiz", error=str(conv_err), deger=str(ts_val))
 
         # 3. Dosya değiştirilme zaman damgasını (mtime) son çare olarak kullan
         try:
             if self._db_path.exists():
                 mtime = self._db_path.stat().st_mtime
-                return time.time() - mtime
-        except OSError:
-            pass
+                if mtime > 0:
+                    return max(0.0, now - mtime)
+        except OSError as os_err:
+            logger.debug("downtime_mtime_okunamadi", error=str(os_err))
 
         return 0.0
 
@@ -302,11 +347,14 @@ class DowntimeTracker:
             key: Konfigürasyon anahtarı.
             value: Kaydedilecek metin değeri.
         """
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO downtime_config (key, value, updated_at)
+                INSERT INTO downtime_config (key, value, updated_at)
                 VALUES (?, ?, ?)
+                ON CONFLICT (key) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    updated_at = EXCLUDED.updated_at
             """,
                 (key, value, datetime.now(UTC).isoformat()),
             )
@@ -321,7 +369,7 @@ class DowntimeTracker:
         Returns:
             Anahtarın değeri veya bulunamazsa None.
         """
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             row = conn.execute("SELECT value FROM downtime_config WHERE key = ?", (key,)).fetchone()
             if not row:
                 return None
@@ -333,7 +381,8 @@ class DowntimeTracker:
         Returns:
             Kesinti süresi.
         """
-        return timedelta(seconds=self._downtime_seconds)
+        with self._lock:
+            return timedelta(seconds=self._downtime_seconds)
 
     def get_downtime_seconds(self) -> float:
         """Hesaplanan kesinti süresini saniye cinsinden döner.
@@ -341,7 +390,8 @@ class DowntimeTracker:
         Returns:
             Kesinti saniyesi.
         """
-        return self._downtime_seconds
+        with self._lock:
+            return self._downtime_seconds
 
     def needs_catchup(self) -> dict[str, bool]:
         """Sistemin kesinti süresine göre hangi catch-up adımlarını gerektirdiğini belirler.
@@ -349,8 +399,9 @@ class DowntimeTracker:
         Returns:
             Her catch-up adımı için gereklilik durumunu belirten sözlük.
         """
-        downtime = timedelta(seconds=self._downtime_seconds)
-        return {key: downtime >= threshold for key, threshold in self.CATCHUP_THRESHOLDS.items()}
+        with self._lock:
+            downtime = timedelta(seconds=self._downtime_seconds)
+            return {key: downtime >= threshold for key, threshold in self.CATCHUP_THRESHOLDS.items()}
 
     def get_catchup_level(self) -> str:
         """Kesinti süresine göre gereken en yüksek catch-up seviyesini döner.
@@ -358,15 +409,16 @@ class DowntimeTracker:
         Returns:
             'full_recalibration', 'model_refresh', 'data_backfill' veya 'none'.
         """
-        downtime = timedelta(seconds=self._downtime_seconds)
+        with self._lock:
+            downtime = timedelta(seconds=self._downtime_seconds)
 
-        if downtime >= self.CATCHUP_THRESHOLDS["full_recalibration"]:
-            return "full_recalibration"
-        if downtime >= self.CATCHUP_THRESHOLDS["model_refresh"]:
-            return "model_refresh"
-        if downtime >= self.CATCHUP_THRESHOLDS["data_backfill"]:
-            return "data_backfill"
-        return "none"
+            if downtime >= self.CATCHUP_THRESHOLDS["full_recalibration"]:
+                return "full_recalibration"
+            if downtime >= self.CATCHUP_THRESHOLDS["model_refresh"]:
+                return "model_refresh"
+            if downtime >= self.CATCHUP_THRESHOLDS["data_backfill"]:
+                return "data_backfill"
+            return "none"
 
     @otel_trace("downtime_tracker.get_status")
     def get_status(self) -> dict[str, Any]:
@@ -441,12 +493,12 @@ class DowntimeTracker:
                     return pl.DataFrame(
                         schema={
                             "id": pl.Int64,
-                            "shutdown_at": pl.Utf8,
+                            "shutdown_at": pl.String,
                             "shutdown_timestamp": pl.Float64,
-                            "startup_at": pl.Utf8,
+                            "startup_at": pl.String,
                             "startup_timestamp": pl.Float64,
                             "downtime_seconds": pl.Float64,
-                            "catchup_level": pl.Utf8,
+                            "catchup_level": pl.String,
                         }
                     )
                 return pl.DataFrame(records)
@@ -466,6 +518,11 @@ def record_startup() -> None:
     downtime_tracker.record_startup()
 
 
+def record_heartbeat() -> None:
+    """Canlılık zaman damgasını aktif singleton tracker üzerinden periyodik kaydeder."""
+    downtime_tracker.record_heartbeat()
+
+
 def get_downtime_status() -> dict[str, Any]:
     """Downtime takipçisinin anlık durum özetini döner."""
     return downtime_tracker.get_status()
@@ -476,7 +533,12 @@ def export_downtime_to_polars(limit: int = 1000) -> pl.DataFrame:
     return downtime_tracker.export_history_to_polars(limit=limit)
 
 
-__all__ = [
+def query_downtime_duckdb(limit: int = 1000) -> pl.DataFrame:
+    """DuckDB üzerinden geçmiş kesinti kayıtlarını Polars DataFrame olarak sorgular."""
+    return downtime_tracker.export_history_to_polars(limit=limit)
+
+
+__all__: Final[list[str]] = [
     "DEFAULT_CATCHUP_THRESHOLDS",
     "DEFAULT_DOWNTIME_DB_PATH",
     "DowntimeTracker",
@@ -484,6 +546,8 @@ __all__ = [
     "export_downtime_to_polars",
     "get_downtime_status",
     "otel_trace",
+    "query_downtime_duckdb",
+    "record_heartbeat",
     "record_shutdown",
     "record_startup",
 ]

@@ -48,30 +48,33 @@ _pipeline_latency = meter.create_histogram(
 DEFAULT_PORTFOLIO_VALUE = 10_000_000  # ₺10M
 
 # Sync-to-async bridge: background event loop for event publishing
-_bg_loop = None
-_bg_thread = None
+_bg_lock = threading.RLock()
+_bg_loop: asyncio.AbstractEventLoop | None = None
+_bg_thread: threading.Thread | None = None
 
 
-def _get_bg_loop() -> Any:
-    """Arka plan asyncio event loop al veya oluştur (sync→async köprüsü)."""
+def _get_bg_loop() -> asyncio.AbstractEventLoop:
+    """Arka plan asyncio event loop al veya oluştur (sync→async köprüsü, thread-safe)."""
     global _bg_loop, _bg_thread
-    if _bg_loop is None or _bg_loop.is_closed():
-        _bg_loop = asyncio.new_event_loop()
-        _bg_thread = threading.Thread(target=_bg_loop.run_forever, daemon=True)
-        _bg_thread.start()
-    return _bg_loop
+    with _bg_lock:
+        if _bg_loop is None or _bg_loop.is_closed():
+            _bg_loop = asyncio.new_event_loop()
+            _bg_thread = threading.Thread(target=_bg_loop.run_forever, daemon=True, name="orch-bg-loop")
+            _bg_thread.start()
+        return _bg_loop
 
 
 def shutdown_bg_loop() -> None:
-    """Arka plan event loop'u düzgün kapat (resource leak önleme)."""
+    """Arka plan event loop'u düzgün kapat (resource leak önleme, thread-safe)."""
     global _bg_loop, _bg_thread
-    if _bg_loop is not None and not _bg_loop.is_closed():
-        _bg_loop.call_soon_threadsafe(_bg_loop.stop)
-        if _bg_thread is not None:
-            _bg_thread.join(timeout=5)
-        _bg_loop.close()
-    _bg_loop = None
-    _bg_thread = None
+    with _bg_lock:
+        if _bg_loop is not None and not _bg_loop.is_closed():
+            _bg_loop.call_soon_threadsafe(_bg_loop.stop)
+            if _bg_thread is not None and _bg_thread.is_alive():
+                _bg_thread.join(timeout=5.0)
+            _bg_loop.close()
+        _bg_loop = None
+        _bg_thread = None
 
 
 def _publish_event_async(event: Any, key: str = "default") -> None:
@@ -99,15 +102,27 @@ class PipelineReport:
     learning_status: dict[str, Any] = field(default_factory=dict)
     alerts: list[str] = field(default_factory=list)
 
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        return (
+            f"PipelineReport(date={self.date!r}, regime={self.regime!r}, "
+            f"tickers={len(self.results)}, top_opps={len(self.top_opportunities)})"
+        )
+
+    def to_polars(self) -> pl.DataFrame:
+        """Rapor özetini Polars DataFrame olarak döndürür."""
+        return export_pipeline_report_to_polars(self)
+
 
 class MasterOrchestrator:
     """Tüm servisleri orkestre eden ana sınıf."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._initialized = False
+        self._lock = threading.RLock()
         self._services: dict[str, Any] = {}
         self._simulation_results: dict[str, Any] = {}  # MC simulation cache
-        self._thread_pool = None  # Lazy-initialized shared pool
+        self._thread_pool: Any = None  # Lazy-initialized shared pool
 
     # Service loading registry: (service_key, module_path, class_or_attr_name, is_class)
     # is_class=True → instantiate; is_class=False → import attribute directly
@@ -238,9 +253,8 @@ class MasterOrchestrator:
                 async def _on_simulation_completed(event) -> Any:
                     ticker = event.data.get("ticker", "")
                     if ticker:
-                        if not hasattr(self, "_simulation_results"):
-                            self._simulation_results = {}
-                        self._simulation_results[ticker] = event.data.get("result")
+                        with self._lock:
+                            self._simulation_results[ticker] = event.data.get("result")
                         logger.debug("Simulation result cached", ticker=ticker)
 
                 try:
@@ -295,16 +309,28 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("agent_analysis_handler_setup_failed", error=str(e))
 
-        self._initialized = True
+        with self._lock:
+            self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
 
     def _get_thread_pool(self) -> Any:
-        """Shared thread pool for sync→async bridging (lazy init)."""
-        if self._thread_pool is None:
-            import concurrent.futures
+        """Shared thread pool for sync→async bridging (lazy init, thread-safe)."""
+        with self._lock:
+            if self._thread_pool is None:
+                import concurrent.futures
 
-            self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="orch-async")
-        return self._thread_pool
+                self._thread_pool = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="orch-async"
+                )
+            return self._thread_pool
+
+    def shutdown(self) -> None:
+        """Kaynakları serbest bırak (thread havuzu ve arka plan loop)."""
+        with self._lock:
+            if self._thread_pool is not None:
+                self._thread_pool.shutdown(wait=False)
+                self._thread_pool = None
+        shutdown_bg_loop()
 
     def _run_agent_async(self, coro) -> Any:
         """Run an async agent coroutine from sync context."""
@@ -322,7 +348,12 @@ class MasterOrchestrator:
 
     def _prepare_prices(self, market_data: dict) -> tuple:
         """Fiyat verisini hazırla ve doğrula. Returns (raw_prices, prices, error)."""
-        raw_prices = np.asarray(market_data.get("prices", []), dtype=float)
+        try:
+            raw_prices = np.asarray(market_data.get("prices", []), dtype=float)
+        except Exception:
+            return np.array([]), np.array([]), "Geçersiz fiyat formatı"
+        if len(raw_prices) == 0:
+            return raw_prices, raw_prices, "Insufficient data"
         valid_idx = ~np.isnan(raw_prices) & (raw_prices > 0)
         prices = raw_prices[valid_idx]
         if len(prices) < 20:
@@ -346,7 +377,7 @@ class MasterOrchestrator:
                         "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
                     }
                 )
-                ohlcv_df = ohlcv_df.dropna(subset=["Close"])
+                ohlcv_df = ohlcv_df.drop_nulls(subset=["Close"])
                 ohlcv_df = ohlcv_df.filter(pl.col("Close") > 0)
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
@@ -618,7 +649,7 @@ class MasterOrchestrator:
                 hist_returns = []
                 if len(prices) > 1:
                     _closes = _pl.Series(prices)
-                    hist_returns = _closes.pct_change().dropna().tolist()
+                    hist_returns = _closes.pct_change().drop_nulls().to_list()
                 forecasts = fe.compute_forecasts(
                     ticker=ticker,
                     features=features,
@@ -1468,11 +1499,12 @@ class MasterOrchestrator:
     @otel_trace("orchestrator.get_status")
     def get_status(self) -> dict[str, Any]:
         """Sistem durumu."""
-        return {
-            "initialized": self._initialized,
-            "services_loaded": len(self._services),
-            "services": list(self._services.keys()),
-        }
+        with self._lock:
+            return {
+                "initialized": self._initialized,
+                "services_loaded": len(self._services),
+                "services": list(self._services.keys()),
+            }
 
     @otel_trace("orchestrator.export_daily_report_json")
     def export_daily_report_json(self, date: str) -> str:
@@ -1482,18 +1514,96 @@ class MasterOrchestrator:
         report = {
             "date": date,
             "status": self.get_status(),
-            "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
         return _json.dumps(report, option=_json.OPT_INDENT_2).decode()
 
     @otel_trace("orchestrator.get_pipeline_stats")
     def get_pipeline_stats(self) -> dict[str, Any]:
         """Pipeline istatistiklerini döndür."""
-        return {
-            "services_count": len(self._services),
-            "initialized": self._initialized,
-            "services": list(self._services.keys()),
-        }
+        with self._lock:
+            return {
+                "services_count": len(self._services),
+                "initialized": self._initialized,
+                "services": list(self._services.keys()),
+            }
+
+    def export_services_status_to_polars(self) -> pl.DataFrame:
+        """Yüklü servislerin durumunu Polars DataFrame olarak döndürür."""
+        rows: list[dict[str, Any]] = []
+        with self._lock:
+            for name, instance in self._services.items():
+                rows.append(
+                    {
+                        "service_name": name,
+                        "service_type": type(instance).__name__,
+                        "is_active": True,
+                    }
+                )
+        if not rows:
+            return pl.DataFrame(
+                schema={"service_name": pl.String, "service_type": pl.String, "is_active": pl.Boolean}
+            )
+        return pl.DataFrame(rows)
+
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        with self._lock:
+            return (
+                f"MasterOrchestrator(initialized={self._initialized}, "
+                f"services={len(self._services)}, thread_pool={'active' if self._thread_pool else 'idle'})"
+            )
+
+
+def export_pipeline_report_to_polars(report: PipelineReport) -> pl.DataFrame:
+    """PipelineReport nesnesindeki per-ticker sonuçlarını Polars DataFrame'e dönüştürür."""
+    rows: list[dict[str, Any]] = []
+    for ticker, res in report.results.items():
+        agent_data = res.get("agent", {}) if isinstance(res.get("agent"), dict) else {}
+        rows.append(
+            {
+                "date": report.date,
+                "ticker": ticker,
+                "sector": res.get("sector", "UNKNOWN"),
+                "feature_count": int(res.get("feature_count", 0) or 0),
+                "agent_direction": str(agent_data.get("direction", "NEUTRAL")),
+                "agent_confidence": float(agent_data.get("confidence", 0.0) or 0.0),
+                "agent_score": float(agent_data.get("score", 50.0) or 50.0),
+                "has_error": res.get("error") is not None,
+                "error_msg": str(res.get("error") or ""),
+            }
+        )
+    if not rows:
+        return pl.DataFrame(
+            schema={
+                "date": pl.String,
+                "ticker": pl.String,
+                "sector": pl.String,
+                "feature_count": pl.Int64,
+                "agent_direction": pl.String,
+                "agent_confidence": pl.Float64,
+                "agent_score": pl.Float64,
+                "has_error": pl.Boolean,
+                "error_msg": pl.String,
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def export_top_opportunities_to_polars(report: PipelineReport) -> pl.DataFrame:
+    """En iyi yatırım fırsatlarını Polars DataFrame formatında dışa aktarır."""
+    if not report.top_opportunities:
+        return pl.DataFrame(
+            schema={
+                "rank": pl.Int64,
+                "ticker": pl.String,
+                "direction": pl.String,
+                "score": pl.Float64,
+                "confidence": pl.Float64,
+                "sector": pl.String,
+            }
+        )
+    return pl.DataFrame(report.top_opportunities)
 
 
 # Singleton
@@ -1505,3 +1615,15 @@ SystemOrchestrator = MasterOrchestrator
 
 # main.py ve diğer çağıranlar için alias
 orchestrator = master_orchestrator
+
+__all__: list[str] = [
+    "DEFAULT_PORTFOLIO_VALUE",
+    "MasterOrchestrator",
+    "PipelineReport",
+    "SystemOrchestrator",
+    "export_pipeline_report_to_polars",
+    "export_top_opportunities_to_polars",
+    "master_orchestrator",
+    "orchestrator",
+    "shutdown_bg_loop",
+]

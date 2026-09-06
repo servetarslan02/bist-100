@@ -519,6 +519,9 @@ def load_config(
     return ConfigLoader.load(path=path, environment=environment)
 
 
+# Global singleton örneği
+config_loader: ConfigLoader = ConfigLoader.load()
+
 __all__ = [
     "CONFIG_DIR",
     "DEFAULT_CONFIG_PATH",
@@ -526,6 +529,7 @@ __all__ = [
     "DEFAULT_ENV_PREFIX",
     "SENSITIVE_KEY_NAMES",
     "ConfigLoader",
+    "config_loader",
     "load_config",
     "export_config_to_polars",
     "export_config_to_duckdb",

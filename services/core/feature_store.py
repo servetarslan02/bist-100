@@ -18,18 +18,25 @@ Kullanım:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import functools
 import hashlib
 import math
+import re
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any, Callable, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 from opentelemetry import trace
+
+from services.core.debounce import configure_duckdb_wal
 
 from . import redis_helper
 
@@ -39,10 +46,14 @@ tracer = trace.get_tracer("alpha-bist.feature_store")
 DEFAULT_MAX_CACHE_SIZE: int = 10000
 DEFAULT_CACHE_TTL_SECONDS: int = 3600
 REDIS_DELETE_CHUNK_SIZE: int = 1000
+DEFAULT_FEATURE_STORE_DB_PATH: str = "data/feature_store_cache.duckdb"
 
 
 def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
+
+    Senkron ve asenkron fonksiyonları otomatik algılayarak span yaşam döngüsünü
+    korur.
 
     Args:
         span_name: Üretilecek span için benzersiz izleme adı.
@@ -52,12 +63,22 @@ def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., A
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
+        if asyncio.iscoroutinefunction(func):
 
-        return wrapper
+            @functools.wraps(func)
+            async def async_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name):
+                    return await func(self, *args, **kwargs)
+
+            return async_wrapper
+        else:
+
+            @functools.wraps(func)
+            def sync_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name):
+                    return func(self, *args, **kwargs)
+
+            return sync_wrapper
 
     return decorator
 
@@ -77,13 +98,14 @@ def _clean_feature_val(val: Any) -> float:
 
 
 class FeatureStore:
-    """İki katmanlı özellik önbellek motoru — bellek içi LRU + opsiyonel Redis."""
+    """İki katmanlı özellik önbellek motoru — bellek içi LRU + opsiyonel Redis + DuckDB kalıcılık."""
 
     def __init__(
         self,
         max_size: int = DEFAULT_MAX_CACHE_SIZE,
         default_ttl: int = DEFAULT_CACHE_TTL_SECONDS,
         redis_url: str | None = None,
+        db_path: str = DEFAULT_FEATURE_STORE_DB_PATH,
     ) -> None:
         """FeatureStore nesnesini ilklendirir.
 
@@ -91,10 +113,13 @@ class FeatureStore:
             max_size: Bellek içi tutulabilecek azami özellik kümesi adedi.
             default_ttl: Saniye cinsinden varsayılan geçerlilik süresi.
             redis_url: Opsiyonel özel Redis bağlantı adresi (None ise merkezi havuz kullanılır).
+            db_path: Kalıcı yerel yedekleme için DuckDB dosya yolu.
         """
         self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._master_cache: dict[str, dict[str, Any]] = {}  # "ticker:date" -> {features, expires_at}
         self._max_size: int = max(1, int(max_size))
         self._default_ttl: int = max(1, int(default_ttl))
+        self._db_path: str = str(db_path)
         self._hits: int = 0
         self._misses: int = 0
         self._lock: threading.RLock = threading.RLock()
@@ -145,6 +170,10 @@ class FeatureStore:
         feat_hash = hashlib.md5(",".join(sorted(features)).encode("utf-8")).hexdigest()[:8]
         return f"feat:{ticker.upper()}:{date}:{feat_hash}"
 
+    def _make_master_key(self, ticker: str, date: str) -> str:
+        """Hisse ve tarih bazlı ana birleştirilmiş özellik havuzu anahtarı üretir."""
+        return f"feat_master:{ticker.upper()}:{date}"
+
     @otel_trace("feature_store.get")
     def get(
         self,
@@ -152,7 +181,7 @@ class FeatureStore:
         date: str,
         feature_names: list[str],
     ) -> dict[str, float] | None:
-        """Önbellekten hisse özelliklerini çeker (önce L1 bellek içi, sonra L2 Redis).
+        """Önbellekten hisse özelliklerini çeker (L1 bellek içi, L1 master alt küme, L2 Redis).
 
         Args:
             ticker: BIST hisse sembolü.
@@ -162,10 +191,12 @@ class FeatureStore:
         Returns:
             Özellik adı ve sayısal değer sözlüğü ya da bulunamazsa None.
         """
-        key = self._make_key(ticker, date, feature_names)
+        symbol = ticker.upper()
+        key = self._make_key(symbol, date, feature_names)
+        master_key = self._make_master_key(symbol, date)
         now = time.time()
 
-        # 1. Aşama: Bellek İçi LRU Önbellek (L1)
+        # 1. Aşama: Tam Anahtar Eşleşmesi (L1 Bellek İçi LRU)
         with self._lock:
             if key in self._cache:
                 entry = self._cache[key]
@@ -174,6 +205,23 @@ class FeatureStore:
                     self._hits += 1
                     return dict(entry["features"])
                 del self._cache[key]
+
+            # 1.1 Aşama: Ana Havuz (Master Cache) Alt Küme Çözümleme (Kural 6 Optimizasyonu)
+            if master_key in self._master_cache:
+                master_entry = self._master_cache[master_key]
+                if now < master_entry["expires_at"]:
+                    master_feats = master_entry["features"]
+                    if all(fname in master_feats for fname in feature_names):
+                        subset = {fname: master_feats[fname] for fname in feature_names}
+                        self._cache[key] = {
+                            "features": subset,
+                            "expires_at": master_entry["expires_at"],
+                        }
+                        self._cache.move_to_end(key)
+                        self._hits += 1
+                        return subset
+                else:
+                    del self._master_cache[master_key]
 
         # 2. Aşama: Redis Paylaşımlı Önbellek (L2)
         if self._redis:
@@ -190,6 +238,26 @@ class FeatureStore:
                         self._cache.move_to_end(key)
                         self._hits += 1
                     return features
+
+                # Redis Master Key Kontrolü
+                master_data = self._redis.get(master_key)
+                if master_data:
+                    raw_master = orjson.loads(master_data)
+                    master_feats = {str(k): _clean_feature_val(v) for k, v in raw_master.items()}
+                    if all(fname in master_feats for fname in feature_names):
+                        subset = {fname: master_feats[fname] for fname in feature_names}
+                        with self._lock:
+                            self._master_cache[master_key] = {
+                                "features": master_feats,
+                                "expires_at": now + self._default_ttl,
+                            }
+                            self._cache[key] = {
+                                "features": subset,
+                                "expires_at": now + self._default_ttl,
+                            }
+                            self._cache.move_to_end(key)
+                            self._hits += 1
+                        return subset
             except Exception as e:
                 logger.debug("ozellik_deposu_redis_okuma_hatasi", anahtar=key, hata=str(e))
 
@@ -205,8 +273,6 @@ class FeatureStore:
         feature_names: list[str],
     ) -> dict[str, dict[str, float]]:
         """Birden çok hisse için özellikleri toplu (batch) olarak sorgular.
-
-        L1'de bulunamayanları tek bir Redis mget çağrısıyla getirir.
 
         Args:
             tickers: Hisse sembolleri listesi.
@@ -224,17 +290,39 @@ class FeatureStore:
         # 1. Aşama: Toplu L1 Kontrolü
         with self._lock:
             for ticker in tickers:
-                key = self._make_key(ticker, date, feature_names)
-                key_to_ticker[key] = ticker
+                symbol = ticker.upper()
+                key = self._make_key(symbol, date, feature_names)
+                master_key = self._make_master_key(symbol, date)
+                key_to_ticker[key] = symbol
+
                 if key in self._cache:
                     entry = self._cache[key]
                     if now < entry["expires_at"]:
                         self._cache.move_to_end(key)
                         self._hits += 1
-                        results[ticker] = dict(entry["features"])
+                        results[symbol] = dict(entry["features"])
                         continue
                     del self._cache[key]
-                missing_tickers.append(ticker)
+
+                # Alt küme kontrolü
+                if master_key in self._master_cache:
+                    m_entry = self._master_cache[master_key]
+                    if now < m_entry["expires_at"]:
+                        m_feats = m_entry["features"]
+                        if all(fn in m_feats for fn in feature_names):
+                            subset = {fn: m_feats[fn] for fn in feature_names}
+                            self._cache[key] = {
+                                "features": subset,
+                                "expires_at": m_entry["expires_at"],
+                            }
+                            self._cache.move_to_end(key)
+                            self._hits += 1
+                            results[symbol] = subset
+                            continue
+                    else:
+                        del self._master_cache[master_key]
+
+                missing_tickers.append(symbol)
 
         if not missing_tickers:
             return results
@@ -287,29 +375,55 @@ class FeatureStore:
             ttl: Saniye cinsinden geçerlilik süresi (None ise varsayılan uygulanır).
             feature_names: İsteğe bağlı anahtar için baz alınacak özellik isimleri.
         """
+        symbol = ticker.upper()
         if feature_names is None:
             feature_names = list(features.keys())
-        key = self._make_key(ticker, date, feature_names)
+        key = self._make_key(symbol, date, feature_names)
+        master_key = self._make_master_key(symbol, date)
         effective_ttl = max(1, int(ttl or self._default_ttl))
         now = time.time()
         clean_features = {str(k): _clean_feature_val(v) for k, v in features.items()}
 
-        # 1. Aşama: Bellek İçi (L1)
+        # 1. Aşama: Bellek İçi (L1) - Hem spesifik anahtar hem master havuz güncellenir
         with self._lock:
+            expires_at = now + effective_ttl
             self._cache[key] = {
                 "features": clean_features,
-                "expires_at": now + effective_ttl,
+                "expires_at": expires_at,
             }
             self._cache.move_to_end(key)
+
+            # Master havuz birleştirme
+            if master_key in self._master_cache and now < self._master_cache[master_key]["expires_at"]:
+                self._master_cache[master_key]["features"].update(clean_features)
+                self._master_cache[master_key]["expires_at"] = max(
+                    self._master_cache[master_key]["expires_at"], expires_at
+                )
+            else:
+                self._master_cache[master_key] = {
+                    "features": dict(clean_features),
+                    "expires_at": expires_at,
+                }
 
             # LRU tahliyesi (eviction)
             while len(self._cache) > self._max_size:
                 self._cache.popitem(last=False)
 
+            if len(self._master_cache) > self._max_size:
+                # Master havuzdan en eski süresi dolmuşları temizle
+                cutoff_keys = [mk for mk, val in self._master_cache.items() if now >= val["expires_at"]]
+                for mk in cutoff_keys:
+                    del self._master_cache[mk]
+
         # 2. Aşama: Redis (L2)
         if self._redis:
             try:
-                self._redis.setex(key, effective_ttl, orjson.dumps(clean_features).decode("utf-8"))
+                payload = orjson.dumps(clean_features).decode("utf-8")
+                self._redis.setex(key, effective_ttl, payload)
+                # Master Redis anahtarını da güncelle
+                with self._lock:
+                    master_payload = orjson.dumps(self._master_cache[master_key]["features"]).decode("utf-8")
+                self._redis.setex(master_key, effective_ttl, master_payload)
             except Exception as e:
                 logger.debug("ozellik_deposu_redis_yazma_hatasi", anahtar=key, hata=str(e))
 
@@ -336,15 +450,32 @@ class FeatureStore:
 
         with self._lock:
             for ticker, features in batch_features.items():
+                symbol = ticker.upper()
                 clean_features = {str(k): _clean_feature_val(v) for k, v in features.items()}
-                key = self._make_key(ticker, date, list(features.keys()))
+                key = self._make_key(symbol, date, list(features.keys()))
+                master_key = self._make_master_key(symbol, date)
+                exp = now + effective_ttl
+
                 self._cache[key] = {
                     "features": clean_features,
-                    "expires_at": now + effective_ttl,
+                    "expires_at": exp,
                 }
                 self._cache.move_to_end(key)
+
+                if master_key in self._master_cache and now < self._master_cache[master_key]["expires_at"]:
+                    self._master_cache[master_key]["features"].update(clean_features)
+                    self._master_cache[master_key]["expires_at"] = max(
+                        self._master_cache[master_key]["expires_at"], exp
+                    )
+                else:
+                    self._master_cache[master_key] = {
+                        "features": dict(clean_features),
+                        "expires_at": exp,
+                    }
+
                 if self._redis:
                     redis_entries[key] = orjson.dumps(clean_features).decode("utf-8")
+                    redis_entries[master_key] = orjson.dumps(self._master_cache[master_key]["features"]).decode("utf-8")
 
             # LRU tahliyesi
             while len(self._cache) > self._max_size:
@@ -372,6 +503,7 @@ class FeatureStore:
         """
         symbol = ticker.upper()
         prefix = f"feat:{symbol}:{date}:" if date else f"feat:{symbol}:"
+        master_prefix = f"feat_master:{symbol}:{date}" if date else f"feat_master:{symbol}:"
 
         deleted_count = 0
         with self._lock:
@@ -380,10 +512,17 @@ class FeatureStore:
                 del self._cache[k]
                 deleted_count += 1
 
+            master_keys_to_remove = [mk for mk in self._master_cache if mk.startswith(master_prefix)]
+            for mk in master_keys_to_remove:
+                del self._master_cache[mk]
+
         if self._redis:
             try:
                 pattern = f"feat:{symbol}:{date}:*" if date else f"feat:{symbol}:*"
-                matching_keys = list(self._redis.scan_iter(match=pattern))
+                master_pattern = f"feat_master:{symbol}:{date}*" if date else f"feat_master:{symbol}:*"
+                matching_keys = list(self._redis.scan_iter(match=pattern)) + list(
+                    self._redis.scan_iter(match=master_pattern)
+                )
                 if matching_keys:
                     for i in range(0, len(matching_keys), REDIS_DELETE_CHUNK_SIZE):
                         chunk = matching_keys[i : i + REDIS_DELETE_CHUNK_SIZE]
@@ -408,6 +547,7 @@ class FeatureStore:
             total = self._hits + self._misses
             return {
                 "size": len(self._cache),
+                "master_size": len(self._master_cache),
                 "max_size": self._max_size,
                 "hits": self._hits,
                 "misses": self._misses,
@@ -425,6 +565,7 @@ class FeatureStore:
         return pl.DataFrame(
             {
                 "size": pl.Series([stats["size"]], dtype=pl.Int64),
+                "master_size": pl.Series([stats["master_size"]], dtype=pl.Int64),
                 "max_size": pl.Series([stats["max_size"]], dtype=pl.Int64),
                 "hits": pl.Series([stats["hits"]], dtype=pl.Int64),
                 "misses": pl.Series([stats["misses"]], dtype=pl.Int64),
@@ -440,7 +581,7 @@ class FeatureStore:
             Önbellekteki anahtar, son kullanma zamanı ve kalan süreyi içeren Polars DataFrame.
         """
         empty_schema = {
-            "key": pl.Utf8,
+            "key": pl.String,
             "expires_at": pl.Float64,
             "remaining_seconds": pl.Float64,
         }
@@ -458,7 +599,7 @@ class FeatureStore:
                 )
         if not records:
             return pl.DataFrame(schema=empty_schema)
-        return pl.DataFrame(records)
+        return pl.DataFrame(records, schema=empty_schema)
 
     def export_features_to_polars(
         self,
@@ -478,21 +619,169 @@ class FeatureStore:
         """
         feats = self.get(ticker, date, feature_names)
         if not feats:
-            schema = {"ticker": pl.Utf8, "date": pl.Utf8, **{f: pl.Float64 for f in feature_names}}
+            schema = {"ticker": pl.String, "date": pl.String, **{f: pl.Float64 for f in feature_names}}
             return pl.DataFrame(schema=schema)
 
         data = {"ticker": [ticker.upper()], "date": [date], **{k: [v] for k, v in feats.items()}}
         return pl.DataFrame(data)
 
+    def export_to_duckdb(
+        self,
+        db_path: str | None = None,
+        table_name: str = "feature_store_snapshot",
+    ) -> int:
+        """Bellekteki tüm master özellikleri yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+        Args:
+            db_path: DuckDB dosya yolu (None ise varsayılan kullanılır).
+            table_name: Hedef tablo adı.
+
+        Returns:
+            Kaydedilen toplam hisse-tarih kayıt adedi.
+        """
+        target_path = str(db_path or self._db_path)
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table_name):
+            raise ValueError(f"Geçersiz tablo adı: {table_name}")
+
+        records: list[dict[str, Any]] = []
+        with self._lock:
+            for master_key, entry in self._master_cache.items():
+                parts = master_key.split(":")
+                if len(parts) >= 3:
+                    symbol = parts[1]
+                    date_val = parts[2]
+                    records.append({
+                        "ticker": symbol,
+                        "date": date_val,
+                        "features_json": orjson.dumps(entry["features"], default=str).decode("utf-8"),
+                        "expires_at": entry["expires_at"],
+                    })
+
+        if not records:
+            return 0
+
+        df = pl.DataFrame(records)
+        target = Path(target_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists() and target.stat().st_size == 0:
+            with contextlib.suppress(OSError):
+                target.unlink()
+
+        with duckdb.connect(target_path) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    ticker VARCHAR,
+                    date VARCHAR,
+                    features_json VARCHAR,
+                    expires_at DOUBLE,
+                    PRIMARY KEY (ticker, date)
+                )
+            """)
+            conn.register("df_features_view", df.to_arrow())
+            conn.execute(f"""
+                INSERT INTO {table_name}
+                SELECT * FROM df_features_view
+                ON CONFLICT (ticker, date) DO UPDATE SET
+                    features_json = EXCLUDED.features_json,
+                    expires_at = EXCLUDED.expires_at
+            """)
+
+        return df.height
+
+    def load_from_duckdb(
+        self,
+        db_path: str | None = None,
+        table_name: str = "feature_store_snapshot",
+    ) -> int:
+        """DuckDB anlık görüntüsünden süresi dolmamış özellikleri bellek içi önbelleğe geri yükler.
+
+        Args:
+            db_path: DuckDB dosya yolu.
+            table_name: Kaynak tablo adı.
+
+        Returns:
+            Yüklenen toplam hisse-tarih kayıt adedi.
+        """
+        target_path = str(db_path or self._db_path)
+        target = Path(target_path)
+        if not target.exists() or target.stat().st_size == 0:
+            return 0
+
+        now = time.time()
+        loaded = 0
+        try:
+            with duckdb.connect(target_path, read_only=True) as conn:
+                rows = conn.execute(
+                    f"SELECT ticker, date, features_json, expires_at FROM {table_name} WHERE expires_at > ?",
+                    [now],
+                ).fetchall()
+
+                with self._lock:
+                    for ticker, date_val, feat_json, expires_at in rows:
+                        try:
+                            raw = orjson.loads(feat_json)
+                            clean = {str(k): _clean_feature_val(v) for k, v in raw.items()}
+                            master_key = self._make_master_key(ticker, date_val)
+                            self._master_cache[master_key] = {
+                                "features": clean,
+                                "expires_at": float(expires_at),
+                            }
+                            loaded += 1
+                        except Exception:
+                            continue
+        except Exception as exc:
+            logger.warning("feature_store_duckdb_yukleme_hatasi", hata=str(exc))
+
+        return loaded
+
 
 # Global tekil nesne
-feature_store: FeatureStore = FeatureStore()
+feature_store: Final[FeatureStore] = FeatureStore()
 
-__all__ = [
+
+def export_feature_stats_to_polars() -> pl.DataFrame:
+    """Önbellek performans metriklerini Polars DataFrame olarak dışa aktarır."""
+    return feature_store.export_stats_to_polars()
+
+
+def export_features_to_polars(
+    ticker: str,
+    date: str,
+    feature_names: list[str],
+) -> pl.DataFrame:
+    """Belirtilen hisse ve tarih için özellikleri doğrudan Polars DataFrame olarak döndürür."""
+    return feature_store.export_features_to_polars(ticker, date, feature_names)
+
+
+def export_features_to_duckdb(
+    db_path: str = DEFAULT_FEATURE_STORE_DB_PATH,
+    table_name: str = "feature_store_snapshot",
+) -> int:
+    """Bellekteki özellikleri yerel DuckDB tablosuna anlık görüntü olarak kaydeder."""
+    return feature_store.export_to_duckdb(db_path=db_path, table_name=table_name)
+
+
+def load_features_from_duckdb(
+    db_path: str = DEFAULT_FEATURE_STORE_DB_PATH,
+    table_name: str = "feature_store_snapshot",
+) -> int:
+    """DuckDB anlık görüntüsünden özellikleri bellek içi önbelleğe geri yükler."""
+    return feature_store.load_from_duckdb(db_path=db_path, table_name=table_name)
+
+
+__all__: Final[list[str]] = [
     "DEFAULT_CACHE_TTL_SECONDS",
+    "DEFAULT_FEATURE_STORE_DB_PATH",
     "DEFAULT_MAX_CACHE_SIZE",
     "REDIS_DELETE_CHUNK_SIZE",
     "FeatureStore",
+    "export_feature_stats_to_polars",
+    "export_features_to_duckdb",
+    "export_features_to_polars",
     "feature_store",
+    "load_features_from_duckdb",
     "otel_trace",
 ]
+
+

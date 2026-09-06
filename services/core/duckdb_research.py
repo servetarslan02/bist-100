@@ -249,8 +249,10 @@ class DuckDBResearchEngine:
         if sql is None:
             query = f"SELECT * FROM read_parquet('{safe_path}')"
         else:
-            stripped = sql.strip()
-            if not re.search(r"\bFROM\b", stripped, re.IGNORECASE):
+            stripped = sql.strip().rstrip(";")
+            if re.search(r"\bread_parquet\s*\(", stripped, re.IGNORECASE):
+                query = stripped
+            elif not re.search(r"\bFROM\b", stripped, re.IGNORECASE):
                 # WHERE, GROUP BY, ORDER BY, LIMIT, HAVING tespit edilirse FROM araya eklenir
                 clause_match = re.search(
                     r"\b(WHERE|GROUP\s+BY|ORDER\s+BY|LIMIT|HAVING)\b",
@@ -322,7 +324,10 @@ class DuckDBResearchEngine:
 
         query = f"SELECT {cols_str} FROM read_parquet('{safe_path}')"
         if where_clause:
-            query += f" WHERE {where_clause}"
+            clean_where = where_clause.strip().rstrip(";")
+            if ";" in clean_where or "--" in clean_where or "/*" in clean_where:
+                raise ValueError(f"where_clause içinde yasaklı karakter/çoklu ifade tespit edildi: {where_clause!r}")
+            query += f" WHERE {clean_where}"
 
         with self._lock:
             conn = self._get_conn()
@@ -350,7 +355,7 @@ class DuckDBResearchEngine:
 
     @otel_trace("duckdb_research.register_parquet")
     def register_parquet(self, name: str, parquet_path: str | Path) -> None:
-        """Parquet dosyasını DuckDB içinde sanal bir görünüm (VIEW) olarak kaydeder.
+        """Parquet dosyasını DuckDB içinde sanal bir görünüm (TEMPORARY VIEW) olarak kaydeder.
 
         Args:
             name: Sanal tablo adı (geçerli SQL identifier olmalıdır).
@@ -365,7 +370,7 @@ class DuckDBResearchEngine:
         safe_path = self._escape_path(parquet_path)
         with self._lock:
             conn = self._get_conn()
-            conn.execute(f"CREATE OR REPLACE VIEW \"{name}\" AS SELECT * FROM read_parquet('{safe_path}')")
+            conn.execute(f'CREATE OR REPLACE TEMPORARY VIEW "{name}" AS SELECT * FROM read_parquet(\'{safe_path}\')')
             self._parquet_cache[name] = str(parquet_path)
             logger.info("Parquet sanal tablo olarak kaydedildi", name=name, path=str(parquet_path))
 
@@ -522,12 +527,23 @@ class DuckDBResearchEngine:
         output_path = Path(parquet_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        count_query = f'SELECT COUNT(*) FROM "{table}"'
+        count_query = f'SELECT COUNT(*) AS total_count FROM "{table}"'
         if where:
-            count_query += f" WHERE {where}"
+            clean_where = where.strip().rstrip(";")
+            if ";" in clean_where or "--" in clean_where or "/*" in clean_where:
+                raise ValueError(f"where koşulunda geçersiz/güvensiz karakter tespit edildi: {where!r}")
+            count_query += f" WHERE {clean_where}"
 
         total_rows = await pg_fetch(count_query)
-        total = total_rows[0]["count"] if total_rows else 0
+        total = 0
+        if total_rows:
+            first_row = total_rows[0]
+            if isinstance(first_row, dict) or hasattr(first_row, "get"):
+                total = int(first_row.get("total_count", first_row.get("count", 0)))
+            elif isinstance(first_row, (tuple, list)):
+                total = int(first_row[0])
+            else:
+                total = int(first_row)
 
         if total == 0:
             logger.warning("Aktarılacak veri bulunamadı", table=table)
@@ -546,7 +562,7 @@ class DuckDBResearchEngine:
             while offset < total:
                 query = f'SELECT * FROM "{table}"'
                 if where:
-                    query += f" WHERE {where}"
+                    query += f" WHERE {clean_where}"
                 query += f" ORDER BY 1 LIMIT {batch_size} OFFSET {offset}"
 
                 rows = await pg_fetch(query)
@@ -574,8 +590,10 @@ class DuckDBResearchEngine:
 
                     shutil.move(batch_files[0], str(output_path))
                 else:
-                    combined = pl.concat([pl.read_parquet(f) for f in batch_files])
-                    combined.write_parquet(str(output_path))
+                    # Kural 6 Proaktif İyileştirme: Tüm batch'leri belleğe aynı anda yükleyip RAM tüketmek yerine
+                    # Polars scan_parquet + sink_parquet ile doğrudan diske akış (streaming) yapılır
+                    glob_pattern = f"{tmpdir}/batch_*.parquet"
+                    pl.scan_parquet(glob_pattern).sink_parquet(str(output_path), compression="zstd")
 
         logger.info(
             "TimescaleDB → Parquet aktarımı tamamlandı",
@@ -656,11 +674,13 @@ class DuckDBResearchEngine:
                     "parquet_views": list(self._parquet_cache.keys()),
                 }
             except Exception as exc:
+                logger.error("research_engine_stats_alinamadi", error=str(exc))
                 return {"error": str(exc)}
 
 
 # Global tekil örnek
 research_engine: Final[DuckDBResearchEngine] = DuckDBResearchEngine()
+duckdb_research_store: Final[DuckDBResearchEngine] = research_engine
 
 
 def get_research_engine() -> DuckDBResearchEngine:
@@ -677,20 +697,47 @@ def query_parquet(
     return research_engine.query_parquet(parquet_path=parquet_path, sql=sql, params=params)
 
 
+def query_parquet_columns(
+    parquet_path: str | Path,
+    columns: list[str],
+    where_clause: str | None = None,
+    params: dict[str, Any] | list[Any] | None = None,
+) -> pl.DataFrame:
+    """Projection ve Predicate pushdown ile kolon filtreli Parquet sorgular."""
+    return research_engine.query_parquet_columns(
+        parquet_path=parquet_path, columns=columns, where_clause=where_clause, params=params
+    )
+
+
+def scan_parquet(parquet_path: str | Path) -> pl.LazyFrame:
+    """Parquet dosyasını sıfır bellek tüketimiyle sorgulamak üzere Polars LazyFrame döner."""
+    return research_engine.scan_parquet(parquet_path=parquet_path)
+
+
+def register_parquet(name: str, parquet_path: str | Path) -> None:
+    """Parquet dosyasını DuckDB içinde sanal görünüm olarak kaydeder."""
+    research_engine.register_parquet(name=name, parquet_path=parquet_path)
+
+
 def get_research_stats() -> dict[str, Any]:
     """Research motoru istatistiklerini döner."""
     return research_engine.get_stats()
 
 
-__all__ = [
+__all__: Final[list[str]] = [
     "DEFAULT_BATCH_SIZE",
     "DEFAULT_EXPORT_TABLES",
     "DEFAULT_PARQUET_OUTPUT_DIR",
     "DEFAULT_RESEARCH_DB_PATH",
     "DuckDBResearchEngine",
+    "duckdb_research_store",
     "get_research_engine",
     "get_research_stats",
     "otel_trace",
     "query_parquet",
+    "query_parquet_columns",
+    "register_parquet",
     "research_engine",
+    "scan_parquet",
 ]
+

@@ -20,11 +20,14 @@ Metrikler:
   portfolio_invariant_failures — Counter
 """
 
+from __future__ import annotations
+
 import asyncio
+import contextlib
 import functools
 import time
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import Any, Callable, Final
 
 import polars as pl
 import structlog
@@ -37,11 +40,11 @@ from .observability import health_checker, prometheus_metrics
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.monitoring")
 
-DEFAULT_SYNC_INTERVAL_SECONDS: float = 5.0
-PROMETHEUS_HISTOGRAM_BUCKETS: list[float] = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+DEFAULT_SYNC_INTERVAL_SECONDS: Final[float] = 5.0
+PROMETHEUS_HISTOGRAM_BUCKETS: Final[list[float]] = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
 
 
-def otel_trace(span_name: str) -> Callable:
+def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Belirtilen metodu OpenTelemetry span içine alan dekoratör.
 
     Args:
@@ -51,25 +54,43 @@ def otel_trace(span_name: str) -> Callable:
         Dekoratör sarmalayıcı fonksiyonu.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         """Hedef fonksiyonu sarmalayarak span yaşam döngüsünü yönetir."""
         if asyncio.iscoroutinefunction(func):
 
             @functools.wraps(func)
-            async def async_wrapper(*args, **kwargs) -> Any:
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 with tracer.start_as_current_span(span_name):
                     return await func(*args, **kwargs)
 
             return async_wrapper
 
         @functools.wraps(func)
-        def sync_wrapper(*args, **kwargs) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
 
         return sync_wrapper
 
     return decorator
+
+
+def _extract_metric_value(val: Any) -> float:
+    """Prometheus Counter/Gauge nesnesinden veya ilkel sayısal tipten güvenli float değer ayıklar."""
+    if isinstance(val, (int, float)):
+        return float(val)
+    if hasattr(val, "_value"):
+        with contextlib.suppress(Exception):
+            return float(val._value.get())
+    if hasattr(val, "collect"):
+        with contextlib.suppress(Exception):
+            collected = val.collect()
+            if collected and collected[0].samples:
+                return float(collected[0].samples[0].value)
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
 
 
 class PortfolioMonitor:
@@ -83,9 +104,15 @@ class PortfolioMonitor:
         """
         self._portfolio_service: Any = None
         self._last_sync_time: float | None = None
-        self._sync_interval_s: float = sync_interval_seconds
+        self._sync_interval_s: float = max(0.1, float(sync_interval_seconds))
         self._invariant_failure_count: int = 0
-        self._lock: asyncio.Lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Asenkron kilit nesnesini gerektiğinde (lazy) oluşturur ve döndürür."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     @otel_trace("monitoring.bind")
     def bind(self, portfolio_service: Any) -> None:
@@ -106,30 +133,39 @@ class PortfolioMonitor:
         if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
             return
 
-        async with self._lock:
-            # Kilitten sonra tekrar kontrol et (double-checked locking)
+        async with self._get_lock():
+            # Çift kilit kontrolü (double-checked locking)
             now = time.time()
             if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
                 return
+            self._last_sync_time = now
 
             try:
-                from services.paper_trading.paper_orchestrator import paper_orchestrator
+                summary: dict[str, Any] = {}
+                if self._portfolio_service and hasattr(self._portfolio_service, "get_summary"):
+                    summary = self._portfolio_service.get_summary()
+                elif self._portfolio_service and hasattr(self._portfolio_service, "portfolio"):
+                    summary = self._portfolio_service.portfolio.get_summary()
+                else:
+                    with contextlib.suppress(Exception):
+                        from services.paper_trading.paper_orchestrator import paper_orchestrator
+                        summary = paper_orchestrator.portfolio.get_summary()
 
-                summary = paper_orchestrator.portfolio.get_summary()
-
-                # Portföy Göstergeleri (Gauges)
-                prometheus_metrics.set_gauge("portfolio_equity", summary.get("total_value", 0.0))
-                prometheus_metrics.set_gauge("portfolio_cash", summary.get("cash", 0.0))
-                prometheus_metrics.set_gauge("portfolio_positions_count", summary.get("num_positions", 0))
-                prometheus_metrics.set_gauge("portfolio_unrealized_pnl", summary.get("unrealized_pnl", 0.0))
-                prometheus_metrics.set_gauge("portfolio_realized_pnl", summary.get("total_pnl", 0.0))
-                prometheus_metrics.set_gauge("portfolio_commission_total", summary.get("total_commission", 0.0))
-                prometheus_metrics.set_gauge("portfolio_drawdown_pct", summary.get("max_drawdown_pct", 0.0))
+                # Portföy Göstergeleri (Gauges) — None korumalı float dönüşümü
+                prometheus_metrics.set_gauge("portfolio_equity", float(summary.get("total_value") or 0.0))
+                prometheus_metrics.set_gauge("portfolio_cash", float(summary.get("cash") or 0.0))
+                prometheus_metrics.set_gauge("portfolio_positions_count", int(summary.get("num_positions") or 0))
+                prometheus_metrics.set_gauge("portfolio_unrealized_pnl", float(summary.get("unrealized_pnl") or 0.0))
+                prometheus_metrics.set_gauge("portfolio_realized_pnl", float(summary.get("total_pnl") or 0.0))
+                prometheus_metrics.set_gauge(
+                    "portfolio_commission_total", float(summary.get("total_commission") or 0.0)
+                )
+                prometheus_metrics.set_gauge("portfolio_drawdown_pct", float(summary.get("max_drawdown_pct") or 0.0))
 
                 # Muhasebe Invariant Kontrolü: Equity == Cash + Invested
-                total_val = float(summary.get("total_value", 0.0))
-                cash_val = float(summary.get("cash", 0.0))
-                invested_val = float(summary.get("invested_value", 0.0))
+                total_val = float(summary.get("total_value") or 0.0)
+                cash_val = float(summary.get("cash") or 0.0)
+                invested_val = float(summary.get("invested_value") or 0.0)
 
                 invariant_ok = abs(total_val - (cash_val + invested_val)) < 1.0
                 if not invariant_ok:
@@ -145,8 +181,8 @@ class PortfolioMonitor:
                     alerting.check_negative_cash(cash_val)
 
                 # Düşüş (Drawdown) Kontrolü
-                drawdown = summary.get("max_drawdown_pct", 0.0)
-                if drawdown:
+                drawdown = float(summary.get("max_drawdown_pct") or 0.0)
+                if drawdown > 0.0:
                     alerting.check_drawdown(drawdown)
 
                 # Kilit (Lock) Metrikleri
@@ -154,17 +190,15 @@ class PortfolioMonitor:
                 for key, m in lock_metrics.items():
                     prometheus_metrics.set_gauge(
                         "lock_acquisition_total",
-                        m.get("total_acquisitions", 0),
+                        int(m.get("total_acquisitions") or 0),
                         {"key": key},
                     )
                     prometheus_metrics.set_gauge(
                         "lock_wait_seconds",
-                        m.get("avg_wait_ms", 0.0) / 1000.0,
+                        float(m.get("avg_wait_ms") or 0.0) / 1000.0,
                         {"key": key},
                     )
                 alerting.check_lock_metrics(lock_metrics)
-
-                self._last_sync_time = now
 
             except Exception as e:
                 logger.warning("Portföy metrik senkronizasyonu başarısız", hata=str(e))
@@ -259,13 +293,13 @@ class PortfolioMonitor:
         for name, value in metrics.get("counters", {}).items():
             base_name, _ = self._parse_metric_name(name)
             lines.append(f"# TYPE {base_name} counter")
-            lines.append(f"{name} {value}")
+            lines.append(f"{name} {_extract_metric_value(value)}")
 
         # Göstergeler (Gauges)
         for name, value in metrics.get("gauges", {}).items():
             base_name, _ = self._parse_metric_name(name)
             lines.append(f"# TYPE {base_name} gauge")
-            lines.append(f"{name} {value}")
+            lines.append(f"{name} {_extract_metric_value(value)}")
 
         # Histogramlar (Histograms)
         for name, stats in metrics.get("histograms", {}).items():
@@ -275,13 +309,20 @@ class PortfolioMonitor:
             label_str = f"{{{labels}}}" if labels else ""
             prefix = f"{labels}," if labels else ""
 
-            lines.append(f"{base_name}_count{label_str} {stats.get('count', 0)}")
-            lines.append(f"{base_name}_sum{label_str} {stats.get('sum', 0.0):.6f}")
+            count_val = stats.get("count", 0)
+            sum_val = float(stats.get("sum", 0.0))
+            samples = stats.get("samples")
+
+            lines.append(f"{base_name}_count{label_str} {count_val}")
+            lines.append(f"{base_name}_sum{label_str} {sum_val:.6f}")
 
             for bucket in PROMETHEUS_HISTOGRAM_BUCKETS:
-                count = sum(1 for v in [stats.get("p50", 0.0)] if v <= bucket)
-                lines.append(f'{base_name}_bucket{{{prefix}le="{bucket}"}} {count}')
-            lines.append(f'{base_name}_bucket{{{prefix}le="+Inf"}} {stats.get("count", 0)}')
+                if samples and isinstance(samples, list):
+                    b_count = sum(1 for v in samples if v <= bucket)
+                else:
+                    b_count = sum(1 for v in [float(stats.get("p50", 0.0))] if v <= bucket)
+                lines.append(f'{base_name}_bucket{{{prefix}le="{bucket}"}} {b_count}')
+            lines.append(f'{base_name}_bucket{{{prefix}le="+Inf"}} {count_val}')
 
         return "\n".join(lines) + "\n"
 
@@ -300,19 +341,24 @@ class PortfolioMonitor:
     async def get_portfolio_api(self) -> dict[str, Any]:
         """Portföy ve muhasebe durumunu API yanıtı olarak döndürür."""
         try:
-            from services.paper_trading.paper_orchestrator import paper_orchestrator
-
-            summary = paper_orchestrator.portfolio.get_summary()
+            summary: dict[str, Any] = {}
+            if self._portfolio_service and hasattr(self._portfolio_service, "get_summary"):
+                summary = self._portfolio_service.get_summary()
+            elif self._portfolio_service and hasattr(self._portfolio_service, "portfolio"):
+                summary = self._portfolio_service.portfolio.get_summary()
+            else:
+                from services.paper_trading.paper_orchestrator import paper_orchestrator
+                summary = paper_orchestrator.portfolio.get_summary()
             return {
                 "status": "HEALTHY",
                 "portfolio": summary,
                 "accounting": {
-                    "cash": summary.get("cash", 0.0),
-                    "settled_cash": summary.get("settled_cash", 0.0),
-                    "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
-                    "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
-                    "invested_value": summary.get("invested_value", 0.0),
-                    "total_value": summary.get("total_value", 0.0),
+                    "cash": float(summary.get("cash") or 0.0),
+                    "settled_cash": float(summary.get("settled_cash") or 0.0),
+                    "unsettled_t1": float(summary.get("unsettled_cash_t1") or 0.0),
+                    "unsettled_t2": float(summary.get("unsettled_cash_t2") or 0.0),
+                    "invested_value": float(summary.get("invested_value") or 0.0),
+                    "total_value": float(summary.get("total_value") or 0.0),
                 },
                 "engine": "PaperTradingOrchestrator_SingleSource",
                 "timestamp": datetime.now(UTC).isoformat(),
@@ -326,46 +372,83 @@ class PortfolioMonitor:
             }
 
     def export_metrics_to_polars(self) -> pl.DataFrame:
-        """Güncel Prometheus metriklerini Polars DataFrame olarak dışa aktarır."""
+        """Güncel Prometheus metriklerini (Sayaçlar, Göstergeler, Histogramlar) Polars DataFrame olarak dışa aktarır."""
         raw_metrics = prometheus_metrics.get_metrics()
         records: list[dict[str, Any]] = []
 
         now_str = datetime.now(UTC).isoformat()
         for name, value in raw_metrics.get("counters", {}).items():
             base, labels = self._parse_metric_name(name)
-            records.append(
-                {
-                    "metric_type": "counter",
-                    "name": base,
-                    "labels": labels,
-                    "value": float(value),
-                    "timestamp": now_str,
-                }
-            )
+            records.append({
+                "metric_type": "counter",
+                "name": base,
+                "labels": labels,
+                "value": _extract_metric_value(value),
+                "timestamp": now_str,
+            })
 
         for name, value in raw_metrics.get("gauges", {}).items():
             base, labels = self._parse_metric_name(name)
-            records.append(
-                {
-                    "metric_type": "gauge",
-                    "name": base,
-                    "labels": labels,
-                    "value": float(value),
-                    "timestamp": now_str,
-                }
-            )
+            records.append({
+                "metric_type": "gauge",
+                "name": base,
+                "labels": labels,
+                "value": _extract_metric_value(value),
+                "timestamp": now_str,
+            })
+
+        for name, stats in raw_metrics.get("histograms", {}).items():
+            base, labels = self._parse_metric_name(name)
+            records.append({
+                "metric_type": "histogram_count",
+                "name": f"{base}_count",
+                "labels": labels,
+                "value": float(stats.get("count", 0)),
+                "timestamp": now_str,
+            })
+            records.append({
+                "metric_type": "histogram_p50",
+                "name": f"{base}_p50",
+                "labels": labels,
+                "value": float(stats.get("p50", 0.0)),
+                "timestamp": now_str,
+            })
 
         if not records:
-            return pl.DataFrame(
-                schema={
-                    "metric_type": pl.Utf8,
-                    "name": pl.Utf8,
-                    "labels": pl.Utf8,
-                    "value": pl.Float64,
-                    "timestamp": pl.Utf8,
-                }
-            )
+            return pl.DataFrame(schema={
+                "metric_type": pl.String,
+                "name": pl.String,
+                "labels": pl.String,
+                "value": pl.Float64,
+                "timestamp": pl.String,
+            })
 
+        return pl.DataFrame(records)
+
+    @staticmethod
+    def export_lock_metrics_to_polars() -> pl.DataFrame:
+        """Veritabanı ve dağıtık kilit performans telemetrisini Polars DataFrame olarak dışa aktarır."""
+        lock_metrics = get_all_metrics()
+        records: list[dict[str, Any]] = []
+        now_str = datetime.now(UTC).isoformat()
+        for key, data in lock_metrics.items():
+            records.append({
+                "lock_key": str(key),
+                "total_acquisitions": int(data.get("total_acquisitions") or 0),
+                "total_timeouts": int(data.get("total_timeouts") or 0),
+                "avg_wait_ms": float(data.get("avg_wait_ms") or 0.0),
+                "max_wait_ms": float(data.get("max_wait_ms") or 0.0),
+                "timestamp": now_str,
+            })
+        if not records:
+            return pl.DataFrame(schema={
+                "lock_key": pl.String,
+                "total_acquisitions": pl.Int64,
+                "total_timeouts": pl.Int64,
+                "avg_wait_ms": pl.Float64,
+                "max_wait_ms": pl.Float64,
+                "timestamp": pl.String,
+            })
         return pl.DataFrame(records)
 
     def __repr__(self) -> str:
@@ -376,13 +459,17 @@ class PortfolioMonitor:
         )
 
 
-# Singleton Örneği
-portfolio_monitor: PortfolioMonitor = PortfolioMonitor()
+# Singleton Örneği ve kolaylık fonksiyonları
+portfolio_monitor: Final[PortfolioMonitor] = PortfolioMonitor()
+export_metrics_to_polars = portfolio_monitor.export_metrics_to_polars
+export_lock_metrics_to_polars = portfolio_monitor.export_lock_metrics_to_polars
 
-__all__ = [
+__all__: Final[list[str]] = [
     "DEFAULT_SYNC_INTERVAL_SECONDS",
     "PROMETHEUS_HISTOGRAM_BUCKETS",
     "PortfolioMonitor",
+    "export_lock_metrics_to_polars",
+    "export_metrics_to_polars",
     "otel_trace",
     "portfolio_monitor",
 ]

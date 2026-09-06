@@ -15,12 +15,16 @@ from __future__ import annotations
 
 import functools
 import math
+import os
 from typing import Any, Callable, Final, Sequence
 
+import duckdb
 import numpy as np
 import polars as pl
+import structlog
 from opentelemetry import trace
 
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.metrics_math")
 
 DEFAULT_PERIODS_PER_YEAR: Final[int] = 252
@@ -60,21 +64,44 @@ def _to_clean_numpy(values: np.ndarray | pl.Series | pl.DataFrame | Sequence[flo
     """
     try:
         if isinstance(values, pl.DataFrame):
-            arr = values.to_numpy().flatten().astype(np.float64)
+            numeric_cols = [col for col, dtype in zip(values.columns, values.dtypes, strict=False) if dtype.is_numeric()]
+            if not numeric_cols:
+                return np.array([], dtype=np.float64)
+            arr = values.select(numeric_cols).to_numpy().flatten().astype(np.float64)
         elif isinstance(values, pl.Series):
             arr = values.drop_nulls().to_numpy().astype(np.float64)
         else:
             arr = np.asarray(values, dtype=np.float64)
-    except (ValueError, TypeError):
+    except Exception:
         cleaned: list[float] = []
-        raw_list = values.to_list() if hasattr(values, "to_list") else values
-        for v in raw_list:
+        if isinstance(values, pl.DataFrame):
+            for row in values.to_dicts():
+                for v in row.values():
+                    try:
+                        fv = float(v)
+                        if math.isfinite(fv):
+                            cleaned.append(fv)
+                    except (ValueError, TypeError):
+                        continue
+        elif hasattr(values, "to_list"):
+            for v in values.to_list():
+                try:
+                    fv = float(v)
+                    if math.isfinite(fv):
+                        cleaned.append(fv)
+                except (ValueError, TypeError):
+                    continue
+        else:
             try:
-                fv = float(v)
-                if math.isfinite(fv):
-                    cleaned.append(fv)
-            except (ValueError, TypeError):
-                continue
+                for v in values:  # type: ignore[union-attr]
+                    try:
+                        fv = float(v)
+                        if math.isfinite(fv):
+                            cleaned.append(fv)
+                    except (ValueError, TypeError):
+                        continue
+            except Exception:
+                pass
         return np.array(cleaned, dtype=np.float64)
 
     if arr.ndim > 1:
@@ -246,6 +273,100 @@ def calculate_profit_factor(returns: np.ndarray | pl.Series | pl.DataFrame | Seq
     return float(min(100.0, pf)) if math.isfinite(pf) else 0.0
 
 
+@otel_trace("metrics_math.calculate_omega_ratio")
+def calculate_omega_ratio(
+    returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    threshold: float = 0.0,
+) -> float:
+    """Omega Oranını (Eşik üstü kazançların eşik altı kayıplara kümülatif oranı) hesaplar.
+
+    Non-normal ve asimetrik BIST getiri dağılımlarında Sharpe oranına göre çok daha üstün bir risk-getiri metriğidir.
+
+    Args:
+        returns: Dönemsel getiri serisi.
+        threshold: Asgari kabul edilebilir getiri eşiği (varsayılan: 0.0).
+
+    Returns:
+        Omega oranı (kayıp yoksa 100.0 ile sınırlandırılır).
+    """
+    arr = _to_clean_numpy(returns)
+    if len(arr) == 0:
+        return 0.0
+
+    excess = arr - threshold
+    upside = float(np.sum(np.maximum(0.0, excess)))
+    downside = float(np.sum(np.maximum(0.0, -excess)))
+
+    if downside <= 1e-12:
+        return 100.0 if upside > 0.0 else 1.0
+
+    omega = upside / downside
+    return float(min(100.0, omega)) if math.isfinite(omega) else 1.0
+
+
+@otel_trace("metrics_math.calculate_tail_ratio")
+def calculate_tail_ratio(
+    returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+) -> float:
+    """Kuyruk Oranını (Tail Ratio, 95. persentil / |5. persentil|) hesaplar.
+
+    Dağılımın sağ kuyruk (büyük kazanç) potansiyelinin sol kuyruk (büyük kayıp) riskine oranını ölçer.
+
+    Args:
+        returns: Dönemsel getiri serisi.
+
+    Returns:
+        Kuyruk oranı (1.0 üstü pozitif asimetriyi, 1.0 altı negatif kuyruk riskini gösterir).
+    """
+    arr = _to_clean_numpy(returns)
+    if len(arr) < 5:
+        return 1.0
+
+    p95 = float(np.percentile(arr, 95))
+    p5 = float(np.percentile(arr, 5))
+
+    abs_p5 = abs(p5)
+    if abs_p5 <= 1e-12:
+        return 10.0 if p95 > 0 else 1.0
+
+    ratio = p95 / abs_p5
+    return float(max(0.0, min(50.0, ratio))) if math.isfinite(ratio) else 1.0
+
+
+@otel_trace("metrics_math.calculate_information_ratio")
+def calculate_information_ratio(
+    returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    benchmark_returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
+) -> float:
+    """Bilgi Oranını (Information Ratio, Alfa / Takip Hatası) hesaplar.
+
+    Args:
+        returns: Portföy getiri serisi.
+        benchmark_returns: Karşılaştırma ölçütü (ör: XU100) getiri serisi.
+        periods_per_year: Yıllık periyot sayısı.
+
+    Returns:
+        Yıllıklandırılmış Bilgi Oranı (IR).
+    """
+    r_arr = _to_clean_numpy(returns)
+    b_arr = _to_clean_numpy(benchmark_returns)
+
+    min_len = min(len(r_arr), len(b_arr))
+    if min_len < 2 or periods_per_year <= 0:
+        return 0.0
+
+    active_return = r_arr[:min_len] - b_arr[:min_len]
+    tracking_error = float(np.std(active_return, ddof=1))
+
+    if tracking_error <= 1e-12 or not math.isfinite(tracking_error):
+        return 0.0
+
+    mean_active = float(np.mean(active_return))
+    ir = (mean_active / tracking_error) * math.sqrt(periods_per_year)
+    return float(ir) if math.isfinite(ir) else 0.0
+
+
 @otel_trace("metrics_math.calculate_ic")
 def calculate_ic(
     scores: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
@@ -279,7 +400,8 @@ def calculate_ic(
     try:
         ic = float(np.corrcoef(s_clean, a_clean)[0, 1])
         return ic if math.isfinite(ic) else 0.0
-    except Exception:
+    except Exception as exc:
+        logger.debug("metrics_math_ic_hesaplama_hatasi", hata=str(exc))
         return 0.0
 
 
@@ -307,10 +429,16 @@ def calculate_rank_ic(
     s_clean = s_arr[:min_len]
     a_clean = a_arr[:min_len]
 
-    rank_s = np.argsort(np.argsort(s_clean)).astype(float)
-    rank_a = np.argsort(np.argsort(a_clean)).astype(float)
+    try:
+        from scipy import stats
 
-    return calculate_ic(rank_s, rank_a)
+        res = stats.spearmanr(s_clean, a_clean)
+        corr = float(getattr(res, "statistic", getattr(res, "correlation", 0.0)))
+        return corr if math.isfinite(corr) else 0.0
+    except Exception:
+        rank_s = np.argsort(np.argsort(s_clean)).astype(float)
+        rank_a = np.argsort(np.argsort(a_clean)).astype(float)
+        return calculate_ic(rank_s, rank_a)
 
 
 @otel_trace("metrics_math.calculate_var_cvar")
@@ -341,6 +469,85 @@ def calculate_var_cvar(
     return var_val, cvar_val
 
 
+def evaluate_strategy_viability(
+    returns_or_summary: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    min_sharpe: float = 1.0,
+    max_drawdown: float = -0.25,
+    min_profit_factor: float = 1.2,
+    min_win_rate: float = 0.40,
+) -> tuple[bool, str, dict[str, float]]:
+    """Strateji performans metriklerini kurumsal risk kapılarına göre otomatik değerlendirir (Self-Healing / Kural 6).
+
+    Tam otomatik BIST sisteminde, backtest veya model yürütme sonuçlarının canlıya çıkmaya uygun olup olmadığını
+    denetler.
+
+    Args:
+        returns_or_summary: Getiri serisi veya metrics_summary_to_polars çıktısı DataFrame.
+        min_sharpe: Kabul edilebilir asgari Sharpe oranı (varsayılan: 1.0).
+        max_drawdown: İzin verilen en büyük azami kayıp eşiği (örn: -0.25 = en fazla %25 düşüş).
+        min_profit_factor: Asgari kâr faktörü (varsayılan: 1.2).
+        min_win_rate: Asgari kazanma oranı (varsayılan: 0.40).
+
+    Returns:
+        (uygun_mu, gerekce, metrikler_sozlugu) üçlüsü.
+    """
+    if isinstance(returns_or_summary, pl.DataFrame) and "sharpe_ratio" in returns_or_summary.columns:
+        row = returns_or_summary.to_dicts()[0]
+        sharpe = float(row.get("sharpe_ratio", 0.0))
+        max_dd = float(row.get("max_drawdown", 0.0))
+        profit_factor = float(row.get("profit_factor", 0.0))
+        win_rate = float(row.get("win_rate", 0.0))
+        sortino = float(row.get("sortino_ratio", 0.0))
+        calmar = float(row.get("calmar_ratio", 0.0))
+    else:
+        arr = _to_clean_numpy(returns_or_summary)
+        sharpe = calculate_sharpe_ratio(arr)
+        max_dd = calculate_max_drawdown(arr)
+        profit_factor = calculate_profit_factor(arr)
+        win_rate = calculate_win_rate(arr)
+        sortino = calculate_sortino_ratio(arr)
+        calmar = calculate_calmar_ratio(arr)
+
+    metrics_dict = {
+        "sharpe_ratio": round(sharpe, 3),
+        "sortino_ratio": round(sortino, 3),
+        "calmar_ratio": round(calmar, 3),
+        "max_drawdown": round(max_dd, 3),
+        "profit_factor": round(profit_factor, 3),
+        "win_rate": round(win_rate, 3),
+    }
+
+    if max_dd < max_drawdown:
+        return (
+            False,
+            f"Risk İhlali: Azami değer kaybı (%{max_dd*100:.1f}) izin verilen sınırı (%{max_drawdown*100:.1f}) aştı",
+            metrics_dict,
+        )
+
+    if sharpe < min_sharpe:
+        return (
+            False,
+            f"Performans Yetersiz: Sharpe oranı ({sharpe:.2f}) asgari eşiğin ({min_sharpe:.2f}) altında",
+            metrics_dict,
+        )
+
+    if profit_factor < min_profit_factor:
+        return (
+            False,
+            f"Kârlılık Yetersiz: Kâr faktörü ({profit_factor:.2f}) asgari eşiğin ({min_profit_factor:.2f}) altında",
+            metrics_dict,
+        )
+
+    if win_rate < min_win_rate:
+        return (
+            False,
+            f"Kazanma Oranı Yetersiz: Kazanma oranı (%{win_rate*100:.1f}) asgari eşiğin (%{min_win_rate*100:.1f}) altında",
+            metrics_dict,
+        )
+
+    return True, "Strateji tüm kurumsal quant ve risk kriterlerini karşıladı", metrics_dict
+
+
 def metrics_summary_to_polars(
     returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
     risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
@@ -358,18 +565,92 @@ def metrics_summary_to_polars(
     """
     arr = _to_clean_numpy(returns)
     var_95, cvar_95 = calculate_var_cvar(arr, DEFAULT_CONFIDENCE_LEVEL)
-    return pl.DataFrame({
-        "sharpe_ratio": pl.Series([calculate_sharpe_ratio(arr, risk_free_rate, periods_per_year)], dtype=pl.Float64),
-        "sortino_ratio": pl.Series([calculate_sortino_ratio(arr, risk_free_rate, periods_per_year)], dtype=pl.Float64),
-        "max_drawdown": pl.Series([calculate_max_drawdown(arr)], dtype=pl.Float64),
-        "calmar_ratio": pl.Series([calculate_calmar_ratio(arr, periods_per_year)], dtype=pl.Float64),
-        "win_rate": pl.Series([calculate_win_rate(arr)], dtype=pl.Float64),
-        "profit_factor": pl.Series([calculate_profit_factor(arr)], dtype=pl.Float64),
-        "var_95": pl.Series([var_95], dtype=pl.Float64),
-        "cvar_95": pl.Series([cvar_95], dtype=pl.Float64),
-        "total_periods": pl.Series([len(arr)], dtype=pl.Int64),
-    })
+    return pl.DataFrame(
+        {
+            "sharpe_ratio": pl.Series([calculate_sharpe_ratio(arr, risk_free_rate, periods_per_year)], dtype=pl.Float64),
+            "sortino_ratio": pl.Series([calculate_sortino_ratio(arr, risk_free_rate, periods_per_year)], dtype=pl.Float64),
+            "max_drawdown": pl.Series([calculate_max_drawdown(arr)], dtype=pl.Float64),
+            "calmar_ratio": pl.Series([calculate_calmar_ratio(arr, periods_per_year)], dtype=pl.Float64),
+            "win_rate": pl.Series([calculate_win_rate(arr)], dtype=pl.Float64),
+            "profit_factor": pl.Series([calculate_profit_factor(arr)], dtype=pl.Float64),
+            "omega_ratio": pl.Series([calculate_omega_ratio(arr)], dtype=pl.Float64),
+            "tail_ratio": pl.Series([calculate_tail_ratio(arr)], dtype=pl.Float64),
+            "var_95": pl.Series([var_95], dtype=pl.Float64),
+            "cvar_95": pl.Series([cvar_95], dtype=pl.Float64),
+            "total_periods": pl.Series([len(arr)], dtype=pl.Int64),
+        }
+    )
 
+
+def export_metrics_to_duckdb(
+    returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    strategy_id: str,
+    db_path: str = "data/strategy_metrics.duckdb",
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
+) -> int:
+    """Hesaplanan strateji metriklerini kalıcı DuckDB tablosuna kaydeder (GEMINI.md Kural 5 & Kural 6).
+
+    Args:
+        returns: Getiri dizisi.
+        strategy_id: Model veya strateji kimliği.
+        db_path: Hedef DuckDB dosya yolu.
+        periods_per_year: Yıllık periyot sayısı.
+
+    Returns:
+        Kaydedilen kayıt sayısı (başarılı ise 1).
+    """
+    df = metrics_summary_to_polars(returns, periods_per_year=periods_per_year)
+    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
+    with duckdb.connect(db_path) as con:
+        con.execute("PRAGMA checkpoint_threshold='4MB'")
+        con.execute("PRAGMA wal_autocheckpoint='2MB'")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS strategy_performance_ledger (
+                strategy_id VARCHAR NOT NULL,
+                sharpe_ratio DOUBLE,
+                sortino_ratio DOUBLE,
+                max_drawdown DOUBLE,
+                calmar_ratio DOUBLE,
+                win_rate DOUBLE,
+                profit_factor DOUBLE,
+                omega_ratio DOUBLE,
+                tail_ratio DOUBLE,
+                var_95 DOUBLE,
+                cvar_95 DOUBLE,
+                total_periods BIGINT,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        row = df.to_dicts()[0]
+        query = (
+            "INSERT INTO strategy_performance_ledger ("
+            "strategy_id, sharpe_ratio, sortino_ratio, max_drawdown, calmar_ratio, "
+            "win_rate, profit_factor, omega_ratio, tail_ratio, var_95, cvar_95, total_periods"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        )
+        con.execute(
+            query,
+            [
+                str(strategy_id),
+                row["sharpe_ratio"],
+                row["sortino_ratio"],
+                row["max_drawdown"],
+                row["calmar_ratio"],
+                row["win_rate"],
+                row["profit_factor"],
+                row.get("omega_ratio", 0.0),
+                row.get("tail_ratio", 0.0),
+                row["var_95"],
+                row["cvar_95"],
+                row["total_periods"],
+            ],
+        )
+    return 1
+
+
+# Geriye dönük uyumluluk takma adları
+calculate_sharpe = calculate_sharpe_ratio
+calculate_sortino = calculate_sortino_ratio
 
 __all__: Final[list[str]] = [
     "DEFAULT_CONFIDENCE_LEVEL",
@@ -377,13 +658,20 @@ __all__: Final[list[str]] = [
     "DEFAULT_RISK_FREE_RATE",
     "calculate_calmar_ratio",
     "calculate_ic",
+    "calculate_information_ratio",
     "calculate_max_drawdown",
+    "calculate_omega_ratio",
     "calculate_profit_factor",
     "calculate_rank_ic",
+    "calculate_sharpe",
     "calculate_sharpe_ratio",
+    "calculate_sortino",
     "calculate_sortino_ratio",
+    "calculate_tail_ratio",
     "calculate_var_cvar",
     "calculate_win_rate",
+    "evaluate_strategy_viability",
+    "export_metrics_to_duckdb",
     "metrics_summary_to_polars",
     "otel_trace",
 ]

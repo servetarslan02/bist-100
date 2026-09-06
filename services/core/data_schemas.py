@@ -79,6 +79,11 @@ class BaseDataSchema(BaseModel):
         """orjson bayt dizisi üretir."""
         return orjson.dumps(self.model_dump(mode="json"))
 
+    def __repr__(self) -> str:
+        """Açıklayıcı model metin temsili."""
+        fields = ", ".join(f"{k}={v!r}" for k, v in list(self.model_dump().items())[:5])
+        return f"<{self.__class__.__name__} {fields}>"
+
 
 class OHLCVSchema(BaseDataSchema):
     """OHLCV çubuk fiyat ve hacim doğrulama şeması.
