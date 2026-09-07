@@ -72,6 +72,35 @@ DEFAULT_UPTICK_RULE_ACTIVE: Final[bool] = True
 
 # DuckDB Denetim İzi Veritabanı Yolu
 DEFAULT_COMPLIANCE_DB_PATH: Final[str] = "data/compliance_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 class ComplianceAction(StrEnum):
@@ -174,6 +203,7 @@ class ComplianceChecker:
             db_file = Path(self._db_path)
             db_file.parent.mkdir(parents=True, exist_ok=True)
             self._conn = duckdb.connect(str(db_file))
+            configure_duckdb_wal(self._conn)
             with self._lock:
                 self._conn.execute(
                     """
@@ -830,6 +860,23 @@ class ComplianceChecker:
                 logger.error("compliance_audit_duckdb_sorgu_hatasi", error=str(exc))
                 return pl.DataFrame(schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Motor durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "db_path": self._db_path,
+                "conn_active": self._conn is not None,
+                "blackout_tickers_count": len(self._blackout_calendar),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Motor durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str | None = None) -> None:
+        """Yasal denetim günlüğü tablosunu sıfırlar."""
+        clear_compliance_audit_duckdb(db_path=db_path or self._db_path)
+
     def __repr__(self) -> str:
         """Motorun okunabilir durum temsilini döndürür."""
         return (
@@ -1024,14 +1071,134 @@ def query_compliance_audit_duckdb(
     )
 
 
+def read_compliance_audit_from_duckdb(
+    db_path: str = DEFAULT_COMPLIANCE_DB_PATH,
+    ticker: str | None = None,
+    check_type: str | None = None,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan uyumluluk denetim günlüğünü Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        ticker: İsteğe bağlı pay kodu filtresi.
+        check_type: İsteğe bağlı denetim tipi.
+        limit: Dönecek maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan denetim kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "id": pl.Int64,
+                "timestamp": pl.Datetime(time_zone="UTC"),
+                "ticker": pl.Utf8,
+                "check_type": pl.Utf8,
+                "action": pl.Utf8,
+                "notification_required": pl.Boolean,
+                "violation": pl.Boolean,
+                "reason": pl.Utf8,
+                "details_json": pl.Utf8,
+            }
+        )
+
+    if (
+        compliance_checker._conn is not None
+        and Path(compliance_checker._db_path).resolve() == path_obj.resolve()
+    ):
+        return compliance_checker.query_audit_duckdb(ticker=ticker, check_type=check_type, limit=limit)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'compliance_audit_log'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "id": pl.Int64,
+                        "timestamp": pl.Datetime(time_zone="UTC"),
+                        "ticker": pl.Utf8,
+                        "check_type": pl.Utf8,
+                        "action": pl.Utf8,
+                        "notification_required": pl.Boolean,
+                        "violation": pl.Boolean,
+                        "reason": pl.Utf8,
+                        "details_json": pl.Utf8,
+                    }
+                )
+
+            query = """
+                SELECT id, timestamp, ticker, check_type, action,
+                       notification_required, violation, reason, details_json
+                FROM compliance_audit_log
+            """
+            params: list[Any] = []
+            conditions: list[str] = []
+
+            if ticker:
+                conditions.append("ticker = ?")
+                params.append(ticker.strip().upper())
+            if check_type:
+                conditions.append("check_type = ?")
+                params.append(check_type.strip())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY id DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_compliance_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "id": pl.Int64,
+                "timestamp": pl.Datetime(time_zone="UTC"),
+                "ticker": pl.Utf8,
+                "check_type": pl.Utf8,
+                "action": pl.Utf8,
+                "notification_required": pl.Boolean,
+                "violation": pl.Boolean,
+                "reason": pl.Utf8,
+                "details_json": pl.Utf8,
+            }
+        )
+
+
+def clear_compliance_audit_duckdb(db_path: str = DEFAULT_COMPLIANCE_DB_PATH) -> None:
+    """DuckDB'de depolanan uyumluluk denetim günlüğü tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS compliance_audit_log;")
+            conn.execute("DROP SEQUENCE IF EXISTS seq_compliance_audit_id;")
+    except Exception as exc:
+        logger.error("duckdb_compliance_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_ALGO_ORDER_THRESHOLD",
     "DEFAULT_ALGO_VOLUME_THRESHOLD",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_COMPLIANCE_DB_PATH",
     "DEFAULT_MAX_OTR_THRESHOLD",
     "DEFAULT_MIN_OTR_EVALUATION_ORDERS",
     "DEFAULT_PORTFOLIO_CONCENTRATION_LIMIT",
     "DEFAULT_UPTICK_RULE_ACTIVE",
+    "DEFAULT_WAL_SIZE",
     "MANDATORY_TENDER_OFFER_THRESHOLD",
     "SPK_SHARE_NOTIFICATION_THRESHOLDS",
     "ComplianceAction",
@@ -1042,8 +1209,12 @@ __all__: Final[list[str]] = [
     "check_order_to_trade_ratio",
     "check_short_sale_uptick",
     "check_spk_compliance",
+    "clear_compliance_audit_duckdb",
     "compliance_checker",
+    "configure_duckdb_wal",
     "export_compliance_audit_to_polars",
     "query_compliance_audit_duckdb",
+    "read_compliance_audit_from_duckdb",
     "register_blackout_period",
+    "to_orjson_bytes",
 ]

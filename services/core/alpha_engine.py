@@ -14,7 +14,7 @@ import datetime
 import hashlib
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import duckdb
 import lightgbm as lgb
@@ -37,12 +37,15 @@ tracer = trace.get_tracer("alpha-bist.alpha_engine")
 meter = metrics.get_meter("alpha-bist.alpha_engine")
 
 # Varsayılan Hiperparametreler ve Sabitler
-DEFAULT_MODEL_PATH = "data/alpha_engine_model.pkl"
-DEFAULT_DUCKDB_PATH = "data/duckdb/alpha_models.duckdb"
-DEFAULT_BATCH_SIZE = 100
-DEFAULT_FORWARD_DAYS = 20
-DEFAULT_MIN_HISTORY_BARS = 120
-DEFAULT_EXCLUDE_FEATURES = [
+DEFAULT_MODEL_PATH: Final[str] = "data/alpha_engine_model.pkl"
+DEFAULT_ALPHA_MODELS_DB: Final[str] = "data/alpha_models.duckdb"
+DEFAULT_DUCKDB_PATH: Final[str] = DEFAULT_ALPHA_MODELS_DB
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+DEFAULT_BATCH_SIZE: Final[int] = 100
+DEFAULT_FORWARD_DAYS: Final[int] = 20
+DEFAULT_MIN_HISTORY_BARS: Final[int] = 120
+DEFAULT_EXCLUDE_FEATURES: Final[list[str]] = [
     "momentum_accel",
     "roc_120d",
     "dist_sma200",
@@ -61,6 +64,22 @@ DEFAULT_PARAMS: dict[str, Any] = {
     "random_state": 42,
     "seed": 42,
 }
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 
 def _safe_float(val: Any, default: float = 0.0) -> float:
@@ -154,6 +173,23 @@ class AlphaEngine:
             logger.info("alpha_engine_disk_modeli_yuklendi", ozellik_sayisi=len(self.features))
         else:
             logger.info("alpha_engine_egitilmemis_durumda")
+
+    def to_dict(self) -> dict[str, Any]:
+        """AlphaEngine model durumunu sözlüğe çevirir."""
+        with self._lock:
+            return {
+                "trained": self.model is not None,
+                "feature_count": len(self.features),
+                "features": self.features,
+                "params": self.params,
+                "exclude_features": self.exclude_features,
+                "has_gpu": self.has_gpu,
+                "gpu_device_name": self.gpu_device_name,
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """AlphaEngine model durumunu orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """AlphaEngine nesnesinin açıklayıcı dize temsili."""
@@ -557,8 +593,8 @@ class AlphaEngine:
                 now_iso = datetime.datetime.now(datetime.UTC).isoformat()
                 model_id = f"alpha_{feature_hash}_{int(datetime.datetime.now(datetime.UTC).timestamp())}"
 
-                conn = duckdb.connect(database=str(db_path))
-                try:
+                with duckdb.connect(database=str(db_path)) as conn:
+                    configure_duckdb_wal(conn)
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS alpha_model_registry (
                             id VARCHAR PRIMARY KEY,
@@ -596,8 +632,6 @@ class AlphaEngine:
                             self.gpu_device_name,
                         ],
                     )
-                finally:
-                    conn.close()
 
                 logger.info("alpha_engine_duckdb_metadata_kaydedildi", model_id=model_id, db_path=db_path)
             except Exception as exc:
@@ -745,16 +779,77 @@ def get_model_history_from_duckdb(
         return []
 
 
+def read_alpha_models_from_duckdb(
+    db_path: str = DEFAULT_DUCKDB_PATH,
+    limit: int = 50,
+) -> pl.DataFrame:
+    """DuckDB model kayıt defterindeki geçmiş modelleri Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Okunacak maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Model kayıtlarının Polars DataFrame temsili.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(database=str(db_path), read_only=True) as conn:
+            tables = conn.execute("SHOW TABLES").fetchall()
+            table_names = [t[0] for t in tables]
+            if "alpha_model_registry" not in table_names:
+                return pl.DataFrame()
+            return conn.execute(
+                """
+                SELECT id, trained_at, feature_hash, feature_count, sample_count,
+                       features_json, exclude_features_json, params_json, metrics_json,
+                       gpu_used, device_name
+                FROM alpha_model_registry
+                ORDER BY trained_at DESC
+                LIMIT ?
+                """,
+                [int(limit)],
+            ).pl()
+    except Exception as exc:
+        logger.error("DuckDB model tablosu okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_alpha_models_duckdb(db_path: str = DEFAULT_DUCKDB_PATH) -> None:
+    """Belirtilen DuckDB dosyasındaki model kayıt tablosunu sıfırlar.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(database=str(db_path)) as conn:
+            conn.execute("DROP TABLE IF EXISTS alpha_model_registry")
+    except Exception as exc:
+        logger.warning("DuckDB model tablosu temizlenemedi", hata=str(exc))
+
+
 __all__ = [
+    "DEFAULT_ALPHA_MODELS_DB",
     "DEFAULT_BATCH_SIZE",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_DUCKDB_PATH",
     "DEFAULT_EXCLUDE_FEATURES",
     "DEFAULT_FORWARD_DAYS",
     "DEFAULT_MIN_HISTORY_BARS",
     "DEFAULT_MODEL_PATH",
     "DEFAULT_PARAMS",
+    "DEFAULT_WAL_SIZE",
     "AlphaEngine",
+    "clear_alpha_models_duckdb",
+    "configure_duckdb_wal",
     "get_model_history_from_duckdb",
+    "read_alpha_models_from_duckdb",
+    "to_orjson_bytes",
 ]
 
 

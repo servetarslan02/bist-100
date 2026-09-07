@@ -9,8 +9,7 @@ Bu modül, kurumsal düzeyde güvenlik ve uyumluluk için:
 - DuckDB üzerinde güvenlik denetim izi (Security Audit Log) ve Polars analitik aktarımı sağlar.
 """
 
-from __future__ import annotations
-
+import contextlib
 import hashlib
 import hmac
 import re
@@ -19,16 +18,15 @@ import threading
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
-
-if TYPE_CHECKING:
-    import duckdb
 
 logger = structlog.get_logger(__name__)
 
@@ -50,8 +48,26 @@ except ImportError:
     _USE_CRYPTO = False
 
 DEFAULT_SECURITY_AUDIT_DB: Final[str] = "data/security_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
 _GLOBAL_LOCK = threading.RLock()
 _SECURITY_DUCKDB_CONN: duckdb.DuckDBPyConnection | None = None
+_SECURITY_DUCKDB_PATH: str = DEFAULT_SECURITY_AUDIT_DB
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("Security DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 class Role(StrEnum):
@@ -117,7 +133,7 @@ class SecurityAuditEvent:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return (
@@ -131,39 +147,63 @@ def set_security_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     global _SECURITY_DUCKDB_CONN
     with _GLOBAL_LOCK:
         _SECURITY_DUCKDB_CONN = conn
-        _init_security_duckdb_schema()
+        _init_security_duckdb_schema_conn(_SECURITY_DUCKDB_CONN)
 
 
-def _init_security_duckdb_schema() -> None:
-    """DuckDB güvenlik denetim şemasını ilklendirir."""
-    if _SECURITY_DUCKDB_CONN is None:
-        return
+def set_security_duckdb_path(path: str) -> None:
+    """Güvenlik denetim günlüğü için DuckDB dosya yolunu tanımlar."""
+    global _SECURITY_DUCKDB_PATH
     with _GLOBAL_LOCK:
-        try:
-            _SECURITY_DUCKDB_CONN.execute("""
-                CREATE TABLE IF NOT EXISTS security_audit_log (
-                    id BIGINT,
-                    event_type VARCHAR,
-                    username VARCHAR,
-                    action VARCHAR,
-                    result VARCHAR,
-                    details_json VARCHAR,
-                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE SEQUENCE IF NOT EXISTS seq_security_audit_log START 1;
-            """)
-        except Exception as exc:
-            logger.error("Security DuckDB şema oluşturma hatası", hata=str(exc))
+        _SECURITY_DUCKDB_PATH = path
+
+
+def _init_security_duckdb_schema_conn(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB güvenlik denetim şemasını belirtilen bağlantıda ilklendirir."""
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS security_audit_log (
+                id BIGINT,
+                event_type VARCHAR,
+                username VARCHAR,
+                action VARCHAR,
+                result VARCHAR,
+                details_json VARCHAR,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_security_audit_log START 1;
+        """)
+    except Exception as exc:
+        logger.error("Security DuckDB şema oluşturma hatası", hata=str(exc))
+
+
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının geçici olup olmadığını döner."""
+    global _SECURITY_DUCKDB_CONN, _SECURITY_DUCKDB_PATH
+    if _SECURITY_DUCKDB_CONN is not None:
+        return _SECURITY_DUCKDB_CONN, False
+    try:
+        p = Path(_SECURITY_DUCKDB_PATH)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        read_only = not writable
+        conn = duckdb.connect(str(p), read_only=read_only)
+        if writable:
+            configure_duckdb_wal(conn)
+            _init_security_duckdb_schema_conn(conn)
+        return conn, True
+    except Exception as exc:
+        logger.debug("Security DuckDB dosya bağlantı hatası", yol=_SECURITY_DUCKDB_PATH, hata=str(exc))
+        return None, False
 
 
 def _record_security_event(event: SecurityAuditEvent) -> None:
     """Güvenlik olayını DuckDB denetim tablosuna işler."""
-    if _SECURITY_DUCKDB_CONN is None:
-        return
     with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
         try:
-            det_json = orjson.dumps(event.details).decode("utf-8")
-            _SECURITY_DUCKDB_CONN.execute(
+            det_json = orjson.dumps(event.details, default=str).decode("utf-8")
+            conn.execute(
                 """
                 INSERT INTO security_audit_log (
                     id, event_type, username, action, result, details_json, recorded_at
@@ -182,6 +222,10 @@ def _record_security_event(event: SecurityAuditEvent) -> None:
             )
         except Exception as exc:
             logger.debug("Security DuckDB olay yazma hatası", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 @dataclass
@@ -210,7 +254,7 @@ class User:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return f"User(id='{self.user_id}', kullanici='{self.username}', rol='{self.role.value}')"
@@ -611,29 +655,63 @@ def decrypt_data(token: bytes, key: bytes) -> str:
 
 def export_security_audit_to_polars() -> pl.DataFrame:
     """DuckDB'de saklanan güvenlik denetim kayıtlarını Polars DataFrame olarak döner."""
-    if _SECURITY_DUCKDB_CONN is None:
-        return pl.DataFrame(
-            schema={
-                "id": pl.Int64,
-                "event_type": pl.Utf8,
-                "username": pl.Utf8,
-                "action": pl.Utf8,
-                "result": pl.Utf8,
-                "details_json": pl.Utf8,
-                "recorded_at": pl.Datetime,
-            }
-        )
+    return read_security_audit_from_duckdb()
 
+
+def read_security_audit_from_duckdb(
+    duckdb_path: str = DEFAULT_SECURITY_AUDIT_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından veya aktif bağlantıdan güvenlik denetim kayıtlarını okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "id": pl.Int64,
+            "event_type": pl.Utf8,
+            "username": pl.Utf8,
+            "action": pl.Utf8,
+            "result": pl.Utf8,
+            "details_json": pl.Utf8,
+            "recorded_at": pl.Datetime,
+        }
+    )
     with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=False)
+        if conn is None:
+            return empty_df
         try:
-            return _SECURITY_DUCKDB_CONN.execute("SELECT * FROM security_audit_log ORDER BY id ASC").pl()
+            query = f"SELECT * FROM security_audit_log ORDER BY id ASC LIMIT {int(limit)}"
+            return conn.execute(query).pl()
         except Exception as exc:
             logger.error("DuckDB güvenlik denetim kayıtları çekilemedi", hata=str(exc))
-            return pl.DataFrame()
+            return empty_df
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
+
+
+def clear_security_audit_duckdb(
+    duckdb_path: str = DEFAULT_SECURITY_AUDIT_DB,
+) -> None:
+    """Güvenlik denetim tablosunu temizler."""
+    with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
+        try:
+            conn.execute("DELETE FROM security_audit_log;")
+        except Exception as exc:
+            logger.error("DuckDB güvenlik denetim kayıtları temizlenemedi", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_SECURITY_AUDIT_DB",
+    "DEFAULT_WAL_SIZE",
     "ROLE_PERMISSIONS",
     "AuthenticationService",
     "AuthorizationService",
@@ -646,11 +724,16 @@ __all__ = [
     "User",
     "auth_service",
     "authz_service",
+    "clear_security_audit_duckdb",
+    "configure_duckdb_wal",
     "decrypt_data",
     "encrypt_data",
     "export_security_audit_to_polars",
+    "read_security_audit_from_duckdb",
     "safety_governance",
     "secret_redaction",
     "set_security_duckdb_connection",
+    "set_security_duckdb_path",
     "system_state",
+    "to_orjson_bytes",
 ]

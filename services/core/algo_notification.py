@@ -13,7 +13,8 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final
 
 import duckdb
 import orjson
@@ -27,12 +28,31 @@ logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.algo_notification")
 
 # Standart SPK ve BIST Algoritmik İşlem Parametre Sabitleri
-DEFAULT_STRATEGY_NAME = "GENERIC_BIST_ALGO"
-DEFAULT_STRATEGY_TYPE = "QUANT_MOMENTUM"
-DEFAULT_RISK_LEVEL = "MEDIUM"
-DEFAULT_MARKET = "BIST_EQUITY"
-DEFAULT_OPERATOR = "ALPHA_BIST_SYSTEM"
-VALID_RISK_LEVELS = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
+DEFAULT_ALGO_NOTIFICATION_DB: Final[str] = "data/algo_notifications.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+DEFAULT_STRATEGY_NAME: Final[str] = "GENERIC_BIST_ALGO"
+DEFAULT_STRATEGY_TYPE: Final[str] = "QUANT_MOMENTUM"
+DEFAULT_RISK_LEVEL: Final[str] = "MEDIUM"
+DEFAULT_MARKET: Final[str] = "BIST_EQUITY"
+DEFAULT_OPERATOR: Final[str] = "ALPHA_BIST_SYSTEM"
+VALID_RISK_LEVELS: Final[frozenset[str]] = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 
 @dataclass(slots=True)
@@ -82,6 +102,10 @@ class AlgoNotification:
         """Bildirimi sözlük (dict) formatına dönüştürür."""
         return asdict(self)
 
+    def to_orjson_bytes(self) -> bytes:
+        """Bildirimi orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
     def __repr__(self) -> str:
         """Açıklayıcı nesne temsilini döndürür."""
         return (
@@ -98,7 +122,7 @@ class AlgoNotificationStore:
     _instance: AlgoNotificationStore | None = None
     _init_lock = threading.Lock()
 
-    def __init__(self, db_path: str = ":memory:") -> None:
+    def __init__(self, db_path: str = DEFAULT_ALGO_NOTIFICATION_DB) -> None:
         """Bildirim deposunu başlatır ve DuckDB şemasını hazırlar.
 
         Args:
@@ -107,7 +131,20 @@ class AlgoNotificationStore:
         self._db_path = db_path
         self._lock = threading.RLock()
         self._is_closed = False
-        self._conn = duckdb.connect(database=self._db_path)
+        if self._db_path != ":memory:":
+            try:
+                Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+                self._conn = duckdb.connect(database=self._db_path)
+            except Exception as exc:
+                logger.warning(
+                    "DuckDB disk baglantisi kurulamadi, bellege donuluyor",
+                    yol=self._db_path,
+                    hata=str(exc),
+                )
+                self._conn = duckdb.connect(database=":memory:")
+        else:
+            self._conn = duckdb.connect(database=":memory:")
+        configure_duckdb_wal(self._conn)
         self._setup_schema()
 
     def _setup_schema(self) -> None:
@@ -315,6 +352,10 @@ class AlgoNotificationStore:
                 raise RuntimeError("AlgoNotificationStore veritabanı bağlantısı kapalı.")
             self._conn.execute("DELETE FROM spk_algo_notifications;")
 
+    def clear_audit_duckdb(self) -> None:
+        """Tabloyu temizler (clear metodunun eşanlamlısı)."""
+        self.clear()
+
     def close(self) -> None:
         """DuckDB veritabanı bağlantısını güvenli biçimde kapatır."""
         with self._lock:
@@ -460,18 +501,77 @@ def reset_default_store() -> None:
             _default_store = None
 
 
+def read_algo_notifications_from_duckdb(
+    db_path: str = DEFAULT_ALGO_NOTIFICATION_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Belirtilen DuckDB dosyasından algoritmik bildirimleri Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Okunacak maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Bildirimlerin Polars DataFrame temsili.
+    """
+    import polars as pl
+
+    target = Path(db_path)
+    if not target.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(db_path, read_only=True) as conn:
+            return conn.execute(
+                """
+                SELECT notification_id, strategy_name, strategy_type, risk_level,
+                       market, description, parameters_json, kill_switch_enabled,
+                       operator, compliance_status, timestamp, timestamp_iso
+                FROM spk_algo_notifications
+                ORDER BY timestamp DESC
+                LIMIT ?;
+                """,
+                [int(limit)],
+            ).pl()
+    except Exception as exc:
+        logger.error("DuckDB dosyasindan algoritmik bildirimler okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_algo_notifications_duckdb(db_path: str = DEFAULT_ALGO_NOTIFICATION_DB) -> None:
+    """Belirtilen DuckDB dosyasındaki bildirim tablosunu sıfırlar.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(db_path) as conn:
+            conn.execute("DROP TABLE IF EXISTS spk_algo_notifications")
+    except Exception as exc:
+        logger.warning("DuckDB bildirim tablosu temizlenemedi", hata=str(exc))
+
+
 __all__ = [
+    "DEFAULT_ALGO_NOTIFICATION_DB",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_MARKET",
     "DEFAULT_OPERATOR",
     "DEFAULT_RISK_LEVEL",
     "DEFAULT_STRATEGY_NAME",
     "DEFAULT_STRATEGY_TYPE",
+    "DEFAULT_WAL_SIZE",
     "VALID_RISK_LEVELS",
     "AlgoNotification",
     "AlgoNotificationStore",
+    "clear_algo_notifications_duckdb",
+    "configure_duckdb_wal",
     "generate_algo_notification",
     "get_default_store",
+    "read_algo_notifications_from_duckdb",
     "reset_default_store",
+    "to_orjson_bytes",
 ]
 
 

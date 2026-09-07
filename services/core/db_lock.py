@@ -177,7 +177,7 @@ class LockMetrics:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson serileştirilmiş bayt dizisi döndürür."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def health_status(self) -> dict[str, Any]:
         """Kilit sağlık ve bozulma durumunu analiz eder.
@@ -211,6 +211,14 @@ class LockMetrics:
 _metrics_lock = threading.RLock()
 _metrics: dict[str, LockMetrics] = {}
 _named_asyncio_locks: dict[str, asyncio.Lock] = {}
+
+
+def clear_lock_metrics() -> None:
+    """Bellekte tutulan kilit metriklerini ve kilit havuzunu sıfırlar."""
+    with _metrics_lock:
+        _metrics.clear()
+        _named_asyncio_locks.clear()
+        logger.info("kilit_metrikleri_temizlendi")
 
 
 def _get_named_asyncio_lock(key: str) -> asyncio.Lock:
@@ -865,7 +873,7 @@ def export_lock_metrics_to_polars() -> pl.DataFrame:
             d["key"] = key
             h = m.health_status()
             d["status"] = h["status"]
-            d["issues"] = orjson.dumps(h["issues"]).decode("utf-8")
+            d["issues"] = orjson.dumps(h["issues"], default=str).decode("utf-8")
             data.append(d)
 
     schema = {
@@ -892,7 +900,7 @@ def export_lock_metrics_to_polars() -> pl.DataFrame:
 
 
 def export_lock_metrics_to_duckdb(
-    db_path: str | Path = DEFAULT_LOCK_AUDIT_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_LOCK_AUDIT_TABLE,
 ) -> int:
     """Kilit performans ve denetim kayıtlarını yerel DuckDB tablosuna aktarır.
@@ -908,7 +916,7 @@ def export_lock_metrics_to_duckdb(
     if df.is_empty():
         return 0
 
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_LOCK_AUDIT_DUCKDB_PATH)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
     if path_obj.exists() and path_obj.stat().st_size == 0:
         with contextlib.suppress(OSError):
@@ -916,12 +924,15 @@ def export_lock_metrics_to_duckdb(
 
     try:
         with duckdb.connect(str(path_obj)) as conn:
-            configure_duckdb_wal(conn)
+            with contextlib.suppress(Exception):
+                configure_duckdb_wal(conn)
             conn.register("df_lock_metrics", df.to_arrow())
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_lock_metrics WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_lock_metrics")
+            with contextlib.suppress(Exception):
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name}(key)")
         return len(df)
     except Exception as e:
         logger.error("export_lock_metrics_to_duckdb_basarisiz", error=str(e))
@@ -929,7 +940,7 @@ def export_lock_metrics_to_duckdb(
 
 
 def query_lock_metrics_duckdb(
-    db_path: str | Path = DEFAULT_LOCK_AUDIT_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_LOCK_AUDIT_TABLE,
 ) -> pl.DataFrame:
     """DuckDB üzerinden geçmiş kilit performans denetimlerini sorgular.
@@ -941,7 +952,7 @@ def query_lock_metrics_duckdb(
     Returns:
         pl.DataFrame: Sorgu sonucu Polars DataFrame.
     """
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_LOCK_AUDIT_DUCKDB_PATH)
     if not path_obj.exists() or path_obj.stat().st_size == 0:
         return pl.DataFrame()
 
@@ -975,6 +986,7 @@ __all__ = [
     "CoordinatedLock",
     "DatabaseLock",
     "LockMetrics",
+    "clear_lock_metrics",
     "export_lock_metrics_to_duckdb",
     "export_lock_metrics_to_polars",
     "get_all_metrics",

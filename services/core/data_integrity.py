@@ -108,7 +108,7 @@ class IntegrityGapItem:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
@@ -141,7 +141,7 @@ class IntegrityValidationReport:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def to_json(self) -> str:
         """JSON metni üretir."""
@@ -654,6 +654,13 @@ class DataIntegrityValidator:
                 "max_history": self._max_history,
             }
 
+    def clear_history(self) -> None:
+        """Bellekte tutulan denetim rapor geçmişini ve durumunu sıfırlar."""
+        with self._lock:
+            self._validation_history.clear()
+            self._last_validation = None
+            logger.info("veri_butunlugu_gecmisi_temizlendi")
+
     # =====================================================
     # POLARS VE DUCKDB ANALİTİK ENTEGRASYONU
     # =====================================================
@@ -685,7 +692,7 @@ class DataIntegrityValidator:
                 "has_issues": bool(r.has_issues),
                 "issues_count": len(r.issues),
                 "recommendations_count": len(r.recommendations),
-                "raw_issues": orjson.dumps(r.issues).decode("utf-8"),
+                "raw_issues": orjson.dumps(r.issues, default=str).decode("utf-8"),
             }
             for r in reports
         ]
@@ -719,12 +726,15 @@ class DataIntegrityValidator:
 
         try:
             with duckdb.connect(str(target_path)) as conn:
-                configure_duckdb_wal(conn)
+                with contextlib.suppress(Exception):
+                    configure_duckdb_wal(conn)
                 conn.register("df_integrity", df_history.to_arrow())
                 conn.execute(
                     f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_integrity WHERE 1=0"
                 )
                 conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_integrity")
+                with contextlib.suppress(Exception):
+                    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name}(timestamp)")
             return len(df_history)
         except Exception as e:
             logger.error("export_integrity_to_duckdb_failed", error=str(e))
@@ -837,6 +847,11 @@ def query_integrity_duckdb(
     return data_integrity_validator.query_integrity_duckdb(db_path=db_path, table_name=table_name, limit=limit)
 
 
+def clear_integrity_history() -> None:
+    """Doğrulayıcı geçmişini sıfırlar."""
+    data_integrity_validator.clear_history()
+
+
 __all__ = [
     "ALLOWED_PG_INTEGRITY_TABLES",
     "DEFAULT_FEATURE_STALE_HOURS",
@@ -848,6 +863,7 @@ __all__ = [
     "DataIntegrityValidator",
     "IntegrityGapItem",
     "IntegrityValidationReport",
+    "clear_integrity_history",
     "data_integrity_validator",
     "export_integrity_to_duckdb",
     "export_integrity_to_polars",

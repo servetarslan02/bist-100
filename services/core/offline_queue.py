@@ -55,25 +55,43 @@ def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def otel_trace(span_name: str) -> Any:
-    """Metot veya fonksiyonu OpenTelemetry span içine alan dekoratör.
+    """Metot, senkron fonksiyon veya asenkron coroutine'i OpenTelemetry span içine alan dekoratör.
 
     Args:
         span_name: Span adı.
 
     Returns:
-        Sarmalayıcı fonksiyon.
+        Sarmalayıcı fonksiyon veya coroutine.
     """
 
     def decorator(func: Any) -> Any:
-        """Hedef fonksiyonu OTel span ile sarmalar."""
+        """Hedef fonksiyon veya coroutine'i OTel span ile sarmalar."""
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name) as span:
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as exc:
+                        if hasattr(span, "record_exception"):
+                            span.record_exception(exc)
+                        raise
+
+            return async_wrapper
 
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             """Fonksiyon çağrısını span içinde icra eder."""
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
+            with tracer.start_as_current_span(span_name) as span:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    if hasattr(span, "record_exception"):
+                        span.record_exception(exc)
+                    raise
 
-        return wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -446,7 +464,7 @@ class OfflineQueue:
     async def to_orjson_bytes(self) -> bytes:
         """Kuyruk istatistiklerini ve özetini C seviyesinde orjson bayt dizisine serileştirir."""
         stats = await self.get_stats()
-        return orjson.dumps(stats, option=orjson.OPT_SORT_KEYS)
+        return orjson.dumps(stats, option=orjson.OPT_SORT_KEYS, default=str)
 
     def export_offline_queue_to_polars(self) -> pl.DataFrame:
         """Kuyruktaki tüm bekleyen kayıtları Polars DataFrame olarak dışa aktarır."""
@@ -522,6 +540,25 @@ def retry_failed_entries(event_type: str | None = None) -> int:
     return offline_queue.retry_failed_entries(event_type=event_type)
 
 
+def clear_offline_queue_duckdb(db_path: str = DEFAULT_OFFLINE_DB_PATH) -> None:
+    """Belirtilen DuckDB veritabanındaki offline kuyruk tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DELETE FROM offline_queue")
+        conn.commit()
+        logger.info("offline_queue_duckdb_temizlendi", db_path=str(path))
+    finally:
+        conn.close()
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_MAX_ENTRIES",
     "DEFAULT_OFFLINE_DB_PATH",
@@ -529,6 +566,7 @@ __all__: Final[list[str]] = [
     "DEFAULT_TTL_HOURS",
     "MAX_RETRY_ATTEMPTS",
     "OfflineQueue",
+    "clear_offline_queue_duckdb",
     "configure_duckdb_wal",
     "export_offline_queue_to_polars",
     "export_offline_stats_to_polars",

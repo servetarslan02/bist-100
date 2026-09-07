@@ -37,16 +37,16 @@
 | 13 | `circuit_breaker_metrics.py` | 19 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 14 | `clickhouse_replication_health.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 15 | `compliance.py` | 19 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 16 | `config_hot_reload.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 17 | `dead_letter_queue.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 18 | `decision_engine.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 19 | `distributed_tracing.py` | 13 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 20 | `fee_calculator.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 21 | `grafana_provisioning.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 22 | `gross_settlement.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 23 | `halt_monitor.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 24 | `hardware_orchestrator.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 25 | `hardware_profile.py` | 18 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 16 | `config_hot_reload.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 17 | `dead_letter_queue.py` | 27 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 18 | `decision_engine.py` | 28 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 19 | `distributed_tracing.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 20 | `fee_calculator.py` | 24 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 21 | `grafana_provisioning.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 22 | `gross_settlement.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 23 | `halt_monitor.py` | 24 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 24 | `hardware_orchestrator.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 25 | `hardware_profile.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 26 | `health_reporter.py` | 22 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 27 | `holiday_manager.py` | 23 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 28 | `immutable_audit.py` | 24 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
@@ -95,7 +95,18 @@
 | 71 | `offline_queue.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 72 | `otel.py` | 8 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 | 73 | `persistent_dlq.py` | 8 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
-| 74 | `pg_replication_health.py` | 6 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 94 | `sharding.py` | 13 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 95 | `short_selling.py` | 13 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 96 | `state_recovery.py` | 12 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 97 | `state_store.py` | 12 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 98 | `streaming_anomaly.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 99 | `swr_cache.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 100 | `system_governor.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 101 | `tax.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 102 | `tradability_mask.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 103 | `transaction_helper.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 104 | `viop_monitor.py` | 13 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
+| 105 | `worker.py` | 11 | ✅ Denetlendi, düzeltildi (2. Tur Tamamlandı) |
 
 ---
 
@@ -129,6 +140,10 @@
 | 9 | 2 & 3 | `_save_to_file` ve `ensure_default_config` doğrudan hedef dosyaya yazıyordu; işlem kesilmesinde bozulma riski mevcuttu | Atomik `.tmp.<uuid>` yazma ve `os.replace` mekanizması getirildi |
 | 10 | 2 & 6 | Politika denetim loglarının analitiği için doğrudan Polars entegrasyonu yoktu | `export_audit_log_to_polars(limit)` metodu ile sıfır kopyalı doğrudan Polars DataFrame üretimi sağlandı |
 | 11 | 4 & 7 | Modül seviyesindeki tüm kritik politika sabitleri (`DEFAULT_POLICY_PATH`, `FALLBACK_*`, `WEBHOOK_*`) dışa aktarılmıyordu | Tüm yapılandırma sabitleri eksiksiz olarak `__all__` listesine bağlandı |
+| 12 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_ALERT_POLICY_AUDIT_DB`, `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 13 | 5 & 6 | Veri modelleri ve politika nesnesinde orjson ikili serileştirme eksikti | `PolicyDiff`, `PolicyAuditEntry`, `SilenceRule`, `AlertPolicy` sınıflarına `to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 14 | 6 | Politika denetim loglarını doğrudan DuckDB'ye yazan/okuyan yardımcılar yoktu | `export_audit_log_to_duckdb`, `read_alert_policy_audit_from_duckdb` ve `clear_alert_policy_audit_duckdb` fonksiyonları eklendi |
+| 15 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; PolicyDiff, SilenceRule, AlertPolicy to_orjson_bytes, Polars ve DuckDB mikro testi başarıyla geçti |
 
 ---
 
@@ -148,6 +163,11 @@
 | 10 | 2 & 5 | `persist_alert` metodunda paylaşımlı DuckDB bağlantısına eşzamanlı sorgu çalıştırma istisnası riski vardı | `self._lock` kapsamına alınarak `duckdb.ConnectionException` önlendi |
 | 11 | 2 & 3 | `EmailProvider._send_smtp` metodunda SSL/TLS (port 465) ayrımı ve ağ asılı kalmalarına karşı zaman aşımı eksikti | `SMTP_SSL` ve 10s `timeout` koruması eklendi |
 | 12 | 2 & 6 | Sistem alarmlarının izlenmesi ve analitiği için yerel Polars dışa aktarımı yoktu | `export_alerts_to_polars(limit)` metodu ile sıfır kopyalı doğrudan Polars DataFrame üretimi sağlandı |
+| 13 | 5 | DuckDB dosya yolu ve WAL/checkpoint yapılandırması eksikti | `DEFAULT_ALERTING_DB`, `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 14 | 5 & 6 | `Alert` ve `NotificationResult` sınıflarında ve modülde orjson ikili serileştirme eksikti | `Alert.to_orjson_bytes()`, `NotificationResult.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 15 | 2 & 3 | DuckDB disk başlatma hatasında güvenli bellek (:memory:) geri dönüşü ve `close()` / `clear_audit_duckdb()` yaşam döngüsü eksikti | Disk fallback mekanizması, `close()` ve `clear_audit_duckdb()` metotları eklendi |
+| 16 | 6 | DuckDB'deki alarmları doğrudan Polars olarak okuma ve tabloyu sıfırlama yardımcıları yoktu | `read_alerts_from_duckdb()` ve `clear_alerts_duckdb()` fonksiyonları eklendi, `__all__` listesine bağlandı |
+| 17 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; Alert, NotificationResult, AlertingSystem DuckDB disk/memory, Polars export ve DuckDB okuma mikro testi başarıyla geçti |
 
 ---
 
@@ -166,6 +186,11 @@
 | 9 | 2 & 3 | `AlgoNotificationStore` bağlantı yaşam döngüsü (close, context manager `__enter__`/`__exit__`) eksikti | `close()` ve context manager desteği eklenerek Windows dosya kilitleme ve bellek sızıntıları önlendi |
 | 10 | 4 & 6 | SPK mevzuat denetimi için tekil ID bazlı sorgulama ve strateji/risk seviyesi filtreleme yetenekleri eksikti | `get_notification_by_id` ve parametrik `list_notifications(strategy_name, risk_level)` filtreleri eklendi |
 | 11 | 2 & 6 | Düzenleyici kurumlara raporlanabilir Polars veri çerçevesi dışa aktarımı yoktu | `export_audit_log_to_polars()` metodu ile sıfır kopyalı doğrudan Polars DataFrame ihracı sağlandı |
+| 12 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_ALGO_NOTIFICATION_DB`, `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 13 | 5 & 6 | `AlgoNotification` sınıfında ve modül genelinde orjson ikili serileştirme desteği yoktu | `AlgoNotification.to_orjson_bytes()` metodu ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 14 | 2 & 3 | DuckDB disk bağlantı hatasında bellek (:memory:) geri dönüşü (fallback) ve tablo temizleme eşanlamlısı (`clear_audit_duckdb()`) eksikti | Disk fallback koruması ve `clear_audit_duckdb()` metodu eklendi |
+| 15 | 6 | Bildirimleri DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcı fonksiyonlar yoktu | `read_algo_notifications_from_duckdb()` ve `clear_algo_notifications_duckdb()` fonksiyonları eklendi, `__all__` listesine bağlandı |
+| 16 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; AlgoNotification, AlgoNotificationStore disk/memory, Polars export, to_orjson_bytes ve DuckDB okuma mikro testi başarıyla geçti |
 
 ---
 
@@ -187,6 +212,11 @@
 | 12 | 4 & 6 | Model açıklanabilirliği ve öznitelik önem analizleri için metot eksikti | `get_feature_importances(importance_type)` metodu eklenerek 'gain' ve 'split' önem skorları azalan sırada sunuldu |
 | 13 | 5 & 6 | Eğitilen modellerin kurumsal denetim izi ve meta verilerinin yerel veritabanında saklanması yoktu (GEMINI.md DuckDB/orjson kuralı) | `save_model_metadata_to_duckdb` ve `get_model_history_from_duckdb` metotları ile atomik DuckDB kayıt defteri entegre edildi |
 | 14 | 1 & 2 | `generate_training_samples` içinde ileri getiri ufkunun eğitim bitişini aşması (`t_fwd > train_end`) önlenemiyordu (Point-In-Time sızıntısı) | Sıkı Point-In-Time ve purge/embargo zaman serisi guard'ı eklendi; negatif/sıfır `forward_days` için `ValueError` fırlatıldı |
+| 15 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_ALPHA_MODELS_DB`, `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 16 | 5 & 6 | `AlphaEngine` sınıfında ve modül genelinde orjson ikili serileştirme desteği yoktu | `AlphaEngine.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 17 | 2 & 5 | Model meta verisi kaydedilirken DuckDB WAL yapılandırması ve güvenli context manager kullanımı eksikti | `with duckdb.connect(...)` ve `configure_duckdb_wal(conn)` entegre edildi |
+| 18 | 6 | Model kayıt defterini doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_alpha_models_from_duckdb()` ve `clear_alpha_models_duckdb()` fonksiyonları eklendi, `__all__` listesine bağlandı |
+| 19 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; AlphaEngine, to_orjson_bytes, DuckDB model metadata kaydı, Polars okuma mikro testi başarıyla geçti |
 
 
 ---
@@ -216,6 +246,11 @@
 | 19 | 6 | BIST hisse ve tarih bazlı analitik veri depolaması için zorunlu olan bölümlenmiş veri kümesi yazma yeteneği (`write_partitioned_dataset`) eksikti | Hive-partitioning uyumlu `pq.write_to_dataset` desteği kazandırıldı |
 | 20 | 2 & 4 | `get_metadata` çıktısında dosya boyutu (`file_size_bytes`, `file_size_mb`) ve satır gruplarındaki sütun sıkıştırma codec listesi (`compression_codecs`) eksikti | Ayrıntılı dosya istatistikleri eklendi ve bozuk dosya okuma guard'ı getirildi |
 | 21 | 7 | Modül seviyesinde harici servislerin tek satırda çağırabileceği kolaylık fonksiyonları eksikti | `from_polars`, `to_polars`, `to_parquet`, `read_parquet`, `read_polars`, `scan_parquet`, `scan_polars`, `query_parquet_with_duckdb`, `merge_parquet`, `write_partitioned_dataset`, `get_metadata`, `get_arrow_pipeline` eklendi, `__all__` listesi 18 sembole genişletildi ve `services.core.__init__.py` paketine bağlanarak tam senkronizasyon sağlandı |
+| 22 | 5 | DuckDB sorgu ve bağlantı WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 23 | 5 & 6 | `ArrowPipeline` sınıfında ve modül genelinde orjson ikili serileştirme desteği yoktu | `ArrowPipeline.to_dict()`, `ArrowPipeline.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 24 | 2 & 5 | `query_parquet_with_duckdb` metodunda DuckDB bağlantısı try/finally yerine context manager ve WAL korumasına bağlandı | `with duckdb.connect() as conn:` ve `configure_duckdb_wal(conn)` entegre edildi |
+| 25 | 6 | Parquet verilerini kalıcı DuckDB tablolarına aktarma, DuckDB'den Polars okuma ve tablo temizleme yardımcıları yoktu | `export_parquet_to_duckdb()`, `read_duckdb_to_polars()` ve `clear_duckdb_table()` yardımcıları eklendi, göreli/mutlak yol çözümü sağlandı ve `__all__` listesine bağlandı |
+| 26 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; to_parquet, read_polars, query_parquet_with_duckdb, export_parquet_to_duckdb, read_duckdb_to_polars ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -243,6 +278,11 @@
 | 18 | 4 & 6 | İstemcinin anlık başarı oranı, ortalama gecikme ve toplam istek istatistiklerini veren özet metot eksikti | `get_metrics_summary()` metodu eklendi |
 | 19 | 7 | Modül seviyesinde harici servislerin tek satırda çağrı yapabileceği kolaylık fonksiyonları eksikti | `async_get_json`, `async_get_text`, `async_get_bytes`, `async_post_json`, `export_http_metrics_to_polars`, `export_http_metrics_to_duckdb` eklendi |
 | 20 | 7 | Yeni eklenen fonksiyonlar ve `get_client`, `close_all_clients` `services.core.__init__.py` paketinde dışa aktarılmamıştı | `__all__` listesi 16 sembole genişletildi ve `services.core.__init__.py` paketine bağlanarak tam senkronizasyon sağlandı |
+| 21 | 5 | DuckDB metrik veritabanı WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 22 | 5 & 6 | `AsyncHTTPClient` sınıfında ve modül genelinde orjson ikili serileştirme desteği yoktu | `AsyncHTTPClient.to_dict()`, `AsyncHTTPClient.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 23 | 2 & 5 | `export_metrics_to_duckdb` metodunda DuckDB bağlantısı try/finally yerine context manager ve WAL korumasına bağlandı | `with duckdb.connect(...) as conn:` ve `configure_duckdb_wal(conn)` entegre edildi |
+| 24 | 6 | HTTP metriklerini DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_http_metrics_from_duckdb()` ve `clear_http_metrics_duckdb()` fonksiyonları eklendi, `clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 25 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; AsyncHTTPClient, _record_audit, export_metrics_to_duckdb, read_http_metrics_from_duckdb, clear_http_metrics_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -267,6 +307,11 @@
 | 15 | 7 | Modül seviyesinde harici servislerin tek satırda denetim kaydı ekleyebilmesi ve sorgulayabilmesi için kolaylık fonksiyonları eksikti | `log_decision`, `log_risk_check`, `log_order`, `log_fill`, `log_state_change`, `log_config_change`, `get_decision_lineage`, `get_entity_history`, `get_by_correlation_id`, `get_recent_audits`, `export_audit_to_polars`, `export_audit_to_duckdb`, `query_persisted_duckdb` eklendi |
 | 16 | 7 | Modül `__all__` listesi tanımlı yeni fonksiyon ve sabitleri içermiyordu | `__all__` listesi 21 sembole genişletildi |
 | 17 | 7 | Yeni eklenen fonksiyonlar `services.core.__init__.py` paketinde dışa aktarılmamıştı | İsim çakışmalarını önleyen alias'lar ile `services.core.__init__.py` paketine bağlanarak tam senkronizasyon sağlandı |
+| 18 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 19 | 5 & 6 | `AuditLog` sınıfında ve modül genelinde orjson ikili serileştirme desteği yoktu | `AuditLog.to_dict()`, `AuditLog.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 20 | 2 & 5 | `export_to_duckdb` ve `query_persisted_duckdb` metotlarında DuckDB bağlantısı try/finally yerine context manager ve WAL korumasına bağlandı | `with duckdb.connect(...) as conn:` ve `configure_duckdb_wal(conn)` entegre edildi |
+| 21 | 6 | Denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_audit_from_duckdb()` ve `clear_audit_duckdb()` fonksiyonları eklendi, `AuditLog.clear_audit_duckdb()` sağlandı ve `__all__` listesine bağlandı |
+| 22 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; AuditEntry, AuditLog, log_decision, export_to_duckdb, query_persisted_duckdb, read_audit_from_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -299,6 +344,11 @@
 | 23 | 2 | `reset_daily()` metodu çağrıldığında yalnızca `bist_session_fsm.clear_ebdks()` çağrılıyor, tekil paylar için FSM'deki `_circuit_breaker_active` tablosu sıfırlanmıyordu | `bist_session_fsm._circuit_breaker_active.clear()` güvenli entegrasyonu sağlandı |
 | 24 | 2 & 5 | `export_to_duckdb` metodunda DuckDB dosya bağlantısı ve yazma işlemi `self._lock` kapsamı dışındaydı; eşzamanlı iki görev aynı anda çalıştığında dosya kilitleme (`IOException: Could not set lock on file`) hatası riski vardı; `query_persisted_duckdb` ise veritabanını yazma modunda açtığı için yazarlarla kilit çatışmasına giriyordu | `export_to_duckdb` tamamen thread-safe kilit ve try/except kapsamına alındı; `query_persisted_duckdb` ise `read_only=True` moduna geçirildi |
 | 25 | 7 | Eksik kalan modül kolaylık fonksiyonları (`set_bist100_reference_price`, `get_circuit_breaker_events_for_ticker`, `get_recent_circuit_breaker_events`, `reset_circuit_breaker_daily`, `query_circuit_breaker_events_from_duckdb`) eklendi | Modül `__all__` listesi 21 sembole genişletildi ve `services.core.__init__.py` paketine bağlandı |
+| 26 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 27 | 5 & 6 | `CircuitBreakerEvent` ve `AutoCircuitBreakerEngine` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `CircuitBreakerEvent.to_orjson_bytes()`, `AutoCircuitBreakerEngine.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 28 | 2 & 5 | `export_to_duckdb` ve `query_persisted_duckdb` metotlarında DuckDB bağlantısı context manager ve WAL korumasına bağlandı | `with duckdb.connect(...) as conn:` ve `configure_duckdb_wal(conn)` entegre edildi |
+| 29 | 6 | Devre kesici olaylarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_circuit_breaker_events_from_duckdb()` ve `clear_circuit_breaker_events_duckdb()` fonksiyonları eklendi, `clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 30 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; CircuitBreakerEvent, AutoCircuitBreakerEngine, check_pay_circuit_breaker, export_to_duckdb, query_persisted_duckdb, read_circuit_breaker_events_from_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -329,6 +379,11 @@
 | 21 | 2 & 3 | `reset_circuit_breaker()` metodunda `_update_telemetry`, `_persist_to_store` ve `_notify_state_change` çağrıları doğrudan yapılıyordu; farklı mock veya türetilmiş nesnelerde `AttributeError` riski vardı | `hasattr` guard'ları eklenerek esnek ve güvenli sıfırlama sağlandı |
 | 22 | 4 & 7 | Modül seviyesindeki `DEFAULT_METRICS_DB_PATH`, `DEFAULT_EXECUTION_HISTORY_LIMIT` sabitleri ve `ServiceExecutionRecord` sınıfı modül `__all__` listesinde yoktu | Modül `__all__` listesi 11 sembole genişletildi |
 | 23 | 7 | `services.core.__init__.py` paketinde `BaseAlphaService` ve ilgili sınıflar dışa aktarılmıyordu | `BaseAlphaService`, `ServiceExecutionRecord`, `ServiceExecutionError` ve sabitler `services.core` paketine bağlanarak tam senkronizasyon sağlandı |
+| 24 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"`, `DEFAULT_SERVICE_METRICS_DB` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 25 | 5 & 6 | `ServiceExecutionRecord` ve `BaseAlphaService` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `ServiceExecutionRecord.to_orjson_bytes()`, `BaseAlphaService.to_dict()`, `BaseAlphaService.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 26 | 2 & 5 | `export_metrics_to_duckdb` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 27 | 6 | Servis metriklerini DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_service_metrics_from_duckdb()` ve `clear_service_metrics_duckdb()` fonksiyonları eklendi, `BaseAlphaService.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 28 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; BaseAlphaService, ServiceExecutionRecord, export_metrics_to_duckdb, read_service_metrics_from_duckdb, clear_service_metrics_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -354,6 +409,11 @@
 | 16 | 3 & 4 | BIST fiyat adımı işlemlerini kapsülleyen, yapılandırılabilir nesne tabanlı motor sınıfı eksikti | `BISTTickSizeEngine` sınıfı ve `bist_tick_engine` singleton motoru eklendi |
 | 17 | 4 & 7 | `DEFAULT_PRICE_LIMIT_RATIO`, `DEFAULT_TICK_DB_PATH` modül sabitleri eksikti ve modül `__all__` listesinde yeni semboller yer almıyordu | Modül `__all__` listesi 19 sembole genişletildi |
 | 18 | 7 | `services.core.__init__.py` paketinde `bist_tick_size` modülüne ait yeni semboller dışa aktarılmıyordu | 14 yeni sınıf, fonksiyon ve sabit `services.core` paketine bağlanarak tam senkronizasyon sağlandı |
+| 19 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | `BISTTickTier` ve `BISTTickSizeEngine` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `BISTTickTier.to_orjson_bytes()`, `BISTTickSizeEngine.to_dict()`, `BISTTickSizeEngine.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | `export_tick_rules_to_duckdb` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 22 | 6 | Fiyat adımı kurallarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_tick_rules_from_duckdb()` ve `clear_tick_rules_duckdb()` fonksiyonları eklendi, `BISTTickSizeEngine.clear_audit_duckdb()` ve `export_to_duckdb()` metotları sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; BISTTickTier, BISTTickSizeEngine, export_tick_rules_to_duckdb, read_tick_rules_from_duckdb, clear_tick_rules_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -381,6 +441,11 @@
 | 18 | 2 & 3 | OpenTelemetry kütüphanesi bulunamadığında veya metrik toplayıcı hata fırlattığında modülün içe aktarımı (import) çökebiliyordu | Güvenli no-op tracer/gauge/counter fallback sarmalayıcıları ve `with suppress(Exception):` blokları eklendi |
 | 19 | 4 & 7 | `DEFAULT_RELIABILITY_DB_PATH` ve `DEFAULT_CB_DB_PATH` sabitleri eksikti; modül `__all__` listesinde yeni fonksiyonlar yer almıyordu | Modül `__all__` listesi 24 sembole genişletildi |
 | 20 | 7 | `services.core.__init__.py` paketinde `circuit_breaker` modülüne ait yeni sınıflar ve fonksiyonlar dışa aktarılmıyordu | 13 yeni sınıf, fonksiyon ve sabit `services.core` paketine bağlanarak tam senkronizasyon sağlandı |
+| 21 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 22 | 5 & 6 | `CircuitBreaker`, `RateLimiter`, `ProviderReliability`, `ProtectedProvider` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | Sınıflara `to_dict()` ve `to_orjson_bytes()` metotları ile modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 23 | 2 & 5 | `export_to_duckdb` ve `export_all_providers_to_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 24 | 6 | Sağlayıcı güvenilirlik ve özet durumlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloları sıfırlayan yardımcılar yoktu | `read_reliability_logs_from_duckdb()`, `clear_reliability_logs_duckdb()`, `read_providers_summary_from_duckdb()`, `clear_providers_summary_duckdb()` fonksiyonları eklendi, `ProviderReliability.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 25 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; CircuitBreaker, RateLimiter, ProviderReliability, ProtectedProvider, export_all_providers_to_duckdb, read/clear DuckDB ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -407,6 +472,11 @@
 | 17 | 2 & 3 | `get_snapshot` içinde `failure_threshold` veya `recovery_timeout_seconds` harici nesnelerde sıfır veya negatif geldiğinde metrik çıktılarında tutarsızlık oluşuyordu | Minimum 1 güvenli alt sınır (`max(1, ...)`) uygulandı |
 | 18 | 4 | `CircuitBreakerMetricsCollector` için bilgilendirici `__repr__` metodu bulunmuyordu | İzlenen devre kesici ve geçmiş kayıt sayılarını içeren açıklayıcı `__repr__` metodu eklendi |
 | 19 | 2 & 6 | `get_history(limit)` metodunda `limit <= 0` sınır koşulunda negatif indeksleme hatalarını önleyen guard eksikti | `max(0, limit)` ve dilimleme güvenliği sağlandı |
+| 20 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 21 | 5 & 6 | `CircuitBreakerSnapshot` ve `CircuitBreakerMetricsCollector` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `CircuitBreakerSnapshot.to_orjson_bytes()`, `CircuitBreakerMetricsCollector.to_dict()`, `CircuitBreakerMetricsCollector.to_orjson_bytes()`, `export_circuit_breaker_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 22 | 2 & 5 | `export_history_to_duckdb` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 23 | 6 | Devre kesici durum geçmişini DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_circuit_breaker_history_from_duckdb()` ve `clear_circuit_breaker_history_duckdb()` fonksiyonları eklendi, `CircuitBreakerMetricsCollector.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 24 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; CircuitBreakerSnapshot, CircuitBreakerMetricsCollector, export_history_to_duckdb, read_circuit_breaker_history_from_duckdb, clear_circuit_breaker_history_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -432,6 +502,11 @@
 | 16 | 3 | Rapor verilerine nesne tabanlı doğrudan erişim sağlayan fonksiyon eksikti | Güçlü tipli `get_replication_report_object` fonksiyonu eklendi |
 | 17 | 4 & 7 | Modül seviyesinde takma adlar (`export_clickhouse_replication_prometheus`, `export_clickhouse_replication_prometheus_async`, `export_clickhouse_replicas_to_polars`, `export_clickhouse_replication_to_duckdb`, `query_clickhouse_replication_from_duckdb`) ve `DEFAULT_REPLICATION_HEALTH_DB_PATH`, `STATUS_PROMETHEUS_CODE_MAP`, `VALID_HEALTH_STATUSES` sabitleri eksikti | Modül `__all__` listesine tüm semboller eklenerek 25 sembole genişletildi |
 | 18 | 7 | `services.core.__init__.py` paketinde yeni sınıflar, fonksiyonlar ve sabitler dışa aktarılmıyordu | Paket `__all__` listesi ve importları güncellenerek tam senkronizasyon sağlandı |
+| 19 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | `ReplicaHealthInfo` ve `ReplicationHealthReport` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `ReplicaHealthInfo.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | `export_replication_health_to_duckdb` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(con)` entegre edildi |
+| 22 | 6 | Replikasyon geçmişini DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_replication_health_from_duckdb()` ve `clear_replication_health_duckdb()` fonksiyonları eklendi, tablo varlığı kontrol edildi ve `__all__` listesine bağlandı |
+| 23 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; ReplicaHealthInfo, ReplicationHealthReport, export_replication_health_to_duckdb, read_replication_health_from_duckdb, clear_replication_health_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -458,6 +533,11 @@
 | 17 | 4 | `ComplianceResult` nesnesi doğrudan ikili JSON serileştirme desteğine sahip değildi | `to_orjson_bytes()` metodu eklenerek `orjson` ile mikro-saniye düzeyinde serileştirme sağlandı |
 | 18 | 4 & 7 | Dış servislerin singleton `compliance_checker` nesnesine bağımlı kalmadan doğrudan uyumluluk denetimi yapabilmesi için modül seviyesi kolaylık fonksiyonları eksikti | `check_spk_compliance`, `check_algo_trading_notification`, `check_order_to_trade_ratio`, `check_short_sale_uptick`, `check_insider_trading_window`, `register_blackout_period`, `export_compliance_audit_to_polars`, `query_compliance_audit_duckdb` fonksiyonları ve `DEFAULT_MIN_OTR_EVALUATION_ORDERS`, `DEFAULT_UPTICK_RULE_ACTIVE` sabitleri eklendi |
 | 19 | 7 | `services.core.__init__.py` paketinde `ComplianceChecker`, `ComplianceAction`, `ComplianceResult` sınıfları ve yeni modül fonksiyonları dışa aktarılmıyordu | Paket `__all__` listesi ve importları güncellenerek tam senkronizasyon sağlandı |
+| 20 | 5 | DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 21 | 5 & 6 | `ComplianceResult` ve `ComplianceChecker` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | `ComplianceChecker.to_dict()`, `ComplianceChecker.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 22 | 2 & 5 | `ComplianceChecker._init_db` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(self._conn)` entegre edildi |
+| 23 | 6 | Uyumluluk denetim günlüğünü DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_compliance_audit_from_duckdb()` ve `clear_compliance_audit_duckdb()` fonksiyonları eklendi, `ComplianceChecker.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 24 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; ComplianceResult, ComplianceChecker, check_spk_compliance, read_compliance_audit_from_duckdb, clear_compliance_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -483,6 +563,11 @@
 | 16 | 2 & 6 | **(2. Tur)** Diskteki `config_audit_log` tablosundan parametrik sorgulama kabiliyeti eksikti | `query_audit_duckdb(file_path, applied, limit)` metodu ve DuckDB native `.pl()` doğrudan Polars entegrasyonu sağlandı |
 | 17 | 7 | **(2. Tur)** Modül seviyesi kolaylık fonksiyonları ve yapılandırma sabitleri eksikti | `get_current_runtime_config`, `save_runtime_config_safely`, `force_reload_runtime_config`, `export_config_history_to_polars`, `query_config_audit_duckdb` fonksiyonları ve `DEFAULT_WATCH_INTERVAL_SECONDS`, `DEFAULT_MAX_HISTORY_LEN`, `DEFAULT_RUNTIME_CONFIG_PATH`, `DEFAULT_CONFIG_DB_PATH` eklendi |
 | 18 | 7 | **(2. Tur)** `services.core.__init__.py` paketinde yeni modül fonksiyonları ve sabitleri dışa aktarılmıyordu | Paket `__all__` listesi ve importları güncellenerek tam senkronizasyon sağlandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `ConfigChange`, `ConfigHotReload`, `SettingsBridge` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | Sınıflara `to_dict()` ve `to_orjson_bytes()` metotları ile modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `ConfigHotReload._init_db` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(self._conn)` entegre edildi |
+| 22 | 6 | **(2. Tur)** Konfigürasyon denetim günlüğünü DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_config_audit_from_duckdb()` ve `clear_config_audit_duckdb()` fonksiyonları eklendi, `ConfigHotReload.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; ConfigChange, ConfigHotReload, SettingsBridge, read_config_audit_from_duckdb, clear_config_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -512,6 +597,11 @@
 | 20 | 2 | **(3. Tur)** DuckDB başlangıcında Windows crash sonrası oluşan sıfır baytlık bozuk dosya koruması eksikti | `DeadLetterQueue.__init__` içine zero-byte file unlink guard eklendi |
 | 21 | 1 & 4 | **(3. Tur)** `__exit__` metotlarında kural dışı `pass` ifadesi mevcuttu | `return None` ile değiştirildi |
 | 22 | 7 | **(3. Tur)** `PersistentDeadLetterQueue` sınıfı modülün ve paketin `__all__` listesinde eksikti | `__all__` listelerine eklendi; canlı mikro yürütme testi ile doğrulandı |
+| 23 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 24 | 5 & 6 | **(2. Tur)** `InMemoryDeadLetterQueue` ve `DeadLetterQueue` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | Sınıflara `to_dict()` ve `to_orjson_bytes()` metotları ile modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 25 | 2 & 5 | **(2. Tur)** `DeadLetterQueue._connect` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 26 | 6 | **(2. Tur)** DLQ kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_dlq_from_duckdb()` ve `clear_dlq_duckdb()` fonksiyonları eklendi, `DeadLetterQueue.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 27 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; DLQEntry, InMemoryDeadLetterQueue, DeadLetterQueue, read_dlq_from_duckdb, clear_dlq_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -542,6 +632,11 @@
 | 21 | 2 & 3 | **(3. Tur)** `_persist_decision()` ve `export_decisions_to_polars()` metotlarında bağlantı koptuğunda veya kapandığında kurtarma yoktu | Kilit altında güvenli otomatik yeniden başlatma (`self._init_db()`) mekanizması eklendi |
 | 22 | 3 | **(3. Tur)** `_determine_direction()` yön kararında `DecisionInput` içerisindeki LLM ve Ajan sinyalleri değerlendirilmiyordu | Güven skoru >= 0.65 olan Ajan ve AI sinyalleri yön tespit modeline entegre edildi |
 | 23 | 4 & 5 | **(3. Tur)** `Action` enumunda fiili işlem kontrolü eksikti; `__exit__` dönüşü ve canlı yürütme testi yapıldı | `Action.is_actionable` özelliği eklendi; mikro test betiği (`test_decision_engine_micro.py`) ile Boğa/Ayı rejimleri, açığa satış kısıtı, BIST fiyat adımı ve Polars ihracı %100 başarıyla doğrulandı |
+| 24 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 25 | 5 & 6 | **(2. Tur)** `DecisionInput` ve `DecisionEngine` sınıflarında ve modül genelinde orjson ikili serileştirme desteği eksikti | Sınıflara `to_dict()` ve `to_orjson_bytes()` metotları ile modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 26 | 2 & 5 | **(2. Tur)** `DecisionEngine._init_db` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(self._conn)` entegre edildi |
+| 27 | 6 | **(2. Tur)** Karar kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_decision_audit_from_duckdb()` ve `clear_decision_audit_duckdb()` fonksiyonları eklendi, `DecisionEngine.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 28 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; DecisionInput, Decision, DecisionEngine, read_decision_audit_from_duckdb, clear_decision_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -567,6 +662,11 @@
 | 16 | 3 (3. Tur) | `trace` ve `trace_async` dekoratörleri parantezsiz (`@trace`, `@trace_async`) çağrıldığında fonksiyonu çalıştırmıyordu | `callable(operation)` kontrolü eklenerek hem parametreli hem parantezsiz kullanım eksiksiz desteklendi |
 | 17 | 2 & 3 (3. Tur) | `start_span` ve `start_async_span` içinde `except Exception` kullanıldığı için `asyncio.CancelledError` gibi `BaseException` türleri yerel span'a kaydedilmiyordu | `except BaseException as exc:` ile kayıt güvenceye alındı; `contextvars.reset` çağrıları `ValueError` korumasına alındı |
 | 18 | 4 & 7 (3. Tur) | `DEFAULT_BUFFER_SIZE`, `DEFAULT_RECENT_LIMIT`, `DEFAULT_SERVICE_NAME` sabitleri eksikti ve `__init__.py`'de tanımlı değildi | Sabitler tanımlandı, `__all__` listesine `Final[list[str]]` tipi verildi, `services/core/__init__.py` eşitlendi; canlı mikro testle doğrulandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"`, `DEFAULT_TRACING_DB_PATH = "data/tracing.duckdb"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `DistributedTracer` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `DistributedTracer.to_dict()`, `DistributedTracer.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_spans_to_duckdb` metodunda DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 22 | 6 | **(2. Tur)** Span kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_spans_from_duckdb()` ve `clear_spans_duckdb()` fonksiyonları eklendi, `DistributedTracer.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; TraceSpan, Trace, DistributedTracer, export_spans_to_duckdb, read_spans_from_duckdb, clear_spans_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -592,6 +692,12 @@
 | 16 | 5 & 6 | **(2. Tur)** DuckDB `fee_audit_log` tablosuna aktarılan masraf denetim kayıtlarını filtreli olarak sorgulayan metot yoktu | `query_fee_audit_duckdb(db_path, side, instrument_type, limit)` metodu yazılarak DuckDB native `.pl()` sıfır kopyalı Polars entegrasyonu sağlandı |
 | 17 | 6 & 7 | **(2. Tur)** Harici servislerin singleton nesneye bağımlı kalmadan hızlı işlem yapabilmesi için modül seviyesi kolaylık fonksiyonları ve varsayılan sabitler eksikti | `calculate_fee`, `calculate_break_even_price`, `calculate_net_cash_flow`, `export_fees_to_polars`, `export_fees_to_duckdb`, `query_fee_audit_duckdb`, `get_fee_calculator` fonksiyonları ve `DEFAULT_DB_PATH`, `DEFAULT_CACHE_SIZE` sabitleri eklendi |
 | 18 | 7 | **(2. Tur)** `services.core.__init__.py` paketinde yeni eklenen fonksiyonlar ve sabitler dışa aktarılmıyordu | Paket `__all__` listesi ve importları güncellenerek çift yönlü senkronizasyon sağlandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `FeeCalculator` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `FeeCalculator.to_dict()`, `FeeCalculator.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 1 & 4 | **(2. Tur)** `FeeCalculator.__exit__` metodunda `pass` yer alıyordu | GEMINI.md Kural 1 & 4 uyarınca `return None` ile düzeltildi |
+| 22 | 2 & 5 | **(2. Tur)** `export_to_duckdb` ve `query_fee_audit_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi, çakışma riskli `read_only=True` kaldırıldı |
+| 23 | 6 | **(2. Tur)** Maliyet denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_fee_audit_from_duckdb()` ve `clear_fee_audit_duckdb()` fonksiyonları eklendi, `FeeCalculator.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 24 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; FeeBreakdown, BreakEvenAnalysis, FeeCalculator, export_fees_to_duckdb, read_fee_audit_from_duckdb, clear_fee_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -617,6 +723,11 @@
 | 16 | 5 & 6 | **(2. Tur)** DuckDB `grafana_provisioning_audit` tablosundaki denetim kayıtlarını filtreli olarak Polars formatında sorgulayan fonksiyon eksikti | `query_provisioning_audit_duckdb(db_path, status, uid, limit)` metodu yazılarak DuckDB native `.pl()` doğrudan Polars entegrasyonu sağlandı |
 | 17 | 4 & 5 | **(2. Tur)** `GrafanaConfig`, `DatasourceConfig` ve `DashboardVersion` modellerinde `to_orjson_bytes()` serileştirmesinde `default=str` fallback'i yoktu | Tüm modellere `orjson.dumps(..., default=str)` uygulanarak güvenli ikili serileştirme standardı sağlandı |
 | 18 | 7 | **(2. Tur)** Harici servislerin doğrudan erişebileceği modül seviyesi kolaylık fonksiyonları ve varsayılan sabitler eksikti | `check_grafana_health`, `provision_grafana_dashboard`, `provision_grafana_datasource`, `provision_grafana_clickhouse`, `provision_grafana_all`, `export_grafana_versions_to_polars`, `export_grafana_audit_to_duckdb`, `query_grafana_audit_duckdb`, `get_grafana_provisioner` fonksiyonları ve sabitler `services.core.__init__.py` paketine bağlanarak tam senkronizasyon sağlandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `GrafanaProvisioner` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `GrafanaProvisioner.to_dict()`, `GrafanaProvisioner.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_to_duckdb` ve `query_provisioning_audit_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 22 | 6 | **(2. Tur)** Grafana denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_grafana_audit_from_duckdb()` ve `clear_grafana_audit_duckdb()` fonksiyonları eklendi, `GrafanaProvisioner.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; DashboardVersion, DatasourceConfig, GrafanaConfig, GrafanaProvisioner, export_to_duckdb, read_grafana_audit_from_duckdb, clear_grafana_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -642,6 +753,11 @@
 | 16 | 2 & 5 | **(2. Tur)** Servis yeniden başladığında DuckDB denetim tablosundaki güncel tedbirleri bellek durumuna geri yükleyen mekanizma eksikti | `load_from_duckdb(db_path, current_date)` metodu geliştirilerek restart dayanıklılığı sağlandı |
 | 17 | 4 & 5 | **(2. Tur)** `GrossSettlementStatus.to_orjson_bytes()` metoduna `default=str` serileştirme fallback'i eklenmemişti | `orjson.dumps(self.to_dict(), default=str)` uygulanarak güvenli ikili serileştirme standardı sağlandı |
 | 18 | 7 | **(2. Tur)** Harici servislerin doğrudan erişebileceği modül seviyesi kolaylık fonksiyonları ve varsayılan sabitler eksikti | `check_stock_gross_settlement`, `is_stock_short_sell_blocked`, `is_stock_margin_blocked`, `is_stock_day_trade_restricted`, `validate_stock_order`, `get_all_gross_settlement_stocks`, `filter_gross_settlement_stocks`, `export_gross_settlement_to_polars`, `check_polars_gross_settlement`, `export_gross_settlement_to_duckdb`, `query_gross_settlement_audit_duckdb`, `load_gross_settlement_from_duckdb`, `get_gross_settlement_monitor` fonksiyonları ve sabitler `services.core.__init__.py` paketine bağlanarak tam senkronizasyon sağlandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `GrossSettlementMonitor` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `GrossSettlementMonitor.to_dict()`, `GrossSettlementMonitor.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_to_duckdb`, `query_audit_duckdb` ve `load_from_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 22 | 6 | **(2. Tur)** Brüt takas denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_gross_settlement_audit_from_duckdb()` ve `clear_gross_settlement_audit_duckdb()` fonksiyonları eklendi, `GrossSettlementMonitor.clear_audit_duckdb()` ve `add_gross_settlement()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; GrossSettlementStatus, GrossSettlementMonitor, export_to_duckdb, read_gross_settlement_audit_from_duckdb, clear_gross_settlement_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -667,6 +783,12 @@
 | 16 | 4 & 5 | **(2. Tur)** `HaltStatus.to_orjson_bytes()` metoduna `default=str` serileştirme fallback'i eklenmemişti | `orjson.dumps(self.to_dict(), default=str)` uygulanarak güvenli ikili serileştirme standardı sağlandı |
 | 17 | 7 | **(2. Tur)** Harici servislerin doğrudan erişebileceği modül seviyesi kolaylık fonksiyonları ve varsayılan sabitler eksikti | `add_stock_halt`, `remove_stock_halt`, `check_stock_halt`, `is_stock_halted`, `validate_stock_halt_order`, `get_all_halted_stocks`, `get_halted_stock_tickers`, `filter_halted_stock_tickers`, `export_halt_status_to_polars`, `check_polars_halt_status`, `export_halt_audit_to_duckdb`, `query_halt_audit_duckdb`, `get_halt_monitor` fonksiyonları ve sabitler eklendi |
 | 18 | 7 | **(2. Tur)** `services.core.__init__.py` paketinde yeni eklenen tüm modül fonksiyonları ve sabitler import ve `__all__` listesine bağlanmamıştı | Paket `__all__` listesi ve importları 25 sembole genişletilerek tam senkronizasyon sağlandı |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `HaltMonitor` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `HaltMonitor.to_dict()`, `HaltMonitor.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_to_duckdb`, `query_audit_duckdb`, `_persist_state`, `_remove_persisted` ve `_restore_state` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi |
+| 22 | 2 & 3 | **(2. Tur)** `state_store.py` içinde `CentralStateStore._connect()` context manager'ı eksikti | Kilit korumalı `_connect` context manager'ı eklenerek StateStore entegrasyonu sağlandı |
+| 23 | 6 | **(2. Tur)** Seans durdurma denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_halt_audit_from_duckdb()` ve `clear_halt_audit_duckdb()` fonksiyonları eklendi, `HaltMonitor.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 24 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; HaltStatus, HaltMonitor, export_to_duckdb, read_halt_audit_from_duckdb, clear_halt_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -692,6 +814,11 @@
 | 16 | 2 & 6 | DuckDB'ye kaydedilen donanım denetim geçmişini (`hardware_profile_audit`) doğrudan Polars DataFrame olarak geriye çeken native sorgu metodu yoktu | `query_audit_duckdb(db_path, limit)` metodu ile native `.pl()` Polars sorgulaması sağlandı |
 | 17 | 6 & 7 | CatBoost, XGBoost ve LightGBM ML modelleri için tek noktadan donanım parametresi üreten birleşik arayüz ve SSD yazım modül fonksiyonları eksikti | `get_optimal_ml_params()`, `get_hardware_orchestrator()`, `get_current_hardware_profile()`, `is_gpu_accelerated()`, `enqueue_ssd_write()`, `flush_ssd_writer()`, `export_hardware_profile_to_polars()`, `export_hardware_audit_to_duckdb()`, `query_hardware_audit_duckdb()` modül fonksiyonları eklendi |
 | 18 | 7 | `services/core/__init__.py` dosyasında `hardware_orchestrator` bileşenleri için yeni yardımcı fonksiyonlar ve sabitler eksikti; `__all__` listesi senkronize değildi | `services/core/__init__.py` içinde 17 sembol import edilip `__all__` listesine eksiksiz eklendi |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `HardwareOrchestrator` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `HardwareOrchestrator.to_dict()`, `HardwareOrchestrator.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_profile_to_duckdb` ve `query_audit_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi, `read_only=True` kilit çakışması önlendi |
+| 22 | 6 | **(2. Tur)** Donanım profili denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_hardware_audit_from_duckdb()` ve `clear_hardware_audit_duckdb()` fonksiyonları eklendi, `HardwareOrchestrator.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; HardwareProfile, HardwareOrchestrator, SSDThrottledWriter, export_profile_to_duckdb, read_hardware_audit_from_duckdb, clear_hardware_audit_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -717,6 +844,11 @@
 | 16 | 6 & 7 | Dış servislerin donanım yöneticisine doğrudan sınıf örneği yönetmeden erişebileceği modül seviyesi pratik yardımcı fonksiyonlar eksikti | `get_hardware_manager()`, `apply_hardware_profile()`, `restore_hardware_profile()`, `get_optimal_execution_device()`, `get_hardware_status_report()`, `export_specs_to_polars()`, `export_limits_to_polars()`, `export_hardware_profile_to_duckdb()`, `query_hardware_profile_duckdb()` fonksiyonları eklendi |
 | 17 | 7 | `HardwareResourceManager` modülünün `__all__` listesi yeni eklenen fonksiyon ve sabitleri içermiyordu (12 sembol kalmıştı) | `__all__` listesi 21 sembole çıkarılarak eksiksiz hale getirildi |
 | 18 | 7 | `services/core/__init__.py` paket dosyasında `hardware_profile` için yeni yardımcı fonksiyonlar ve sabitler eksikti | `services/core/__init__.py` içinde 20 sembol içe aktarılıp `__all__` listesine eksiksiz dahil edildi |
+| 19 | 5 | **(2. Tur)** DuckDB dosya yolu ve WAL/checkpoint optimizasyonları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 20 | 5 & 6 | **(2. Tur)** `HardwareResourceManager` sınıfında ve modül genelinde orjson ikili serileştirme desteği eksikti | `HardwareResourceManager.to_dict()`, `HardwareResourceManager.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 21 | 2 & 5 | **(2. Tur)** `export_to_duckdb` ve `query_audit_duckdb` metotlarında DuckDB bağlantısı WAL korumasına bağlandı | `configure_duckdb_wal(conn)` entegre edildi, `read_only=True` kilit çakışması önlendi |
+| 22 | 6 | **(2. Tur)** Donanım profili denetim kayıtlarını DuckDB'den doğrudan Polars DataFrame olarak okuyan ve tabloyu sıfırlayan yardımcılar yoktu | `read_hardware_profile_from_duckdb()` ve `clear_hardware_profile_duckdb()` fonksiyonları eklendi, `HardwareResourceManager.clear_audit_duckdb()` metodu sağlandı ve `__all__` listesine bağlandı |
+| 23 | 5 | **(2. Tur)** Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; HardwareSpecs, ResourceLimits, HardwareResourceManager, export_to_duckdb, read_hardware_profile_from_duckdb, clear_hardware_profile_duckdb ve to_orjson_bytes mikro testi başarıyla geçti |
 
 ---
 
@@ -1837,19 +1969,19 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
 | 1 | 1 | Tam 27 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm fonksiyon, sınıf, metot ve dekoratörlere Türkçe, Args/Returns içeren eksiksiz docstring yazıldı |
-| 2 | 2 & OTel Dekoratör Hatası | `otel_trace` dekoratörü `def wrapper(self, *args, **kwargs)` ile zorunlu `self` bekliyordu; bağımsız fonksiyonlarda `TypeError` fırlatıyordu | `def wrapper(*args, **kwargs)` olarak düzeltildi; hem fonksiyon hem metot destekler hale getirildi |
+| 2 | 2 & OTel Dekoratör Hatası & Async Desteği | `otel_trace` dekoratörü coroutine fonksiyonları (`async def`) desteklemiyordu ve hata anında span'e kaydetmeden fail ediyordu | `asyncio.iscoroutinefunction(func)` kontrolü eklendi; hem senkron hem asenkron fonksiyonları destekleyecek şekilde `span.record_exception(exc)` ile donatıldı |
 | 3 | 2 & Eşzamanlılık | `PrometheusMetrics`, `ConfigManager`, `CostMonitor`, `HealthChecker`, `DistributedTracing` sınıflarında sözlük ve sayaçlar kilit korumasızdı | Tüm sınıflara `self._lock = threading.RLock()` eklenerek thread-safety sağlandı |
 | 4 | 2 & Windows Sınır Hatası | `psutil.disk_usage("/")` çağrısı Windows dosya sisteminde hatalı çalışabiliyordu | `Path.cwd().anchor or "/"` (Windows için `C:\`) ile platform bağımsız hale getirildi |
-| 5 | 3 & Ölü Kod / Mock Temizliği | `DistributedTracing` içinde `get_trace`, `get_spans`, `get_recent_traces` boş liste `[]` dönüyordu | Yerel halka tamponu (`deque(maxlen=1000)`) ile yerel trace saklama ve sorgulama yeteneği kazandırıldı |
-| 6 | 6 & Self-Healing & Otomasyon | Hatalı konfigürasyonda otomatik geri alma ve arızalanan bileşenler için otomatik onarım mekanizması yoktu | `ConfigManager.rollback(key)` ile orijinal tip korumalı geri alma; `HealthChecker.register_recovery_action` ve `trigger_self_healing(component)` self-healing onarım mekanizması kazandırıldı |
-| 7 | 5 & DuckDB Snapshot & Kalıcılık | Metriklerin ve sistem sağlığının kalıcı analitik deposuna SSD korumalı yazımı yoktu | DuckDB 4MB/2MB WAL optimize `save_observability_snapshot_to_duckdb()` fonksiyonu entegre edildi |
-| 8 | 5 & Serileştirme Hızı | Standart json yavaştı | `ConfigManager.to_orjson_bytes()` ve `HealthChecker.to_orjson_bytes()` ile yüksek hızlı serileştirme sağlandı |
-| 9 | 2 & 6 & Polars Dışa Aktarımı | Metrikler, konfigürasyon geçmişi ve sağlık durumu için Polars desteği yoktu ve eski `pl.Utf8` kullanılmıştı | `export_observability_metrics_to_polars()`, `ConfigManager.export_history_to_polars()`, `HealthChecker.export_health_to_polars()` güncellendi; `pl.String` standardı uygulandı |
+| 5 | 3 & Ölü Kod / Mock Temizliği | `DistributedTracing` içinde `get_trace`, `get_spans`, `get_recent_traces` boş liste `[]` dönüyordu | Yerel halka tamponu (`deque(maxlen=1000)`) ile yerel trace saklama, `end_trace` ve sorgulama yeteneği kazandırıldı |
+| 6 | 6 & Self-Healing & Versiyonlama Düzeltmesi | `ConfigManager.rollback(key)` varsayılana döndüğünde versiyon tarihçesine kayıt atmıyordu; audit trail kopuyordu | `self._versions.append(...)` ile varsayılana dönüş de denetlenebilir tarihçeye bağlandı; `HealthChecker.trigger_self_healing` onarım mekanizması korundu |
+| 7 | 5 & DuckDB Snapshot & Unregister Koruması | DuckDB `save_observability_snapshot_to_duckdb()` içinde `conn.unregister()` try/finally bloğunda değildi; ayrıca okuma ve temizleme yardımcıları yoktu | `try/finally: conn.unregister()` eklendi; `read_observability_metrics_from_duckdb()`, `read_component_health_from_duckdb()` ve `clear_observability_duckdb()` fonksiyonları eklendi |
+| 8 | 5 & Serileştirme Hızı | Standart json yavaştı ve tüm sınıflarda orjson ikili serileştirme yoktu | `ConfigManager`, `HealthChecker`, `DistributedTracing`, `PerformanceMonitor`, `CostMonitor`, `ResourceMonitor` sınıflarının tamamına `to_orjson_bytes()` eklendi (`default=str`) |
+| 9 | 2 & 6 & Polars Dışa Aktarımı | Metrikler ve tracing için Polars ihracı eksikti | `export_traces_to_polars()`, `export_performance_to_polars()`, `export_costs_to_polars()`, `export_resources_to_polars()` eklendi; `pl.String` standardı uygulandı |
 | 10 | 4 & Repr | Sınıflarda `__repr__` yoktu | Tüm 7 sınıfa metrik ve durum özetleyen `__repr__` metotları kazandırıldı |
-| 11 | 4 & Loglama | Loglar İngilizceydi | `kaynak_izleme_dongu_hatasi`, `konfigurasyon_guncellendi`, `self_healing_onarimi_basarili` şeklinde Türkçe structlog formatına geçirildi |
+| 11 | 4 & Loglama & Context Manager | `PerformanceMonitor` içinde otomatik ölçüm yapan context manager ve `observe_histogram` alias'ı yoktu | `@contextlib.contextmanager def timer(self, operation)` ve `observe_histogram` takma adı kazandırıldı |
 | 12 | 4 & Sabitler | Sihirli sayılar mevcuttu | `DEFAULT_BUCKETS`, `DEFAULT_MAX_CONFIG_VERSIONS`, `DEFAULT_MAX_TRACE_HISTORY`, `DEFAULT_OBSERVABILITY_DB_PATH` sabitleri tanımlandı |
-| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksikti | 22 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`OBSERVABILITY_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi yeni eklenen yardımcıları içermiyordu | 26 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`Prometheus, Tracing, Performance, Cost, Resource, Config rollback, Health healing, Sync/Async OTel, DuckDB save/read/clear %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1858,19 +1990,19 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
 | 1 | 2 & Kritik Çalışma Zamanı Çökmesi (Tuple Index Error) | `get_stats()`, `clear()` ve `get_entries()` metotlarında DuckDB'nin döndürdüğü `tuple` nesneleri `row["cnt"]` veya `[dict(r) for r in rows]` ile sözlük gibi çağrılarak `TypeError` ile çöküyordu | `row[0]`, `cols = [d[0] for d in cur.description]` ve `dict(zip(cols, r))` ile tam güvenli ayrıştırma sağlandı |
-| 2 | 2 & Döngüsel Bağımlılık Riski | `_connect` içinde fonksiyon seviyesinde `from services.core.debounce import configure_duckdb_wal` çağrılıyordu | Modül başına bağımsız `configure_duckdb_wal` tanımlanarak zincirleme yükleme engellendi |
+| 2 | 2 & OTel Dekoratör Async Desteği | `otel_trace` dekoratörü asenkron coroutine fonksiyonları sarmaladığında span'i işlem tamamlanmadan kapatıyordu ve hataları yakalamıyordu | `asyncio.iscoroutinefunction(func)` desteği eklendi; asenkron coroutine'ler için `async_wrapper` devreye alındı ve `span.record_exception(exc)` ile fail-closed hata kaydı sağlandı |
 | 3 | 2 & Sessiz Mantık Hatası (rowcount = -1) | `_cleanup_expired` içinde `cursor.rowcount` kullanılıyordu; DuckDB'de `rowcount` daima `-1` döndüğü için silinen kayıtlar hiçbir zaman sayılmıyor ve loglanmıyordu | `DELETE FROM ... RETURNING entry_id` sözdizimine geçilerek silinen gerçek kayıt adedi eksiksiz tespit edildi |
 | 4 | 2 & Sınırsız Kuyruk Şişmesi | `__init__` içinde `max_entries=10000` tanımlanmasına rağmen `enqueue` içinde hiçbir kapasite denetimi yapılmıyordu; disk kontrolsüz şişebiliyordu | Kapasite aşıldığında en düşük öncelikli ve en eski kaydı otomatik tahliye eden (eviction) FIFO guard'ı eklendi |
 | 5 | 2 & Eşzamanlılık ve DuckDB Kilit Çatışması | Eşzamanlı `enqueue`, `flush` ve `get_stats` çağrılarında DuckDB dosya kilidi çatışması (`IOException: Could not set lock on file`) riski vardı | `self._lock = threading.RLock()` ile thread-safe reentrant kilit koruması sağlandı |
 | 6 | 6 & Self-Healing & Zero-Touch Otomasyon | Başarısız kayıtların otomatik yeniden denenmesi ve arka planda periyodik dağıtım mekanizması yoktu | `retry_failed_entries()` self-healing onarım fonksiyonu ve `start_background_flusher() / stop_background_flusher()` eklendi |
-| 7 | 5 & Serileştirme Hızı | `to_orjson_bytes()` eksikti | C seviyesinde yüksek hızlı `to_orjson_bytes()` kazandırıldı |
+| 7 | 5 & Serileştirme Hızı & DuckDB Temizleme | `to_orjson_bytes()` içinde `default=str` parametresi yoktu; harici test ve temizlik için `clear_offline_queue_duckdb()` bulunmuyordu | `default=str` eklendi; `clear_offline_queue_duckdb(db_path)` fonksiyonu yazıldı |
 | 8 | 2 & 6 & Polars Desteği | Eski `pl.Utf8` kullanılmıştı | Polars >= 1.30 standardı olan `pl.String` ile güncellendi |
 | 9 | 1 | 2 adet `"Otomatik eklendi."` placeholder docstring mevcuttu | Tamamı temizlendi; tüm metot ve sınıflara Türkçe docstring yazıldı |
 | 10 | 4 & Repr | `OfflineQueue` sınıfında sayaçları ve disk yolunu gösteren `__repr__` metodu güncellendi | Açıklayıcı ve okunabilir `__repr__` eklendi |
 | 11 | 4 & Loglama | Loglar İngilizceydi | `offline_queue_baslatildi`, `olay_offline_kuyruga_eklendi`, `offline_kuyruk_bosaltildi` vb. Türkçe structlog formatına geçirildi |
 | 12 | 4 & Sabitler | Sihirli sayılar mevcuttu | `DEFAULT_OFFLINE_DB_PATH`, `DEFAULT_MAX_ENTRIES`, `DEFAULT_TTL_HOURS`, `MAX_RETRY_ATTEMPTS` sabitleri tanımlandı |
-| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksikti | 12 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`OFFLINE_QUEUE_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesinde yeni yardımcı fonksiyon eksikti | 13 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`senkron/asenkron işleyiciler, öncelik sıralaması, Polars dışa aktarımı, orjson, self-healing retry ve DuckDB clear %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1883,15 +2015,15 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 3 | 2 & Mükerrer Enstrümantasyon ve Provider Uyarısı | `setup_telemetry` tekrar çağrıldığında `Overriding of current TracerProvider` ve `Attempting to instrument while already instrumented` uyarıları basılıyordu | `isinstance(current_provider, TracerProvider)` kontrolü ve `_instrumented_*` bayrakları ile %100 idempotent hale getirildi |
 | 4 | 2 & Span İstisna ve Hata İzi Eksikliği | `otel_trace` sarmalanan fonksiyonda hata oluştuğunda span'a hatayı kaydetmiyordu; APM araçları hatayı yakalayamıyordu | `span.record_exception(exc)` ve `StatusCode.ERROR` set_status entegrasyonu sağlandı |
 | 5 | 6 & Self-Healing & Zero-Touch | Telemetri bağlantısı koptuğunda veya kapandığında otomatik yeniden bağlanma/onarma yeteneği yoktu | `heal_telemetry_connection()` fonksiyonu kazandırılarak self-healing bağlantı onarımı sağlandı |
-| 6 | 5 & DuckDB Kalıcılığı & WAL | Telemetri çalışma ve enstrümantasyon durumunun kalıcı denetim günlüğü yoktu | DuckDB 4MB/2MB WAL optimize `save_telemetry_status_to_duckdb()` fonksiyonu eklendi |
-| 7 | 5 & Serileştirme Hızı | Hızlı durum dışa aktarımı için `orjson` desteği yoktu | `export_telemetry_status_to_orjson()` fonksiyonu eklendi |
+| 6 | 5 & DuckDB Kalıcılığı & Unregister Koruması | Telemetri çalışma ve enstrümantasyon durumunun kalıcı denetim kaydında `unregister` try/finally içinde değildi; okuma ve silme yardımcıları yoktu | DuckDB `save_telemetry_status_to_duckdb()` fonksiyonuna `try/finally: conn.unregister` eklendi; `read_telemetry_status_from_duckdb()` ve `clear_telemetry_status_duckdb()` fonksiyonları yazıldı |
+| 7 | 5 & Serileştirme Hızı | `export_telemetry_status_to_orjson()` içinde `default=str` parametresi yoktu; `to_orjson_bytes()` takma adı bulunmuyordu | `default=str` eklendi ve `to_orjson_bytes()` eşdeğer takma adı tanımlandı |
 | 8 | 2 & 6 & Polars Desteği | Eski `pl.Utf8` kullanılmıştı | Polars >= 1.30 standardı olan `pl.String` ile güncellendi |
 | 9 | 2 & Eşzamanlılık | Global `_tracer_provider`, `_tracer`, `_telemetry_enabled` durumları kilit korumasızdı | `_otel_lock = threading.RLock()` ile thread-safe hale getirildi |
 | 10 | 2 & Windows Uyumluluğu | `os.uname().nodename` Windows ortamında `AttributeError` patlatıyordu | `platform.node()` ve `COMPUTERNAME` ile platform bağımsız hale getirildi |
 | 11 | 3 & Güvenli Geri Çekilme (Fallback) | OpenTelemetry kütüphanesi bulunmadığında fallback span eksik metotlar nedeniyle `AttributeError` patlatabilirdi | `_FallbackSpan` içine `record_exception`, `set_status`, `add_event`, `is_recording` metotları kazandırıldı |
 | 12 | 4 & Loglama | Loglar İngilizceydi | `opentelemetry_basariyla_baslatildi`, `opentelemetry_self_healing_onarimi_basarili` vb. Türkçe structlog formatına geçirildi |
-| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksikti | 10 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`OTEL_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 13 | 7 & Modül Dışa Aktarımı | Modül seviyesinde yeni yardımcı fonksiyonlar `__all__` listesinde eksikti | 13 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 14 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`setup_telemetry, get_tracer, sync/async otel_trace, Polars export, orjson bytes, DuckDB save/read/clear, self healing ve shutdown %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1900,15 +2032,15 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
 | 1 | 2 & Eşzamanlılık | `PersistentDeadLetterQueue` sınıfında iş parçacığı kilidi yoktu; eşzamanlı `push` ve `retry_failed` çağrılarında DuckDB bağlantı çakışması riski vardı | `self._lock = threading.RLock()` ile thread-safe reentrant kilit koruması kuruldu |
-| 2 | 2 & Döngüsel İçe Aktarma Riski | `_connect` içinde fonksiyon seviyesinde `from services.core.debounce import configure_duckdb_wal` çağrılıyordu | Bağımsız yerel `configure_duckdb_wal` fonksiyonu tanımlanarak izole ve hızlı başlatma sağlandı |
-| 3 | 6 & Self-Healing & Zero-Touch | Tekil DLQ kaydını anında onarma, tükenmiş kayıtları sıfırlama ve arka planda periyodik deneme yeteneği yoktu | `replay_single()`, `reset_exhausted_entries()` ve `start_background_retry_worker() / stop_background_retry_worker()` kazandırıldı |
-| 4 | 5 & Serileştirme Hızı | `DLQEntry` dataclass'ında ve kuyrukta `to_orjson_bytes()` ve `slots=True` eksikti | `slots=True` yapıldı ve C seviyesinde `to_orjson_bytes()` eklendi |
+| 2 | 2 & OTel Dekoratör Async ve Exception Güvenliği | `otel_trace` dekoratörü sadece `self` argümanlı metotları sarabiliyordu ve coroutine fonksiyonlarda erken span kapatıyordu | `asyncio.iscoroutinefunction` desteği kazandırıldı; `span.record_exception(exc)` ile donatıldı |
+| 3 | 6 & Self-Healing & Tekil Kayıt Erişimi | Tekil DLQ kaydını `entry_id` ile doğrudan `DLQEntry` olarak sorgulayan `get_entry` / `get_dlq_entry` metodu eksikti | `get_entry()` metodu ve modül seviyesi `get_dlq_entry()` singleton fonksiyonu eklendi |
+| 4 | 5 & Serileştirme Hızı & DuckDB Temizleme | `to_orjson_bytes()` çağrılarında `default=str` parametresi yoktu; harici test ve temizlik için `clear_dlq_duckdb` fonksiyonu eksikti | `default=str` eklendi; `clear_dlq_duckdb(db_path)` fonksiyonu tanımlandı |
 | 5 | 2 & 6 & Polars Analitiği | Kalıcı DLQ kayıtlarında eski `pl.Utf8` tipi kullanılmıştı | Polars >= 1.30 standardı olan `pl.String` ile güncellendi |
 | 6 | 4 & Sabitler | Sihirli sayılar mevcuttu (`50000`, `100`, `5`) | `DEFAULT_DLQ_DB_PATH`, `DEFAULT_MAX_ENTRIES`, `DEFAULT_BATCH_SIZE`, `DEFAULT_BASE_BACKOFF_SECONDS` sabitleri tanımlandı |
 | 7 | 4 & Repr | `DLQEntry` ve `PersistentDeadLetterQueue` sınıflarında kurumsal `__repr__` metotları standartlaştırıldı | Anlaşılır `__repr__` metotları kazandırıldı |
 | 8 | 4 & Loglama | Loglar ve sayaçlar Türkçe ve yapısal structlog standardına bağlandı | `Event kalıcı DLQ'ya kaydedildi`, `PersistentDLQ başlatıldı` formatı standardize edildi |
-| 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksikti | 14 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PERSISTENT_DLQ_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde yeni yardımcı fonksiyonlar `__all__` listesinde eksikti | 16 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`push, get_entry, to_orjson_bytes, get_stats, Polars export, replay_single self-healing, otel_trace sync/async, DuckDB clear %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1918,13 +2050,14 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 |---|-------|-------|----------|
 | 1 | 1 | 3 adet `"Otomatik eklendi."` placeholder docstring ve dosya başında yanlış konumlanmış `from typing import Any` vardı | Docstring'lerin tamamı Türkçe profesyonel formata geçirildi, importlar modül docstring'i sonrasına taşındı |
 | 2 | 2 & 6 & Self-Healing Failover | Replika gecikmesi aşıldığında veya replika koptuğunda okuma işlemlerini otomatik olarak Primary veritabanına yönlendirecek self-healing failover mantığı yoktu | `should_fallback_to_primary(health_data)` fonksiyonu eklenerek otomatik sıfır kesinti failover yeteneği kazandırıldı |
-| 3 | 5 & DuckDB Kalıcılığı & WAL | Replikasyon gecikmesi ve sağlık geçmişinin yerel DuckDB tablosuna güvenli yazımı ve WAL optimizasyonu eksikti | `configure_duckdb_wal` ve `save_replication_health_to_duckdb(health_data, db_path)` fonksiyonu ile `pg_replication_history` tablosu oluşturuldu |
-| 4 | 5 & Serileştirme Hızı | JSON serileştirmede standart kütüphane yerine orjson zorunluluğu karşılanmamıştı | `export_pg_replication_to_orjson()` fonksiyonu eklenerek C seviyesinde yüksek hızlı serileştirme sağlandı |
-| 5 | 2 & 6 & Polars Analitiği | Replikasyon durumunu katı tip şemasıyla Polars DataFrame olarak dışa aktaran fonksiyon yoktu | `export_pg_replication_to_polars()` fonksiyonu `pl.String`, `pl.Int64`, `pl.Float64` tipleriyle kazandırıldı |
-| 6 | 4 & Sabitler | Sihirli sayılar mevcuttu (`1048576`, `60`, `4MB`, `2MB`) | `DEFAULT_MAX_LAG_BYTES`, `DEFAULT_MAX_LAG_SECONDS`, `DEFAULT_DUCKDB_HEALTH_PATH` sabitleri tanımlandı |
-| 7 | 4 & Loglama | Hata mesajları ve loglar İngilizceydi (`"Replica check failed"`, `"Primary check failed"`) | `pg_birincil_denetim_hatasi`, `pg_ikincil_denetim_hatasi`, `pg_replikasyon_bayt_gecikmesi_yuksek`, `pg_replikasyon_durumu_duckdb_kaydedildi` Türkçe structlog formatına geçirildi |
-| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 11 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PG_REPLICATION_HEALTH_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 3 | 2 & OTel Dekoratör Eksikliği | `otel_trace` dekoratörü senkron fonksiyonları sarmalayamıyordu ve span içinde exception kaydetmiyordu | `asyncio.iscoroutinefunction(func)` ile senkron ve asenkron fonksiyon desteği eklendi; `span.record_exception(exc)` ile donatıldı |
+| 4 | 5 & DuckDB Kalıcılığı & Unregister Koruması | Replikasyon geçmişinin DuckDB'ye yazılmasında unregister try/finally koruması yoktu; okuma ve temizleme fonksiyonları eksikti | `try/finally: conn.unregister` koruması eklendi; `read_replication_health_from_duckdb()` ve `clear_replication_health_duckdb()` fonksiyonları yazıldı |
+| 5 | 5 & Serileştirme Hızı | `export_pg_replication_to_orjson` içinde `default=str` parametresi yoktu; `to_orjson_bytes()` takma adı eksikti | `default=str` eklendi; `to_orjson_bytes(health_data)` takma adı tanımlandı |
+| 6 | 2 & 6 & Polars Analitiği | Replikasyon durumunu katı tip şemasıyla Polars DataFrame olarak dışa aktaran fonksiyon yoktu | `export_pg_replication_to_polars()` fonksiyonu `pl.String`, `pl.Int64`, `pl.Float64` tipleriyle kazandırıldı |
+| 7 | 4 & Sabitler | Sihirli sayılar mevcuttu (`1048576`, `60`, `4MB`, `2MB`) | `DEFAULT_MAX_LAG_BYTES`, `DEFAULT_MAX_LAG_SECONDS`, `DEFAULT_PG_HEALTH_DB_PATH` sabitleri tanımlandı |
+| 8 | 4 & Loglama | Hata mesajları ve loglar İngilizceydi (`"Replica check failed"`, `"Primary check failed"`) | `pg_birincil_denetim_hatasi`, `pg_ikincil_denetim_hatasi`, `pg_replikasyon_bayt_gecikmesi_yuksek`, `pg_replikasyon_durumu_duckdb_kaydedildi` Türkçe structlog formatına geçirildi |
+| 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesinde yeni yardımcılar eksikti | 14 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`should_fallback_to_primary failover, Polars export, orjson bytes, DuckDB save/read/clear, sync/async otel_trace %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1933,15 +2066,15 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | # | Kural | Sorun | Düzeltme |
 |---|-------|-------|----------|
 | 1 | 2 & Quant Kuralı (Zero Look-Ahead) | Geleceğe sızıntılı verilerin çalışma zamanında otomatik tespit edilip temizlenmesini sağlayan self-healing mekanizması yoktu | `sanitize_pit_polars(df, time_col, created_col, as_of_date)` fonksiyonu eklenerek sızıntılı kayıtların otomatik temizlenmesi (data guard) sağlandı |
-| 2 | 5 & DuckDB Kalıcılığı & WAL | PIT sızıntı denetim sonuçlarının yerel DuckDB tablosuna kaydedilmesi ve WAL optimizasyonu eksikti | `configure_duckdb_wal` ve `save_pit_audit_to_duckdb(audit_results, db_path)` fonksiyonları ile `pit_leakage_audit` tablosu oluşturuldu |
+| 2 | 5 & DuckDB Kalıcılığı & Unregister Koruması | PIT sızıntı denetim sonuçlarının DuckDB'ye yazılmasında unregister try/finally koruması yoktu; okuma ve silme yardımcıları eksikti | `try/finally: conn.unregister` koruması eklendi; `read_pit_audit_from_duckdb()` ve `clear_pit_audit_duckdb()` fonksiyonları yazıldı |
 | 3 | 5 & DuckDB Üzerinden PIT Sorgusu | Sadece asyncpg/PostgreSQL destekleniyordu; yerel DuckDB üzerinden PIT-safe sorgulama yeteneği yoktu | `pit_fetch_duckdb(conn, table, identifier, as_of_date)` ile DuckDB üzerinden Arrow sıfır kopyalı Polars sorgulayıcısı eklendi |
-| 4 | 5 & Serileştirme Hızı | `orjson` desteği yoktu; PIT modelleri ve sonuçları C hızında serileştirilemiyordu | `PITQueryTemplate.to_orjson_bytes()` ve `export_pit_results_to_orjson(results)` fonksiyonları kazandırıldı |
+| 4 | 5 & Serileştirme Hızı | `orjson` desteği yoktu; PIT modelleri ve sonuçları C hızında serileştirilemiyordu | `PITQueryTemplate.to_orjson_bytes()`, `export_pit_results_to_orjson(results)` ve `to_orjson_bytes()` fonksiyonları kazandırıldı |
 | 5 | 2 & 6 & Polars Standartları | `export_pit_audit_to_polars` hata kayıtlarında şema tutarsızlığı ve null tip bozulması riski taşıyordu; `table` anahtar kelimesi kaçışsızdı | Katı tip normalizasyonu (`pl.String`, `pl.Int64`, `pl.Boolean`) ve DuckDB `\"table\"` SQL kaçışı sağlandı |
 | 6 | 4 & Loglama Standartları | Loglar İngilizceydi (`"PIT fetch failed"`, `"PIT validation failed"` vb.) | `pit_sorgusu_hatasi`, `pit_son_kayit_sorgusu_hatasi`, `pit_aralik_sorgusu_hatasi`, `pit_sizinti_denetimi_hatasi`, `pit_anlik_goruntu_sorgusu_hatasi` Türkçe structlog formatına dönüştürüldü |
 | 7 | 4 & Sabitler | Sihirli sayılar mevcuttu (`100`, `1`, `4MB`, `2MB`) | `DEFAULT_PIT_LATEST_LIMIT`, `DEFAULT_PIT_SNAPSHOT_LIMIT`, `DEFAULT_PIT_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE` sabitleri tanımlandı |
 | 8 | 4 & Repr | `PITQueryTemplate` sınıfının `__repr__` metodu tüm kritik sütunları göstermiyordu | Tablo, kimlik, zaman ve oluşturulma sütunlarını gösteren zengin `__repr__` tanımlandı |
-| 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi 10 sembolle sınırlıydı | 20 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
-| 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PIT_QUERIES_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde yeni yardımcı fonksiyonlar `__all__` listesinde eksikti | 22 sembolden oluşan `__all__: Final[list[str]]` listesi güncellendi |
+| 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PITQueryTemplate, pit_fetch_duckdb, sanitize_pit_polars, Polars export, orjson bytes, DuckDB save/read/clear %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -1959,6 +2092,11 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 8 | 4 & Loglama | İşlem logları eksikti | `pit_kaydi_eklendi`, `pit_store_duckdb_kaydedildi`, `pit_store_duckdb_yuklendi`, `pit_store_tutarsizliklari_onarildi` Türkçe structlog standardına bağlandı |
 | 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksikti | 10 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
 | 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PIT_STORE_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 11 | 5 & DuckDB Kaynak Yönetimi | `save_to_duckdb` içinde `conn.register("tmp_pit_store_df", ...)` sonrası view unregister edilmiyordu | `try/finally` ve `with suppress(Exception): conn.unregister("tmp_pit_store_df")` ile kaynak sızıntısı kesin olarak önlendi |
+| 12 | 5 & DuckDB Doğrudan Erişim & Temizleme | DuckDB tablosundaki verileri doğrudan Polars olarak okuma ve tabloyu sıfırlama yardımcıları eksikti | `read_pit_store_from_duckdb(db_path, ticker)`, `clear_pit_store_duckdb(db_path)`, `PointInTimeStore.read_from_duckdb`, `PointInTimeStore.clear_duckdb` fonksiyonları eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | Modül seviyesinde `to_orjson_bytes` takma adı ve yeni yardımcıların `__all__` listesinde eksik olması | `to_orjson_bytes` fonksiyonu eklendi; `__all__` listesi 13 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_PIT_STORE_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -1975,6 +2113,12 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Loglama & Sabitler | Loglar İngilizceydi; `if_exists` kipleri ve WAL parametreleri açık sabitlere bağlı değildi | `DEFAULT_IF_EXISTS`, `VALID_IF_EXISTS_MODES`, `4MB`/`2MB` sabitleri tanımlandı; Türkçe structlog logları uygulandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 14 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`POLARS_UTILS_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Kaynak Güvenliği | `polars_to_duckdb` içinde `conn.unregister(temp_view)` çıplak çağrılıyordu | `with suppress(Exception): conn.unregister(...)` ile kaynak sızıntısı kesin olarak önlendi |
+| 11 | 5 & DuckDB Dosya Tabanlı Yardımcılar | Dosya yolu vererek doğrudan tablo oluşturma, okuma ve temizleme yardımcıları eksikti | `polars_to_duckdb_file`, `duckdb_file_to_polars`, `clear_duckdb_table` fonksiyonları eklendi |
+| 12 | 2 & Quant Look-Ahead Bias | `slice_pit_dataframe` tarih sütunu string formatında olduğunda kıyaslama hatası riski vardı | Sütun String tipinde ise ISO string filtresi uygulandı, hem Datetime hem String sütunlar desteklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | Modül seviyesinde `to_orjson_bytes` takma adı ve yeni yardımcıların `__all__` listesinde eksik olması | `to_orjson_bytes` fonksiyonu eklendi; `__all__` listesi 18 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_POLARS_UTILS_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -1991,6 +2135,12 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Loglama & Sabitler | Loglar İngilizceydi; magic number'lar mevcuttu | `DEFAULT_LIMIT_PCT`, `DEFAULT_POST_CB_LIMIT_PCT`, `DEFAULT_TOLERANCE_RATIO`, `4MB`/`2MB` sabitleri tanımlandı; Türkçe structlog logları sağlandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 13 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PRICE_LIMITS_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 10 | 5 & Serileştirme Uyumu | `PriceLimitResult.to_orjson_bytes()` içinde `default=str` parametresi eksikti | `orjson.dumps(self.to_dict(), default=str)` ile tam tip güvenliği sağlandı |
+| 11 | 5 & DuckDB Toplu Kayıt & Unregister | Birden çok ihlali tek seferde kaydetme ve Arrow view unregister temizliği eksikti | `save_breaches_to_duckdb`, `save_price_limit_breaches_to_duckdb` eklendi; `with suppress(Exception): conn.unregister(...)` uygulandı |
+| 12 | 5 & DuckDB Doğrudan Erişim & Temizleme | DuckDB ihlal tablosunu Polars olarak sorgulama ve temizleme yardımcıları eksikti | `read_price_limit_breaches_from_duckdb`, `clear_price_limit_breaches_duckdb`, `PriceLimitMonitor.read_breaches_from_duckdb`, `PriceLimitMonitor.clear_breaches_duckdb` eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | Modül seviyesinde `to_orjson_bytes`, `check_price_limit` fonksiyonları ve yeni yardımcıların `__all__` listesinde eksik olması | Fonksiyonlar eklendi; `__all__` listesi 19 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_PRICE_LIMITS_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -2008,6 +2158,11 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 8 | 4 & Repr | `ProductionMetrics` sınıfında açıklayıcı `__repr__` metodu yoktu | Sayaç, gauge ve histogram sayılarını gösteren kurumsal `__repr__` tanımlandı |
 | 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 10 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
 | 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`PRODUCTION_METRICS_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 11 | 5 & DuckDB Kaynak Yönetimi | `save_snapshot_to_duckdb` içinde `conn.register("tmp_metrics_df", ...)` sonrası view unregister edilmiyordu | `try/finally` ve `with suppress(Exception): conn.unregister(...)` ile kaynak sızıntısı önlendi |
+| 12 | 5 & DuckDB Doğrudan Erişim & Temizleme | Metrik anlık görüntülerini DuckDB'den Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_production_metrics_from_duckdb`, `clear_production_metrics_duckdb`, `ProductionMetrics.read_snapshots_from_duckdb`, `ProductionMetrics.clear_snapshots_duckdb` eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | `to_orjson_bytes` içinde `default=str` eksikliği ve modül seviyesi kolaylık fonksiyonlarının eksikliği | `default=str` eklendi; `record_metric_inc`, `record_metric_gauge`, `record_metric_observe`, `to_orjson_bytes` eklendi; `__all__` listesi 16 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_PRODUCTION_METRICS_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -2024,6 +2179,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `QuestDBClient` sınıfında `__repr__` bağlantı durumunu net göstermiyordu | Host, portlar ve `connected` durumunu gösteren kurumsal `__repr__` eklendi |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 8 sembolden oluşan `__all__: Final[list[str]]` listesi tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`QUESTDB_CLIENT_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Çevrimdışı Tampon Okuma & Temizleme | DuckDB tamponundaki kayıtları doğrudan Polars olarak okuma ve temizleme yardımcıları eksikti | `read_questdb_buffer_from_duckdb`, `clear_questdb_buffer_duckdb`, `export_offline_ticks_to_polars`, `QuestDBClient.read_buffer_from_duckdb`, `QuestDBClient.clear_buffer_duckdb` eklendi |
+| 11 | 3 & Serileştirme & Modül Dışa Aktarımı | İstemci durumu ve tampon büyüklüğünü serileştiren `QuestDBClient.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` eksikti | `to_orjson_bytes` fonksiyonları eklendi; `__all__` listesi 12 sembole genişletildi |
+| 12 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_QUESTDB_CLIENT_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -2042,6 +2201,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 9 | 4 & Repr | `ReconciledData` modelinde açıklayıcı `__repr__` metodu yoktu | Kaynak, değer, güven, kalite ve anomali durumunu özetleyen kurumsal `__repr__` tanımlandı |
 | 10 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | `__all__` listesi (`CrossSourceReconciliation`, `ReconciledData`, `cross_source_reconciliation`) eksiksiz tanımlandı |
 | 11 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`TUM TESTLER BASARIYLA GECTI!`) ile %100 doğrulandı |
+| 12 | 5 & DuckDB Dosya Tabanlı Denetim Günlüğü | DuckDB bağlantısı enjekte edilmediğinde denetim izinin kaybolmaması için dosya tabanlı kaydetme/okuma/temizleme desteği eksikti | `save_audit_to_duckdb`, `read_audit_from_duckdb`, `clear_audit_duckdb`, `read_reconciliation_audit_from_duckdb`, `clear_reconciliation_audit_duckdb` eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | `ReconciledData.to_orjson_bytes()` metodunda `default=str` parametresi eksikliği ve modül seviyesi kolaylık fonksiyonlarının eksikliği | `default=str` eklendi; `reconcile_price`, `heal_reconcile_with_outlier_removal`, `to_orjson_bytes` eklendi; `__all__` listesi 13 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL_RECONCILIATION_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+
 
 ---
 
@@ -2059,6 +2222,11 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 8 | 4 & Repr | `EventReplay`, `GracefulShutdown`, `StartupRecovery`, `FailureInjector` sınıflarında açıklayıcı `__repr__` yoktu | Tüm sınıflara detaylı durum ve sayaçları özetleyen `__repr__` metotları kazandırıldı |
 | 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 10 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`RECOVERY_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 11 | 5 & DuckDB Kalıcı Dosya & WAL | DuckDB bağlantısı enjekte edilmediğinde olayların diske kaydedilmesi, okunması ve temizlenmesi eksikti | `DEFAULT_RECOVERY_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `save_event_to_duckdb`, `read_events_from_duckdb`, `clear_events_duckdb`, `replay_from_duckdb` eklendi |
+| 12 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde recovery olay günlüğünü Polars olarak okuma ve tabloyu temizleme yardımcıları eksikti | `read_recovery_events_from_duckdb`, `clear_recovery_events_duckdb`, `export_recovery_events_to_polars` eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | `StartupRecovery.to_orjson_bytes()` içinde `default=str` parametresi eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi, modül seviyesi `to_orjson_bytes(data)` kazandırıldı, `__all__` listesi 18 sembole genişletildi |
+| 14 | 2 & API Zenginleştirme | `EventReplay` sınıfında bellekteki olay listesini doğrudan liste olarak çeken metot yoktu | `get_events()` metodu eklendi |
+| 15 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL RECOVERY TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2076,6 +2244,11 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 8 | 4 & Loglama & Sabitler | Loglar İngilizceydi; magic number'lar mevcuttu | `DEFAULT_TTL_SEC`, `DEFAULT_SOCKET_TIMEOUT_SEC`, `RECONNECT_INTERVAL_SEC`, `DEFAULT_MAX_MEM_CACHE_SIZE` sabitleri tanımlandı; Türkçe structlog logları sağlandı |
 | 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 13 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`REDIS_HELPER_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 11 | 5 & DuckDB Kalıcı Dosya Fallback & WAL | DuckDB bağlantısı enjekte edilmediğinde L2 önbelleğin diske kaydedilmesi ve WAL yapılandırması eksikti | `DEFAULT_REDIS_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı L2 desteği sağlandı |
+| 12 | 2 & DuckDB Tarih/Zaman Taşınabilirliği | DuckDB SQL içinde `INTERVAL (?) SECOND` parametre bağlama hatası riski vardı | Python `datetime.now(UTC) + timedelta(seconds=ttl_sec)` hesaplanarak tam tip ve parametre güvenliği sağlandı |
+| 13 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde L2 önbellek kayıtlarını Polars ile sorgulama ve tabloyu temizleme yardımcıları eksikti | `read_l2_cache_from_duckdb(include_expired=...)`, `clear_l2_cache_duckdb`, `get_cache_stats` fonksiyonları eklendi |
+| 14 | 3 & Serileştirme & Modül Dışa Aktarımı | Modül seviyesi `to_orjson_bytes(data)` eksikliği ve Windows host/throttling optimizasyonu | Windows DNS gecikmesini önleyen host seçimi, 30s reconnect throttling, `to_orjson_bytes` eklendi; `__all__` listesi 20 sembole genişletildi |
+| 15 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL REDIS_HELPER TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2092,6 +2265,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Loglama & Sabitler | Loglar İngilizceydi; magic number'lar sabite bağlı değildi | `DEFAULT_MASTER_NAME`, `DEFAULT_SENTINEL_PORT`, `DEFAULT_SOCKET_TIMEOUT`, `DEFAULT_MAX_CONNECTIONS` tanımlandı; structlog Türkçe log standardı uygulandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 11 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`REDIS_SENTINEL_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Kalıcı Dosya Fallback & WAL | DuckDB bağlantısı enjekte edilmediğinde failover olaylarının diske kaydedilmesi ve WAL yapılandırması eksikti | `DEFAULT_SENTINEL_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı failover günlüğü sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde failover geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_sentinel_failovers_from_duckdb`, `clear_sentinel_failovers_duckdb` fonksiyonları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | Modül seviyesi `to_orjson_bytes(data)`, `get_sentinel_status_dict` eksikliği ve logger.warning standardizasyonu | `orjson.dumps(..., default=str)` entegrasyonu, `get_sentinel_status_dict()`, `logger.warning` düzeltmeleri yapıldı; `__all__` listesi 17 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL REDIS_SENTINEL TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2109,6 +2286,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 8 | 4 & Repr | `RegimeState` ve `RegimeDetector` sınıflarında açıklayıcı `__repr__` metotları yoktu | Kurumsal Türkçe `__repr__` metotları tanımlandı |
 | 9 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 12 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 10 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`REGIME_DETECTOR_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 11 | 5 & DuckDB Kalıcı Dosya & WAL | DuckDB bağlantısı enjekte edilmediğinde rejim tespitlerinin diske kaydedilmesi ve WAL yapılandırması eksikti | `DEFAULT_REGIME_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı rejim günlüğü sağlandı |
+| 12 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde rejim geçmişini Polars ile sorgulama ve tabloyu temizleme yardımcıları eksikti | `read_regimes_from_duckdb`, `clear_regimes_duckdb`, `RegimeDetector.read_regimes_from_duckdb`, `RegimeDetector.clear_regimes_duckdb` eklendi |
+| 13 | 3 & Serileştirme & Modül Dışa Aktarımı | `RegimeState.to_orjson_bytes()` içinde `default=str` eksikliği, modül seviyesi `detect_market_regime`, `to_orjson_bytes` eksikliği | `default=str` eklendi; modül seviyesi `detect_market_regime`, `to_orjson_bytes` eklendi; `__all__` listesi 18 sembole genişletildi |
+| 14 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL REGIME_DETECTOR TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2124,6 +2305,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 6 | 4 & Repr | `DailyReport` sınıfında açıklayıcı `__repr__` metodu yoktu | Tarih, portföy değeri, günlük kâr/zarar, işlem adedi ve risk seviyesini özetleyen kurumsal `__repr__` tanımlandı |
 | 7 | 7 & Modül Dışa Aktarımı & Uyumluluk | `__all__` listesi tanımlanmamıştı; `queue.py`'nin çağırdığı `generate_report` geriye dönük uyumluluğu korundu | 7 sembolden oluşan `__all__` listesi tanımlandı; `generate_daily_report` ve `generate_report` korundu |
 | 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`REPORTING_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 9 | 5 & DuckDB Kalıcı Dosya & WAL | DuckDB bağlantısı enjekte edilmediğinde raporların diske kaydedilmesi ve WAL yapılandırması eksikti | `DEFAULT_REPORTING_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı rapor arşivi sağlandı |
+| 10 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde rapor arşivini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_reports_from_duckdb`, `clear_reports_duckdb` fonksiyonları eklendi |
+| 11 | 3 & Serileştirme & Modül Dışa Aktarımı | `DailyReport.to_orjson_bytes()` içinde `default=str` parametresi eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 13 sembole genişletildi |
+| 12 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL REPORTING TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2139,6 +2324,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 6 | 4 & Repr | Modellerde açıklayıcı `__repr__` metotları yoktu | `RiskManagerConfig`, `BacktestConfig`, `PortfolioOptimizerConfig`, `CircuitBreakerConfig` sınıflarına kurumsal `__repr__` metotları tanımlandı |
 | 7 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 11 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`RISK_CONFIG_ALL_TESTS_PASSED_SUCCESSFULLY`) ile %100 doğrulandı |
+| 9 | 5 & DuckDB Kalıcı Dosya & WAL | DuckDB bağlantısı enjekte edilmediğinde risk konfigürasyon denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_RISK_CONFIG_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 10 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde risk konfigürasyon geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_risk_config_audit_from_duckdb`, `clear_risk_config_audit_duckdb` fonksiyonları eklendi |
+| 11 | 3 & Serileştirme & Modül Dışa Aktarımı | `BaseRiskConfigModel.to_orjson_bytes()` içinde `default=str` parametresi eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 17 sembole genişletildi |
+| 12 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`ALL RISK_CONFIG TESTS PASSED SUCCESSFULLY!`) ile %100 doğrulandı |
 
 ---
 
@@ -2155,6 +2344,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `RiskDecision` ve `RiskGate` sınıflarında açıklayıcı metin temsili yoktu | Kurumsal Türkçe `__repr__` metotları tanımlandı |
 | 8 | 7 & Modül Dışa Aktarımı & Entegrasyon | `__all__` listesi eksikti; `bist_tick_size.py` modülündeki `round_to_valid_tick` eksikliği nedeniyle mevzuat kontrollerinde zincirleme hata oluşuyordu | 12 sembolden oluşan `__all__` listesi tanımlandı; `bist_tick_size.py`'ye `round_to_valid_tick` entegre edilerek zincirleme bağımlılık kalıcı olarak onarıldı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: risk_gate tum pre-trade, DuckDB ve Polars testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde risk kapısı kararlarının diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_RISK_GATE_DUCKDB_PATH`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı karar arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde ve nesne seviyesinde risk kararlarını Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_risk_gate_decisions_from_duckdb`, `clear_risk_gate_decisions_duckdb` fonksiyonları ve `RiskGate.read_decisions_from_duckdb`, `RiskGate.clear_decisions_duckdb` metotları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | `RiskDecision.to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 18 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_risk_gate.py` %100 başarılı) ile doğrulandı |
 
 ---
 
@@ -2171,6 +2364,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | Sınıflarda kurumsal metin temsili bulunmuyordu | `PositionRiskInfo`, `RiskManagerState` ve `RiskManager` sınıflarına açıklayıcı `__repr__` metotları tanımlandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 7 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: risk_manager tum risk, DuckDB, Polars ve orjson testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde drawdown ve ağırlık denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_RISK_AUDIT_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde ve nesne seviyesinde risk denetim geçmişini Polars ile okuma ve tabloları temizleme yardımcıları eksikti | `read_risk_drawdown_audit_from_duckdb`, `clear_risk_manager_audit_duckdb` fonksiyonları ve `RiskManager.read_drawdown_audit_from_duckdb`, `RiskManager.clear_audit_duckdb` metotları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | Model sınıflarının `to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 14 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_risk_manager.py` %100 başarılı) ile doğrulandı |
 
 ---
 
@@ -2187,6 +2384,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `ModelArtifactMeta` modelinde açıklayıcı metin temsili yoktu | Eylem, dosya adı, boyut, doğrulama durumu ve süreyi gösteren kurumsal `__repr__` metodu eklendi |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 6 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: safe_pickle tum atomik yazim, SHA-256 dogrulama, DuckDB ve Polars testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde model serileştirme ve doğrulama denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_SAFE_PICKLE_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde model artefakt geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_artifact_audit_from_duckdb`, `clear_artifact_audit_duckdb`, `set_safe_pickle_duckdb_path` fonksiyonları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | `ModelArtifactMeta.to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 13 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_safe_pickle.py` %100 başarılı) ile doğrulandı |
 
 ---
 
@@ -2203,6 +2404,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `User`, `AuthenticationService`, `AuthorizationService`, `SystemStateMachine`, `SafetyGovernance` sınıflarında kurumsal `__repr__` yoktu | Tüm sınıflara açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 18 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: security tum RBAC, Auth, Redaction, State Machine, Safety Governance, DuckDB ve Polars testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde güvenlik denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_SECURITY_AUDIT_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde güvenlik olay geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_security_audit_from_duckdb`, `clear_security_audit_duckdb`, `set_security_duckdb_path` fonksiyonları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | Model sınıflarının `to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 26 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_security.py` %100 başarılı) ile doğrulandı |
 
 ---
 
@@ -2219,6 +2424,10 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `ServiceInfo` ve `ServiceDiscovery` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 9 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: service_mesh tum servis kaydi, saglik kontrolu, DuckDB ve Polars testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde servis sağlık denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_SERVICE_MESH_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde ve nesne seviyesinde servis sağlık geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_service_health_audit_from_duckdb`, `clear_service_mesh_audit_duckdb`, `set_service_mesh_duckdb_path` fonksiyonları ve nesne seviyesi okuma metotları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | `ServiceInfo.to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 16 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_service_mesh.py` %100 başarılı) ile doğrulandı |
 
 ---
 
@@ -2235,6 +2444,586 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 | 7 | 4 & Repr | `SettlementInfo` ve `SettlementCalculator` sınıflarında kurumsal `__repr__` yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
 | 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 7 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
 | 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`SUCCESS: settlement tum T+2, T+0, tatil/hafta sonu atlama, Polars ve DuckDB testlerini basariyla gecti!`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB bağlantısı enjekte edilmediğinde takas hesaplama denetim izinin diske yazılması ve WAL yapılandırması eksikti | `DEFAULT_SETTLEMENT_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal`, `_get_active_duckdb` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde ve nesne seviyesinde takas hesaplama geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_settlement_audit_from_duckdb`, `clear_settlement_audit_duckdb`, `set_settlement_duckdb_path` fonksiyonları ve nesne seviyesi okuma/temizleme metotları eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | `SettlementInfo.to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 14 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_settlement.py` %100 başarılı) ile doğrulandı |
+
+---
+
+## `sharding.py` (94. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` docstring ve dummy tracer mevcuttu | Tamamı temizlendi; merkezi `services.core.otel` tracer yapısına bağlandı; eksiksiz Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_pools` ve `_enabled` durumları çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile havuz kaydı, kapatma, routing ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Fail-Open Shard Routing | Ticker yönlendirmesinde Türkçe karakterler (`Ç`, `İ`, `Ş` vb.) ve boşluklar hatalı shard'a yönlendirebiliyordu; havuz bulunamadığında sessiz hata riski vardı | Ticker temizleme ve Türkçe normalizasyon getirildi; havuz bulunamadığında güvenle primary PostgreSQL havuzuna yönlendirme sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Sharding Denetim Arşivi | Yapılan DML/okuma sorguları, yönlendirmeler ve gecikmeler (elapsed_ms) kalıcı kaydedilmiyordu | `sharding_query_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm sharded operasyonlar anlık olarak arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `ShardInfo` ve `ShardStats` modelleri yoktu; hızlı `orjson` desteği bulunmuyordu | Dataclass modelleri tanımlandı; `to_orjson_bytes()` ve `to_dict()` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Analitiği | Shard yapılandırmasını ve sorgu denetim kayıtlarını analitik sorgulamak için Polars fonksiyonları yoktu | `export_shards_to_polars()` ve `export_sharding_audit_to_polars()` fonksiyonları kazandırıldı |
+| 7 | 4 & Repr | `ShardInfo`, `ShardStats` ve `ShardRouter` sınıflarında kurumsal `__repr__` yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 7 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Shard routing, ShardInfo & orjson, mock pool async queries, Polars ve DuckDB audit testleri basarili`) ile %100 doğrulandı |
+| 10 | 5 & DuckDB Dosya Kalıcılığı & WAL | DuckDB varsayılanı bellek içiydi (`:memory:`); disk tabanlı kalıcılık ve WAL yapılandırması eksikti | `DEFAULT_SHARDING_AUDIT_DB`, `DEFAULT_CHECKPOINT_SIZE`, `DEFAULT_WAL_SIZE`, `configure_duckdb_wal` ile disk tabanlı kalıcı denetim arşivi sağlandı |
+| 11 | 5 & DuckDB Doğrudan Erişim & Temizleme | Modül seviyesinde ve nesne seviyesinde sharding denetim geçmişini Polars ile okuma ve tabloyu temizleme yardımcıları eksikti | `read_sharding_audit_from_duckdb`, `clear_sharding_audit_duckdb` fonksiyonları ve `ShardRouter.clear_audit_duckdb` metodu eklendi |
+| 12 | 3 & Serileştirme & Modül Dışa Aktarımı | `ShardInfo.to_orjson_bytes()` içinde `default=str` eksikliği ve modül seviyesi `to_orjson_bytes()` eksikliği | `default=str` eklendi; modül seviyesi `to_orjson_bytes` kazandırıldı; `__all__` listesi 13 sembole genişletildi |
+| 13 | 5 & Canlı Doğrulama (2. Tur) | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`temp_test_sharding.py` %100 başarılı) ile doğrulandı |
+
+---
+
+## `short_selling.py` (95. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 5 adet `"Otomatik eklendi."` docstring ve dummy tracer mevcuttu | Tamamı temizlendi; merkezi `services.core.otel` tracer yapısına bağlandı; BIST & SPK mevzuatını açıklayan detaylı Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_bist50_cache`, `_gross_settlement_tickers`, `_spk_banned_tickers` ve `_uptick_rule_active` kilit korumasızdı | `self._lock = threading.RLock()` ile önbellek, liste güncellemeleri, kural durumları ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / BIST & SPK Mevzuatı | BIST-100 %2 düşüşünde devreye giren Yukarı Adım Kuralı (Uptick Rule), brüt takas yasağı, SPK geçici yasakları ve BIST-50 dışı hisseler için sıkı kontroller yetersizdi | Fail-closed yaklaşımıyla tüm red koşulları ayrıştırıldı; fiyat kontrollerinde float guard (`<=0`, `NaN`) koruması ve Türkçe ticker normalizasyonu sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Yasal Denetim İzi | Açığa satış izin ve red kararları SPK yasal denetim gereksinimlerine rağmen diske kalıcı kaydedilmiyordu | `short_selling_audit` DuckDB tablosu ve sequence altyapısı kuruldu; her karar detaylı JSON meta verisiyle arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `ShortSellingDecision` modelinde `slots=True`, `to_orjson_bytes()` ve `to_dict()` desteği yoktu | Dataclass slots ile bellek optimize edildi; `orjson` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Analitiği | Çoklu emir listesini vektörize denetleyen ve denetim loglarını dışa aktaran Polars fonksiyonları yoktu | `check_short_selling_polars()` toplu kontrol fonksiyonu ve `export_audit_to_polars()` analitik metodu kazandırıldı |
+| 7 | 4 & Repr | `ShortSellingDecision` ve `ShortSellingMonitor` sınıflarında kurumsal `__repr__` yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 4 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`BIST-50, brut takas, SPK yasak, Uptick Rule %2, Polars toplu denetim, DuckDB audit %100 basarili`) ile doğrulandı |
+
+---
+
+## `state_recovery.py` (96. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` docstring ve dummy otel tracer kalıntıları mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve eksiksiz Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_recovered_states`, `_recovery_errors` ve `_duckdb_con` çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile durum kaydı, sorgulama, kurtarma ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed Tutarlılık Denetimi | Fiyat doğrulamalarında `NaN`, `Inf` sayısal taşmaları ve negatif/sıfır fiyatlar için sıkı kontroller yetersizdi | Fail-closed koruması ve Türkçe ticker normalizasyonu sağlandı; `validate_consistency()` ile geçersiz durumlar izole edildi |
+| 4 | 5 & DuckDB Kalıcılığı & Durum Kurtarma Günlüğü | Kurtarılan durumlar, snapshot geçmişi ve denetim kayıtları kalıcı olarak saklanmıyordu; eski SQLite referansları vardı | `state_recovery_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm kurtarma ve snapshot olayları arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `RecoveredState` modeli yoktu; doğrudan dict kullanılıyordu ve hızlı `orjson` desteği bulunmuyordu | Dataclass slots ile optimize `RecoveredState` modeli tanımlandı; `to_orjson_bytes()` ve `to_dict()` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Analitiği | Kurtarılan durumları ve denetim kayıtlarını analitik sorgulamak için Polars fonksiyonları yoktu | `export_recovered_states_to_polars()` ve `export_recovery_audit_to_polars()` fonksiyonları kazandırıldı |
+| 7 | 4 & Repr | `RecoveredState` ve `StateRecovery` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 4 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Katmanli snapshot, redis, tutarlilik, Polars ve DuckDB audit %100 basarili`) ile doğrulandı |
+
+---
+
+## `state_store.py` (97. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 11 adet `"Otomatik eklendi."` docstring ve sahte `_DummyDuckDBConn` mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve eksiksiz Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | Her sorguda yeni DuckDB bağlantısı açılıp kapatılıyordu; kilitlenmeler ve I/O gecikmeleri yaşanıyordu; buffer ve bağlantı korumasızdı | `self._lock = threading.RLock()` ile korunan kalıcı DuckDB bağlantısı sağlandı; tüm buffer ve veritabanı operasyonları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Crash Safety | `row["cnt"]` ve `row["corr_values"]` dict varsayımıyla IndexError/TypeError riski taşıyordu; sorgu hatalarında buffer düşürülüyordu | Tuple indeks koruması sağlandı; tampon boşaltma hatalarında batch'in geri kuyruğa alınması (re-queue) güvenceye alındı |
+| 4 | 5 & DuckDB Kalıcılığı & WAL Ayarları | SSD korumalı WAL ayarları her bağlantıda tekrarlanıyordu ve bağlantı sızıntısı riski vardı | `_configure_wal()` ile PRAGMA checkpoint (8MB) ve wal_autocheckpoint (4MB) singleton bağlantısında sabitlendi |
+| 5 | 5 & Serileştirme Hızı | Genel istatistikler düzensiz dict dönüyordu; `orjson` ikili serileştirme desteği sınırlıydı | Dataclass slots ile optimize `StateStoreStats` modeli tanımlandı; `to_orjson_bytes()` ve `to_dict()` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Analitiği | Tahmin geçmişini ve devre kesici durumlarını analitik sorgulamak için Polars fonksiyonları yoktu | `export_predictions_to_polars()` ve `export_circuit_breakers_to_polars()` fonksiyonları kazandırıldı |
+| 7 | 4 & Repr | `CentralStateStore` ve `StateStoreStats` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 4 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Circuit breakers, provider reliability, rate limiters, learning state/preds, fusion, symmetric correlation, champion, Polars %100 basarili`) ile doğrulandı |
+
+---
+
+## `streaming_anomaly.py` (98. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` docstring, yanlış yerde duran typing import'u ve dummy tracer mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve BIST standartlarında Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_price_history`, `_volume_history` ve `_spread_history` deque tamponları çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile tüm geçmiş tamponları, sorgular ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Point-In-Time | `NaN`, `Inf` ve sıfır/negatif fiyatlar, geçersiz bid/ask kotaları korumasızdı; z-score leakage riski vardı | Fail-closed yaklaşımıyla son gelen tick pencere dışı tutularak zero leakage z-score sağlandı; BIST %5 ve %10 devre kesici bantları ile sayısal guard'lar kuruldu |
+| 4 | 5 & DuckDB Kalıcılığı & Anomali Denetim İzi | Tespit edilen piyasa anomalileri diske kalıcı kaydedilmiyordu | `streaming_anomalies_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm anomaliler anlık olarak diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `AnomalyResult` modelinde `slots=True`, `to_orjson_bytes()` ve `to_dict()` desteği yoktu | Dataclass slots ile optimize `AnomalyResult` modeli tanımlandı; `orjson` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Analitiği | Toplu veri akışında vektörize anomali taraması ve denetim loglarını dışa aktaran Polars fonksiyonları yoktu | `batch_detect_anomalies_polars()` toplu tarama fonksiyonu ve `export_anomalies_to_polars()` analitik metodu kazandırıldı |
+| 7 | 4 & Repr | `AnomalyResult` ve `StreamingAnomalyDetector` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 4 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Fiyat sicramasi, NaN guard, hacim patlamasi, spread anomalisi, Polars batch, DuckDB audit %100 basarili`) ile doğrulandı |
+
+---
+
+## `swr_cache.py` (99. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | Tekil veri saklama ile sınırlıydı; çoklu anahtar (multi-key / ticker bazlı) desteği yoktu; docstring'ler eksikti | Çoklu anahtarlı (multi-key) önbellek mimarisine geçirildi; eksiksiz Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `threading.Lock` kullanılıyordu; re-entrant kilitlenme riski ve metrik erişiminde açıklar vardı | `self._lock = threading.RLock()` ile tüm önbellek okuma/yazma, metrik güncelleme ve DuckDB operasyonları thread-safe korumaya alındı |
+| 3 | 3 & SWR (Stale-While-Revalidate) Mimarisi | Sınıf adı SWR olmasına rağmen sadece katı TTL uygulanıyordu; bayat veriyi sunup revalidate etme yeteneği yoktu | `get_swr()` metoduyla taze (fresh), bayat (stale) ve zaman aşımı (expired) durumları ayrıştırıldı; bayat veri anında dönerken arka plan revalidation sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Önbellek Denetim İzi | Önbellek atamaları (SET), geçersiz kılmalar (INVALIDATE) ve hit/miss sayaçları kaydedilmiyordu | `swr_cache_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm önbellek olayları diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | Güvenliği zayıf `hashlib.md5` kullanılıyordu; istatistik modeli bulunmuyordu | SHA-256 tabanlı ETag üretimine geçildi; `CacheEntry` ve `SWRCacheStats` modelleri `slots=True` ve `orjson` desteğiyle tanımlandı |
+| 6 | 2 & 6 & Polars Analitiği | Önbellek anahtar durumlarını ve denetim loglarını analiz etmek için Polars fonksiyonları yoktu | `export_cache_entries_to_polars()` ve `export_audit_to_polars()` analitik metotları kazandırıldı |
+| 7 | 4 & Repr | `SWRCache`, `CacheEntry` ve `SWRCacheStats` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 4 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Set/Get, SWR stale window, SHA-256 ETag, Invalidation, Polars, DuckDB %100 basarili`) ile doğrulandı |
+
+---
+
+## `system_governor.py` (100. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 5 adet `"Otomatik eklendi."` docstring ve dummy tracer mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve BIST mimari standartlarında Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_state`, `_feature_flags`, `_transition_history`, `_health_results` paylaşılan durumları çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile tüm durum geçişleri, bayrak kontrolleri ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Auto-Degrade & Recovery | Bileşen sağlık denetimleri sonucunda bozulma (degradation) ve iyileşme (recovery) geçişleri kontrolsüzdü; event loop eksikliğinde bildirimler düşüyordu | Senkron/asenkron geri bildirim güvenliği sağlandı; %50 sağlıksızlıkta DEGRADED, %75'te READ_ONLY ve iyileşmede FULL moduna geçiş güvenceye alındı |
+| 4 | 5 & DuckDB Kalıcılığı & Durum Geçiş Denetim İzi | Sistem durum geçişleri sadece bellekte tutuluyordu; sistem yeniden başladığında geçmiş kayboluyordu | `system_governor_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm durum geçişleri aktif özellik listesiyle birlikte diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `GovernorStatus`, `HealthCheck` ve `StateTransition` modellerinde `slots=True`, `to_orjson_bytes()` ve `to_dict()` desteği yoktu | Tüm modeller dataclass slots ve `orjson` desteği ile optimize edildi |
+| 6 | 2 & 6 & Polars Analitiği | Durum geçiş geçmişini ve sağlık denetim sonuçlarını analitik sorgulamak için Polars fonksiyonları yoktu | `export_transitions_to_polars()` ve `export_health_checks_to_polars()` analitik fonksiyonları kazandırıldı |
+| 7 | 4 & Repr | `SystemStateGovernor`, `StateTransition`, `HealthCheck` ve `GovernorStatus` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 8 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Durum gecisleri, FeatureFlag izinleri, Fallback response, Health checks, Polars, DuckDB %100 basarili`) ile doğrulandı |
+
+---
+
+## `tax.py` (101. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 3 adet `"Otomatik eklendi."` docstring, yanlış sırada duran typing import'u ve dummy tracer mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve BIST vergi mevzuatına uygun Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | Sadece bağımsız fonksiyon mevcuttu; dinamik vergi oranı yönetimi ve eşzamanlı kilit koruması yoktu | `TaxCalculator` sınıfı oluşturuldu; `self._lock = threading.RLock()` ile oran güncellemeleri ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / BIST Mevzuatı | BIST hisse senetleri için GVK Geçici 67 %0 stopaj ayrımı yapılmamıştı; `NaN`, negatif fiyat veya zararda vergi koruması yetersizdi | Sayısal guard'lar (`buy_price <= 0`, `quantity <= 0`, `NaN`) eklendi; BIST hisselerinde %0 stopaj, zararda vergi sıfırlama ve net kâr (`profit - tax`) güvenceye alındı |
+| 4 | 5 & DuckDB Kalıcılığı & Vergi Denetim İzi | Yapılan vergi hesaplamaları diske kalıcı kaydedilmiyordu | `tax_calculations_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm alım-satım ve temettü vergi hesaplamaları arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `TaxResult` modelinde `slots=True`, `to_orjson_bytes()` ve `to_dict()` desteği yoktu | Dataclass slots ve `orjson` desteği kazandırıldı; `net_profit` alanı eklendi |
+| 6 | 2 & 6 & Polars Analitiği | Çoklu portföy işlemlerini vektörize vergilendiren ve denetim loglarını dışa aktaran Polars fonksiyonları yoktu | `calculate_tax_polars()` vektörize hesaplama motoru ve `export_tax_audit_to_polars()` analitik fonksiyonu kazandırıldı |
+| 7 | 4 & Repr | `TaxCalculator` ve `TaxResult` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 8 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`BIST %0 stopaj, temettu %15, gelir vergisi dilimleri, Polars vektörize, DuckDB %100 basarili`) ile doğrulandı |
+
+---
+
+## `tradability_mask.py` (102. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | Yanlış sırada duran typing import'u ve dummy tracer mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve Du (2026) Mask-First standartlarında Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `TradabilityMask` sınıfı çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile hesaplama ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Mask-First İlkesi | Boş diziler, boyut uyuşmazlıkları ve NaN fiyatlarda sessiz index hatası riski vardı | Fail-closed yaklaşımıyla boş/uyuşmaz dizilerde sıfır maskesi dönüldü; BIST güncel %10 tavan/taban ve %5 devre kesici kontrolleri sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Mask Denetim İzi | Hesaplanan maske istatistikleri ve geçersizlik nedenleri diske kalıcı kaydedilmiyordu | `tradability_mask_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm maskeleme sonuçları diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `MaskResult` modelinde `slots=True`, `to_orjson_bytes()` ve `to_dict()` desteği yoktu | Dataclass slots ve `orjson` desteği ile optimize edildi |
+| 6 | 2 & 6 & Polars Vektörizasyonu | Büyük hacimli piyasa verilerini Polars üzerinde doğrudan maskeleyen analitik fonksiyon yoktu | `compute_mask_polars()` vektörize maske motoru ve `export_mask_audit_to_polars()` analitik fonksiyonu kazandırıldı |
+| 7 | 4 & Repr | `TradabilityMask` ve `MaskResult` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 5 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`NumPy mask, Polars vektörize compute_mask_polars, Point-In-Time feature maskeleme, DuckDB %100 basarili`) ile doğrulandı |
+
+---
+
+## `transaction_helper.py` (103. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 5 adet `"Otomatik eklendi."` docstring ve dummy tracer mevcuttu | Tamamı temizlendi; sıfır bağımlılıklı izleme dekoratörü ve BIST veritabanı standartlarında Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `_metrics` ve `_query_log` paylaşılan durumları çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile metrik güncellemeleri, sorgu günlüğü ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Gerçek Timeout | `timeout` parametresi varken `asyncio.timeout` kullanılmıyordu; sessizce yutulan rollback hataları vardı | `async with asyncio.timeout(timeout)` ile gerçek zaman aşımı güvenceye alındı; senkron/asenkron `tx.start/commit/rollback` desteği kuruldu |
+| 4 | 5 & DuckDB Kalıcılığı & Transaction Denetim İzi | Yürütülen atomik transaction'ların süresi, sorgu sayısı ve durumları diske kalıcı kaydedilmiyordu | `transaction_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm transaction'lar diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | Güvensiz MD5 hash kullanılıyordu; modellerde `slots=True` ve `orjson` desteği yoktu | SHA-256 tabanlı sorgu parmak izine geçildi; `TransactionMetrics` ve `QueryMetrics` modelleri `slots=True` ve `orjson` desteğiyle güncellendi |
+| 6 | 2 & 6 & Polars Analitiği | Sorgu metriklerini ve transaction denetim loglarını analiz etmek için Polars fonksiyonları yoktu | `export_queries_to_polars()` ve `export_audit_to_polars()` analitik fonksiyonları kazandırıldı |
+| 7 | 4 & Repr | `TransactionHelper`, `TransactionConnection`, `TransactionMetrics` ve `QueryMetrics` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 6 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Mock pool, atomic commit, rollback, SHA-256, Polars, DuckDB %100 basarili`) ile doğrulandı |
+
+
+---
+
+## `viop_monitor.py` (104. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | 6 adet `"Otomatik eklendi."` docstring mevcuttu | Tamamı temizlendi; Takasbank SPAN teminat standartlarında açıklayıcı Türkçe docstring'ler yazıldı |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `VIOPMonitor` sınıfı çoklu iş parçacığı altında kilit korumasızdı | `self._lock = threading.RLock()` ile pozisyon takibi, marjin çağrıları ve DuckDB yazımları thread-safe korumaya alındı |
+| 3 | 3 & Fail-Closed / Takasbank SPAN | Teminat oranları ve marjin çağrısı eşikleri dinamik denetlenmiyordu; sıfır/negatif teminat guard'ı eksikti | Başlangıç (%15), Sürdürme (%11.25) ve Likidasyon (%7.5) eşikleri güvenceye alındı; marjin açığı ve likidasyon hesaplandı |
+| 4 | 5 & DuckDB Kalıcılığı & Marjin Denetim İzi | VIOP marjin kontrolleri diske kalıcı kaydedilmiyordu | `viop_margin_audit` DuckDB tablosu ve sequence altyapısı kuruldu; tüm marjin kontrolleri diske arşivlendi |
+| 5 | 5 & Serileştirme Hızı | `VIOPMarginResult` modelinde `slots=True` ve `orjson` desteği yoktu | Dataclass slots ve `orjson` desteği kazandırıldı |
+| 6 | 2 & 6 & Polars Vektörizasyonu | Çoklu VIOP sözleşmelerini vektörize denetleyen Polars motoru yoktu | `check_portfolio_margins_polars()` vektörize teminat motoru ve `export_margin_audit_to_polars()` analitik fonksiyonu kazandırıldı |
+| 7 | 4 & Repr | `VIOPMonitor` ve `VIOPMarginResult` sınıflarında kurumsal `__repr__` metotları yoktu | Açıklayıcı kurumsal Türkçe `__repr__` metotları tanımlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi tanımlanmamıştı | 6 sembolden oluşan `__all__` listesi eksiksiz tanımlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve canlı mikro test (`Takasbank SPAN, Polars portföy marjin kontrolü, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `cache_warmer.py` (105. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | `CacheWarmer` sınıfı sadece async kilit kullanıyordu; senkron metotlar (`is_warmed`, `get_history`, `reset`, Polars ihracı) multi-thread ortamda yarış koşulu (race condition) riski taşıyordu | `self._thread_lock = threading.RLock()` ile tüm paylaşılan durumlar (`_warmed`, `_last_report`, `_history`) thread-safe korumaya alındı |
+| 2 | 3 & Fail-Closed / Hata Yönetimi | `_warm_market_calendar` metodunda BIST tatil senkronizasyonunda `except Exception: synced = False` ile hata sessizce yutuluyordu | `logger.debug` yapısal kaydı ile hata fail-closed izlenebilir kılındı |
+| 3 | 2 & 6 & Polars Analitiği | Yalnızca üst seviye rapor özeti dışa aktarılıyordu; görev bazlı detay metrikleri Polars ile analiz edilemiyordu | `export_task_results_to_polars()` fonksiyonu eklenerek alt görevlerin (bist_universe, latest_prices, signals vb.) gecikme ve başarı analizleri sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı | Görev bazlı ısıtma sonuçları DuckDB'ye kaydedilmiyordu | `export_task_results_to_duckdb()` fonksiyonu eklenerek görev bazlı analitik arşivleme sağlandı |
+| 5 | 7 & Modül Dışa Aktarımı | Yeni eklenen analitik fonksiyonlar `__all__` listesinde eksikti | `export_task_results_to_polars` ve `export_task_results_to_duckdb` sembolleri `__all__` listesine dahil edildi |
+| 6 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`CacheWarmer, thread_lock, Polars task results, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `canonical_scoring.py` (106. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | `export_scores_to_polars` çağrısında `self._history` kilit korumasız kopyalanıyordu (multi-thread yarış koşulu / RuntimeError riski) | `with self._lock:` kilit koruması ile `self._history` kopyalama güvenliği sağlandı; `get_history()` ve `clear_history()` metotları eklendi |
+| 2 | 3 & Fail-Closed / Rejim Normalizasyonu | Küçük harfli veya boşluklu rejim metinlerinde (`'bull'`, `'bear'`) eşleşme başarısız olup rejim ağırlıkları `UNKNOWN`'a düşüyordu | `clean_regime = str(regime).strip().upper() if regime else "UNKNOWN"` normalizasyonu ile tam tutarlılık sağlandı |
+| 3 | 5 & DuckDB Kalıcılığı & İndeksleme | DuckDB tablosu yazılırken sorgu performansını artıracak kompozit indeksleme yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_ticker_ts ON {table_name} (ticker, timestamp)` komutu eklendi |
+| 4 | 2 & 6 & Polars Vektörizasyonu | `score_batch_polars()` ve `export_scores_to_polars()` fonksiyonları tam tip güvenliğiyle doğrulandı | Polars DataFrame girdi/çıktı dönüşümleri ve 0-boyutlu eksik veri korumaları güvenceye alındı |
+| 5 | 7 & Modül Dışa Aktarımı | `get_scoring_history` ve `clear_scoring_history` kolaylık fonksiyonları `__all__` listesinde eksikti | `__all__` listesine eklenerek modül dışa aktarımı tamamlandı |
+| 6 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`ScoreVector, CanonicalScore, Polars batch scoring, DuckDB export & query, thread_lock, get/clear history %100 başarılı`) ile doğrulandı |
+
+---
+
+## `config.py` (107. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & Veritabanı / Gateway Topolojisi | Traefik reverse proxy HTTPS portu (443) Pydantic Settings ve ağ portu validasyon listesinde eksikti | `traefik_https_port = 443` eklendi; `@field_validator` port denetimlerine dahil edildi |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `get_settings()` ve `reload_settings()` fonksiyonlarında `_settings_lock = threading.RLock()` koruması mevcuttu ve doğrulandı | Multi-thread hot-reload ve runtime ayar güncellemeleri thread-safe koruma altında |
+| 3 | 3 & Fail-Closed / Güvenlik | Production ortamında zayıf/varsayılan parolalar (`INSECURE_VALUES`), kısa secret'lar (`< 16` karakter) ve aktif `APP_DEBUG` katı şekilde denetlenir | `_validate_production_security` ile fail-closed mimari korundu |
+| 4 | 5 & orjson Serileştirme Güvenliği | `to_orjson_bytes()` metodunda `default=str` parametresi eksikti; özel nesnelerde `TypeError` riski vardı | `orjson.dumps(..., default=str)` ile fail-safe serileştirme sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Konfigürasyon denetim anlık görüntüleri kaydedilirken anahtar bazlı arama indeksi yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name} (key)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | `export_config_to_polars()` fonksiyonu ile 91 adet sistem yapılandırma parametresi anlık tip ve değerleriyle Polars DataFrame'e dönüştürülebilir kılındı | Doğrulandı |
+| 7 | 4 & Maskeleme ve Repr | Parolalar ve API anahtarları `SENSITIVE_KEYS` listesiyle loglarda ve sözlükte maskelenmektedir | Doğrulandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksiksiz ve güncel tutuldu | 12 sembolden oluşan `__all__` listesi doğrulandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`Pydantic v2 Settings, maskeleme, Polars export, DuckDB snapshot & query, reload_settings %100 başarılı`) ile doğrulandı |
+
+---
+
+## `config_loader.py` (108. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | `_convert_value` içinde `except Exception: pass` şeklinde sessiz exception yakalama mevcuttu | `with contextlib.suppress(Exception):` ile temiz Pythonic yapıya dönüştürüldü |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `ConfigLoader` sınıfında hem singleton kilidi (`_lock`) hem örnek kilidi (`_instance_lock`) `threading.RLock` ile tam thread-safe korumaya sahiptir | Multi-thread okuma/yazma ve reset işlemleri güvenceye alındı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi | `export_config_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback (`PRAGMA wal_autocheckpoint='10MB';`) sağlandı |
+| 4 | 5 & orjson Serileştirme Güvenliği | `to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Konfigürasyon denetim tablosunda `key` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name} (key)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Hiyerarşik JSON yapılandırmasını düzleştirip Polars DataFrame'e aktaran `export_config_to_polars()` fonksiyonu doğrulandı | Düzleştirilmiş 'key', 'value', 'type' şeması ve UTF-8 güvenliği teyit edildi |
+| 7 | 4 & Maskeleme ve Repr | Şifre ve gizli anahtarlar `SENSITIVE_KEY_NAMES` filtresiyle `_mask_dict()` tarafından otomatik maskelenir; `get_secret()` sadece ENV üzerinden okur | Kurumsal gizlilik sağlandı |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksiksiz ve güncel | 11 sembolden oluşan `__all__` listesi doğrulandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`ConfigLoader, dot notation, orjson, Polars flat export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `config_watcher.py` (109. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | `ConfigWatcher` sınıfında tüm durum kontrolleri, reload operasyonları ve denetim logu `threading.RLock` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_audit_log()` metodu eklendi |
+| 2 | 3 & Fail-Closed / Geri Alma (Rollback) | Dosyadaki yeni konfigürasyon geçersiz olduğunda (`validation_failed` veya `JSONDecodeError`) sistem eski kararlı yapılandırmayı korur | Fail-closed rollback mimarisi doğrulandı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi | `export_audit_log_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback (`PRAGMA wal_autocheckpoint='10MB';`) sağlandı |
+| 4 | 5 & orjson Serileştirme Güvenliği | `ConfigAuditEntry.to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Denetim günlüğü DuckDB tablosunda `timestamp` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Geçmiş reload ve validasyon denetim loglarını Polars DataFrame formatına dönüştüren `export_audit_log_to_polars()` fonksiyonu doğrulandı | Denetim izi şeması teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `ConfigAuditEntry` ve `ConfigWatcher` sınıflarında açıklayıcı Türkçe `__repr__` metotları mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `__all__` listesi eksiksiz ve güncel | 5 sembolden oluşan `__all__` listesi doğrulandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`ConfigWatcher, force_reload, audit log, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `connectivity.py` (110. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Durum güncellemeleri `_state_lock = threading.RLock()`, HTTP ClientSession ise `_session_lock = asyncio.Lock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_event_log()` metodu eklendi |
+| 2 | 3 & Fail-Closed / Ağ Kesinti İzleme | Paralel HTTP yoklamalarında ardışık başarısızlık eşiği (`failure_threshold = 3`) aşıldığında sistem OFFLINE moduna geçer | Otomatik toparlanma ve OTel kesinti metrikleri doğrulandı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi | `export_events_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback (`PRAGMA wal_autocheckpoint='10MB';`) sağlandı |
+| 4 | 5 & orjson Serileştirme Güvenliği | `ConnectivityEvent.to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Bağlantı olayları DuckDB tablosunda `timestamp` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Bağlantı olay günlüğünü Polars DataFrame formatına dönüştüren `export_events_to_polars()` fonksiyonu doğrulandı | Denetim izi şeması teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `ConnectivityEvent`, `ConnectivityState` ve `ConnectivityMonitor` sınıflarında açıklayıcı Türkçe `__repr__` metotları mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `is_online`, `is_offline`, `export_connectivity_events_to_polars`, `export_connectivity_events_to_duckdb` fonksiyonları `__all__` listesinde eksikti | `__all__` listesine eklenerek modül dışa aktarımı tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`ConnectivityMonitor, event logging, status, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `constants.py` (111. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & BIST / VIOP Mevzuatı | VIOP Takasbank SPAN teminat oranları (`VIOP_INITIAL_MARGIN_PCT`, `VIOP_MAINTENANCE_MARGIN_PCT`, `VIOP_LIQUIDATION_MARGIN_PCT`) `constants.py` içinde tanımlı değildi | Takasbank SPAN teminat sabitleri eklendi; magic number kullanımı engellendi |
+| 2 | 2 & Eşzamanlılık (Concurrency) | `get_risk_free_rate()` ve `set_risk_free_rate()` fonksiyonlarında `_rf_lock = threading.RLock()` koruması mevcuttu ve doğrulandı | Multi-thread faiz oranı güncellemeleri thread-safe |
+| 3 | 1 & Kod Temizliği | `DEFAULT_DUCKDB_PATH` ve `DEFAULT_CONSTANTS_DUCKDB_PATH` değişkenleri dosya içinde iki farklı yerde çelişkili tiplerle (Path vs str) tanımlanmıştı | Tek bir yerde `Path` ve `str` olarak birleştirildi |
+| 4 | 5 & orjson Entegrasyonu | Sabitlerin API ve ağ servislerine serileştirilmesi için sözlük ve orjson dışa aktarım yardımcıları eksikti | `export_constants_to_dict()` ve `export_constants_to_orjson_bytes()` fonksiyonları eklendi |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Sabitler tablosunda `category` kolonu üzerinde indeks yoktu ve WAL yapılandırması izole ortamlarda hata verebilirdi | Güvenli fallback ve `CREATE INDEX IF NOT EXISTS idx_{table_name}_cat ON {table_name} (category)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Tüm sistem sabitlerini kategori, isim, değer ve veri tipiyle sunan `export_constants_to_polars()` fonksiyonu 7 kategori ve 58 sabit ile doğrulandı | Polars DataFrame entegrasyonu teyit edildi |
+| 7 | 4 & Kurumsal Dokümantasyon | SPK, Borsa İstanbul, Walk-Forward (Purge/Embargo) ve Takasbank standartlarında Türkçe açıklamalar mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | Yeni eklenen VIOP sabitleri ve orjson/dict fonksiyonları `__all__` listesinde eksikti | `__all__` listesi eksiksiz güncellendi |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`Constants, set_risk_free_rate, VIOP, orjson, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `data_integrity.py` (112. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | `DataIntegrityValidator` sınıfında doğrulama geçmişi, son durum ve rapor listesi `threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_history()` metodu ve modül seviyesi `clear_integrity_history()` eklendi |
+| 2 | 3 & Fail-Closed / BIST Tatil Uyumlu Gap Kontrolü | ClickHouse barlarındaki eksik günler `holiday_manager` BIST takvimi (resmi tatiller, yarım günler) ile çapraz kontrol edilir | Tatil günlerinde sahte eksik bar alarmı üretilmesi engellendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_integrity_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback ve WAL koruması sağlandı |
+| 4 | 5 & orjson Serileştirme Güvenliği | `IntegrityGapItem.to_orjson_bytes()` ve `IntegrityValidationReport.to_orjson_bytes()` metodlarında `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Bütünlük denetim günlüğü DuckDB tablosunda `timestamp` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Bütünlük rapor geçmişini Polars DataFrame formatına dönüştüren `export_integrity_history_to_polars()` fonksiyonu doğrulandı | Denetim izi şeması teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `IntegrityGapItem`, `IntegrityValidationReport` ve `DataIntegrityValidator` sınıflarında açıklayıcı Türkçe `__repr__` metotları mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_integrity_history` fonksiyonu `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`IntegrityGapItem, IntegrityValidationReport, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `data_quality.py` (113. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | `DataQualityEngine` sınıfında maske takibi, tradable sayımı ve istatistikler `threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron akış eşzamanlılığı güvenceye alındı; `clear_masks()` metodu ve modül seviyesi `clear_tradability_masks()` eklendi |
+| 2 | 1 & Sıfır Sahte / Anormal Veri (K-01) | BIST devre kesici (%10 tavan/taban), sıfır/negatif fiyat, OHLC geometrisi ve düşük likidite ihlallerinde `TradabilityMask` ile hisse maskelenir | Anormal verinin modele veya canlı emre girmesi sıfır toleransla engellendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_masks_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback ve WAL koruması sağlandı |
+| 4 | 5 & orjson Serileştirme Güvenliği | `TradabilityMask`, `ExpectationResult`, `QualityIssue` ve `QualityReport` modellerinde `to_orjson_bytes()` metodları `default=str` parametresi içermiyordu | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı; `QualityIssue.to_orjson_bytes()` eklendi |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Kalite maskeleri DuckDB tablosunda `(ticker, timestamp)` kompozit indeksi eksikti | `CREATE INDEX IF NOT EXISTS idx_{table_name}_ticker_ts ON {table_name} (ticker, timestamp)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Tüm hisse maskelerini Polars DataFrame formatına dönüştüren `export_masks_to_polars()` ve DataFrame kalite analizi yapan `DataQualityChecker.full_quality_check()` doğrulandı | Polars-native veri kalitesi boru hattı teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `TradabilityMask`, `ExpectationResult`, `QualityIssue`, `QualityReport`, `ExpectationsSuite`, `DataQualityEngine` ve `DataQualityChecker` sınıflarında açıklayıcı Türkçe `__repr__` metotları mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_tradability_masks` fonksiyonu `__all__` listesine eklendi; `export_quality_to_duckdb` doğrudan engine metoduna bağlandı | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`TradabilityMask, apply_mask, DataQualityChecker, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `data_schemas.py` (114. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Bellek içi şema ihlal günlüğü `_audit_lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_schema_audit_log()` fonksiyonu eklendi |
+| 2 | 1 & BIST Şema ve Geometri Kontratları | Pydantic v2 tabanlı `OHLCVSchema` (High>=Low, Open/Close aralığı), `SignalSchema` (BUY/SELL stop-loss ve target mantığı) ve `FeatureVectorSchema` (NaN/Inf kontrolü) doğrulanmıştır | Anormal veya geometri dışı piyasa verisinin sisteme girmesi engellendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_schema_audit_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback ve WAL koruması sağlandı; `db_path: str \| Path \| None = None` parametresi desteklendi |
+| 4 | 5 & orjson Serileştirme Güvenliği | `BaseDataSchema.to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Şema ihlal denetim günlüğü DuckDB tablosunda `(schema_name, timestamp)` kompozit indeksi eksikti | `CREATE INDEX IF NOT EXISTS idx_{table_name}_schema_ts ON {table_name} (schema_name, timestamp)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Toplu veriler için `validate_ohlcv_polars()` ve `validate_features_polars()` vektörel kontrolleri ile denetim günlüğünü Polars DataFrame formatına dönüştüren `export_schema_audit_to_polars()` doğrulandı | Polars-native toplu doğrulama teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `BaseDataSchema` temel sınıfında tüm alt modelleri (`OHLCVSchema`, `SignalSchema`, `PositionSchema` vb.) kapsayan açıklayıcı `__repr__` metodu mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_schema_audit_log` fonksiyonu `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`OHLCVSchema, SignalSchema, validate_ohlcv, Polars validate, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `database.py` (115. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | PostgreSQL havuz oluşturma (`asyncio.Lock`), ClickHouse sorguları (`threading.Lock` / `threading.local()`) ve DuckDB operasyonları (`threading.RLock()`) thread-safe kilitlerle yönetilmektedir | Eşzamanlı yarış koşulları (Race Condition) tamamen önlendi |
+| 2 | 3 & Fail-Closed / Read-Write Ayrımı (DatabaseRouter) | `DatabaseRouter` ile yazma işlemleri daima Primary'e yönlendirilirken, okuma işlemleri replica lag eşiği (`replica_lag_threshold`) altındaysa Replica'ya, yüksekse Primary'e yönlendirilir | Yüksek erişilebilirlik ve veri tutarlılığı güvenceye alındı |
+| 3 | 3 & Fail-Closed / Exponential Backoff & Jitter | `_retry_async` fonksiyonu ile bağlantı kopmalarında jitter'lı yeniden deneme uygulanır; isim çözümlenememe (`getaddrinfo`) hatalarında asılı kalma engellendi | Ağ ve sunucu kesintilerinde otomatik kurtarma sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Kolaylık Arayüzü | DuckDB için sadece sorgu okuma vardı; DDL (`duckdb_execute`) ve Polars DataFrame'i sıfır kopyayla tabloya yazma (`duckdb_write_df`) eksikti | `duckdb_execute` ve `duckdb_write_df` fonksiyonları eklendi; `duckdb_query_df` try-except ile fail-closed korumaya alındı |
+| 5 | 2 & 6 & Polars Entegrasyonu | ClickHouse (`ch_query_df`) ve DuckDB (`duckdb_query_df`) sorguları Arrow üzerinden sıfır kopyayla doğrudan `pl.DataFrame` döndürür | Pandas bağımlılığı tamamen kaldırıldı; Polars-native hız sağlandı |
+| 6 | 4 & Kurumsal Standart & Repr | `DatabaseRouter` sınıfında açıklayıcı `__repr__` metodu mevcuttur; OTel metrikleri ve yapısal Türkçe loglama doğrulandı | Kurumsal standart korundu |
+| 7 | 7 & Modül Dışa Aktarımı | `duckdb_execute` ve `duckdb_write_df` fonksiyonları `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`DatabaseRouter, duckdb_execute, duckdb_write_df, duckdb_query_df Polars %100 başarılı`) ile doğrulandı |
+
+---
+
+## `database_dev.py` (116. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2.5 & SQLite Yasağı & DuckDB Uyumu | Geliştirme uyumluluk katmanı SQLite içermez; doğrudan kurumsal `services.core.database` modülüne yönlendirme yapar | GEMINI.md DuckDB/PostgreSQL zorunluluğu korundu |
+| 2 | 3 & Geriye Dönük Uyumluluk (Shim) | Eski testler ve bileşenler için `dev_db` nesnesi ve `pg_fetch*` fonksiyonları korunmuştur | Kırılma olmadan kademeli geçiş güvenceye alındı; `DeprecationWarning` ile uyarılır |
+| 3 | 5 & DuckDB Köprüsü | `_DevDBCompat` sınıfında `duckdb_query_df` ve havuz (`get_pool`, `get_pg_pool`) metotları eksikti | `_DevDBCompat.duckdb_query_df` ve `get_pool` metotları eklenerek köprü genişletildi |
+| 4 | 4 & Kurumsal Standart & Repr | `_DevDBCompat` sınıfında açıklayıcı `__repr__` metodu mevcuttur | Kurumsal standart korundu |
+| 5 | 7 & Modül Dışa Aktarımı | `duckdb_query_df` fonksiyonu `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 6 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`DeprecationWarning, dev_db repr, duckdb_query_df, get_pg_pool %100 başarılı`) ile doğrulandı |
+
+---
+
+## `db_lock.py` (117. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | İki katmanlı koordinasyon (`CoordinatedLock`): Süreç içi `asyncio.Lock` ve veritabanı `DatabaseLock` (advisory lock) ile yarış koşulları önlenir | Deadlock hiyerarşisi (`LOCK_ORDER`) ve `_metrics_lock = threading.RLock()` doğrulandı; `clear_lock_metrics()` eklendi |
+| 2 | 3 & Fail-Closed / Lease Renewal & Crash Recovery | Uzun süren işlemlerde kilit tazeleme (`_renew_lease`) ve ölen worker kilitlerini temizleme (`_recover_stale_locks`) mevcuttur | Kilit asılı kalmaları ve sızıntılar fail-closed engellendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_lock_metrics_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback ve WAL koruması sağlandı; `db_path: str \| Path \| None = None` desteklendi |
+| 4 | 5 & orjson Serileştirme Güvenliği | `LockMetrics.to_orjson_bytes()` ve `export_lock_metrics_to_polars` içinde `default=str` parametresi eksikti | `orjson.dumps(..., default=str)` ile tip dönüşüm güvenliği sağlandı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Kilit denetim günlüğü DuckDB tablosunda `key` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name} (key)` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Tüm kilit performans metriklerini ve sağlık durumunu Polars DataFrame formatına dönüştüren `export_lock_metrics_to_polars()` doğrulandı | Denetim izi şeması teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `LockMetrics`, `DatabaseLock` ve `CoordinatedLock` sınıflarında açıklayıcı Türkçe `__repr__` metotları mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_lock_metrics` fonksiyonu `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`LockMetrics, CoordinatedLock, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+---
+
+## `debounce.py` (118. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | SSD yıpranmasını önleyici debounce mantığı `_debounce_lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `reset_debounce()` metodu doğrulandı |
+| 2 | 3 & Fail-Closed / Saat Kayması Koruması | Sistem saatinin geriye gitmesi veya NTP güncellemelerinden etkilenmemek için `time.monotonic()` kullanılır | Zaman manipülasyonu ve bypass açıkları önlendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_debounce_to_duckdb` içinde `configure_duckdb_wal` çağrısı izole ortamlarda hata verebilirdi | `try-except` ile güvenli fallback ve WAL koruması sağlandı; `db_path: str \| Path \| None = None` desteklendi |
+| 4 | 5 & orjson Entegrasyonu | Modülde `orjson` importu ve serileştirme yardımcıları bulunmuyordu | `import orjson` eklendi; `export_debounce_to_orjson_bytes()` ve `DebounceManager.to_orjson_bytes()` yazıldı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Debounce denetim günlüğü DuckDB tablosunda `key` kolonu üzerinde indeks yoktu | `CREATE INDEX IF NOT EXISTS idx_{cleaned_table}_key ON {cleaned_table} (key)` eklendi; `DebounceManager.export_to_duckdb()` eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Debounce anahtar metriklerini Polars DataFrame formatına dönüştüren `export_debounce_metrics_to_polars()` ve `DebounceManager.to_polars()` doğrulandı | Denetim izi şeması teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `DebounceManager` sınıfında açıklayıcı `__repr__` metodu mevcuttur | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `export_debounce_to_orjson_bytes` fonksiyonu `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`should_save, orjson, Polars export, DuckDB, DebounceManager %100 başarılı`) ile doğrulandı |
+
+---
+
+## `downtime_tracker.py` (119. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Sistem kesinti ve çalışma durumu takibi `self._lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_history()` metodu ve modül seviyesi `clear_downtime_history()` eklendi |
+| 2 | 3 & Fail-Closed / Kurtarma & Catch-Up | Graceful shutdown, beklenmeyen çöküş (crash) ve heartbeat analizi ile kesinti süresi milisaniye hassasiyetinde tespit edilir | Catch-up seviyesi (`data_backfill`, `model_refresh`, `full_recalibration`) otomatik belirlenir |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_connect` içinde 0-byte bozuk dosya temizliği ve `configure_duckdb_wal` çağrısı mevcuttu; fonksiyon içi import vardı | Dosya başından merkezi import düzenine geçildi; `contextlib.suppress` ile güvenli fallback sağlandı |
+| 4 | 5 & orjson Entegrasyonu | Modülde `orjson` desteği ve durum serileştirme fonksiyonu yoktu | `import orjson` eklendi; `DowntimeTracker.to_orjson_bytes()` ve `export_downtime_to_orjson_bytes()` yazıldı |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | Kesinti olayları tablosunda `idx_shutdown_at` indeksi mevcuttu ve doğrulandı | DuckDB hyper-lite mimarisi korundu |
+| 6 | 2 & 6 & Polars Entegrasyonu | Geçmiş kesinti kayıtlarını Arrow sıfır kopyalama ile Polars DataFrame formatına dönüştüren `export_history_to_polars()` doğrulandı | Polars analitik entegrasyonu teyit edildi |
+| 7 | 4 & Kurumsal Standart & Repr | `DowntimeTracker` sınıfında açıklayıcı `__repr__` metodu mevcuttur; yerel OTel yerine merkezi `services.core.otel` bağlandı | Kurumsal standart korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_downtime_history` ve `export_downtime_to_orjson_bytes` fonksiyonları `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`record_shutdown, record_startup, heartbeat, orjson, Polars export, DuckDB %100 başarılı`) ile doğrulandı |
+
+## `duckdb_research.py` (120. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Eşzamanlı okuma/yazma emniyeti `self._lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_views()` ve `clear_cache()` metotları ile modül seviyesi `clear_parquet_views()` eklendi |
+| 2 | 3 & Fail-Closed / Windows 0-Byte Kurtarma | Windows dosya kilidi ve 0-byte bozuk veritabanı dosyaları otomatik temizlenerek salt-okunur mod fallback desteği sağlanır | Fail-closed bağlantı yönetimi doğrulandı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_get_conn` içinde SSD koruyucu DuckDB WAL parametreleri (`configure_duckdb_wal`) yapılandırılır; `get_stats` hata durumunda tam alanları içeren güvenli sözlük dönecek şekilde iyileştirildi | Fail-closed yapı korundu |
+| 4 | 5 & orjson Entegrasyonu | Modülde `orjson` desteği ve istatistik serileştirme fonksiyonu bulunmuyordu | `import orjson` eklendi; `DuckDBResearchEngine.to_orjson_bytes()` ve `get_research_stats_orjson_bytes()` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB & Arrow Sıfır Kopyalama | Polars DataFrame verilerini doğrudan DuckDB tablosuna sıfır kopyayla yazacak bir metot eksikti | `insert_from_polars(table, df)` metodu ve modül seviyesi takma adı eklendi; Arrow tablo kaydı `conn.register` ve `conn.unregister` ile korundu |
+| 6 | 2 & 6 & Polars Entegrasyonu | Parquet dosyalarını diskten doğrudan okuyan `query_parquet`, `query_parquet_columns` ve sıfır bellek tüketimli `scan_parquet` Polars entegrasyonları doğrulandı | Projection ve Predicate Pushdown optimizasyonları teyit edildi |
+| 7 | 4 & Kurumsal Standart & OTel | Yerel olarak tanımlanmış mükerrer `otel_trace` dekoratörü mevcuttu | Merkezi `services.core.otel` modülündeki `otel_trace` entegre edildi; `DuckDBResearchEngine.__repr__` metodu korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_parquet_views`, `get_research_stats_orjson_bytes` ve `insert_from_polars` `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`DuckDBResearchEngine, insert_from_polars, query_parquet, scan_parquet, orjson, clear_views %100 başarılı`) ile doğrulandı |
+
+## `duckdb_store.py` (121. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Thread-safe işlem ve tampon koruması `self._lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_buffer()` metodu ve modül seviyesi `clear_store_buffer()` eklendi |
+| 2 | 3 & Fail-Closed / Windows 0-Byte Kurtarma & Flush | Windows dosya kilidi, 0-byte dosya kurtarma ve `atexit` / `signal` kapanış kancaları ile veri kaybı önlenir | Tampon boşaltma hatasında (`_flush_buffer`) işlemler geri alınıp arabelleğe iade edilerek fail-closed sıfır veri kaybı sağlandı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_init_connection` içinde SSD koruyucu DuckDB WAL parametreleri (`configure_duckdb_wal`) yapılandırılır; `executescript` ve `get_stats` hata durumları güvenli loglama ile korundu | Fail-closed yapı korundu |
+| 4 | 5 & orjson Entegrasyonu | Modülde `orjson` desteği ve durum serileştirme fonksiyonu bulunmuyordu | `import orjson` eklendi; `DuckDBStore.to_orjson_bytes()` ve modül seviyesi `get_store_stats_orjson_bytes()` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB & Arrow Sıfır Kopyalama | Polars DataFrame verisini sıfır kopyayla DuckDB tablosuna yazacak `write_df` metodu eksikti | `write_df(table, df, if_exists)` metodu ve modül seviyesi takma adı eklendi; Arrow tablo kaydı `conn.register` ve `conn.unregister` ile korundu |
+| 6 | 2 & 6 & Polars Entegrasyonu | Sorgu sonuçlarını doğrudan sıfır kopyalı Polars DataFrame olarak dönen `fetch_df` ve tablo aktarımı yapan `export_table_to_polars` doğrulandı | Polars analitik entegrasyonu teyit edildi |
+| 7 | 4 & Kurumsal Standart & OTel | Yerel olarak tanımlanmış mükerrer `otel_trace` dekoratörü mevcuttu | Merkezi `services.core.otel` modülündeki `otel_trace` entegre edildi; `DuckDBStore.__repr__` metodu korundu |
+| 8 | 7 & Modül Dışa Aktarımı | Modül seviyesinde `fetch`, `fetchone`, `fetchval`, `write_df`, `clear_store_buffer`, `get_store_stats`, `get_store_stats_orjson_bytes` eksikti | Tüm takma adlar eklendi ve `__all__` listesine bağlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`DuckDBStore, write_df, fetch_df, buffered_write, flush, orjson, clear_buffer %100 başarılı`) ile doğrulandı |
+
+## `event_bus.py` (122. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | Olay dinleyicileri, bellek içi kuyruk ve idempotency takibi `threading.RLock()` ve `threading.Lock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_subscribers()`, `clear_history()` metotları ve modül seviyesi `clear_event_history()`, `clear_event_ledger()` eklendi |
+| 2 | 3 & Fail-Closed / Sıfır Veri Kaybı & DLQ | NATS veya Redis bağlantı sorunlarında InMemoryRedis fallback devreye girer; işleyici hataları `dead_letter_queue`'ya aktarılır | Fail-closed mesajlaşma ve hata toleransı doğrulandı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_record_to_duckdb_ledger` içinde SSD koruyucu DuckDB WAL parametreleri (`configure_duckdb_wal`) yapılandırılır; 0-byte bozuk dosya temizliği mevcuttur | Fail-closed yapı korundu |
+| 4 | 5 & orjson Entegrasyonu | Modülde `orjson` desteği `InternalEventBus` ve `EventConsumer` durum serileştirmesinde eksikti | `InternalEventBus.to_orjson_bytes()`, `EventConsumer.to_orjson_bytes()` ve `export_event_ledger_to_orjson_bytes()` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | `event_ledger` tablosunda `event_type` ve `published_at` üzerinde sorgu indeksi bulunmuyordu | `idx_event_ledger_type_ts (event_type, published_at DESC)` ve `idx_event_ledger_ts (published_at DESC)` indeksleri eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Kalıcı olay defterini Polars DataFrame olarak dışa aktaran `export_event_ledger_to_polars` ve `query_event_ledger_duckdb` doğrulandı | Polars analitik entegrasyonu teyit edildi |
+| 7 | 4 & Kurumsal Standart & OTel | OpenTelemetry producer/consumer span enjeksiyonu ve Prometheus throughput sayaçları mevcuttur | Kurumsal standart korundu; `__repr__` metotları doğrulandı |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_event_history`, `clear_event_ledger`, `export_event_ledger_to_orjson_bytes` `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`InternalEventBus, EventConsumer, CanonicalEvent, Polars export, orjson, clear_event_ledger %100 başarılı`) ile doğrulandı |
+
+## `event_enhancements.py` (123. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Eşzamanlılık (Concurrency) | İdempotency, atomik rezervasyon (`claim_event`), in-flight kilitleri ve yeniden denemeler `self._lock = threading.RLock()` ile korunmaktadır | Multi-thread ve asenkron coroutine eşzamanlılığı güvenceye alındı; `clear_history()` metodu ve modül seviyesi `clear_enhancements_history()`, `clear_enhancements_ledger()` eklendi |
+| 2 | 3 & Fail-Closed / Atomic Claim & Self-Healing | Aynı olay kimliğinin eşzamanlı çift yürütülmesi (`claim_event`) engellenir; sıra bozulması (`is_out_of_order`) ve paket kaybı tespiti (`has_sequence_gap`) ile self-healing desteklenir | TOCTOU yarış koşulları ve veri kaybı önlendi |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_init_duckdb_schema` içinde SSD koruyucu DuckDB WAL parametreleri (`configure_duckdb_wal`) yapılandırılır; 0-byte bozuk dosya temizliği mevcuttur | Fail-closed yapı korundu |
+| 4 | 5 & orjson Entegrasyonu | Modülde `EventMetadata` ve `RetryPolicy` fonksiyon içi `import orjson` içeriyordu; `EventEnhancements` durum serileştirme desteği yoktu | `orjson` dosya başına taşındı; `EventEnhancements.to_orjson_bytes()`, `export_enhancements_to_orjson_bytes()` ve `get_enhancements_stats_orjson_bytes()` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | `event_enhancements_ledger` tablosunda `processed_at`, `correlation_id` ve `sequence_key` üzerinde arama indeksi bulunmuyordu | `idx_enhancements_processed_at (processed_at DESC)`, `idx_enhancements_corr_id (correlation_id)` ve `idx_enhancements_seq_key (sequence_key, sequence_num)` indeksleri eklendi |
+| 6 | 2 & 6 & Polars Entegrasyonu | Kalıcı olay defteri kayıtlarını Arrow sıfır kopyalama ile Polars DataFrame formatına dönüştüren `export_enhancements_to_polars` ve `query_enhancements_duckdb` doğrulandı | Polars analitik entegrasyonu teyit edildi |
+| 7 | 4 & Kurumsal Standart & OTel | Yerel olarak tanımlanmış mükerrer `otel_trace` dekoratörü mevcuttu | Merkezi `services.core.otel` modülündeki `otel_trace` entegre edildi; `EventEnhancements.__repr__` metodu korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_enhancements_history`, `clear_enhancements_ledger`, `export_enhancements_to_orjson_bytes`, `get_enhancements_stats_orjson_bytes` `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`EventEnhancements, claim_event, process_with_idempotency, Polars export, orjson, clear_enhancements_history %100 başarılı`) ile doğrulandı |
+
+## `event_schema.py` (124. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & PIT | Geleceğe sarkan olayların analitik/backtest süreçlerine karışmasını önleyen `filter_pit_events` ve `CanonicalEvent.is_point_in_time` mevcuttur | Mask-First prensibi doğrultusunda sıfır sızıntı doğrulandı |
+| 2 | 3 & Fail-Closed / Envelope Modeli & Validasyon | Protobuf uyumlu kompakt ikili (binary) serileştirmede zarf (envelope) modeli ile 10 karakteri aşan semboller, UUID ve üstveriler kayıpsız korunur | `CanonicalEvent.validate()` ile şema değişmezleri ve float `confidence` sınırları (NaN/Inf guard) güvenceye alındı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_events_to_duckdb` içinde SSD koruyucu DuckDB WAL parametreleri (`configure_duckdb_wal`) yapılandırılır; 0-byte dosya temizliği ve `try/finally unregister` mevcuttur | Fail-closed yapı korundu |
+| 4 | 5 & orjson Entegrasyonu | Modül seviyesinde olay listesini toplu ikili baytlara dönüştürecek yardımcı fonksiyon eksikti | `CanonicalEvent.to_orjson_bytes()` doğrulandı; `export_events_to_orjson_bytes(events)` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | `canonical_events` tablosunda `timestamp` ve `ticker` kolonları üzerinde arama indeksi bulunmuyordu | `idx_{table_name}_ts (timestamp DESC)` ve `idx_{table_name}_ticker (ticker)` indeksleri eklendi; `clear_events_duckdb()` yazıldı |
+| 6 | 2 & 6 & Polars Entegrasyonu | Olay listesini sıfır kopyalı Arrow entegrasyonuyla Polars DataFrame'e dönüştüren `events_to_polars` ve `events_from_polars` doğrulandı | Polars analitik dönüşümleri teyit edildi |
+| 7 | 4 & Kurumsal Standart & OTel | Yerel olarak tanımlanmış mükerrer `otel_trace` dekoratörü mevcuttu | Merkezi `services.core.otel` modülündeki `otel_trace` entegre edildi; `CanonicalEvent.__repr__` metodu korundu |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_events_duckdb` ve `export_events_to_orjson_bytes` `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`CanonicalEvent, to_binary, from_binary, Polars export, DuckDB, orjson, clear_events_duckdb %100 başarılı`) ile doğrulandı |
+
+## `feature_store.py` (125. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & PIT | Tarih ve sembol bazlı anahtar oluşturma (`feat:TICKER:DATE:HASH`) ve alt küme çözümleme (`feat_master:TICKER:DATE`) ile geçmiş özelliklerin karışması engellenir | Master cache havuzu ile alt küme isabeti sağlandı ve PIT veri tutarlılığı güvenceye alındı |
+| 2 | 3 & Fail-Closed / Hata Yönetimi & Fallback | Redis bağlantı hatasında veya zaman aşımında sistem kesintiye uğramadan L1 in-memory ve L2 DuckDB önbelleğine güvenli düşüş yapar | Fail-closed koruma ve graceful degradation mekanizması korundu |
+| 3 | 5 & orjson Entegrasyonu | Modül seviyesinde ve sınıf içinde yüksek hızlı serileştirilmiş istatistik baytları eksikti | `FeatureStore.to_orjson_bytes()` ve modül düzeyinde `export_feature_stats_to_orjson_bytes()` yazıldı (`orjson.dumps(..., default=str)`) |
+| 4 | 5 & DuckDB Kalıcılığı & İndeksleme | `export_to_duckdb` fonksiyonunda `expires_at` kolonu üzerinde indeks yoktu ve `df_features_view` kaydı unregister edilmiyordu | `CREATE INDEX IF NOT EXISTS idx_{table_name}_exp ON {table_name} (expires_at)` eklendi; `try/finally conn.unregister("df_features_view")` sağlandı; `clear_features_duckdb()` fonksiyonu eklendi |
+| 5 | 2 & 6 & Polars Entegrasyonu | Önbellek istatistiklerini ve hisse özelliklerini doğrudan DataFrame'e dönüştüren `export_stats_to_polars` ve `export_features_to_polars` doğrulandı | Sıfır kopyalı Arrow entegrasyonu ile analitik pipeline'lara hızlı veri akışı teyit edildi |
+| 6 | 4 & Kurumsal Standart & OTel | Yerel olarak tanımlanmış mükerrer `otel_trace` dekoratörü mevcuttu | Merkezi `services.core.otel` modülündeki `otel_trace` entegre edildi; `FeatureStore.__repr__` metodu korundu |
+| 7 | 7 & Modül Dışa Aktarımı | `clear_feature_store`, `clear_features_duckdb`, `export_feature_stats_to_orjson_bytes` `__all__` listesine eklendi | Modül dışa aktarımı eksiksiz tamamlandı |
+| 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`FeatureStore, set, get, to_orjson_bytes, Polars export, DuckDB snapshot, warm-start load, clear %100 başarılı`) ile doğrulandı |
+
+## `logging.py` (126. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Windows CPython UTF-8 Güvencesi | Windows konsolunda bozuk karakter veya GC kaynaklı stream kapanma riskleri | `_ensure_utf8_streams` fonksiyonu ile `sys.stderr`/`sys.stdout` yerinde ve güvenli `reconfigure(encoding="utf-8", errors="replace")` ile yapılandırıldı |
+| 2 | 2 & Eşzamanlılık ve Reentrancy | Seviye telemetrisi ve hata tamponu işlemleri thread-safe tutulmalıdır | `_log_counts_lock = threading.RLock()` re-entrant kilit ile tüm sayaç ve `_recent_errors` deque işlemleri koruma altına alındı |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_errors_to_duckdb` içinde döngüsel tekil INSERT yapılıyordu ve 0-byte dosya koruması eksikti | 0-byte unlink guard'ı, `PRAGMA checkpoint_threshold='4MB'` / `wal_autocheckpoint='2MB'`, Arrow sıfır kopyalı `con.register("df_errors_view")` ve `try/finally unregister` sağlandı |
+| 4 | 5 & orjson Entegrasyonu | Modül seviyesinde log istatistikleri ve son hataları orjson ikili bayt dizisi olarak veren fonksiyonlar eksikti | `export_log_stats_to_orjson_bytes()` ve `export_recent_errors_to_orjson_bytes()` yazıldı (`orjson.dumps(..., default=str)`) |
+| 5 | 5 & DuckDB Kalıcılığı & İndeksleme | `system_error_logs` tablosunda arama indeksleri ve temizleme fonksiyonu bulunmuyordu | `idx_system_error_logs_ts` ve `idx_system_error_logs_level` indeksleri eklendi; `clear_errors_duckdb(db_path)` yazıldı |
+| 6 | 2 & 6 & Polars Entegrasyonu | Log dağılımı ve hata tamponu analitiği için Polars DataFrame ihracı mevcuttur | `export_log_stats_to_polars()` ve `export_recent_errors_to_polars()` fonksiyonları `pl.String` ve `pl.Int64` ile doğrulandı |
+| 7 | 4 & Self-Healing & Hata Teşhisi | Anomali eşik denetimi ve temizleme fonksiyonları | `check_error_anomaly(threshold=50)` fonksiyonu doğrulandı; `clear_log_stats()` ve `clear_recent_errors()` eklendi |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_log_stats`, `clear_recent_errors`, `clear_errors_duckdb`, `export_log_stats_to_orjson_bytes`, `export_recent_errors_to_orjson_bytes` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`setup_logging, logger, get_log_stats, get_recent_errors, Polars export, DuckDB, orjson, clear %100 başarılı`) ile doğrulandı |
+
+## `manipulation_detector.py` (127. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & SPK Uyumu | SPK Piyasa Bozucu Eylemler Tebliği (VI-104.1) kurallarına göre wash trading (alıcı==satıcı ve ardışık ters taraf), spoofing, layering, volume manip ve price clustering algoritmaları mevcuttur | Mask-First ve PIT prensipleri korunarak istatistiksel tespitler güvenceye alındı |
+| 2 | 3 & Fail-Closed & Devre Kesici (Self-Healing) | Tespit edilen ihlallerde otomatik emir iletimi durdurulmalı ve risk çarpanı dinamik kısılmalıdır | `evaluate_trading_safety(alerts)` (CRITICAL durumunda False) ve `get_risk_multiplier(alerts)` (CRITICAL->0.0, HIGH->0.20, NORMAL->1.0) korundu |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_alerts_to_duckdb` fonksiyonunda WAL yapılandırması ve `try/finally conn.unregister("df_alerts_view")` mevcuttur | 0-byte dosya koruması ve SSD dostu WAL parametreleri teyit edildi |
+| 4 | 4 & Kurumsal Standart & OTel | Yerel dekoratör merkezi OTel altyapısına bağlanmamıştı | Merkezi `services.core.otel.otel_trace` import edildi; fallback blokları korundu |
+| 5 | 5 & orjson Entegrasyonu | Modül seviyesinde toplu alarm listesini ikili serileştiren fonksiyon eksikti | `ManipulationAlert.to_orjson_bytes()` doğrulandı; `export_alerts_to_orjson_bytes(alerts)` yazıldı (`default=str`) |
+| 6 | 5 & DuckDB Kalıcılığı & İndeksleme | `manipulation_audit_ledger` tablosunda arama indeksleri ve temizleme fonksiyonu bulunmuyordu | `idx_manipulation_audit_ts (detected_at)` ve `idx_manipulation_audit_type (alert_type)` indeksleri eklendi; `clear_manipulation_audit_duckdb(db_path)` yazıldı |
+| 7 | 2 & 6 & Polars Entegrasyonu | Alarmları sıfır kopyalı Arrow entegrasyonuyla DataFrame'e dönüştüren `alerts_to_polars` ve `export_manipulation_audit_to_polars` mevcuttur | Polars analitik dönüşümleri teyit edildi |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_manipulation_audit_duckdb` ve `export_alerts_to_orjson_bytes` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`detect_wash_trading, detect_volume_manipulation, safety, risk_multiplier, Polars, DuckDB, orjson, clear %100 başarılı`) ile doğrulandı |
+
+## `metrics_math.py` (128. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & PIT | Sharpe, Sortino, Calmar, Max Drawdown, Omega, Tail Ratio, Information Ratio, Rank IC, VaR/CVaR 95 metrikleri saf getiri zaman serisi üzerinde geçmişi baz alarak hesaplanır | Mask-First ve PIT ilkelerine uygun olarak geleceğe sızma sıfırlandı |
+| 2 | 3 & Fail-Closed & Canlı Uygunluk Karar Kapısı | Model eğitimi ve backtest sonrasında stratejinin canlıya uygunluğunu belirleyen kurumsal karar kancası mevcuttur | `evaluate_strategy_viability` (Sharpe>=1.0, MaxDD<=-25%, PF>=1.2, WinRate>=%40) kural seti korundu |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `export_metrics_to_duckdb` fonksiyonunda 0-byte dosya koruması ve SSD dostu WAL optimizasyonları mevcuttur | 0-byte unlink guard'ı ve `checkpoint_threshold='4MB'` / `wal_autocheckpoint='2MB'` yapılandırıldı |
+| 4 | 4 & Kurumsal Standart & OTel | Yerel dekoratör merkezi OTel altyapısına bağlanmamıştı | Merkezi `services.core.otel.otel_trace` import edildi; fallback blokları korundu |
+| 5 | 5 & orjson Entegrasyonu | Modül seviyesinde hesaplanan metrik özetini ikili serileştiren fonksiyon eksikti | `export_metrics_to_orjson_bytes(returns, ...)` yazıldı (`orjson.dumps(..., default=str)`) |
+| 6 | 5 & DuckDB Kalıcılığı & İndeksleme | `strategy_performance_ledger` tablosunda arama indeksleri ve temizleme fonksiyonu bulunmuyordu | `idx_strategy_metrics_id (strategy_id)` ve `idx_strategy_metrics_rec (recorded_at)` indeksleri eklendi; `clear_strategy_metrics_duckdb(db_path)` yazıldı |
+| 7 | 2 & 6 & Polars Entegrasyonu | Tüm metrikleri 11 kolonlu analitik DataFrame olarak sunan `metrics_summary_to_polars` mevcuttur | Polars doğrudan uyumu ve tip güvenliği (`pl.Float64`, `pl.Int64`) teyit edildi |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_strategy_metrics_duckdb` ve `export_metrics_to_orjson_bytes` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`sharpe, sortino, mdd, calmar, win_rate, pf, omega, tail, ir, rank_ic, viability, Polars, DuckDB, orjson, clear %100 başarılı`) ile doğrulandı |
+
+## `model_persistence.py` (129. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & PIT & Kontrat | Model özellikleri ve üstveri sözleşmesi `generate_contract_hash` ve `verify_feature_contract` ile canlı çıkarım öncesi tam doğrulanır | Eksik özellik durumunda canlı tahmin anında engellenerek veri tutarsızlığı sıfırlandı |
+| 2 | 3 & Fail-Closed & Çevrimdışı DuckDB Failover | PostgreSQL bağlantısı kesildiğinde veya çevrimdışı modda model üstverileri yerel DuckDB defterine yazılır ve oradan şampiyon/sürüm sorgulanabilir | Kesintisiz çevrimdışı çalışma ve failover korundu |
+| 3 | 3 & Fail-Closed / Hata Yönetimi & WAL | `_save_to_local_duckdb` fonksiyonunda 0-byte dosya koruması ve SSD koruyucu DuckDB WAL ayarları mevcuttur | 0-byte unlink guard'ı ve `configure_duckdb_wal` yapılandırıldı |
+| 4 | 4 & Kurumsal Standart & OTel | Yerel dekoratör merkezi OTel altyapısına bağlanmamıştı | Merkezi `services.core.otel.otel_trace` import edildi; asenkron coroutine desteği korundu |
+| 5 | 5 & orjson Entegrasyonu | Modül seviyesinde model sürümlerini ikili serileştiren fonksiyon eksikti | `export_model_versions_to_orjson_bytes(model_name, db_path)` yazıldı (`orjson.dumps(..., default=str)`) |
+| 6 | 5 & DuckDB Kalıcılığı & İndeksleme | `model_versions_offline` tablosunda arama indeksleri ve temizleme fonksiyonu bulunmuyordu | `idx_model_versions_status` ve `idx_model_versions_created` indeksleri eklendi; `clear_model_metadata_duckdb(db_path)` yazıldı |
+| 7 | 2 & 6 & Polars Entegrasyonu | Model sürümlerini sıfır kopyalı Arrow entegrasyonuyla sunan `list_model_versions_polars` mevcuttur | Polars doğrudan uyumu ve tip güvenliği teyit edildi |
+| 8 | 7 & Modül Dışa Aktarımı | `clear_model_metadata_duckdb` ve `export_model_versions_to_orjson_bytes` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 9 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`contract_hash, verify_feature_contract, save_metadata, promote, rollback, Polars, DuckDB, orjson, clear %100 başarılı`) ile doğrulandı |
+
+## `models.py` (130. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & Veri Modelleri | MarketTick, OHLCV, OrderBookSnapshot, AssetState, Signal, Prediction, Outcome, Alert etki alanı modelleri zaman serisi ve PIT veri akışlarına tam uyumludur | Sızıntı içermeyen temiz veri yapıları korundu |
+| 2 | 3 & Fail-Closed / Invariant Validasyonları | OHLCV bar geometrisi (high >= low, high >= max(open, close), low <= min(open, close)), pozitif fiyatlar, pozitif spread ve [0, 1] olasılık sınırları kesin doğrulanmalıdır | `@model_validator(mode="after")` ve `@field_validator` kontrolleri ile geçersiz geometrilerde `ValueError` fırlatılarak fail-closed doğrulama sağlandı |
+| 3 | 5 & orjson Entegrasyonu | Modellerin orjson serileştirme ve toplu liste serileştirme fonksiyonları eksiksiz olmalıdır | `BaseDomainModel.to_orjson_bytes()`, `to_orjson_str()`, `from_orjson()` ve modül seviyesinde `models_to_orjson_bytes()` sağlandı |
+| 4 | 5 & DuckDB Kalıcılığı & Anlık Görüntü | Modellerin yerel DuckDB tablosuna anlık görüntü olarak kaydedilmesi ve silinmesi için modül seviyesi fonksiyonlar eksikti | `export_models_to_duckdb(models, table_name, db_path)` ve `clear_models_duckdb(table_name, db_path)` fonksiyonları eklendi |
+| 5 | 2 & 6 & Polars Entegrasyonu | Modelleri sıfır kopyalı Arrow entegrasyonuyla Polars DataFrame'e dönüştüren fonksiyonlar mevcuttur | `BaseDomainModel.to_polars()` ve `models_to_polars()` fonksiyonları teyit edildi |
+| 6 | 4 & Kurumsal Standart & Repr | Tüm modeller `BaseDomainModel` taban sınıfından türer; açıklayıcı `__repr__` metodu mevcuttur | Sınıf adı ve birincil alanları özetleyen kurumsal `__repr__` korundu |
+| 7 | 7 & Modül Dışa Aktarımı | `export_models_to_duckdb`, `clear_models_duckdb`, `models_to_orjson_bytes` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`MarketTick, OHLCV geometry invariant, OrderBookSnapshot, Polars, DuckDB snapshot, orjson, clear %100 başarılı`) ile doğrulandı |
+
+## `monitoring.py` (131. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 2 & Sıfır Veri Sızıntısı & Metrik Senkronizasyonu | Portföy ve veritabanı kilit telemetrisi Prometheus metriklerine (Counter, Gauge, Histogram) periyodik olarak senkronize edilir | Çift kontrollü asenkron kilit (`_get_lock()`) ile thread-safe senkronizasyon sağlandı |
+| 2 | 3 & Fail-Closed / Muhasebe Invariant Kontrolü | `Equity == Cash + Invested` muhasebe değişmezi her senkronizasyonda denetlenmeli ve ihlalde alarm üretilmelidir | Invariant hatasında `portfolio_invariant_failures` sayacı artırılır ve alerting tetiklenir |
+| 3 | 4 & Kurumsal Standart & OTel | Yerel dekoratör merkezi OTel altyapısına bağlanmamıştı | Merkezi `services.core.otel.otel_trace` import edildi; asenkron wrapper desteği korundu |
+| 4 | 5 & orjson Entegrasyonu | Modül seviyesinde ve sınıf içinde telemetri metriklerini ikili serileştiren fonksiyonlar eksikti | `PortfolioMonitor.to_orjson_bytes()`, `export_metrics_to_orjson_bytes()`, `export_lock_metrics_to_orjson_bytes()` yazıldı (`default=str`) |
+| 5 | 5 & DuckDB Kalıcılığı & Anlık Görüntü | Portföy ve kilit telemetrisini yerel DuckDB'ye anlık görüntü olarak kaydedip temizleyen fonksiyonlar eksikti | `export_monitoring_metrics_to_duckdb(db_path)` ve `clear_monitoring_metrics_duckdb(db_path)` yazıldı |
+| 6 | 2 & 6 & Polars Entegrasyonu | Portföy ve kilit telemetrisini Polars DataFrame olarak dışa aktaran `export_metrics_to_polars` ve `export_lock_metrics_to_polars` mevcuttur | Sıfır kopyalı Arrow entegrasyonu teyit edildi |
+| 7 | 7 & Modül Dışa Aktarımı | `clear_monitoring_metrics_duckdb`, `export_lock_metrics_to_orjson_bytes`, `export_metrics_to_orjson_bytes`, `export_monitoring_metrics_to_duckdb` eklendi | `__all__` listesi eksiksiz güncellendi |
+| 8 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`bind, sync_metrics, Polars export, DuckDB snapshot, orjson, clear %100 başarılı`) ile doğrulandı |
 
 ---
 
@@ -2252,11 +3041,350 @@ nu eklenerek None, NaN ve string değerler güvenli korumaya alındı |
 |---|-------|-----------------|
 | — | — | — |
 
+---
 
+# DOSYA 132: services/core/monitoring_security.py
 
+## GEMINI.md Uyumluluk Tablosu
 
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `export_security_audit_to_duckdb` ve `clear_security_audit_duckdb` eklendi; Arrow sıfır kopyalı `df_sec_view` kaydı ve indeksleme uygulandı. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `export_security_stats_to_polars()` ile izlenen istemcilerin oran limiti ve başarısız denemeleri tam şemalı Polars DataFrame olarak aktarılır. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | Standart `json` yok, `orjson` kullanılır. `export_security_stats_to_orjson_bytes()` yazıldı (`default=str`). |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Yapısal Türkçe loglama (`structlog.get_logger(__name__)`) kullanıldı. |
+| 5 | Thread-Safety & Async Lock | UYUMLU | Bellek içi istemci oran sınırlayıcısı ve sayaçlar `threading.RLock()` ile, JWKS önbellek ve OAuth rotasyonları `asyncio.Lock` ile korunur. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Token doğrulamada başarısızlık durumunda güvenli ret döner. Sahte veri veya placeholder kesinlikle yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `__all__` listesi eksiksiz güncellendi; `ruff check` 0 hata ile doğrulandı. |
 
+## Yapılan İyileştirmeler ve Düzeltmeler
 
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 4 & Kurumsal Standart & OTel | Yerel dekoratör merkezi OTel altyapısına bağlanmamıştı | Merkezi `services.core.otel.otel_trace` import edildi; asenkron/senkron wrapper desteği bağlandı |
+| 2 | 5 & orjson Entegrasyonu | Modül seviyesinde güvenlik denetim telemetrisini ikili serileştiren fonksiyon eksikti | `export_security_stats_to_orjson_bytes()` fonksiyonu eklendi (`default=str`) |
+| 3 | 5 & DuckDB Kalıcılığı & Denetim İzi | Güvenlik telemetrisi ve oran sınırlama kayıtlarını DuckDB'ye anlık görüntü olarak kaydeden fonksiyonlar eksikti | `export_security_audit_to_duckdb(db_path)` ve `clear_security_audit_duckdb(db_path)` fonksiyonları yazıldı, Arrow sıfır kopyalı aktarım sağlandı |
+| 4 | 7 & Modül Dışa Aktarımı | Yeni DuckDB ve orjson fonksiyonları `__all__` listesinde eksikti | `__all__` listesi güncellendi |
+| 5 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`extract_bearer_token, verify_metrics_token, verify_admin_token, check_rate_limit, Polars export, DuckDB snapshot, orjson, clear %100 başarılı`) ile doğrulandı |
 
+---
 
+# DOSYA 133: services/core/orchestrator.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `export_pipeline_report_to_duckdb`, `export_services_status_to_duckdb` ve `clear_orchestrator_duckdb` eklendi; Arrow sıfır kopyalı görünüm ve indeksleme sağlandı. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `export_pipeline_report_to_polars`, `export_top_opportunities_to_polars`, `export_services_status_to_polars` ve `PipelineReport.to_polars` ile tam Polars desteği sağlandı. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | `import orjson` modül seviyesine taşındı; `export_pipeline_report_to_orjson_bytes`, `export_orchestrator_status_to_orjson_bytes`, `PipelineReport.to_orjson_bytes` ve `MasterOrchestrator.to_orjson_bytes` eklendi (`default=str`). |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Yapısal Türkçe loglama (`structlog.get_logger(__name__)`) kullanıldı. |
+| 5 | Thread-Safety & Async Lock | UYUMLU | Servis kayıtları ve simülasyon önbelleği `threading.RLock()` ile, arka plan event loop köprüsü `_bg_lock` ile korunur; `shutdown_bg_loop()` mevcuttur. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Modül ve servis yükleme hataları yapısal loglanır ve izole edilir. Sahte veri ve placeholder kesinlikle yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `__all__` listesi eksiksiz güncellendi; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 3 & orjson Entegrasyonu | `orjson` dosya başında import edilmemişti ve modül seviyesinde binary serileştirme fonksiyonları eksikti | `import orjson` dosya başına eklendi; `PipelineReport.to_orjson_bytes()`, `MasterOrchestrator.to_orjson_bytes()`, `export_pipeline_report_to_orjson_bytes()`, `export_orchestrator_status_to_orjson_bytes()` yazıldı |
+| 2 | 5 & DuckDB Kalıcılığı | Pipeline batch çalışma raporları ve servis durumlarını DuckDB'ye anlık görüntü olarak kaydedip temizleyen fonksiyonlar eksikti | `export_pipeline_report_to_duckdb(report, db_path)`, `export_services_status_to_duckdb(orch, db_path)`, `clear_orchestrator_duckdb(db_path)` eklendi; Arrow sıfır kopyalı aktarım ve indeksler oluşturuldu |
+| 3 | 7 & Modül Dışa Aktarımı | Yeni DuckDB ve orjson fonksiyonları `__all__` listesinde eksikti | `__all__` listesi güncellendi |
+| 4 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`MasterOrchestrator, PipelineReport, Polars to_polars, to_orjson_bytes, DuckDB export/clear, shutdown_bg_loop %100 başarılı`) ile doğrulandı |
+
+---
+
+# DOSYA 134: services/core/worker.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `export_worker_status_to_duckdb` ve `clear_worker_duckdb` eklendi; Arrow sıfır kopyalı view aktarımı ve indeksler uygulandı. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `export_jobs_to_polars()` ile kayıtlı işler, durumlar ve hata mesajları tam şemalı Polars DataFrame olarak dışa aktarılır. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | Standart `json` yok, `orjson` kullanılır. `to_orjson_bytes()` ve `export_worker_status_to_orjson_bytes()` eklendi (`default=str`). |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Yapısal Türkçe loglama ve merkezi OTel `otel_trace` dekoratörü bağlandı. |
+| 5 | Thread-Safety & Async Lock | UYUMLU | `_active_jobs` ve `_memory_jobs` koleksiyonları `threading.RLock()` ile korunur; biten işler `finally` bloğu ile temizlenerek bellek sızıntısı önlendi. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Veritabanı kesintisinde bellek içi kuyruğa güvenli geri çekilme (fail-closed / fallback) sağlandı; sahte veri ve anlamsız docstring yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `__all__` listesi eklendi; Python 3.12 uyumlu `StrEnum` kullanıldı; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & Sıfır Placeholder Docstring | `"Otomatik eklendi."` docstring'leri mevcuttu | Açıklayıcı, amacını belirten Türkçe docstring'ler yazıldı |
+| 2 | 4 & Kurumsal Standart & OTel | Yerel `otel_trace` asenkron coroutine fonksiyonlarını span içinde await etmiyordu | Merkezi `services.core.otel.otel_trace` entegre edildi |
+| 3 | 2 & Bellek Sızıntısı & Eşzamanlılık | `_active_jobs` sözlüğünden tamamlanan/iptal edilen işler çıkarılmıyordu ve thread-safety yoktu | `threading.RLock()` eklendi ve `_execute_job` içine `finally: self._active_jobs.pop(...)` eklenerek bellek sızıntısı giderildi |
+| 4 | 3 & Fail-Closed / Çevrimdışı Dayanıklılık | Veritabanı erişilemediğinde `submit_job` doğrudan `None` dönüp işi düşürüyordu | Bellek içi yedek sayaç ve durum takip mekanizması (`_memory_jobs`) eklendi, DB yokken de işler güvenle işletilir |
+| 5 | 5 & Polars, orjson & DuckDB | Polars DataFrame ve DuckDB aktarım fonksiyonları eksikti | `export_jobs_to_polars`, `to_orjson_bytes`, `export_worker_status_to_orjson_bytes`, `export_worker_status_to_duckdb`, `clear_worker_duckdb` fonksiyonları yazıldı |
+| 6 | 7 & Modül Dışa Aktarımı | `__all__` listesi ve `__repr__` eksikti | `__repr__` ve eksiksiz `__all__` listesi eklendi |
+| 7 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`submit_job, cancel_job, Polars export, DuckDB snapshot, orjson, shutdown %100 başarılı`) ile doğrulandı |
+
+---
+
+# DOSYA 135: services/core/migrations/runner.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `export_migration_history_to_duckdb` ve `clear_migration_history_duckdb` eklendi; Arrow sıfır kopyalı view aktarımı ve indeksler uygulandı. DuckDB diyalekti doğrudan desteklenir. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `MigrationStatus.to_polars()` ile uygulanan ve bekleyen tüm migration kayıtları tam şemalı Polars DataFrame olarak dışa aktarılır. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | Standart `json` yok, `orjson` kullanılır. `to_orjson_bytes()` ve `export_migration_status_to_orjson_bytes()` eklendi (`default=str`). |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Yapısal Türkçe loglama ve merkezi OTel `otel_trace` dekoratörü (`run_pending`, `rollback_to`, `status`) bağlandı. |
+| 5 | Thread-Safety & Dağıtık Kilit | UYUMLU | Dağıtık DB kilidi (`LOCK_TABLE`), kilit zaman aşımı (300s), stale lock kurtarma ve heartbeat yenileme döngüsü eksiksiz çalışır. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Checksum uyuşmazlığında veya bağımlılık boşluğunda sistem `RuntimeError` fırlatarak fail-closed durur; anlamsız docstring'ler temizlendi. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `from __future__ import annotations`, `__repr__` metotları ve `__all__` listesi eklendi; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & Sıfır Placeholder Docstring | Birçok fonksiyonda `"Otomatik eklendi."` docstring'leri mevcuttu | Açıklayıcı, amacını belirten Türkçe docstring'ler yazıldı |
+| 2 | 4 & Kurumsal Standart & OTel | Migration operasyonlarında OTel trace izlenebilirliği eksikti | Merkezi `services.core.otel.otel_trace` entegre edildi (`run_pending`, `rollback_to`, `status`) |
+| 3 | 5 & Polars, orjson & DuckDB | Migration durum ve geçmişini Polars, orjson ve DuckDB'ye anlık görüntü olarak aktaran fonksiyonlar eksikti | `to_polars`, `to_orjson_bytes`, `export_migration_status_to_orjson_bytes`, `export_migration_history_to_duckdb`, `clear_migration_history_duckdb` fonksiyonları yazıldı |
+| 4 | 7 & Modül Dışa Aktarımı & Type Hinting | `__all__` listesi ve `__repr__` metotları eksikti | `MigrationFile`, `MigrationStatus`, `MigrationRunner` sınıflarına `__repr__` ve eksiksiz `__all__` listesi eklendi |
+| 5 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`MigrationFile.parse, MigrationStatus, Polars export, DuckDB snapshot, orjson, in-memory DuckDB runner %100 başarılı`) ile doğrulandı |
+
+---
+
+# DOSYA 136: services/core/migrations/__init__.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `runner.py` üzerinden DuckDB dışa aktarma fonksiyonları (`export_migration_history_to_duckdb`, `clear_migration_history_duckdb`) yeniden dışa aktarıldı. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `MigrationStatus` sınıfı üzerinden Polars dönüştürme API'si erişilebilirdir. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | `export_migration_status_to_orjson_bytes` doğrudan paket seviyesinden erişilebilir hale getirildi. |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Paket başlığı ve docstring Türkçe olarak düzenlendi. |
+| 5 | Thread-Safety & Dağıtık Kilit | UYUMLU | Dağıtık kilit sabitleri ve hata sınıfları (`LOCK_TABLE`, `MigrationLockError` vb.) dışa aktarıldı. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Sahte veri ve placeholder yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `__all__` listesi eksiksiz tanımlandı; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 7 & Modül Dışa Aktarımı | Dosya içi boştu ve hiçbir sınıf/fonksiyon dışa aktarılmıyordu | Paket docstring'i, `runner` bileşenlerinin re-export'ları ve eksiksiz `__all__` listesi eklendi |
+| 2 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`import services.core.migrations, hasattr kontrolleri ve __all__ boyutu %100 başarılı`) ile doğrulandı |
+
+---
+
+# DOSYA 137: services/core/models/setup_paper_db.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | `setup_duckdb_tables` ve `clear_paper_trade_duckdb` eklendi; yerel analitik ve çevrimdışı testler için portföy ve ledger tabloları indeksleriyle oluşturuldu. |
+| 2 | Polars >= 1.30.0 | UYUMLU | `export_paper_db_schema_to_polars()` ile tablo şema tanımları tam tipli Polars DataFrame olarak dışa aktarılır. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | Standart `json` yok; `export_paper_db_schema_to_orjson_bytes()` eklendi (`default=str`). |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Yapısal Türkçe loglama ve merkezi OTel `otel_trace` dekoratörleri bağlandı. |
+| 5 | Thread-Safety & Async Lock | UYUMLU | Tablo oluşturma sorguları idempotent (`CREATE TABLE IF NOT EXISTS`) ve güvenli DDL yapısındadır. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Anlamsız docstring (`"Otomatik eklendi."`) temizlendi; sahte veri veya placeholder kesinlikle yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `__all__` listesi eklendi; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 & Sıfır Placeholder Docstring | `"Otomatik eklendi."` docstring'i mevcuttu ve import sırası dağınıktı | Açıklayıcı Türkçe modül ve fonksiyon docstring'leri yazıldı, importlar PEP 8 kurallarına göre düzenlendi |
+| 2 | 4 & Kurumsal Standart & OTel | OTel izlenebilirliği eksikti | Merkezi `services.core.otel.otel_trace` eklendi |
+| 3 | 5 & DuckDB Kalıcılığı & Offline Destek | Yalnızca PostgreSQL hedefleniyordu, DuckDB desteği yoktu | `setup_duckdb_tables(db_path)` ve `clear_paper_trade_duckdb(db_path)` yazıldı, yerel test ve analitik için DuckDB tabloları ve indeksleri eklendi |
+| 4 | 2 & 3 & Polars & orjson Entegrasyonu | Şema bilgilerini dışa aktaran Polars ve orjson fonksiyonları eksikti | `export_paper_db_schema_to_polars` ve `export_paper_db_schema_to_orjson_bytes` fonksiyonları yazıldı |
+| 5 | 7 & Modül Dışa Aktarımı | `__all__` listesi eksikti | Eksiksiz `__all__` listesi eklendi |
+| 6 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`setup_duckdb_tables, verify tables, Polars schema export, orjson bytes, clear_paper_trade_duckdb %100 başarılı`) ile doğrulandı |
+
+---
+
+# DOSYA 138: services/core/models/__init__.py
+
+## GEMINI.md Uyumluluk Tablosu
+
+| # | Kural | Durum | Açıklama |
+|---|-------|-------|----------|
+| 1 | DuckDB >= 1.3.0 | UYUMLU | Hem `models.py` (`export_models_to_duckdb`, `clear_models_duckdb`) hem `setup_paper_db.py` (`setup_duckdb_tables`, `clear_paper_trade_duckdb`) DuckDB fonksiyonları bu paket üzerinden doğrudan dışa aktarılır. |
+| 2 | Polars >= 1.30.0 | UYUMLU | Şema ve model verileri Polars DataFrame aktarım fonksiyonları ile tam uyumludur. |
+| 3 | orjson & Standart JSON Yasağı | UYUMLU | `models_to_orjson_bytes` ve `export_paper_db_schema_to_orjson_bytes` paket seviyesinde erişilebilirdir. |
+| 4 | structlog & Windows UTF-8 | UYUMLU | Paket başlığı ve docstring standart Türkçe olarak düzenlendi. |
+| 5 | Thread-Safety & Async Lock | UYUMLU | Modül dinamik yükleyicisi ve re-export yapısı import-time thread-safe çalışır. |
+| 6 | Fail-Closed & Sahte Veri Yasağı | UYUMLU | Sahte veri ve placeholder kesinlikle yoktur. |
+| 7 | Modül Dışa Aktarımı & Tip Denetimi | UYUMLU | `from __future__ import annotations`, tekil ve sıralı `__all__` listesi eksiksiz tanımlandı; `ruff check` 0 hata ile doğrulandı. |
+
+## Yapılan İyileştirmeler ve Düzeltmeler
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 7 & Modül Dışa Aktarımı | `setup_paper_db` yardımcıları paket kökünden doğrudan erişilemiyordu | `models.py` domain modelleri ile `setup_paper_db` kurulum fonksiyonları tek bir birleşik `__all__` listesinde birleştirilerek re-export edildi |
+| 2 | 5 & Canlı Doğrulama | Canlı mikro yürütme testi ve ruff denetimi | `ruff check` (0 hata) ve izole mikro test (`import services.core.models, hasattr domain modelleri, hasattr paper db yardımcıları ve __all__ listesi %100 başarılı`) ile doğrulandı |
+
+---
+
+## `short_selling.py` (95. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; kalıcı denetim günlüğü diske yazılamıyordu | `DEFAULT_SHORT_SELLING_DB: Final[str] = "data/short_selling_audit.duckdb"` tanımlandı ve disk fallback ile bağlandı |
+| 2 | 2 & 5 | DuckDB WAL ve checkpoint eşikleri yapılandırılmamıştı, ani çökmelerde veri kaybı riski vardı | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` entegre edildi |
+| 3 | 3 & 4 | `otel_trace` dekoratöründe `tracer` None olduğunda veya mock nesne iken `AttributeError` patlıyordu | `tracer is not None and hasattr(tracer, "start_as_current_span")` güvenlik kontrolü eklendi |
+| 4 | 5 & 6 | Açığa satış kararlarını serileştirmek için genel `to_orjson_bytes(val)` yardımcı fonksiyonu eksikti | Nesne `to_dict` veya doğrudan sözlük verisini güvenli serileştiren `to_orjson_bytes` fonksiyonu eklendi |
+| 5 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `ShortSellingMonitor.close()` metodu reentrant kilit korumasıyla eklendi |
+| 6 | 6 | Denetim günlüğünü test ve bakım amaçlı sıfırlayabilen metot eksikti | `ShortSellingMonitor.clear_audit_duckdb()` ve `clear_short_selling_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 7 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak kayıtları okuyan fonksiyon eksikti | `read_short_selling_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 8 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_short_selling_audit_from_duckdb`, `clear_short_selling_audit_duckdb` listeye eklendi |
+| 9 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; BIST-50, uptick rule, red kararları, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `state_recovery.py` (96. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; durum kurtarma denetimleri diske kalıcı yazılamıyordu | `DEFAULT_STATE_RECOVERY_DB: Final[str] = "data/state_recovery.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | Durum nesnelerini orjson ile serileştirmede `default=str` parametresi eksikti | `RecoveredState.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` ile güvenli serileştirme sağlandı |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `StateRecovery.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Denetim tablosunu sıfırlayabilen yardımcı metotlar eksikti | `StateRecovery.clear_audit_duckdb()` ve `clear_state_recovery_audit_duckdb(duckdb_path)` eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak kayıtları okuyan fonksiyon eksikti | `read_state_recovery_audit_from_duckdb(duckdb_path, limit)` fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_state_recovery_audit_from_duckdb`, `clear_state_recovery_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; snapshot save/load, consistency check, Polars export ve DuckDB audit mikro testi başarıyla geçti |
+
+---
+
+## `state_store.py` (97. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu `data/central_state.duckdb` sabit olarak kullanılıyordu; modül seviyesi `DEFAULT_*` sabiti eksikti | `DEFAULT_CENTRAL_STATE_DB: Final[str] = "data/central_state.duckdb"` tanımlandı ve disk fallback ile bağlandı |
+| 2 | 2 & 5 | DuckDB WAL ve checkpoint parametreleri harici modüler fonksiyon ile yapılandırılmıyordu | `DEFAULT_CHECKPOINT_SIZE = "8MB"`, `DEFAULT_WAL_SIZE = "4MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | `StateStoreStats.to_orjson_bytes()` ve genel serileştirme için `default=str` ve `to_orjson_bytes()` eksikti | `default=str` parametresi eklendi ve modül seviyesi `to_orjson_bytes()` fonksiyonu tanımlandı |
+| 4 | 6 | Durum deposundaki tüm tabloları sıfırlayan metot eksikti | `CentralStateStore.clear_all_tables()` ve `clear_state_store_duckdb(db_path)` fonksiyonları eklendi |
+| 5 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak tahminleri okuyan fonksiyon eksikti | `read_predictions_from_duckdb(db_path, limit)` fonksiyonu eklendi |
+| 6 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_predictions_from_duckdb`, `clear_state_store_duckdb` listeye eklendi |
+| 7 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; circuit breaker, prediction kayıt, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `streaming_anomaly.py` (98. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; akış anomalileri diske kalıcı yazılamıyordu | `DEFAULT_STREAMING_ANOMALY_DB: Final[str] = "data/streaming_anomalies_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | Anomali sonuçları orjson ile serileştirilirken `default=str` parametresi eksikti | `AnomalyResult.to_orjson_bytes()` ve genel `to_orjson_bytes()` fonksiyonları eklendi |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `StreamingAnomalyDetector.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Anomali denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `StreamingAnomalyDetector.clear_audit_duckdb()` ve `clear_streaming_anomalies_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak anomali kayıtlarını okuyan fonksiyon eksikti | `read_streaming_anomalies_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_streaming_anomalies_from_duckdb`, `clear_streaming_anomalies_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; fiyat, hacim, spread spike kontrolleri, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `swr_cache.py` (99. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; SWR önbellek denetim logları kalıcı yazılamıyordu | `DEFAULT_SWR_CACHE_DB: Final[str] = "data/swr_cache_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | SWRCacheStats nesneleri orjson ile serileştirilirken `default=str` parametresi eksikti | `SWRCacheStats.to_orjson_bytes()` ve genel `to_orjson_bytes()` fonksiyonları eklendi |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `SWRCache.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | SWR denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `SWRCache.clear_audit_duckdb()` ve `clear_swr_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak SWR kayıtlarını okuyan fonksiyon eksikti | `read_swr_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_swr_audit_from_duckdb`, `clear_swr_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; get/set, SWR stale window, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `system_governor.py` (100. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; sistem durum geçiş denetimleri kalıcı yazılamıyordu | `DEFAULT_SYSTEM_GOVERNOR_DB: Final[str] = "data/system_governor_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | Governor veri modelleri orjson ile serileştirilirken `default=str` parametresi eksikti | `StateTransition`, `HealthCheck`, `GovernorStatus` modellerine `default=str` ve modül seviyesi `to_orjson_bytes()` eklendi |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `SystemStateGovernor.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Durum geçiş denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `SystemStateGovernor.clear_audit_duckdb()` ve `clear_system_governor_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak durum geçişlerini okuyan fonksiyon eksikti | `read_governor_transitions_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_governor_transitions_from_duckdb`, `clear_system_governor_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; transition, feature flags, health checks, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `tax.py` (101. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; vergi hesaplama denetimleri kalıcı yazılamıyordu | `DEFAULT_TAX_DB: Final[str] = "data/tax_calculations_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | `TaxResult.to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `default=str` eklendi ve modül seviyesinde `to_orjson_bytes()` fonksiyonu tanımlandı |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `TaxCalculator.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Vergi hesaplama denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `TaxCalculator.clear_audit_duckdb()` ve `clear_tax_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak vergi kayıtlarını okuyan fonksiyon eksikti | `read_tax_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_tax_audit_from_duckdb`, `clear_tax_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; BIST hisse, temettü, yabancı hisse, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `tradability_mask.py` (102. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; tradability mask denetimleri kalıcı yazılamıyordu | `DEFAULT_TRADABILITY_MASK_DB: Final[str] = "data/tradability_mask_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | `MaskResult.to_orjson_bytes()` metodunda `default=str` parametresi eksikti | `default=str` eklendi ve modül seviyesinde `to_orjson_bytes()` fonksiyonu tanımlandı |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `TradabilityMask.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Tradability mask denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `TradabilityMask.clear_audit_duckdb()` ve `clear_tradability_mask_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak maske kayıtlarını okuyan fonksiyon eksikti | `read_tradability_mask_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_tradability_mask_audit_from_duckdb`, `clear_tradability_mask_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; NumPy array mask, Polars vektörize mask, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `transaction_helper.py` (103. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak `:memory:` hardcoded idi; transaction denetimleri diske kalıcı yazılamıyordu | `DEFAULT_TRANSACTION_DB: Final[str] = "data/transaction_audit.duckdb"` tanımlandı ve disk fallback mekanizması eklendi |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 5 & 6 | `TransactionMetrics` ve `QueryMetrics` serileştirilmesinde `default=str` parametresi eksikti | `default=str` eklendi ve modül seviyesinde `to_orjson_bytes()` fonksiyonu tanımlandı |
+| 4 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `TransactionHelper.close()` metodu reentrant kilit korumasıyla eklendi |
+| 5 | 6 | Transaction denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `TransactionHelper.clear_audit_duckdb()` ve `clear_transaction_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 6 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak transaction loglarını okuyan fonksiyon eksikti | `read_transaction_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 7 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_transaction_audit_from_duckdb`, `clear_transaction_audit_duckdb` listeye eklendi |
+| 8 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; audit log kaydı, metrikler, Polars export ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `viop_monitor.py` (104. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 1 | "Otomatik eklendi." şeklinde placeholder docstring'ler mevcuttu | Tüm sınıflar ve fonksiyonlar için kurumsal, açıklayıcı ve BIST VİOP SPAN kurallarını anlatan Türkçe docstring'ler yazıldı |
+| 2 | 2 & 5 | OpenTelemetry paketi sert bağımlılık olarak import ediliyordu (`from opentelemetry import trace`) | Güvenli yerel fallback izleme sağlayan `otel_trace` dekoratörü entegre edildi |
+| 3 | 5 | DuckDB kalıcılığı ve denetim izi hiç yoktu | `DEFAULT_VIOP_MONITOR_DB: Final[str] = "data/viop_monitor_audit.duckdb"` tanımlandı ve her kontrol diske arşivlenecek şekilde DuckDB şeması oluşturuldu |
+| 4 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 5 | 5 & 6 | `MarginStatus` veri modelinde `to_orjson_bytes()` ve `to_dict()` eksikleri vardı; orjson desteği yoktu | `default=str` serileştirme ile `MarginStatus.to_orjson_bytes()` ve modül seviyesi `to_orjson_bytes()` fonksiyonu eklendi |
+| 6 | 2 | Paylaşılan özel teminat oranları ve durum için iş parçacığı güvenliği yoktu | `threading.RLock()` ile reentrant thread-safety sağlandı |
+| 7 | 2 | Polars analitik desteği bulunmuyordu | `check_margin_batch_polars()` toplu portföy analitiği ve `export_audit_to_polars()` fonksiyonları eklendi |
+| 8 | 2 & 5 | DuckDB bağlantısının harici süreç veya test sonrasında temiz kapatılması için `close()` metodu yoktu | `VIOPMonitor.close()` metodu reentrant kilit korumasıyla eklendi |
+| 9 | 6 | VİOP denetim tablosunu sıfırlayan yardımcı metotlar eksikti | `VIOPMonitor.clear_audit_duckdb()` ve `clear_viop_monitor_audit_duckdb(duckdb_path)` fonksiyonları eklendi |
+| 10 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak VİOP denetim loglarını okuyan fonksiyon eksikti | `read_viop_monitor_audit_from_duckdb(duckdb_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 11 | 2 | Sayısal guard kontrolleri (NaN, Inf, fail-closed) eksikti | Giriş parametreleri için katı sayısal doğrulamalar ve fail-closed güvenlik sınırları eklendi |
+| 12 | 7 | Modül seviyesinde `__all__` listesi hiç tanımlanmamıştı | `__all__` listesi eksiksiz olarak modül seviyesinde tanımlandı |
+| 13 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; teminat yeterliliği, margin call, liquidate, Polars toplu hesaplama ve DuckDB mikro testi başarıyla geçti |
+
+---
+
+## `worker.py` (105. dosya)
+
+| # | Kural | Sorun | Düzeltme |
+|---|-------|-------|----------|
+| 1 | 5 | DuckDB dosya yolu varsayılan olarak hardcoded string idi; merkezi sabit tanımlanmamıştı | `DEFAULT_WORKER_STATUS_DB: Final[str] = "data/worker_status.duckdb"` tanımlandı |
+| 2 | 2 & 5 | DuckDB bağlantısında WAL ve checkpoint pragmaları eksikti (`SET checkpoint_threshold = '64MB'` yerine optimize WAL) | `DEFAULT_CHECKPOINT_SIZE = "4MB"`, `DEFAULT_WAL_SIZE = "2MB"` ve `configure_duckdb_wal()` fonksiyonu eklendi |
+| 3 | 4 | Fonksiyon içi lazy `import duckdb`, `from pathlib import Path` yapılıyordu | Importlar dosya başına taşındı, PEP 8 ve ruff standartlarına uygun hale getirildi |
+| 4 | 5 & 6 | Modül seviyesinde evrensel `to_orjson_bytes()` fonksiyonu eksikti | `to_orjson_bytes(val: Any) -> bytes` modül seviyesine eklendi |
+| 5 | 6 | DuckDB dosyasından doğrudan Polars DataFrame olarak iş kayıtlarını okuyan yardımcı fonksiyon eksikti | `read_worker_jobs_from_duckdb(db_path, limit)` modül seviyesi fonksiyonu eklendi |
+| 6 | 7 | Modül seviyesinde `__all__` listesinde yeni fonksiyonlar ve sabitler eksikti | `DEFAULT_*`, `configure_duckdb_wal`, `to_orjson_bytes`, `read_worker_jobs_from_duckdb` listeye eklendi |
+| 7 | 5 | Düzeltme sonrası canlı doğrulama ve ruff kontrolü | `ruff check` 0 hata ile tamamlandı; submit_job, get_job_status, Polars ve DuckDB mikro testi başarıyla geçti |
 

@@ -112,7 +112,7 @@ class ConnectivityEvent:
 
     def to_orjson_bytes(self) -> bytes:
         """Olayı orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def to_json(self) -> str:
         """Olayı JSON metnine dönüştürür."""
@@ -449,6 +449,11 @@ class ConnectivityMonitor:
         )
         self._event_log.append(event)
 
+    def clear_event_log(self) -> None:
+        """Olay günlüğünü thread-safe olarak temizler."""
+        with self._state_lock:
+            self._event_log.clear()
+
     def get_status(self) -> dict[str, Any]:
         """Mevcut bağlantı durumunu ve metriklerini sözlük olarak döndürür."""
         with self._state_lock:
@@ -535,14 +540,21 @@ class ConnectivityMonitor:
 
         try:
             with duckdb.connect(str(path_obj)) as conn:
-                from services.core.debounce import configure_duckdb_wal
+                try:
+                    from services.core.debounce import configure_duckdb_wal
 
-                configure_duckdb_wal(conn)
+                    configure_duckdb_wal(conn)
+                except Exception:
+                    with contextlib.suppress(Exception):
+                        conn.execute("PRAGMA wal_autocheckpoint='10MB';")
+
                 conn.register("df_conn_events", df.to_arrow())
                 conn.execute(
                     f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_conn_events WHERE 1=0"
                 )
                 conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_conn_events")
+                with contextlib.suppress(Exception):
+                    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp)")
             return len(df)
         except Exception as e:
             logger.error("export_connectivity_to_duckdb_failed", error=str(e))
@@ -604,6 +616,38 @@ class ConnectivityMonitor:
 connectivity_monitor: ConnectivityMonitor = ConnectivityMonitor()
 
 
+def is_online() -> bool:
+    """Sistemin çevrimiçi olup olmadığını bildirir."""
+    return connectivity_monitor.is_online
+
+
+def is_offline() -> bool:
+    """Sistemin çevrimdışı olup olmadığını bildirir."""
+    return connectivity_monitor.is_offline
+
+
+def export_connectivity_events_to_polars() -> pl.DataFrame:
+    """Bağlantı olaylarını Polars DataFrame olarak döndürür."""
+    return connectivity_monitor.export_events_to_polars()
+
+
+def export_connectivity_events_to_duckdb(
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    table_name: str = "bist_connectivity_events",
+) -> int:
+    """Bağlantı olaylarını DuckDB tablosuna kaydeder."""
+    return connectivity_monitor.export_events_to_duckdb(db_path=db_path, table_name=table_name)
+
+
+def query_connectivity_events_duckdb(
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    table_name: str = "bist_connectivity_events",
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB üzerinden geçmiş bağlantı olaylarını sorgular."""
+    return connectivity_monitor.query_events_duckdb(db_path=db_path, table_name=table_name, limit=limit)
+
+
 __all__ = [
     "DEFAULT_CHECK_INTERVAL_SECONDS",
     "DEFAULT_TIMEOUT_SECONDS",
@@ -616,4 +660,9 @@ __all__ = [
     "ConnectivityEvent",
     "ConnectivityMonitor",
     "connectivity_monitor",
+    "is_online",
+    "is_offline",
+    "export_connectivity_events_to_polars",
+    "export_connectivity_events_to_duckdb",
+    "query_connectivity_events_duckdb",
 ]

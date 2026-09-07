@@ -10,6 +10,7 @@ TimescaleDB / PostgreSQL Streaming Replication İzleme Motoru:
 
 from __future__ import annotations
 
+import asyncio
 import functools
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,25 +43,43 @@ def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def otel_trace(span_name: str) -> Any:
-    """Metot veya fonksiyonu OpenTelemetry span içine alan dekoratör.
+    """Metot, senkron fonksiyon veya asenkron coroutine'i OpenTelemetry span içine alan dekoratör.
 
     Args:
         span_name: Span adı.
 
     Returns:
-        Sarmalayıcı fonksiyon.
+        Sarmalayıcı fonksiyon veya coroutine.
     """
 
     def decorator(func: Any) -> Any:
-        """Hedef fonksiyonu OTel span ile sarmalar."""
+        """Hedef fonksiyon veya coroutine'i OTel span ile sarmalar."""
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name) as span:
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as exc:
+                        if hasattr(span, "record_exception"):
+                            span.record_exception(exc)
+                        raise
+
+            return async_wrapper
 
         @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            """Asenkron çağrıyı span içinde icra eder."""
-            with tracer.start_as_current_span(span_name):
-                return await func(*args, **kwargs)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            """Fonksiyon çağrısını span içinde icra eder."""
+            with tracer.start_as_current_span(span_name) as span:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    if hasattr(span, "record_exception"):
+                        span.record_exception(exc)
+                    raise
 
-        return wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -237,7 +256,12 @@ def export_pg_replication_to_polars(health_data: dict[str, Any] | None = None) -
 
 def export_pg_replication_to_orjson(health_data: dict[str, Any]) -> bytes:
     """Replikasyon durumunu C seviyesinde orjson bayt dizisine dönüştürür."""
-    return orjson.dumps(health_data, option=orjson.OPT_SORT_KEYS)
+    return orjson.dumps(health_data, option=orjson.OPT_SORT_KEYS, default=str)
+
+
+def to_orjson_bytes(health_data: dict[str, Any]) -> bytes:
+    """export_pg_replication_to_orjson için takma ad."""
+    return export_pg_replication_to_orjson(health_data)
 
 
 def save_replication_health_to_duckdb(
@@ -267,14 +291,78 @@ def save_replication_health_to_duckdb(
         df_health = export_pg_replication_to_polars(health_data)
         if df_health.height > 0:
             conn.register("tmp_pg_rep", df_health.to_arrow())
-            conn.execute("""
-                INSERT INTO pg_replication_history
-                SELECT primary_status, replica_status, lag_bytes, lag_seconds, overall_status, error_count, checked_at
-                FROM tmp_pg_rep
-            """)
-            conn.unregister("tmp_pg_rep")
+            try:
+                conn.execute("""
+                    INSERT INTO pg_replication_history
+                    SELECT primary_status, replica_status, lag_bytes, lag_seconds, overall_status, error_count, checked_at
+                    FROM tmp_pg_rep
+                """)
+            finally:
+                conn.unregister("tmp_pg_rep")
         conn.commit()
         logger.info("pg_replikasyon_durumu_duckdb_kaydedildi", db_path=str(path))
+    finally:
+        conn.close()
+
+
+def read_replication_health_from_duckdb(
+    db_path: str = DEFAULT_PG_HEALTH_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB içindeki replikasyon geçmiş kayıtlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+
+    Returns:
+        Replikasyon geçmiş kayıtlarını içeren Polars DataFrame.
+    """
+    path = Path(db_path)
+    schema = {
+        "primary_status": pl.String,
+        "replica_status": pl.String,
+        "lag_bytes": pl.Int64,
+        "lag_seconds": pl.Float64,
+        "overall_status": pl.String,
+        "error_count": pl.Int64,
+        "checked_at": pl.String,
+    }
+    if not path.exists():
+        return pl.DataFrame(schema=schema)
+
+    conn = duckdb.connect(str(path), read_only=True)
+    try:
+        configure_duckdb_wal(conn)
+        tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+        if "pg_replication_history" not in tables:
+            return pl.DataFrame(schema=schema)
+        arrow_table = conn.execute(
+            f"SELECT primary_status, replica_status, lag_bytes, lag_seconds, overall_status, error_count, checked_at "
+            f"FROM pg_replication_history ORDER BY checked_at DESC LIMIT {int(limit)}"
+        ).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def clear_replication_health_duckdb(
+    db_path: str = DEFAULT_PG_HEALTH_DB_PATH,
+) -> None:
+    """DuckDB tablosundaki replikasyon geçmiş kayıtlarını temizler.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS pg_replication_history")
+        conn.commit()
+        logger.info("pg_replication_duckdb_temizlendi", db_path=str(path))
     finally:
         conn.close()
 
@@ -284,11 +372,14 @@ __all__: Final[list[str]] = [
     "DEFAULT_MAX_LAG_SECONDS",
     "DEFAULT_PG_HEALTH_DB_PATH",
     "check_replication_health",
+    "clear_replication_health_duckdb",
     "configure_duckdb_wal",
     "export_pg_replication_to_orjson",
     "export_pg_replication_to_polars",
     "get_replication_metrics",
     "otel_trace",
+    "read_replication_health_from_duckdb",
     "save_replication_health_to_duckdb",
     "should_fallback_to_primary",
+    "to_orjson_bytes",
 ]

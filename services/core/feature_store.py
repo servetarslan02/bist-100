@@ -18,9 +18,7 @@ Kullanım:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import functools
 import hashlib
 import math
 import re
@@ -28,59 +26,24 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 import duckdb
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
 
 from services.core.debounce import configure_duckdb_wal
+from services.core.otel import otel_trace
 
 from . import redis_helper
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.feature_store")
 
 DEFAULT_MAX_CACHE_SIZE: int = 10000
 DEFAULT_CACHE_TTL_SECONDS: int = 3600
 REDIS_DELETE_CHUNK_SIZE: int = 1000
 DEFAULT_FEATURE_STORE_DB_PATH: str = "data/feature_store_cache.duckdb"
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
-
-    Senkron ve asenkron fonksiyonları otomatik algılayarak span yaşam döngüsünü
-    korur.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(self, *args, **kwargs)
-
-            return async_wrapper
-        else:
-
-            @functools.wraps(func)
-            def sync_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return func(self, *args, **kwargs)
-
-            return sync_wrapper
-
-    return decorator
 
 
 def _clean_feature_val(val: Any) -> float:
@@ -555,6 +518,23 @@ class FeatureStore:
                 "redis_connected": self._redis is not None,
             }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Önbellek istatistiklerini orjson binary olarak döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        return orjson.dumps(self.get_stats(), option=orjson.OPT_INDENT_2, default=str)
+
+    def clear(self) -> None:
+        """Bellek içi tüm özellik önbelleklerini ve sayaçları temizler."""
+        with self._lock:
+            self._cache.clear()
+            self._master_cache.clear()
+            self._hits = 0
+            self._misses = 0
+            logger.info("FeatureStore bellek içi önbelleği temizlendi")
+
     def export_stats_to_polars(self) -> pl.DataFrame:
         """Önbellek performans metriklerini Polars DataFrame olarak dışa aktarır (GEMINI.md Kural 2).
 
@@ -678,14 +658,20 @@ class FeatureStore:
                     PRIMARY KEY (ticker, date)
                 )
             """)
-            conn.register("df_features_view", df.to_arrow())
             conn.execute(f"""
-                INSERT INTO {table_name}
-                SELECT * FROM df_features_view
-                ON CONFLICT (ticker, date) DO UPDATE SET
-                    features_json = EXCLUDED.features_json,
-                    expires_at = EXCLUDED.expires_at
+                CREATE INDEX IF NOT EXISTS idx_{table_name}_exp ON {table_name} (expires_at);
             """)
+            conn.register("df_features_view", df.to_arrow())
+            try:
+                conn.execute(f"""
+                    INSERT INTO {table_name}
+                    SELECT * FROM df_features_view
+                    ON CONFLICT (ticker, date) DO UPDATE SET
+                        features_json = EXCLUDED.features_json,
+                        expires_at = EXCLUDED.expires_at
+                """)
+            finally:
+                conn.unregister("df_features_view")
 
         return df.height
 
@@ -697,47 +683,81 @@ class FeatureStore:
         """DuckDB anlık görüntüsünden süresi dolmamış özellikleri bellek içi önbelleğe geri yükler.
 
         Args:
-            db_path: DuckDB dosya yolu.
-            table_name: Kaynak tablo adı.
+            db_path: DuckDB veritabanı dosya yolu.
+            table_name: Yüklenecek tablo adı.
 
         Returns:
-            Yüklenen toplam hisse-tarih kayıt adedi.
+            Geri yüklenen özellik kaydı sayısı.
         """
-        target_path = str(db_path or self._db_path)
-        target = Path(target_path)
-        if not target.exists() or target.stat().st_size == 0:
+        target_path = db_path or self._db_path
+        if not Path(target_path).exists():
             return 0
 
         now = time.time()
-        loaded = 0
         try:
-            with duckdb.connect(target_path, read_only=True) as conn:
-                rows = conn.execute(
-                    f"SELECT ticker, date, features_json, expires_at FROM {table_name} WHERE expires_at > ?",
-                    [now],
-                ).fetchall()
+            with duckdb.connect(target_path) as conn:
+                configure_duckdb_wal(conn)
+                # Tablonun varlığını kontrol et
+                tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+                if table_name not in tables:
+                    return 0
 
-                with self._lock:
-                    for ticker, date_val, feat_json, expires_at in rows:
-                        try:
-                            raw = orjson.loads(feat_json)
-                            clean = {str(k): _clean_feature_val(v) for k, v in raw.items()}
-                            master_key = self._make_master_key(ticker, date_val)
-                            self._master_cache[master_key] = {
-                                "features": clean,
-                                "expires_at": float(expires_at),
-                            }
-                            loaded += 1
-                        except Exception:
-                            continue
-        except Exception as exc:
-            logger.warning("feature_store_duckdb_yukleme_hatasi", hata=str(exc))
+                arrow_table = conn.execute(f"""
+                    SELECT ticker, date, features_json, expires_at
+                    FROM {table_name}
+                    WHERE expires_at > {now}
+                """).fetch_arrow_table()
 
-        return loaded
+            if arrow_table.num_rows == 0:
+                return 0
+
+            df = pl.from_arrow(arrow_table)
+            loaded_count = 0
+
+            with self._lock:
+                for row in df.iter_rows(named=True):
+                    try:
+                        feat_dict = orjson.loads(row["features_json"])
+                        master_key = f"features:{row['ticker']}:{row['date']}"
+                        self._master_cache[master_key] = {
+                            "features": feat_dict,
+                            "expires_at": row["expires_at"],
+                        }
+                        loaded_count += 1
+                    except Exception as e:
+                        logger.error("DuckDB satır çözme hatası", ticker=row.get("ticker"), hata=str(e))
+
+            logger.info("Özellikler DuckDB'den yüklendi", kayit_sayisi=loaded_count, tablo=table_name)
+            return loaded_count
+        except Exception as e:
+            logger.error("DuckDB yükleme hatası", dosya=target_path, hata=str(e))
+            return 0
 
 
 # Global tekil nesne
 feature_store: Final[FeatureStore] = FeatureStore()
+
+
+def clear_feature_store() -> None:
+    """Genel FeatureStore tekil nesnesinin tüm önbellek ve sayaçlarını sıfırlar."""
+    feature_store.clear()
+
+
+def clear_features_duckdb(
+    db_path: str = DEFAULT_FEATURE_STORE_DB_PATH,
+    table_name: str = "feature_store_snapshot",
+) -> None:
+    """DuckDB tablosundaki tüm özellik anlık görüntü verilerini temizler."""
+    if not Path(db_path).exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        configure_duckdb_wal(conn)
+        conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+
+def export_feature_stats_to_orjson_bytes() -> bytes:
+    """Önbellek istatistiklerini orjson serileştirilmiş bayt dizisi olarak döndürür."""
+    return feature_store.to_orjson_bytes()
 
 
 def export_feature_stats_to_polars() -> pl.DataFrame:
@@ -776,6 +796,9 @@ __all__: Final[list[str]] = [
     "DEFAULT_MAX_CACHE_SIZE",
     "REDIS_DELETE_CHUNK_SIZE",
     "FeatureStore",
+    "clear_feature_store",
+    "clear_features_duckdb",
+    "export_feature_stats_to_orjson_bytes",
     "export_feature_stats_to_polars",
     "export_features_to_duckdb",
     "export_features_to_polars",

@@ -60,6 +60,35 @@ DEFAULT_WATCH_INTERVAL_SECONDS: Final[float] = 30.0  # SSD koruma limiti (30s)
 DEFAULT_MAX_HISTORY_LEN: Final[int] = 100
 DEFAULT_CONFIG_DB_PATH: Final[str] = "data/config_audit.duckdb"
 DEFAULT_RUNTIME_CONFIG_PATH: Final[str] = "config/runtime.json"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 @dataclass(slots=True)
@@ -95,7 +124,7 @@ class ConfigChange:
         return {
             "change_id": self.change_id,
             "timestamp": self.timestamp.isoformat(),
-            "file_path": self.file_path,
+            "file_path": Path(self.file_path).as_posix(),
             "old_hash": self.old_hash[:12] if self.old_hash else "",
             "new_hash": self.new_hash[:12] if self.new_hash else "",
             "changed_keys": list(self.changed_keys),
@@ -177,6 +206,7 @@ class ConfigHotReload:
             db_file = Path(self._db_path)
             db_file.parent.mkdir(parents=True, exist_ok=True)
             self._conn = duckdb.connect(str(db_file))
+            configure_duckdb_wal(self._conn)
             with self._lock:
                 self._conn.execute(
                     """
@@ -646,6 +676,25 @@ class ConfigHotReload:
                 logger.error("config_history_polars_hatasi", error=str(exc))
                 return pl.DataFrame(schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Motor durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "file_path": self._config_path.as_posix(),
+                "running": self._running,
+                "keys_count": len(self._current_config),
+                "history_count": len(self._change_history),
+                "conn_active": self._conn is not None,
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Motor durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str | None = None) -> None:
+        """Konfigürasyon denetim tablosunu sıfırlar."""
+        clear_config_audit_duckdb(db_path=db_path or self._db_path)
+
     def __repr__(self) -> str:
         """Motorun okunabilir durum temsilini döndürür."""
         return (
@@ -848,6 +897,18 @@ class SettingsBridge:
         """
         return cls._SECRET_FIELDS.copy()
 
+    def to_dict(self) -> dict[str, Any]:
+        """Köprü durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "watching": self._watching,
+                "history_count": len(self._settings_history),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Köprü durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
     def __repr__(self) -> str:
         """Köprünün okunabilir durum temsilini döndürür."""
         return f"SettingsBridge(watching={self._watching}, history_count={len(self._settings_history)})"
@@ -925,19 +986,142 @@ def query_config_audit_duckdb(
     )
 
 
+def read_config_audit_from_duckdb(
+    db_path: str = DEFAULT_CONFIG_DB_PATH,
+    file_path: str | None = None,
+    applied: bool | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan konfigürasyon denetim izini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        file_path: İsteğe bağlı dosya yolu filtresi.
+        applied: İsteğe bağlı uygulanma durumu filtresi.
+        limit: Dönecek maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan denetim kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "id": pl.Int64,
+                "timestamp": pl.Datetime("us", "UTC"),
+                "change_id": pl.Utf8,
+                "file_path": pl.Utf8,
+                "old_hash": pl.Utf8,
+                "new_hash": pl.Utf8,
+                "changed_keys": pl.Utf8,
+                "applied": pl.Boolean,
+                "error": pl.Utf8,
+            }
+        )
+
+    if (
+        config_hot_reload._conn is not None
+        and Path(config_hot_reload._db_path).resolve() == path_obj.resolve()
+    ):
+        return config_hot_reload.query_audit_duckdb(file_path=file_path, applied=applied, limit=limit)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'config_audit_log'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "id": pl.Int64,
+                        "timestamp": pl.Datetime("us", "UTC"),
+                        "change_id": pl.Utf8,
+                        "file_path": pl.Utf8,
+                        "old_hash": pl.Utf8,
+                        "new_hash": pl.Utf8,
+                        "changed_keys": pl.Utf8,
+                        "applied": pl.Boolean,
+                        "error": pl.Utf8,
+                    }
+                )
+
+            query = """
+                SELECT id, timestamp, change_id, file_path, old_hash,
+                       new_hash, changed_keys, applied, error
+                FROM config_audit_log
+            """
+            params: list[Any] = []
+            conditions: list[str] = []
+
+            if file_path:
+                conditions.append("file_path = ?")
+                params.append(str(file_path))
+            if applied is not None:
+                conditions.append("applied = ?")
+                params.append(bool(applied))
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY id DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_config_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "id": pl.Int64,
+                "timestamp": pl.Datetime("us", "UTC"),
+                "change_id": pl.Utf8,
+                "file_path": pl.Utf8,
+                "old_hash": pl.Utf8,
+                "new_hash": pl.Utf8,
+                "changed_keys": pl.Utf8,
+                "applied": pl.Boolean,
+                "error": pl.Utf8,
+            }
+        )
+
+
+def clear_config_audit_duckdb(db_path: str = DEFAULT_CONFIG_DB_PATH) -> None:
+    """DuckDB'de depolanan konfigürasyon denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS config_audit_log;")
+            conn.execute("DROP SEQUENCE IF EXISTS seq_config_audit_id;")
+    except Exception as exc:
+        logger.error("duckdb_config_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_CONFIG_DB_PATH",
     "DEFAULT_MAX_HISTORY_LEN",
     "DEFAULT_RUNTIME_CONFIG_PATH",
+    "DEFAULT_WAL_SIZE",
     "DEFAULT_WATCH_INTERVAL_SECONDS",
     "ConfigChange",
     "ConfigHotReload",
     "SettingsBridge",
+    "clear_config_audit_duckdb",
     "config_hot_reload",
+    "configure_duckdb_wal",
     "export_config_history_to_polars",
     "force_reload_runtime_config",
     "get_current_runtime_config",
     "query_config_audit_duckdb",
+    "read_config_audit_from_duckdb",
     "save_runtime_config_safely",
     "settings_bridge",
+    "to_orjson_bytes",
 ]

@@ -15,15 +15,14 @@ import threading
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import numpy as np
 import orjson
 import polars as pl
 import structlog
-
-if TYPE_CHECKING:
-    import duckdb
 
 try:
     from services.core.otel import otel_trace
@@ -46,6 +45,9 @@ logger = structlog.get_logger(__name__)
 
 DEFAULT_LOOKBACK_DAYS: Final[int] = 60
 DEFAULT_MAX_HISTORY_LEN: Final[int] = 1000
+DEFAULT_REGIME_DUCKDB_PATH: Final[str] = "data/market_regimes.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 REGIME_BULL: Final[str] = "BULL"
 REGIME_BEAR: Final[str] = "BEAR"
@@ -61,6 +63,19 @@ VALID_REGIMES: Final[tuple[str, ...]] = (
     REGIME_HIGH_VOL,
     REGIME_LOW_VOL,
 )
+
+
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL parametrelerini optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("regime_duckdb_wal_yapilandirma_uyarisi", hata=str(e))
 
 
 @dataclass
@@ -93,7 +108,7 @@ class RegimeState:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine dönüştürür."""
-        return orjson.dumps(self.to_dict(), option=orjson.OPT_SERIALIZE_NUMPY)
+        return orjson.dumps(self.to_dict(), default=str, option=orjson.OPT_SERIALIZE_NUMPY)
 
 
 class RegimeDetector:
@@ -130,6 +145,7 @@ class RegimeDetector:
         if self._duckdb_conn is None:
             return
         with self._lock:
+            configure_duckdb_wal(self._duckdb_conn)
             try:
                 self._duckdb_conn.execute("""
                     CREATE TABLE IF NOT EXISTS market_regime_history (
@@ -145,14 +161,55 @@ class RegimeDetector:
             except Exception as exc:
                 logger.error("RegimeDetector DuckDB şema oluşturma hatası", hata=str(exc))
 
+    def _get_active_duckdb(self, writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+        """Aktif DuckDB bağlantısını ve kapatılması gerekip gerekmediğini döndürür."""
+        with self._lock:
+            if self._duckdb_conn is not None:
+                return self._duckdb_conn, False
+
+        p = Path(DEFAULT_REGIME_DUCKDB_PATH)
+        if not writable and not p.exists():
+            return None, False
+
+        try:
+            if writable:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                conn = duckdb.connect(str(p))
+                configure_duckdb_wal(conn)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS market_regime_history (
+                        id BIGINT,
+                        regime VARCHAR,
+                        confidence DOUBLE,
+                        duration_days INTEGER,
+                        factors_json VARCHAR,
+                        detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE SEQUENCE IF NOT EXISTS seq_market_regime START 1;
+                """)
+                return conn, True
+            else:
+                conn = duckdb.connect(str(p), read_only=True)
+                tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+                if "market_regime_history" not in tables:
+                    conn.close()
+                    return None, False
+                return conn, True
+        except Exception as exc:
+            logger.debug("RegimeDetector DuckDB aktif bağlantı hatası", hata=str(exc))
+            return None, False
+
     def _record_to_duckdb(self, state: RegimeState) -> None:
         """Tespit edilen rejimi DuckDB tablosuna yazar."""
-        if self._duckdb_conn is None:
+        conn, should_close = self._get_active_duckdb(writable=True)
+        if conn is None:
             return
         with self._lock:
             try:
-                factors_str = orjson.dumps(state.factors, option=orjson.OPT_SERIALIZE_NUMPY).decode("utf-8")
-                self._duckdb_conn.execute(
+                factors_str = orjson.dumps(
+                    state.factors, default=str, option=orjson.OPT_SERIALIZE_NUMPY
+                ).decode("utf-8")
+                conn.execute(
                     """
                     INSERT INTO market_regime_history (id, regime, confidence, duration_days, factors_json, detected_at)
                     VALUES (nextval('seq_market_regime'), ?, ?, ?, ?, ?)
@@ -161,6 +218,79 @@ class RegimeDetector:
                 )
             except Exception as exc:
                 logger.debug("RegimeDetector DuckDB kayıt hatası", hata=str(exc))
+            finally:
+                if should_close:
+                    conn.close()
+
+    def read_regimes_from_duckdb(
+        self,
+        db_path: str = DEFAULT_REGIME_DUCKDB_PATH,
+        limit: int = 100,
+    ) -> pl.DataFrame:
+        """DuckDB'deki rejim geçmişini Polars DataFrame olarak okur."""
+        empty_schema = {
+            "id": pl.Int64,
+            "regime": pl.String,
+            "confidence": pl.Float64,
+            "duration_days": pl.Int32,
+            "factors_json": pl.String,
+            "detected_at": pl.Datetime,
+        }
+        with self._lock:
+            if self._duckdb_conn is not None:
+                try:
+                    return self._duckdb_conn.execute(
+                        "SELECT * FROM market_regime_history ORDER BY id DESC LIMIT ?",
+                        [limit],
+                    ).pl()
+                except Exception as e:
+                    logger.error("RegimeDetector DuckDB okuma hatası", hata=str(e))
+                    return pl.DataFrame(schema=empty_schema)
+
+        p = Path(db_path)
+        if not p.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        try:
+            conn = duckdb.connect(str(p), read_only=True)
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "market_regime_history" not in tables:
+                conn.close()
+                return pl.DataFrame(schema=empty_schema)
+            df = conn.execute(
+                "SELECT * FROM market_regime_history ORDER BY id DESC LIMIT ?",
+                [limit],
+            ).pl()
+            conn.close()
+            return df
+        except Exception as e:
+            logger.error("RegimeDetector dosya okuma hatası", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+
+    def clear_regimes_duckdb(self, db_path: str = DEFAULT_REGIME_DUCKDB_PATH) -> bool:
+        """DuckDB'deki rejim geçmiş tablosunu temizler."""
+        with self._lock:
+            if self._duckdb_conn is not None:
+                try:
+                    self._duckdb_conn.execute("DELETE FROM market_regime_history")
+                    return True
+                except Exception as e:
+                    logger.error("RegimeDetector DuckDB temizleme hatası", hata=str(e))
+                    return False
+
+        p = Path(db_path)
+        if not p.exists():
+            return True
+        try:
+            conn = duckdb.connect(str(p))
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "market_regime_history" in tables:
+                conn.execute("DELETE FROM market_regime_history")
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error("RegimeDetector dosya temizleme hatası", hata=str(e))
+            return False
 
     def __repr__(self) -> str:
         with self._lock:
@@ -554,19 +684,50 @@ class RegimeDetector:
                     "timestamp": r["timestamp"],
                     "regime": r["regime"],
                     "confidence": r["confidence"],
-                    "factors_json": orjson.dumps(r["factors"], option=orjson.OPT_SERIALIZE_NUMPY).decode("utf-8"),
+                    "factors_json": orjson.dumps(
+                        r["factors"], default=str, option=orjson.OPT_SERIALIZE_NUMPY
+                    ).decode("utf-8"),
                 }
                 for r in self._regime_history
             ]
             return pl.DataFrame(records)
 
 
+def read_regimes_from_duckdb(
+    db_path: str = DEFAULT_REGIME_DUCKDB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """Modül seviyesinde DuckDB rejim geçmişini Polars DataFrame olarak okur."""
+    return regime_detector.read_regimes_from_duckdb(db_path=db_path, limit=limit)
+
+
+def clear_regimes_duckdb(db_path: str = DEFAULT_REGIME_DUCKDB_PATH) -> bool:
+    """Modül seviyesinde DuckDB rejim geçmiş tablosunu temizler."""
+    return regime_detector.clear_regimes_duckdb(db_path=db_path)
+
+
+def detect_market_regime(
+    market_data: dict[str, Any],
+    benchmark_ticker: str = "XU100",
+) -> RegimeState:
+    """Modül seviyesinde piyasa rejimini tespit eder."""
+    return regime_detector.detect_regime(market_data=market_data, benchmark_ticker=benchmark_ticker)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Veriyi orjson ile güvenli bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str, option=orjson.OPT_SERIALIZE_NUMPY)
+
+
 # Global Singleton
 regime_detector = RegimeDetector()
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_LOOKBACK_DAYS",
     "DEFAULT_MAX_HISTORY_LEN",
+    "DEFAULT_REGIME_DUCKDB_PATH",
+    "DEFAULT_WAL_SIZE",
     "REGIME_BEAR",
     "REGIME_BULL",
     "REGIME_HIGH_VOL",
@@ -576,5 +737,10 @@ __all__ = [
     "RegimeDetector",
     "RegimeState",
     "VALID_REGIMES",
+    "clear_regimes_duckdb",
+    "configure_duckdb_wal",
+    "detect_market_regime",
+    "read_regimes_from_duckdb",
     "regime_detector",
+    "to_orjson_bytes",
 ]

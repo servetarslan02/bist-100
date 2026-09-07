@@ -16,6 +16,7 @@ from services.core.otel import otel_trace
 
 from .database import (
     close_databases,
+    duckdb_query_df,
     get_db_pool,
     get_pg_pool,
     init_databases,
@@ -39,6 +40,18 @@ class _DevDBCompat:
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
         return "<_DevDBCompat shim -> services.core.database>"
+
+    async def get_pg_pool(self) -> Any:
+        """PostgreSQL bağlantı havuzunu döndürür."""
+        return await get_pg_pool()
+
+    async def get_pool(self) -> Any:
+        """PostgreSQL bağlantı havuzu takma adı."""
+        return await get_pg_pool()
+
+    def duckdb_query_df(self, query: str, parameters: list[Any] | None = None, **kwargs: Any) -> Any:
+        """DuckDB üzerinden sorgu çalıştırır ve Polars DataFrame döner."""
+        return duckdb_query_df(query, parameters, **kwargs)
 
     @otel_trace("database_dev.pg_fetch")
     async def pg_fetch(self, query: str, *args: Any) -> list[Any]:
@@ -109,6 +122,7 @@ __all__ = [
     "_DevDBCompat",
     "close_databases",
     "dev_db",
+    "duckdb_query_df",
     "get_db_pool",
     "get_pg_pool",
     "init_databases",

@@ -232,6 +232,42 @@ def export_recent_errors_to_polars() -> pl.DataFrame:
     )
 
 
+def clear_log_stats() -> None:
+    """Tüm log seviye sayaçlarını sıfırlar."""
+    with _log_counts_lock:
+        for k in _log_counts:
+            _log_counts[k] = 0
+
+
+def clear_recent_errors() -> None:
+    """Son yakalanan hata tamponunu tamamen temizler."""
+    with _log_counts_lock:
+        _recent_errors.clear()
+
+
+def clear_errors_duckdb(db_path: str = "data/log_errors.duckdb") -> None:
+    """DuckDB hata denetim tablosundaki kayıtları siler veya tabloyu kaldırır."""
+    import duckdb
+
+    target = os.path.abspath(db_path)
+    if not os.path.exists(target):
+        return
+    with _log_counts_lock, duckdb.connect(target) as con:
+        con.execute("DROP TABLE IF EXISTS system_error_logs")
+
+
+def export_log_stats_to_orjson_bytes() -> bytes:
+    """Log seviye dağılım istatistiklerini orjson serileştirilmiş ikili bayt olarak döndürür."""
+    stats = get_log_stats()
+    return orjson.dumps(stats, default=str)
+
+
+def export_recent_errors_to_orjson_bytes(limit: int = 50) -> bytes:
+    """Son hata kayıtlarını orjson serileştirilmiş ikili bayt olarak döndürür."""
+    errors = get_recent_errors(limit=limit)
+    return orjson.dumps(errors, default=str)
+
+
 def export_errors_to_duckdb(db_path: str = "data/log_errors.duckdb") -> int:
     """Son hata tamponundaki kayıtları kalıcı DuckDB denetim tablosuna yazar (Kural 5 & 6).
 
@@ -247,8 +283,23 @@ def export_errors_to_duckdb(db_path: str = "data/log_errors.duckdb") -> int:
     if not errors:
         return 0
 
-    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
-    with _log_counts_lock, duckdb.connect(db_path) as con:
+    target = os.path.abspath(db_path)
+    os.makedirs(os.path.dirname(target) if os.path.dirname(target) else ".", exist_ok=True)
+    if os.path.exists(target) and os.path.getsize(target) == 0:
+        with contextlib.suppress(OSError):
+            os.remove(target)
+
+    df_errors = pl.DataFrame(
+        errors,
+        schema={
+            "timestamp": pl.String,
+            "log_level": pl.String,
+            "logger": pl.String,
+            "message": pl.String,
+        },
+    )
+
+    with _log_counts_lock, duckdb.connect(target) as con:
         con.execute("PRAGMA checkpoint_threshold='4MB'")
         con.execute("PRAGMA wal_autocheckpoint='2MB'")
         con.execute("""
@@ -260,15 +311,18 @@ def export_errors_to_duckdb(db_path: str = "data/log_errors.duckdb") -> int:
                 recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        for err in errors:
-            con.execute(
-                """
+        con.execute("CREATE INDEX IF NOT EXISTS idx_system_error_logs_ts ON system_error_logs (timestamp);")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_system_error_logs_level ON system_error_logs (log_level);")
+        con.register("df_errors_view", df_errors.to_arrow())
+        try:
+            con.execute("""
                 INSERT INTO system_error_logs (timestamp, log_level, logger, message)
-                VALUES (?, ?, ?, ?)
-            """,
-                [err["timestamp"], err["log_level"], err["logger"], err["message"]],
-            )
-    return len(errors)
+                SELECT timestamp, log_level, logger, message FROM df_errors_view
+            """)
+        finally:
+            con.unregister("df_errors_view")
+
+    return df_errors.height
 
 
 # Modül yüklendiğinde varsayılan loglamayı başlat
@@ -287,8 +341,13 @@ __all__: Final[list[str]] = [
     "DEFAULT_LOG_LEVEL",
     "NOISY_LOGGERS",
     "check_error_anomaly",
+    "clear_errors_duckdb",
+    "clear_log_stats",
+    "clear_recent_errors",
     "export_errors_to_duckdb",
+    "export_log_stats_to_orjson_bytes",
     "export_log_stats_to_polars",
+    "export_recent_errors_to_orjson_bytes",
     "export_recent_errors_to_polars",
     "get_log_stats",
     "get_logger",

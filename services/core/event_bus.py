@@ -132,6 +132,27 @@ class InternalEventBus:
                 f"aktif={self._running}, redis={'bagli' if self._redis else 'kapali'})"
             )
 
+    def to_orjson_bytes(self) -> bytes:
+        """İç olay yolu durumunu orjson binary formatında döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        with self._lock:
+            data = {
+                "channels": list(self._subscribers.keys()),
+                "total_channels": len(self._subscribers),
+                "is_running": self._running,
+                "has_redis": self._redis is not None,
+            }
+        return orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str)
+
+    def clear_subscribers(self) -> None:
+        """Kayıtlı tüm kanal abonelerini temizler."""
+        with self._lock:
+            self._subscribers.clear()
+            logger.info("InternalEventBus aboneleri temizlendi")
+
     async def _get_redis(self) -> Any:
         """Etkin olay döngüsüne ait Redis istemcisini döner veya oluşturur.
 
@@ -644,7 +665,9 @@ def _record_to_duckdb_ledger(
                         event_type VARCHAR NOT NULL,
                         payload VARCHAR NOT NULL,
                         published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_event_ledger_type_ts ON event_ledger (event_type, published_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_event_ledger_ts ON event_ledger (published_at DESC);
                 """
                 )
                 payload_str = event.to_json()
@@ -892,6 +915,28 @@ class EventConsumer:
         """Tüketiciyi durdurur."""
         self._running = False
 
+    def to_orjson_bytes(self) -> bytes:
+        """Tüketici durumunu orjson binary formatında döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        with self._lock:
+            data = {
+                "group_id": self.group_id,
+                "topics": self.topics,
+                "handlers_count": len(self._handlers),
+                "processed_count": len(self._processed_ids),
+                "is_running": self._running,
+            }
+        return orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str)
+
+    def clear_history(self) -> None:
+        """Tüketici tarafından işlenmiş olay kimlikleri önbelleğini temizler."""
+        with self._lock:
+            self._processed_ids.clear()
+            logger.info("EventConsumer işlenmiş olay geçmişi temizlendi", group_id=self.group_id)
+
 
 # Geriye dönük uyumluluk takma adı
 EventBus = InternalEventBus
@@ -905,6 +950,39 @@ def record_event_to_duckdb_ledger(
     _record_to_duckdb_ledger(event=event, db_path=db_path)
 
 
+def clear_event_history() -> None:
+    """Bellek içi idempotency olay geçmişini temizler."""
+    global _published_events_in_memory
+    with _published_lock:
+        _published_events_in_memory.clear()
+        logger.info("Olay yayın idempotency geçmişi temizlendi")
+
+
+def clear_event_ledger(db_path: str = DEFAULT_EVENT_LEDGER_DB_PATH) -> None:
+    """Kalıcı DuckDB olay defterini temizler (tabloyu sıfırlar)."""
+    target = Path(db_path)
+    if not target.exists():
+        return
+
+    with _duckdb_ledger_lock:
+        try:
+            with duckdb.connect(str(target)) as conn:
+                conn.execute("DELETE FROM event_ledger")
+                logger.info("DuckDB olay defteri temizlendi", path=str(target))
+        except Exception as exc:
+            logger.error("DuckDB olay defteri temizlenirken hata", error=str(exc))
+
+
+def export_event_ledger_to_orjson_bytes(
+    db_path: str = DEFAULT_EVENT_LEDGER_DB_PATH,
+    limit: int = 1000,
+) -> bytes:
+    """Kalıcı DuckDB olay defterini orjson binary olarak döner (GEMINI.md Kural 5)."""
+    df = export_event_ledger_to_polars(db_path=db_path, limit=limit)
+    rows = df.to_dicts()
+    return orjson.dumps(rows, option=orjson.OPT_INDENT_2, default=str)
+
+
 __all__: Final[list[str]] = [
     "CRITICAL_EVENT_TYPES",
     "DEFAULT_EVENT_LEDGER_DB_PATH",
@@ -914,8 +992,11 @@ __all__: Final[list[str]] = [
     "EventConsumer",
     "InMemoryRedis",
     "InternalEventBus",
+    "clear_event_history",
+    "clear_event_ledger",
     "ensure_topics",
     "event_bus",
+    "export_event_ledger_to_orjson_bytes",
     "export_event_ledger_to_polars",
     "flush_producer",
     "publish_event",

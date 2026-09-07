@@ -45,9 +45,39 @@ DEFAULT_IDEMPOTENCY_TTL_SECONDS: Final[float] = 3600.0
 DEFAULT_IDEMPOTENCY_MAX_KEYS: Final[int] = 5000
 DEFAULT_SHUTDOWN_TIMEOUT_SECONDS: Final[float] = 5.0
 DEFAULT_METRICS_DB_PATH: Final[str] = "data/service_metrics.duckdb"
+DEFAULT_SERVICE_METRICS_DB: Final[str] = DEFAULT_METRICS_DB_PATH
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 DEFAULT_EXECUTION_HISTORY_LIMIT: Final[int] = 1000
 
 T = TypeVar("T")
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 @dataclass(slots=True)
@@ -73,6 +103,10 @@ class ServiceExecutionRecord:
             "attempt_count": self.attempt_count,
             "timestamp": self.timestamp,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Kayıt verilerini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Kayıt metin temsilini döner."""
@@ -597,6 +631,7 @@ class BaseAlphaService(ABC):
         path_obj.parent.mkdir(parents=True, exist_ok=True)
 
         with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS service_execution_logs (
@@ -645,6 +680,18 @@ class BaseAlphaService(ABC):
             "p95_duration_ms": round(p95_dur, 2),
         }
 
+    def to_dict(self) -> dict[str, Any]:
+        """Servis durumunu ve metrik özetini sözlük olarak döner."""
+        return self.get_health_status()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Servis durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_METRICS_DB_PATH) -> None:
+        """Servis metrik DuckDB tablosunu sıfırlar."""
+        clear_service_metrics_duckdb(db_path=db_path)
+
     def __repr__(self) -> str:
         """Servisin durum özet temsilini döner."""
         with self._lock:
@@ -657,16 +704,116 @@ class BaseAlphaService(ABC):
         )
 
 
+def read_service_metrics_from_duckdb(
+    db_path: str = DEFAULT_METRICS_DB_PATH,
+    service_name: str | None = None,
+    limit: int | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan mikroservis metriklerini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        service_name: İsteğe bağlı servis adı filtresi.
+        limit: Dönecek maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan metrikler.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "service_name": pl.Utf8,
+                "correlation_id": pl.Utf8,
+                "duration_ms": pl.Float64,
+                "success": pl.Boolean,
+                "error_type": pl.Utf8,
+                "attempt_count": pl.Int64,
+                "timestamp": pl.Float64,
+            }
+        )
+
+    try:
+        with duckdb.connect(str(path_obj), read_only=True) as conn:
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'service_execution_logs'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "service_name": pl.Utf8,
+                        "correlation_id": pl.Utf8,
+                        "duration_ms": pl.Float64,
+                        "success": pl.Boolean,
+                        "error_type": pl.Utf8,
+                        "attempt_count": pl.Int64,
+                        "timestamp": pl.Float64,
+                    }
+                )
+
+            query = "SELECT * FROM service_execution_logs"
+            clauses: list[str] = []
+            params: list[Any] = []
+            if service_name:
+                clauses.append("service_name = ?")
+                params.append(service_name)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY timestamp DESC"
+            if limit and limit > 0:
+                query += f" LIMIT {int(limit)}"
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_servis_metrikleri_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "service_name": pl.Utf8,
+                "correlation_id": pl.Utf8,
+                "duration_ms": pl.Float64,
+                "success": pl.Boolean,
+                "error_type": pl.Utf8,
+                "attempt_count": pl.Int64,
+                "timestamp": pl.Float64,
+            }
+        )
+
+
+def clear_service_metrics_duckdb(db_path: str = DEFAULT_METRICS_DB_PATH) -> None:
+    """DuckDB'de depolanan mikroservis metrikleri tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS service_execution_logs;")
+    except Exception as exc:
+        logger.error("duckdb_servis_metrikleri_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__ = [
     "DEFAULT_BACKOFF_FACTOR",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_EXECUTION_HISTORY_LIMIT",
     "DEFAULT_IDEMPOTENCY_MAX_KEYS",
     "DEFAULT_IDEMPOTENCY_TTL_SECONDS",
     "DEFAULT_MAX_RETRIES",
     "DEFAULT_METRICS_DB_PATH",
+    "DEFAULT_SERVICE_METRICS_DB",
     "DEFAULT_SHUTDOWN_TIMEOUT_SECONDS",
     "DEFAULT_TIMEOUT_SECONDS",
+    "DEFAULT_WAL_SIZE",
     "BaseAlphaService",
     "ServiceExecutionError",
     "ServiceExecutionRecord",
+    "clear_service_metrics_duckdb",
+    "configure_duckdb_wal",
+    "read_service_metrics_from_duckdb",
+    "to_orjson_bytes",
 ]

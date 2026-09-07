@@ -65,6 +65,35 @@ DEFAULT_DLQ_MAX_RETRIES: Final[int] = DEFAULT_MAX_RETRIES
 DEFAULT_BASE_BACKOFF_SECONDS: Final[float] = 5.0
 DEFAULT_MAX_BACKOFF_SECONDS: Final[float] = 3600.0  # Azami 1 saat backoff sınırı
 DEFAULT_BATCH_SIZE: Final[int] = 100
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 class DLQStatus(StrEnum):
@@ -484,6 +513,19 @@ class InMemoryDeadLetterQueue:
                 return pl.DataFrame(schema=empty_schema)
             return pl.DataFrame(matched, schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Kuyruk durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "engine": "InMemoryDeadLetterQueue",
+                "entries_count": len(self._entries),
+                "max_entries": self._max_entries,
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Kuyruk durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
     def __enter__(self) -> InMemoryDeadLetterQueue:
         """Context manager giriş protokolü."""
         return self
@@ -530,10 +572,7 @@ class DeadLetterQueue(PersistentDeadLetterQueue):
     def _connect(self) -> Any:
         """Güvenli DuckDB bağlantısı ve WAL yapılandırması sağlar."""
         conn = duckdb.connect(str(self.db_path))
-        with contextlib.suppress(Exception):
-            from services.core.duckdb_store import configure_duckdb_wal
-
-            configure_duckdb_wal(conn)
+        configure_duckdb_wal(conn)
         try:
             yield conn
         finally:
@@ -904,6 +943,24 @@ class DeadLetterQueue(PersistentDeadLetterQueue):
                 logger.error("dlq_polars_aktarim_hatasi", error=str(exc))
                 return pl.DataFrame(schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Kuyruk durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "engine": "DeadLetterQueue",
+                "db_path": str(self.db_path),
+                "max_entries": self._max_entries,
+                "total_pushed": getattr(self, "_total_pushed", 0),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Kuyruk durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str | None = None) -> None:
+        """DuckDB DLQ tablosunu sıfırlar."""
+        clear_dlq_duckdb(db_path=db_path or str(self.db_path))
+
     def __enter__(self) -> DeadLetterQueue:
         """Context manager giriş protokolü."""
         return self
@@ -1114,16 +1171,114 @@ def register_dlq_retry_handler(event_type: str, handler: Callable[..., Any]) -> 
 persistent_dlq: Final[PersistentDeadLetterQueue | InMemoryDeadLetterQueue] = dead_letter_queue
 
 
+def read_dlq_from_duckdb(
+    db_path: str = DEFAULT_DLQ_DB_PATH,
+    status: DLQStatus | str | None = None,
+    event_type: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan DLQ kayıtlarını doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        status: İsteğe bağlı durum filtresi.
+        event_type: İsteğe bağlı olay tipi filtresi.
+        limit: Dönecek maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan DLQ kayıtları.
+    """
+    path_obj = Path(db_path)
+    empty_schema = {
+        "entry_id": pl.Utf8,
+        "event_id": pl.Utf8,
+        "event_type": pl.Utf8,
+        "payload": pl.Utf8,
+        "error": pl.Utf8,
+        "retry_count": pl.Int64,
+        "max_retries": pl.Int64,
+        "status": pl.Utf8,
+        "created_at": pl.Utf8,
+        "last_retry_at": pl.Utf8,
+        "next_retry_at": pl.Utf8,
+        "resolved_at": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=empty_schema)
+
+    if (
+        isinstance(dead_letter_queue, DeadLetterQueue)
+        and Path(str(dead_letter_queue.db_path)).resolve() == path_obj.resolve()
+    ):
+        return dead_letter_queue.export_to_polars(status=status, event_type=event_type, limit=limit)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'dlq_entries'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = """
+                SELECT entry_id, event_id, event_type, payload, error,
+                       retry_count, max_retries, status, created_at,
+                       last_retry_at, next_retry_at, resolved_at
+                FROM dlq_entries
+            """
+            conditions: list[str] = []
+            params: list[Any] = []
+
+            status_val = status.value if isinstance(status, DLQStatus) else (str(status) if status else None)
+            if status_val:
+                conditions.append("status = ?")
+                params.append(status_val)
+            if event_type:
+                conditions.append("event_type = ?")
+                params.append(str(event_type))
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_dlq_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_dlq_duckdb(db_path: str = DEFAULT_DLQ_DB_PATH) -> None:
+    """DuckDB'deki DLQ tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS dlq_entries;")
+    except Exception as exc:
+        logger.error("duckdb_dlq_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Yapılandırma Sabitleri
     "DEFAULT_BASE_BACKOFF_SECONDS",
     "DEFAULT_BATCH_SIZE",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_DLQ_DB_PATH",
     "DEFAULT_MAX_BACKOFF_SECONDS",
     "DEFAULT_MAX_ENTRIES",
     "DEFAULT_MAX_IN_MEMORY_ENTRIES",
     "DEFAULT_MAX_RETRIES",
     "DEFAULT_DLQ_MAX_RETRIES",
+    "DEFAULT_WAL_SIZE",
     # Modeller ve Enumlar
     "DLQEntry",
     "DLQStatus",
@@ -1137,13 +1292,17 @@ __all__: Final[list[str]] = [
     "persistent_dlq",
     # Kolaylık Fonksiyonları
     "clear_dlq",
+    "clear_dlq_duckdb",
+    "configure_duckdb_wal",
     "export_dlq_to_polars",
     "get_dlq_entries",
     "get_dlq_stats",
     "push_to_dlq",
     "push_to_dlq_sync",
+    "read_dlq_from_duckdb",
     "register_dlq_retry_handler",
     "remove_dlq_entry",
     "retry_dlq_failed",
+    "to_orjson_bytes",
 ]
 

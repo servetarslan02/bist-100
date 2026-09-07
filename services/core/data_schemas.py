@@ -62,6 +62,13 @@ def _record_schema_violation(schema_name: str, error_msg: str, payload: dict[str
         _audit_log_entries.append(entry)
 
 
+def clear_schema_audit_log() -> None:
+    """Bellekte tutulan şema denetim günlüğünü sıfırlar."""
+    with _audit_lock:
+        _audit_log_entries.clear()
+        logger.info("sema_denetim_gunlugu_temizlendi")
+
+
 # =====================================================
 # PYDANTIC V2 VERİ DOĞRULAMA ŞEMALARI
 # =====================================================
@@ -77,7 +84,7 @@ class BaseDataSchema(BaseModel):
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.model_dump(mode="json"))
+        return orjson.dumps(self.model_dump(mode="json"), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı model metin temsili."""
@@ -414,7 +421,7 @@ def export_schema_audit_to_polars() -> pl.DataFrame:
 
 
 def export_schema_audit_to_duckdb(
-    db_path: str | Path = DEFAULT_SCHEMA_AUDIT_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_SCHEMA_AUDIT_TABLE,
 ) -> int:
     """Şema doğrulama ihlallerini yerel DuckDB tablosuna yazar.
@@ -430,7 +437,7 @@ def export_schema_audit_to_duckdb(
     if df.is_empty():
         return 0
 
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_SCHEMA_AUDIT_DUCKDB_PATH)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
     if path_obj.exists() and path_obj.stat().st_size == 0:
         with contextlib.suppress(OSError):
@@ -438,12 +445,17 @@ def export_schema_audit_to_duckdb(
 
     try:
         with duckdb.connect(str(path_obj)) as conn:
-            configure_duckdb_wal(conn)
+            with contextlib.suppress(Exception):
+                configure_duckdb_wal(conn)
             conn.register("df_schema_audit", df.to_arrow())
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_schema_audit WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_schema_audit")
+            with contextlib.suppress(Exception):
+                conn.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_{table_name}_schema_ts ON {table_name}(schema_name, timestamp)"
+                )
         return len(df)
     except Exception as e:
         logger.error("export_schema_audit_to_duckdb_failed", error=str(e))
@@ -451,7 +463,7 @@ def export_schema_audit_to_duckdb(
 
 
 def query_schema_audit_duckdb(
-    db_path: str | Path = DEFAULT_SCHEMA_AUDIT_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_SCHEMA_AUDIT_TABLE,
     limit: int = 100,
 ) -> pl.DataFrame:
@@ -472,7 +484,7 @@ def query_schema_audit_duckdb(
         "payload_preview": pl.Utf8,
     }
     empty_df = pl.DataFrame(schema=schema)
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_SCHEMA_AUDIT_DUCKDB_PATH)
     if not path_obj.exists() or path_obj.stat().st_size == 0:
         return empty_df
 
@@ -503,6 +515,7 @@ __all__ = [
     "PositionSchema",
     "PredictionSchema",
     "SignalSchema",
+    "clear_schema_audit_log",
     "export_schema_audit_to_duckdb",
     "export_schema_audit_to_polars",
     "query_schema_audit_duckdb",

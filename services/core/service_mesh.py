@@ -12,6 +12,7 @@ Docker Compose ve mikroservis mimarisinde çalışan servislerin:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import ssl
 import threading
@@ -19,25 +20,41 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
 
-if TYPE_CHECKING:
-    import duckdb
-
 logger = structlog.get_logger(__name__)
 
 DEFAULT_HEALTH_CHECK_INTERVAL: Final[int] = 60  # SSD aşınmasını önlemek için 60 saniye
 DEFAULT_FAILURE_THRESHOLD: Final[int] = 3
 DEFAULT_SERVICE_MESH_DB: Final[str] = "data/service_mesh_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 _GLOBAL_LOCK = threading.RLock()
 _MESH_DUCKDB_CONN: duckdb.DuckDBPyConnection | None = None
+_MESH_DUCKDB_PATH: str = DEFAULT_SERVICE_MESH_DB
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("ServiceMesh DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 class ServiceStatus(StrEnum):
@@ -85,7 +102,7 @@ class ServiceInfo:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return (
@@ -99,29 +116,52 @@ def set_service_mesh_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     global _MESH_DUCKDB_CONN
     with _GLOBAL_LOCK:
         _MESH_DUCKDB_CONN = conn
-        _init_service_mesh_duckdb_schema()
+        _init_service_mesh_duckdb_schema_conn(_MESH_DUCKDB_CONN)
 
 
-def _init_service_mesh_duckdb_schema() -> None:
-    """DuckDB servis sağlık denetim şemasını ilklendirir."""
-    if _MESH_DUCKDB_CONN is None:
-        return
+def set_service_mesh_duckdb_path(path: str) -> None:
+    """Servis sağlık arşivi DuckDB dosya yolunu tanımlar."""
+    global _MESH_DUCKDB_PATH
     with _GLOBAL_LOCK:
-        try:
-            _MESH_DUCKDB_CONN.execute("""
-                CREATE TABLE IF NOT EXISTS service_health_audit (
-                    id BIGINT,
-                    service_name VARCHAR,
-                    address VARCHAR,
-                    status VARCHAR,
-                    failure_count INTEGER,
-                    response_time_ms DOUBLE,
-                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE SEQUENCE IF NOT EXISTS seq_service_health_audit START 1;
-            """)
-        except Exception as exc:
-            logger.error("ServiceMesh DuckDB şema oluşturma hatası", hata=str(exc))
+        _MESH_DUCKDB_PATH = path
+
+
+def _init_service_mesh_duckdb_schema_conn(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB servis sağlık denetim şemasını belirtilen bağlantıda ilklendirir."""
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS service_health_audit (
+                id BIGINT,
+                service_name VARCHAR,
+                address VARCHAR,
+                status VARCHAR,
+                failure_count INTEGER,
+                response_time_ms DOUBLE,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_service_health_audit START 1;
+        """)
+    except Exception as exc:
+        logger.error("ServiceMesh DuckDB şema oluşturma hatası", hata=str(exc))
+
+
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının geçici olup olmadığını döner."""
+    global _MESH_DUCKDB_CONN, _MESH_DUCKDB_PATH
+    if _MESH_DUCKDB_CONN is not None:
+        return _MESH_DUCKDB_CONN, False
+    try:
+        p = Path(_MESH_DUCKDB_PATH)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        read_only = not writable
+        conn = duckdb.connect(str(p), read_only=read_only)
+        if writable:
+            configure_duckdb_wal(conn)
+            _init_service_mesh_duckdb_schema_conn(conn)
+        return conn, True
+    except Exception as exc:
+        logger.debug("ServiceMesh DuckDB dosya bağlantı hatası", yol=_MESH_DUCKDB_PATH, hata=str(exc))
+        return None, False
 
 
 def _record_health_audit(
@@ -132,11 +172,12 @@ def _record_health_audit(
     response_time_ms: float,
 ) -> None:
     """Sağlık kontrolü sonucunu DuckDB denetim tablosuna yazar."""
-    if _MESH_DUCKDB_CONN is None:
-        return
     with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
         try:
-            _MESH_DUCKDB_CONN.execute(
+            conn.execute(
                 """
                 INSERT INTO service_health_audit (
                     id, service_name, address, status, failure_count, response_time_ms, recorded_at
@@ -155,6 +196,10 @@ def _record_health_audit(
             )
         except Exception as exc:
             logger.debug("ServiceMesh DuckDB denetim yazma hatası", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 class ServiceDiscovery:
@@ -510,25 +555,15 @@ class ServiceDiscovery:
 
     def export_health_audit_to_polars(self) -> pl.DataFrame:
         """DuckDB'de saklanan servis sağlık denetim geçmişini Polars DataFrame olarak döner."""
-        if _MESH_DUCKDB_CONN is None:
-            return pl.DataFrame(
-                schema={
-                    "id": pl.Int64,
-                    "service_name": pl.Utf8,
-                    "address": pl.Utf8,
-                    "status": pl.Utf8,
-                    "failure_count": pl.Int64,
-                    "response_time_ms": pl.Float64,
-                    "recorded_at": pl.Datetime,
-                }
-            )
+        return self.read_health_audit_from_duckdb()
 
-        with _GLOBAL_LOCK:
-            try:
-                return _MESH_DUCKDB_CONN.execute("SELECT * FROM service_health_audit ORDER BY id ASC").pl()
-            except Exception as exc:
-                logger.error("DuckDB servis sağlık kayıtları çekilemedi", hata=str(exc))
-                return pl.DataFrame()
+    def read_health_audit_from_duckdb(self, limit: int = 1000) -> pl.DataFrame:
+        """DuckDB'de saklanan servis sağlık denetim kayıtlarını okur."""
+        return read_service_health_audit_from_duckdb(limit=limit)
+
+    def clear_health_audit_duckdb(self) -> None:
+        """DuckDB üzerindeki servis sağlık kayıtlarını temizler."""
+        clear_service_mesh_audit_duckdb()
 
     def __repr__(self) -> str:
         with self._lock:
@@ -577,16 +612,73 @@ def export_services_to_polars() -> pl.DataFrame:
     return service_mesh.export_services_to_polars()
 
 
+def read_service_health_audit_from_duckdb(
+    duckdb_path: str = DEFAULT_SERVICE_MESH_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından veya aktif bağlantıdan servis sağlık denetim geçmişini okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "id": pl.Int64,
+            "service_name": pl.Utf8,
+            "address": pl.Utf8,
+            "status": pl.Utf8,
+            "failure_count": pl.Int64,
+            "response_time_ms": pl.Float64,
+            "recorded_at": pl.Datetime,
+        }
+    )
+    with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=False)
+        if conn is None:
+            return empty_df
+        try:
+            query = f"SELECT * FROM service_health_audit ORDER BY id ASC LIMIT {int(limit)}"
+            return conn.execute(query).pl()
+        except Exception as exc:
+            logger.error("DuckDB servis sağlık kayıtları çekilemedi", hata=str(exc))
+            return empty_df
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
+
+
+def clear_service_mesh_audit_duckdb(
+    duckdb_path: str = DEFAULT_SERVICE_MESH_DB,
+) -> None:
+    """Servis sağlık denetim tablosunu temizler."""
+    with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
+        try:
+            conn.execute("DELETE FROM service_health_audit;")
+        except Exception as exc:
+            logger.error("DuckDB servis sağlık kayıtları temizlenemedi", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
+
+
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_FAILURE_THRESHOLD",
     "DEFAULT_HEALTH_CHECK_INTERVAL",
     "DEFAULT_SERVICE_MESH_DB",
+    "DEFAULT_WAL_SIZE",
     "ServiceDiscovery",
     "ServiceInfo",
     "ServiceStatus",
+    "clear_service_mesh_audit_duckdb",
+    "configure_duckdb_wal",
     "export_health_audit_to_polars",
     "export_services_to_polars",
     "init_service_mesh",
+    "read_service_health_audit_from_duckdb",
     "service_mesh",
     "set_service_mesh_duckdb_connection",
+    "set_service_mesh_duckdb_path",
+    "to_orjson_bytes",
 ]

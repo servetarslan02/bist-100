@@ -7,17 +7,17 @@ DuckDB denetim günlüğü, Polars analitiği, orjson serileştirme ve RLock thr
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
-
-if TYPE_CHECKING:
-    import duckdb
 
 try:
     from services.core.otel import otel_trace
@@ -45,6 +45,24 @@ DEFAULT_MIN_CONFIDENCE: Final[float] = 0.3
 DEFAULT_MAX_DRAWDOWN_PCT: Final[float] = 20.0
 DEFAULT_DAILY_LOSS_LIMIT_PCT: Final[float] = 5.0
 DEFAULT_MACRO_STRESS_THRESHOLD_PCT: Final[float] = -15.0
+
+DEFAULT_RISK_GATE_DUCKDB_PATH: Final[str] = "data/risk_gate_decisions.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("RiskGate DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 @dataclass
@@ -77,7 +95,7 @@ class RiskDecision:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
 
 class RiskGate:
@@ -93,6 +111,7 @@ class RiskGate:
         daily_loss_limit_pct: float = DEFAULT_DAILY_LOSS_LIMIT_PCT,
         macro_stress_threshold_pct: float = DEFAULT_MACRO_STRESS_THRESHOLD_PCT,
         duckdb_conn: duckdb.DuckDBPyConnection | None = None,
+        duckdb_path: str = DEFAULT_RISK_GATE_DUCKDB_PATH,
     ) -> None:
         self._lock = threading.RLock()
         self.max_position_pct = max_position_pct
@@ -105,39 +124,54 @@ class RiskGate:
         self._daily_pnl: float = 0.0
         self._macro_stress_result: dict[str, Any] | None = None
         self._duckdb_conn = duckdb_conn
+        self._duckdb_path = duckdb_path
         if self._duckdb_conn is not None:
-            self._init_duckdb_schema()
+            self._init_duckdb_schema_conn(self._duckdb_conn)
 
     def set_duckdb_connection(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Risk kararları arşivi için DuckDB bağlantısını tanımlar."""
         with self._lock:
             self._duckdb_conn = conn
-            self._init_duckdb_schema()
+            self._init_duckdb_schema_conn(self._duckdb_conn)
 
-    def _init_duckdb_schema(self) -> None:
-        """DuckDB risk karar denetim tablosunu ilklendirir."""
-        if self._duckdb_conn is None:
-            return
-        with self._lock:
-            try:
-                self._duckdb_conn.execute("""
-                    CREATE TABLE IF NOT EXISTS risk_gate_decisions (
-                        id BIGINT,
-                        ticker VARCHAR,
-                        side VARCHAR,
-                        quantity INTEGER,
-                        price DOUBLE,
-                        allowed BOOLEAN,
-                        reason VARCHAR,
-                        checks_passed INTEGER,
-                        checks_failed INTEGER,
-                        details_json VARCHAR,
-                        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE SEQUENCE IF NOT EXISTS seq_risk_gate_decisions START 1;
-                """)
-            except Exception as exc:
-                logger.error("RiskGate DuckDB şema oluşturma hatası", hata=str(exc))
+    def _init_duckdb_schema_conn(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Belirtilen DuckDB bağlantısında risk karar denetim tablosunu ilklendirir."""
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS risk_gate_decisions (
+                    id BIGINT,
+                    ticker VARCHAR,
+                    side VARCHAR,
+                    quantity INTEGER,
+                    price DOUBLE,
+                    allowed BOOLEAN,
+                    reason VARCHAR,
+                    checks_passed INTEGER,
+                    checks_failed INTEGER,
+                    details_json VARCHAR,
+                    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_risk_gate_decisions START 1;
+            """)
+        except Exception as exc:
+            logger.error("RiskGate DuckDB şema oluşturma hatası", hata=str(exc))
+
+    def _get_active_duckdb(self, writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+        """Aktif DuckDB bağlantısını ve bağlantının geçici (kapatılması gereken) olup olmadığını döner."""
+        if self._duckdb_conn is not None:
+            return self._duckdb_conn, False
+        try:
+            db_path = Path(self._duckdb_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            read_only = not writable
+            conn = duckdb.connect(str(db_path), read_only=read_only)
+            if writable:
+                configure_duckdb_wal(conn)
+                self._init_duckdb_schema_conn(conn)
+            return conn, True
+        except Exception as exc:
+            logger.debug("RiskGate DuckDB dosya bağlantı hatası", yol=self._duckdb_path, hata=str(exc))
+            return None, False
 
     def _record_decision(
         self,
@@ -148,12 +182,13 @@ class RiskGate:
         decision: RiskDecision,
     ) -> None:
         """Risk kararını DuckDB'ye kaydeder."""
-        if self._duckdb_conn is None:
-            return
         with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=True)
+            if conn is None:
+                return
             try:
-                det_json = orjson.dumps(decision.details).decode("utf-8")
-                self._duckdb_conn.execute(
+                det_json = orjson.dumps(decision.details, default=str).decode("utf-8")
+                conn.execute(
                     """
                     INSERT INTO risk_gate_decisions (
                         id, ticker, side, quantity, price, allowed,
@@ -178,6 +213,10 @@ class RiskGate:
                 )
             except Exception as exc:
                 logger.debug("RiskGate DuckDB kayıt hatası", ticker=ticker, hata=str(exc))
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
 
     def __repr__(self) -> str:
         with self._lock:
@@ -505,39 +544,120 @@ class RiskGate:
 
     def export_decisions_to_polars(self) -> pl.DataFrame:
         """DuckDB üzerindeki risk kararlarını Polars DataFrame olarak dışa aktarır."""
-        if self._duckdb_conn is None:
-            return pl.DataFrame(
-                schema={
-                    "ticker": pl.Utf8,
-                    "side": pl.Utf8,
-                    "quantity": pl.Int64,
-                    "price": pl.Float64,
-                    "allowed": pl.Boolean,
-                    "reason": pl.Utf8,
-                    "checks_passed": pl.Int64,
-                    "checks_failed": pl.Int64,
-                    "checked_at": pl.Datetime("ms"),
-                }
-            )
+        return self.read_decisions_from_duckdb()
 
+    def read_decisions_from_duckdb(self, limit: int = 1000) -> pl.DataFrame:
+        """DuckDB üzerindeki risk kararlarını okur ve Polars DataFrame olarak döner."""
+        empty_df = pl.DataFrame(
+            schema={
+                "ticker": pl.Utf8,
+                "side": pl.Utf8,
+                "quantity": pl.Int64,
+                "price": pl.Float64,
+                "allowed": pl.Boolean,
+                "reason": pl.Utf8,
+                "checks_passed": pl.Int64,
+                "checks_failed": pl.Int64,
+                "checked_at": pl.Datetime("ms"),
+            }
+        )
         with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=False)
+            if conn is None:
+                return empty_df
             try:
-                return self._duckdb_conn.execute(
-                    """
+                query = f"""
                     SELECT ticker, side, quantity, price, allowed, reason, checks_passed, checks_failed, checked_at
                     FROM risk_gate_decisions
                     ORDER BY id DESC
-                    """
-                ).pl()
+                    LIMIT {int(limit)}
+                """
+                return conn.execute(query).pl()
             except Exception as exc:
                 logger.error("DuckDB risk kararları Polars sorgu hatası", hata=str(exc))
-                return pl.DataFrame()
+                return empty_df
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
+
+    def clear_decisions_duckdb(self) -> None:
+        """DuckDB üzerindeki risk kararlarını temizler."""
+        with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=True)
+            if conn is None:
+                return
+            try:
+                conn.execute("DELETE FROM risk_gate_decisions;")
+            except Exception as exc:
+                logger.error("DuckDB risk kararları temizleme hatası", hata=str(exc))
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
+
+
+def read_risk_gate_decisions_from_duckdb(
+    duckdb_path: str = DEFAULT_RISK_GATE_DUCKDB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından risk kararlarını okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "ticker": pl.Utf8,
+            "side": pl.Utf8,
+            "quantity": pl.Int64,
+            "price": pl.Float64,
+            "allowed": pl.Boolean,
+            "reason": pl.Utf8,
+            "checks_passed": pl.Int64,
+            "checks_failed": pl.Int64,
+            "checked_at": pl.Datetime("ms"),
+        }
+    )
+    p = Path(duckdb_path)
+    if not p.exists():
+        return empty_df
+    try:
+        conn = duckdb.connect(str(p), read_only=True)
+        try:
+            query = f"""
+                SELECT ticker, side, quantity, price, allowed, reason, checks_passed, checks_failed, checked_at
+                FROM risk_gate_decisions
+                ORDER BY id DESC
+                LIMIT {int(limit)}
+            """
+            return conn.execute(query).pl()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB doğrudan risk kararları okuma hatası", yol=duckdb_path, hata=str(exc))
+        return empty_df
+
+
+def clear_risk_gate_decisions_duckdb(
+    duckdb_path: str = DEFAULT_RISK_GATE_DUCKDB_PATH,
+) -> None:
+    """Doğrudan DuckDB dosyasındaki risk kararları tablosunu temizler."""
+    p = Path(duckdb_path)
+    if not p.exists():
+        return
+    try:
+        conn = duckdb.connect(str(p), read_only=False)
+        configure_duckdb_wal(conn)
+        try:
+            conn.execute("DELETE FROM risk_gate_decisions;")
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB doğrudan risk kararları temizleme hatası", yol=duckdb_path, hata=str(exc))
 
 
 # Global Singleton
 risk_gate = RiskGate()
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_DAILY_LOSS_LIMIT_PCT",
     "DEFAULT_MACRO_STRESS_THRESHOLD_PCT",
     "DEFAULT_MAX_DRAWDOWN_PCT",
@@ -545,7 +665,13 @@ __all__ = [
     "DEFAULT_MAX_POSITION_PCT",
     "DEFAULT_MAX_SINGLE_ORDER_PCT",
     "DEFAULT_MIN_CONFIDENCE",
+    "DEFAULT_RISK_GATE_DUCKDB_PATH",
+    "DEFAULT_WAL_SIZE",
     "RiskDecision",
     "RiskGate",
+    "clear_risk_gate_decisions_duckdb",
+    "configure_duckdb_wal",
+    "read_risk_gate_decisions_from_duckdb",
     "risk_gate",
+    "to_orjson_bytes",
 ]

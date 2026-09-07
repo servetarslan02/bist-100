@@ -25,10 +25,32 @@ import numpy as np
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    try:
+        from opentelemetry import trace
+        tracer = trace.get_tracer("alpha-bist.manipulation_detector")
+
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                @functools.wraps(func)
+                def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+                    with tracer.start_as_current_span(span_name):
+                        return func(self, *args, **kwargs)
+                return wrapper
+            return decorator
+    except ImportError:
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                @functools.wraps(func)
+                def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+                    return func(self, *args, **kwargs)
+                return wrapper
+            return decorator
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.manipulation_detector")
 
 
 def configure_duckdb_wal(conn: Any) -> None:
@@ -60,27 +82,6 @@ VALID_SEVERITIES: Final[set[str]] = {
 }
 
 _duckdb_lock: Final[threading.RLock] = threading.RLock()
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 @dataclass(slots=True)
@@ -646,6 +647,8 @@ def export_alerts_to_duckdb(
                 detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_manipulation_audit_ts ON manipulation_audit_ledger (detected_at);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_manipulation_audit_type ON manipulation_audit_ledger (alert_type);")
         conn.register("df_alerts_view", df.to_arrow())
         try:
             conn.execute(
@@ -734,6 +737,25 @@ def export_manipulation_audit_to_polars(
     return pl.from_arrow(arrow_table)  # type: ignore[return-value]
 
 
+def export_alerts_to_orjson_bytes(alerts: list[ManipulationAlert]) -> bytes:
+    """Manipülasyon alarmlarını orjson serileştirilmiş ikili bayt olarak döndürür."""
+    records = [a.to_dict() for a in alerts]
+    return orjson.dumps(records, default=str)
+
+
+def clear_manipulation_audit_duckdb(
+    db_path: str = DEFAULT_MANIPULATION_AUDIT_DB_PATH,
+) -> None:
+    """DuckDB manipülasyon denetim defterindeki tüm kayıtları siler."""
+    target = Path(db_path)
+    if not target.exists():
+        return
+
+    with _duckdb_lock, duckdb.connect(db_path) as conn:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS manipulation_audit_ledger")
+
+
 # Global tekil nesne
 manipulation_detector: Final[ManipulationDetector] = ManipulationDetector()
 
@@ -748,8 +770,10 @@ __all__: Final[list[str]] = [
     "VALID_ALERT_TYPES",
     "VALID_SEVERITIES",
     "alerts_to_polars",
+    "clear_manipulation_audit_duckdb",
     "configure_duckdb_wal",
     "export_alerts_to_duckdb",
+    "export_alerts_to_orjson_bytes",
     "export_manipulation_audit_to_polars",
     "manipulation_detector",
     "otel_trace",

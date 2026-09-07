@@ -24,22 +24,42 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.mime.text import MIMEText
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from pathlib import Path
+from typing import Any, Final, Protocol, runtime_checkable
 
-if TYPE_CHECKING:
-    import polars as pl
-
+import duckdb
 import httpx
 import orjson
+import polars as pl
 import structlog
 from opentelemetry import metrics as otel_metrics
 from opentelemetry import trace
 
 from .alert_policy import AlertPolicy, VersionConflictError
 
+DEFAULT_ALERTING_DB: Final[str] = "data/alerting.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.alerting")
 meter = otel_metrics.get_meter("alpha-bist.alerting")
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli byte dizisine serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 # ─── Prometheus Metrikleri ────────────────────────────────────────────────────
 _alert_created_counter = meter.create_counter(
@@ -186,6 +206,10 @@ class Alert:
             "resolved_at": self.resolved_at,
             "escalation_count": self.escalation_count,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Alarm nesnesini orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def to_webhook_payload(self) -> dict[str, Any]:
         """Genel webhook entegrasyonları için yük formatı oluşturur."""
@@ -648,6 +672,10 @@ class NotificationResult:
             "last_error": self.last_error,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Sonuç verisini orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
 
 # ─── AlertingSystem ───────────────────────────────────────────────────────────
 
@@ -662,6 +690,7 @@ class AlertingSystem:
         db: Any = None,
         dialect: str = "duckdb",
         policy: AlertPolicy | None = None,
+        duckdb_path: str = DEFAULT_ALERTING_DB,
     ) -> None:
         """Alarm sistemini başlatır.
 
@@ -671,6 +700,7 @@ class AlertingSystem:
             db: DuckDB bağlantısı (sistem yeniden başlama kurtarması için).
             dialect: Veritabanı lehçesi (varsayılan: duckdb).
             policy: Özelleştirilmiş AlertPolicy nesnesi.
+            duckdb_path: DuckDB veritabanı dosya yolu.
         """
         self._max_alerts = max_alerts
         self._alerts: deque[Alert] = deque(maxlen=self._max_alerts)
@@ -681,9 +711,32 @@ class AlertingSystem:
         self._retry_config = RetryConfig()
         self._notification_log: deque[NotificationResult] = deque(maxlen=1000)
         self._failed_notifications: deque[NotificationResult] = deque(maxlen=500)
-        self._db = db
         self._dialect = dialect
         self._policy = policy or AlertPolicy()
+        self._duckdb_path = duckdb_path
+
+        # DuckDB bağlantısı ve WAL yapılandırması
+        if db is not None:
+            self._db = db
+            self._owns_db = False
+        else:
+            if self._duckdb_path != ":memory:":
+                try:
+                    Path(self._duckdb_path).parent.mkdir(parents=True, exist_ok=True)
+                    self._db = duckdb.connect(self._duckdb_path)
+                except Exception as e:
+                    logger.warning(
+                        "DuckDB disk baglantisi kurulamadi, bellege donuluyor",
+                        yol=self._duckdb_path,
+                        hata=str(e),
+                    )
+                    self._db = duckdb.connect(":memory:")
+            else:
+                self._db = duckdb.connect(":memory:")
+            self._owns_db = True
+            configure_duckdb_wal(self._db)
+
+        self._init_duckdb_schema()
 
         # Durum izleme alanları
         self._last_health_status: str | None = None
@@ -693,6 +746,49 @@ class AlertingSystem:
 
         # Arka plan eskalasyon görevi
         self._escalation_task: asyncio.Task[None] | None = None
+
+    def _init_duckdb_schema(self) -> None:
+        """DuckDB alarm durum tablosunu senkron oluşturur."""
+        if not self._db:
+            return
+        try:
+            with self._lock:
+                self._db.execute(
+                    "CREATE TABLE IF NOT EXISTS alerts_state ("
+                    "fingerprint TEXT PRIMARY KEY, "
+                    "alert_type TEXT NOT NULL, "
+                    "severity TEXT NOT NULL, "
+                    "status TEXT NOT NULL, "
+                    "message TEXT, "
+                    "details TEXT DEFAULT '{}', "
+                    "timestamp REAL NOT NULL, "
+                    "acknowledged_at REAL, "
+                    "escalated_at REAL, "
+                    "resolved_at REAL, "
+                    "escalation_count INTEGER DEFAULT 0, "
+                    "notification_status TEXT DEFAULT 'pending', "
+                    "updated_at REAL)"
+                )
+        except Exception as exc:
+            logger.warning("alarm_veritabani_tablo_olusturma_hatasi", error=str(exc))
+
+    def close(self) -> None:
+        """DuckDB bağlantısını güvenle kapatır."""
+        with self._lock:
+            if getattr(self, "_owns_db", False) and self._db:
+                try:
+                    self._db.close()
+                except Exception as exc:
+                    logger.debug("DuckDB baglantisi kapatilirken hata", hata=str(exc))
+
+    def clear_audit_duckdb(self) -> None:
+        """DuckDB alarm durum tablosunu temizler."""
+        if self._db:
+            try:
+                with self._lock:
+                    self._db.execute("DELETE FROM alerts_state")
+            except Exception as exc:
+                logger.warning("DuckDB alarm tablosu temizlenemedi", hata=str(exc))
 
     def __repr__(self) -> str:
         """Alarm yöneticisinin dize temsili."""
@@ -912,6 +1008,33 @@ class AlertingSystem:
 
     # ─── Sorgular ─────────────────────────────────────────────────────────────
 
+    def create_alert(
+        self,
+        alert_type: str,
+        severity: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+    ) -> Alert:
+        """Yeni bir alarm oluşturur ve sisteme dahil eder.
+
+        Args:
+            alert_type: Alarmın türü.
+            severity: Önem derecesi (INFO, WARNING, CRITICAL).
+            message: Alarm açıklaması.
+            details: Ek parametreler.
+
+        Returns:
+            Alert: Üretilen alarm nesnesi.
+        """
+        alert = Alert(
+            alert_type=alert_type,
+            severity=severity,
+            message=message,
+            details=details or {},
+        )
+        self._add_alert(alert)
+        return alert
+
     def get_active_alerts(self) -> list[dict[str, Any]]:
         """Mevcut tüm aktif alarmları döner."""
         with self._lock:
@@ -1094,8 +1217,8 @@ class AlertingSystem:
         except Exception as exc:
             logger.warning("alarm_veritabani_tablo_olusturma_hatasi", error=str(exc))
 
-    async def persist_alert(self, alert: Alert) -> None:
-        """Alarmı DuckDB'ye kaydeder (varsa günceller)."""
+    def persist_alert_sync(self, alert: Alert) -> None:
+        """Alarmı DuckDB'ye senkron olarak kaydeder (varsa günceller)."""
         if not self._db:
             return
         try:
@@ -1126,6 +1249,10 @@ class AlertingSystem:
                 )
         except Exception as exc:
             logger.warning("alarm_veritabani_kayit_hatasi", error=str(exc))
+
+    async def persist_alert(self, alert: Alert) -> None:
+        """Alarmı DuckDB'ye kaydeder (varsa günceller)."""
+        self.persist_alert_sync(alert)
 
     async def load_from_db(self) -> None:
         """Sistem yeniden başladığında açık alarmları DuckDB'den kurtarır."""
@@ -1221,7 +1348,7 @@ class AlertingSystem:
                 if channels and self._router.get_all_providers():
                     loop.create_task(self._notify_all(alert))
             except RuntimeError:
-                logger.warning("alarm_bildirim_gonderilemedi_event_loop_yok")
+                self.persist_alert_sync(alert)
 
     def _is_duplicate(self, alert: Alert) -> bool:
         """Aynı parmak izine sahip alarmın dedup_window_s süresi içinde gelip gelmediğini kontrol eder."""
@@ -1280,10 +1407,51 @@ class AlertingSystem:
         return result
 
 
+def read_alerts_from_duckdb(
+    db_path: str = DEFAULT_ALERTING_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB dosyasından doğrudan kayıtlı alarmları Polars DataFrame olarak okur."""
+    try:
+        conn = duckdb.connect(db_path)
+        try:
+            return conn.execute(
+                """
+                SELECT fingerprint, alert_type, severity, status, message, details,
+                       timestamp, acknowledged_at, escalated_at, resolved_at,
+                       escalation_count, notification_status, updated_at
+                FROM alerts_state
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                [limit],
+            ).pl()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB dosyasindan alarmlar okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_alerts_duckdb(db_path: str = DEFAULT_ALERTING_DB) -> None:
+    """Belirtilen DuckDB dosyasındaki alarmlar tablosunu sıfırlar."""
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(db_path) as conn:
+            conn.execute("DROP TABLE IF EXISTS alerts_state")
+    except Exception as exc:
+        logger.warning("DuckDB alarm tablosu temizlenemedi", hata=str(exc))
+
+
 # ─── Singleton ────────────────────────────────────────────────────────────────
 alerting = AlertingSystem()
 
 __all__ = [
+    "DEFAULT_ALERTING_DB",
+    "DEFAULT_CHECKPOINT_SIZE",
+    "DEFAULT_WAL_SIZE",
     "Alert",
     "AlertSeverity",
     "AlertStatus",
@@ -1300,4 +1468,8 @@ __all__ = [
     "SlackProvider",
     "WebhookProvider",
     "alerting",
+    "clear_alerts_duckdb",
+    "configure_duckdb_wal",
+    "read_alerts_from_duckdb",
+    "to_orjson_bytes",
 ]

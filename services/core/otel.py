@@ -394,7 +394,12 @@ def export_telemetry_status_to_orjson() -> bytes:
             "endpoint": _endpoint or "internal",
             "checked_at": datetime.now(UTC).isoformat(),
         }
-    return orjson.dumps(status_dict, option=orjson.OPT_SORT_KEYS)
+    return orjson.dumps(status_dict, option=orjson.OPT_SORT_KEYS, default=str)
+
+
+def to_orjson_bytes() -> bytes:
+    """export_telemetry_status_to_orjson için takma ad."""
+    return export_telemetry_status_to_orjson()
 
 
 def save_telemetry_status_to_duckdb(
@@ -422,27 +427,93 @@ def save_telemetry_status_to_duckdb(
         df_status = export_telemetry_status_to_polars()
         if df_status.height > 0:
             conn.register("tmp_otel_status", df_status.to_arrow())
-            conn.execute("""
-                INSERT INTO telemetry_status_history
-                SELECT service_name, enabled, has_provider, has_tracer, endpoint, checked_at
-                FROM tmp_otel_status
-            """)
-            conn.unregister("tmp_otel_status")
+            try:
+                conn.execute("""
+                    INSERT INTO telemetry_status_history
+                    SELECT service_name, enabled, has_provider, has_tracer, endpoint, checked_at
+                    FROM tmp_otel_status
+                """)
+            finally:
+                conn.unregister("tmp_otel_status")
         conn.commit()
         logger.info("telemetri_durumu_duckdb_kaydedildi", db_path=str(path))
     finally:
         conn.close()
 
 
+def read_telemetry_status_from_duckdb(
+    db_path: str = DEFAULT_TELEMETRY_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB içindeki telemetri durum geçmişini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+
+    Returns:
+        Telemetri geçmişini içeren Polars DataFrame.
+    """
+    path = Path(db_path)
+    schema = {
+        "service_name": pl.String,
+        "enabled": pl.Boolean,
+        "has_provider": pl.Boolean,
+        "has_tracer": pl.Boolean,
+        "endpoint": pl.String,
+        "checked_at": pl.String,
+    }
+    if not path.exists():
+        return pl.DataFrame(schema=schema)
+
+    conn = duckdb.connect(str(path), read_only=True)
+    try:
+        configure_duckdb_wal(conn)
+        tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+        if "telemetry_status_history" not in tables:
+            return pl.DataFrame(schema=schema)
+        arrow_table = conn.execute(
+            f"SELECT service_name, enabled, has_provider, has_tracer, endpoint, checked_at "
+            f"FROM telemetry_status_history ORDER BY checked_at DESC LIMIT {int(limit)}"
+        ).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def clear_telemetry_status_duckdb(
+    db_path: str = DEFAULT_TELEMETRY_DB_PATH,
+) -> None:
+    """DuckDB tablosundaki telemetri geçmiş kayıtlarını temizler.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS telemetry_status_history")
+        conn.commit()
+        logger.info("telemetry_duckdb_temizlendi", db_path=str(path))
+    finally:
+        conn.close()
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_TELEMETRY_DB_PATH",
+    "clear_telemetry_status_duckdb",
     "configure_duckdb_wal",
     "export_telemetry_status_to_orjson",
     "export_telemetry_status_to_polars",
     "get_tracer",
     "heal_telemetry_connection",
     "otel_trace",
+    "read_telemetry_status_from_duckdb",
     "save_telemetry_status_to_duckdb",
     "setup_telemetry",
     "shutdown_telemetry",
+    "to_orjson_bytes",
 ]

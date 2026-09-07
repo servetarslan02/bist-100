@@ -36,6 +36,8 @@ DEFAULT_DATABASE: Final[str] = "alpha_bist"
 DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS: Final[int] = 10
 DEFAULT_MAX_QUEUE_SIZE: Final[int] = 100
 DEFAULT_REPLICATION_HEALTH_DB_PATH: Final[str] = "data/replication_health.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 VALID_HEALTH_STATUSES: Final[tuple[str, ...]] = (
     "healthy",
     "degraded",
@@ -50,6 +52,33 @@ STATUS_PROMETHEUS_CODE_MAP: Final[dict[str, int]] = {
     "error": 3,
     "unknown": -1,
 }
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 def _safe_int(val: Any, default: int = 0) -> int:
@@ -134,6 +163,10 @@ class ReplicaHealthInfo:
             "active_replicas": self.active_replicas,
             "parts_to_check": self.parts_to_check,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Replika verisini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Replika için bilgilendirici metin temsili."""
@@ -613,6 +646,7 @@ def export_replication_health_to_duckdb(
 
     con = duckdb.connect(str(path_obj))
     try:
+        configure_duckdb_wal(con)
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS replication_health_history (
@@ -677,23 +711,55 @@ def query_replication_health_from_duckdb(
     if not path_obj.exists():
         return pl.DataFrame()
 
-    con = duckdb.connect(str(path_obj), read_only=True)
     try:
-        query = "SELECT * FROM replication_health_history"
-        params: list[Any] = []
-        if database:
-            query += " WHERE database = ?"
-            params.append(database)
-        query += " ORDER BY timestamp DESC LIMIT ?"
-        params.append(max(1, limit))
+        with duckdb.connect(str(path_obj), read_only=True) as con:
+            table_check = con.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'replication_health_history'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame()
 
-        arrow_table = con.execute(query, params).arrow()
-        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+            query = "SELECT * FROM replication_health_history"
+            params: list[Any] = []
+            if database:
+                query += " WHERE database = ?"
+                params.append(database)
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            arrow_table = con.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)  # type: ignore[return-value]
     except Exception as exc:
         logger.warning("duckdb_replikasyon_sorgusu_basarisiz", hata=str(exc))
         return pl.DataFrame()
-    finally:
-        con.close()
+
+
+def read_replication_health_from_duckdb(
+    db_path: str | Path = DEFAULT_REPLICATION_HEALTH_DB_PATH,
+    database: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan replikasyon geçmişini Polars DataFrame olarak okur."""
+    return query_replication_health_from_duckdb(db_path=db_path, limit=limit, database=database)
+
+
+def clear_replication_health_duckdb(
+    db_path: str | Path = DEFAULT_REPLICATION_HEALTH_DB_PATH,
+) -> None:
+    """DuckDB'de depolanan replikasyon geçmişi tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as con:
+            configure_duckdb_wal(con)
+            con.execute("DROP TABLE IF EXISTS replication_health_history;")
+    except Exception as exc:
+        logger.error("duckdb_replikasyon_temizleme_hatasi", db_path=str(db_path), hata=str(exc))
 
 
 def export_replication_health_orjson(database: str = DEFAULT_DATABASE) -> bytes:
@@ -721,16 +787,20 @@ if __name__ == "__main__":
     logger.info("clickhouse_replikasyon_raporu", rapor=export_replication_health_orjson().decode("utf-8"))
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_DATABASE",
     "DEFAULT_MAX_ABSOLUTE_DELAY_SECONDS",
     "DEFAULT_MAX_QUEUE_SIZE",
     "DEFAULT_REPLICATION_HEALTH_DB_PATH",
+    "DEFAULT_WAL_SIZE",
     "STATUS_PROMETHEUS_CODE_MAP",
     "VALID_HEALTH_STATUSES",
     "ReplicaHealthInfo",
     "ReplicationHealthReport",
     "check_replication_health",
     "check_replication_health_async",
+    "clear_replication_health_duckdb",
+    "configure_duckdb_wal",
     "export_clickhouse_replicas_to_polars",
     "export_clickhouse_replication_prometheus",
     "export_clickhouse_replication_prometheus_async",
@@ -746,5 +816,7 @@ __all__ = [
     "is_replication_healthy_async",
     "query_clickhouse_replication_from_duckdb",
     "query_replication_health_from_duckdb",
+    "read_replication_health_from_duckdb",
+    "to_orjson_bytes",
 ]
 

@@ -43,6 +43,27 @@ DEFAULT_MAX_ENTRIES: Final[int] = 5000
 DEFAULT_ENTITY_INDEX_LIMIT: Final[int] = 500
 MAX_INDEXED_ENTITIES: Final[int] = 1000
 DEFAULT_AUDIT_DB_PATH: Final[str] = "data/audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_orjson_bytes"):
+        return val.to_orjson_bytes()
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
+
 
 VALID_AUDIT_ACTIONS: Final[frozenset[str]] = frozenset(
     {
@@ -525,6 +546,18 @@ class AuditLog:
             "tracked_entities": tracked_entities,
         }
 
+    def to_dict(self) -> dict[str, Any]:
+        """Denetim kaydı sistem durumunu sözlüğe çevirir."""
+        return self.get_stats()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Denetim kaydı sistem durumunu orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_AUDIT_DB_PATH) -> None:
+        """DuckDB denetim tablosunu sıfırlar."""
+        clear_audit_duckdb(db_path)
+
     @otel_trace("audit_log.export_to_polars")
     def export_to_polars(self, limit: int | None = None) -> pl.DataFrame:
         """Mevcut denetim kayıtlarını Polars DataFrame olarak döner.
@@ -593,8 +626,8 @@ class AuditLog:
         if not entries:
             return 0
 
-        conn = duckdb.connect(database=str(target_path))
-        try:
+        with duckdb.connect(database=str(target_path)) as conn:
+            configure_duckdb_wal(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audit_trail (
@@ -635,8 +668,6 @@ class AuditLog:
             )
             logger.info("audit_log_duckdb_aktarildi", adet=len(entries), db_path=str(target_path))
             return len(entries)
-        finally:
-            conn.close()
 
     @otel_trace("audit_log.query_persisted_duckdb")
     def query_persisted_duckdb(
@@ -665,8 +696,7 @@ class AuditLog:
         if not target_path.exists():
             return []
 
-        conn = duckdb.connect(database=str(target_path))
-        try:
+        with duckdb.connect(database=str(target_path), read_only=True) as conn:
             query = (
                 "SELECT audit_id, action, entity_type, entity_id, actor, "
                 "details_json, timestamp, correlation_id, parent_audit_id "
@@ -711,8 +741,7 @@ class AuditLog:
                     }
                 )
             return results
-        finally:
-            conn.close()
+
 
     def clear(self) -> None:
         """Test amaçlı tüm bellek içi denetim kayıtlarını ve indekslerini sıfırlar."""
@@ -921,6 +950,58 @@ def query_persisted_duckdb(
     )
 
 
+def read_audit_from_duckdb(
+    db_path: str = DEFAULT_AUDIT_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Belirtilen DuckDB dosyasından denetim izi kayıtlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Okunacak maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Denetim kayıtlarının Polars DataFrame temsili.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(str(target), read_only=True) as conn:
+            tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+            if "audit_trail" not in tables:
+                return pl.DataFrame()
+            return conn.execute(
+                """
+                SELECT audit_id, action, entity_type, entity_id, actor,
+                       details_json, timestamp, correlation_id, parent_audit_id
+                FROM audit_trail
+                ORDER BY timestamp DESC
+                LIMIT ?;
+                """,
+                [int(limit)],
+            ).pl()
+    except Exception as exc:
+        logger.error("DuckDB denetim izi tablosu okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_audit_duckdb(db_path: str = DEFAULT_AUDIT_DB_PATH) -> None:
+    """Belirtilen DuckDB dosyasındaki denetim izi tablosunu sıfırlar.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(str(target)) as conn:
+            conn.execute("DROP TABLE IF EXISTS audit_trail")
+    except Exception as exc:
+        logger.warning("DuckDB denetim tablosu temizlenemedi", hata=str(exc))
+
+
 def get_audit_log() -> AuditLog:
     """Tekil AuditLog örneğini döner."""
     return audit_log
@@ -928,13 +1009,17 @@ def get_audit_log() -> AuditLog:
 
 __all__: list[str] = [
     "DEFAULT_AUDIT_DB_PATH",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_ENTITY_INDEX_LIMIT",
     "DEFAULT_MAX_ENTRIES",
+    "DEFAULT_WAL_SIZE",
     "MAX_INDEXED_ENTITIES",
     "VALID_AUDIT_ACTIONS",
     "AuditEntry",
     "AuditLog",
     "audit_log",
+    "clear_audit_duckdb",
+    "configure_duckdb_wal",
     "export_audit_to_duckdb",
     "export_audit_to_polars",
     "get_audit_log",
@@ -949,4 +1034,6 @@ __all__: list[str] = [
     "log_risk_check",
     "log_state_change",
     "query_persisted_duckdb",
+    "read_audit_from_duckdb",
+    "to_orjson_bytes",
 ]

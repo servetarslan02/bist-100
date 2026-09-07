@@ -79,7 +79,7 @@ class ConfigAuditEntry:
 
     def to_orjson_bytes(self) -> bytes:
         """Denetim kaydını orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def to_json(self) -> str:
         """Denetim kaydını JSON metnine dönüştürür."""
@@ -345,6 +345,11 @@ class ConfigWatcher:
             items = list(self._audit_log)[-limit:]
             return [e.to_dict() for e in items]
 
+    def clear_audit_log(self) -> None:
+        """Denetim günlüğünü thread-safe olarak temizler."""
+        with self._lock:
+            self._audit_log.clear()
+
     def get_status(self) -> dict[str, Any]:
         """İzleyicinin anlık çalışma durumunu döndürür."""
         with self._lock:
@@ -421,14 +426,21 @@ class ConfigWatcher:
 
         try:
             with duckdb.connect(str(path_obj)) as conn:
-                from services.core.debounce import configure_duckdb_wal
+                try:
+                    from services.core.debounce import configure_duckdb_wal
 
-                configure_duckdb_wal(conn)
+                    configure_duckdb_wal(conn)
+                except Exception:
+                    with contextlib.suppress(Exception):
+                        conn.execute("PRAGMA wal_autocheckpoint='10MB';")
+
                 conn.register("df_audit_snap", df.to_arrow())
                 conn.execute(
                     f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_audit_snap WHERE 1=0"
                 )
                 conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_audit_snap")
+                with contextlib.suppress(Exception):
+                    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp)")
             return len(df)
         except Exception as e:
             logger.error("export_config_watcher_to_duckdb_failed", error=str(e))

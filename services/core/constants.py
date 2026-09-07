@@ -53,6 +53,11 @@ BIST_HALTED_PRICE_THRESHOLD: float = 10.0  # Aşırı volatilite durdurma eşiğ
 MIN_VOLUME_FOR_TRADING: int = 1000  # İşlem için gereken minimum günlük lot adedi
 MAX_PARTICIPATION_RATE: float = 0.10  # Günlük hacmin maksimum %10'una katılım izni
 
+# VIOP Takasbank SPAN Teminat Sabitleri
+VIOP_INITIAL_MARGIN_PCT: float = 15.0  # Başlangıç teminat oranı (%15)
+VIOP_MAINTENANCE_MARGIN_PCT: float = 11.25  # Sürdürme teminatı oranı (%11.25, 0.75 * Başlangıç)
+VIOP_LIQUIDATION_MARGIN_PCT: float = 7.5  # Likidasyon teminatı oranı (%7.5, 0.50 * Başlangıç)
+
 # =====================================================
 # 2. MODEL EĞİTİM VE DOĞRULAMA SABİTLERİ (QUANT / ML)
 # =====================================================
@@ -114,6 +119,7 @@ DEFAULT_TERMINAL_GROWTH: float = 0.03  # %3 Nihai büyüme oranı (Uzun vadeli r
 
 CONFIG_DIR: Path = Path(__file__).parent.parent.parent / "config"
 DEFAULT_DUCKDB_PATH: Path = Path("data/constants.duckdb")
+DEFAULT_CONSTANTS_DUCKDB_PATH: str = str(DEFAULT_DUCKDB_PATH)
 
 _rf_lock: threading.RLock = threading.RLock()
 _cached_rf_rate: float | None = None
@@ -178,17 +184,11 @@ MAX_DAILY_PNL: int = 1000  # Günlük PnL kayıt hafıza limiti
 # =====================================================
 # 7. POLARS VE DUCKDB ANALİTİK DIŞA AKTARIMI
 # =====================================================
-DEFAULT_CONSTANTS_DUCKDB_PATH: str = "data/constants.duckdb"
-DEFAULT_DUCKDB_PATH: str = DEFAULT_CONSTANTS_DUCKDB_PATH
 
 
-def export_constants_to_polars() -> pl.DataFrame:
-    """Tüm sistem sabitlerini kategori, isim, tip ve değerleri ile Polars DataFrame olarak döner.
-
-    Returns:
-        'category', 'constant_name', 'value', 'data_type' sütunlu DataFrame.
-    """
-    categories: dict[str, dict[str, Any]] = {
+def export_constants_to_dict() -> dict[str, dict[str, Any]]:
+    """Tüm sistem sabitlerini kategori bazında hiyerarşik sözlük olarak döner."""
+    return {
         "BIST_MARKET": {
             "BIST_COMMISSION_RATE": BIST_COMMISSION_RATE,
             "BIST_EXCHANGE_FEE_RATE": BIST_EXCHANGE_FEE_RATE,
@@ -203,6 +203,11 @@ def export_constants_to_polars() -> pl.DataFrame:
             "BIST_HALTED_PRICE_THRESHOLD": BIST_HALTED_PRICE_THRESHOLD,
             "MIN_VOLUME_FOR_TRADING": MIN_VOLUME_FOR_TRADING,
             "MAX_PARTICIPATION_RATE": MAX_PARTICIPATION_RATE,
+        },
+        "VIOP_DERIVATIVES": {
+            "VIOP_INITIAL_MARGIN_PCT": VIOP_INITIAL_MARGIN_PCT,
+            "VIOP_MAINTENANCE_MARGIN_PCT": VIOP_MAINTENANCE_MARGIN_PCT,
+            "VIOP_LIQUIDATION_MARGIN_PCT": VIOP_LIQUIDATION_MARGIN_PCT,
         },
         "MODEL_TRAINING": {
             "DEFAULT_PURGE_DAYS": DEFAULT_PURGE_DAYS,
@@ -258,6 +263,20 @@ def export_constants_to_polars() -> pl.DataFrame:
         },
     }
 
+
+def export_constants_to_orjson_bytes() -> bytes:
+    """Tüm sistem sabitlerini orjson formatında bayt dizisine serileştirir."""
+    return orjson.dumps(export_constants_to_dict(), default=str)
+
+
+def export_constants_to_polars() -> pl.DataFrame:
+    """Tüm sistem sabitlerini kategori, isim, tip ve değerleri ile Polars DataFrame olarak döner.
+
+    Returns:
+        'category', 'constant_name', 'value', 'data_type' sütunlu DataFrame.
+    """
+    categories = export_constants_to_dict()
+
     rows: list[dict[str, str]] = []
     for cat, item_dict in categories.items():
         for name, val in item_dict.items():
@@ -305,14 +324,21 @@ def export_constants_to_duckdb(
 
     try:
         with duckdb.connect(str(path_obj)) as conn:
-            from services.core.debounce import configure_duckdb_wal
+            try:
+                from services.core.debounce import configure_duckdb_wal
 
-            configure_duckdb_wal(conn)
+                configure_duckdb_wal(conn)
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("PRAGMA wal_autocheckpoint='10MB';")
+
             conn.register("df_consts", df_snapshot.to_arrow())
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_consts WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_consts")
+            with contextlib.suppress(Exception):
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_cat ON {table_name} (category)")
         return len(df_snapshot)
     except Exception as e:
         logger.error("export_constants_to_duckdb_failed", error=str(e))
@@ -371,7 +397,7 @@ def query_constants_duckdb(
 
 
 __all__ = [
-    # BIST Piyasa
+    # BIST Piyasa & VIOP
     "BIST_COMMISSION_RATE",
     "BIST_EXCHANGE_FEE_RATE",
     "BIST_BSMV_RATE",
@@ -385,6 +411,9 @@ __all__ = [
     "BIST_HALTED_PRICE_THRESHOLD",
     "MIN_VOLUME_FOR_TRADING",
     "MAX_PARTICIPATION_RATE",
+    "VIOP_INITIAL_MARGIN_PCT",
+    "VIOP_MAINTENANCE_MARGIN_PCT",
+    "VIOP_LIQUIDATION_MARGIN_PCT",
     # Model Eğitim
     "DEFAULT_PURGE_DAYS",
     "DEFAULT_EMBARGO_DAYS",
@@ -437,6 +466,8 @@ __all__ = [
     # Polars & DuckDB Fonksiyonları
     "DEFAULT_CONSTANTS_DUCKDB_PATH",
     "DEFAULT_DUCKDB_PATH",
+    "export_constants_to_dict",
+    "export_constants_to_orjson_bytes",
     "export_constants_to_polars",
     "export_constants_to_duckdb",
     "query_constants_duckdb",

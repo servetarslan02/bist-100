@@ -43,6 +43,26 @@ DEFAULT_EVENT_QUEUE_MAXLEN: Final[int] = 1000
 DEFAULT_MARKET_TYPE: Final[str] = "ana"
 VALID_MARKET_TYPES: Final[frozenset[str]] = frozenset({"yildiz", "ana", "alt"})
 DEFAULT_CB_DB_PATH: Final[str] = "data/circuit_breaker_events.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_orjson_bytes"):
+        return val.to_orjson_bytes()
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 
 @dataclass(slots=True)
@@ -517,11 +537,12 @@ class AutoCircuitBreakerEngine:
         with self._lock:
             events = list(self._events)
 
-            if not events:
-                return 0
+        if not events:
+            return 0
 
-            conn = duckdb.connect(database=str(target_path))
-            try:
+        try:
+            with duckdb.connect(database=str(target_path)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS circuit_breaker_events (
@@ -563,11 +584,9 @@ class AutoCircuitBreakerEngine:
                 )
                 logger.info("circuit_breaker_events_duckdb_aktarildi", adet=len(events), db_path=str(target_path))
                 return len(events)
-            except Exception as exc:
-                logger.error("circuit_breaker_duckdb_aktarim_hatasi", error=str(exc), db_path=str(target_path))
-                raise
-            finally:
-                conn.close()
+        except Exception as exc:
+            logger.error("circuit_breaker_duckdb_aktarim_hatasi", error=str(exc), db_path=str(target_path))
+            raise
 
     @otel_trace("auto_circuit_breaker.query_persisted_duckdb")
     def query_persisted_duckdb(
@@ -593,47 +612,50 @@ class AutoCircuitBreakerEngine:
             return []
 
         try:
-            conn = duckdb.connect(database=str(target_path), read_only=True)
-        except Exception as exc:
-            logger.warning(
-                "circuit_breaker_duckdb_okuma_baglanti_hatasi", error=str(exc), db_path=str(target_path)
-            )
-            return []
+            with duckdb.connect(database=str(target_path), read_only=True) as conn:
+                query = "SELECT ticker, event_type, trigger_price, reference_price, change_pct, threshold_pct, triggered_at, duration_minutes, feature_code, market_phase FROM circuit_breaker_events WHERE 1=1"
+                params: list[Any] = []
+                if ticker:
+                    query += " AND ticker = ?"
+                    params.append(ticker.upper().strip())
+                if event_type:
+                    query += " AND event_type = ?"
+                    params.append(event_type.upper().strip())
 
-        try:
-            query = "SELECT ticker, event_type, trigger_price, reference_price, change_pct, threshold_pct, triggered_at, duration_minutes, feature_code, market_phase FROM circuit_breaker_events WHERE 1=1"
-            params: list[Any] = []
-            if ticker:
-                query += " AND ticker = ?"
-                params.append(ticker.upper().strip())
-            if event_type:
-                query += " AND event_type = ?"
-                params.append(event_type.upper().strip())
+                query += " ORDER BY triggered_at DESC LIMIT ?"
+                params.append(max(1, limit))
 
-            query += " ORDER BY triggered_at DESC LIMIT ?"
-            params.append(max(1, limit))
-
-            rows = conn.execute(query, params).fetchall()
-            return [
-                {
-                    "ticker": r[0],
-                    "event_type": r[1],
-                    "trigger_price": r[2],
-                    "reference_price": r[3],
-                    "change_pct": r[4],
-                    "threshold_pct": r[5],
-                    "triggered_at": str(r[6]),
-                    "duration_minutes": r[7],
-                    "feature_code": r[8],
-                    "market_phase": r[9],
-                }
-                for r in rows
-            ]
+                rows = conn.execute(query, params).fetchall()
+                return [
+                    {
+                        "ticker": r[0],
+                        "event_type": r[1],
+                        "trigger_price": r[2],
+                        "reference_price": r[3],
+                        "change_pct": r[4],
+                        "threshold_pct": r[5],
+                        "triggered_at": str(r[6]),
+                        "duration_minutes": r[7],
+                        "feature_code": r[8],
+                        "market_phase": r[9],
+                    }
+                    for r in rows
+                ]
         except Exception as exc:
             logger.error("circuit_breaker_duckdb_sorgu_hatasi", error=str(exc), db_path=str(target_path))
             return []
-        finally:
-            conn.close()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Devre kesici motorunun anlık durum özetini sözlüğe dönüştürür."""
+        return self.get_status()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Devre kesici motorunun durumunu orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_CB_DB_PATH) -> None:
+        """DuckDB devre kesici olay tablosunu sıfırlar."""
+        clear_circuit_breaker_events_duckdb(db_path)
 
     def __repr__(self) -> str:
         """Devre kesici motorunun durum temsilini döner."""
@@ -773,6 +795,58 @@ def query_circuit_breaker_events_from_duckdb(
     )
 
 
+def read_circuit_breaker_events_from_duckdb(
+    db_path: str = DEFAULT_CB_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Belirtilen DuckDB dosyasından devre kesici olaylarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Okunacak maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Olayların Polars DataFrame temsili.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(str(target), read_only=True) as conn:
+            tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+            if "circuit_breaker_events" not in tables:
+                return pl.DataFrame()
+            return conn.execute(
+                """
+                SELECT ticker, event_type, trigger_price, reference_price, change_pct,
+                       threshold_pct, triggered_at, duration_minutes, feature_code, market_phase
+                FROM circuit_breaker_events
+                ORDER BY triggered_at DESC
+                LIMIT ?;
+                """,
+                [int(limit)],
+            ).pl()
+    except Exception as exc:
+        logger.error("DuckDB devre kesici tablosu okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_circuit_breaker_events_duckdb(db_path: str = DEFAULT_CB_DB_PATH) -> None:
+    """Belirtilen DuckDB dosyasındaki devre kesici olay tablosunu sıfırlar.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(str(target)) as conn:
+            conn.execute("DROP TABLE IF EXISTS circuit_breaker_events")
+    except Exception as exc:
+        logger.warning("DuckDB devre kesici tablosu temizlenemedi", hata=str(exc))
+
+
 def get_auto_circuit_breaker() -> AutoCircuitBreakerEngine:
     """Tekil AutoCircuitBreakerEngine örneğini döner."""
     return auto_circuit_breaker
@@ -780,14 +854,18 @@ def get_auto_circuit_breaker() -> AutoCircuitBreakerEngine:
 
 __all__: list[str] = [
     "DEFAULT_CB_DB_PATH",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_EVENT_QUEUE_MAXLEN",
     "DEFAULT_MARKET_TYPE",
+    "DEFAULT_WAL_SIZE",
     "VALID_MARKET_TYPES",
     "AutoCircuitBreaker",
     "AutoCircuitBreakerEngine",
     "CircuitBreakerEvent",
     "auto_circuit_breaker",
     "check_stock_circuit_breaker",
+    "clear_circuit_breaker_events_duckdb",
+    "configure_duckdb_wal",
     "export_circuit_breaker_events_to_duckdb",
     "export_circuit_breaker_events_to_polars",
     "get_auto_circuit_breaker",
@@ -797,7 +875,9 @@ __all__: list[str] = [
     "is_ebdks_in_effect",
     "is_stock_in_circuit_breaker",
     "query_circuit_breaker_events_from_duckdb",
+    "read_circuit_breaker_events_from_duckdb",
     "reset_circuit_breaker_daily",
     "set_bist100_reference_price",
+    "to_orjson_bytes",
     "update_bist100_index",
 ]

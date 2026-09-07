@@ -46,6 +46,8 @@ DEFAULT_MAX_RETRY_DELAY_S: Final[float] = 30.0
 DEFAULT_USER_AGENT: Final[str] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ALPHA-BIST/2.0"
 DEFAULT_MAX_METRICS_HISTORY: Final[int] = 1000
 DEFAULT_HTTP_METRICS_DB_PATH: Final[str] = "data/http_metrics.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 _http_requests_counter = meter.create_counter(
     "alpha.http.requests.total",
@@ -60,6 +62,22 @@ _http_latency_histogram = meter.create_histogram(
     description="HTTP istek gecikme süresi",
     unit="s",
 )
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 
 def _orjson_serializer(data: Any) -> str:
@@ -620,8 +638,8 @@ class AsyncHTTPClient:
         if not records:
             return 0
 
-        conn = duckdb.connect(str(target_path))
-        try:
+        with duckdb.connect(str(target_path)) as conn:
+            configure_duckdb_wal(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bist_http_metrics (
@@ -659,8 +677,10 @@ class AsyncHTTPClient:
                 data_tuples,
             )
             return len(records)
-        finally:
-            conn.close()
+
+    def clear_audit_duckdb(self, db_path: str | Path | None = None) -> None:
+        """DuckDB istek metrikleri tablosunu temizler."""
+        clear_http_metrics_duckdb(db_path)
 
     def get_metrics_summary(self) -> dict[str, Any]:
         """İstemcinin çalışma metriklerinin özet istatistiğini döner."""
@@ -688,6 +708,14 @@ class AsyncHTTPClient:
             "success_rate_pct": round((successes / total) * 100.0, 2) if total > 0 else 0.0,
             "avg_latency_ms": round(avg_latency, 2),
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        """İstemcinin çalışma metriklerinin özet istatistiğini döner."""
+        return self.get_metrics_summary()
+
+    def to_orjson_bytes(self) -> bytes:
+        """İstemcinin metrik özetini orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     async def close(self) -> None:
         """Aktif HTTP oturumunu kapatır ve bağlantı kaynaklarını serbest bırakır."""
@@ -808,21 +836,78 @@ def export_http_metrics_to_duckdb(
     return client.export_metrics_to_duckdb(db_path=db_path)
 
 
+def read_http_metrics_from_duckdb(
+    db_path: str | Path | None = None,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Belirtilen DuckDB dosyasından HTTP istek metriklerini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Okunacak maksimum kayıt sayısı.
+
+    Returns:
+        pl.DataFrame: Metriklerin Polars DataFrame temsili.
+    """
+    target = Path(db_path or DEFAULT_HTTP_METRICS_DB_PATH)
+    if not target.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(str(target), read_only=True) as conn:
+            tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+            if "bist_http_metrics" not in tables:
+                return pl.DataFrame()
+            return conn.execute(
+                """
+                SELECT timestamp, method, url, status, elapsed_ms, attempt, success, error, recorded_at
+                FROM bist_http_metrics
+                ORDER BY recorded_at DESC
+                LIMIT ?;
+                """,
+                [int(limit)],
+            ).pl()
+    except Exception as exc:
+        logger.error("DuckDB HTTP metrik tablosu okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_http_metrics_duckdb(db_path: str | Path | None = None) -> None:
+    """Belirtilen DuckDB dosyasındaki HTTP istek metrikleri tablosunu sıfırlar.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    target = Path(db_path or DEFAULT_HTTP_METRICS_DB_PATH)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(str(target)) as conn:
+            conn.execute("DROP TABLE IF EXISTS bist_http_metrics")
+    except Exception as exc:
+        logger.warning("DuckDB HTTP metrik tablosu temizlenemedi", hata=str(exc))
+
+
 __all__: list[str] = [
     "DEFAULT_BASE_RETRY_DELAY_S",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HTTP_METRICS_DB_PATH",
     "DEFAULT_MAX_METRICS_HISTORY",
     "DEFAULT_MAX_RETRIES",
     "DEFAULT_MAX_RETRY_DELAY_S",
     "DEFAULT_TIMEOUT",
     "DEFAULT_USER_AGENT",
+    "DEFAULT_WAL_SIZE",
     "AsyncHTTPClient",
     "async_get_bytes",
     "async_get_json",
     "async_get_text",
     "async_post_json",
+    "clear_http_metrics_duckdb",
     "close_all_clients",
+    "configure_duckdb_wal",
     "export_http_metrics_to_duckdb",
     "export_http_metrics_to_polars",
     "get_client",
+    "read_http_metrics_from_duckdb",
+    "to_orjson_bytes",
 ]

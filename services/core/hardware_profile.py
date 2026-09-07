@@ -33,7 +33,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -68,6 +68,35 @@ DEFAULT_MAX_DUCKDB_MEM_LOW_MB: int = 512
 DEFAULT_MAX_CACHE_ITEMS: int = 5000
 DEFAULT_SSD_WRITE_LIMIT_MBPS: int = 128
 DEFAULT_HARDWARE_PROFILE_DB_PATH: str = "data/hardware_profile_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 # ==============================================================================
@@ -622,6 +651,7 @@ class HardwareResourceManager:
             )
 
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS hardware_resource_audit (
@@ -673,18 +703,58 @@ class HardwareResourceManager:
             pl.DataFrame: Donanım profili denetim geçmişi tablosu.
         """
         target_file = Path(db_path).resolve()
+        schema: dict[str, pl.DataType] = {
+            "id": pl.Utf8,
+            "created_at": pl.Datetime,
+            "cpu_logical": pl.Int64,
+            "cpu_physical": pl.Int64,
+            "ram_total_gb": pl.Float64,
+            "ram_avail_gb": pl.Float64,
+            "gpu_name": pl.Utf8,
+            "gpu_vram_mb": pl.Float64,
+            "gpu_available": pl.Boolean,
+            "max_cpu_threads": pl.Int64,
+            "max_gpu_vram_mb": pl.Float64,
+            "max_duckdb_mem_mb": pl.Int64,
+            "process_priority": pl.Utf8,
+            "is_applied": pl.Boolean,
+        }
         if not target_file.exists():
-            return pl.DataFrame()
+            return pl.DataFrame(schema=schema)
 
         with self._lock:
-            with duckdb.connect(str(target_file), read_only=True) as conn:
+            with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
+                table_check = conn.execute(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_name = 'hardware_resource_audit'"
+                ).fetchone()
+                if not table_check or table_check[0] == 0:
+                    return pl.DataFrame(schema=schema)
+
                 query = (
                     "SELECT id, created_at, cpu_logical, cpu_physical, ram_total_gb, ram_avail_gb, "
                     "gpu_name, gpu_vram_mb, gpu_available, max_cpu_threads, max_gpu_vram_mb, "
                     "max_duckdb_mem_mb, process_priority, is_applied "
                     "FROM hardware_resource_audit ORDER BY created_at DESC LIMIT ?"
                 )
-                return conn.execute(query, [limit]).pl()
+                return conn.execute(query, [max(1, int(limit))]).pl()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Yönetici durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "is_applied": self._is_applied,
+                "specs": self.specs.to_dict(),
+                "limits": self.limits.to_dict(),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Yönetici durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH) -> None:
+        """DuckDB donanım profili denetim tablosunu sıfırlar."""
+        clear_hardware_profile_duckdb(db_path=db_path)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -753,7 +823,79 @@ def query_hardware_profile_duckdb(
     return hardware_manager.query_audit_duckdb(db_path=db_path, limit=limit)
 
 
+def read_hardware_profile_from_duckdb(
+    db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosunu doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan donanım profili denetim kayıtları.
+    """
+    path_obj = Path(db_path).resolve()
+    schema: dict[str, pl.DataType] = {
+        "id": pl.Utf8,
+        "created_at": pl.Datetime,
+        "cpu_logical": pl.Int64,
+        "cpu_physical": pl.Int64,
+        "ram_total_gb": pl.Float64,
+        "ram_avail_gb": pl.Float64,
+        "gpu_name": pl.Utf8,
+        "gpu_vram_mb": pl.Float64,
+        "gpu_available": pl.Boolean,
+        "max_cpu_threads": pl.Int64,
+        "max_gpu_vram_mb": pl.Float64,
+        "max_duckdb_mem_mb": pl.Int64,
+        "process_priority": pl.Utf8,
+        "is_applied": pl.Boolean,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=schema)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'hardware_resource_audit'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=schema)
+
+            query = (
+                "SELECT id, created_at, cpu_logical, cpu_physical, ram_total_gb, ram_avail_gb, "
+                "gpu_name, gpu_vram_mb, gpu_available, max_cpu_threads, max_gpu_vram_mb, "
+                "max_duckdb_mem_mb, process_priority, is_applied "
+                "FROM hardware_resource_audit ORDER BY created_at DESC LIMIT ?"
+            )
+            return conn.execute(query, [max(1, int(limit))]).pl()
+    except Exception as exc:
+        logger.warning("duckdb_hardware_profile_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=schema)
+
+
+def clear_hardware_profile_duckdb(db_path: str = DEFAULT_HARDWARE_PROFILE_DB_PATH) -> None:
+    """DuckDB'deki donanım profili denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path).resolve()
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS hardware_resource_audit;")
+    except Exception as exc:
+        logger.error("duckdb_hardware_profile_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: list[str] = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HARDWARE_PROFILE_DB_PATH",
     "DEFAULT_MAX_CACHE_ITEMS",
     "DEFAULT_MAX_CPU_THREADS",
@@ -762,10 +904,13 @@ __all__: list[str] = [
     "DEFAULT_MIN_CPU_THREADS",
     "DEFAULT_SSD_WRITE_LIMIT_MBPS",
     "DEFAULT_VRAM_FRACTION",
+    "DEFAULT_WAL_SIZE",
     "HardwareResourceManager",
     "HardwareSpecs",
     "ResourceLimits",
     "apply_hardware_profile",
+    "clear_hardware_profile_duckdb",
+    "configure_duckdb_wal",
     "export_hardware_profile_to_duckdb",
     "export_limits_to_polars",
     "export_specs_to_polars",
@@ -774,5 +919,7 @@ __all__: list[str] = [
     "get_optimal_execution_device",
     "hardware_manager",
     "query_hardware_profile_duckdb",
+    "read_hardware_profile_from_duckdb",
     "restore_hardware_profile",
+    "to_orjson_bytes",
 ]

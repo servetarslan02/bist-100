@@ -859,10 +859,62 @@ def duckdb_query_df(
     if not path_obj.exists() or path_obj.stat().st_size == 0:
         return pl.DataFrame()
 
-    with get_duckdb(db_path=path_obj, read_only=True) as conn:
-        cursor = conn.execute(query, parameters or [])
-        arrow_table = cursor.arrow()
-        return pl.from_arrow(arrow_table)
+    try:
+        with get_duckdb(db_path=path_obj, read_only=True) as conn:
+            cursor = conn.execute(query, parameters or [])
+            arrow_table = cursor.arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.error("duckdb_query_df_basarisiz", query=query[:100], error=str(exc))
+        return pl.DataFrame()
+
+
+def duckdb_execute(
+    query: str,
+    parameters: list[Any] | None = None,
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+) -> None:
+    """DuckDB üzerinde DDL veya DML komutu (CREATE, INSERT, UPDATE, DELETE) çalıştırır.
+
+    Args:
+        query: SQL komut metni.
+        parameters: Parametre listesi.
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    with get_duckdb(db_path=path_obj, read_only=False) as conn:
+        conn.execute(query, parameters or [])
+
+
+def duckdb_write_df(
+    df: pl.DataFrame,
+    table_name: str,
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    mode: str = "append",
+) -> int:
+    """Polars DataFrame verisini sıfır kopyayla (Arrow) yerel DuckDB tablosuna yazar.
+
+    Args:
+        df: Yazılacak Polars DataFrame.
+        table_name: Hedef tablo adı.
+        db_path: DuckDB veritabanı dosya yolu.
+        mode: Yazma modu ('append' veya 'replace').
+
+    Returns:
+        int: Eklenen satır sayısı.
+    """
+    if df.is_empty():
+        return 0
+
+    path_obj = Path(db_path)
+    with get_duckdb(db_path=path_obj, read_only=False) as conn:
+        conn.register("df_source", df.to_arrow())
+        if mode == "replace":
+            conn.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df_source")
+        else:
+            conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_source WHERE 1=0")
+            conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_source")
+    return len(df)
 
 
 # ─── Redis ────────────────────────────────────────────────────────────────────
@@ -1175,7 +1227,9 @@ __all__ = [
     "close_pg_pool",
     "close_redis",
     "db_router",
+    "duckdb_execute",
     "duckdb_query_df",
+    "duckdb_write_df",
     "get_ch_client",
     "get_clickhouse",
     "get_db_pool",

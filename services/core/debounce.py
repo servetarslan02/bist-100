@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
 
@@ -234,8 +235,13 @@ def export_debounce_metrics_to_polars() -> pl.DataFrame:
     return pl.DataFrame(list(stats.values()), schema=schema)
 
 
+def export_debounce_to_orjson_bytes() -> bytes:
+    """Debounce istatistiklerini orjson formatında serileştirir."""
+    return orjson.dumps(get_debounce_stats(), default=str)
+
+
 def export_debounce_to_duckdb(
-    db_path: str | Path = DEFAULT_DEBOUNCE_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_DEBOUNCE_AUDIT_TABLE,
 ) -> int:
     """Debounce metriklerini yerel DuckDB tablosuna aktarır.
@@ -255,7 +261,7 @@ def export_debounce_to_duckdb(
     if df.is_empty():
         return 0
 
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_DEBOUNCE_DUCKDB_PATH)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
     if path_obj.exists() and path_obj.stat().st_size == 0:
         with contextlib.suppress(OSError):
@@ -263,12 +269,15 @@ def export_debounce_to_duckdb(
 
     try:
         with duckdb.connect(str(path_obj)) as conn:
-            configure_duckdb_wal(conn)
+            with contextlib.suppress(Exception):
+                configure_duckdb_wal(conn)
             conn.register("df_debounce", df.to_arrow())
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {cleaned_table} AS SELECT * FROM df_debounce WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {cleaned_table} SELECT * FROM df_debounce")
+            with contextlib.suppress(Exception):
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{cleaned_table}_key ON {cleaned_table}(key)")
         return len(df)
     except Exception as e:
         logger.error("export_debounce_to_duckdb_basarisiz", error=str(e))
@@ -276,7 +285,7 @@ def export_debounce_to_duckdb(
 
 
 def query_debounce_duckdb(
-    db_path: str | Path = DEFAULT_DEBOUNCE_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_DEBOUNCE_AUDIT_TABLE,
 ) -> pl.DataFrame:
     """DuckDB üzerinden geçmiş debounce kayıtlarını sorgular.
@@ -292,7 +301,7 @@ def query_debounce_duckdb(
     if not _TABLE_NAME_REGEX.match(cleaned_table):
         raise ValueError(f"Geçersiz tablo adı: {table_name!r}")
 
-    path_obj = Path(db_path)
+    path_obj = Path(db_path or DEFAULT_DEBOUNCE_DUCKDB_PATH)
     if not path_obj.exists() or path_obj.stat().st_size == 0:
         return pl.DataFrame()
 
@@ -437,6 +446,60 @@ class DebounceManager:
             ]
             return pl.DataFrame(rows, schema=schema)
 
+    def get_stats(self) -> dict[str, dict[str, Any]]:
+        """Yerel durum istatistiklerini sözlük formatında döner."""
+        now = time.monotonic()
+        with self._lock:
+            return {
+                k: {
+                    "key": k,
+                    "elapsed_seconds": round(now - last_ts, 3),
+                    "allowed_writes": self._local_writes.get(k, 0),
+                    "debounced_calls": self._local_debounced.get(k, 0),
+                }
+                for k, last_ts in self._local_last_writes.items()
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Yerel istatistikleri orjson bayt dizisi olarak serileştirir."""
+        return orjson.dumps(self.get_stats(), default=str)
+
+    def export_to_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        table_name: str = DEFAULT_DEBOUNCE_AUDIT_TABLE,
+    ) -> int:
+        """Yerel metrikleri DuckDB tablosuna aktarır."""
+        cleaned_table = str(table_name).strip()
+        if not _TABLE_NAME_REGEX.match(cleaned_table):
+            raise ValueError(f"Geçersiz tablo adı: {table_name!r}")
+
+        df = self.to_polars()
+        if df.is_empty():
+            return 0
+
+        path_obj = Path(db_path or DEFAULT_DEBOUNCE_DUCKDB_PATH)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        if path_obj.exists() and path_obj.stat().st_size == 0:
+            with contextlib.suppress(OSError):
+                path_obj.unlink()
+
+        try:
+            with duckdb.connect(str(path_obj)) as conn:
+                with contextlib.suppress(Exception):
+                    configure_duckdb_wal(conn)
+                conn.register("df_local_debounce", df.to_arrow())
+                conn.execute(
+                    f"CREATE TABLE IF NOT EXISTS {cleaned_table} AS SELECT * FROM df_local_debounce WHERE 1=0"
+                )
+                conn.execute(f"INSERT INTO {cleaned_table} SELECT * FROM df_local_debounce")
+                with contextlib.suppress(Exception):
+                    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{cleaned_table}_key ON {cleaned_table}(key)")
+            return len(df)
+        except Exception as e:
+            logger.error("export_to_duckdb_basarisiz", error=str(e))
+            return 0
+
     def __repr__(self) -> str:
         """Yönetici nesnesinin durum temsili."""
         with self._lock:
@@ -458,6 +521,7 @@ __all__: Final[list[str]] = [
     "debounced_save",
     "export_debounce_metrics_to_polars",
     "export_debounce_to_duckdb",
+    "export_debounce_to_orjson_bytes",
     "get_debounce_stats",
     "get_remaining_debounce_time",
     "query_debounce_duckdb",

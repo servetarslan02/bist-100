@@ -45,6 +45,35 @@ RESTRICTION_NO_DAY_TRADE: Final[str] = "GUN_ICI_AL_SAT_YASAGI"
 
 DEFAULT_GROSS_SETTLEMENT_DB_PATH: Final[str] = "data/gross_settlement_audit.duckdb"
 DEFAULT_MAX_QUERY_LIMIT: Final[int] = 100
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 VALID_RESTRICTION_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -254,6 +283,25 @@ class GrossSettlementMonitor:
             self._gross_tickers_with_details[sym] = clean_details
 
         logger.info("brut_takas_detayi_eklendi", hisse=sym, detay=clean_details)
+
+    def add_gross_settlement(
+        self,
+        ticker: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        reason: str = "VBTS",
+        day_trade_restricted: bool = False,
+    ) -> None:
+        """Hisse için brüt takas tedbiri tanımlar."""
+        self.set_gross_ticker_detail(
+            ticker=ticker,
+            details={
+                "start_date": start_date,
+                "end_date": end_date,
+                "reason": reason,
+                "day_trade_restricted": day_trade_restricted,
+            },
+        )
 
     def add_gross_ticker(self, ticker: str) -> None:
         """Tekil hisseyi brüt takas listesine ekle.
@@ -622,6 +670,7 @@ class GrossSettlementMonitor:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS gross_settlement_audit (
@@ -683,6 +732,7 @@ class GrossSettlementMonitor:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 tables = conn.execute(
                     "SELECT table_name FROM information_schema.tables WHERE table_name = 'gross_settlement_audit'"
                 ).fetchall()
@@ -723,6 +773,7 @@ class GrossSettlementMonitor:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 tables = conn.execute(
                     "SELECT table_name FROM information_schema.tables WHERE table_name = 'gross_settlement_audit'"
                 ).fetchall()
@@ -763,6 +814,23 @@ class GrossSettlementMonitor:
 
             logger.info("brut_takas_duckdbden_yuklendi", yuklenen_adet=loaded_count, yol=db_path)
             return loaded_count
+
+    def to_dict(self) -> dict[str, Any]:
+        """İzleyici durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "gross_tickers_count": len(self._gross_tickers),
+                "detailed_records_count": len(self._gross_tickers_with_details),
+                "gross_tickers": sorted(self._gross_tickers),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """İzleyici durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_GROSS_SETTLEMENT_DB_PATH) -> None:
+        """DuckDB brüt takas denetim tablosunu sıfırlar."""
+        clear_gross_settlement_audit_duckdb(db_path=db_path)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -889,10 +957,83 @@ def load_gross_settlement_from_duckdb(
     return gross_settlement_monitor.load_from_duckdb(db_path=db_path, current_date=current_date)
 
 
+def read_gross_settlement_audit_from_duckdb(
+    db_path: str = DEFAULT_GROSS_SETTLEMENT_DB_PATH,
+    ticker: str | None = None,
+    limit: int = DEFAULT_MAX_QUERY_LIMIT,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosunu doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        ticker: İsteğe bağlı hisse kodu filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan denetim kayıtları.
+    """
+    path_obj = Path(db_path)
+    schema: dict[str, pl.DataType] = {
+        "id": pl.Utf8,
+        "created_at": pl.Datetime,
+        "ticker": pl.Utf8,
+        "start_date": pl.Utf8,
+        "end_date": pl.Utf8,
+        "day_trade_restricted": pl.Boolean,
+        "reason": pl.Utf8,
+        "details_json": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=schema)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'gross_settlement_audit'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=schema)
+
+            query = "SELECT * FROM gross_settlement_audit WHERE 1=1"
+            params: list[Any] = []
+
+            if ticker:
+                query += " AND ticker = ?"
+                params.append(ticker.upper().strip())
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(max(1, int(limit)))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_gross_settlement_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=schema)
+
+
+def clear_gross_settlement_audit_duckdb(db_path: str = DEFAULT_GROSS_SETTLEMENT_DB_PATH) -> None:
+    """DuckDB'deki brüt takas denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS gross_settlement_audit;")
+    except Exception as exc:
+        logger.error("duckdb_gross_settlement_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Sabitler
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_GROSS_SETTLEMENT_DB_PATH",
     "DEFAULT_MAX_QUERY_LIMIT",
+    "DEFAULT_WAL_SIZE",
     "RESTRICTION_GROSS_SETTLEMENT",
     "RESTRICTION_NO_DAY_TRADE",
     "RESTRICTION_NO_MARGIN",
@@ -908,6 +1049,8 @@ __all__: Final[list[str]] = [
     # Modül Seviyesi Kolaylık Fonksiyonları
     "check_polars_gross_settlement",
     "check_stock_gross_settlement",
+    "clear_gross_settlement_audit_duckdb",
+    "configure_duckdb_wal",
     "export_gross_settlement_to_duckdb",
     "export_gross_settlement_to_polars",
     "filter_gross_settlement_stocks",
@@ -918,5 +1061,7 @@ __all__: Final[list[str]] = [
     "is_stock_short_sell_blocked",
     "load_gross_settlement_from_duckdb",
     "query_gross_settlement_audit_duckdb",
+    "read_gross_settlement_audit_from_duckdb",
+    "to_orjson_bytes",
     "validate_stock_order",
 ]

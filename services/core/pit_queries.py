@@ -656,6 +656,11 @@ def export_pit_results_to_orjson(results: Any) -> bytes:
     return orjson.dumps(results, default=str)
 
 
+def to_orjson_bytes(results: Any) -> bytes:
+    """export_pit_results_to_orjson için takma ad."""
+    return export_pit_results_to_orjson(results)
+
+
 def save_pit_audit_to_duckdb(
     audit_results: list[dict[str, Any]],
     db_path: str = DEFAULT_PIT_DUCKDB_PATH,
@@ -691,14 +696,80 @@ def save_pit_audit_to_duckdb(
             """
         )
         conn.register("tmp_pit_df", df.to_arrow())
-        conn.execute(
-            """
-            INSERT INTO pit_leakage_audit (table_name, identifier, check_date, leak_count, has_leakage, status)
-            SELECT "table", identifier, check_date, leak_count, has_leakage, status
-            FROM tmp_pit_df
-            """
-        )
+        try:
+            conn.execute(
+                """
+                INSERT INTO pit_leakage_audit (table_name, identifier, check_date, leak_count, has_leakage, status)
+                SELECT "table", identifier, check_date, leak_count, has_leakage, status
+                FROM tmp_pit_df
+                """
+            )
+        finally:
+            conn.unregister("tmp_pit_df")
+        conn.commit()
         logger.info("pit_denetim_sonuclari_duckdb_kaydedildi", kayit_sayisi=df.height, db_path=str(path_obj))
+    finally:
+        conn.close()
+
+
+def read_pit_audit_from_duckdb(
+    db_path: str = DEFAULT_PIT_DUCKDB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB içindeki PIT denetim geçmişini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+
+    Returns:
+        PIT sızıntı denetim kayıtlarını içeren Polars DataFrame.
+    """
+    path = Path(db_path)
+    schema = {
+        "table_name": pl.String,
+        "identifier": pl.String,
+        "check_date": pl.String,
+        "leak_count": pl.Int64,
+        "has_leakage": pl.Boolean,
+        "status": pl.String,
+        "recorded_at": pl.String,
+    }
+    if not path.exists():
+        return pl.DataFrame(schema=schema)
+
+    conn = duckdb.connect(str(path), read_only=True)
+    try:
+        configure_duckdb_wal(conn)
+        tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+        if "pit_leakage_audit" not in tables:
+            return pl.DataFrame(schema=schema)
+        arrow_table = conn.execute(
+            f"SELECT table_name, identifier, check_date, leak_count, has_leakage, status, CAST(recorded_at AS VARCHAR) AS recorded_at "
+            f"FROM pit_leakage_audit ORDER BY recorded_at DESC LIMIT {int(limit)}"
+        ).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def clear_pit_audit_duckdb(
+    db_path: str = DEFAULT_PIT_DUCKDB_PATH,
+) -> None:
+    """DuckDB tablosundaki PIT sızıntı denetim kayıtlarını temizler.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS pit_leakage_audit")
+        conn.commit()
+        logger.info("pit_audit_duckdb_temizlendi", db_path=str(path))
     finally:
         conn.close()
 
@@ -711,6 +782,7 @@ __all__: Final[list[str]] = [
     "DEFAULT_WAL_SIZE",
     "PIT_QUERY_TEMPLATES",
     "PITQueryTemplate",
+    "clear_pit_audit_duckdb",
     "configure_duckdb_wal",
     "export_pit_audit_to_polars",
     "export_pit_results_to_orjson",
@@ -722,7 +794,9 @@ __all__: Final[list[str]] = [
     "pit_fetch_range",
     "pit_fetch_snapshot",
     "pit_validate_no_leakage",
+    "read_pit_audit_from_duckdb",
     "sanitize_pit_polars",
     "save_pit_audit_to_duckdb",
+    "to_orjson_bytes",
 ]
 

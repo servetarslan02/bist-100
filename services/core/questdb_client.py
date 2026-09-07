@@ -373,6 +373,79 @@ class QuestDBClient:
         finally:
             conn.close()
 
+    def read_buffer_from_duckdb(
+        self,
+        db_path: str | None = None,
+        ticker: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB çevrimdışı tamponundaki tick kayıtlarını Polars DataFrame olarak okur."""
+        target_path = db_path or self._duckdb_buffer_path
+        path_obj = Path(target_path)
+        empty_schema = {
+            "ticker": pl.String,
+            "price": pl.Float64,
+            "volume": pl.Int64,
+            "bid": pl.Float64,
+            "ask": pl.Float64,
+            "recorded_at": pl.Datetime,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "questdb_offline_ticks" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = "SELECT ticker, price, volume, bid, ask, recorded_at FROM questdb_offline_ticks "
+            params: list[Any] = []
+            if ticker:
+                query += "WHERE ticker = ? "
+                params.append(ticker.upper().strip())
+            query += "ORDER BY recorded_at ASC"
+
+            return conn.execute(query, params).pl()
+        except Exception as e:
+            logger.error("questdb_tampon_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_buffer_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB çevrimdışı tamponundaki tüm tick kayıtlarını temizler."""
+        target_path = db_path or self._duckdb_buffer_path
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "questdb_offline_ticks" in tables:
+                conn.execute("DELETE FROM questdb_offline_ticks")
+            logger.info("questdb_tampon_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("questdb_tampon_temizleme_hatasi", hata=str(e))
+            return False
+        finally:
+            conn.close()
+
+    def to_orjson_bytes(self) -> bytes:
+        """İstemci durumunu ve tampon büyüklüğünü orjson bayt dizisine dönüştürür."""
+        with self._lock:
+            buffer_df = self.read_buffer_from_duckdb()
+            state = {
+                "host": self._host,
+                "ilp_port": self._ilp_port,
+                "http_port": self._http_port,
+                "connected": self._connected,
+                "buffered_ticks_count": len(buffer_df),
+                "duckdb_path": self._duckdb_buffer_path,
+            }
+            return orjson.dumps(state, default=str)
+
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
         with self._lock:
@@ -386,6 +459,36 @@ class QuestDBClient:
 questdb_client = QuestDBClient()
 
 
+def read_questdb_buffer_from_duckdb(
+    db_path: str = DEFAULT_QUESTDB_DUCKDB_BUFFER_PATH,
+    ticker: str | None = None,
+    client: QuestDBClient = questdb_client,
+) -> pl.DataFrame:
+    """DuckDB çevrimdışı tamponundaki tick kayıtlarını Polars DataFrame olarak okur."""
+    return client.read_buffer_from_duckdb(db_path=db_path, ticker=ticker)
+
+
+def clear_questdb_buffer_duckdb(
+    db_path: str = DEFAULT_QUESTDB_DUCKDB_BUFFER_PATH,
+    client: QuestDBClient = questdb_client,
+) -> bool:
+    """DuckDB çevrimdışı tamponundaki kayıtları temizler."""
+    return client.clear_buffer_duckdb(db_path=db_path)
+
+
+def export_offline_ticks_to_polars(
+    db_path: str = DEFAULT_QUESTDB_DUCKDB_BUFFER_PATH,
+    client: QuestDBClient = questdb_client,
+) -> pl.DataFrame:
+    """Çevrimdışı tamponundaki tick kayıtlarını Polars DataFrame olarak döndürür."""
+    return client.read_buffer_from_duckdb(db_path=db_path)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HTTP_TIMEOUT",
@@ -393,7 +496,12 @@ __all__: Final[list[str]] = [
     "DEFAULT_SOCKET_TIMEOUT",
     "DEFAULT_WAL_SIZE",
     "QuestDBClient",
+    "clear_questdb_buffer_duckdb",
     "configure_duckdb_wal",
+    "export_offline_ticks_to_polars",
     "questdb_client",
+    "read_questdb_buffer_from_duckdb",
+    "to_orjson_bytes",
 ]
+
 

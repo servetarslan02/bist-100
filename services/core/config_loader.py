@@ -283,7 +283,7 @@ class ConfigLoader:
 
     def to_orjson_bytes(self, mask_secrets: bool = True) -> bytes:
         """Yapılandırmayı orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict(mask_secrets=mask_secrets))
+        return orjson.dumps(self.to_dict(mask_secrets=mask_secrets), default=str)
 
     def to_json(self, mask_secrets: bool = True) -> str:
         """Yapılandırmayı JSON metnine dönüştürür."""
@@ -335,10 +335,8 @@ class ConfigLoader:
         if (val_clean.startswith("[") and val_clean.endswith("]")) or (
             val_clean.startswith("{") and val_clean.endswith("}")
         ):
-            try:
+            with contextlib.suppress(Exception):
                 return orjson.loads(val_clean)
-            except Exception:
-                pass
 
         return val_clean
 
@@ -446,14 +444,21 @@ def export_config_to_duckdb(
 
     try:
         with duckdb.connect(str(path_obj)) as conn:
-            from services.core.debounce import configure_duckdb_wal
+            try:
+                from services.core.debounce import configure_duckdb_wal
 
-            configure_duckdb_wal(conn)
+                configure_duckdb_wal(conn)
+            except Exception:
+                with contextlib.suppress(Exception):
+                    conn.execute("PRAGMA wal_autocheckpoint='10MB';")
+
             conn.register("df_loader_snap", df_snapshot.to_arrow())
             conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_loader_snap WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_loader_snap")
+            with contextlib.suppress(Exception):
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name} (key)")
         return len(df_snapshot)
     except Exception as e:
         logger.error("export_config_loader_to_duckdb_failed", error=str(e))

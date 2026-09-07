@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict, deque
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -135,7 +136,7 @@ class ProductionMetrics:
 
     def to_orjson_bytes(self) -> bytes:
         """Tüm metrikleri yüksek hızlı orjson bayt dizisine dönüştürür."""
-        return orjson.dumps(self.get_all())
+        return orjson.dumps(self.get_all(), default=str)
 
     @otel_trace("production_metrics.reset")
     def reset(self) -> None:
@@ -223,15 +224,76 @@ class ProductionMetrics:
                 """
             )
             conn.register("tmp_metrics_df", df.to_arrow())
-            conn.execute(
-                """
-                INSERT INTO production_metrics_snapshots (type, name, value, extra)
-                SELECT type, name, value, extra
-                FROM tmp_metrics_df
-                """
-            )
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO production_metrics_snapshots (type, name, value, extra)
+                    SELECT type, name, value, extra
+                    FROM tmp_metrics_df
+                    """
+                )
+            finally:
+                with suppress(Exception):
+                    conn.unregister("tmp_metrics_df")
             logger.info("uretim_metrikleri_duckdb_kaydedildi", kayit_sayisi=df.height, db_path=str(path_obj))
             return df.height
+        finally:
+            conn.close()
+
+    def read_snapshots_from_duckdb(
+        self,
+        db_path: str | None = None,
+        metric_type: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB'de kayıtlı metrik anlık görüntülerini Polars DataFrame olarak okur."""
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        empty_schema = {
+            "type": pl.String,
+            "name": pl.String,
+            "value": pl.Float64,
+            "extra": pl.String,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "production_metrics_snapshots" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = "SELECT type, name, value, extra FROM production_metrics_snapshots "
+            params: list[Any] = []
+            if metric_type:
+                query += "WHERE type = ? "
+                params.append(metric_type.lower().strip())
+            query += "ORDER BY recorded_at DESC"
+
+            return conn.execute(query, params).pl()
+        except Exception as e:
+            logger.error("uretim_metrikleri_duckdb_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_snapshots_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB tablosundaki tüm metrik anlık görüntülerini temizler."""
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "production_metrics_snapshots" in tables:
+                conn.execute("DELETE FROM production_metrics_snapshots")
+            logger.info("uretim_metrikleri_duckdb_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("uretim_metrikleri_duckdb_temizleme_hatasi", hata=str(e))
+            return False
         finally:
             conn.close()
 
@@ -334,6 +396,58 @@ def save_production_metrics_to_duckdb(
     return metrics.save_snapshot_to_duckdb(db_path=db_path)
 
 
+def read_production_metrics_from_duckdb(
+    db_path: str = DEFAULT_METRICS_DUCKDB_PATH,
+    metric_type: str | None = None,
+    metrics: ProductionMetrics = production_metrics,
+) -> pl.DataFrame:
+    """DuckDB'de kayıtlı metrik anlık görüntülerini Polars DataFrame olarak okur."""
+    return metrics.read_snapshots_from_duckdb(db_path=db_path, metric_type=metric_type)
+
+
+def clear_production_metrics_duckdb(
+    db_path: str = DEFAULT_METRICS_DUCKDB_PATH,
+    metrics: ProductionMetrics = production_metrics,
+) -> bool:
+    """DuckDB tablosundaki metrik kayıtlarını temizler."""
+    return metrics.clear_snapshots_duckdb(db_path=db_path)
+
+
+def record_metric_inc(
+    name: str,
+    value: float = 1.0,
+    labels: dict[str, Any] | None = None,
+    metrics: ProductionMetrics = production_metrics,
+) -> None:
+    """Global metrik sayacını artırır."""
+    metrics.inc(name, value=value, labels=labels)
+
+
+def record_metric_gauge(
+    name: str,
+    value: float,
+    labels: dict[str, Any] | None = None,
+    metrics: ProductionMetrics = production_metrics,
+) -> None:
+    """Global gösterge değerini günceller."""
+    metrics.set_gauge(name, value=value, labels=labels)
+
+
+def record_metric_observe(
+    name: str,
+    value: float,
+    labels: dict[str, Any] | None = None,
+    metrics: ProductionMetrics = production_metrics,
+) -> None:
+    """Global histogram gözlemi ekler."""
+    metrics.observe(name, value=value, labels=labels)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HISTOGRAM_MAXLEN",
@@ -341,9 +455,16 @@ __all__: Final[list[str]] = [
     "DEFAULT_WAL_SIZE",
     "Metrics",
     "ProductionMetrics",
+    "clear_production_metrics_duckdb",
     "configure_duckdb_wal",
     "export_production_metrics_to_polars",
     "production_metrics",
+    "read_production_metrics_from_duckdb",
+    "record_metric_gauge",
+    "record_metric_inc",
+    "record_metric_observe",
     "save_production_metrics_to_duckdb",
+    "to_orjson_bytes",
 ]
+
 

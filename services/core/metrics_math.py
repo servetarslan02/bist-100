@@ -13,6 +13,7 @@ Platform genelinde (Backtest, Model Eğitimi, Risk Motoru) kullanılan merkezi m
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import math
 import os
@@ -20,37 +21,39 @@ from typing import Any, Callable, Final, Sequence
 
 import duckdb
 import numpy as np
+import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    try:
+        from opentelemetry import trace
+        tracer = trace.get_tracer("alpha-bist.metrics_math")
+
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                @functools.wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    with tracer.start_as_current_span(span_name):
+                        return func(*args, **kwargs)
+                return wrapper
+            return decorator
+    except ImportError:
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                @functools.wraps(func)
+                def wrapper(*args: Any, **kwargs: Any) -> Any:
+                    return func(*args, **kwargs)
+                return wrapper
+            return decorator
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.metrics_math")
 
 DEFAULT_PERIODS_PER_YEAR: Final[int] = 252
 DEFAULT_RISK_FREE_RATE: Final[float] = 0.0
 DEFAULT_CONFIDENCE_LEVEL: Final[float] = 0.95
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def _to_clean_numpy(values: np.ndarray | pl.Series | pl.DataFrame | Sequence[float]) -> np.ndarray:
@@ -582,6 +585,27 @@ def metrics_summary_to_polars(
     )
 
 
+def export_metrics_to_orjson_bytes(
+    returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
+    risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
+    periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
+) -> bytes:
+    """Tüm temel performans metriklerini orjson serileştirilmiş ikili bayt dizisi olarak döndürür."""
+    df = metrics_summary_to_polars(returns, risk_free_rate=risk_free_rate, periods_per_year=periods_per_year)
+    return orjson.dumps(df.to_dicts()[0], default=str)
+
+
+def clear_strategy_metrics_duckdb(db_path: str = "data/strategy_metrics.duckdb") -> None:
+    """DuckDB strateji performans defterindeki tüm kayıtları siler."""
+    if not os.path.exists(db_path):
+        return
+
+    with duckdb.connect(db_path) as con:
+        con.execute("PRAGMA checkpoint_threshold='4MB'")
+        con.execute("PRAGMA wal_autocheckpoint='2MB'")
+        con.execute("DROP TABLE IF EXISTS strategy_performance_ledger")
+
+
 def export_metrics_to_duckdb(
     returns: np.ndarray | pl.Series | pl.DataFrame | Sequence[float],
     strategy_id: str,
@@ -600,8 +624,13 @@ def export_metrics_to_duckdb(
         Kaydedilen kayıt sayısı (başarılı ise 1).
     """
     df = metrics_summary_to_polars(returns, periods_per_year=periods_per_year)
-    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
-    with duckdb.connect(db_path) as con:
+    target = os.path.abspath(db_path)
+    os.makedirs(os.path.dirname(target) if os.path.dirname(target) else ".", exist_ok=True)
+    if os.path.exists(target) and os.path.getsize(target) == 0:
+        with contextlib.suppress(OSError):
+            os.remove(target)
+
+    with duckdb.connect(target) as con:
         con.execute("PRAGMA checkpoint_threshold='4MB'")
         con.execute("PRAGMA wal_autocheckpoint='2MB'")
         con.execute("""
@@ -621,6 +650,8 @@ def export_metrics_to_duckdb(
                 recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        con.execute("CREATE INDEX IF NOT EXISTS idx_strategy_metrics_id ON strategy_performance_ledger (strategy_id);")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_strategy_metrics_rec ON strategy_performance_ledger (recorded_at);")
         row = df.to_dicts()[0]
         query = (
             "INSERT INTO strategy_performance_ledger ("
@@ -670,8 +701,10 @@ __all__: Final[list[str]] = [
     "calculate_tail_ratio",
     "calculate_var_cvar",
     "calculate_win_rate",
+    "clear_strategy_metrics_duckdb",
     "evaluate_strategy_viability",
     "export_metrics_to_duckdb",
+    "export_metrics_to_orjson_bytes",
     "metrics_summary_to_polars",
     "otel_trace",
 ]

@@ -13,6 +13,7 @@ Kaynak: Borsa İstanbul resmi mevzuat ve seans kuralları.
 from __future__ import annotations
 
 import threading
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -112,7 +113,7 @@ class PriceLimitResult:
 
     def to_orjson_bytes(self) -> bytes:
         """Sonuç verilerini yüksek hızlı orjson bayt dizisine dönüştürür."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
 
 class PriceLimitMonitor:
@@ -390,6 +391,126 @@ class PriceLimitMonitor:
         finally:
             conn.close()
 
+    def save_breaches_to_duckdb(
+        self,
+        results: list[PriceLimitResult],
+        db_path: str | None = None,
+    ) -> int:
+        """Birden çok fiyat limiti ihlalini DuckDB tablosuna toplu olarak kaydeder.
+
+        Args:
+            results: PriceLimitResult listesi.
+            db_path: İsteğe bağlı DuckDB dosya yolu.
+
+        Returns:
+            Kaydedilen ihlal sayısı.
+        """
+        breaches = [r for r in results if r.limit_hit]
+        if not breaches:
+            return 0
+
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+        df = export_price_limits_to_polars(breaches)
+        conn = duckdb.connect(str(path_obj))
+        try:
+            configure_duckdb_wal(conn)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS price_limit_breaches (
+                    ticker VARCHAR,
+                    direction VARCHAR,
+                    change_pct DOUBLE,
+                    current_price DOUBLE,
+                    reference_price DOUBLE,
+                    upper_limit DOUBLE,
+                    lower_limit DOUBLE,
+                    breach_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.register("tmp_breaches_df", df.to_arrow())
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO price_limit_breaches (ticker, direction, change_pct, current_price, reference_price, upper_limit, lower_limit)
+                    SELECT ticker, direction, change_pct, current_price, reference_price, upper_limit, lower_limit
+                    FROM tmp_breaches_df
+                    """
+                )
+            finally:
+                with suppress(Exception):
+                    conn.unregister("tmp_breaches_df")
+            logger.info("toplu_fiyat_limiti_ihlalleri_kaydedildi", adet=len(breaches), db_path=str(path_obj))
+            return len(breaches)
+        finally:
+            conn.close()
+
+    def read_breaches_from_duckdb(
+        self,
+        db_path: str | None = None,
+        ticker: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB'de kayıtlı fiyat limiti ihlallerini Polars DataFrame olarak okur."""
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        empty_schema = {
+            "ticker": pl.String,
+            "direction": pl.String,
+            "change_pct": pl.Float64,
+            "current_price": pl.Float64,
+            "reference_price": pl.Float64,
+            "upper_limit": pl.Float64,
+            "lower_limit": pl.Float64,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "price_limit_breaches" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = (
+                "SELECT ticker, direction, change_pct, current_price, reference_price, upper_limit, lower_limit "
+                "FROM price_limit_breaches "
+            )
+            params: list[Any] = []
+            if ticker:
+                query += "WHERE ticker = ? "
+                params.append(ticker.upper().strip())
+            query += "ORDER BY breach_time DESC"
+
+            return conn.execute(query, params).pl()
+        except Exception as e:
+            logger.error("fiyat_limiti_duckdb_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_breaches_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB tablosundaki tüm fiyat limiti ihlallerini temizler."""
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "price_limit_breaches" in tables:
+                conn.execute("DELETE FROM price_limit_breaches")
+            logger.info("fiyat_limiti_ihlalleri_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("fiyat_limiti_duckdb_temizleme_hatasi", hata=str(e))
+            return False
+        finally:
+            conn.close()
+
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
         with self._lock:
@@ -401,6 +522,56 @@ class PriceLimitMonitor:
 
 # Singleton
 price_limit_monitor = PriceLimitMonitor()
+
+
+def check_price_limit(
+    ticker: str,
+    current_price: float,
+    reference_price: float,
+    monitor: PriceLimitMonitor = price_limit_monitor,
+) -> PriceLimitResult:
+    """Fiyat limiti denetimi yapar."""
+    return monitor.check_price_limit(ticker, current_price, reference_price)
+
+
+def save_price_limit_breach_to_duckdb(
+    result: PriceLimitResult,
+    db_path: str = DEFAULT_PRICE_LIMIT_DUCKDB_PATH,
+    monitor: PriceLimitMonitor = price_limit_monitor,
+) -> None:
+    """Fiyat limiti ihlalini DuckDB'ye kaydeder."""
+    monitor.save_breach_to_duckdb(result, db_path=db_path)
+
+
+def save_price_limit_breaches_to_duckdb(
+    results: list[PriceLimitResult],
+    db_path: str = DEFAULT_PRICE_LIMIT_DUCKDB_PATH,
+    monitor: PriceLimitMonitor = price_limit_monitor,
+) -> int:
+    """Birden çok fiyat limiti ihlalini DuckDB'ye toplu kaydeder."""
+    return monitor.save_breaches_to_duckdb(results, db_path=db_path)
+
+
+def read_price_limit_breaches_from_duckdb(
+    db_path: str = DEFAULT_PRICE_LIMIT_DUCKDB_PATH,
+    ticker: str | None = None,
+    monitor: PriceLimitMonitor = price_limit_monitor,
+) -> pl.DataFrame:
+    """DuckDB'de kayıtlı fiyat limiti ihlallerini Polars DataFrame olarak okur."""
+    return monitor.read_breaches_from_duckdb(db_path=db_path, ticker=ticker)
+
+
+def clear_price_limit_breaches_duckdb(
+    db_path: str = DEFAULT_PRICE_LIMIT_DUCKDB_PATH,
+    monitor: PriceLimitMonitor = price_limit_monitor,
+) -> bool:
+    """DuckDB tablosundaki ihlalleri temizler."""
+    return monitor.clear_breaches_duckdb(db_path=db_path)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
 
 
 def export_price_limits_to_polars(results: list[PriceLimitResult]) -> pl.DataFrame:
@@ -433,8 +604,15 @@ __all__: Final[list[str]] = [
     "MARKET_LIMITS",
     "PriceLimitMonitor",
     "PriceLimitResult",
+    "check_price_limit",
+    "clear_price_limit_breaches_duckdb",
     "configure_duckdb_wal",
     "export_price_limits_to_polars",
     "price_limit_monitor",
+    "read_price_limit_breaches_from_duckdb",
+    "save_price_limit_breach_to_duckdb",
+    "save_price_limit_breaches_to_duckdb",
+    "to_orjson_bytes",
 ]
+
 

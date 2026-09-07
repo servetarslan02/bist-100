@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
+import orjson
 import polars as pl
 import structlog
 from opentelemetry import metrics, trace
@@ -112,6 +113,10 @@ class PipelineReport:
     def to_polars(self) -> pl.DataFrame:
         """Rapor özetini Polars DataFrame olarak döndürür."""
         return export_pipeline_report_to_polars(self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Pipeline raporunu orjson ile ikili serileştirir."""
+        return export_pipeline_report_to_orjson_bytes(self)
 
 
 class MasterOrchestrator:
@@ -1509,14 +1514,16 @@ class MasterOrchestrator:
     @otel_trace("orchestrator.export_daily_report_json")
     def export_daily_report_json(self, date: str) -> str:
         """Günlük pipeline raporunu JSON olarak dışa aktar."""
-        import orjson as _json
-
         report = {
             "date": date,
             "status": self.get_status(),
             "generated_at": datetime.now(UTC).isoformat(),
         }
-        return _json.dumps(report, option=_json.OPT_INDENT_2).decode()
+        return orjson.dumps(report, option=orjson.OPT_INDENT_2, default=str).decode()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Orkestratör durumunu ve servislerini orjson ile ikili serileştirir."""
+        return export_orchestrator_status_to_orjson_bytes(self)
 
     @otel_trace("orchestrator.get_pipeline_stats")
     def get_pipeline_stats(self) -> dict[str, Any]:
@@ -1606,6 +1613,150 @@ def export_top_opportunities_to_polars(report: PipelineReport) -> pl.DataFrame:
     return pl.DataFrame(report.top_opportunities)
 
 
+def export_pipeline_report_to_orjson_bytes(report: PipelineReport) -> bytes:
+    """PipelineReport nesnesini orjson serileştirilmiş ikili bayt olarak döndürür."""
+    df = export_pipeline_report_to_polars(report)
+    payload = {
+        "date": report.date,
+        "regime": report.regime,
+        "results": df.to_dicts(),
+        "top_opportunities": report.top_opportunities,
+        "system_health": report.system_health,
+        "alerts": report.alerts,
+    }
+    return orjson.dumps(payload, default=str)
+
+
+def export_orchestrator_status_to_orjson_bytes(
+    orchestrator_instance: MasterOrchestrator | None = None,
+) -> bytes:
+    """Orkestratör servisleri ve durumunu orjson serileştirilmiş ikili bayt olarak döndürür."""
+    inst = orchestrator_instance or master_orchestrator
+    payload = {
+        "status": inst.get_status(),
+        "stats": inst.get_pipeline_stats(),
+    }
+    return orjson.dumps(payload, default=str)
+
+
+def export_pipeline_report_to_duckdb(
+    report: PipelineReport,
+    db_path: str = "data/orchestrator_pipeline_reports.duckdb",
+) -> int:
+    """PipelineReport sonuçlarını yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+    Args:
+        report: Pipeline raporu nesnesi.
+        db_path: DuckDB veritabanı dosya yolu.
+
+    Returns:
+        Kaydedilen kayıt sayısı.
+    """
+    from pathlib import Path
+
+    import duckdb
+
+    df = export_pipeline_report_to_polars(report)
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("SET checkpoint_threshold = '64MB';")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pipeline_report_runs (
+                date VARCHAR,
+                ticker VARCHAR,
+                sector VARCHAR,
+                feature_count BIGINT,
+                agent_direction VARCHAR,
+                agent_confidence DOUBLE,
+                agent_score DOUBLE,
+                has_error BOOLEAN,
+                error_msg VARCHAR,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pipeline_report_date ON pipeline_report_runs (date);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pipeline_report_ticker ON pipeline_report_runs (ticker);")
+        if df.height > 0:
+            conn.register("df_pipe_view", df.to_arrow())
+            try:
+                conn.execute("""
+                    INSERT INTO pipeline_report_runs
+                    (date, ticker, sector, feature_count, agent_direction, agent_confidence, agent_score, has_error, error_msg)
+                    SELECT date, ticker, sector, feature_count, agent_direction, agent_confidence, agent_score, has_error, error_msg
+                    FROM df_pipe_view
+                """)
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_pipe_view")
+    return df.height
+
+
+def export_services_status_to_duckdb(
+    orchestrator_instance: MasterOrchestrator | None = None,
+    db_path: str = "data/orchestrator_services_status.duckdb",
+) -> int:
+    """Yüklü servislerin durumunu yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+    Args:
+        orchestrator_instance: MasterOrchestrator örneği (None ise master_orchestrator).
+        db_path: DuckDB veritabanı dosya yolu.
+
+    Returns:
+        Kaydedilen servis kayıt sayısı.
+    """
+    from pathlib import Path
+
+    import duckdb
+
+    inst = orchestrator_instance or master_orchestrator
+    df = inst.export_services_status_to_polars()
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("SET checkpoint_threshold = '64MB';")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS orchestrator_services_status (
+                service_name VARCHAR,
+                service_type VARCHAR,
+                is_active BOOLEAN,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_orch_service_name ON orchestrator_services_status (service_name);")
+        if df.height > 0:
+            conn.register("df_srv_view", df.to_arrow())
+            try:
+                conn.execute("""
+                    INSERT INTO orchestrator_services_status
+                    (service_name, service_type, is_active)
+                    SELECT service_name, service_type, is_active
+                    FROM df_srv_view
+                """)
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_srv_view")
+    return df.height
+
+
+def clear_orchestrator_duckdb(
+    db_path: str = "data/orchestrator_pipeline_reports.duckdb",
+) -> None:
+    """DuckDB üzerindeki orchestrator denetim ve pipeline tablolarını temizler."""
+    from pathlib import Path
+
+    import duckdb
+
+    target = Path(db_path)
+    if not target.exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS pipeline_report_runs")
+        conn.execute("DROP TABLE IF EXISTS orchestrator_services_status")
+
+
 # Singleton
 master_orchestrator = MasterOrchestrator()
 
@@ -1621,9 +1772,15 @@ __all__: list[str] = [
     "MasterOrchestrator",
     "PipelineReport",
     "SystemOrchestrator",
+    "clear_orchestrator_duckdb",
+    "export_orchestrator_status_to_orjson_bytes",
+    "export_pipeline_report_to_duckdb",
+    "export_pipeline_report_to_orjson_bytes",
     "export_pipeline_report_to_polars",
+    "export_services_status_to_duckdb",
     "export_top_opportunities_to_polars",
     "master_orchestrator",
     "orchestrator",
     "shutdown_bg_loop",
 ]
+

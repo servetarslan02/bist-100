@@ -19,21 +19,20 @@ Veri Akışı:
 
 from __future__ import annotations
 
-import asyncio
-import functools
 import re
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.duckdb_research")
 
 DEFAULT_RESEARCH_DB_PATH: Final[str] = "data/research.duckdb"
 DEFAULT_PARQUET_OUTPUT_DIR: Final[str] = "data/parquet"
@@ -52,38 +51,6 @@ DEFAULT_EXPORT_TABLES: Final[list[str]] = [
     "paper_trades",
     "backtest_runs",
 ]
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metot çağrılarını OpenTelemetry span'i ile sarmalayan dekoratör.
-
-    Senkron ve asenkron metotları otomatik tespit ederek uygun sarmalayıcıyı uygular.
-
-    Args:
-        span_name: OTel span adı.
-
-    Returns:
-        Sarmalayıcı dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Fonksiyonu OTel span bağlamında çalıştırır."""
-
-        @functools.wraps(func)
-        async def async_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Asenkron fonksiyon için span oluşturur ve yürütür."""
-            with tracer.start_as_current_span(span_name):
-                return await func(self, *args, **kwargs)
-
-        @functools.wraps(func)
-        def sync_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Senkron fonksiyon için span oluşturur ve yürütür."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
-
-    return decorator
 
 
 class DuckDBResearchEngine:
@@ -383,6 +350,22 @@ class DuckDBResearchEngine:
         with self._lock:
             return list(self._parquet_cache.keys())
 
+    def clear_views(self) -> None:
+        """Kayıtlı tüm sanal Parquet görünümlerini DuckDB'den ve yerel önbellekten temizler."""
+        with self._lock:
+            if self._conn is not None:
+                for name in list(self._parquet_cache.keys()):
+                    try:
+                        self._conn.execute(f'DROP VIEW IF EXISTS "{name}"')
+                    except Exception as drop_err:
+                        logger.debug("Sanal görünüm düşürülürken hata", view=name, error=str(drop_err))
+            self._parquet_cache.clear()
+            logger.info("Tüm Parquet sanal görünümleri temizlendi")
+
+    def clear_cache(self) -> None:
+        """Önbelleği ve sanal görünümleri temizler (clear_views için takma ad)."""
+        self.clear_views()
+
     # =====================================================
     # RESEARCH VERİTABANI OPERASYONLARI
     # =====================================================
@@ -495,6 +478,41 @@ class DuckDBResearchEngine:
             conn = self._get_conn()
             conn.execute(f'INSERT INTO "{table}" SELECT * FROM read_parquet(\'{safe_path}\')')
             logger.info("Parquet verisi araştırma tablosuna aktarıldı", table=table, path=str(parquet_path))
+
+    def insert_from_polars(self, table: str, df: pl.DataFrame) -> None:
+        """Polars DataFrame verisini sıfır kopyalama ile araştırma tablosuna yazar veya ekler.
+
+        Args:
+            table: Hedef tablo adı.
+            df: Yazılacak Polars DataFrame.
+
+        Raises:
+            ValueError: Tablo adı geçersiz ise.
+        """
+        if not self._is_valid_identifier(table):
+            raise ValueError(f"Geçersiz tablo adı: {table!r}")
+        if df.is_empty():
+            logger.warning("Yazılacak Polars DataFrame boş, işlem atlandı", table=table)
+            return
+
+        arrow_table = df.to_arrow()
+        with self._lock:
+            conn = self._get_conn()
+            temp_view_name = f"_tmp_polars_arrow_{table}"
+            conn.register(temp_view_name, arrow_table)
+            try:
+                table_exists = conn.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = ? AND table_schema = 'main'",
+                    (table,),
+                ).fetchone() is not None
+
+                if not table_exists:
+                    conn.execute(f'CREATE TABLE "{table}" AS SELECT * FROM "{temp_view_name}"')
+                else:
+                    conn.execute(f'INSERT INTO "{table}" SELECT * FROM "{temp_view_name}"')
+                logger.info("Polars verisi araştırma tablosuna başarıyla aktarıldı", table=table, row_count=len(df))
+            finally:
+                conn.unregister(temp_view_name)
 
     # =====================================================
     # TIMESCALEDB → PARQUET AKTARIMI
@@ -643,6 +661,14 @@ class DuckDBResearchEngine:
     # DURUM VE İSTATİSTİKLER
     # =====================================================
 
+    def to_orjson_bytes(self) -> bytes:
+        """Motor istatistiklerini orjson formatında binary olarak döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        return orjson.dumps(self.get_stats(), option=orjson.OPT_INDENT_2, default=str)
+
     def get_stats(self) -> dict[str, Any]:
         """Research veritabanı boyut, tablo ve sanal görünüm istatistiklerini döner.
 
@@ -675,7 +701,13 @@ class DuckDBResearchEngine:
                 }
             except Exception as exc:
                 logger.error("research_engine_stats_alinamadi", error=str(exc))
-                return {"error": str(exc)}
+                return {
+                    "db_path": str(self._db_path),
+                    "db_size_bytes": 0,
+                    "tables": {},
+                    "parquet_views": [],
+                    "error": str(exc),
+                }
 
 
 # Global tekil örnek
@@ -719,9 +751,24 @@ def register_parquet(name: str, parquet_path: str | Path) -> None:
     research_engine.register_parquet(name=name, parquet_path=parquet_path)
 
 
+def clear_parquet_views() -> None:
+    """Kayıtlı tüm sanal Parquet görünümlerini ve önbelleği temizler."""
+    research_engine.clear_views()
+
+
+def insert_from_polars(table: str, df: pl.DataFrame) -> None:
+    """Polars DataFrame verisini sıfır kopyayla araştırma tablosuna yazar."""
+    research_engine.insert_from_polars(table=table, df=df)
+
+
 def get_research_stats() -> dict[str, Any]:
     """Research motoru istatistiklerini döner."""
     return research_engine.get_stats()
+
+
+def get_research_stats_orjson_bytes() -> bytes:
+    """Research motoru istatistiklerini orjson formatında binary olarak döner."""
+    return research_engine.to_orjson_bytes()
 
 
 __all__: Final[list[str]] = [
@@ -730,9 +777,12 @@ __all__: Final[list[str]] = [
     "DEFAULT_PARQUET_OUTPUT_DIR",
     "DEFAULT_RESEARCH_DB_PATH",
     "DuckDBResearchEngine",
+    "clear_parquet_views",
     "duckdb_research_store",
     "get_research_engine",
     "get_research_stats",
+    "get_research_stats_orjson_bytes",
+    "insert_from_polars",
     "otel_trace",
     "query_parquet",
     "query_parquet_columns",

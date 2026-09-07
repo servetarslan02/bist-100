@@ -18,17 +18,17 @@ Kullanım:
 from __future__ import annotations
 
 import re
+from contextlib import suppress
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
-
-if TYPE_CHECKING:
-    import duckdb
 
 logger = structlog.get_logger(__name__)
 
@@ -161,7 +161,59 @@ def polars_to_duckdb(
             conn.execute(f"CREATE TABLE IF NOT EXISTS {safe_table} AS SELECT * FROM {temp_view} WHERE 1=0")
             conn.execute(f"INSERT INTO {safe_table} SELECT * FROM {temp_view}")
     finally:
-        conn.unregister(temp_view)
+        with suppress(Exception):
+            conn.unregister(temp_view)
+
+
+@otel_trace("polars_utils.polars_to_duckdb_file")
+def polars_to_duckdb_file(
+    db_path: str,
+    df: pl.DataFrame,
+    table_name: str,
+    if_exists: str = DEFAULT_IF_EXISTS,
+) -> None:
+    """Polars DataFrame'ini belirtilen DuckDB dosyasındaki tabloya kaydeder."""
+    path_obj = Path(db_path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    conn = duckdb.connect(str(path_obj))
+    try:
+        configure_duckdb_wal(conn)
+        polars_to_duckdb(conn, df, table_name, if_exists=if_exists)
+    finally:
+        conn.close()
+
+
+@otel_trace("polars_utils.duckdb_file_to_polars")
+def duckdb_file_to_polars(db_path: str, query: str) -> pl.DataFrame:
+    """DuckDB dosyasından salt-okunur modda sorgu çalıştırıp Polars DataFrame döner."""
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame()
+    conn = duckdb.connect(str(path_obj), read_only=True)
+    try:
+        return duckdb_to_polars(conn, query)
+    finally:
+        conn.close()
+
+
+@otel_trace("polars_utils.clear_duckdb_table")
+def clear_duckdb_table(db_path: str, table_name: str) -> bool:
+    """DuckDB dosyasındaki belirtilen tablonun verilerini temizler."""
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return True
+    safe_table = _validate_table_name(table_name)
+    conn = duckdb.connect(str(path_obj))
+    try:
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if safe_table in tables:
+            conn.execute(f"DELETE FROM {safe_table}")
+        return True
+    except Exception as e:
+        logger.error("duckdb_tablo_temizleme_hatasi", tablo=safe_table, hata=str(e))
+        return False
+    finally:
+        conn.close()
 
 
 @otel_trace("polars_utils.concat_dataframes")
@@ -251,6 +303,10 @@ def slice_pit_dataframe(
     if cutoff.tzinfo is None:
         cutoff = cutoff.replace(tzinfo=UTC)
 
+    col_dtype = df.schema.get(date_column)
+    if col_dtype == pl.String:
+        return df.filter(pl.col(date_column) <= cutoff.isoformat())
+
     return df.filter(pl.col(date_column) <= cutoff)
 
 
@@ -286,20 +342,30 @@ def polars_from_orjson(json_bytes: bytes | str) -> pl.DataFrame:
     return pl.from_dicts(data)
 
 
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_IF_EXISTS",
     "DEFAULT_WAL_SIZE",
     "VALID_IF_EXISTS_MODES",
     "clean_numeric_extremes",
+    "clear_duckdb_table",
     "concat_dataframes",
     "configure_duckdb_wal",
+    "duckdb_file_to_polars",
     "duckdb_to_polars",
     "export_polars_to_orjson",
     "polars_from_orjson",
     "polars_to_duckdb",
+    "polars_to_duckdb_file",
     "safe_polars_from_pandas",
     "slice_pit_dataframe",
+    "to_orjson_bytes",
     "yf_to_polars",
 ]
+
 

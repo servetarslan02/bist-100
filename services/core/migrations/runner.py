@@ -18,7 +18,10 @@ Kullanım:
     await runner.status()
 """
 
+from __future__ import annotations
+
 import asyncio
+import contextlib
 import hashlib
 import re
 import time
@@ -26,9 +29,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import orjson
+import polars as pl
 import structlog
 
-logger = structlog.get_logger()
+from services.core.otel import otel_trace
+
+logger = structlog.get_logger(__name__)
 
 MIGRATIONS_DIR = Path(__file__).parent
 
@@ -40,7 +47,7 @@ LOCK_OWNER_PREFIX = "alpha_migrate_"
 
 @dataclass
 class MigrationFile:
-    """Parsed migration dosyası."""
+    """Ayrıştırılmış (parsed) migration dosyası veri modeli."""
 
     version: int
     name: str
@@ -49,8 +56,18 @@ class MigrationFile:
     checksum: str
 
     @staticmethod
-    def parse(filepath: Path) -> "MigrationFile":
-        """Otomatik eklendi."""
+    def parse(filepath: Path) -> MigrationFile:
+        """Migration SQL dosyasını okur, up/down bölümlerine ayırır ve checksum hesaplar.
+
+        Args:
+            filepath: Okunacak SQL dosyasının dosya yolu (Path).
+
+        Returns:
+            MigrationFile örneği.
+
+        Raises:
+            ValueError: Dosya adı v{sayı}_{isim}.sql formatında değilse.
+        """
         match = re.match(r"v(\d+)_(.+)\.sql", filepath.name)
         if not match:
             raise ValueError(f"Geçersiz migration dosyası: {filepath.name}")
@@ -77,14 +94,60 @@ class MigrationFile:
             checksum=checksum,
         )
 
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        return f"MigrationFile(v={self.version}, name={self.name!r}, checksum={self.checksum!r})"
+
 
 @dataclass
 class MigrationStatus:
-    """Otomatik eklendi."""
+    """Veritabanı migration durum özeti."""
+
     current_version: int
     pending_count: int
     applied: list[dict[str, Any]]
     pending: list[dict[str, Any]]
+
+    def to_polars(self) -> pl.DataFrame:
+        """Migration durumunu Polars DataFrame olarak aktarır."""
+        rows: list[dict[str, Any]] = []
+        for app in self.applied:
+            rows.append({
+                "version": int(app.get("version", 0)),
+                "name": str(app.get("name", "")),
+                "checksum": str(app.get("checksum", "")),
+                "status": "APPLIED",
+                "applied_at": str(app.get("applied_at", "")),
+            })
+        for pend in self.pending:
+            rows.append({
+                "version": int(pend.get("version", 0)),
+                "name": str(pend.get("name", "")),
+                "checksum": str(pend.get("checksum", "")),
+                "status": "PENDING",
+                "applied_at": "",
+            })
+        schema = {
+            "version": pl.Int64,
+            "name": pl.String,
+            "checksum": pl.String,
+            "status": pl.String,
+            "applied_at": pl.String,
+        }
+        if not rows:
+            return pl.DataFrame(schema=schema)
+        return pl.DataFrame(rows, schema=schema)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Migration durumunu orjson ikili serileştirilmiş bayt olarak döndürür."""
+        return export_migration_status_to_orjson_bytes(self)
+
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        return (
+            f"MigrationStatus(current_version={self.current_version}, "
+            f"applied={len(self.applied)}, pending={self.pending_count})"
+        )
 
 
 class MigrationLockError(Exception):
@@ -94,12 +157,22 @@ class MigrationLockError(Exception):
 class MigrationRunner:
     """Production-grade migration runner with distributed locking."""
 
-    def __init__(self, db, dialect: str = "postgresql"):
-        """Otomatik eklendi."""
+    def __init__(self, db: Any, dialect: str = "postgresql") -> None:
+        """MigrationRunner başlatıcı metodu.
+
+        Args:
+            db: Veritabanı bağlantısı veya havuzu.
+            dialect: Veritabanı diyalekti ('postgresql', 'sqlite', 'duckdb').
+        """
         self._db = db
         self._dialect = dialect
         self._lock_id: str | None = None
         self._heartbeat_task: asyncio.Task | None = None
+
+    def __repr__(self) -> str:
+        """Açıklayıcı metin temsili."""
+        return f"MigrationRunner(dialect={self._dialect!r}, locked={bool(self._lock_id)})"
+
 
     # =====================================================
     # LOCK TABLE
@@ -205,7 +278,7 @@ class MigrationRunner:
             return
 
         async def _heartbeat_loop() -> Any:
-            """Otomatik eklendi."""
+            """Periyodik olarak kilit süresini yenileyen arka plan döngüsü."""
             while True:
                 try:
                     await asyncio.sleep(LOCK_TIMEOUT_SECONDS // 3)
@@ -231,9 +304,9 @@ class MigrationRunner:
     # =====================================================
 
     async def init_schema_migrations(self) -> Any:
-        """Otomatik eklendi."""
-        ts_type = "TIMESTAMP" if self._dialect == "sqlite" else "TIMESTAMPTZ"
-        default_ts = "CURRENT_TIMESTAMP" if self._dialect == "sqlite" else "NOW()"
+        """Migration geçmiş tablosunu (schema_migrations) veritabanında oluşturur."""
+        ts_type = "TIMESTAMP" if self._dialect in ("sqlite", "duckdb") else "TIMESTAMPTZ"
+        default_ts = "CURRENT_TIMESTAMP" if self._dialect in ("sqlite", "duckdb") else "NOW()"
         await self._execute(f"""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version INTEGER PRIMARY KEY,
@@ -248,7 +321,7 @@ class MigrationRunner:
     # =====================================================
 
     def discover_migrations(self) -> list[MigrationFile]:
-        """Otomatik eklendi."""
+        """Migration dizinindeki tüm SQL dosyalarını keşfeder ve sürüm sırasına göre sıralar."""
         migrations = []
         for f in sorted(MIGRATIONS_DIR.glob("v*.sql")):
             try:
@@ -258,7 +331,7 @@ class MigrationRunner:
         return migrations
 
     async def get_applied(self) -> dict[int, dict[str, Any]]:
-        """Otomatik eklendi."""
+        """Veritabanında önceden başarıyla uygulanmış migration'ları sorgular."""
         try:
             rows = await self._fetchall(
                 "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version"
@@ -268,7 +341,7 @@ class MigrationRunner:
             return {}
 
     async def get_current_version(self) -> int:
-        """Otomatik eklendi."""
+        """Veritabanında uygulanmış en güncel migration sürüm numarasını döndürür."""
         applied = await self.get_applied()
         return max(applied.keys()) if applied else 0
 
@@ -312,8 +385,9 @@ class MigrationRunner:
     # STATUS
     # =====================================================
 
+    @otel_trace("migration.status")
     async def status(self) -> MigrationStatus:
-        """Otomatik eklendi."""
+        """Tüm migration'ların güncel durumunu (uygulananlar ve bekleyenler) tespit eder."""
         await self.init_schema_migrations()
         applied_map = await self.get_applied()
         all_migrations = self.discover_migrations()
@@ -342,6 +416,7 @@ class MigrationRunner:
     # RUN (UP) — with distributed lock
     # =====================================================
 
+    @otel_trace("migration.run_pending")
     async def run_pending(self) -> list[int]:
         """Bekleyen migration'ları uygula (distributed lock ile)."""
         # Lock al
@@ -417,6 +492,7 @@ class MigrationRunner:
     # ROLLBACK (DOWN) — with distributed lock
     # =====================================================
 
+    @otel_trace("migration.rollback_to")
     async def rollback_to(self, target_version: int) -> list[int]:
         """Belirli version'a geri al (distributed lock ile)."""
         if not await self._acquire_lock():
@@ -456,7 +532,7 @@ class MigrationRunner:
             await self._release_lock()
 
     async def _apply_down(self, m: MigrationFile) -> Any:
-        """Otomatik eklendi."""
+        """Belirtilen migration dosyasındaki down SQL komutlarını geri alır."""
         statements = self._split_statements(m.down_sql)
         await self._begin_transaction()
         try:
@@ -475,23 +551,23 @@ class MigrationRunner:
     # =====================================================
 
     async def _begin_transaction(self) -> Any:
-        """Otomatik eklendi."""
-        if self._dialect == "sqlite":
-            pass  # DuckDB auto-transaction
+        """Veritabanı işlem bloğunu (transaction) başlatır."""
+        if self._dialect in ("sqlite", "duckdb"):
+            pass  # DuckDB / SQLite auto-transaction
         else:
             await self._db.execute("BEGIN")
 
     async def _commit(self) -> Any:
-        """Otomatik eklendi."""
-        if self._dialect == "sqlite":
+        """Açık olan veritabanı işlemini kalıcı olarak onaylar (commit)."""
+        if self._dialect in ("sqlite", "duckdb"):
             self._db.commit()
         else:
             await self._db.execute("COMMIT")
 
     async def _rollback(self) -> Any:
-        """Otomatik eklendi."""
+        """Açık olan veritabanı işlemini geri alır (rollback)."""
         try:
-            if self._dialect == "sqlite":
+            if self._dialect in ("sqlite", "duckdb"):
                 self._db.rollback()
             else:
                 await self._db.execute("ROLLBACK")
@@ -504,7 +580,7 @@ class MigrationRunner:
     # =====================================================
 
     def _prepare_statement(self, stmt: str) -> str | None:
-        """Otomatik eklendi."""
+        """SQL ifadesini yorum satırlarından arındırır ve diyalekte uygun hale getirir."""
         stmt = stmt.strip()
         if not stmt:
             return None
@@ -517,12 +593,12 @@ class MigrationRunner:
         stmt = "\n".join(lines).strip()
         if not stmt:
             return None
-        if self._dialect == "sqlite":
+        if self._dialect in ("sqlite", "duckdb"):
             stmt = self._pg_to_sqlite(stmt)
         return stmt
 
     def _split_statements(self, sql: str) -> list[str]:
-        """Otomatik eklendi."""
+        """Çoklu SQL komutlarını bağımsız ifadeler halinde böler."""
         if "-- migrate:split" in sql:
             parts = sql.split("-- migrate:split")
             return [p.strip() for p in parts if p.strip()]
@@ -553,7 +629,7 @@ class MigrationRunner:
         return statements
 
     def _pg_to_sqlite(self, stmt: str) -> str:
-        """Otomatik eklendi."""
+        """PostgreSQL SQL sözdizimini yerel SQL sözdizimine dönüştürür."""
         s = stmt
         s = s.replace("TIMESTAMPTZ", "TIMESTAMP")
         s = re.sub(r"\bBOOLEAN\b", "INTEGER", s, flags=re.IGNORECASE)
@@ -598,7 +674,7 @@ class MigrationRunner:
     # =====================================================
 
     async def _execute_safe(self, sql: str) -> Any:
-        """Otomatik eklendi."""
+        """SQL komutunu çalıştırır; zaten var olan tablo/sütun hatalarını güvenle tolere eder."""
         try:
             await self._execute(sql)
         except Exception as e:
@@ -612,8 +688,8 @@ class MigrationRunner:
             raise
 
     async def _execute(self, sql: str, *args) -> Any:
-        """Otomatik eklendi."""
-        if self._dialect == "sqlite":
+        """Diyalekte göre SQL ifadesini parametrelerle çalıştırır."""
+        if self._dialect in ("sqlite", "duckdb"):
             if args:
                 # Parametreli sorgular tek statement olmalı
                 cursor = self._db.execute(sql, args)
@@ -624,25 +700,114 @@ class MigrationRunner:
                     if stmt:
                         self._db.execute(stmt)
                 cursor = None
-            self._db.commit()
+            if hasattr(self._db, "commit"):
+                self._db.commit()
             return cursor
         else:
             return await self._db.execute(sql, *args)
 
     async def _fetchall(self, sql: str, *args) -> list[dict]:
-        """Otomatik eklendi."""
-        if self._dialect == "sqlite":
+        """SQL sorgusunu çalıştırıp tüm sonuç satırlarını sözlük listesi olarak döndürür."""
+        if self._dialect in ("sqlite", "duckdb"):
             cursor = self._db.execute(sql, args)
             return [dict(r) for r in cursor.fetchall()]
         else:
             return [dict(r) for r in await self._db.fetch(sql, *args)]
 
     async def _fetchone(self, sql: str, *args) -> dict | None:
-        """Otomatik eklendi."""
-        if self._dialect == "sqlite":
+        """SQL sorgusunu çalıştırıp tek bir sonuç satırını sözlük olarak döndürür."""
+        if self._dialect in ("sqlite", "duckdb"):
             cursor = self._db.execute(sql, args)
             row = cursor.fetchone()
             return dict(row) if row else None
         else:
             row = await self._db.fetchrow(sql, *args)
             return dict(row) if row else None
+
+
+def export_migration_status_to_orjson_bytes(status: MigrationStatus) -> bytes:
+    """Migration durumunu orjson ikili serileştirilmiş bayt olarak döndürür."""
+    df = status.to_polars()
+    payload = {
+        "current_version": status.current_version,
+        "pending_count": status.pending_count,
+        "migrations": df.to_dicts(),
+    }
+    return orjson.dumps(payload, default=str)
+
+
+def export_migration_history_to_duckdb(
+    status: MigrationStatus,
+    db_path: str = "data/migration_history.duckdb",
+) -> int:
+    """Migration durum ve geçmişini yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+    Args:
+        status: MigrationStatus nesnesi.
+        db_path: DuckDB veritabanı dosya yolu.
+
+    Returns:
+        Kaydedilen migration kayıt sayısı.
+    """
+    from pathlib import Path
+
+    import duckdb
+
+    df = status.to_polars()
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("SET checkpoint_threshold = '64MB';")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS migration_run_history (
+                version BIGINT,
+                name VARCHAR,
+                checksum VARCHAR,
+                status VARCHAR,
+                applied_at VARCHAR,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_migration_version ON migration_run_history (version);")
+        if df.height > 0:
+            conn.register("df_mig_view", df.to_arrow())
+            try:
+                conn.execute("""
+                    INSERT INTO migration_run_history (version, name, checksum, status, applied_at)
+                    SELECT version, name, checksum, status, applied_at
+                    FROM df_mig_view
+                """)
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_mig_view")
+    return df.height
+
+
+def clear_migration_history_duckdb(db_path: str = "data/migration_history.duckdb") -> None:
+    """DuckDB üzerindeki migration geçmiş tablosunu temizler."""
+    from pathlib import Path
+
+    import duckdb
+
+    target = Path(db_path)
+    if not target.exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS migration_run_history")
+
+
+__all__: list[str] = [
+    "LOCK_OWNER_PREFIX",
+    "LOCK_TABLE",
+    "LOCK_TIMEOUT_SECONDS",
+    "MIGRATIONS_DIR",
+    "MigrationFile",
+    "MigrationLockError",
+    "MigrationRunner",
+    "MigrationStatus",
+    "clear_migration_history_duckdb",
+    "export_migration_history_to_duckdb",
+    "export_migration_status_to_orjson_bytes",
+]
+

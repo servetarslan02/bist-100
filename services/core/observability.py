@@ -14,6 +14,8 @@ Sistem Gözlemlenebilirlik, İzleme ve Teşhis Mimarisi:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import functools
 import os
 import threading
@@ -45,25 +47,43 @@ def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def otel_trace(span_name: str) -> Any:
-    """Metot veya fonksiyonu OpenTelemetry span içine alan genel dekoratör.
+    """Metot, senkron fonksiyon veya asenkron coroutine'i OpenTelemetry span içine alan genel dekoratör.
 
     Args:
         span_name: Span adı.
 
     Returns:
-        Sarmalayıcı fonksiyon.
+        Sarmalayıcı fonksiyon veya coroutine.
     """
 
     def decorator(func: Any) -> Any:
-        """Hedef fonksiyonu OTel span ile sarmalar."""
+        """Hedef fonksiyon veya coroutine'i OTel span ile sarmalar."""
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name) as span:
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as exc:
+                        if hasattr(span, "record_exception"):
+                            span.record_exception(exc)
+                        raise
+
+            return async_wrapper
 
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             """Fonksiyon çağrısını span içinde icra eder."""
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
+            with tracer.start_as_current_span(span_name) as span:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    if hasattr(span, "record_exception"):
+                        span.record_exception(exc)
+                    raise
 
-        return wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -163,6 +183,16 @@ class PrometheusMetrics:
             hist.labels(**labels).observe(val)
         else:
             hist.observe(val)
+
+    def observe_histogram(
+        self,
+        name: str,
+        value: float,
+        labels: dict[str, str] | None = None,
+        buckets: tuple[float, ...] | None = None,
+    ) -> None:
+        """Histogram gözlem kaydı yapar (observe ile eşdeğer takma ad)."""
+        self.observe(name, value, labels=labels, buckets=buckets)
 
     def timed(
         self,
@@ -304,6 +334,21 @@ class DistributedTracing:
                 }
             )
 
+    def end_trace(
+        self,
+        trace_id: str,
+        status: str = "completed",
+        duration_ms: float = 0.0,
+    ) -> None:
+        """Trace sürecini sonlandırır ve yerel tampona bitiş kaydı ekler.
+
+        Args:
+            trace_id: Sonlandırılacak izleme kimliği.
+            status: Tamamlanma durumu ('completed', 'SUCCESS', 'FAILED' vb.).
+            duration_ms: Milisaniye cinsinden toplam süre.
+        """
+        self.add_span(trace_id, operation="end_trace", duration_ms=duration_ms, status=status)
+
     def get_trace(self, trace_id: str) -> list[dict[str, Any]]:
         """Belirtilen trace_id'ye ait yerel tampon kayıtlarını döndürür."""
         with self._lock:
@@ -317,6 +362,38 @@ class DistributedTracing:
         """En son izleme kayıtlarını döndürür."""
         with self._lock:
             return list(self._history)[-limit:]
+
+    def export_traces_to_polars(self) -> pl.DataFrame:
+        """Yerel izleme tamponunu Polars DataFrame olarak dışa aktarır."""
+        with self._lock:
+            items = list(self._history)
+
+        schema = {
+            "trace_id": pl.String,
+            "operation": pl.String,
+            "duration_ms": pl.Float64,
+            "status": pl.String,
+            "timestamp": pl.String,
+        }
+        if not items:
+            return pl.DataFrame(schema=schema)
+
+        normalized = [
+            {
+                "trace_id": str(item.get("trace_id", "")),
+                "operation": str(item.get("operation", "")),
+                "duration_ms": float(item.get("duration_ms", 0.0) or 0.0),
+                "status": str(item.get("status", "unknown")),
+                "timestamp": str(item.get("timestamp", "")),
+            }
+            for item in items
+        ]
+        return pl.DataFrame(normalized, schema=schema)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Yerel tampon kayıtlarını C seviyesinde orjson bayt dizisine serileştirir."""
+        with self._lock:
+            return orjson.dumps(list(self._history), option=orjson.OPT_SORT_KEYS, default=str)
 
     def __repr__(self) -> str:
         """İzleme yöneticisinin metinsel temsili."""
@@ -339,6 +416,20 @@ class PerformanceMonitor:
         with self._lock:
             self._latencies[operation].append(val)
         prometheus_metrics.observe("operation_latency_seconds", val / 1000.0, labels={"operation": operation})
+
+    def record(self, operation: str, latency_ms: float) -> None:
+        """record_latency için eşdeğer takma ad."""
+        self.record_latency(operation, latency_ms)
+
+    @contextlib.contextmanager
+    def timer(self, operation: str) -> Any:
+        """İşlem süresini otomatik ölçen context manager."""
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            elapsed_ms = (time.perf_counter() - start) * 1000.0
+            self.record_latency(operation, elapsed_ms)
 
     @otel_trace("observability.PerformanceMonitor.get_stats")
     def get_stats(self, operation: str) -> dict[str, float]:
@@ -364,6 +455,34 @@ class PerformanceMonitor:
         with self._lock:
             ops = list(self._latencies.keys())
         return {op: self.get_stats(op) for op in ops}
+
+    def export_performance_to_polars(self) -> pl.DataFrame:
+        """Tüm performans istatistiklerini Polars DataFrame olarak dışa aktarır."""
+        stats = self.get_all_stats()
+        rows = [
+            {
+                "operation": op,
+                "count": float(s["count"]),
+                "avg_ms": float(s["avg_ms"]),
+                "p95_ms": float(s["p95_ms"]),
+                "p99_ms": float(s["p99_ms"]),
+            }
+            for op, s in stats.items()
+        ]
+        schema = {
+            "operation": pl.String,
+            "count": pl.Float64,
+            "avg_ms": pl.Float64,
+            "p95_ms": pl.Float64,
+            "p99_ms": pl.Float64,
+        }
+        if not rows:
+            return pl.DataFrame(schema=schema)
+        return pl.DataFrame(rows, schema=schema)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Performans istatistiklerini C seviyesinde orjson bayt dizisine serileştirir."""
+        return orjson.dumps(self.get_all_stats(), option=orjson.OPT_SORT_KEYS, default=str)
 
     def __repr__(self) -> str:
         """Performans izleyicisinin metinsel temsili."""
@@ -402,6 +521,39 @@ class CostMonitor:
                 "by_model": dict(self._by_model),
             }
 
+    def record_llm_call(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        model: str = "default",
+        provider: str = "openai",
+        estimated_cost_usd: float | None = None,
+    ) -> None:
+        """LLM çağrısı kaydı ve maliyet tahmini ekler."""
+        total_tok = max(0, prompt_tokens) + max(0, completion_tokens)
+        cost = estimated_cost_usd
+        if cost is None:
+            cost = (total_tok / 1000.0) * 0.005
+        self.record(provider=provider, model=model, tokens=total_tok, cost_usd=cost)
+
+    def get_total_cost(self) -> float:
+        """Kümülatif maliyeti döndürür."""
+        with self._lock:
+            return float(self._total_cost)
+
+    def export_costs_to_polars(self) -> pl.DataFrame:
+        """Maliyet dağılımını Polars DataFrame olarak dışa aktarır."""
+        with self._lock:
+            items = [{"model": m, "cost_usd": float(c)} for m, c in self._by_model.items()]
+        schema = {"model": pl.String, "cost_usd": pl.Float64}
+        if not items:
+            return pl.DataFrame(schema=schema)
+        return pl.DataFrame(items, schema=schema)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Maliyet özetini C seviyesinde orjson bayt dizisine serileştirir."""
+        return orjson.dumps(self.get_summary(), option=orjson.OPT_SORT_KEYS, default=str)
+
     def __repr__(self) -> str:
         """Maliyet yöneticisinin metinsel temsili."""
         with self._lock:
@@ -417,6 +569,30 @@ class ResourceMonitor:
         self._running = False
         self._thread: threading.Thread | None = None
         self._lock = threading.RLock()
+
+    def check_resources(self) -> dict[str, float]:
+        """Anlık CPU ve RAM kullanım verilerini okur ve sözlük olarak döner."""
+        try:
+            cpu = float(self._process.cpu_percent(interval=None))
+            mem = float(self._process.memory_info().rss / (1024 * 1024))
+            return {"cpu_pct": cpu, "memory_mb": mem}
+        except Exception:
+            return {"cpu_pct": 0.0, "memory_mb": 0.0}
+
+    def export_resources_to_polars(self) -> pl.DataFrame:
+        """Anlık kaynak kullanımını Polars DataFrame olarak üretir."""
+        res = self.check_resources()
+        schema = {"metric": pl.String, "value": pl.Float64, "timestamp": pl.String}
+        ts = datetime.now(UTC).isoformat()
+        rows = [
+            {"metric": "cpu_pct", "value": res["cpu_pct"], "timestamp": ts},
+            {"metric": "memory_mb", "value": res["memory_mb"], "timestamp": ts},
+        ]
+        return pl.DataFrame(rows, schema=schema)
+
+    def to_orjson_bytes(self) -> bytes:
+        """Kaynak kullanımını C seviyesinde orjson bayt dizisine serileştirir."""
+        return orjson.dumps(self.check_resources(), option=orjson.OPT_SORT_KEYS, default=str)
 
     @otel_trace("observability.ResourceMonitor.start_background_monitoring")
     def start_background_monitoring(self, interval_seconds: int = 60) -> None:
@@ -579,7 +755,19 @@ class ConfigManager:
             if len(key_history) < 2:
                 # Önceki sürüm yoksa ve varsayılanlarda varsa varsayılana dön
                 if key in self._config:
-                    del self._config[key]
+                    old_val = self._config.pop(key)
+                    default_val = self._defaults.get(key)
+                    self._versions.append(
+                        {
+                            "key": key,
+                            "old": str(old_val),
+                            "new": str(default_val),
+                            "raw_value": default_val,
+                            "actor": actor,
+                            "reason": "self_healing_rollback_to_default",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        }
+                    )
                     logger.info("konfigurasyon_varsayilana_donduruldu", key=key, actor=actor)
                     return True
                 return False
@@ -846,26 +1034,127 @@ def save_observability_snapshot_to_duckdb(
         df_metrics = export_observability_metrics_to_polars()
         if df_metrics.height > 0:
             conn.register("tmp_metrics", df_metrics.to_arrow())
-            conn.execute(
-                """
-                INSERT INTO observability_metrics_snapshot
-                SELECT type, name, value, timestamp FROM tmp_metrics
-                """
-            )
-            conn.unregister("tmp_metrics")
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO observability_metrics_snapshot
+                    SELECT type, name, value, timestamp FROM tmp_metrics
+                    """
+                )
+            finally:
+                conn.unregister("tmp_metrics")
 
         df_health = health_checker.export_health_to_polars()
         if df_health.height > 0:
             conn.register("tmp_health", df_health.to_arrow())
-            conn.execute(
-                """
-                INSERT INTO component_health_snapshot
-                SELECT component, status, details, last_check, checked_at FROM tmp_health
-                """
-            )
-            conn.unregister("tmp_health")
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO component_health_snapshot
+                    SELECT component, status, details, last_check, checked_at FROM tmp_health
+                    """
+                )
+            finally:
+                conn.unregister("tmp_health")
         conn.commit()
         logger.info("observability_snapshot_duckdb_kaydedildi", db_path=str(path))
+    finally:
+        conn.close()
+
+
+def read_observability_metrics_from_duckdb(
+    db_path: str = DEFAULT_OBSERVABILITY_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB içindeki metrik snapshot kayıtlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+
+    Returns:
+        Metrik snapshot kayıtlarını içeren Polars DataFrame.
+    """
+    path = Path(db_path)
+    schema = {
+        "metric_type": pl.String,
+        "metric_name": pl.String,
+        "metric_value": pl.Float64,
+        "recorded_at": pl.String,
+    }
+    if not path.exists():
+        return pl.DataFrame(schema=schema)
+
+    conn = duckdb.connect(str(path), read_only=True)
+    try:
+        configure_duckdb_wal(conn)
+        tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+        if "observability_metrics_snapshot" not in tables:
+            return pl.DataFrame(schema=schema)
+        arrow_table = conn.execute(
+            f"SELECT metric_type, metric_name, metric_value, recorded_at FROM observability_metrics_snapshot ORDER BY recorded_at DESC LIMIT {int(limit)}"
+        ).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def read_component_health_from_duckdb(
+    db_path: str = DEFAULT_OBSERVABILITY_DB_PATH,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB içindeki bileşen sağlık snapshot kayıtlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+        limit: Döndürülecek maksimum kayıt sayısı.
+
+    Returns:
+        Sağlık snapshot kayıtlarını içeren Polars DataFrame.
+    """
+    path = Path(db_path)
+    schema = {
+        "component": pl.String,
+        "status": pl.String,
+        "details": pl.String,
+        "last_check": pl.String,
+        "recorded_at": pl.String,
+    }
+    if not path.exists():
+        return pl.DataFrame(schema=schema)
+
+    conn = duckdb.connect(str(path), read_only=True)
+    try:
+        configure_duckdb_wal(conn)
+        tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+        if "component_health_snapshot" not in tables:
+            return pl.DataFrame(schema=schema)
+        arrow_table = conn.execute(
+            f"SELECT component, status, details, last_check, recorded_at FROM component_health_snapshot ORDER BY recorded_at DESC LIMIT {int(limit)}"
+        ).arrow()
+        return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def clear_observability_duckdb(
+    db_path: str = DEFAULT_OBSERVABILITY_DB_PATH,
+) -> None:
+    """DuckDB tablosundaki geçmiş snapshot kayıtlarını güvenle temizler.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS observability_metrics_snapshot")
+        conn.execute("DROP TABLE IF EXISTS component_health_snapshot")
+        conn.commit()
+        logger.info("observability_duckdb_temizlendi", db_path=str(path))
     finally:
         conn.close()
 
@@ -882,6 +1171,7 @@ __all__: Final[list[str]] = [
     "PerformanceMonitor",
     "PrometheusMetrics",
     "ResourceMonitor",
+    "clear_observability_duckdb",
     "config_manager",
     "configure_duckdb_wal",
     "cost_monitor",
@@ -891,6 +1181,8 @@ __all__: Final[list[str]] = [
     "otel_trace",
     "performance_monitor",
     "prometheus_metrics",
+    "read_component_health_from_duckdb",
+    "read_observability_metrics_from_duckdb",
     "resource_monitor",
     "save_observability_snapshot_to_duckdb",
 ]

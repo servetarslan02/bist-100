@@ -14,6 +14,7 @@ ilk istek gecikmesini (cold-start latency) ve API yanıt sürelerini düşürür
 """
 
 import asyncio
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -186,6 +187,7 @@ class CacheWarmer:
         """
         self._warmed = False
         self._lock = asyncio.Lock()
+        self._thread_lock = threading.RLock()
         self._max_history = max_history
         self._last_report: CacheWarmingReport | None = None
         self._history: list[CacheWarmingReport] = []
@@ -203,9 +205,10 @@ class CacheWarmer:
             Isıtma operasyonu detaylarını içeren CacheWarmingReport modeli.
         """
         async with self._lock:
-            if self._warmed and not force and self._last_report is not None:
-                logger.debug("Önbellek zaten sıcak durumda, yeniden ısıtma atlandı.")
-                return self._last_report
+            with self._thread_lock:
+                if self._warmed and not force and self._last_report is not None:
+                    logger.debug("Önbellek zaten sıcak durumda, yeniden ısıtma atlandı.")
+                    return self._last_report
 
             start_time = time.monotonic()
             report_id = f"warm_{uuid.uuid4().hex[:10]}"
@@ -232,11 +235,12 @@ class CacheWarmer:
                 tasks=results,
             )
 
-            self._warmed = True
-            self._last_report = report
-            self._history.append(report)
-            if len(self._history) > self._max_history:
-                self._history.pop(0)
+            with self._thread_lock:
+                self._warmed = True
+                self._last_report = report
+                self._history.append(report)
+                if len(self._history) > self._max_history:
+                    self._history.pop(0)
 
             logger.info(
                 "Önbellek ısıtma tamamlandı",
@@ -298,7 +302,8 @@ class CacheWarmer:
 
             try:
                 synced = await asyncio.wait_for(holiday_manager.sync_from_bist(), timeout=2.0)
-            except Exception:
+            except Exception as sync_err:
+                logger.debug("BIST tatil takvimi senkronizasyonu atlandı/başarısız", hata=str(sync_err))
                 synced = False
 
             calendar = get_market_calendar()
@@ -535,23 +540,27 @@ class CacheWarmer:
 
     def reset(self) -> None:
         """Önbellek ısıtıcı durumunu ve rapor geçmişini sıfırlar."""
-        self._warmed = False
-        self._last_report = None
-        self._history.clear()
-        self.stop_background_refresher()
-        logger.info("Önbellek ısıtıcı durumu sıfırlandı.")
+        with self._thread_lock:
+            self._warmed = False
+            self._last_report = None
+            self._history.clear()
+            self.stop_background_refresher()
+            logger.info("Önbellek ısıtıcı durumu sıfırlandı.")
 
     def is_warmed(self) -> bool:
         """Önbelleğin en az bir kez ısıtılıp ısıtılmadığını bildirir."""
-        return self._warmed
+        with self._thread_lock:
+            return self._warmed
 
     def get_last_report(self) -> CacheWarmingReport | None:
         """Son çalıştırmanın detaylı raporunu döndürür."""
-        return self._last_report
+        with self._thread_lock:
+            return self._last_report
 
     def get_history(self) -> list[CacheWarmingReport]:
         """Geçmiş ısıtma raporlarını döndürür."""
-        return list(self._history)
+        with self._thread_lock:
+            return list(self._history)
 
     def export_warming_history_to_polars(self) -> pl.DataFrame:
         """Tüm ısıtma operasyon geçmişini Polars DataFrame olarak dışa aktarır.
@@ -566,7 +575,10 @@ class CacheWarmer:
             "total_duration_ms": pl.Float64,
             "timestamp": pl.Float64,
         }
-        if not self._history:
+        with self._thread_lock:
+            history_copy = list(self._history)
+
+        if not history_copy:
             return pl.DataFrame(schema=schema)
 
         records = [
@@ -577,9 +589,79 @@ class CacheWarmer:
                 "total_duration_ms": r.total_duration_ms,
                 "timestamp": r.timestamp,
             }
-            for r in self._history
+            for r in history_copy
         ]
         return pl.DataFrame(records, schema=schema)
+
+    def export_task_results_to_polars(self) -> pl.DataFrame:
+        """Tüm ısıtma görevlerinin alt sonuçlarını Polars DataFrame olarak dışa aktarır.
+
+        Returns:
+            Polars DataFrame (report_id, task_name, success, duration_ms, item_count, error_message, timestamp).
+        """
+        schema = {
+            "report_id": pl.Utf8,
+            "task_name": pl.Utf8,
+            "success": pl.Boolean,
+            "duration_ms": pl.Float64,
+            "item_count": pl.Int64,
+            "error_message": pl.Utf8,
+            "timestamp": pl.Float64,
+        }
+        with self._thread_lock:
+            reports = list(self._history)
+
+        if not reports:
+            return pl.DataFrame(schema=schema)
+
+        records = []
+        for r in reports:
+            for t in r.tasks:
+                records.append(
+                    {
+                        "report_id": r.report_id,
+                        "task_name": t.task_name,
+                        "success": t.success,
+                        "duration_ms": t.duration_ms,
+                        "item_count": t.item_count,
+                        "error_message": t.error_message,
+                        "timestamp": t.timestamp,
+                    }
+                )
+        return pl.DataFrame(records, schema=schema)
+
+    def export_task_results_to_duckdb(
+        self,
+        db_path: str | Path = DEFAULT_DUCKDB_PATH,
+        table_name: str = "bist_cache_warming_tasks_log",
+    ) -> int:
+        """Görev bazlı ısıtma sonuçlarını DuckDB tablosuna kaydeder.
+
+        Args:
+            db_path: DuckDB veritabanı dosya yolu.
+            table_name: Hedef tablo adı.
+
+        Returns:
+            Kaydedilen kayıt sayısı.
+        """
+        df = self.export_task_results_to_polars()
+        if len(df) == 0:
+            return 0
+
+        target_path = Path(db_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if target_path.exists() and target_path.stat().st_size == 0:
+            target_path.unlink()
+
+        conn = duckdb.connect(str(target_path))
+        try:
+            conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df WHERE 1=0;")
+            conn.register("df_tasks", df)
+            conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_tasks;")
+            return len(df)
+        finally:
+            conn.close()
 
     def export_warming_history_to_duckdb(
         self,
@@ -706,12 +788,25 @@ def export_warming_history_to_polars() -> pl.DataFrame:
     return cache_warmer.export_warming_history_to_polars()
 
 
+def export_task_results_to_polars() -> pl.DataFrame:
+    """Görev bazlı ısıtma sonuçlarını Polars DataFrame olarak döndürür."""
+    return cache_warmer.export_task_results_to_polars()
+
+
 def export_warming_history_to_duckdb(
     db_path: str | Path = DEFAULT_DUCKDB_PATH,
     table_name: str = "bist_cache_warming_log",
 ) -> int:
     """Isıtma geçmişini DuckDB tablosuna kaydeder."""
     return cache_warmer.export_warming_history_to_duckdb(db_path, table_name)
+
+
+def export_task_results_to_duckdb(
+    db_path: str | Path = DEFAULT_DUCKDB_PATH,
+    table_name: str = "bist_cache_warming_tasks_log",
+) -> int:
+    """Görev bazlı ısıtma sonuçlarını DuckDB tablosuna kaydeder."""
+    return cache_warmer.export_task_results_to_duckdb(db_path, table_name)
 
 
 def query_cache_warming_duckdb(
@@ -738,6 +833,8 @@ __all__ = [
     "get_cache_warmer",
     "is_cache_warmed",
     "export_warming_history_to_polars",
+    "export_task_results_to_polars",
     "export_warming_history_to_duckdb",
+    "export_task_results_to_duckdb",
     "query_cache_warming_duckdb",
 ]

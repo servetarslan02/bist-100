@@ -52,6 +52,35 @@ ACTION_NO_ACTION: Final[str] = "NO_ACTION"
 
 DEFAULT_HALT_DB_PATH: Final[str] = "data/halt_audit.duckdb"
 DEFAULT_HALT_QUERY_LIMIT: Final[int] = 100
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 VALID_HALT_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -546,6 +575,7 @@ class HaltMonitor:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS halt_audit_log (
@@ -611,6 +641,7 @@ class HaltMonitor:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 tables = conn.execute(
                     "SELECT table_name FROM information_schema.tables WHERE table_name = 'halt_audit_log'"
                 ).fetchall()
@@ -645,6 +676,7 @@ class HaltMonitor:
                 return
 
             with state_store._connect() as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS halt_states (
@@ -687,6 +719,7 @@ class HaltMonitor:
         """Halt durumunu DuckDB tablosundan sil."""
         try:
             with state_store._connect() as conn:
+                configure_duckdb_wal(conn)
                 conn.execute("DELETE FROM halt_states WHERE ticker = ?", (ticker,))
         except Exception as e:
             logger.warning("halt_silme_duckdb_atlanildi", hisse=ticker, hata=str(e))
@@ -695,6 +728,7 @@ class HaltMonitor:
         """Halt durumunu DuckDB tablosundan geri yükle."""
         try:
             with state_store._connect() as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS halt_states (
@@ -745,6 +779,22 @@ class HaltMonitor:
                     logger.info("halt_durumlari_duckdbden_yuklendi", adet=len(rows))
         except Exception as e:
             logger.warning("halt_durumu_duckdb_geri_yukleme_atlanildi", hata=str(e))
+
+    def to_dict(self) -> dict[str, Any]:
+        """İzleyici durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "halted_tickers_count": len(self._halted_tickers),
+                "halted_tickers": sorted(self._halted_tickers.keys()),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """İzleyici durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_HALT_DB_PATH) -> None:
+        """DuckDB seans durdurma denetim tablosunu sıfırlar."""
+        clear_halt_audit_duckdb(db_path=db_path)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -872,6 +922,83 @@ def query_halt_audit_duckdb(
     )
 
 
+def read_halt_audit_from_duckdb(
+    db_path: str = DEFAULT_HALT_DB_PATH,
+    ticker: str | None = None,
+    halt_type: str | None = None,
+    limit: int = DEFAULT_HALT_QUERY_LIMIT,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosunu doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        ticker: İsteğe bağlı hisse filtresi.
+        halt_type: İsteğe bağlı durdurma sınıfı filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan denetim kayıtları.
+    """
+    path_obj = Path(db_path)
+    schema: dict[str, pl.DataType] = {
+        "id": pl.Utf8,
+        "created_at": pl.Datetime,
+        "ticker": pl.Utf8,
+        "reason": pl.Utf8,
+        "halt_type": pl.Utf8,
+        "expected_resume": pl.Utf8,
+        "action": pl.Utf8,
+        "halted_at": pl.Utf8,
+        "details_json": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=schema)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'halt_audit_log'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=schema)
+
+            query = "SELECT * FROM halt_audit_log WHERE 1=1"
+            params: list[Any] = []
+
+            if ticker:
+                query += " AND ticker = ?"
+                params.append(ticker.upper().strip())
+            if halt_type:
+                query += " AND halt_type = ?"
+                params.append(halt_type.strip().upper())
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(max(1, int(limit)))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_halt_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=schema)
+
+
+def clear_halt_audit_duckdb(db_path: str = DEFAULT_HALT_DB_PATH) -> None:
+    """DuckDB'deki seans durdurma denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS halt_audit_log;")
+    except Exception as exc:
+        logger.error("duckdb_halt_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Eylem Sabitleri
     "ACTION_CANCEL_ORDERS",
@@ -887,8 +1014,10 @@ __all__: Final[list[str]] = [
     "HALT_TYPE_VOLATILITY",
     "VALID_HALT_TYPES",
     # Yapılandırma Sabitleri
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HALT_DB_PATH",
     "DEFAULT_HALT_QUERY_LIMIT",
+    "DEFAULT_WAL_SIZE",
     # Modeller ve Çekirdek Sınıf
     "HaltMonitor",
     "HaltStatus",
@@ -898,6 +1027,8 @@ __all__: Final[list[str]] = [
     "add_stock_halt",
     "check_polars_halt_status",
     "check_stock_halt",
+    "clear_halt_audit_duckdb",
+    "configure_duckdb_wal",
     "export_halt_audit_to_duckdb",
     "export_halt_status_to_polars",
     "filter_halted_stock_tickers",
@@ -906,6 +1037,8 @@ __all__: Final[list[str]] = [
     "get_halted_stock_tickers",
     "is_stock_halted",
     "query_halt_audit_duckdb",
+    "read_halt_audit_from_duckdb",
     "remove_stock_halt",
+    "to_orjson_bytes",
     "validate_stock_halt_order",
 ]

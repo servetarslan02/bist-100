@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -400,21 +401,104 @@ class PointInTimeStore:
                 """
             )
             conn.register("tmp_pit_store_df", df.to_arrow())
-            conn.execute(
-                """
-                INSERT INTO pit_store_records (ticker, field_name, value, valid_from, valid_until, source, revision)
-                SELECT ticker, field_name, value, valid_from, valid_until, source, revision
-                FROM tmp_pit_store_df
-                ON CONFLICT (ticker, field_name, revision) DO UPDATE SET
-                    value = EXCLUDED.value,
-                    valid_from = EXCLUDED.valid_from,
-                    valid_until = EXCLUDED.valid_until,
-                    source = EXCLUDED.source,
-                    synced_at = now()
-                """
-            )
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO pit_store_records (ticker, field_name, value, valid_from, valid_until, source, revision)
+                    SELECT ticker, field_name, value, valid_from, valid_until, source, revision
+                    FROM tmp_pit_store_df
+                    ON CONFLICT (ticker, field_name, revision) DO UPDATE SET
+                        value = EXCLUDED.value,
+                        valid_from = EXCLUDED.valid_from,
+                        valid_until = EXCLUDED.valid_until,
+                        source = EXCLUDED.source,
+                        synced_at = now()
+                    """
+                )
+            finally:
+                with suppress(Exception):
+                    conn.unregister("tmp_pit_store_df")
             logger.info("pit_store_duckdb_kaydedildi", kayit_sayisi=df.height, db_path=str(path_obj))
             return df.height
+        finally:
+            conn.close()
+
+    def read_from_duckdb(
+        self,
+        db_path: str | None = None,
+        ticker: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB'de saklanan PIT kayıtlarını Polars DataFrame olarak okur.
+
+        Args:
+            db_path: İsteğe bağlı DuckDB dosya yolu.
+            ticker: İsteğe bağlı hisse filtresi.
+
+        Returns:
+            Polars DataFrame.
+        """
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        empty_schema = {
+            "ticker": pl.String,
+            "field_name": pl.String,
+            "value": pl.String,
+            "valid_from": pl.String,
+            "valid_until": pl.String,
+            "source": pl.String,
+            "revision": pl.Int64,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "pit_store_records" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = (
+                "SELECT ticker, field_name, value, valid_from, valid_until, source, revision "
+                "FROM pit_store_records "
+            )
+            params: list[Any] = []
+            if ticker:
+                query += "WHERE ticker = ? "
+                params.append(ticker.upper().strip())
+            query += "ORDER BY ticker, field_name, revision ASC"
+
+            df = conn.execute(query, params).pl()
+            return df
+        except Exception as e:
+            logger.error("pit_store_duckdb_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB tablosundaki PIT kayıtlarını temizler.
+
+        Args:
+            db_path: İsteğe bağlı DuckDB dosya yolu.
+
+        Returns:
+            İşlem başarılı ise True.
+        """
+        target_path = db_path or self._duckdb_path
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "pit_store_records" in tables:
+                conn.execute("DELETE FROM pit_store_records")
+            logger.info("pit_store_duckdb_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("pit_store_duckdb_temizleme_hatasi", hata=str(e))
+            return False
         finally:
             conn.close()
 
@@ -542,16 +626,42 @@ def load_pit_store_from_duckdb(
     return store.load_from_duckdb(db_path=db_path)
 
 
+def read_pit_store_from_duckdb(
+    db_path: str = DEFAULT_PIT_STORE_DUCKDB_PATH,
+    ticker: str | None = None,
+    store: PointInTimeStore = pit_store,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan PIT kayıtlarını Polars DataFrame olarak okur."""
+    return store.read_from_duckdb(db_path=db_path, ticker=ticker)
+
+
+def clear_pit_store_duckdb(
+    db_path: str = DEFAULT_PIT_STORE_DUCKDB_PATH,
+    store: PointInTimeStore = pit_store,
+) -> bool:
+    """DuckDB tablosundaki PIT kayıtlarını temizler."""
+    return store.clear_duckdb(db_path=db_path)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_PIT_STORE_DUCKDB_PATH",
     "DEFAULT_WAL_SIZE",
     "PITRecord",
     "PointInTimeStore",
+    "clear_pit_store_duckdb",
     "configure_duckdb_wal",
     "export_pit_store_to_polars",
     "load_pit_store_from_duckdb",
     "pit_store",
+    "read_pit_store_from_duckdb",
     "save_pit_store_to_duckdb",
+    "to_orjson_bytes",
 ]
+
 

@@ -20,22 +20,38 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
 
-if TYPE_CHECKING:
-    import duckdb
-
 logger = structlog.get_logger(__name__)
 
 DEFAULT_SAFE_PICKLE_DB: Final[str] = "data/model_artifacts_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
 _LOCK = threading.RLock()
 _DUCKDB_CONN: duckdb.DuckDBPyConnection | None = None
+_DUCKDB_PATH: str = DEFAULT_SAFE_PICKLE_DB
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("SafePickle DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 @dataclass(slots=True)
@@ -58,7 +74,7 @@ class ModelArtifactMeta:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return (
@@ -73,39 +89,63 @@ def set_safe_pickle_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     global _DUCKDB_CONN
     with _LOCK:
         _DUCKDB_CONN = conn
-        _init_duckdb_schema()
+        _init_duckdb_schema_conn(_DUCKDB_CONN)
 
 
-def _init_duckdb_schema() -> None:
-    """DuckDB denetim tablosunu ilklendirir."""
-    if _DUCKDB_CONN is None:
-        return
+def set_safe_pickle_duckdb_path(path: str) -> None:
+    """Model artefaktları DuckDB dosya yolunu tanımlar."""
+    global _DUCKDB_PATH
     with _LOCK:
-        try:
-            _DUCKDB_CONN.execute("""
-                CREATE TABLE IF NOT EXISTS model_artifact_audit (
-                    id BIGINT,
-                    action VARCHAR,
-                    file_path VARCHAR,
-                    file_size_bytes BIGINT,
-                    sha256_hash VARCHAR,
-                    is_verified BOOLEAN,
-                    elapsed_ms DOUBLE,
-                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE SEQUENCE IF NOT EXISTS seq_model_artifact_audit START 1;
-            """)
-        except Exception as exc:
-            logger.error("SafePickle DuckDB şema oluşturma hatası", hata=str(exc))
+        _DUCKDB_PATH = path
+
+
+def _init_duckdb_schema_conn(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB denetim tablosunu belirtilen bağlantıda ilklendirir."""
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS model_artifact_audit (
+                id BIGINT,
+                action VARCHAR,
+                file_path VARCHAR,
+                file_size_bytes BIGINT,
+                sha256_hash VARCHAR,
+                is_verified BOOLEAN,
+                elapsed_ms DOUBLE,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_model_artifact_audit START 1;
+        """)
+    except Exception as exc:
+        logger.error("SafePickle DuckDB şema oluşturma hatası", hata=str(exc))
+
+
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının geçici olup olmadığını döner."""
+    global _DUCKDB_CONN, _DUCKDB_PATH
+    if _DUCKDB_CONN is not None:
+        return _DUCKDB_CONN, False
+    try:
+        p = Path(_DUCKDB_PATH)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        read_only = not writable
+        conn = duckdb.connect(str(p), read_only=read_only)
+        if writable:
+            configure_duckdb_wal(conn)
+            _init_duckdb_schema_conn(conn)
+        return conn, True
+    except Exception as exc:
+        logger.debug("SafePickle DuckDB dosya bağlantı hatası", yol=_DUCKDB_PATH, hata=str(exc))
+        return None, False
 
 
 def _record_audit(meta: ModelArtifactMeta) -> None:
     """Denetim kaydını DuckDB'ye işler."""
-    if _DUCKDB_CONN is None:
-        return
     with _LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
         try:
-            _DUCKDB_CONN.execute(
+            conn.execute(
                 """
                 INSERT INTO model_artifact_audit (
                     id, action, file_path, file_size_bytes, sha256_hash, is_verified, elapsed_ms, recorded_at
@@ -125,6 +165,10 @@ def _record_audit(meta: ModelArtifactMeta) -> None:
             )
         except Exception as exc:
             logger.debug("SafePickle DuckDB denetim yazma hatası", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 @otel_trace("safe_pickle.safe_pickle_dump")
@@ -284,33 +328,72 @@ def safe_pickle_load(path: str | Path, verify_hash: bool = True) -> Any:
 @otel_trace("safe_pickle.export_artifact_audit_to_polars")
 def export_artifact_audit_to_polars() -> pl.DataFrame:
     """DuckDB'deki model serileştirme denetim geçmişini Polars DataFrame olarak döner."""
-    if _DUCKDB_CONN is None:
-        return pl.DataFrame(
-            schema={
-                "id": pl.Int64,
-                "action": pl.Utf8,
-                "file_path": pl.Utf8,
-                "file_size_bytes": pl.Int64,
-                "sha256_hash": pl.Utf8,
-                "is_verified": pl.Boolean,
-                "elapsed_ms": pl.Float64,
-                "recorded_at": pl.Datetime,
-            }
-        )
+    return read_artifact_audit_from_duckdb()
 
+
+def read_artifact_audit_from_duckdb(
+    duckdb_path: str = DEFAULT_SAFE_PICKLE_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından veya aktif bağlantıdan model serileştirme denetim geçmişini okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "id": pl.Int64,
+            "action": pl.Utf8,
+            "file_path": pl.Utf8,
+            "file_size_bytes": pl.Int64,
+            "sha256_hash": pl.Utf8,
+            "is_verified": pl.Boolean,
+            "elapsed_ms": pl.Float64,
+            "recorded_at": pl.Datetime,
+        }
+    )
     with _LOCK:
+        conn, should_close = _get_active_duckdb(writable=False)
+        if conn is None:
+            return empty_df
         try:
-            return _DUCKDB_CONN.execute("SELECT * FROM model_artifact_audit ORDER BY id ASC").pl()
+            query = f"SELECT * FROM model_artifact_audit ORDER BY id ASC LIMIT {int(limit)}"
+            return conn.execute(query).pl()
         except Exception as exc:
             logger.error("DuckDB model artefakt kayıtları çekilemedi", hata=str(exc))
-            return pl.DataFrame()
+            return empty_df
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
+
+
+def clear_artifact_audit_duckdb(
+    duckdb_path: str = DEFAULT_SAFE_PICKLE_DB,
+) -> None:
+    """Model artefaktları denetim tablosunu temizler."""
+    with _LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
+        try:
+            conn.execute("DELETE FROM model_artifact_audit;")
+        except Exception as exc:
+            logger.error("DuckDB model artefakt kayıtları temizlenemedi", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_SAFE_PICKLE_DB",
+    "DEFAULT_WAL_SIZE",
     "ModelArtifactMeta",
+    "clear_artifact_audit_duckdb",
+    "configure_duckdb_wal",
     "export_artifact_audit_to_polars",
+    "read_artifact_audit_from_duckdb",
     "safe_pickle_dump",
     "safe_pickle_load",
     "set_safe_pickle_duckdb_connection",
+    "set_safe_pickle_duckdb_path",
+    "to_orjson_bytes",
 ]

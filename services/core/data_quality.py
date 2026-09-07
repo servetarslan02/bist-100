@@ -101,7 +101,7 @@ class TradabilityMask:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
@@ -136,7 +136,7 @@ class ExpectationResult:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
@@ -167,6 +167,10 @@ class QualityIssue:
     def to_dict(self) -> dict[str, Any]:
         """Sözlük formatına dönüştürür."""
         return asdict(self)
+
+    def to_orjson_bytes(self) -> bytes:
+        """orjson bayt dizisi üretir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
@@ -203,7 +207,7 @@ class QualityReport:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisi üretir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Açıklayıcı metin temsili."""
@@ -802,6 +806,12 @@ class DataQualityEngine:
             "reasons_breakdown": reasons,
         }
 
+    def clear_masks(self) -> None:
+        """Kayıtlı tüm hisse maskelerini sıfırlar."""
+        with self._lock:
+            self._masks.clear()
+            logger.info("islem_gorebilirlik_maskeleri_temizlendi")
+
     def export_masks_to_polars(self) -> pl.DataFrame:
         """Mevcut tüm hisse maskelerini Polars DataFrame olarak dışa aktarır."""
         with self._lock:
@@ -825,11 +835,53 @@ class DataQualityEngine:
                 "is_tradable": m.is_tradable,
                 "price_mask": float(m.price_mask),
                 "volume_mask": float(m.volume_mask),
-                "reasons": orjson.dumps(m.reasons).decode("utf-8"),
+                "reasons": orjson.dumps(m.reasons, default=str).decode("utf-8"),
             }
             for m in masks
         ]
         return pl.DataFrame(data, schema=schema)
+
+    def export_masks_to_duckdb(
+        self,
+        db_path: str | Path | None = None,
+        table_name: str = DEFAULT_QUALITY_AUDIT_TABLE,
+    ) -> int:
+        """Mevcut hisse maskelerini DuckDB tablosuna aktarır.
+
+        Args:
+            db_path: Hedef DuckDB dosya yolu.
+            table_name: Hedef tablo adı.
+
+        Returns:
+            int: Eklenen kayıt sayısı.
+        """
+        df = self.export_masks_to_polars()
+        if df.is_empty():
+            return 0
+
+        target_path = Path(db_path or self._duckdb_path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_path.exists() and target_path.stat().st_size == 0:
+            with contextlib.suppress(OSError):
+                target_path.unlink()
+
+        try:
+            with duckdb.connect(str(target_path)) as conn:
+                with contextlib.suppress(Exception):
+                    configure_duckdb_wal(conn)
+                conn.register("df_masks", df.to_arrow())
+                conn.execute(
+                    f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_masks WHERE 1=0"
+                )
+                conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_masks")
+                with contextlib.suppress(Exception):
+                    conn.execute(
+                        f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ticker_ts ON {table_name}(ticker, timestamp)"
+                    )
+            return len(df)
+        except Exception as e:
+            logger.error("export_masks_to_duckdb_failed", error=str(e))
+            return 0
 
 
 # =====================================================
@@ -1000,13 +1052,18 @@ def check_tradability(
     )
 
 
+def clear_tradability_masks() -> None:
+    """Tüm kayıtlı işlem görebilirlik maskelerini sıfırlar."""
+    data_quality.clear_masks()
+
+
 def export_masks_to_polars() -> pl.DataFrame:
     """Mevcut hisse maskelerini Polars DataFrame olarak dışa aktarır."""
     return data_quality.export_masks_to_polars()
 
 
 def export_quality_to_duckdb(
-    db_path: str | Path = DEFAULT_QUALITY_DUCKDB_PATH,
+    db_path: str | Path | None = None,
     table_name: str = DEFAULT_QUALITY_AUDIT_TABLE,
 ) -> int:
     """Mevcut hisse maskelerini DuckDB tablosuna aktarır.
@@ -1018,28 +1075,7 @@ def export_quality_to_duckdb(
     Returns:
         int: Eklenen kayıt sayısı.
     """
-    df = export_masks_to_polars()
-    if df.is_empty():
-        return 0
-
-    path_obj = Path(db_path)
-    path_obj.parent.mkdir(parents=True, exist_ok=True)
-    if path_obj.exists() and path_obj.stat().st_size == 0:
-        with contextlib.suppress(OSError):
-            path_obj.unlink()
-
-    try:
-        with duckdb.connect(str(path_obj)) as conn:
-            configure_duckdb_wal(conn)
-            conn.register("df_masks", df.to_arrow())
-            conn.execute(
-                f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_masks WHERE 1=0"
-            )
-            conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_masks")
-        return len(df)
-    except Exception as e:
-        logger.error("export_quality_to_duckdb_failed", error=str(e))
-        return 0
+    return data_quality.export_masks_to_duckdb(db_path=db_path, table_name=table_name)
 
 
 def query_quality_duckdb(
@@ -1108,6 +1144,7 @@ __all__ = [
     "TradabilityMask",
     "build_default_financial_suite",
     "check_tradability",
+    "clear_tradability_masks",
     "data_quality",
     "data_quality_checker",
     "export_masks_to_polars",

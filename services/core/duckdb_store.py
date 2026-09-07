@@ -16,54 +16,29 @@ Parquet/Arrow/Polars entegrasyonu ve tamponlu (batched) SSD dostu yazma mimarisi
 from __future__ import annotations
 
 import atexit
-import functools
 import re
 import signal
 import threading
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import duckdb
+import orjson
 import structlog
-from opentelemetry import trace
 
 from services.core.debounce import configure_duckdb_wal
+from services.core.otel import otel_trace
 
 if TYPE_CHECKING:
     import polars as pl
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.duckdb_store")
 
 DEFAULT_DUCKDB_STORE_PATH: Final[str] = "data/central_state.db"
 DEFAULT_BUFFER_SIZE: Final[int] = 10
 DEFAULT_FLUSH_INTERVAL: Final[float] = 30.0
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metot çağrılarını OpenTelemetry span'i ile sarmalayan dekoratör.
-
-    Args:
-        span_name: OTel span adı.
-
-    Returns:
-        Sarmalayıcı fonksiyon.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Fonksiyonu OTel bağlamında çalıştırır."""
-
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Span oluşturup hedef metodu yürütür."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 class DuckDBStore:
@@ -248,6 +223,61 @@ class DuckDBStore:
         with self._lock, self._get_conn() as conn:
             return conn.execute(f'SELECT * FROM "{table}" LIMIT ?', (limit,)).pl()
 
+    def write_df(self, table: str, df: pl.DataFrame, if_exists: str = "append") -> None:
+        """Polars DataFrame verisini sıfır kopyalama ile DuckDB tablosuna yazar.
+
+        Args:
+            table: Hedef tablo adı.
+            df: Yazılacak Polars DataFrame.
+            if_exists: Tablo mevcutsa uygulanacak strateji ('append' veya 'replace').
+
+        Raises:
+            ValueError: Tablo adı geçersiz ise.
+        """
+        if not self._is_valid_identifier(table):
+            raise ValueError(f"Geçersiz tablo adı: {table!r}")
+        if df.is_empty():
+            logger.warning("Yazılacak Polars DataFrame boş, işlem atlandı", table=table)
+            return
+
+        arrow_table = df.to_arrow()
+        with self._lock, self._get_conn() as conn:
+            temp_view_name = f"_tmp_store_arrow_{table}"
+            conn.register(temp_view_name, arrow_table)
+            try:
+                table_exists = conn.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = ? AND table_schema = 'main'",
+                    (table,),
+                ).fetchone() is not None
+
+                if not table_exists:
+                    conn.execute(f'CREATE TABLE "{table}" AS SELECT * FROM "{temp_view_name}"')
+                elif if_exists == "replace":
+                    conn.execute(f'CREATE OR REPLACE TABLE "{table}" AS SELECT * FROM "{temp_view_name}"')
+                else:
+                    conn.execute(f'INSERT INTO "{table}" SELECT * FROM "{temp_view_name}"')
+                logger.info(
+                    "Polars verisi depoya başarıyla yazıldı",
+                    table=table,
+                    row_count=len(df),
+                    if_exists=if_exists,
+                )
+            finally:
+                conn.unregister(temp_view_name)
+
+    def clear_buffer(self) -> int:
+        """Arabellekte biriken bekleyen yazma işlemlerini diske yazmadan temizler.
+
+        Returns:
+            Temizlenen işlem sayısı.
+        """
+        with self._lock:
+            discarded = len(self._write_buffer)
+            self._write_buffer.clear()
+            if discarded > 0:
+                logger.warning("DuckDB yazma arabelleği boşaltılmadan temizlendi", discarded_count=discarded)
+            return discarded
+
     @otel_trace("duckdb_store.executescript")
     def executescript(self, script: str) -> None:
         """Çoklu SQL komutu içeren betiği çalıştırır.
@@ -400,6 +430,14 @@ class DuckDBStore:
                 "table_counts": stats,
             }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Depo istatistiklerini orjson formatında binary olarak döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        return orjson.dumps(self.get_stats(), option=orjson.OPT_INDENT_2, default=str)
+
     def __del__(self) -> None:
         """Nesne bellekten silinirken kaynakları güvenle temizler."""
         with suppress(Exception):
@@ -442,6 +480,21 @@ duckdb_store: Final[DuckDBStore] = DuckDBStore()
 DuckDBStateStore = DuckDBStore
 
 
+def fetch(query: str, params: Any = ()) -> list[dict[str, Any]]:
+    """SQL sorgusunu çalıştırır ve sonuçları sözlük listesi olarak döner."""
+    return duckdb_store.fetch(query=query, params=params)
+
+
+def fetchone(query: str, params: Any = ()) -> dict[str, Any] | None:
+    """SQL sorgusundan tek bir satır döner."""
+    return duckdb_store.fetchone(query=query, params=params)
+
+
+def fetchval(query: str, params: Any = ()) -> Any:
+    """SQL sorgusunun ilk sütunundaki tek bir skaler değeri döner."""
+    return duckdb_store.fetchval(query=query, params=params)
+
+
 def fetch_df(query: str, params: Any = ()) -> pl.DataFrame:
     """SQL sorgusu sonucunu doğrudan sıfır kopyalı Polars DataFrame olarak döner."""
     return duckdb_store.fetch_df(query=query, params=params)
@@ -452,9 +505,29 @@ def export_table_to_polars(table: str, limit: int = 1000) -> pl.DataFrame:
     return duckdb_store.export_table_to_polars(table=table, limit=limit)
 
 
+def write_df(table: str, df: pl.DataFrame, if_exists: str = "append") -> None:
+    """Polars DataFrame verisini sıfır kopyayla DuckDB deposuna yazar."""
+    duckdb_store.write_df(table=table, df=df, if_exists=if_exists)
+
+
 def execute(query: str, params: Any = ()) -> None:
     """Global DuckDB deposunda yazma sorgusu çalıştırır."""
     duckdb_store.execute(query=query, params=params)
+
+
+def clear_store_buffer() -> int:
+    """Global DuckDB deposunun tamponundaki bekleyen sorguları temizler."""
+    return duckdb_store.clear_buffer()
+
+
+def get_store_stats() -> dict[str, Any]:
+    """Global DuckDB deposunun istatistiklerini döner."""
+    return duckdb_store.get_stats()
+
+
+def get_store_stats_orjson_bytes() -> bytes:
+    """Global DuckDB deposunun istatistiklerini orjson binary olarak döner."""
+    return duckdb_store.to_orjson_bytes()
 
 
 __all__: Final[list[str]] = [
@@ -463,11 +536,18 @@ __all__: Final[list[str]] = [
     "DEFAULT_FLUSH_INTERVAL",
     "DuckDBStateStore",
     "DuckDBStore",
+    "clear_store_buffer",
     "configure_duckdb_wal",
     "duckdb_store",
     "execute",
     "export_table_to_polars",
+    "fetch",
     "fetch_df",
+    "fetchone",
+    "fetchval",
+    "get_store_stats",
+    "get_store_stats_orjson_bytes",
     "otel_trace",
+    "write_df",
 ]
 

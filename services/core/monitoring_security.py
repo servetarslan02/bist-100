@@ -32,10 +32,36 @@ import httpx
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    try:
+        from opentelemetry import trace
+        tracer = trace.get_tracer("alpha-bist.monitoring_security")
+
+        def otel_trace(span_name: str) -> Any:
+            def decorator(func: Any) -> Any:
+                if inspect.iscoroutinefunction(func):
+                    @functools.wraps(func)
+                    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                        with tracer.start_as_current_span(span_name):
+                            return await func(*args, **kwargs)
+                    return async_wrapper
+                else:
+                    @functools.wraps(func)
+                    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                        with tracer.start_as_current_span(span_name):
+                            return func(*args, **kwargs)
+                    return sync_wrapper
+            return decorator
+    except ImportError:
+        def otel_trace(span_name: str) -> Any:
+            def decorator(func: Any) -> Any:
+                return func
+            return decorator
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.monitoring_security")
 
 # ----------------------------------------------------------------------
 # Sabitler (Magic number ve string'lerin yerine açık tanımlar)
@@ -49,31 +75,6 @@ DEFAULT_MAX_TRACKED_CLIENTS: Final[int] = 10_000
 DEFAULT_HTTP_TIMEOUT_SECONDS: Final[float] = 10.0
 DEFAULT_RATE_LIMIT_WINDOW_SECONDS: Final[float] = 60.0
 DEFAULT_FAILED_ATTEMPTS_TTL_SECONDS: Final[float] = 3600.0
-
-
-def otel_trace(span_name: str) -> Any:
-    """Metot veya fonksiyonu OpenTelemetry span bağlamında çalıştıran sarmalayıcı (decorator).
-
-    Args:
-        span_name: Oluşturulacak span adı.
-
-    Returns:
-        Sarmalanmış senkron veya asenkron fonksiyon.
-    """
-    def decorator(func: Any) -> Any:
-        if inspect.iscoroutinefunction(func):
-            @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(*args, **kwargs)
-            return async_wrapper
-        else:
-            @functools.wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return func(*args, **kwargs)
-            return sync_wrapper
-    return decorator
 
 
 @dataclass
@@ -830,6 +831,80 @@ verify_metrics_token = monitoring_auth.verify_metrics_token
 verify_admin_token = monitoring_auth.verify_admin_token
 reset_client = monitoring_auth.reset_client
 
+
+def export_security_stats_to_orjson_bytes() -> bytes:
+    """Güvenlik ve oran sınırlama istatistiklerini orjson serileştirilmiş ikili bayt olarak döndürür."""
+    df = monitoring_auth.export_security_stats_to_polars()
+    return orjson.dumps(df.to_dicts(), default=str)
+
+
+def export_security_audit_to_duckdb(
+    db_path: str = "data/monitoring_security_audit.duckdb",
+) -> int:
+    """Güvenlik ve oran sınırlama telemetrisini yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+
+    Returns:
+        Kaydedilen kayıt sayısı.
+    """
+    import contextlib
+    from pathlib import Path
+
+    import duckdb
+
+    df = monitoring_auth.export_security_stats_to_polars()
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.stat().st_size == 0:
+        with contextlib.suppress(OSError):
+            target.unlink()
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("PRAGMA checkpoint_threshold='4MB'")
+        conn.execute("PRAGMA wal_autocheckpoint='2MB'")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS monitoring_security_audit (
+                client_ip VARCHAR,
+                active_request_count BIGINT,
+                failed_attempts BIGINT,
+                is_rate_limited BOOLEAN,
+                last_seen_at VARCHAR,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_ip ON monitoring_security_audit (client_ip);")
+        if df.height > 0:
+            conn.register("df_sec_view", df.to_arrow())
+            try:
+                conn.execute("""
+                    INSERT INTO monitoring_security_audit
+                    (client_ip, active_request_count, failed_attempts, is_rate_limited, last_seen_at)
+                    SELECT client_ip, active_request_count, failed_attempts, is_rate_limited, last_seen_at
+                    FROM df_sec_view
+                """)
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_sec_view")
+    return df.height
+
+
+def clear_security_audit_duckdb(
+    db_path: str = "data/monitoring_security_audit.duckdb",
+) -> None:
+    """DuckDB güvenlik denetim tablosunu siler."""
+    from pathlib import Path
+
+    import duckdb
+
+    target = Path(db_path)
+    if not target.exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS monitoring_security_audit")
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_ADMIN_TOKEN",
     "DEFAULT_FAILED_ATTEMPTS_TTL_SECONDS",
@@ -851,6 +926,9 @@ __all__: Final[list[str]] = [
     "StaticTokenProvider",
     "auth_manager",
     "check_rate_limit",
+    "clear_security_audit_duckdb",
+    "export_security_audit_to_duckdb",
+    "export_security_stats_to_orjson_bytes",
     "export_security_stats_to_polars",
     "extract_api_key",
     "extract_bearer_token",

@@ -11,19 +11,19 @@ Bu modül, Borsa İstanbul Pay Piyasası'nda çalışan stratejiler için:
 
 from __future__ import annotations
 
+import contextlib
 import math
 import threading
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import numpy as np
 import orjson
 import polars as pl
 import structlog
-
-if TYPE_CHECKING:
-    import duckdb
 
 from services.core.otel import otel_trace
 from services.core.risk_config import RiskManagerConfig, risk_config
@@ -33,6 +33,22 @@ logger = structlog.get_logger(__name__)
 DEFAULT_WEIGHT_METHOD: Final[str] = "equal"
 DEFAULT_MAX_WEIGHT: Final[float] = 0.20
 DEFAULT_RISK_AUDIT_DB: Final[str] = "data/risk_manager_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("RiskManager DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 @dataclass(slots=True)
@@ -71,7 +87,7 @@ class PositionRiskInfo:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return (
@@ -103,7 +119,7 @@ class RiskManagerState:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         return (
@@ -119,6 +135,7 @@ class RiskManager:
         self,
         config: RiskManagerConfig | None = None,
         duckdb_conn: duckdb.DuckDBPyConnection | None = None,
+        duckdb_path: str = DEFAULT_RISK_AUDIT_DB,
     ) -> None:
         self._lock = threading.RLock()
         cfg = config or risk_config
@@ -142,52 +159,68 @@ class RiskManager:
         self._halt_reason: str = ""
 
         self._duckdb_conn = duckdb_conn
+        self._duckdb_path = duckdb_path
         if self._duckdb_conn is not None:
-            self._init_duckdb_schema()
+            self._init_duckdb_schema_conn(self._duckdb_conn)
 
     def set_duckdb_connection(self, conn: duckdb.DuckDBPyConnection) -> None:
         """DuckDB risk denetim arşivi için bağlantıyı tanımlar."""
         with self._lock:
             self._duckdb_conn = conn
-            self._init_duckdb_schema()
+            self._init_duckdb_schema_conn(self._duckdb_conn)
 
-    def _init_duckdb_schema(self) -> None:
+    def _init_duckdb_schema_conn(self, conn: duckdb.DuckDBPyConnection) -> None:
         """DuckDB risk denetim tablolarını ilklendirir."""
-        if self._duckdb_conn is None:
-            return
-        with self._lock:
-            try:
-                self._duckdb_conn.execute("""
-                    CREATE TABLE IF NOT EXISTS risk_drawdown_audit (
-                        id BIGINT,
-                        current_equity DOUBLE,
-                        peak_equity DOUBLE,
-                        drawdown_pct DOUBLE,
-                        is_halted BOOLEAN,
-                        halt_reason VARCHAR,
-                        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE SEQUENCE IF NOT EXISTS seq_risk_drawdown_audit START 1;
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS risk_drawdown_audit (
+                    id BIGINT,
+                    current_equity DOUBLE,
+                    peak_equity DOUBLE,
+                    drawdown_pct DOUBLE,
+                    is_halted BOOLEAN,
+                    halt_reason VARCHAR,
+                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_risk_drawdown_audit START 1;
 
-                    CREATE TABLE IF NOT EXISTS risk_weights_audit (
-                        id BIGINT,
-                        method VARCHAR,
-                        tickers_count INTEGER,
-                        weights_json VARCHAR,
-                        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE SEQUENCE IF NOT EXISTS seq_risk_weights_audit START 1;
-                """)
-            except Exception as exc:
-                logger.error("RiskManager DuckDB şema oluşturma hatası", hata=str(exc))
+                CREATE TABLE IF NOT EXISTS risk_weights_audit (
+                    id BIGINT,
+                    method VARCHAR,
+                    tickers_count INTEGER,
+                    weights_json VARCHAR,
+                    calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_risk_weights_audit START 1;
+            """)
+        except Exception as exc:
+            logger.error("RiskManager DuckDB şema oluşturma hatası", hata=str(exc))
+
+    def _get_active_duckdb(self, writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+        """Aktif DuckDB bağlantısını ve bağlantının geçici olup olmadığını döner."""
+        if self._duckdb_conn is not None:
+            return self._duckdb_conn, False
+        try:
+            p = Path(self._duckdb_path)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            read_only = not writable
+            conn = duckdb.connect(str(p), read_only=read_only)
+            if writable:
+                configure_duckdb_wal(conn)
+                self._init_duckdb_schema_conn(conn)
+            return conn, True
+        except Exception as exc:
+            logger.debug("RiskManager DuckDB dosya bağlantı hatası", yol=self._duckdb_path, hata=str(exc))
+            return None, False
 
     def _record_drawdown_audit(self) -> None:
         """Drawdown durumunu DuckDB denetim tablosuna yazar."""
-        if self._duckdb_conn is None:
-            return
         with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=True)
+            if conn is None:
+                return
             try:
-                self._duckdb_conn.execute(
+                conn.execute(
                     """
                     INSERT INTO risk_drawdown_audit (
                         id, current_equity, peak_equity, drawdown_pct, is_halted, halt_reason, recorded_at
@@ -206,15 +239,20 @@ class RiskManager:
                 )
             except Exception as exc:
                 logger.debug("RiskManager DuckDB drawdown yazma hatası", hata=str(exc))
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
 
     def _record_weights_audit(self, method: str, weights: dict[str, float]) -> None:
         """Ağırlık hesaplama geçmişini DuckDB'ye yazar."""
-        if self._duckdb_conn is None:
-            return
         with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=True)
+            if conn is None:
+                return
             try:
-                w_json = orjson.dumps(weights).decode("utf-8")
-                self._duckdb_conn.execute(
+                w_json = orjson.dumps(weights, default=str).decode("utf-8")
+                conn.execute(
                     """
                     INSERT INTO risk_weights_audit (
                         id, method, tickers_count, weights_json, calculated_at
@@ -231,6 +269,10 @@ class RiskManager:
                 )
             except Exception as exc:
                 logger.debug("RiskManager DuckDB ağırlık yazma hatası", hata=str(exc))
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
 
     @property
     def is_halted(self) -> bool:
@@ -635,25 +677,51 @@ class RiskManager:
     @otel_trace("risk_manager.export_audit_to_polars")
     def export_audit_to_polars(self) -> pl.DataFrame:
         """DuckDB'de saklanan drawdown denetim geçmişini Polars DataFrame olarak döner."""
-        if self._duckdb_conn is None:
-            return pl.DataFrame(
-                schema={
-                    "id": pl.Int64,
-                    "current_equity": pl.Float64,
-                    "peak_equity": pl.Float64,
-                    "drawdown_pct": pl.Float64,
-                    "is_halted": pl.Boolean,
-                    "halt_reason": pl.Utf8,
-                    "recorded_at": pl.Datetime,
-                }
-            )
+        return self.read_drawdown_audit_from_duckdb()
 
+    def read_drawdown_audit_from_duckdb(self, limit: int = 1000) -> pl.DataFrame:
+        """DuckDB'de saklanan drawdown denetim kayıtlarını okur."""
+        empty_df = pl.DataFrame(
+            schema={
+                "id": pl.Int64,
+                "current_equity": pl.Float64,
+                "peak_equity": pl.Float64,
+                "drawdown_pct": pl.Float64,
+                "is_halted": pl.Boolean,
+                "halt_reason": pl.Utf8,
+                "recorded_at": pl.Datetime,
+            }
+        )
         with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=False)
+            if conn is None:
+                return empty_df
             try:
-                return self._duckdb_conn.execute("SELECT * FROM risk_drawdown_audit ORDER BY id ASC").pl()
+                query = f"SELECT * FROM risk_drawdown_audit ORDER BY id ASC LIMIT {int(limit)}"
+                return conn.execute(query).pl()
             except Exception as exc:
                 logger.error("DuckDB drawdown denetim kayıtları çekilemedi", hata=str(exc))
-                return pl.DataFrame()
+                return empty_df
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
+
+    def clear_audit_duckdb(self) -> None:
+        """DuckDB üzerindeki drawdown ve ağırlık denetim tablolarını temizler."""
+        with self._lock:
+            conn, should_close = self._get_active_duckdb(writable=True)
+            if conn is None:
+                return
+            try:
+                conn.execute("DELETE FROM risk_drawdown_audit;")
+                conn.execute("DELETE FROM risk_weights_audit;")
+            except Exception as exc:
+                logger.error("DuckDB risk denetim kayıtları temizlenemedi", hata=str(exc))
+            finally:
+                if should_close:
+                    with contextlib.suppress(Exception):
+                        conn.close()
 
     def __repr__(self) -> str:
         with self._lock:
@@ -664,15 +732,71 @@ class RiskManager:
             )
 
 
+def read_risk_drawdown_audit_from_duckdb(
+    duckdb_path: str = DEFAULT_RISK_AUDIT_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından drawdown denetim geçmişini okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "id": pl.Int64,
+            "current_equity": pl.Float64,
+            "peak_equity": pl.Float64,
+            "drawdown_pct": pl.Float64,
+            "is_halted": pl.Boolean,
+            "halt_reason": pl.Utf8,
+            "recorded_at": pl.Datetime,
+        }
+    )
+    p = Path(duckdb_path)
+    if not p.exists():
+        return empty_df
+    try:
+        conn = duckdb.connect(str(p), read_only=True)
+        try:
+            query = f"SELECT * FROM risk_drawdown_audit ORDER BY id ASC LIMIT {int(limit)}"
+            return conn.execute(query).pl()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB doğrudan drawdown denetim okuma hatası", yol=duckdb_path, hata=str(exc))
+        return empty_df
+
+
+def clear_risk_manager_audit_duckdb(
+    duckdb_path: str = DEFAULT_RISK_AUDIT_DB,
+) -> None:
+    """Doğrudan DuckDB dosyasındaki risk denetim tablolarını temizler."""
+    p = Path(duckdb_path)
+    if not p.exists():
+        return
+    try:
+        conn = duckdb.connect(str(p), read_only=False)
+        configure_duckdb_wal(conn)
+        try:
+            conn.execute("DELETE FROM risk_drawdown_audit;")
+            conn.execute("DELETE FROM risk_weights_audit;")
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB doğrudan risk denetim temizleme hatası", yol=duckdb_path, hata=str(exc))
+
+
 # Global varsayılan singleton motoru
 risk_manager: Final[RiskManager] = RiskManager()
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_MAX_WEIGHT",
     "DEFAULT_RISK_AUDIT_DB",
+    "DEFAULT_WAL_SIZE",
     "DEFAULT_WEIGHT_METHOD",
     "PositionRiskInfo",
     "RiskManager",
     "RiskManagerState",
+    "clear_risk_manager_audit_duckdb",
+    "configure_duckdb_wal",
+    "read_risk_drawdown_audit_from_duckdb",
     "risk_manager",
+    "to_orjson_bytes",
 ]

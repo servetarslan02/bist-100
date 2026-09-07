@@ -24,10 +24,36 @@ import duckdb
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    try:
+        from opentelemetry import trace
+        tracer = trace.get_tracer("alpha-bist.model_persistence")
+
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                if asyncio.iscoroutinefunction(func):
+                    @functools.wraps(func)
+                    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                        with tracer.start_as_current_span(span_name):
+                            return await func(*args, **kwargs)
+                    return async_wrapper
+
+                @functools.wraps(func)
+                def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                    with tracer.start_as_current_span(span_name):
+                        return func(*args, **kwargs)
+                return sync_wrapper
+            return decorator
+    except ImportError:
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                return func
+            return decorator
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.model_persistence")
 
 DEFAULT_MODEL_METADATA_DB_PATH: Final[str] = "data/model_metadata.duckdb"
 
@@ -48,36 +74,6 @@ def configure_duckdb_wal(conn: Any) -> None:
     with contextlib.suppress(Exception):
         conn.execute("PRAGMA checkpoint_threshold='4MB'")
         conn.execute("PRAGMA wal_autocheckpoint='2MB'")
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal senkron/asenkron izleme dekoratörü.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(*args, **kwargs)
-
-            return async_wrapper
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
-
-        return sync_wrapper
-
-    return decorator
 
 
 class ModelPersistence:
@@ -124,6 +120,8 @@ class ModelPersistence:
                         PRIMARY KEY (model_name, version)
                     )
                 """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_model_versions_status ON model_versions_offline (status);")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_model_versions_created ON model_versions_offline (created_at DESC);")
                 conn.execute(
                     """
                     INSERT INTO model_versions_offline
@@ -591,6 +589,28 @@ class ModelPersistence:
         ).hexdigest()[:16]
 
 
+def export_model_versions_to_orjson_bytes(
+    model_name: str,
+    db_path: str = DEFAULT_MODEL_METADATA_DB_PATH,
+) -> bytes:
+    """Model sürümlerini orjson serileştirilmiş ikili bayt dizisi olarak döndürür."""
+    df = ModelPersistence.list_model_versions_polars(model_name=model_name, db_path=db_path)
+    return orjson.dumps(df.to_dicts(), default=str)
+
+
+def clear_model_metadata_duckdb(
+    db_path: str = DEFAULT_MODEL_METADATA_DB_PATH,
+) -> None:
+    """DuckDB çevrimdışı model kayıt tablosundaki tüm kayıtları siler."""
+    target = Path(db_path)
+    if not target.exists():
+        return
+
+    with _duckdb_lock, duckdb.connect(db_path) as conn:
+        configure_duckdb_wal(conn)
+        conn.execute("DROP TABLE IF EXISTS model_versions_offline")
+
+
 # Global tekil nesne ve kolaylık fonksiyonları
 model_persistence: Final[ModelPersistence] = ModelPersistence()
 save_model_metadata = ModelPersistence.save_model_metadata
@@ -605,7 +625,9 @@ generate_contract_hash = ModelPersistence.generate_contract_hash
 __all__: Final[list[str]] = [
     "DEFAULT_MODEL_METADATA_DB_PATH",
     "ModelPersistence",
+    "clear_model_metadata_duckdb",
     "configure_duckdb_wal",
+    "export_model_versions_to_orjson_bytes",
     "generate_contract_hash",
     "get_champion_model",
     "list_model_versions",

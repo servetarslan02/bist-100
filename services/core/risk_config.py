@@ -9,20 +9,36 @@ from __future__ import annotations
 
 import threading
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 from pydantic import BaseModel, Field, field_validator
 
-if TYPE_CHECKING:
-    import duckdb
-
 logger = structlog.get_logger(__name__)
 
 _config_lock = threading.RLock()
 _duckdb_conn: duckdb.DuckDBPyConnection | None = None
+
+DEFAULT_RISK_CONFIG_DUCKDB_PATH: Final[str] = "data/risk_config_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL parametrelerini optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("risk_config_duckdb_wal_yapilandirma_uyarisi", hata=str(e))
 
 
 def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
@@ -30,6 +46,7 @@ def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     global _duckdb_conn
     with _config_lock:
         _duckdb_conn = conn
+        configure_duckdb_wal(_duckdb_conn)
         try:
             _duckdb_conn.execute("""
                 CREATE TABLE IF NOT EXISTS risk_config_audit (
@@ -44,14 +61,52 @@ def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
             logger.error("Risk config DuckDB şema hatası", hata=str(exc))
 
 
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve kapatılması gerekip gerekmediğini döndürür."""
+    with _config_lock:
+        if _duckdb_conn is not None:
+            return _duckdb_conn, False
+
+    p = Path(DEFAULT_RISK_CONFIG_DUCKDB_PATH)
+    if not writable and not p.exists():
+        return None, False
+
+    try:
+        if writable:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            conn = duckdb.connect(str(p))
+            configure_duckdb_wal(conn)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS risk_config_audit (
+                    id BIGINT,
+                    config_type VARCHAR,
+                    payload_json VARCHAR,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_risk_config_audit START 1;
+            """)
+            return conn, True
+        else:
+            conn = duckdb.connect(str(p), read_only=True)
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "risk_config_audit" not in tables:
+                conn.close()
+                return None, False
+            return conn, True
+    except Exception as exc:
+        logger.debug("risk_config_duckdb_aktif_baglanti_hatasi", hata=str(exc))
+        return None, False
+
+
 def _record_config_audit(config_type: str, payload: dict[str, Any]) -> None:
     """Konfigürasyon değişikliklerini DuckDB denetim tablosuna yazar."""
-    if _duckdb_conn is None:
+    conn, should_close = _get_active_duckdb(writable=True)
+    if conn is None:
         return
     with _config_lock:
         try:
-            json_str = orjson.dumps(payload).decode("utf-8")
-            _duckdb_conn.execute(
+            json_str = orjson.dumps(payload, default=str).decode("utf-8")
+            conn.execute(
                 """
                 INSERT INTO risk_config_audit (id, config_type, payload_json, updated_at)
                 VALUES (nextval('seq_risk_config_audit'), ?, ?, CURRENT_TIMESTAMP)
@@ -60,6 +115,9 @@ def _record_config_audit(config_type: str, payload: dict[str, Any]) -> None:
             )
         except Exception as exc:
             logger.debug("Risk config DuckDB audit kayıt hatası", hata=str(exc))
+        finally:
+            if should_close:
+                conn.close()
 
 
 class BaseRiskConfigModel(BaseModel):
@@ -73,7 +131,7 @@ class BaseRiskConfigModel(BaseModel):
 
     def to_orjson_bytes(self) -> bytes:
         """Modeli orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def update_from_dict(self, updates: dict[str, Any]) -> None:
         """Sözlük üzerinden parametreleri güvenle günceller ve denetim kaydı oluşturur."""
@@ -194,7 +252,62 @@ def export_all_risk_configs_to_polars() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def read_risk_config_audit_from_duckdb(
+    db_path: str = DEFAULT_RISK_CONFIG_DUCKDB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosundaki konfigürasyon geçmişini Polars DataFrame olarak okur."""
+    empty_schema = {
+        "id": pl.Int64,
+        "config_type": pl.String,
+        "payload_json": pl.String,
+        "updated_at": pl.Datetime,
+    }
+    conn, should_close = _get_active_duckdb(writable=False)
+    if conn is None:
+        return pl.DataFrame(schema=empty_schema)
+    try:
+        return conn.execute(
+            """
+            SELECT id, config_type, payload_json, updated_at
+            FROM risk_config_audit
+            ORDER BY id DESC LIMIT ?
+            """,
+            [limit],
+        ).pl()
+    except Exception as e:
+        logger.error("read_risk_config_audit_duckdb_hatasi", hata=str(e))
+        return pl.DataFrame(schema=empty_schema)
+    finally:
+        if should_close:
+            conn.close()
+
+
+def clear_risk_config_audit_duckdb(db_path: str = DEFAULT_RISK_CONFIG_DUCKDB_PATH) -> bool:
+    """DuckDB denetim tablosundaki tüm kayıtları temizler."""
+    conn, should_close = _get_active_duckdb(writable=True)
+    if conn is None:
+        return True
+    try:
+        conn.execute("DELETE FROM risk_config_audit")
+        return True
+    except Exception as e:
+        logger.error("clear_risk_config_audit_duckdb_hatasi", hata=str(e))
+        return False
+    finally:
+        if should_close:
+            conn.close()
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Veriyi orjson ile güvenli bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
+
+
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
+    "DEFAULT_RISK_CONFIG_DUCKDB_PATH",
+    "DEFAULT_WAL_SIZE",
     "BacktestConfig",
     "BaseRiskConfigModel",
     "CircuitBreakerConfig",
@@ -202,8 +315,12 @@ __all__ = [
     "RiskManagerConfig",
     "backtest_config",
     "circuit_breaker_config",
+    "clear_risk_config_audit_duckdb",
+    "configure_duckdb_wal",
     "export_all_risk_configs_to_polars",
     "portfolio_config",
+    "read_risk_config_audit_from_duckdb",
     "risk_config",
     "set_duckdb_connection",
+    "to_orjson_bytes",
 ]

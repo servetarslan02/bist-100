@@ -15,34 +15,36 @@ import math
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import numpy as np
 import orjson
 import polars as pl
 import structlog
 
-if TYPE_CHECKING:
-    import duckdb
-
-try:
-    from services.core.otel import otel_trace
-except ImportError:
-    import functools
-
-    def otel_trace(name: str):
-        """Merkezi OTel tracer bulunamadığında kullanılan yerel fallback dekoratörü."""
-
-        def decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-
-            return wrapper
-
-        return decorator
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
+
+# Modül Sabitleri
+DEFAULT_RECONCILIATION_DUCKDB_PATH: Final[str] = "data/reconciliation_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL boyutunu optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(e))
 
 
 @dataclass
@@ -82,7 +84,7 @@ class ReconciledData:
 
     def to_orjson_bytes(self) -> bytes:
         """Veriyi orjson formatında bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
 
 class CrossSourceReconciliation:
@@ -152,6 +154,133 @@ class CrossSourceReconciliation:
             except Exception as exc:
                 logger.error("Reconciliation DuckDB şema oluşturma hatası", hata=str(exc))
 
+    def save_audit_to_duckdb(
+        self,
+        ticker: str,
+        field_name: str,
+        result: ReconciledData,
+        db_path: str | None = None,
+    ) -> None:
+        """Uzlaştırma denetim kaydını dosya tabanlı DuckDB'ye kaydeder."""
+        target_path = db_path or DEFAULT_RECONCILIATION_DUCKDB_PATH
+        path_obj = Path(target_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        conn = duckdb.connect(str(path_obj))
+        try:
+            configure_duckdb_wal(conn)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS reconciliation_audit (
+                    ticker VARCHAR,
+                    field_name VARCHAR,
+                    best_source VARCHAR,
+                    best_value DOUBLE,
+                    discrepancy_pct DOUBLE,
+                    quality_score DOUBLE,
+                    confidence DOUBLE,
+                    is_consistent BOOLEAN,
+                    anomaly_detected BOOLEAN,
+                    raw_sources_json VARCHAR,
+                    reconciled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            raw_json = orjson.dumps(result.all_sources, default=str).decode("utf-8")
+            conn.execute(
+                """
+                INSERT INTO reconciliation_audit (
+                    ticker, field_name, best_source, best_value,
+                    discrepancy_pct, quality_score, confidence,
+                    is_consistent, anomaly_detected, raw_sources_json, reconciled_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    ticker,
+                    field_name,
+                    result.source,
+                    result.value,
+                    result.discrepancy_pct,
+                    result.quality_score,
+                    result.confidence,
+                    result.is_consistent,
+                    result.anomaly_detected,
+                    raw_json,
+                    result.reconciled_at,
+                ],
+            )
+        except Exception as exc:
+            logger.error("Reconciliation DuckDB dosya kaydi hatasi", ticker=ticker, field=field_name, hata=str(exc))
+        finally:
+            conn.close()
+
+    def read_audit_from_duckdb(
+        self,
+        db_path: str | None = None,
+        ticker: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB'de kayıtlı uzlaştırma denetim kayıtlarını Polars DataFrame olarak okur."""
+        target_path = db_path or DEFAULT_RECONCILIATION_DUCKDB_PATH
+        path_obj = Path(target_path)
+        empty_schema = {
+            "ticker": pl.String,
+            "field_name": pl.String,
+            "best_source": pl.String,
+            "best_value": pl.Float64,
+            "discrepancy_pct": pl.Float64,
+            "quality_score": pl.Float64,
+            "confidence": pl.Float64,
+            "is_consistent": pl.Boolean,
+            "anomaly_detected": pl.Boolean,
+            "raw_sources_json": pl.String,
+            "reconciled_at": pl.Datetime,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "reconciliation_audit" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = (
+                "SELECT ticker, field_name, best_source, best_value, discrepancy_pct, "
+                "quality_score, confidence, is_consistent, anomaly_detected, raw_sources_json, reconciled_at "
+                "FROM reconciliation_audit "
+            )
+            params: list[Any] = []
+            if ticker:
+                query += "WHERE ticker = ? "
+                params.append(ticker.upper().strip())
+            query += "ORDER BY reconciled_at DESC"
+
+            return conn.execute(query, params).pl()
+        except Exception as e:
+            logger.error("reconciliation_duckdb_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_audit_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB tablosundaki uzlaştırma denetim kayıtlarını temizler."""
+        target_path = db_path or DEFAULT_RECONCILIATION_DUCKDB_PATH
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "reconciliation_audit" in tables:
+                conn.execute("DELETE FROM reconciliation_audit")
+            logger.info("reconciliation_audit_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("reconciliation_audit_temizleme_hatasi", hata=str(e))
+            return False
+        finally:
+            conn.close()
+
     def _record_audit(
         self,
         ticker: str,
@@ -159,38 +288,39 @@ class CrossSourceReconciliation:
         result: ReconciledData,
     ) -> None:
         """Uzlaştırma denetim kaydını DuckDB'ye yazar."""
-        if self._duckdb_conn is None:
-            return
-        with self._lock:
-            try:
-                raw_json = orjson.dumps(result.all_sources).decode("utf-8")
-                self._duckdb_conn.execute(
-                    """
-                    INSERT INTO reconciliation_audit (
-                        id, ticker, field_name, best_source, best_value,
-                        discrepancy_pct, quality_score, confidence,
-                        is_consistent, anomaly_detected, raw_sources_json, reconciled_at
-                    ) VALUES (
-                        nextval('seq_reconciliation_audit'), ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?
+        if self._duckdb_conn is not None:
+            with self._lock:
+                try:
+                    raw_json = orjson.dumps(result.all_sources, default=str).decode("utf-8")
+                    self._duckdb_conn.execute(
+                        """
+                        INSERT INTO reconciliation_audit (
+                            id, ticker, field_name, best_source, best_value,
+                            discrepancy_pct, quality_score, confidence,
+                            is_consistent, anomaly_detected, raw_sources_json, reconciled_at
+                        ) VALUES (
+                            nextval('seq_reconciliation_audit'), ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?
+                        )
+                        """,
+                        [
+                            ticker,
+                            field_name,
+                            result.source,
+                            result.value,
+                            result.discrepancy_pct,
+                            result.quality_score,
+                            result.confidence,
+                            result.is_consistent,
+                            result.anomaly_detected,
+                            raw_json,
+                            result.reconciled_at,
+                        ],
                     )
-                    """,
-                    [
-                        ticker,
-                        field_name,
-                        result.source,
-                        result.value,
-                        result.discrepancy_pct,
-                        result.quality_score,
-                        result.confidence,
-                        result.is_consistent,
-                        result.anomaly_detected,
-                        raw_json,
-                        result.reconciled_at,
-                    ],
-                )
-            except Exception as exc:
-                logger.error("Reconciliation DuckDB denetim kaydı hatası", ticker=ticker, field=field_name, hata=str(exc))
+                except Exception as exc:
+                    logger.error("Reconciliation DuckDB denetim kaydı hatası", ticker=ticker, field=field_name, hata=str(exc))
+        else:
+            self.save_audit_to_duckdb(ticker, field_name, result)
 
     @otel_trace("reconciliation.reconcile_price")
     def reconcile_price(
@@ -523,8 +653,74 @@ class CrossSourceReconciliation:
 # Global Singleton
 cross_source_reconciliation = CrossSourceReconciliation()
 
-__all__ = [
+
+def reconcile_price(
+    sources: dict[str, float],
+    ticker: str = "UNKNOWN",
+    field_name: str = "price",
+    timestamp: datetime | None = None,
+    engine: CrossSourceReconciliation = cross_source_reconciliation,
+) -> ReconciledData:
+    """Fiyat ve sayısal metrik kaynaklarını uzlaştırır."""
+    return engine.reconcile_price(sources, ticker=ticker, field_name=field_name, timestamp=timestamp)
+
+
+def heal_reconcile_with_outlier_removal(
+    sources: dict[str, float],
+    ticker: str = "UNKNOWN",
+    field_name: str = "price",
+    max_outlier_removals: int = 1,
+    engine: CrossSourceReconciliation = cross_source_reconciliation,
+) -> tuple[ReconciledData, list[str]]:
+    """Aykırı değer saptandığında bozuk kaynakları otomatik eleyip yeniden uzlaştırır (Self-Healing)."""
+    return engine.heal_reconcile_with_outlier_removal(
+        sources,
+        ticker=ticker,
+        field_name=field_name,
+        max_outlier_removals=max_outlier_removals,
+    )
+
+
+def read_reconciliation_audit_from_duckdb(
+    db_path: str = DEFAULT_RECONCILIATION_DUCKDB_PATH,
+    ticker: str | None = None,
+    engine: CrossSourceReconciliation = cross_source_reconciliation,
+) -> pl.DataFrame:
+    """DuckDB'de kayıtlı uzlaştırma denetim kayıtlarını Polars DataFrame olarak okur."""
+    return engine.read_audit_from_duckdb(db_path=db_path, ticker=ticker)
+
+
+def clear_reconciliation_audit_duckdb(
+    db_path: str = DEFAULT_RECONCILIATION_DUCKDB_PATH,
+    engine: CrossSourceReconciliation = cross_source_reconciliation,
+) -> bool:
+    """DuckDB tablosundaki uzlaştırma denetim kayıtlarını temizler."""
+    return engine.clear_audit_duckdb(db_path=db_path)
+
+
+def export_reconciliation_to_polars(records: list[ReconciledData]) -> pl.DataFrame:
+    """Uzlaştırılmış veri listesini Polars DataFrame'e dönüştürür."""
+    return CrossSourceReconciliation.export_to_polars(records)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Verilen veriyi orjson bayt dizisine dönüştürür."""
+    return orjson.dumps(data, default=str)
+
+
+__all__: Final[list[str]] = [
+    "DEFAULT_CHECKPOINT_SIZE",
+    "DEFAULT_RECONCILIATION_DUCKDB_PATH",
+    "DEFAULT_WAL_SIZE",
     "CrossSourceReconciliation",
     "ReconciledData",
+    "clear_reconciliation_audit_duckdb",
+    "configure_duckdb_wal",
     "cross_source_reconciliation",
+    "export_reconciliation_to_polars",
+    "heal_reconcile_with_outlier_removal",
+    "read_reconciliation_audit_from_duckdb",
+    "reconcile_price",
+    "to_orjson_bytes",
 ]
+

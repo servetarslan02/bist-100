@@ -13,13 +13,13 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
+import orjson
 import polars as pl
 import structlog
-
-if TYPE_CHECKING:
-    import duckdb
 
 try:
     import redis.asyncio as aioredis
@@ -55,6 +55,9 @@ DEFAULT_SENTINEL_PORT: Final[int] = 26379
 DEFAULT_SOCKET_TIMEOUT: Final[float] = 1.0
 DEFAULT_SENTINEL_TIMEOUT: Final[float] = 0.5
 DEFAULT_MAX_CONNECTIONS: Final[int] = 500
+DEFAULT_SENTINEL_DUCKDB_PATH: Final[str] = "data/sentinel_failovers.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 _ha_redis: Any | None = None
 _ha_loop: asyncio.AbstractEventLoop | None = None
@@ -62,10 +65,24 @@ _ha_lock: asyncio.Lock | None = None
 _duckdb_conn: duckdb.DuckDBPyConnection | None = None
 
 
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL parametrelerini optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("sentinel_duckdb_wal_yapilandirma_uyarisi", hata=str(e))
+
+
 def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     """Sentinel failover denetim tablosunu DuckDB üzerinde ilklendirir."""
     global _duckdb_conn
     _duckdb_conn = conn
+    configure_duckdb_wal(_duckdb_conn)
     try:
         _duckdb_conn.execute("""
             CREATE TABLE IF NOT EXISTS sentinel_failover_history (
@@ -81,12 +98,50 @@ def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
         logger.error("Sentinel DuckDB şema oluşturma hatası", hata=str(exc))
 
 
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının kapatılması gerekip gerekmediğini döndürür."""
+    if _duckdb_conn is not None:
+        return _duckdb_conn, False
+
+    p = Path(DEFAULT_SENTINEL_DUCKDB_PATH)
+    if not writable and not p.exists():
+        return None, False
+
+    try:
+        if writable:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            conn = duckdb.connect(str(p))
+            configure_duckdb_wal(conn)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sentinel_failover_history (
+                    id BIGINT,
+                    master_name VARCHAR,
+                    event_type VARCHAR,
+                    detail_json VARCHAR,
+                    occurred_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE SEQUENCE IF NOT EXISTS seq_sentinel_failovers START 1;
+            """)
+            return conn, True
+        else:
+            conn = duckdb.connect(str(p), read_only=True)
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "sentinel_failover_history" not in tables:
+                conn.close()
+                return None, False
+            return conn, True
+    except Exception as exc:
+        logger.debug("sentinel_duckdb_baglanti_hatasi", hata=str(exc))
+        return None, False
+
+
 def _record_failover_event(master_name: str, event_type: str, detail: str = "") -> None:
     """Failover ve master değişim olayını DuckDB'ye kaydeder."""
-    if _duckdb_conn is None:
+    conn, should_close = _get_active_duckdb(writable=True)
+    if conn is None:
         return
     try:
-        _duckdb_conn.execute(
+        conn.execute(
             """
             INSERT INTO sentinel_failover_history (id, master_name, event_type, detail_json, occurred_at)
             VALUES (nextval('seq_sentinel_failovers'), ?, ?, ?, CURRENT_TIMESTAMP)
@@ -95,6 +150,9 @@ def _record_failover_event(master_name: str, event_type: str, detail: str = "") 
         )
     except Exception as exc:
         logger.debug("Sentinel failover kaydı hatası", hata=str(exc))
+    finally:
+        if should_close:
+            conn.close()
 
 
 def _get_ha_lock() -> asyncio.Lock:
@@ -160,7 +218,7 @@ async def get_ha_redis() -> Any:
                 await _ha_redis.ping()
                 return _ha_redis
             except Exception as exc:
-                logger.warn("Mevcut HA Redis bağlantısı koptu, yeniden bağlanılıyor", hata=str(exc))
+                logger.warning("Mevcut HA Redis bağlantısı koptu, yeniden bağlanılıyor", hata=str(exc))
                 _record_failover_event(get_sentinel_master(), "DISCONNECTED", str(exc))
                 _ha_redis = None
 
@@ -194,15 +252,15 @@ async def get_ha_redis() -> Any:
                 )
                 return _ha_redis
             except Exception as exc:
-                logger.warn("Redis Sentinel bağlantısı başarısız, doğrudan moda geçiliyor", hata=str(exc))
+                logger.warning("Redis Sentinel bağlantısı başarısız, doğrudan moda geçiliyor", hata=str(exc))
                 _record_failover_event(master_name, "SENTINEL_FALLBACK", str(exc))
 
         # 2. Doğrudan Redis Bağlantısı (Fallback)
         try:
             from services.core.config import settings
 
-            redis_url = getattr(settings, "redis_url", "redis://localhost:6379/0")
-            redis_host = getattr(settings, "redis_host", "localhost")
+            redis_url = getattr(settings, "redis_url", "redis://127.0.0.1:6379/0")
+            redis_host = getattr(settings, "redis_host", "127.0.0.1")
 
             if HAS_REDIS and aioredis is not None:
                 client = aioredis.from_url(
@@ -239,7 +297,7 @@ async def close_ha_redis() -> None:
                     await _ha_redis.close()
                 _record_failover_event(get_sentinel_master(), "CLOSED", "Manual close")
             except Exception as exc:
-                logger.warn("HA Redis kapatılırken hata oluştu", hata=str(exc))
+                logger.warning("HA Redis kapatılırken hata oluştu", hata=str(exc))
             finally:
                 _ha_redis = None
                 _ha_loop = None
@@ -279,18 +337,112 @@ def export_sentinel_status_to_polars() -> pl.DataFrame:
     return pl.DataFrame(records)
 
 
+def read_sentinel_failovers_from_duckdb(
+    db_path: str = DEFAULT_SENTINEL_DUCKDB_PATH,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB üzerindeki failover denetim geçmişini Polars DataFrame olarak okur."""
+    empty_schema = {
+        "id": pl.Int64,
+        "master_name": pl.String,
+        "event_type": pl.String,
+        "detail_json": pl.String,
+        "occurred_at": pl.Datetime,
+    }
+    if _duckdb_conn is not None:
+        try:
+            return _duckdb_conn.execute(
+                "SELECT * FROM sentinel_failover_history ORDER BY id DESC LIMIT ?",
+                [limit],
+            ).pl()
+        except Exception as e:
+            logger.error("read_sentinel_failovers_conn_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+
+    p = Path(db_path)
+    if not p.exists():
+        return pl.DataFrame(schema=empty_schema)
+
+    try:
+        conn = duckdb.connect(str(p), read_only=True)
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if "sentinel_failover_history" not in tables:
+            conn.close()
+            return pl.DataFrame(schema=empty_schema)
+        df = conn.execute(
+            "SELECT * FROM sentinel_failover_history ORDER BY id DESC LIMIT ?",
+            [limit],
+        ).pl()
+        conn.close()
+        return df
+    except Exception as e:
+        logger.error("read_sentinel_failovers_file_hatasi", hata=str(e))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_sentinel_failovers_duckdb(db_path: str = DEFAULT_SENTINEL_DUCKDB_PATH) -> bool:
+    """DuckDB üzerindeki failover geçmiş tablosunu temizler."""
+    if _duckdb_conn is not None:
+        try:
+            _duckdb_conn.execute("DELETE FROM sentinel_failover_history")
+            return True
+        except Exception as e:
+            logger.error("clear_sentinel_failovers_conn_hatasi", hata=str(e))
+            return False
+
+    p = Path(db_path)
+    if not p.exists():
+        return True
+    try:
+        conn = duckdb.connect(str(p))
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if "sentinel_failover_history" in tables:
+            conn.execute("DELETE FROM sentinel_failover_history")
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error("clear_sentinel_failovers_file_hatasi", hata=str(e))
+        return False
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Veriyi orjson ile güvenli bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
+
+
+def get_sentinel_status_dict() -> dict[str, Any]:
+    """Sentinel konfigürasyonunu ve bağlantı metriklerini sözlük olarak döndürür."""
+    hosts = get_sentinel_hosts()
+    master = get_sentinel_master()
+    return {
+        "master_name": master,
+        "sentinel_hosts_count": len(hosts),
+        "sentinel_hosts": hosts,
+        "is_connected": _ha_redis is not None,
+        "has_redis_pkg": HAS_REDIS,
+    }
+
+
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_MASTER_NAME",
     "DEFAULT_MAX_CONNECTIONS",
+    "DEFAULT_SENTINEL_DUCKDB_PATH",
     "DEFAULT_SENTINEL_PORT",
     "DEFAULT_SENTINEL_TIMEOUT",
     "DEFAULT_SOCKET_TIMEOUT",
+    "DEFAULT_WAL_SIZE",
     "HAS_REDIS",
+    "clear_sentinel_failovers_duckdb",
     "close_ha_redis",
+    "configure_duckdb_wal",
     "export_sentinel_status_to_polars",
     "get_ha_redis",
     "get_redis_password",
     "get_sentinel_hosts",
     "get_sentinel_master",
+    "get_sentinel_status_dict",
+    "read_sentinel_failovers_from_duckdb",
     "set_duckdb_connection",
+    "to_orjson_bytes",
 ]

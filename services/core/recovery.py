@@ -12,38 +12,39 @@ from __future__ import annotations
 import asyncio
 import threading
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
-
-import orjson
-import polars as pl
-import structlog
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import duckdb
+import duckdb
+import orjson
+import polars as pl
+import structlog
 
-try:
-    from services.core.otel import otel_trace
-except ImportError:
-    import functools
-
-    def otel_trace(name: str):
-        """Merkezi OTel tracer bulunamadığında kullanılan yerel fallback dekoratörü."""
-
-        def decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-
-            return wrapper
-
-        return decorator
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
 
 DEFAULT_MAX_MEMORY_EVENTS: Final[int] = 2000
 DEFAULT_MAX_SHUTDOWN_HANDLERS: Final[int] = 100
+DEFAULT_RECOVERY_DUCKDB_PATH: Final[str] = "data/recovery_events.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL boyutunu optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(e))
 
 
 class EventReplay:
@@ -112,7 +113,7 @@ class EventReplay:
 
             if self._duckdb_conn is not None:
                 try:
-                    payload = orjson.dumps(data).decode("utf-8")
+                    payload = orjson.dumps(data, default=str).decode("utf-8")
                     self._duckdb_conn.execute(
                         """
                         INSERT INTO recovery_event_log (id, event_type, payload_json, created_at)
@@ -122,6 +123,127 @@ class EventReplay:
                     )
                 except Exception as exc:
                     logger.error("DuckDB olay kaydetme hatası", event_type=event_type, hata=str(exc))
+            else:
+                self.save_event_to_duckdb(event_type, data, timestamp=ts_str)
+
+    def save_event_to_duckdb(
+        self,
+        event_type: str,
+        data: dict[str, Any],
+        timestamp: str | None = None,
+        db_path: str | None = None,
+    ) -> None:
+        """Olayı dosya tabanlı DuckDB günlüğüne yazar."""
+        target_path = db_path or DEFAULT_RECOVERY_DUCKDB_PATH
+        path_obj = Path(target_path)
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        ts_str = timestamp or datetime.now(UTC).isoformat()
+        payload = orjson.dumps(data, default=str).decode("utf-8")
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            configure_duckdb_wal(conn)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS recovery_event_log (
+                    event_type VARCHAR,
+                    payload_json VARCHAR,
+                    created_at VARCHAR,
+                    logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO recovery_event_log (event_type, payload_json, created_at) VALUES (?, ?, ?)",
+                [event_type, payload, ts_str],
+            )
+        except Exception as exc:
+            logger.error("DuckDB olay dosya kaydetme hatasi", event_type=event_type, hata=str(exc))
+        finally:
+            conn.close()
+
+    def read_events_from_duckdb(
+        self,
+        db_path: str | None = None,
+        event_type: str | None = None,
+    ) -> pl.DataFrame:
+        """DuckDB'de kayıtlı olayları Polars DataFrame olarak okur."""
+        target_path = db_path or DEFAULT_RECOVERY_DUCKDB_PATH
+        path_obj = Path(target_path)
+        empty_schema = {
+            "event_type": pl.String,
+            "payload_json": pl.String,
+            "created_at": pl.String,
+            "logged_at": pl.Datetime,
+        }
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+        conn = duckdb.connect(str(path_obj), read_only=True)
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "recovery_event_log" not in tables:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = "SELECT event_type, payload_json, created_at, logged_at FROM recovery_event_log "
+            params: list[Any] = []
+            if event_type:
+                query += "WHERE event_type = ? "
+                params.append(event_type.strip())
+            query += "ORDER BY created_at ASC"
+
+            return conn.execute(query, params).pl()
+        except Exception as e:
+            logger.error("recovery_duckdb_okuma_hatasi", hata=str(e))
+            return pl.DataFrame(schema=empty_schema)
+        finally:
+            conn.close()
+
+    def clear_events_duckdb(self, db_path: str | None = None) -> bool:
+        """DuckDB tablosundaki olay kayıtlarını temizler."""
+        target_path = db_path or DEFAULT_RECOVERY_DUCKDB_PATH
+        path_obj = Path(target_path)
+        if not path_obj.exists():
+            return True
+
+        conn = duckdb.connect(str(path_obj))
+        try:
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "recovery_event_log" in tables:
+                conn.execute("DELETE FROM recovery_event_log")
+            logger.info("recovery_event_log_temizlendi", db_path=str(path_obj))
+            return True
+        except Exception as e:
+            logger.error("recovery_event_log_temizleme_hatasi", hata=str(e))
+            return False
+        finally:
+            conn.close()
+
+    def replay_from_duckdb(
+        self,
+        from_timestamp: str,
+        handler: Callable[[dict[str, Any]], Any],
+        db_path: str | None = None,
+    ) -> int:
+        """DuckDB'de saklanan olayları belirtilen zamandan itibaren replay eder."""
+        df = self.read_events_from_duckdb(db_path=db_path)
+        if df.is_empty():
+            return 0
+        filtered = df.filter(pl.col("created_at") >= from_timestamp)
+        count = 0
+        for row in filtered.iter_rows(named=True):
+            try:
+                data = orjson.loads(row["payload_json"])
+                event = {
+                    "event_type": row["event_type"],
+                    "data": data,
+                    "timestamp": row["created_at"],
+                }
+                handler(event)
+                count += 1
+            except Exception as exc:
+                logger.error("DuckDB replay isleyici hatasi", event_type=row["event_type"], hata=str(exc))
+        return count
 
     @otel_trace("recovery.replay_from")
     def replay_from(self, from_timestamp: str, handler: Callable[[dict[str, Any]], Any]) -> int:
@@ -165,6 +287,11 @@ class EventReplay:
         """Bellekteki olay sayısını döndürür."""
         with self._lock:
             return len(self._event_log)
+
+    def get_events(self) -> list[dict[str, Any]]:
+        """Bellekteki olay günlüğünün kopyasını döndürür."""
+        with self._lock:
+            return list(self._event_log)
 
     def export_events_to_polars(self) -> pl.DataFrame:
         """Bellekteki olay günlüğünü Polars DataFrame formatına dönüştürür."""
@@ -358,7 +485,7 @@ class StartupRecovery:
     def to_orjson_bytes(self) -> bytes:
         """Son kurtarma sonucunu orjson bayt dizisine serileştirir."""
         with self._lock:
-            return orjson.dumps(self._last_recovery_result)
+            return orjson.dumps(self._last_recovery_result, default=str)
 
     def export_steps_to_polars(self) -> pl.DataFrame:
         """Son kurtarma adımlarını Polars DataFrame olarak dışa aktarır."""
@@ -386,7 +513,7 @@ class FailureInjector:
         key = f"{component}:{failure_type}"
         with self._lock:
             self._active_failures[key] = True
-        logger.warn("Test amaçlı hata enjekte edildi", bilesen=component, tip=failure_type)
+        logger.warning("Test amaçlı hata enjekte edildi", bilesen=component, tip=failure_type)
 
     @otel_trace("recovery.clear")
     def clear(self, component: str, failure_type: str = "down") -> None:
@@ -416,6 +543,75 @@ class FailureInjector:
             return dict(self._active_failures)
 
 
+def read_recovery_events_from_duckdb(
+    db_path: str = DEFAULT_RECOVERY_DUCKDB_PATH,
+    event_type: str | None = None,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Modül seviyesinde DuckDB recovery olay günlüğünü Polars DataFrame olarak okur."""
+    path_obj = Path(db_path)
+    empty_schema = {
+        "event_type": pl.String,
+        "payload_json": pl.String,
+        "created_at": pl.String,
+        "logged_at": pl.Datetime,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=empty_schema)
+    conn = duckdb.connect(str(path_obj), read_only=True)
+    try:
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if "recovery_event_log" not in tables:
+            return pl.DataFrame(schema=empty_schema)
+        query = "SELECT event_type, payload_json, created_at, logged_at FROM recovery_event_log "
+        params: list[Any] = []
+        if event_type:
+            query += "WHERE event_type = ? "
+            params.append(event_type.strip())
+        query += "ORDER BY created_at ASC LIMIT ?"
+        params.append(limit)
+        return conn.execute(query, params).pl()
+    except Exception as e:
+        logger.error("read_recovery_events_from_duckdb_hatasi", hata=str(e))
+        return pl.DataFrame(schema=empty_schema)
+    finally:
+        conn.close()
+
+
+def clear_recovery_events_duckdb(db_path: str = DEFAULT_RECOVERY_DUCKDB_PATH) -> bool:
+    """Modül seviyesinde DuckDB recovery olay günlüğü tablosunu temizler."""
+    return event_replay.clear_events_duckdb(db_path=db_path)
+
+
+def export_recovery_events_to_polars(events: list[dict[str, Any]]) -> pl.DataFrame:
+    """Olay listesini Polars DataFrame'e dönüştürür."""
+    if not events:
+        return pl.DataFrame(
+            schema={
+                "event_type": pl.String,
+                "data": pl.String,
+                "timestamp": pl.String,
+            }
+        )
+    normalized = []
+    for ev in events:
+        normalized.append(
+            {
+                "event_type": str(ev.get("event_type", "")),
+                "data": orjson.dumps(ev.get("data", {}), default=str).decode("utf-8")
+                if not isinstance(ev.get("data"), str)
+                else ev.get("data"),
+                "timestamp": str(ev.get("timestamp", "")),
+            }
+        )
+    return pl.DataFrame(normalized)
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Veriyi orjson ile güvenli bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
+
+
 # Global Singletons
 event_replay = EventReplay()
 graceful_shutdown = GracefulShutdown()
@@ -423,14 +619,22 @@ startup_recovery = StartupRecovery()
 failure_injector = FailureInjector()
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_MAX_MEMORY_EVENTS",
     "DEFAULT_MAX_SHUTDOWN_HANDLERS",
+    "DEFAULT_RECOVERY_DUCKDB_PATH",
+    "DEFAULT_WAL_SIZE",
     "EventReplay",
     "FailureInjector",
     "GracefulShutdown",
     "StartupRecovery",
+    "clear_recovery_events_duckdb",
+    "configure_duckdb_wal",
     "event_replay",
+    "export_recovery_events_to_polars",
     "failure_injector",
     "graceful_shutdown",
+    "read_recovery_events_from_duckdb",
     "startup_recovery",
+    "to_orjson_bytes",
 ]

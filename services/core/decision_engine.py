@@ -38,7 +38,6 @@ import structlog
 
 from services.core.bist_tick_size import round_to_bist_tick
 from services.core.canonical_scoring import CanonicalScore
-from services.core.duckdb_store import configure_duckdb_wal
 from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
@@ -48,6 +47,35 @@ DEFAULT_MIN_SCORE: Final[float] = 60.0
 DEFAULT_MIN_CONFIDENCE: Final[float] = 0.65
 DEFAULT_STOP_FALLBACK_PCT: Final[float] = 6.5  # BIST ortalaması için makul stop yüzdesi
 DEFAULT_DECISION_DB_PATH: Final[str] = "data/decision_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 class Action(StrEnum):
@@ -145,6 +173,23 @@ class DecisionInput:
         self.portfolio_drawdown = _safe_float(self.portfolio_drawdown, 0.0)
         self.avg_volume = _safe_float(self.avg_volume, 0.0)
         self.spread_pct = _safe_float(self.spread_pct, 0.0)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Girdi parametrelerini sözlük olarak döner."""
+        return {
+            "ticker": self.ticker,
+            "price": self.price,
+            "regime": self.regime,
+            "ml_score": self.ml_score,
+            "ml_confidence": self.ml_confidence,
+            "atr": self.atr,
+            "atr_pct": self.atr_pct,
+            "allow_short": self.allow_short,
+        }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Girdi parametrelerini ikili orjson formatına dönüştürür."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Nesnenin okunabilir hata ayıklama temsili."""
@@ -1037,6 +1082,24 @@ class DecisionEngine:
                 logger.error("decision_history_polars_hatasi", error=str(exc))
                 return pl.DataFrame(schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Karar motoru durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "min_score": self._min_score,
+                "min_confidence": self._min_confidence,
+                "db_path": self._db_path,
+                "conn_active": self._conn is not None,
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Karar motoru durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str | None = None) -> None:
+        """Kalıcı DuckDB karar denetim tablosunu sıfırlar."""
+        clear_decision_audit_duckdb(db_path=db_path or self._db_path)
+
     def __enter__(self) -> DecisionEngine:
         """Context manager giriş protokolü."""
         return self
@@ -1138,12 +1201,112 @@ def query_decision_audit_duckdb(
     return decision_engine.export_decisions_to_polars(ticker=ticker, action=action, limit=limit)
 
 
+def read_decision_audit_from_duckdb(
+    db_path: str = DEFAULT_DECISION_DB_PATH,
+    ticker: str | None = None,
+    action: Action | str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan karar günlüğünü doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        ticker: İsteğe bağlı hisse filtresi.
+        action: İsteğe bağlı aksiyon filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan karar kayıtları.
+    """
+    path_obj = Path(db_path)
+    empty_schema = {
+        "id": pl.Int64,
+        "timestamp": pl.Datetime("us", "UTC"),
+        "ticker": pl.Utf8,
+        "action": pl.Utf8,
+        "direction": pl.Utf8,
+        "confidence": pl.Float64,
+        "score": pl.Float64,
+        "target_price": pl.Float64,
+        "stop_price": pl.Float64,
+        "expected_return": pl.Float64,
+        "conviction": pl.Utf8,
+        "reasons_json": pl.Utf8,
+        "risks_json": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=empty_schema)
+
+    if (
+        decision_engine._conn is not None
+        and Path(decision_engine._db_path).resolve() == path_obj.resolve()
+    ):
+        return decision_engine.export_decisions_to_polars(ticker=ticker, action=action, limit=limit)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'decision_audit_log'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = """
+                SELECT id, timestamp, ticker, action, direction, confidence,
+                       score, target_price, stop_price, expected_return,
+                       conviction, reasons_json, risks_json
+                FROM decision_audit_log
+            """
+            conditions: list[str] = []
+            params: list[Any] = []
+
+            if ticker:
+                conditions.append("ticker = ?")
+                params.append(str(ticker).upper().strip())
+            if action is not None:
+                act_val = action.value if isinstance(action, Action) else str(action)
+                conditions.append("action = ?")
+                params.append(act_val)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY id DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_decision_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_decision_audit_duckdb(db_path: str = DEFAULT_DECISION_DB_PATH) -> None:
+    """DuckDB'deki karar denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS decision_audit_log;")
+            conn.execute("DROP SEQUENCE IF EXISTS seq_decision_audit_id;")
+    except Exception as exc:
+        logger.error("duckdb_decision_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Sabitler
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_DECISION_DB_PATH",
     "DEFAULT_MIN_CONFIDENCE",
     "DEFAULT_MIN_SCORE",
     "DEFAULT_STOP_FALLBACK_PCT",
+    "DEFAULT_WAL_SIZE",
     # Modeller ve Enumlar
     "Action",
     "Decision",
@@ -1152,9 +1315,13 @@ __all__: Final[list[str]] = [
     # Singleton
     "decision_engine",
     # Kolaylık Fonksiyonları
+    "clear_decision_audit_duckdb",
+    "configure_duckdb_wal",
     "decide_trade",
     "export_decisions_to_polars",
     "get_decision_engine",
     "make_trading_decision",
     "query_decision_audit_duckdb",
+    "read_decision_audit_from_duckdb",
+    "to_orjson_bytes",
 ]

@@ -45,6 +45,35 @@ DEFAULT_BSMV_RATE: Final[float] = 0.05  # %5.0 (Komisyon üzerinden BSMV)
 DEFAULT_MIN_COMMISSION: Final[float] = 1.0  # Minimum 1.00 TL işlem komisyonu
 
 DEFAULT_FEE_DB_PATH: Final[str] = "data/fee_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 VALID_SIDES: Final[frozenset[str]] = frozenset({"BUY", "SELL", "UNKNOWN"})
 VALID_INSTRUMENT_TYPES: Final[frozenset[str]] = frozenset({"equity", "viop", "warrant"})
@@ -662,6 +691,7 @@ class FeeCalculator:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS fee_audit_log (
@@ -733,7 +763,14 @@ class FeeCalculator:
 
         with self._lock:
             try:
-                with duckdb.connect(str(target_file), read_only=True) as conn:
+                with duckdb.connect(str(target_file)) as conn:
+                    configure_duckdb_wal(conn)
+                    table_check = conn.execute(
+                        "SELECT count(*) FROM information_schema.tables WHERE table_name = 'fee_audit_log'"
+                    ).fetchone()
+                    if not table_check or table_check[0] == 0:
+                        return pl.DataFrame(schema=empty_schema)
+
                     query = """
                         SELECT id, created_at, amount, broker_fee, bist_fee, mkk_fee,
                                bsmv, total, effective_rate, side, instrument_type,
@@ -760,13 +797,34 @@ class FeeCalculator:
                 logger.error("fee_audit_sorgulama_hatasi", error=str(exc))
                 return pl.DataFrame(schema=empty_schema)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Hesaplayıcı durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "broker_rate": self.broker_rate,
+                "bist_fee_rate": self.bist_fee_rate,
+                "viop_fee_rate": self.viop_fee_rate,
+                "mkk_fee_rate": self.mkk_fee_rate,
+                "bsmv_rate": self.bsmv_rate,
+                "min_commission": self.min_commission,
+                "tiered_rates_count": len(self._tiered_rates),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Hesaplayıcı durumunu ikili orjson formatına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_FEE_DB_PATH) -> None:
+        """DuckDB maliyet denetim tablosunu sıfırlar."""
+        clear_fee_audit_duckdb(db_path=db_path)
+
     def __enter__(self) -> FeeCalculator:
         """Context manager giriş protokolü."""
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager çıkış protokolü."""
-        pass
+        return None
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -943,15 +1001,107 @@ def query_fee_audit_duckdb(
     )
 
 
+def read_fee_audit_from_duckdb(
+    db_path: str = DEFAULT_FEE_DB_PATH,
+    side: str | None = None,
+    instrument_type: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan işlem maliyeti denetim izini doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        side: İsteğe bağlı işlem yönü filtresi.
+        instrument_type: İsteğe bağlı enstrüman filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan maliyet kayıtları.
+    """
+    path_obj = Path(db_path)
+    empty_schema = {
+        "id": pl.Utf8,
+        "created_at": pl.Datetime("us", "UTC"),
+        "amount": pl.Float64,
+        "broker_fee": pl.Float64,
+        "bist_fee": pl.Float64,
+        "mkk_fee": pl.Float64,
+        "bsmv": pl.Float64,
+        "total": pl.Float64,
+        "effective_rate": pl.Float64,
+        "side": pl.Utf8,
+        "instrument_type": pl.Utf8,
+        "net_amount": pl.Float64,
+        "metadata_json": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=empty_schema)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'fee_audit_log'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = """
+                SELECT id, created_at, amount, broker_fee, bist_fee, mkk_fee,
+                       bsmv, total, effective_rate, side, instrument_type,
+                       net_amount, metadata_json
+                FROM fee_audit_log
+            """
+            conditions: list[str] = []
+            params: list[Any] = []
+
+            if side:
+                conditions.append("side = ?")
+                params.append(str(side).upper().strip())
+            if instrument_type:
+                conditions.append("instrument_type = ?")
+                params.append(str(instrument_type).lower().strip())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_fee_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_fee_audit_duckdb(db_path: str = DEFAULT_FEE_DB_PATH) -> None:
+    """DuckDB'deki maliyet denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS fee_audit_log;")
+    except Exception as exc:
+        logger.error("duckdb_fee_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Sabitler
     "DEFAULT_BIST_FEE_RATE",
     "DEFAULT_BROKER_RATE",
     "DEFAULT_BSMV_RATE",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_FEE_DB_PATH",
     "DEFAULT_MIN_COMMISSION",
     "DEFAULT_MKK_FEE_RATE",
     "DEFAULT_VIOP_FEE_RATE",
+    "DEFAULT_WAL_SIZE",
     "VALID_INSTRUMENT_TYPES",
     "VALID_SIDES",
     # Modeller
@@ -966,9 +1116,13 @@ __all__: Final[list[str]] = [
     "calculate_fee_polars",
     "calculate_net_cash_flow",
     "calculate_polars",
+    "clear_fee_audit_duckdb",
+    "configure_duckdb_wal",
     "export_breakdowns_to_polars",
     "export_fees_to_duckdb",
     "export_fees_to_polars",
     "get_fee_calculator",
     "query_fee_audit_duckdb",
+    "read_fee_audit_from_duckdb",
+    "to_orjson_bytes",
 ]

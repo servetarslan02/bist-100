@@ -9,30 +9,45 @@ Bu modül, Borsa İstanbul Pay Piyasası Takas ve Saklama esaslarına uygun olar
 - DuckDB üzerinde takas hesaplama denetim geçmişi arşivi ve orjson desteği sağlar.
 """
 
-from __future__ import annotations
-
+import contextlib
 import threading
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Final
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
 
 from services.core.otel import otel_trace
 
-if TYPE_CHECKING:
-    import duckdb
-
 logger = structlog.get_logger(__name__)
 
 DEFAULT_NORMAL_SETTLEMENT_DAYS: Final[int] = 2  # T+2
 DEFAULT_GROSS_SETTLEMENT_DAYS: Final[int] = 0  # T+0
 DEFAULT_SETTLEMENT_DB: Final[str] = "data/settlement_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 _GLOBAL_LOCK = threading.RLock()
 _SETTLEMENT_DUCKDB_CONN: duckdb.DuckDBPyConnection | None = None
+_SETTLEMENT_DUCKDB_PATH: str = DEFAULT_SETTLEMENT_DB
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint yapılandırmasını uygular."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("Settlement DuckDB WAL pragma yapılandırma uyarısı", hata=str(exc))
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Herhangi bir Python nesnesini güvenli ve hızlı şekilde orjson bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
 
 
 @dataclass(slots=True)
@@ -55,7 +70,7 @@ class SettlementInfo:
 
     def to_orjson_bytes(self) -> bytes:
         """orjson bayt dizisine serileştirir."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         takas_tipi = "Brüt Takas (T+0)" if self.is_gross else f"Normal (T+{self.settlement_days})"
@@ -70,37 +85,61 @@ def set_settlement_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     global _SETTLEMENT_DUCKDB_CONN
     with _GLOBAL_LOCK:
         _SETTLEMENT_DUCKDB_CONN = conn
-        _init_settlement_duckdb_schema()
+        _init_settlement_duckdb_schema_conn(_SETTLEMENT_DUCKDB_CONN)
 
 
-def _init_settlement_duckdb_schema() -> None:
-    """DuckDB takas denetim şemasını ilklendirir."""
-    if _SETTLEMENT_DUCKDB_CONN is None:
-        return
+def set_settlement_duckdb_path(path: str) -> None:
+    """Takas denetim arşivi DuckDB dosya yolunu tanımlar."""
+    global _SETTLEMENT_DUCKDB_PATH
     with _GLOBAL_LOCK:
-        try:
-            _SETTLEMENT_DUCKDB_CONN.execute("""
-                CREATE TABLE IF NOT EXISTS settlement_audit_log (
-                    id BIGINT,
-                    trade_date DATE,
-                    settlement_date DATE,
-                    settlement_days INTEGER,
-                    is_gross BOOLEAN,
-                    calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE SEQUENCE IF NOT EXISTS seq_settlement_audit_log START 1;
-            """)
-        except Exception as exc:
-            logger.error("Settlement DuckDB şema oluşturma hatası", hata=str(exc))
+        _SETTLEMENT_DUCKDB_PATH = path
+
+
+def _init_settlement_duckdb_schema_conn(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB takas denetim şemasını belirtilen bağlantıda ilklendirir."""
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settlement_audit_log (
+                id BIGINT,
+                trade_date DATE,
+                settlement_date DATE,
+                settlement_days INTEGER,
+                is_gross BOOLEAN,
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE SEQUENCE IF NOT EXISTS seq_settlement_audit_log START 1;
+        """)
+    except Exception as exc:
+        logger.error("Settlement DuckDB şema oluşturma hatası", hata=str(exc))
+
+
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının geçici olup olmadığını döner."""
+    global _SETTLEMENT_DUCKDB_CONN, _SETTLEMENT_DUCKDB_PATH
+    if _SETTLEMENT_DUCKDB_CONN is not None:
+        return _SETTLEMENT_DUCKDB_CONN, False
+    try:
+        p = Path(_SETTLEMENT_DUCKDB_PATH)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        read_only = not writable
+        conn = duckdb.connect(str(p), read_only=read_only)
+        if writable:
+            configure_duckdb_wal(conn)
+            _init_settlement_duckdb_schema_conn(conn)
+        return conn, True
+    except Exception as exc:
+        logger.debug("Settlement DuckDB dosya bağlantı hatası", yol=_SETTLEMENT_DUCKDB_PATH, hata=str(exc))
+        return None, False
 
 
 def _record_settlement_audit(info: SettlementInfo) -> None:
     """Takas hesaplama kaydını DuckDB denetim tablosuna yazar."""
-    if _SETTLEMENT_DUCKDB_CONN is None:
-        return
     with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
         try:
-            _SETTLEMENT_DUCKDB_CONN.execute(
+            conn.execute(
                 """
                 INSERT INTO settlement_audit_log (
                     id, trade_date, settlement_date, settlement_days, is_gross, calculated_at
@@ -118,6 +157,10 @@ def _record_settlement_audit(info: SettlementInfo) -> None:
             )
         except Exception as exc:
             logger.debug("Settlement DuckDB denetim yazma hatası", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 class SettlementCalculator:
@@ -270,6 +313,18 @@ class SettlementCalculator:
 
             return pl.Series(name="settlement_date", values=results, dtype=pl.Date)
 
+    def export_settlement_audit_to_polars(self) -> pl.DataFrame:
+        """DuckDB'de saklanan takas hesaplama kayıtlarını Polars DataFrame olarak döner."""
+        return self.read_audit_from_duckdb()
+
+    def read_audit_from_duckdb(self, limit: int = 1000) -> pl.DataFrame:
+        """DuckDB'de saklanan takas hesaplama kayıtlarını okur."""
+        return read_settlement_audit_from_duckdb(limit=limit)
+
+    def clear_audit_duckdb(self) -> None:
+        """DuckDB üzerindeki takas hesaplama kayıtlarını temizler."""
+        clear_settlement_audit_duckdb()
+
     def __repr__(self) -> str:
         with self._lock:
             return (
@@ -284,33 +339,72 @@ settlement_calculator: Final[SettlementCalculator] = SettlementCalculator()
 
 def export_settlement_audit_to_polars() -> pl.DataFrame:
     """DuckDB'de saklanan takas hesaplama kayıtlarını Polars DataFrame olarak döner."""
-    if _SETTLEMENT_DUCKDB_CONN is None:
-        return pl.DataFrame(
-            schema={
-                "id": pl.Int64,
-                "trade_date": pl.Date,
-                "settlement_date": pl.Date,
-                "settlement_days": pl.Int64,
-                "is_gross": pl.Boolean,
-                "calculated_at": pl.Datetime,
-            }
-        )
+    return settlement_calculator.export_settlement_audit_to_polars()
 
+
+def read_settlement_audit_from_duckdb(
+    duckdb_path: str = DEFAULT_SETTLEMENT_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """Doğrudan DuckDB dosyasından veya aktif bağlantıdan takas denetim kayıtlarını okur."""
+    empty_df = pl.DataFrame(
+        schema={
+            "id": pl.Int64,
+            "trade_date": pl.Date,
+            "settlement_date": pl.Date,
+            "settlement_days": pl.Int64,
+            "is_gross": pl.Boolean,
+            "calculated_at": pl.Datetime,
+        }
+    )
     with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=False)
+        if conn is None:
+            return empty_df
         try:
-            return _SETTLEMENT_DUCKDB_CONN.execute("SELECT * FROM settlement_audit_log ORDER BY id ASC").pl()
+            query = f"SELECT * FROM settlement_audit_log ORDER BY id ASC LIMIT {int(limit)}"
+            return conn.execute(query).pl()
         except Exception as exc:
             logger.error("DuckDB takas denetim kayıtları çekilemedi", hata=str(exc))
-            return pl.DataFrame()
+            return empty_df
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
+
+
+def clear_settlement_audit_duckdb(
+    duckdb_path: str = DEFAULT_SETTLEMENT_DB,
+) -> None:
+    """Takas denetim tablosunu temizler."""
+    with _GLOBAL_LOCK:
+        conn, should_close = _get_active_duckdb(writable=True)
+        if conn is None:
+            return
+        try:
+            conn.execute("DELETE FROM settlement_audit_log;")
+        except Exception as exc:
+            logger.error("DuckDB takas denetim kayıtları temizlenemedi", hata=str(exc))
+        finally:
+            if should_close:
+                with contextlib.suppress(Exception):
+                    conn.close()
 
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_GROSS_SETTLEMENT_DAYS",
     "DEFAULT_NORMAL_SETTLEMENT_DAYS",
     "DEFAULT_SETTLEMENT_DB",
+    "DEFAULT_WAL_SIZE",
     "SettlementCalculator",
     "SettlementInfo",
+    "clear_settlement_audit_duckdb",
+    "configure_duckdb_wal",
     "export_settlement_audit_to_polars",
+    "read_settlement_audit_from_duckdb",
     "set_settlement_duckdb_connection",
+    "set_settlement_duckdb_path",
     "settlement_calculator",
+    "to_orjson_bytes",
 ]

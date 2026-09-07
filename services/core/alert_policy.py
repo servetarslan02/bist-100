@@ -12,6 +12,7 @@ Kurumsal operasyonlar için tasarlanmış alarm yönetim ve eskalasyon politikas
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import copy
 import os
 import threading
@@ -20,19 +21,39 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Final
 
-if TYPE_CHECKING:
-    import polars as pl
-
+import duckdb
 import httpx
 import orjson
+import polars as pl
 import structlog
 from opentelemetry import metrics, trace
+
+DEFAULT_ALERT_POLICY_AUDIT_DB: Final[str] = "data/alert_policy_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer("alpha-bist.alert_policy")
 meter = metrics.get_meter("alpha-bist.alert_policy")
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli byte dizisine serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
+
 
 _policy_updates = meter.create_counter(
     "alpha.alert_policy.updates.total",
@@ -113,6 +134,10 @@ class PolicyDiff:
             "new_values": self.new_values,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
     def summary(self) -> str:
         """İnsan tarafından okunabilir fark özeti üretir.
 
@@ -161,6 +186,10 @@ class PolicyAuditEntry:
         if self.diff:
             result["diff"] = self.diff
         return result
+
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
 
 # =====================================================
@@ -233,6 +262,10 @@ class SilenceRule:
             "is_active": self.is_active,
             "is_expired": self.is_expired,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     @staticmethod
     def _ts_iso(ts: float) -> str:
@@ -1085,8 +1118,6 @@ class AlertPolicy:
         Returns:
             pl.DataFrame: Polars DataFrame nesnesi.
         """
-        import polars as pl
-
         with self._lock:
             data = [e.to_dict() for e in self._audit_log[-limit:]]
         if not data:
@@ -1156,6 +1187,10 @@ class AlertPolicy:
             "severity_thresholds": self.severity_thresholds,
         }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Modeli orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
+
     @classmethod
     def _from_dict(cls, data: dict[str, Any], config_path: str = "") -> AlertPolicy:
         """Sözlük verisinden AlertPolicy örneği inşa eder."""
@@ -1169,6 +1204,104 @@ class AlertPolicy:
         if "severity_thresholds" in data:
             policy.severity_thresholds = data["severity_thresholds"]
         return policy
+
+
+def export_audit_log_to_duckdb(
+    policy: AlertPolicy,
+    db_path: str = DEFAULT_ALERT_POLICY_AUDIT_DB,
+) -> int:
+    """AlertPolicy denetim günlüğünü DuckDB tablosuna kaydeder.
+
+    Args:
+        policy: AlertPolicy nesnesi.
+        db_path: DuckDB dosya yolu.
+
+    Returns:
+        Kaydedilen kayıt sayısı.
+    """
+    df = policy.export_audit_log_to_polars()
+    if df.height == 0:
+        return 0
+
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with duckdb.connect(db_path) as conn:
+        configure_duckdb_wal(conn)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS alert_policy_audit (
+                timestamp DOUBLE,
+                timestamp_iso VARCHAR,
+                action VARCHAR,
+                version BIGINT,
+                actor VARCHAR,
+                details_json VARCHAR,
+                diff_json VARCHAR,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Polars -> DuckDB insert
+        rows: list[dict[str, Any]] = []
+        for d in df.to_dicts():
+            rows.append({
+                "timestamp": float(d.get("timestamp") or 0.0),
+                "timestamp_iso": str(d.get("timestamp_iso") or ""),
+                "action": str(d.get("action") or ""),
+                "version": int(d.get("version") or 0),
+                "actor": str(d.get("actor") or ""),
+                "details_json": orjson.dumps(d.get("details") or {}, default=str).decode("utf-8"),
+                "diff_json": orjson.dumps(d.get("diff") or {}, default=str).decode("utf-8") if d.get("diff") else "",
+            })
+        if rows:
+            pl_rows = pl.DataFrame(rows)
+            conn.register("df_audit_view", pl_rows.to_arrow())
+            try:
+                conn.execute("""
+                    INSERT INTO alert_policy_audit
+                    (timestamp, timestamp_iso, action, version, actor, details_json, diff_json)
+                    SELECT timestamp, timestamp_iso, action, version, actor, details_json, diff_json
+                    FROM df_audit_view
+                """)
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_audit_view")
+    return df.height
+
+
+def read_alert_policy_audit_from_duckdb(
+    db_path: str = DEFAULT_ALERT_POLICY_AUDIT_DB,
+    limit: int = 1000,
+) -> pl.DataFrame:
+    """DuckDB dosyasından doğrudan alert policy denetim kayıtlarını Polars DataFrame olarak okur."""
+    try:
+        conn = duckdb.connect(db_path)
+        try:
+            return conn.execute(
+                """
+                SELECT timestamp, timestamp_iso, action, version, actor, details_json, diff_json, recorded_at
+                FROM alert_policy_audit
+                ORDER BY recorded_at DESC
+                LIMIT ?
+                """,
+                [limit],
+            ).pl()
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.error("DuckDB dosyasindan alert policy audit okunamadi", hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_alert_policy_audit_duckdb(db_path: str = DEFAULT_ALERT_POLICY_AUDIT_DB) -> None:
+    """DuckDB alert policy audit tablosunu sıfırlar."""
+    target = Path(db_path)
+    if not target.exists():
+        return
+    try:
+        with duckdb.connect(db_path) as conn:
+            conn.execute("DROP TABLE IF EXISTS alert_policy_audit")
+    except Exception as exc:
+        logger.warning("DuckDB alert policy audit tablosu temizlenemedi", hata=str(exc))
 
 
 def ensure_default_config(path: str | None = None) -> None:
@@ -1191,7 +1324,10 @@ def ensure_default_config(path: str | None = None) -> None:
 
 
 __all__ = [
+    "DEFAULT_ALERT_POLICY_AUDIT_DB",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_POLICY_PATH",
+    "DEFAULT_WAL_SIZE",
     "FALLBACK_ESCALATION_TIMEOUT_S",
     "FALLBACK_NOTIFICATION_ROUTING",
     "FALLBACK_SEVERITY_THRESHOLDS",
@@ -1203,6 +1339,11 @@ __all__ = [
     "PolicyDiff",
     "SilenceRule",
     "VersionConflictError",
+    "clear_alert_policy_audit_duckdb",
+    "configure_duckdb_wal",
     "ensure_default_config",
+    "export_audit_log_to_duckdb",
+    "read_alert_policy_audit_from_duckdb",
+    "to_orjson_bytes",
 ]
 

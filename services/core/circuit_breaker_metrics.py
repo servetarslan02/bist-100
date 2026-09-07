@@ -37,6 +37,35 @@ logger = structlog.get_logger(__name__)
 DEFAULT_MAX_HISTORY: Final[int] = 1000
 DEFAULT_HISTORY_LIMIT: Final[int] = 50
 DEFAULT_METRICS_HISTORY_DB_PATH: Final[str] = "data/circuit_breaker_history.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 @dataclass(slots=True)
@@ -95,6 +124,10 @@ class CircuitBreakerSnapshot:
             "total_successes": self.total_successes,
             "uptime_pct": round(min(100.0, max(0.0, safe_uptime)), 2),
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Snapshot verilerini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Snapshot için bilgilendirici metin temsili."""
@@ -419,6 +452,7 @@ class CircuitBreakerMetricsCollector:
         path_obj.parent.mkdir(parents=True, exist_ok=True)
 
         with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS circuit_breaker_history (
@@ -499,6 +533,18 @@ class CircuitBreakerMetricsCollector:
             self._tracked_breakers.clear()
             self._history.clear()
 
+    def to_dict(self) -> dict[str, Any]:
+        """Tüm devre kesicilerin metrik özetini sözlük olarak döner."""
+        return self.export_json()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Metrik özetini orjson bayt dizisine dönüştürür."""
+        return self.export_orjson_bytes()
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_METRICS_HISTORY_DB_PATH) -> None:
+        """Durum geçiş geçmişi DuckDB tablosunu sıfırlar."""
+        clear_circuit_breaker_history_duckdb(db_path=db_path)
+
     def __repr__(self) -> str:
         """Toplayıcının okunabilir dize temsilini döner."""
         with self._lock:
@@ -508,6 +554,90 @@ class CircuitBreakerMetricsCollector:
             f"CircuitBreakerMetricsCollector(tracked_breakers={count}, "
             f"history_events={history_len}/{self._max_history})"
         )
+
+
+def read_circuit_breaker_history_from_duckdb(
+    db_path: str = DEFAULT_METRICS_HISTORY_DB_PATH,
+    name: str | None = None,
+    limit: int | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan devre kesici durum geçmişini Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        name: İsteğe bağlı devre kesici adı filtresi.
+        limit: Dönecek maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan geçmiş kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "timestamp": pl.Utf8,
+                "name": pl.Utf8,
+                "old_state": pl.Utf8,
+                "new_state": pl.Utf8,
+            }
+        )
+
+    try:
+        with duckdb.connect(str(path_obj), read_only=True) as conn:
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'circuit_breaker_history'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "timestamp": pl.Utf8,
+                        "name": pl.Utf8,
+                        "old_state": pl.Utf8,
+                        "new_state": pl.Utf8,
+                    }
+                )
+
+            query = "SELECT * FROM circuit_breaker_history"
+            clauses: list[str] = []
+            params: list[Any] = []
+            if name:
+                clauses.append("name = ?")
+                params.append(name)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY timestamp DESC"
+            if limit and limit > 0:
+                query += f" LIMIT {int(limit)}"
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_cb_history_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "timestamp": pl.Utf8,
+                "name": pl.Utf8,
+                "old_state": pl.Utf8,
+                "new_state": pl.Utf8,
+            }
+        )
+
+
+def clear_circuit_breaker_history_duckdb(db_path: str = DEFAULT_METRICS_HISTORY_DB_PATH) -> None:
+    """DuckDB'de depolanan devre kesici durum geçmişi tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS circuit_breaker_history;")
+    except Exception as exc:
+        logger.error("duckdb_cb_history_temizleme_hatasi", db_path=db_path, hata=str(exc))
 
 
 # Global Singleton Örneği
@@ -528,6 +658,11 @@ def export_circuit_breaker_prometheus() -> str:
 def export_circuit_breaker_json() -> dict[str, Any]:
     """JSON metrik özetini döner."""
     return circuit_breaker_metrics.export_json()
+
+
+def export_circuit_breaker_orjson_bytes() -> bytes:
+    """JSON metriklerini orjson bayt dizisi olarak döner."""
+    return circuit_breaker_metrics.export_orjson_bytes()
 
 
 def export_circuit_breaker_snapshots_to_polars() -> pl.DataFrame:
@@ -563,19 +698,26 @@ def record_circuit_breaker_state_change(name: str, old_state: str, new_state: st
 
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_HISTORY_LIMIT",
     "DEFAULT_MAX_HISTORY",
     "DEFAULT_METRICS_HISTORY_DB_PATH",
+    "DEFAULT_WAL_SIZE",
     "CircuitBreakerMetricsCollector",
     "CircuitBreakerSnapshot",
     "circuit_breaker_metrics",
+    "clear_circuit_breaker_history_duckdb",
+    "configure_duckdb_wal",
     "export_circuit_breaker_history_to_duckdb",
     "export_circuit_breaker_history_to_polars",
     "export_circuit_breaker_json",
+    "export_circuit_breaker_orjson_bytes",
     "export_circuit_breaker_prometheus",
     "export_circuit_breaker_snapshots_to_polars",
     "get_circuit_breaker_snapshots",
+    "read_circuit_breaker_history_from_duckdb",
     "record_circuit_breaker_state_change",
+    "to_orjson_bytes",
     "track_circuit_breaker",
     "untrack_circuit_breaker",
 ]

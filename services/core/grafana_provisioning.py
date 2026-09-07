@@ -56,6 +56,35 @@ DEFAULT_PROMETHEUS_URL: Final[str] = "http://localhost:9090"
 DEFAULT_CLICKHOUSE_URL: Final[str] = "http://localhost:8123"
 DEFAULT_CLICKHOUSE_DS_NAME: Final[str] = "ClickHouse"
 DEFAULT_GRAFANA_AUDIT_DB_PATH: Final[str] = "data/grafana_audit.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 VALID_DASHBOARD_STATUSES: Final[frozenset[str]] = frozenset(
     {"SUCCESS", "FAILED", "SKIPPED", "FAILED_IO", "FAILED_JSON", "NOT_FOUND"}
@@ -962,6 +991,7 @@ class GrafanaProvisioner:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS grafana_provisioning_audit (
@@ -1027,6 +1057,7 @@ class GrafanaProvisioner:
 
         with self._lock:
             with duckdb.connect(str(target_file)) as conn:
+                configure_duckdb_wal(conn)
                 # Tablo var mı kontrol et
                 tables = conn.execute(
                     "SELECT table_name FROM information_schema.tables WHERE table_name = 'grafana_provisioning_audit'"
@@ -1048,6 +1079,24 @@ class GrafanaProvisioner:
                 params.append(safe_limit)
 
                 return conn.execute(query, params).pl()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Sağlayıcı durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "url": self._config.url.strip().rstrip("/"),
+                "provisioned_dashboards_count": len(self._provisioned_dashboards),
+                "provisioned_datasources_count": len(self._provisioned_datasources),
+                "versions_count": len(self._versions),
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Sağlayıcı durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_GRAFANA_AUDIT_DB_PATH) -> None:
+        """DuckDB Grafana denetim tablosunu sıfırlar."""
+        clear_grafana_audit_duckdb(db_path=db_path)
 
     def __repr__(self) -> str:
         """Okunabilir nesne temsili."""
@@ -1151,9 +1200,87 @@ def get_grafana_provisioning_status() -> dict[str, Any]:
     return grafana_provisioner.get_provisioning_status()
 
 
+def read_grafana_audit_from_duckdb(
+    db_path: str = DEFAULT_GRAFANA_AUDIT_DB_PATH,
+    status: str | None = None,
+    uid: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB denetim tablosunu doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        status: İsteğe bağlı durum filtresi.
+        uid: İsteğe bağlı dashboard UID filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan denetim kayıtları.
+    """
+    path_obj = Path(db_path)
+    schema: dict[str, pl.DataType] = {
+        "id": pl.Utf8,
+        "created_at": pl.Datetime,
+        "uid": pl.Utf8,
+        "title": pl.Utf8,
+        "version": pl.Int64,
+        "provisioned_at": pl.Utf8,
+        "file_path": pl.Utf8,
+        "status": pl.Utf8,
+        "metadata_json": pl.Utf8,
+    }
+    if not path_obj.exists():
+        return pl.DataFrame(schema=schema)
+
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'grafana_provisioning_audit'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=schema)
+
+            query = "SELECT * FROM grafana_provisioning_audit WHERE 1=1"
+            params: list[Any] = []
+
+            if status:
+                query += " AND status = ?"
+                params.append(status.strip().upper())
+            if uid:
+                query += " AND uid = ?"
+                params.append(uid.strip())
+
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(max(1, int(limit)))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_grafana_audit_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=schema)
+
+
+def clear_grafana_audit_duckdb(db_path: str = DEFAULT_GRAFANA_AUDIT_DB_PATH) -> None:
+    """DuckDB'deki Grafana denetim tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS grafana_provisioning_audit;")
+    except Exception as exc:
+        logger.error("duckdb_grafana_audit_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Sabitler
     "DASHBOARD_DIR",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_CLICKHOUSE_DS_NAME",
     "DEFAULT_CLICKHOUSE_URL",
     "DEFAULT_GRAFANA_AUDIT_DB_PATH",
@@ -1163,6 +1290,7 @@ __all__: Final[list[str]] = [
     "DEFAULT_MAX_VERSIONS",
     "DEFAULT_PROMETHEUS_URL",
     "DEFAULT_TIMEOUT_SECONDS",
+    "DEFAULT_WAL_SIZE",
     "VALID_DASHBOARD_STATUSES",
     # Veri Modelleri ve Ana Motor
     "DashboardVersion",
@@ -1173,6 +1301,8 @@ __all__: Final[list[str]] = [
     "grafana_provisioner",
     # Modül Seviyesi Kolaylık Fonksiyonları
     "check_grafana_health",
+    "clear_grafana_audit_duckdb",
+    "configure_duckdb_wal",
     "export_grafana_audit_to_duckdb",
     "export_grafana_versions_to_polars",
     "get_grafana_provisioner",
@@ -1182,4 +1312,6 @@ __all__: Final[list[str]] = [
     "provision_grafana_dashboard",
     "provision_grafana_datasource",
     "query_grafana_audit_duckdb",
+    "read_grafana_audit_from_duckdb",
+    "to_orjson_bytes",
 ]

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 import duckdb
+import orjson
 import polars as pl
 import pyarrow as pa
 import pyarrow.dataset as ds
@@ -40,9 +41,27 @@ tracer = trace.get_tracer("alpha-bist.arrow_pipeline")
 DEFAULT_BASE_PATH: Final[str] = "data"
 DEFAULT_COMPRESSION: Final[str] = "snappy"
 DEFAULT_SQL_QUERY: Final[str] = "SELECT * FROM parquet_data"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 VALID_COMPRESSIONS: Final[frozenset[str | None]] = frozenset(
     {"snappy", "gzip", "brotli", "lz4", "zstd", "none", None}
 )
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini ayarlar."""
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.debug("DuckDB WAL pragma yapilandirma uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi güvenle orjson ikili baytlarına serileştirir."""
+    if hasattr(val, "to_dict"):
+        return orjson.dumps(val.to_dict(), default=str)
+    return orjson.dumps(val, default=str)
 
 
 class ArrowPipeline:
@@ -58,6 +77,18 @@ class ArrowPipeline:
         self.base_path = Path(base_path)
         with self._lock:
             self.base_path.mkdir(parents=True, exist_ok=True)
+
+    def to_dict(self) -> dict[str, Any]:
+        """ArrowPipeline durumunu ve ayarlarını sözlük formatında döndürür."""
+        return {
+            "base_path": str(self.base_path),
+            "default_compression": DEFAULT_COMPRESSION,
+            "default_sql_query": DEFAULT_SQL_QUERY,
+        }
+
+    def to_orjson_bytes(self) -> bytes:
+        """ArrowPipeline durumunu orjson ikili baytlarına serileştirir."""
+        return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
         """Boru hattının açıklayıcı dize temsili."""
@@ -327,20 +358,19 @@ class ArrowPipeline:
         if not full_path.exists():
             raise FileNotFoundError(f"Sorgulanacak Parquet dosyası bulunamadı: {full_path}")
 
-        conn = duckdb.connect()
         try:
-            escaped_path = str(full_path).replace("'", "''")
-            conn.execute(f"CREATE VIEW parquet_data AS SELECT * FROM read_parquet('{escaped_path}');")
-            if params is not None:
-                arrow_result = conn.execute(sql_query, params).arrow()
-            else:
-                arrow_result = conn.execute(sql_query).arrow()
-            return pl.from_arrow(arrow_result)
+            with duckdb.connect() as conn:
+                configure_duckdb_wal(conn)
+                escaped_path = str(full_path).replace("'", "''")
+                conn.execute(f"CREATE VIEW parquet_data AS SELECT * FROM read_parquet('{escaped_path}');")
+                if params is not None:
+                    arrow_result = conn.execute(sql_query, params).arrow()
+                else:
+                    arrow_result = conn.execute(sql_query).arrow()
+                return pl.from_arrow(arrow_result)
         except Exception as e:
             logger.error("duckdb_parquet_query_failed", yol=str(full_path), sql=sql_query, hata=str(e))
             raise ValueError(f"DuckDB Parquet sorgusu başarısız: {e}") from e
-        finally:
-            conn.close()
 
     @otel_trace("arrow_pipeline.merge_parquet")
     def merge_parquet(
@@ -626,23 +656,118 @@ def get_arrow_pipeline() -> ArrowPipeline:
     return arrow_pipeline
 
 
+def export_parquet_to_duckdb(
+    parquet_path: str,
+    duckdb_path: str,
+    table_name: str = "parquet_data",
+    pipeline: ArrowPipeline | None = None,
+) -> None:
+    """Parquet dosyasını kalıcı bir DuckDB tablosuna aktarır.
+
+    Args:
+        parquet_path: Kaynak Parquet dosya yolu.
+        duckdb_path: Hedef DuckDB veritabanı dosya yolu.
+        table_name: Oluşturulacak DuckDB tablo adı.
+        pipeline: Opsiyonel ArrowPipeline örneği.
+    """
+    inst = pipeline if pipeline is not None else arrow_pipeline
+    p_path = inst._resolve_path(parquet_path)
+    if not p_path.exists():
+        p_path = Path(parquet_path)
+    if not p_path.exists():
+        raise FileNotFoundError(f"Parquet dosyasi bulunamadi: {parquet_path}")
+
+    d_path = inst._resolve_path(duckdb_path)
+    d_path.parent.mkdir(parents=True, exist_ok=True)
+    with duckdb.connect(str(d_path)) as conn:
+        configure_duckdb_wal(conn)
+        escaped_p = str(p_path).replace("'", "''")
+        conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM read_parquet('{escaped_p}')")
+
+
+def read_duckdb_to_polars(
+    duckdb_path: str,
+    table_name: str = "parquet_data",
+    limit: int = 1000,
+    pipeline: ArrowPipeline | None = None,
+) -> pl.DataFrame:
+    """DuckDB tablosundan verileri Polars DataFrame olarak okur.
+
+    Args:
+        duckdb_path: DuckDB veritabanı dosya yolu.
+        table_name: Okunacak tablo adı.
+        limit: Okunacak maksimum satır sayısı.
+        pipeline: Opsiyonel ArrowPipeline örneği.
+
+    Returns:
+        pl.DataFrame: Okunan verilerin Polars DataFrame temsili.
+    """
+    inst = pipeline if pipeline is not None else arrow_pipeline
+    d_path = inst._resolve_path(duckdb_path)
+    if not d_path.exists():
+        d_path = Path(duckdb_path)
+    if not d_path.exists():
+        return pl.DataFrame()
+    try:
+        with duckdb.connect(str(d_path), read_only=True) as conn:
+            tables = [t[0] for t in conn.execute("SHOW TABLES").fetchall()]
+            if table_name not in tables:
+                return pl.DataFrame()
+            return conn.execute(f"SELECT * FROM {table_name} LIMIT ?", [int(limit)]).pl()
+    except Exception as exc:
+        logger.error("DuckDB tablosu okunamadi", tablo=table_name, hata=str(exc))
+        return pl.DataFrame()
+
+
+def clear_duckdb_table(
+    duckdb_path: str,
+    table_name: str = "parquet_data",
+    pipeline: ArrowPipeline | None = None,
+) -> None:
+    """Belirtilen DuckDB tablosunu siler.
+
+    Args:
+        duckdb_path: DuckDB veritabanı dosya yolu.
+        table_name: Silinecek tablo adı.
+        pipeline: Opsiyonel ArrowPipeline örneği.
+    """
+    inst = pipeline if pipeline is not None else arrow_pipeline
+    d_path = inst._resolve_path(duckdb_path)
+    if not d_path.exists():
+        d_path = Path(duckdb_path)
+    if not d_path.exists():
+        return
+    try:
+        with duckdb.connect(str(d_path)) as conn:
+            conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+    except Exception as exc:
+        logger.warning("DuckDB tablosu temizlenemedi", tablo=table_name, hata=str(exc))
+
+
 __all__: list[str] = [
     "DEFAULT_BASE_PATH",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_COMPRESSION",
     "DEFAULT_SQL_QUERY",
+    "DEFAULT_WAL_SIZE",
     "VALID_COMPRESSIONS",
     "ArrowPipeline",
     "arrow_pipeline",
+    "clear_duckdb_table",
+    "configure_duckdb_wal",
+    "export_parquet_to_duckdb",
     "from_polars",
     "get_arrow_pipeline",
     "get_metadata",
     "merge_parquet",
     "query_parquet_with_duckdb",
+    "read_duckdb_to_polars",
     "read_parquet",
     "read_polars",
     "scan_parquet",
     "scan_polars",
     "to_parquet",
     "to_polars",
+    "to_orjson_bytes",
     "write_partitioned_dataset",
 ]

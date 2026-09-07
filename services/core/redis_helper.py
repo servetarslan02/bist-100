@@ -11,14 +11,14 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Final
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any, Final
 
+import duckdb
 import orjson
 import polars as pl
 import structlog
-
-if TYPE_CHECKING:
-    import duckdb
 
 try:
     from services.core.otel import otel_trace
@@ -40,9 +40,12 @@ except ImportError:
 logger = structlog.get_logger(__name__)
 
 DEFAULT_TTL_SEC: Final[int] = 300
-DEFAULT_SOCKET_TIMEOUT_SEC: Final[float] = 1.5
-RECONNECT_INTERVAL_SEC: Final[float] = 5.0
+DEFAULT_SOCKET_TIMEOUT_SEC: Final[float] = 0.5
+RECONNECT_INTERVAL_SEC: Final[float] = 30.0
 DEFAULT_MAX_MEM_CACHE_SIZE: Final[int] = 5000
+DEFAULT_REDIS_DUCKDB_PATH: Final[str] = "data/redis_l2_cache.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
 
 _lock = threading.RLock()
 _redis_client: Any | None = None
@@ -54,11 +57,25 @@ _mem_cache: dict[str, tuple[float, str]] = {}
 _duckdb_conn: duckdb.DuckDBPyConnection | None = None
 
 
+def configure_duckdb_wal(
+    conn: duckdb.DuckDBPyConnection,
+    checkpoint_threshold: str = DEFAULT_CHECKPOINT_SIZE,
+    wal_autocheckpoint: str = DEFAULT_WAL_SIZE,
+) -> None:
+    """DuckDB WAL parametrelerini optimize eder."""
+    try:
+        conn.execute(f"SET checkpoint_threshold = '{checkpoint_threshold}';")
+        conn.execute(f"SET wal_autocheckpoint = '{wal_autocheckpoint}';")
+    except Exception as e:
+        logger.warning("redis_duckdb_wal_yapilandirma_uyarisi", hata=str(e))
+
+
 def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
     """L2 kalıcı önbellek için DuckDB bağlantısını tanımlar ve şemayı kurar."""
     global _duckdb_conn
     with _lock:
         _duckdb_conn = conn
+        configure_duckdb_wal(_duckdb_conn)
         try:
             _duckdb_conn.execute("""
                 CREATE TABLE IF NOT EXISTS redis_l2_cache (
@@ -72,48 +89,87 @@ def set_duckdb_connection(conn: duckdb.DuckDBPyConnection) -> None:
             logger.error("Redis L2 DuckDB şema oluşturma hatası", hata=str(exc))
 
 
+def _get_active_duckdb(writable: bool = False) -> tuple[duckdb.DuckDBPyConnection | None, bool]:
+    """Aktif DuckDB bağlantısını ve bağlantının kapatılması gerekip gerekmediğini döndürür."""
+    with _lock:
+        if _duckdb_conn is not None:
+            return _duckdb_conn, False
+
+    p = Path(DEFAULT_REDIS_DUCKDB_PATH)
+    if not writable and not p.exists():
+        return None, False
+
+    try:
+        if writable:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            conn = duckdb.connect(str(p))
+            configure_duckdb_wal(conn)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS redis_l2_cache (
+                    cache_key VARCHAR PRIMARY KEY,
+                    payload_json VARCHAR,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            return conn, True
+        else:
+            conn = duckdb.connect(str(p), read_only=True)
+            tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+            if "redis_l2_cache" not in tables:
+                conn.close()
+                return None, False
+            return conn, True
+    except Exception as exc:
+        logger.debug("redis_duckdb_aktif_baglanti_hatasi", hata=str(exc))
+        return None, False
+
+
 def _get_l2_duckdb_cache(key: str) -> Any | None:
     """DuckDB L2 önbelleğinden geçerli kaydı okur."""
-    if _duckdb_conn is None:
+    conn, should_close = _get_active_duckdb(writable=False)
+    if conn is None:
         return None
-    with _lock:
-        try:
-            row = _duckdb_conn.execute(
-                """
-                SELECT payload_json FROM redis_l2_cache
-                WHERE cache_key = ? AND expires_at > CURRENT_TIMESTAMP
-                LIMIT 1
-                """,
-                [key],
-            ).fetchone()
-            if row:
-                return orjson.loads(row[0])
-            # Süresi dolmuş kaydı temizle
-            _duckdb_conn.execute(
-                "DELETE FROM redis_l2_cache WHERE cache_key = ? AND expires_at <= CURRENT_TIMESTAMP",
-                [key],
-            )
-        except Exception as exc:
-            logger.debug("Redis L2 DuckDB önbellek okuma hatası", key=key, hata=str(exc))
+    try:
+        now_dt = datetime.now(UTC)
+        row = conn.execute(
+            """
+            SELECT payload_json FROM redis_l2_cache
+            WHERE cache_key = ? AND expires_at > ?
+            LIMIT 1
+            """,
+            [key, now_dt],
+        ).fetchone()
+        if row:
+            return orjson.loads(row[0])
+    except Exception as exc:
+        logger.debug("Redis L2 DuckDB önbellek okuma hatası", key=key, hata=str(exc))
+    finally:
+        if should_close:
+            conn.close()
     return None
 
 
 def _set_l2_duckdb_cache(key: str, data: Any, ttl_sec: int) -> None:
     """DuckDB L2 önbelleğine kayıt yazar."""
-    if _duckdb_conn is None:
+    conn, should_close = _get_active_duckdb(writable=True)
+    if conn is None:
         return
-    with _lock:
-        try:
-            payload = orjson.dumps(data, default=str).decode("utf-8")
-            _duckdb_conn.execute(
-                """
-                INSERT OR REPLACE INTO redis_l2_cache (cache_key, payload_json, expires_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP + INTERVAL (?) SECOND)
-                """,
-                [key, payload, ttl_sec],
-            )
-        except Exception as exc:
-            logger.debug("Redis L2 DuckDB önbellek yazma hatası", key=key, hata=str(exc))
+    try:
+        payload = orjson.dumps(data, default=str).decode("utf-8")
+        exp_dt = datetime.now(UTC) + timedelta(seconds=ttl_sec)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO redis_l2_cache (cache_key, payload_json, expires_at)
+            VALUES (?, ?, ?)
+            """,
+            [key, payload, exp_dt],
+        )
+    except Exception as exc:
+        logger.debug("Redis L2 DuckDB önbellek yazma hatası", key=key, hata=str(exc))
+    finally:
+        if should_close:
+            conn.close()
 
 
 def get_client() -> Any | None:
@@ -138,7 +194,7 @@ def get_client() -> Any | None:
         try:
             import redis as redis_lib
 
-            host = os.environ.get("REDIS_HOST", "redis")
+            host = os.environ.get("REDIS_HOST", "127.0.0.1" if os.name == "nt" else "redis")
             port = int(os.environ.get("REDIS_PORT", "6379"))
             db = int(os.environ.get("REDIS_DB", "0"))
             password = os.environ.get("REDIS_PASSWORD", "") or None
@@ -160,7 +216,8 @@ def get_client() -> Any | None:
         except Exception as exc:
             _redis_available = False
             _redis_client = None
-            logger.warn("Redis bağlantısı kurulamadı, L1/L2 önbelleğe düşülüyor", hata=str(exc))
+            _last_connect_attempt = time.monotonic()
+            logger.warning("Redis bağlantısı kurulamadı, L1/L2 önbelleğe düşülüyor", hata=str(exc))
             return None
 
 
@@ -174,7 +231,7 @@ def get_cached(key: str) -> Any | None:
             if data:
                 return orjson.loads(data)
         except Exception as exc:
-            logger.warn("Redis okuma hatası, yerel önbelleğe düşülüyor", key=key, hata=str(exc))
+            logger.warning("Redis okuma hatası, yerel önbelleğe düşülüyor", key=key, hata=str(exc))
             with _lock:
                 _redis_available = False
 
@@ -217,7 +274,7 @@ def set_cached(key: str, data: Any, ttl: int = DEFAULT_TTL_SEC) -> bool:
             r.setex(key, ttl, payload_str)
             return True
         except Exception as exc:
-            logger.warn("Redis yazma hatası, yerel önbellek korundu", key=key, hata=str(exc))
+            logger.warning("Redis yazma hatası, yerel önbellek korundu", key=key, hata=str(exc))
             with _lock:
                 _redis_available = False
 
@@ -229,11 +286,16 @@ def delete_cached(key: str) -> bool:
     """Önbellekten anahtarı tüm katmanlardan siler."""
     with _lock:
         _mem_cache.pop(key, None)
-        if _duckdb_conn is not None:
-            try:
-                _duckdb_conn.execute("DELETE FROM redis_l2_cache WHERE cache_key = ?", [key])
-            except Exception as exc:
-                logger.debug("DuckDB L2 silme hatası", key=key, hata=str(exc))
+
+    conn, should_close = _get_active_duckdb(writable=True)
+    if conn is not None:
+        try:
+            conn.execute("DELETE FROM redis_l2_cache WHERE cache_key = ?", [key])
+        except Exception as exc:
+            logger.debug("DuckDB L2 silme hatası", key=key, hata=str(exc))
+        finally:
+            if should_close:
+                conn.close()
 
     r = get_client()
     if r is not None:
@@ -241,7 +303,7 @@ def delete_cached(key: str) -> bool:
             r.delete(key)
             return True
         except Exception as exc:
-            logger.warn("Redis silme hatası", key=key, hata=str(exc))
+            logger.warning("Redis silme hatası", key=key, hata=str(exc))
             with _lock:
                 _redis_available = False
 
@@ -272,7 +334,7 @@ def mget_cached(keys: list[str]) -> dict[str, Any]:
                     except Exception:
                         pass
         except Exception as exc:
-            logger.warn("Redis mget pipeline hatası", hata=str(exc))
+            logger.warning("Redis mget pipeline hatası", hata=str(exc))
             with _lock:
                 _redis_available = False
 
@@ -324,7 +386,7 @@ def mset_cached(mapping: dict[str, Any], ttl: int = DEFAULT_TTL_SEC) -> bool:
             pipe.execute()
             return True
         except Exception as exc:
-            logger.warn("Redis mset pipeline hatası", hata=str(exc))
+            logger.warning("Redis mset pipeline hatası", hata=str(exc))
             with _lock:
                 _redis_available = False
 
@@ -377,19 +439,127 @@ def reset_memory_cache() -> None:
         _mem_cache.clear()
 
 
+def read_l2_cache_from_duckdb(
+    db_path: str = DEFAULT_REDIS_DUCKDB_PATH,
+    include_expired: bool = False,
+) -> pl.DataFrame:
+    """DuckDB L2 önbelleğindeki kayıtları Polars DataFrame olarak okur."""
+    p = Path(db_path)
+    empty_schema = {
+        "cache_key": pl.String,
+        "payload_json": pl.String,
+        "expires_at": pl.Datetime,
+        "created_at": pl.Datetime,
+    }
+    with _lock:
+        if _duckdb_conn is not None:
+            try:
+                if include_expired:
+                    return _duckdb_conn.execute("SELECT * FROM redis_l2_cache").pl()
+                return _duckdb_conn.execute(
+                    "SELECT * FROM redis_l2_cache WHERE expires_at > ?",
+                    [datetime.now(UTC)],
+                ).pl()
+            except Exception as e:
+                logger.error("read_l2_cache_duckdb_hatasi", hata=str(e))
+                return pl.DataFrame(schema=empty_schema)
+
+    if not p.exists():
+        return pl.DataFrame(schema=empty_schema)
+
+    try:
+        conn = duckdb.connect(str(p), read_only=True)
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if "redis_l2_cache" not in tables:
+            conn.close()
+            return pl.DataFrame(schema=empty_schema)
+        if include_expired:
+            df = conn.execute("SELECT * FROM redis_l2_cache").pl()
+        else:
+            df = conn.execute(
+                "SELECT * FROM redis_l2_cache WHERE expires_at > ?",
+                [datetime.now(UTC)],
+            ).pl()
+        conn.close()
+        return df
+    except Exception as e:
+        logger.error("read_l2_cache_file_hatasi", hata=str(e))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_l2_cache_duckdb(db_path: str = DEFAULT_REDIS_DUCKDB_PATH) -> bool:
+    """DuckDB L2 tablosundaki tüm kayıtları temizler."""
+    with _lock:
+        if _duckdb_conn is not None:
+            try:
+                _duckdb_conn.execute("DELETE FROM redis_l2_cache")
+                return True
+            except Exception as e:
+                logger.error("clear_l2_cache_duckdb_hatasi", hata=str(e))
+                return False
+
+    p = Path(db_path)
+    if not p.exists():
+        return True
+    try:
+        conn = duckdb.connect(str(p))
+        tables = [r[0] for r in conn.execute("SHOW TABLES").fetchall()]
+        if "redis_l2_cache" in tables:
+            conn.execute("DELETE FROM redis_l2_cache")
+        conn.close()
+        return True
+    except Exception as e:
+        logger.error("clear_l2_cache_file_hatasi", hata=str(e))
+        return False
+
+
+def to_orjson_bytes(data: Any) -> bytes:
+    """Veriyi orjson ile güvenli bayt dizisine serileştirir."""
+    return orjson.dumps(data, default=str)
+
+
+def get_cache_stats() -> dict[str, Any]:
+    """Önbellek katmanlarının genel sağlık ve kapasite durumunu döndürür."""
+    with _lock:
+        mem_count = len(_mem_cache)
+        r_active = _redis_available and _redis_client is not None
+
+    l2_count = 0
+    try:
+        df = read_l2_cache_from_duckdb(include_expired=False)
+        l2_count = df.height
+    except Exception:
+        pass
+
+    return {
+        "redis_available": r_active,
+        "mem_cache_count": mem_count,
+        "duckdb_l2_count": l2_count,
+        "max_mem_cache_size": DEFAULT_MAX_MEM_CACHE_SIZE,
+    }
+
+
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_MAX_MEM_CACHE_SIZE",
+    "DEFAULT_REDIS_DUCKDB_PATH",
     "DEFAULT_SOCKET_TIMEOUT_SEC",
     "DEFAULT_TTL_SEC",
+    "DEFAULT_WAL_SIZE",
     "RECONNECT_INTERVAL_SEC",
+    "clear_l2_cache_duckdb",
+    "configure_duckdb_wal",
     "delete_cached",
     "export_cache_metrics_to_polars",
+    "get_cache_stats",
     "get_cached",
     "get_client",
     "is_available",
     "mget_cached",
     "mset_cached",
+    "read_l2_cache_from_duckdb",
     "reset_memory_cache",
     "set_cached",
     "set_duckdb_connection",
+    "to_orjson_bytes",
 ]

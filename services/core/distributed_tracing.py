@@ -36,6 +36,36 @@ logger = structlog.get_logger(__name__)
 DEFAULT_SERVICE_NAME: Final[str] = "alpha-bist"
 DEFAULT_BUFFER_SIZE: Final[int] = 1000
 DEFAULT_RECENT_LIMIT: Final[int] = 100
+DEFAULT_TRACING_DB_PATH: Final[str] = "data/tracing.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir nesneyi orjson ile ikili bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri veya nesne.
+
+    Returns:
+        bytes: orjson kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 try:
     from opentelemetry import trace as otel_trace
@@ -542,10 +572,7 @@ class DistributedTracer:
 
         df = self.export_spans_to_polars()
         conn = duckdb.connect(db_path)
-        with contextlib.suppress(Exception):
-            from services.core.duckdb_store import configure_duckdb_wal
-
-            configure_duckdb_wal(conn)
+        configure_duckdb_wal(conn)
         conn.register("df_spans", df)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trace_spans (
@@ -599,6 +626,24 @@ class DistributedTracer:
         except Exception as exc:
             logger.error("query_spans_duckdb_hatasi", error=str(exc))
             return pl.DataFrame()
+
+    def to_dict(self) -> dict[str, Any]:
+        """İzleyici durumunu sözlük olarak döner."""
+        with self._lock:
+            return {
+                "service_name": self._service_name,
+                "otel_enabled": self._otel_enabled,
+                "buffer_records": len(self._local_buffer),
+                "buffer_size": self._buffer_size,
+            }
+
+    def to_orjson_bytes(self) -> bytes:
+        """İzleyici durumunu ikili orjson baytlarına dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_TRACING_DB_PATH) -> None:
+        """DuckDB üzerindeki span tablosunu sıfırlar."""
+        clear_spans_duckdb(db_path=db_path)
 
     def __repr__(self) -> str:
         with self._lock:
@@ -724,11 +769,104 @@ def query_spans_duckdb(
 tracer: Final[DistributedTracer] = distributed_tracer
 
 
+def read_spans_from_duckdb(
+    db_path: str = DEFAULT_TRACING_DB_PATH,
+    trace_id: str | None = None,
+    operation: str | None = None,
+    limit: int = 100,
+) -> pl.DataFrame:
+    """DuckDB'de saklanan span kayıtlarını doğrudan Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        trace_id: İsteğe bağlı trace kimliği filtresi.
+        operation: İsteğe bağlı operasyon adı filtresi.
+        limit: Maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan span kayıtları.
+    """
+    empty_schema = {
+        "trace_id": pl.Utf8,
+        "span_id": pl.Utf8,
+        "parent_span_id": pl.Utf8,
+        "operation": pl.Utf8,
+        "start_time": pl.Float64,
+        "end_time": pl.Float64,
+        "duration_ms": pl.Float64,
+        "status": pl.Utf8,
+        "attributes_json": pl.Utf8,
+        "error": pl.Utf8,
+    }
+    if db_path != ":memory:":
+        path_obj = Path(db_path)
+        if not path_obj.exists():
+            return pl.DataFrame(schema=empty_schema)
+
+    try:
+        with duckdb.connect(db_path) as conn:
+            configure_duckdb_wal(conn)
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'trace_spans'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(schema=empty_schema)
+
+            query = """
+                SELECT trace_id, span_id, parent_span_id, operation,
+                       start_time, end_time, duration_ms, status,
+                       attributes_json, error
+                FROM trace_spans
+            """
+            conditions: list[str] = []
+            params: list[Any] = []
+
+            if trace_id:
+                conditions.append("trace_id = ?")
+                params.append(str(trace_id))
+            if operation:
+                conditions.append("operation = ?")
+                params.append(str(operation))
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY start_time DESC LIMIT ?"
+            params.append(max(1, limit))
+
+            return conn.execute(query, params).pl()
+    except Exception as exc:
+        logger.warning("duckdb_spans_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(schema=empty_schema)
+
+
+def clear_spans_duckdb(db_path: str = DEFAULT_TRACING_DB_PATH) -> None:
+    """DuckDB'deki span tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    if db_path == ":memory:":
+        return
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS trace_spans;")
+    except Exception as exc:
+        logger.error("duckdb_spans_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
 __all__: Final[list[str]] = [
     # Yapılandırma Sabitleri
     "DEFAULT_BUFFER_SIZE",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_RECENT_LIMIT",
     "DEFAULT_SERVICE_NAME",
+    "DEFAULT_TRACING_DB_PATH",
+    "DEFAULT_WAL_SIZE",
     # Modeller ve Sınıflar
     "DistributedTracer",
     "Span",
@@ -743,8 +881,12 @@ __all__: Final[list[str]] = [
     "trace",
     "trace_async",
     # Analitik ve Veritabanı
+    "clear_spans_duckdb",
+    "configure_duckdb_wal",
     "export_spans_to_duckdb",
     "export_spans_to_polars",
     "query_spans_duckdb",
+    "read_spans_from_duckdb",
+    "to_orjson_bytes",
 ]
 

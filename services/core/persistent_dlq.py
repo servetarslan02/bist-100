@@ -56,15 +56,43 @@ def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
 
 
 def otel_trace(span_name: str) -> Any:
-    """Metotları OpenTelemetry span bloğu içine alan yardımcı dekoratör."""
+    """Metot, senkron fonksiyon veya asenkron coroutine'i OpenTelemetry span içine alan dekoratör.
 
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+    Args:
+        span_name: Span adı.
+
+    Returns:
+        Sarmalayıcı fonksiyon veya coroutine.
+    """
+
+    def decorator(func: Any) -> Any:
+        """Hedef fonksiyon veya coroutine'i OTel span ile sarmalar."""
+        if asyncio.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with tracer.start_as_current_span(span_name) as span:
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as exc:
+                        if hasattr(span, "record_exception"):
+                            span.record_exception(exc)
+                        raise
+
+            return async_wrapper
+
         @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            """Fonksiyon çağrısını span içinde icra eder."""
+            with tracer.start_as_current_span(span_name) as span:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    if hasattr(span, "record_exception"):
+                        span.record_exception(exc)
+                    raise
 
-        return wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -118,7 +146,7 @@ class DLQEntry:
 
     def to_orjson_bytes(self) -> bytes:
         """Kayıt alanlarını orjson ikili serileştirme ile paketler."""
-        return orjson.dumps(self.to_dict())
+        return orjson.dumps(self.to_dict(), default=str)
 
     @property
     def is_retryable(self) -> bool:
@@ -405,6 +433,37 @@ class PersistentDeadLetterQueue:
             cur = conn.execute(query, params)
             return self._cursor_to_dicts(cur)
 
+    @otel_trace("persistent_dlq.get_entry")
+    async def get_entry(self, entry_id: str) -> DLQEntry | None:
+        """Belirtilen tekil entry_id'ye ait DLQ kaydını DLQEntry nesnesi olarak çeker.
+
+        Args:
+            entry_id: Sorgulanacak kayıt kimliği.
+
+        Returns:
+            Bulunursa DLQEntry nesnesi, yoksa None.
+        """
+        with self._connect() as conn:
+            cur = conn.execute("SELECT * FROM dlq_entries WHERE entry_id = ? LIMIT 1", (entry_id,))
+            rows = self._cursor_to_dicts(cur)
+            if not rows:
+                return None
+            r = rows[0]
+            return DLQEntry(
+                entry_id=str(r["entry_id"]),
+                event_id=str(r["event_id"]),
+                event_type=str(r["event_type"]),
+                payload=str(r.get("payload", "")),
+                error=str(r.get("error", "")),
+                retry_count=int(r.get("retry_count", 0)),
+                max_retries=int(r.get("max_retries", 3)),
+                status=DLQStatus(r.get("status", "PENDING")),
+                created_at=datetime.fromisoformat(r["created_at"]) if r.get("created_at") else None,
+                last_retry_at=datetime.fromisoformat(r["last_retry_at"]) if r.get("last_retry_at") else None,
+                next_retry_at=datetime.fromisoformat(r["next_retry_at"]) if r.get("next_retry_at") else None,
+                resolved_at=datetime.fromisoformat(r["resolved_at"]) if r.get("resolved_at") else None,
+            )
+
     @otel_trace("persistent_dlq.clear")
     async def clear(self) -> int:
         """Tüm DLQ tablosunu temizler ve silinen kayıt adedini döner."""
@@ -559,7 +618,7 @@ class PersistentDeadLetterQueue:
     async def to_orjson_bytes(self) -> bytes:
         """DLQ istatistiklerini C seviyesinde orjson bayt dizisine serileştirir."""
         stats = await self.get_stats()
-        return orjson.dumps(stats, option=orjson.OPT_SORT_KEYS)
+        return orjson.dumps(stats, option=orjson.OPT_SORT_KEYS, default=str)
 
     def export_dlq_to_polars(self, status: str | None = None, limit: int = 1000) -> pl.DataFrame:
         """Kalıcı DLQ kayıtlarını Polars DataFrame olarak dışa aktarır."""
@@ -643,6 +702,30 @@ def reset_exhausted_dlq_entries(event_type: str | None = None) -> int:
     return persistent_dlq.reset_exhausted_entries(event_type=event_type)
 
 
+def get_dlq_entry(entry_id: str) -> Any:
+    """Singleton üzerinden tekil DLQ kaydını asenkron çeker."""
+    return persistent_dlq.get_entry(entry_id=entry_id)
+
+
+def clear_dlq_duckdb(db_path: str = DEFAULT_DLQ_DB_PATH) -> None:
+    """Belirtilen DuckDB veritabanındaki DLQ tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path = Path(db_path)
+    if not path.exists():
+        return
+    conn = duckdb.connect(str(path))
+    try:
+        configure_duckdb_wal(conn)
+        conn.execute("DELETE FROM dlq_entries")
+        conn.commit()
+        logger.info("dlq_duckdb_temizlendi", db_path=str(path))
+    finally:
+        conn.close()
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_BASE_BACKOFF_SECONDS",
     "DEFAULT_BATCH_SIZE",
@@ -651,9 +734,11 @@ __all__: Final[list[str]] = [
     "DLQEntry",
     "DLQStatus",
     "PersistentDeadLetterQueue",
+    "clear_dlq_duckdb",
     "configure_duckdb_wal",
     "export_dlq_stats_to_polars",
     "export_dlq_to_polars",
+    "get_dlq_entry",
     "otel_trace",
     "persistent_dlq",
     "replay_single_dlq_entry",

@@ -29,50 +29,46 @@ import time
 from datetime import UTC, datetime
 from typing import Any, Callable, Final
 
+import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
 
 from .alerting import alerting
 from .db_lock import get_all_metrics, get_health_report
 from .observability import health_checker, prometheus_metrics
 
+try:
+    from services.core.otel import otel_trace
+except ImportError:
+    try:
+        from opentelemetry import trace
+        tracer = trace.get_tracer("alpha-bist.monitoring")
+
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                if asyncio.iscoroutinefunction(func):
+                    @functools.wraps(func)
+                    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                        with tracer.start_as_current_span(span_name):
+                            return await func(*args, **kwargs)
+                    return async_wrapper
+
+                @functools.wraps(func)
+                def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                    with tracer.start_as_current_span(span_name):
+                        return func(*args, **kwargs)
+                return sync_wrapper
+            return decorator
+    except ImportError:
+        def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                return func
+            return decorator
+
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.monitoring")
 
 DEFAULT_SYNC_INTERVAL_SECONDS: Final[float] = 5.0
 PROMETHEUS_HISTOGRAM_BUCKETS: Final[list[float]] = [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Belirtilen metodu OpenTelemetry span içine alan dekoratör.
-
-    Args:
-        span_name: Oluşturulacak span adı.
-
-    Returns:
-        Dekoratör sarmalayıcı fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Hedef fonksiyonu sarmalayarak span yaşam döngüsünü yönetir."""
-        if asyncio.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(*args, **kwargs)
-
-            return async_wrapper
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            with tracer.start_as_current_span(span_name):
-                return func(*args, **kwargs)
-
-        return sync_wrapper
-
-    return decorator
 
 
 def _extract_metric_value(val: Any) -> float:
@@ -451,6 +447,11 @@ class PortfolioMonitor:
             })
         return pl.DataFrame(records)
 
+    def to_orjson_bytes(self) -> bytes:
+        """İzleme metriklerini orjson serileştirilmiş ikili bayt dizisi olarak döndürür (GEMINI.md Kural 5)."""
+        df = self.export_metrics_to_polars()
+        return orjson.dumps(df.to_dicts(), default=str)
+
     def __repr__(self) -> str:
         """Portföy izleyicisinin durumunu özetleyen temsil."""
         return (
@@ -464,12 +465,96 @@ portfolio_monitor: Final[PortfolioMonitor] = PortfolioMonitor()
 export_metrics_to_polars = portfolio_monitor.export_metrics_to_polars
 export_lock_metrics_to_polars = portfolio_monitor.export_lock_metrics_to_polars
 
+
+def export_metrics_to_orjson_bytes() -> bytes:
+    """Metrikleri orjson serileştirilmiş ikili bayt dizisi olarak döndürür."""
+    return portfolio_monitor.to_orjson_bytes()
+
+
+def export_lock_metrics_to_orjson_bytes() -> bytes:
+    """Kilit telemetrisini orjson serileştirilmiş ikili bayt dizisi olarak döndürür."""
+    df = PortfolioMonitor.export_lock_metrics_to_polars()
+    return orjson.dumps(df.to_dicts(), default=str)
+
+
+def export_monitoring_metrics_to_duckdb(
+    db_path: str = "data/monitoring_metrics.duckdb",
+) -> int:
+    """Portföy ve kilit telemetri metriklerini yerel DuckDB tablosuna anlık görüntü olarak kaydeder.
+
+    Args:
+        db_path: DuckDB veritabanı dosya yolu.
+
+    Returns:
+        Toplam kaydedilen telemetri satırı sayısı.
+    """
+    from pathlib import Path
+
+    import duckdb
+
+    df_metrics = export_metrics_to_polars()
+    df_locks = export_lock_metrics_to_polars()
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.stat().st_size == 0:
+        with contextlib.suppress(OSError):
+            target.unlink()
+
+    total_records = 0
+    with duckdb.connect(db_path) as conn:
+        conn.execute("PRAGMA checkpoint_threshold='4MB'")
+        conn.execute("PRAGMA wal_autocheckpoint='2MB'")
+        if df_metrics.height > 0:
+            conn.register("df_mon_view", df_metrics.to_arrow())
+            try:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS monitoring_metrics_snapshot AS SELECT * FROM df_mon_view WHERE 1=0"
+                )
+                conn.execute("INSERT INTO monitoring_metrics_snapshot SELECT * FROM df_mon_view")
+                total_records += df_metrics.height
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_mon_view")
+        if df_locks.height > 0:
+            conn.register("df_lock_view", df_locks.to_arrow())
+            try:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS monitoring_locks_snapshot AS SELECT * FROM df_lock_view WHERE 1=0"
+                )
+                conn.execute("INSERT INTO monitoring_locks_snapshot SELECT * FROM df_lock_view")
+                total_records += df_locks.height
+            finally:
+                with contextlib.suppress(Exception):
+                    conn.unregister("df_lock_view")
+    return total_records
+
+
+def clear_monitoring_metrics_duckdb(
+    db_path: str = "data/monitoring_metrics.duckdb",
+) -> None:
+    """DuckDB izleme tablolarını siler."""
+    from pathlib import Path
+
+    import duckdb
+
+    target = Path(db_path)
+    if not target.exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        conn.execute("DROP TABLE IF EXISTS monitoring_metrics_snapshot")
+        conn.execute("DROP TABLE IF EXISTS monitoring_locks_snapshot")
+
+
 __all__: Final[list[str]] = [
     "DEFAULT_SYNC_INTERVAL_SECONDS",
     "PROMETHEUS_HISTOGRAM_BUCKETS",
     "PortfolioMonitor",
+    "clear_monitoring_metrics_duckdb",
+    "export_lock_metrics_to_orjson_bytes",
     "export_lock_metrics_to_polars",
+    "export_metrics_to_orjson_bytes",
     "export_metrics_to_polars",
+    "export_monitoring_metrics_to_duckdb",
     "otel_trace",
     "portfolio_monitor",
 ]

@@ -385,12 +385,13 @@ class CanonicalScoringPipeline:
             Normalize edilmiş ScoreVector nesnesi.
         """
         clean_ticker = str(ticker).strip().upper() if ticker else "UNKNOWN"
+        clean_regime = str(regime).strip().upper() if regime else "UNKNOWN"
         now_ts = datetime.now(UTC).isoformat()
 
         sv = ScoreVector(
             ticker=clean_ticker,
             timestamp=now_ts,
-            regime=regime,
+            regime=clean_regime,
         )
 
         sv.technical = self._score_technical(features)
@@ -428,8 +429,9 @@ class CanonicalScoringPipeline:
             CanonicalScore nesnesi.
         """
         clean_ticker = str(ticker).strip().upper() if ticker else "UNKNOWN"
-        vector = self.compute_score_vector(clean_ticker, features, regime)
-        weights = self.REGIME_WEIGHTS.get(regime, self.REGIME_WEIGHTS["UNKNOWN"])
+        clean_regime = str(regime).strip().upper() if regime else "UNKNOWN"
+        vector = self.compute_score_vector(clean_ticker, features, clean_regime)
+        weights = self.REGIME_WEIGHTS.get(clean_regime, self.REGIME_WEIGHTS["UNKNOWN"])
 
         # Fırsat boyutlarının ağırlıklı toplamı
         opportunity_dims = vector.get_opportunity_dimensions()
@@ -570,6 +572,16 @@ class CanonicalScoringPipeline:
 
         return self.export_scores_to_polars(scores)
 
+    def get_history(self) -> list[CanonicalScore]:
+        """Kayıtlı skorlama geçmişinin kopyasını thread-safe olarak döndürür."""
+        with self._lock:
+            return list(self._history)
+
+    def clear_history(self) -> None:
+        """Kayıtlı skorlama geçmişini thread-safe olarak temizler."""
+        with self._lock:
+            self._history.clear()
+
     def export_scores_to_polars(self, scores: list[CanonicalScore] | None = None) -> pl.DataFrame:
         """Kanonik skorları katı tipli Polars DataFrame formatına dönüştürür.
 
@@ -579,7 +591,11 @@ class CanonicalScoringPipeline:
         Returns:
             Polars DataFrame.
         """
-        target_scores = scores if scores is not None else list(self._history)
+        if scores is not None:
+            target_scores = scores
+        else:
+            with self._lock:
+                target_scores = list(self._history)
         if not target_scores:
             schema = {
                 "ticker": pl.Utf8,
@@ -670,6 +686,10 @@ class CanonicalScoringPipeline:
                     f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_scores WHERE 1=0"
                 )
                 conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_scores")
+                with contextlib.suppress(Exception):
+                    conn.execute(
+                        f"CREATE INDEX IF NOT EXISTS idx_{table_name}_ticker_ts ON {table_name} (ticker, timestamp)"
+                    )
             return len(df)
         except Exception as e:
             logger.error("export_scores_to_duckdb_failed", error=str(e))
@@ -1252,6 +1272,16 @@ def query_scores_duckdb(
     return canonical_scoring.query_scores_duckdb(db_path=db_path, table_name=table_name, ticker=ticker, limit=limit)
 
 
+def get_scoring_history() -> list[CanonicalScore]:
+    """Kayıtlı kanonik skor geçmişini döndürür."""
+    return canonical_scoring.get_history()
+
+
+def clear_scoring_history() -> None:
+    """Kayıtlı kanonik skor geçmişini temizler."""
+    canonical_scoring.clear_history()
+
+
 __all__ = [
     "DEFAULT_ML_WEIGHT",
     "DEFAULT_RULE_WEIGHT",
@@ -1276,4 +1306,6 @@ __all__ = [
     "export_scores_to_polars",
     "export_scores_to_duckdb",
     "query_scores_duckdb",
+    "get_scoring_history",
+    "clear_scoring_history",
 ]

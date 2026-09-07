@@ -71,6 +71,69 @@ def models_to_polars(models: list[BaseDomainModel]) -> pl.DataFrame:
     return pl.DataFrame([m.model_dump(mode="python") for m in models])
 
 
+def models_to_orjson_bytes(models: list[BaseDomainModel]) -> bytes:
+    """Model listesini yüksek hızlı orjson bayt dizisine serileştirir (GEMINI.md Kural 5)."""
+    return orjson.dumps([m.model_dump(mode="python") for m in models], default=str)
+
+
+def export_models_to_duckdb(
+    models: list[BaseDomainModel],
+    table_name: str,
+    db_path: str = "data/models_snapshot.duckdb",
+) -> int:
+    """Modelleri Polars üzerinden yerel DuckDB tablosuna anlık görüntü olarak yazar.
+
+    Args:
+        models: Kaydedilecek modeller listesi.
+        table_name: Hedef DuckDB tablo adı.
+        db_path: DuckDB dosya yolu.
+
+    Returns:
+        Kaydedilen kayıt sayısı.
+    """
+    if not models:
+        return 0
+    import contextlib
+    from pathlib import Path
+
+    import duckdb
+
+    df = models_to_polars(models)
+    target = Path(db_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.stat().st_size == 0:
+        with contextlib.suppress(OSError):
+            target.unlink()
+
+    with duckdb.connect(db_path) as conn:
+        conn.execute("PRAGMA checkpoint_threshold='4MB'")
+        conn.execute("PRAGMA wal_autocheckpoint='2MB'")
+        conn.register("df_models_view", df.to_arrow())
+        try:
+            conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_models_view WHERE 1=0")
+            conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_models_view")
+        finally:
+            with contextlib.suppress(Exception):
+                conn.unregister("df_models_view")
+    return df.height
+
+
+def clear_models_duckdb(
+    table_name: str,
+    db_path: str = "data/models_snapshot.duckdb",
+) -> None:
+    """DuckDB model anlık görüntü tablosunu temizler."""
+    from pathlib import Path
+
+    import duckdb
+
+    target = Path(db_path)
+    if not target.exists():
+        return
+    with duckdb.connect(db_path) as conn:
+        conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+
+
 # =====================================================
 # Enums
 # =====================================================
@@ -660,5 +723,8 @@ __all__: Final[list[str]] = [
     "SimulationResult",
     "TimeHorizon",
     "WorldState",
+    "clear_models_duckdb",
+    "export_models_to_duckdb",
+    "models_to_orjson_bytes",
     "models_to_polars",
 ]

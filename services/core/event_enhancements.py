@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import functools
 import random
 import threading
 import time
@@ -37,12 +36,13 @@ from pathlib import Path
 from typing import Any, Callable, Final, TypeVar
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.event_enhancements")
 
 T = TypeVar("T")
 
@@ -54,40 +54,6 @@ DEFAULT_EXPONENTIAL_BASE: float = 2.0
 DEFAULT_MAX_IN_MEMORY_EVENTS: int = 100_000
 DEFAULT_CLEANUP_INTERVAL_SECONDS: float = 60.0
 DEFAULT_EVENT_ENHANCEMENT_DB_PATH: str = "data/event_enhancements.duckdb"
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
-
-    Senkron ve asenkron (coroutine) metotları otomatik algılayarak span yaşam
-    döngüsünü asenkron yürütme tamamlanana kadar açık tutar.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(self, *args, **kwargs)
-
-            return async_wrapper
-        else:
-
-            @functools.wraps(func)
-            def sync_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return func(self, *args, **kwargs)
-
-            return sync_wrapper
-
-    return decorator
 
 
 @dataclass(slots=True)
@@ -122,9 +88,7 @@ class EventMetadata:
         }
 
     def to_orjson_bytes(self) -> bytes:
-        """Üstveriyi yüksek performanslı ikili orjson baytlarına dönüştürür."""
-        import orjson
-
+        """Üstveriyi yüksek performanslı ikili orjson baytlarına dönüştürür (GEMINI.md Kural 5)."""
         return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
@@ -174,9 +138,7 @@ class RetryPolicy:
         }
 
     def to_orjson_bytes(self) -> bytes:
-        """Politikayı ikili orjson baytlarına dönüştürür."""
-        import orjson
-
+        """Politikayı ikili orjson baytlarına dönüştürür (GEMINI.md Kural 5)."""
         return orjson.dumps(self.to_dict(), default=str)
 
     def __repr__(self) -> str:
@@ -257,7 +219,10 @@ class EventEnhancements:
                             attempt INT,
                             processed_at TIMESTAMP,
                             retry_after TIMESTAMP
-                        )
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_enhancements_processed_at ON event_enhancements_ledger (processed_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_enhancements_corr_id ON event_enhancements_ledger (correlation_id);
+                        CREATE INDEX IF NOT EXISTS idx_enhancements_seq_key ON event_enhancements_ledger (sequence_key, sequence_num);
                     """)
         except Exception as exc:
             logger.warning("event_enhancements_duckdb_init_hatasi", path=self.db_path, hata=str(exc))
@@ -767,6 +732,25 @@ class EventEnhancements:
                 "db_path": self.db_path,
             }
 
+    def to_orjson_bytes(self) -> bytes:
+        """Motor istatistiklerini orjson binary olarak döner (GEMINI.md Kural 5).
+
+        Returns:
+            JSON bayt dizisi.
+        """
+        return orjson.dumps(self.get_stats(), option=orjson.OPT_INDENT_2, default=str)
+
+    def clear_history(self) -> None:
+        """Bellek içi tüm olay, kuyruk ve korelasyon kayıtlarını temizler."""
+        with self._lock:
+            self._processed_events.clear()
+            self._in_flight_events.clear()
+            self._retry_counts.clear()
+            self._retry_after.clear()
+            self._correlation_map.clear()
+            self._sequence_numbers.clear()
+            logger.info("EventEnhancements bellek içi geçmişi temizlendi")
+
     def __repr__(self) -> str:
         with self._lock:
             stats = self.get_stats()
@@ -858,6 +842,39 @@ def query_enhancements_duckdb(
         return []
 
 
+def clear_enhancements_history() -> None:
+    """Tekil EventEnhancements motorunun bellek içi geçmişini temizler."""
+    event_enhancements.clear_history()
+
+
+def clear_enhancements_ledger(db_path: str = DEFAULT_EVENT_ENHANCEMENT_DB_PATH) -> None:
+    """Kalıcı DuckDB olay defterini sıfırlar (tüm kayıtları siler)."""
+    target = Path(db_path)
+    if not target.exists() or target.stat().st_size == 0:
+        return
+    try:
+        with duckdb.connect(db_path) as conn:
+            conn.execute("DELETE FROM event_enhancements_ledger")
+            logger.info("DuckDB event enhancements defteri temizlendi", path=db_path)
+    except Exception as exc:
+        logger.error("clear_enhancements_ledger_hatasi", path=db_path, hata=str(exc))
+
+
+def export_enhancements_to_orjson_bytes(
+    db_path: str = DEFAULT_EVENT_ENHANCEMENT_DB_PATH,
+    limit: int = 1000,
+) -> bytes:
+    """Kalıcı DuckDB olay defterini orjson binary olarak döner (GEMINI.md Kural 5)."""
+    df = export_enhancements_to_polars(db_path=db_path, limit=limit)
+    rows = df.to_dicts()
+    return orjson.dumps(rows, option=orjson.OPT_INDENT_2, default=str)
+
+
+def get_enhancements_stats_orjson_bytes() -> bytes:
+    """Tekil EventEnhancements motorunun istatistiklerini orjson binary olarak döner."""
+    return event_enhancements.to_orjson_bytes()
+
+
 # Singleton
 event_enhancements: Final[EventEnhancements] = EventEnhancements()
 
@@ -874,8 +891,12 @@ __all__: Final[list[str]] = [
     "EventMetadata",
     "EventRetryPolicy",
     "RetryPolicy",
+    "clear_enhancements_history",
+    "clear_enhancements_ledger",
     "event_enhancements",
+    "export_enhancements_to_orjson_bytes",
     "export_enhancements_to_polars",
+    "get_enhancements_stats_orjson_bytes",
     "otel_trace",
     "query_enhancements_duckdb",
 ]

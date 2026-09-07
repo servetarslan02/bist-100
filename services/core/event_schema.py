@@ -21,9 +21,7 @@ Kullanım:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import functools
 import math
 import re
 import struct
@@ -32,18 +30,17 @@ import uuid
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Callable, Final
+from typing import Any, Final
 
 import duckdb
 import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
 
 from services.core.debounce import configure_duckdb_wal
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.event_schema")
 
 # Binary serileştirme sabitleri:
 # ! = Network byte order (big-endian)
@@ -57,40 +54,6 @@ BINARY_HEADER_FORMAT: str = "!B10sqfBH"
 BINARY_HEADER_SIZE: int = struct.calcsize(BINARY_HEADER_FORMAT)  # 26 bayt
 
 DEFAULT_EVENT_SCHEMA_DB_PATH: str = "data/event_schema_audit.duckdb"
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metotları OpenTelemetry span'i ile sarmalayan kurumsal izleme dekoratörü.
-
-    Senkron ve asenkron fonksiyonları otomatik ayırt ederek span yaşam döngüsünü
-    korur.
-
-    Args:
-        span_name: Üretilecek span için benzersiz izleme adı.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(func):
-
-            @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return await func(*args, **kwargs)
-
-            return async_wrapper
-        else:
-
-            @functools.wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(span_name):
-                    return func(*args, **kwargs)
-
-            return sync_wrapper
-
-    return decorator
 
 
 class EventType(IntEnum):
@@ -715,26 +678,55 @@ def export_events_to_duckdb(
                 version INTEGER,
                 correlation_id VARCHAR,
                 data_json VARCHAR
-            )
+            );
+            CREATE INDEX IF NOT EXISTS idx_{table_name}_ts ON {table_name} (timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_{table_name}_ticker ON {table_name} (ticker);
         """)
         conn.register("df_events_view", df.to_arrow())
-        conn.execute(f"""
-            INSERT INTO {table_name}
-            SELECT * FROM df_events_view
-            ON CONFLICT (event_id) DO UPDATE SET
-                type = EXCLUDED.type,
-                type_name = EXCLUDED.type_name,
-                ticker = EXCLUDED.ticker,
-                timestamp = EXCLUDED.timestamp,
-                source = EXCLUDED.source,
-                confidence = EXCLUDED.confidence,
-                sequence = EXCLUDED.sequence,
-                version = EXCLUDED.version,
-                correlation_id = EXCLUDED.correlation_id,
-                data_json = EXCLUDED.data_json
-        """)
+        try:
+            conn.execute(f"""
+                INSERT INTO {table_name}
+                SELECT * FROM df_events_view
+                ON CONFLICT (event_id) DO UPDATE SET
+                    type = EXCLUDED.type,
+                    type_name = EXCLUDED.type_name,
+                    ticker = EXCLUDED.ticker,
+                    timestamp = EXCLUDED.timestamp,
+                    source = EXCLUDED.source,
+                    confidence = EXCLUDED.confidence,
+                    sequence = EXCLUDED.sequence,
+                    version = EXCLUDED.version,
+                    correlation_id = EXCLUDED.correlation_id,
+                    data_json = EXCLUDED.data_json
+            """)
+        finally:
+            conn.unregister("df_events_view")
 
     return df.height
+
+
+def clear_events_duckdb(
+    db_path: str = DEFAULT_EVENT_SCHEMA_DB_PATH,
+    table_name: str = "canonical_events",
+) -> None:
+    """Kalıcı DuckDB olay şeması tablosundaki tüm kayıtları temizler."""
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table_name):
+        raise ValueError(f"Geçersiz tablo adı: {table_name}")
+
+    target = Path(db_path)
+    if not target.exists() or target.stat().st_size == 0:
+        return
+    try:
+        with duckdb.connect(db_path) as conn:
+            conn.execute(f"DELETE FROM {table_name}")
+            logger.info("DuckDB olay şeması tablosu temizlendi", table=table_name, path=db_path)
+    except Exception as exc:
+        logger.error("clear_events_duckdb_hatasi", table=table_name, path=db_path, hata=str(exc))
+
+
+def export_events_to_orjson_bytes(events: list[CanonicalEvent]) -> bytes:
+    """CanonicalEvent listesini doğrudan yüksek hızlı ikili orjson baytlarına dönüştürür (GEMINI.md Kural 5)."""
+    return orjson.dumps([ev.to_dict() for ev in events], default=str)
 
 
 def query_events_duckdb(
@@ -784,6 +776,7 @@ __all__: Final[list[str]] = [
     "CanonicalEvent",
     "DEFAULT_EVENT_SCHEMA_DB_PATH",
     "EventType",
+    "clear_events_duckdb",
     "create_alert_event",
     "create_heartbeat_event",
     "create_order_filled_event",
@@ -793,6 +786,7 @@ __all__: Final[list[str]] = [
     "events_from_polars",
     "events_to_polars",
     "export_events_to_duckdb",
+    "export_events_to_orjson_bytes",
     "filter_pit_events",
     "otel_trace",
     "query_events_duckdb",

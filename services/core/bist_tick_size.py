@@ -23,9 +23,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
 
@@ -41,6 +42,35 @@ DEFAULT_TICK_TOLERANCE: Final[float] = 1e-4
 DEFAULT_INSTRUMENT_TYPE: Final[str] = "stock"
 DEFAULT_TICK_DB_PATH: Final[str] = "data/bist_tick_rules.duckdb"
 DEFAULT_PRICE_LIMIT_RATIO: Final[float] = 0.10
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 # Özel fiyat adımı tablosu (enstrüman tipine göre)
 SPECIAL_TICK_SIZES: Final[dict[str, float]] = {
@@ -74,6 +104,10 @@ class BISTTickTier:
             "tick_size": self.tick_size,
             "description": self.description,
         }
+
+    def to_orjson_bytes(self) -> bytes:
+        """Kademe verisini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Kademe modelinin açıklayıcı metin temsilini döner."""
@@ -603,6 +637,7 @@ def export_tick_rules_to_duckdb(db_path: str = DEFAULT_TICK_DB_PATH) -> int:
     path_obj.parent.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect(str(path_obj)) as conn:
+        configure_duckdb_wal(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS bist_tick_rules (
@@ -720,9 +755,108 @@ class BISTTickSizeEngine:
             mode=mode,
         )
 
+    def to_dict(self) -> dict[str, Any]:
+        """Motor yapılandırmasını sözlük olarak döner."""
+        return {"default_instrument": self.default_instrument}
+
+    def to_orjson_bytes(self) -> bytes:
+        """Motor yapılandırmasını orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def export_to_duckdb(self, db_path: str = DEFAULT_TICK_DB_PATH) -> int:
+        """Fiyat adımı kurallarını DuckDB veritabanına aktarır."""
+        return export_tick_rules_to_duckdb(db_path=db_path)
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_TICK_DB_PATH) -> None:
+        """DuckDB fiyat adımı kuralları tablosunu sıfırlar."""
+        clear_tick_rules_duckdb(db_path=db_path)
+
     def __repr__(self) -> str:
         """Motorun metin temsilini döner."""
         return f"<BISTTickSizeEngine(varsayilan_enstruman='{self.default_instrument}')>"
+
+
+def read_tick_rules_from_duckdb(
+    db_path: str = DEFAULT_TICK_DB_PATH,
+    instrument_type: str | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan BIST fiyat adımı kurallarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        instrument_type: İsteğe bağlı enstrüman tipi filtresi.
+
+    Returns:
+        pl.DataFrame: Okunan kural kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "instrument_type": pl.Utf8,
+                "tier_name": pl.Utf8,
+                "min_price": pl.Float64,
+                "max_price": pl.Float64,
+                "tick_size": pl.Float64,
+                "description": pl.Utf8,
+            }
+        )
+
+    try:
+        with duckdb.connect(str(path_obj), read_only=True) as conn:
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'bist_tick_rules'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "instrument_type": pl.Utf8,
+                        "tier_name": pl.Utf8,
+                        "min_price": pl.Float64,
+                        "max_price": pl.Float64,
+                        "tick_size": pl.Float64,
+                        "description": pl.Utf8,
+                    }
+                )
+
+            query = "SELECT * FROM bist_tick_rules"
+            params: list[Any] = []
+            if instrument_type:
+                query += " WHERE instrument_type = ?"
+                params.append(instrument_type.lower().strip())
+            query += " ORDER BY min_price ASC"
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_tick_rules_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "instrument_type": pl.Utf8,
+                "tier_name": pl.Utf8,
+                "min_price": pl.Float64,
+                "max_price": pl.Float64,
+                "tick_size": pl.Float64,
+                "description": pl.Utf8,
+            }
+        )
+
+
+def clear_tick_rules_duckdb(db_path: str = DEFAULT_TICK_DB_PATH) -> None:
+    """DuckDB'de depolanan BIST fiyat adımı kuralları tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS bist_tick_rules;")
+    except Exception as exc:
+        logger.error("duckdb_tick_rules_temizleme_hatasi", db_path=db_path, hata=str(exc))
 
 
 # Global singleton motor örneği
@@ -730,10 +864,12 @@ bist_tick_engine: Final[BISTTickSizeEngine] = BISTTickSizeEngine()
 
 
 __all__ = [
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_INSTRUMENT_TYPE",
     "DEFAULT_PRICE_LIMIT_RATIO",
     "DEFAULT_TICK_DB_PATH",
     "DEFAULT_TICK_TOLERANCE",
+    "DEFAULT_WAL_SIZE",
     "SPECIAL_TICK_SIZES",
     "VALID_ROUNDING_MODES",
     "BISTTickSizeEngine",
@@ -741,13 +877,17 @@ __all__ = [
     "add_bist_ticks",
     "bist_tick_engine",
     "calculate_bist_price_limits",
+    "clear_tick_rules_duckdb",
+    "configure_duckdb_wal",
     "export_tick_rules_to_duckdb",
     "get_bist_tick_count_between",
     "get_bist_tick_schedule",
     "get_bist_tick_size",
     "is_valid_bist_tick",
+    "read_tick_rules_from_duckdb",
     "round_polars_series_to_bist_ticks",
     "round_prices_to_bist_ticks",
     "round_to_bist_tick",
     "round_to_valid_tick",
+    "to_orjson_bytes",
 ]

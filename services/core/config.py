@@ -142,6 +142,7 @@ class Settings(BaseSettings):
     # Gateway / Reverse Proxy & Mesajlaşma
     traefik_host: str = Field(default="localhost", alias="TRAEFIK_HOST")
     traefik_port: int = Field(default=80, alias="TRAEFIK_PORT")
+    traefik_https_port: int = Field(default=443, alias="TRAEFIK_HTTPS_PORT")
     traefik_admin_port: int = Field(default=8080, alias="TRAEFIK_ADMIN_PORT")
     nats_url: str = Field(default="nats://localhost:4222", alias="NATS_URL")
     grpc_port: int = Field(default=50051, alias="GRPC_PORT")
@@ -305,6 +306,7 @@ class Settings(BaseSettings):
         "redis_port",
         "redis_sentinel_port",
         "traefik_port",
+        "traefik_https_port",
         "traefik_admin_port",
         "grpc_port",
     )
@@ -339,7 +341,7 @@ class Settings(BaseSettings):
 
     def to_orjson_bytes(self, mask_secrets: bool = True) -> bytes:
         """Ayarları orjson formatında bayt dizisine dönüştürür."""
-        return orjson.dumps(self.to_dict(mask_secrets=mask_secrets))
+        return orjson.dumps(self.to_dict(mask_secrets=mask_secrets), default=str)
 
     def to_json(self, mask_secrets: bool = True) -> str:
         """Ayarları JSON metnine dönüştürür."""
@@ -530,6 +532,8 @@ def export_config_snapshot_to_duckdb(
                 f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df_cfg_snap WHERE 1=0"
             )
             conn.execute(f"INSERT INTO {table_name} SELECT * FROM df_cfg_snap")
+            with contextlib.suppress(Exception):
+                conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_key ON {table_name} (key)")
         return len(df_snapshot)
     except Exception as e:
         logger.error("export_config_snapshot_to_duckdb_failed", error=str(e))

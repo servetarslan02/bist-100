@@ -14,53 +14,31 @@ Kişisel PC senaryosu ve algoritmik alım-satım sürekliliği için kritik alty
 
 from __future__ import annotations
 
-import functools
+import contextlib
 import threading
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Final, Generator
+from typing import Any, Final, Generator
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
-from opentelemetry import trace
+
+from services.core.duckdb_store import configure_duckdb_wal
+from services.core.otel import otel_trace
 
 logger = structlog.get_logger(__name__)
-tracer = trace.get_tracer("alpha-bist.downtime_tracker")
 
-DEFAULT_DOWNTIME_DB_PATH: Final[str] = "data/downtime.db"
+DEFAULT_DOWNTIME_DB_PATH: Final[str] = "data/downtime.duckdb"
 
 DEFAULT_CATCHUP_THRESHOLDS: Final[dict[str, timedelta]] = {
     "data_backfill": timedelta(minutes=30),  # 30 dk+ → veri backfill
     "model_refresh": timedelta(hours=6),  # 6 saat+ → model yenile
     "full_recalibration": timedelta(hours=24),  # 24 saat+ → tam kalibrasyon
 }
-
-
-def otel_trace(span_name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Metot çağrılarını OpenTelemetry span'i ile sarmalayan dekoratör.
-
-    Args:
-        span_name: İzleme span'i için benzersiz adlandırma.
-
-    Returns:
-        Dekoratör fonksiyonu.
-    """
-
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Metodu OpenTelemetry span bağlamında çalıştırır."""
-
-        @functools.wraps(func)
-        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            """Span oluşturup hedef fonksiyonu icra eder."""
-            with tracer.start_as_current_span(span_name):
-                return func(self, *args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 class DowntimeTracker:
@@ -137,19 +115,13 @@ class DowntimeTracker:
         """
         # Windows 0-byte dosya çökme önlemi
         if self._db_path.exists() and self._db_path.is_file() and self._db_path.stat().st_size == 0:
-            try:
+            with contextlib.suppress(OSError):
                 self._db_path.unlink()
                 logger.warning("Bozuk sıfır baytlık DuckDB dosyası temizlendi", path=str(self._db_path))
-            except OSError as unlink_err:
-                logger.debug("Sıfır baytlık dosya silinirken hata oluştu", error=str(unlink_err))
 
         conn = duckdb.connect(str(self._db_path))
-        try:
-            from services.core.duckdb_store import configure_duckdb_wal
-
+        with contextlib.suppress(Exception):
             configure_duckdb_wal(conn)
-        except Exception as wal_err:
-            logger.debug("DuckDB WAL yapılandırması atlandı", error=str(wal_err))
 
         try:
             yield conn
@@ -503,6 +475,20 @@ class DowntimeTracker:
                     )
                 return pl.DataFrame(records)
 
+    def to_orjson_bytes(self) -> bytes:
+        """Downtime durumunu orjson bayt dizisi olarak serileştirir."""
+        return orjson.dumps(self.get_status(), default=str)
+
+    def clear_history(self) -> None:
+        """Kayıtlı tüm kesinti olaylarını ve konfigürasyon geçmişini sıfırlar."""
+        with self._lock, self._connect() as conn:
+            conn.execute("DELETE FROM shutdown_events")
+            conn.execute("DELETE FROM downtime_config")
+            conn.commit()
+            self._downtime_seconds = 0.0
+            self._startup_time = None
+            logger.info("kesinti_gecmisi_temizlendi")
+
 
 # Global tekil (singleton) örnek
 downtime_tracker: Final[DowntimeTracker] = DowntimeTracker()
@@ -528,6 +514,16 @@ def get_downtime_status() -> dict[str, Any]:
     return downtime_tracker.get_status()
 
 
+def export_downtime_to_orjson_bytes() -> bytes:
+    """Downtime durumunu orjson bayt dizisi olarak döner."""
+    return downtime_tracker.to_orjson_bytes()
+
+
+def clear_downtime_history() -> None:
+    """Downtime geçmişini sıfırlar."""
+    downtime_tracker.clear_history()
+
+
 def export_downtime_to_polars(limit: int = 1000) -> pl.DataFrame:
     """Geçmiş kesinti kayıtlarını Polars DataFrame olarak dışa aktarır."""
     return downtime_tracker.export_history_to_polars(limit=limit)
@@ -542,7 +538,9 @@ __all__: Final[list[str]] = [
     "DEFAULT_CATCHUP_THRESHOLDS",
     "DEFAULT_DOWNTIME_DB_PATH",
     "DowntimeTracker",
+    "clear_downtime_history",
     "downtime_tracker",
+    "export_downtime_to_orjson_bytes",
     "export_downtime_to_polars",
     "get_downtime_status",
     "otel_trace",

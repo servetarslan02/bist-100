@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 import duckdb
+import orjson
 import polars as pl
 import structlog
 
@@ -86,6 +87,35 @@ DEFAULT_MAX_DELAY: Final[float] = 32.0
 DEFAULT_WINDOW_SIZE: Final[int] = 100
 DEFAULT_RELIABILITY_DB_PATH: Final[str] = "data/provider_reliability.duckdb"
 DEFAULT_CB_DB_PATH: Final[str] = "data/circuit_breakers.duckdb"
+DEFAULT_CHECKPOINT_SIZE: Final[str] = "4MB"
+DEFAULT_WAL_SIZE: Final[str] = "2MB"
+
+
+def configure_duckdb_wal(conn: duckdb.DuckDBPyConnection) -> None:
+    """DuckDB bağlantısı için WAL ve checkpoint parametrelerini optimize eder.
+
+    Args:
+        conn: Yapılandırılacak DuckDB bağlantısı.
+    """
+    try:
+        conn.execute(f"PRAGMA checkpoint_threshold = '{DEFAULT_CHECKPOINT_SIZE}';")
+        conn.execute(f"PRAGMA wal_autocheckpoint = '{DEFAULT_WAL_SIZE}';")
+    except Exception as exc:
+        logger.warning("duckdb_wal_yapilandirma_uyarisi", hata=str(exc))
+
+
+def to_orjson_bytes(val: Any) -> bytes:
+    """Herhangi bir veriyi orjson ile güvenli bayt dizisine dönüştürür.
+
+    Args:
+        val: Serileştirilecek veri.
+
+    Returns:
+        bytes: orjson ile kodlanmış baytlar.
+    """
+    if hasattr(val, "to_dict"):
+        val = val.to_dict()
+    return orjson.dumps(val, default=str)
 
 
 class CircuitState(StrEnum):
@@ -320,6 +350,14 @@ class CircuitBreaker:
         except Exception as exc:
             logger.debug("circuit_breaker_restore_atlandi", name=self.name, error=str(exc))
 
+    def to_dict(self) -> dict[str, Any]:
+        """Devre kesicinin anlık durum ve sayaç bilgilerini sözlük olarak döner."""
+        return self.get_state()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Devre kesici durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
     def __repr__(self) -> str:
         """Devre kesicinin okunabilir dize temsilini döner."""
         with self._lock:
@@ -402,6 +440,14 @@ class RateLimiter:
                 "max_tokens": self.max_tokens,
                 "refill_rate": self.refill_rate,
             }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Hız limitleyicinin anlık token ve kapasite durumunu döner."""
+        return self.get_state()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Hız limitleyici durumunu orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Hız limitleyicinin okunabilir dize temsilini döner."""
@@ -629,6 +675,18 @@ class ProviderReliability:
             )
         return pl.DataFrame(records)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Sağlayıcı güvenilirlik istatistiklerini sözlük olarak döner."""
+        return self.get_stats()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Güvenilirlik verilerini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
+
+    def clear_audit_duckdb(self, db_path: str = DEFAULT_RELIABILITY_DB_PATH) -> None:
+        """Sağlayıcı güvenilirlik DuckDB tablosunu sıfırlar."""
+        clear_reliability_logs_duckdb(db_path=db_path)
+
     def export_to_duckdb(self, db_path: str = DEFAULT_RELIABILITY_DB_PATH) -> int:
         """Çağrı geçmişini DuckDB tablosuna kaydeder.
 
@@ -644,6 +702,7 @@ class ProviderReliability:
         path_obj = Path(db_path)
         path_obj.parent.mkdir(parents=True, exist_ok=True)
         with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS provider_reliability_logs (
@@ -786,6 +845,14 @@ class ProtectedProvider:
             "rate_limiter": self.rate_limiter.get_state(),
             "reliability": self.reliability.get_stats(),
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Sağlayıcının sağlık ve performans özetini döner."""
+        return self.get_health()
+
+    def to_orjson_bytes(self) -> bytes:
+        """Sağlayıcı verilerini orjson bayt dizisine dönüştürür."""
+        return to_orjson_bytes(self.to_dict())
 
     def __repr__(self) -> str:
         """Korumalı sağlayıcının okunabilir dize temsilini döner."""
@@ -955,6 +1022,7 @@ def export_all_providers_to_duckdb(db_path: str = DEFAULT_CB_DB_PATH) -> int:
     path_obj = Path(db_path)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(path_obj)) as conn:
+        configure_duckdb_wal(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS providers_summary (
@@ -970,8 +1038,182 @@ def export_all_providers_to_duckdb(db_path: str = DEFAULT_CB_DB_PATH) -> int:
             """
         )
         conn.register("tmp_prov_df", df)
-        conn.execute("INSERT OR REPLACE INTO providers_summary SELECT * FROM tmp_prov_df")
+        conn.execute("DELETE FROM providers_summary WHERE provider IN (SELECT provider FROM tmp_prov_df)")
+        conn.execute("INSERT INTO providers_summary SELECT * FROM tmp_prov_df")
         return len(df)
+
+
+def read_reliability_logs_from_duckdb(
+    db_path: str = DEFAULT_RELIABILITY_DB_PATH,
+    provider: str | None = None,
+    limit: int | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan sağlayıcı güvenilirlik kayıtlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        provider: İsteğe bağlı sağlayıcı adı filtresi.
+        limit: Dönecek maksimum satır sayısı.
+
+    Returns:
+        pl.DataFrame: Okunan güvenilirlik kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "provider": pl.Utf8,
+                "success": pl.Boolean,
+                "latency_ms": pl.Float64,
+                "timestamp": pl.Utf8,
+            }
+        )
+
+    try:
+        with duckdb.connect(str(path_obj), read_only=True) as conn:
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'provider_reliability_logs'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "provider": pl.Utf8,
+                        "success": pl.Boolean,
+                        "latency_ms": pl.Float64,
+                        "timestamp": pl.Utf8,
+                    }
+                )
+
+            query = "SELECT * FROM provider_reliability_logs"
+            clauses: list[str] = []
+            params: list[Any] = []
+            if provider:
+                clauses.append("provider = ?")
+                params.append(provider)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY timestamp DESC"
+            if limit and limit > 0:
+                query += f" LIMIT {int(limit)}"
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_reliability_logs_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "provider": pl.Utf8,
+                "success": pl.Boolean,
+                "latency_ms": pl.Float64,
+                "timestamp": pl.Utf8,
+            }
+        )
+
+
+def clear_reliability_logs_duckdb(db_path: str = DEFAULT_RELIABILITY_DB_PATH) -> None:
+    """DuckDB'de depolanan sağlayıcı güvenilirlik kayıtları tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS provider_reliability_logs;")
+    except Exception as exc:
+        logger.error("duckdb_reliability_logs_temizleme_hatasi", db_path=db_path, hata=str(exc))
+
+
+def read_providers_summary_from_duckdb(
+    db_path: str = DEFAULT_CB_DB_PATH,
+    provider: str | None = None,
+) -> pl.DataFrame:
+    """DuckDB'de depolanan sağlayıcı özet durumlarını Polars DataFrame olarak okur.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+        provider: İsteğe bağlı sağlayıcı adı filtresi.
+
+    Returns:
+        pl.DataFrame: Okunan sağlayıcı özet kayıtları.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return pl.DataFrame(
+            schema={
+                "provider": pl.Utf8,
+                "circuit_state": pl.Utf8,
+                "failure_count": pl.Int64,
+                "tokens": pl.Float64,
+                "reliability_score": pl.Float64,
+                "total_calls": pl.Int64,
+                "total_failures": pl.Int64,
+                "success_rate": pl.Float64,
+            }
+        )
+
+    try:
+        with duckdb.connect(str(path_obj), read_only=True) as conn:
+            table_check = conn.execute(
+                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'providers_summary'"
+            ).fetchone()
+            if not table_check or table_check[0] == 0:
+                return pl.DataFrame(
+                    schema={
+                        "provider": pl.Utf8,
+                        "circuit_state": pl.Utf8,
+                        "failure_count": pl.Int64,
+                        "tokens": pl.Float64,
+                        "reliability_score": pl.Float64,
+                        "total_calls": pl.Int64,
+                        "total_failures": pl.Int64,
+                        "success_rate": pl.Float64,
+                    }
+                )
+
+            query = "SELECT * FROM providers_summary"
+            params: list[Any] = []
+            if provider:
+                query += " WHERE provider = ?"
+                params.append(provider)
+            query += " ORDER BY provider ASC"
+
+            arrow_table = conn.execute(query, params).arrow()
+            return pl.from_arrow(arrow_table)
+    except Exception as exc:
+        logger.warning("duckdb_providers_summary_okuma_hatasi", db_path=db_path, hata=str(exc))
+        return pl.DataFrame(
+            schema={
+                "provider": pl.Utf8,
+                "circuit_state": pl.Utf8,
+                "failure_count": pl.Int64,
+                "tokens": pl.Float64,
+                "reliability_score": pl.Float64,
+                "total_calls": pl.Int64,
+                "total_failures": pl.Int64,
+                "success_rate": pl.Float64,
+            }
+        )
+
+
+def clear_providers_summary_duckdb(db_path: str = DEFAULT_CB_DB_PATH) -> None:
+    """DuckDB'de depolanan sağlayıcı özet tablosunu temizler.
+
+    Args:
+        db_path: DuckDB dosya yolu.
+    """
+    path_obj = Path(db_path)
+    if not path_obj.exists():
+        return
+    try:
+        with duckdb.connect(str(path_obj)) as conn:
+            configure_duckdb_wal(conn)
+            conn.execute("DROP TABLE IF EXISTS providers_summary;")
+    except Exception as exc:
+        logger.error("duckdb_providers_summary_temizleme_hatasi", db_path=db_path, hata=str(exc))
 
 
 __all__ = [
@@ -979,6 +1221,7 @@ __all__ = [
     "CB_STATE_GAUGE",
     "DEFAULT_BASE_DELAY",
     "DEFAULT_CB_DB_PATH",
+    "DEFAULT_CHECKPOINT_SIZE",
     "DEFAULT_FAILURE_THRESHOLD",
     "DEFAULT_MAX_DELAY",
     "DEFAULT_MAX_RETRIES",
@@ -986,6 +1229,7 @@ __all__ = [
     "DEFAULT_RECOVERY_TIMEOUT_SECONDS",
     "DEFAULT_REFILL_RATE",
     "DEFAULT_RELIABILITY_DB_PATH",
+    "DEFAULT_WAL_SIZE",
     "DEFAULT_WINDOW_SIZE",
     "CircuitBreaker",
     "CircuitState",
@@ -994,11 +1238,17 @@ __all__ = [
     "RateLimiter",
     "RetryPolicy",
     "clear_all_providers",
+    "clear_providers_summary_duckdb",
+    "clear_reliability_logs_duckdb",
+    "configure_duckdb_wal",
     "export_all_providers_to_duckdb",
     "export_all_providers_to_polars",
     "get_all_health",
     "get_provider",
     "otel_trace",
+    "read_providers_summary_from_duckdb",
+    "read_reliability_logs_from_duckdb",
     "register_protected_provider",
+    "to_orjson_bytes",
     "unregister_protected_provider",
 ]
