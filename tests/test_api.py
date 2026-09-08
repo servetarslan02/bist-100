@@ -307,7 +307,7 @@ class TestSecurity:
         """JWT HS256 kullanmalı."""
         from services.api.auth import JWTHandler
 
-        handler = JWTHandler()
+        handler = JWTHandler(secret_key="test-secret")
         assert handler.algorithm == "HS256"
 
     def test_endpoint_group_recognition(self) -> Any:

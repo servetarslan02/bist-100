@@ -26,6 +26,7 @@ logger = structlog.get_logger(__name__)
 
 __all__ = [
     "InvestingAdapter",
+    "investing_adapter",
 ]
 
 

@@ -37,6 +37,8 @@ logger = structlog.get_logger(__name__)
 
 __all__ = [
     "SatelliteAdapter",
+    "satellite_adapter",
+    "compute_satellite_features",
 ]
 
 

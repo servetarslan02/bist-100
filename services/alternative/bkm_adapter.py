@@ -231,6 +231,9 @@ class BKMAdapter(BaseAdapter):
             "cc_seasonal_deviation": self._calc_seasonal_dev(data),
         }
 
+        if "sector_growth" in data or "vs_sector" in data:
+            features["cc_vs_sector"] = self._calc_seasonal_dev(data)
+
         return features
 
     def _calc_seasonal_dev(self, data: dict[str, Any]) -> float:

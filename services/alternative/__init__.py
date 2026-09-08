@@ -43,8 +43,10 @@ from .feature_store import FeatureManifest, FeatureStore, feature_store
 
 # === Adapters ===
 from .google_trends import GoogleTrendsAdapter, google_trends_adapter
+from .investing_adapter import InvestingAdapter, investing_adapter
 from .jobs import compute_job_features
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
+from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
 
 # === LLM Sentiment ===
 from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
@@ -57,11 +59,6 @@ from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconci
 _LAZY_IMPORTS = {
     "compute_social_features": (".social", "compute_social_features"),
     "compute_web_features": (".web_scraping", "compute_web_features"),
-    "InvestingAdapter": (".investing_adapter", "InvestingAdapter"),
-    "investing_adapter": (".investing_adapter", "investing_adapter"),
-    "SatelliteAdapter": (".satellite_adapter", "SatelliteAdapter"),
-    "satellite_adapter": (".satellite_adapter", "satellite_adapter"),
-    "compute_satellite_features": (".satellite_adapter", "compute_satellite_features"),
 }
 
 
