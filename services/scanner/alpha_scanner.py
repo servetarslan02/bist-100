@@ -107,6 +107,22 @@ class AlphaScanner(ScannerInterface):
         self._scan_count: int = 0
         self._regime: str = "RANGE"
         self._regime_confidence: float = 0.5
+        self._last_results: list[ScannerResult] = []
+
+    def get_latest_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Son tarama sonuçlarını veya kararları dict formatında döndürür."""
+        res = []
+        for r in self._last_results[:limit]:
+            res.append({
+                "ticker": r.ticker,
+                "score": r.opportunity_score,
+                "signal": r.signal_type,
+                "direction": r.signal_direction,
+                "confidence": r.signal_confidence,
+                "price": r.price,
+                "action": r.signal_direction or ("BUY" if r.opportunity_score >= 65 else "HOLD"),
+            })
+        return res
 
     def scan(
         self,
@@ -155,6 +171,7 @@ class AlphaScanner(ScannerInterface):
         elapsed = time.time() - start
         self._last_scan = datetime.now(UTC)
         self._scan_count += 1
+        self._last_results = results
 
         logger.info(
             "Alpha scan completed",

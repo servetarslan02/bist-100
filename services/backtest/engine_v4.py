@@ -496,6 +496,59 @@ class BacktestEngineV4:
             trade_end,
         )
 
+    @staticmethod
+    def _filter_df_until(df: Any, current_date: str) -> Any:
+        """Belirtilen tarihe (dahil) kadar olan verileri filtreler (Polars & Pandas uyumlu)."""
+        if df is None or len(df) == 0:
+            return df
+        if pl is not None and isinstance(df, pl.DataFrame):
+            if "Date" in df.columns:
+                return df.filter(pl.col("Date").cast(pl.Utf8).str.slice(0, 10) <= str(current_date)[:10])
+            return df
+        if hasattr(df, "columns") and "Date" in df.columns:
+            return df[df["Date"].astype(str).str.slice(0, 10) <= str(current_date)[:10]]
+        if hasattr(df, "index"):
+            return df[df.index <= current_date]
+        return df
+
+    @staticmethod
+    def _get_price_at_date(df: Any, target_date: str, column: str = "Open") -> float | None:
+        """Hedef tarihteki belirtilen fiyatı döner (Polars & Pandas uyumlu)."""
+        if df is None or len(df) == 0:
+            return None
+        target_str = str(target_date)[:10]
+        if pl is not None and isinstance(df, pl.DataFrame):
+            if "Date" in df.columns and column in df.columns:
+                filtered = df.filter(pl.col("Date").cast(pl.Utf8).str.slice(0, 10) == target_str)
+                if len(filtered) > 0:
+                    val = filtered[column][0]
+                    return float(val) if val is not None else None
+            return None
+        if hasattr(df, "columns") and "Date" in df.columns and column in df.columns:
+            matches = df[df["Date"].astype(str).str.slice(0, 10) == target_str]
+            if len(matches) > 0:
+                return float(matches[column].iloc[0])
+            return None
+        if hasattr(df, "index") and target_date in df.index and column in df.columns:
+            return float(df.loc[target_date, column])
+        return None
+
+    @staticmethod
+    def _has_date(df: Any, target_date: str) -> bool:
+        """Hedef tarihin DataFrame'de bulunup bulunmadığını kontrol eder."""
+        if df is None or len(df) == 0:
+            return False
+        target_str = str(target_date)[:10]
+        if pl is not None and isinstance(df, pl.DataFrame):
+            if "Date" in df.columns:
+                return len(df.filter(pl.col("Date").cast(pl.Utf8).str.slice(0, 10) == target_str)) > 0
+            return False
+        if hasattr(df, "columns") and "Date" in df.columns:
+            return (df["Date"].astype(str).str.slice(0, 10) == target_str).any()
+        if hasattr(df, "index"):
+            return target_date in df.index
+        return False
+
     def _run_legacy(
         self,
         market_data: dict[str, pl.DataFrame],
@@ -618,7 +671,7 @@ class BacktestEngineV4:
                     hist_adapter = HistoricalDataAdapter(cfg.historical_repository)
 
                 for t, tdf in market_data.items():
-                    tdf_until = tdf[tdf.index <= current_date]
+                    tdf_until = self._filter_df_until(tdf, current_date)
                     if len(tdf_until) >= effective_lookback:
                         feats = self._get_features(t, date_str, tdf_until, effective_lookback, cfg)
                         if feats:
@@ -642,14 +695,14 @@ class BacktestEngineV4:
                 if ticker not in market_data:
                     continue
                 df = market_data[ticker]
-                if next_date not in df.index:
+                if not self._has_date(df, next_date):
                     continue
 
                 # Score hesapla (canonical modda enriched features)
                 if cfg.use_canonical_scoring and ticker in day_features:
                     features = day_features[ticker]
                 else:
-                    df_until = df[df.index <= current_date]
+                    df_until = self._filter_df_until(df, current_date)
                     if len(df_until) < effective_lookback:
                         continue
                     features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
@@ -660,9 +713,10 @@ class BacktestEngineV4:
                 total_scans += 1
                 score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
-                    price = float(df.loc[next_date, "Open"])
-                    sim.execute_sell(ticker, price, date_str)
-                    signals_count += 1
+                    price = self._get_price_at_date(df, next_date, "Open")
+                    if price is not None:
+                        sim.execute_sell(ticker, price, date_str)
+                        signals_count += 1
 
             # BUY sinyalleri
             buy_candidates = []
@@ -700,7 +754,7 @@ class BacktestEngineV4:
                     if quality_info and quality_info[1] < cfg.min_quality_score:
                         data_quality_issues += 1
                         continue
-                    df_until = df[df.index <= current_date]
+                    df_until = self._filter_df_until(df, current_date)
                     if len(df_until) < effective_lookback:
                         continue
                     features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
@@ -722,9 +776,11 @@ class BacktestEngineV4:
                 if not sim.can_buy():
                     break
                 df = market_data[ticker]
-                if next_date not in df.index:
+                if not self._has_date(df, next_date):
                     continue
-                price = float(df.loc[next_date, "Open"])
+                price = self._get_price_at_date(df, next_date, "Open")
+                if price is None:
+                    continue
                 atr = day_features.get(ticker, {}).get("atr_pct", 2.0) if day_features else 2.0
                 vol_ratio = max(0.5, float(atr) / 2.5)
                 sim.execute_buy(ticker, price, date_str, volatility_ratio=vol_ratio)
@@ -733,8 +789,10 @@ class BacktestEngineV4:
             # Equity snapshot
             prices = {}
             for ticker in sim._positions:
-                if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = float(market_data[ticker].loc[current_date, "Close"])
+                if ticker in market_data:
+                    c_price = self._get_price_at_date(market_data[ticker], current_date, "Close")
+                    if c_price is not None:
+                        prices[ticker] = c_price
             sim.update_equity(prices, date_str, bench_price)
 
         elapsed = _time.time() - start_time
@@ -1474,13 +1532,17 @@ class BacktestEngineV4:
 
                 df = market_data.get(ticker)
                 if df is not None:
-                    mask_arr = df.index <= current_date
-                    stock_close = df["Close"].to_numpy()[mask_arr]
-                    bench_slice = benchmark_close[: len(stock_close)]
-                    if len(stock_close) > 20 and len(bench_slice) == len(stock_close):
-                        rs_motor = RelativeStrengthMotor()
-                        rs_feats = rs_motor.compute(ticker, stock_close, bench_slice)
-                        enriched.update(rs_feats)
+                    df_filtered = self._filter_df_until(df, current_date)
+                    if "Close" in df_filtered.columns:
+                        if pl is not None and isinstance(df_filtered, pl.DataFrame):
+                            stock_close = df_filtered["Close"].to_numpy().astype(float)
+                        else:
+                            stock_close = df_filtered["Close"].to_numpy().astype(float)
+                        bench_slice = benchmark_close[: len(stock_close)]
+                        if len(stock_close) > 20 and len(bench_slice) == len(stock_close):
+                            rs_motor = RelativeStrengthMotor()
+                            rs_feats = rs_motor.compute(ticker, stock_close, bench_slice)
+                            enriched.update(rs_feats)
             except Exception as e:
                 logger.debug("relative_strength_hatasi: ticker=%s, hata=%s", ticker, str(e))
 
@@ -1495,19 +1557,26 @@ class BacktestEngineV4:
 
         # === SEASONALITY (PIT-safe) ===
         try:
-            dates_list = []
+            dates_list: list[str] = []
             df = market_data.get(ticker)
             if df is not None:
-                mask_arr = df.index <= current_date
-                dates_list = [str(d.date()) if hasattr(d, "date") else str(d) for d in df.index[mask_arr]]
-            if len(dates_list) >= 252:
-                close_arr = df["Close"].to_numpy()[mask_arr] if df is not None else None
-                if close_arr is not None and len(close_arr) >= 252:
-                    from services.features.seven_motors import SeasonalityMotor
+                df_filtered = self._filter_df_until(df, current_date)
+                if pl is not None and isinstance(df_filtered, pl.DataFrame):
+                    if "Date" in df_filtered.columns:
+                        dates_list = [str(d)[:10] for d in df_filtered["Date"].to_list()]
+                elif hasattr(df_filtered, "columns") and "Date" in df_filtered.columns:
+                    dates_list = [str(d)[:10] for d in df_filtered["Date"]]
+                elif hasattr(df_filtered, "index"):
+                    dates_list = [str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df_filtered.index]
 
-                    season_motor = SeasonalityMotor()
-                    season_feats = season_motor.compute(ticker, close_arr, dates_list)
-                    enriched.update(season_feats)
+                if len(dates_list) >= 252 and "Close" in df_filtered.columns:
+                    close_arr = df_filtered["Close"].to_numpy().astype(float)
+                    if len(close_arr) >= 252:
+                        from services.features.seven_motors import SeasonalityMotor
+
+                        season_motor = SeasonalityMotor()
+                        season_feats = season_motor.compute(ticker, close_arr, dates_list)
+                        enriched.update(season_feats)
         except Exception as e:
             logger.debug("seasonality_hatasi: ticker=%s, hata=%s", ticker, str(e))
 

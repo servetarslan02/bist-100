@@ -93,11 +93,12 @@ async def create_decision(
     try:
         from ...core.database import pg_fetchrow
 
+        user_id = getattr(user, "user_id", None) or getattr(user, "sub", "system")
         row = await pg_fetchrow(
             "INSERT INTO decisions (ticker, action, created_by) VALUES ($1, $2, $3) RETURNING id, created_at",
             ticker,
             action,
-            user.user_id,
+            user_id,
         )
         return {
             "status": "created",

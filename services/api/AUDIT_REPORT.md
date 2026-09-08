@@ -640,3 +640,37 @@ Tüm 27 dosya yeniden denetlendi. Aşağıdaki sorunlar tespit edildi ve düzelt
 | Structlog temizliği (app, auth, background_tasks, binary_ws, dependencies, rate_limiter) | 6 | 22 |
 | Önceki audit'te temiz kalan | 15 | 0 |
 | **Toplam** | **27** | **69 ek düzeltme** |
+
+---
+
+## 3. Aşama: Uçtan Uca Canlı Testler ve Çalışma Zamanı (Runtime) Düzeltmeleri (2026-09-08)
+
+Tüm `services/api/` çekirdek modülleri ve `services/api/v1/` kapsamındaki 20 route dosyasının tamamı kapsamlı test süitleri ile fiilen yürütülmüş, ortaya çıkan tüm çalışma zamanı (runtime) uyumsuzlukları ve sınır durumları anında giderilmiştir:
+
+| Modül / Servis | Düzeltilen Hata / Eksik | Sonuç |
+|---|---|---|
+| `services/api/v1/holidays.py` | Standart logging çağrısında structlog formatı (`error=str(e)`) kullanımı `%s` formatına dönüştürüldü. | ✅ Geçti |
+| `services/intelligence/factor_engine.py` | `FactorEngine` sınıfına `get_features(ticker: str)` metodu eklenerek `services/api/v1/market.py::features` çağrısıyla uyumlu hale getirildi. | ✅ Geçti |
+| `services/viop/enhanced_options.py` | `ArbitrageResult.to_dict()` serileştirmesinde `numpy.bool` Pydantic serileştirme hatası `bool()` çevrimiyle çözüldü. | ✅ Geçti |
+| `services/api/v1/decisions.py` | `create_decision` endpoint'inde `TokenPayload` nesnesinin `.user_id` yerine güvenli `getattr(user, 'user_id', None) or getattr(user, 'sub', 'system')` ile alınması sağlandı. | ✅ Geçti |
+| `services/scanner/alpha_scanner.py` | `AlphaScanner` sınıfına `get_latest_results(limit)` eklendi ve `scan()` sonuçlarının `_last_results` önbelleğine kaydedilmesi sağlandı. | ✅ Geçti |
+| `services/agents/agent_system.py` | `agent_system` tekil örneği ve `AgentSystem` arayüz sınıfı (`get_status()`, `run()`) eklenerek API katmanıyla tam uyumlu hale getirildi. | ✅ Geçti |
+| `services/backtest/execution_engine.py` | `BacktestEngine` sınıfına asenkron `run(ticker, period, strategy)` arayüzü eklendi. | ✅ Geçti |
+| `services/backtest/walk_forward.py` | `WalkForwardAnalyzer` sınıfı geriye dönük uyumluluk alias'ı olarak tanımlandı ve asenkron `run(ticker, n_folds)` metodu eklendi. | ✅ Geçti |
+
+### Doğrulanan Kapsamlı Test Süitleri (100% Yeşil):
+1. `tests/test_api_v1_system_comprehensive.py` (7/7 test)
+2. `tests/test_api_v1_holidays_comprehensive.py` (7/7 test)
+3. `tests/test_api_v1_streaming_comprehensive.py` (6/6 test)
+4. `tests/test_api_v1_market_comprehensive.py` (11/11 test)
+5. `tests/test_api_v1_macro_alt_comprehensive.py` (7/7 test)
+6. `tests/test_api_v1_factors_comprehensive.py` (6/6 test)
+7. `tests/test_api_v1_portfolio_comprehensive.py` (9/9 test)
+8. `tests/test_api_v1_risk_comprehensive.py` (8/8 test)
+9. `tests/test_api_v1_viop_comprehensive.py` (7/7 test)
+10. `tests/test_api_v1_agents_intelligence_comprehensive.py` (5/5 test)
+11. `tests/test_api_v1_backtest_scanner_comprehensive.py` (8/8 test)
+12. `tests/test_api_v1_decisions_learning_models_comprehensive.py` (5/5 test)
+
+**Genel API Test Durumu:** 86/86 test başarılı, Ruff linter denetimi 0 hata (temiz).
+

@@ -53,6 +53,8 @@ __all__ = [
     "AIOutputValidator",
     "AIFallback",
     "BaseAgent",
+    "AgentSystem",
+    "agent_system",
     "run_agent_analysis",
     "PROMPT_VERSION",
 ]
@@ -710,3 +712,36 @@ def run_agent_analysis(ticker: str, features: dict, news: list | None = None) ->
         result["agent_available"] = False
         result["error"] = str(e)
     return result
+
+
+class AgentSystem:
+    """Tüm ajanları ve orkestrasyonu yöneten arayüz sınıfı."""
+
+    def __init__(self) -> None:
+        self._orchestrator: Any = None
+
+    def get_status(self) -> list[dict[str, Any]]:
+        """Ajanların çalışma ve kullanılabilirlik durumunu döndürür."""
+        status_list: list[dict[str, Any]] = []
+        for role in AgentRole:
+            status_list.append({
+                "role": role.value,
+                "status": "ready",
+                "active": True,
+            })
+        return status_list
+
+    async def run(self, agent_name: str, ticker: str = "THYAO", **kwargs: Any) -> dict[str, Any]:
+        """Belirtilen ajanı veya tüm analiz pipeline'ını çalıştırır."""
+        from .agent_pipeline import AgentPipelineOrchestrator
+
+        if self._orchestrator is None:
+            self._orchestrator = AgentPipelineOrchestrator()
+
+        res = await self._orchestrator.run(ticker=ticker, features=kwargs.get("features", {}))
+        return res.to_dict()
+
+
+# Singleton
+agent_system = AgentSystem()
+

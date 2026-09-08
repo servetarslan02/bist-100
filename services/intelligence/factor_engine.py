@@ -57,6 +57,27 @@ class FactorEngine:
         "low_vol": 0.20,
     }
 
+    def get_features(self, ticker: str) -> dict[str, Any]:
+        """Hisse için faktör özelliklerini sözlük olarak döner.
+
+        Args:
+            ticker: Hisse sembolü.
+
+        Returns:
+            dict: Faktör skorları ve metrikleri.
+        """
+        score = self.get_ticker_factor_score(ticker)
+        if score is None:
+            return {}
+        return {
+            "value_score": score.value_score,
+            "momentum_score": score.momentum_score,
+            "quality_score": score.quality_score,
+            "size_score": score.size_score,
+            "low_vol_score": score.low_vol_score,
+            "composite_score": score.composite_score,
+        }
+
     def compute_factor_scores(
         self,
         ticker: str,

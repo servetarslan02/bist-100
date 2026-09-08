@@ -1153,18 +1153,18 @@ class ArbitrageResult:
     estimated_profit: float
 
     def to_dict(self) -> dict[str, Any]:
-        """Otomatik eklendi."""
+        """Arbitraj sonucunu sözlük olarak döndürür."""
         return {
-            "spot_price": self.spot_price,
-            "futures_price": self.futures_price,
-            "theoretical_futures": self.theoretical_futures,
-            "basis": self.basis,
-            "fair_basis": self.fair_basis,
-            "basis_diff": self.basis_diff,
-            "basis_pct": self.basis_pct,
-            "arbitrage_opportunity": self.arbitrage_opportunity,
-            "strategy": self.strategy,
-            "estimated_profit": self.estimated_profit,
+            "spot_price": float(self.spot_price),
+            "futures_price": float(self.futures_price),
+            "theoretical_futures": float(self.theoretical_futures),
+            "basis": float(self.basis),
+            "fair_basis": float(self.fair_basis),
+            "basis_diff": float(self.basis_diff),
+            "basis_pct": float(self.basis_pct),
+            "arbitrage_opportunity": bool(self.arbitrage_opportunity),
+            "strategy": str(self.strategy),
+            "estimated_profit": float(self.estimated_profit),
         }
 
 

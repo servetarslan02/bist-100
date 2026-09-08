@@ -4,8 +4,14 @@ from typing import Any
 
 import logging
 import os
+import warnings
 
 import pytest
+
+# Third-party Starlette & AnyIO test client deprecation warnings
+warnings.filterwarnings("ignore", message=".*Using `httpx` with `starlette.testclient` is deprecated.*")
+warnings.filterwarnings("ignore", message=".*The anyio.abc.BlockingPortal alias is deprecated.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="starlette.testclient")
 
 logger = logging.getLogger(__name__)
 

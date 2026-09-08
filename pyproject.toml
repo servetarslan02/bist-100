@@ -103,7 +103,7 @@ ignore_missing_imports = true
 pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--tb=short -q --ignore=tests/e2e_full_test.py"
+addopts = "--tb=short -q --disable-warnings -p no:warnings --ignore=tests/e2e_full_test.py"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -13,7 +13,7 @@ from services.ml.feature_engine import FeatureEngine
 class FeatureCalculator(FeatureEngine):
     """Canonical FeatureEngine bridge for feature calculator."""
 
-    def compute_all_features(self, df: Any, ticker: str = "") -> dict[str, float]:
+    def compute_all_features(self, df: Any, ticker: str = "", mask: Any = None) -> dict[str, float]:
         """Compute all features for given dataframe and ticker."""
         if df is None:
             return {}
@@ -27,6 +27,15 @@ class FeatureCalculator(FeatureEngine):
             pdf = pl.DataFrame(df)
         else:
             return {}
+
+        if mask is not None and len(mask) == len(pdf):
+            try:
+                import numpy as np
+
+                mask_arr = np.asarray(mask, dtype=bool)
+                pdf = pdf.filter(pl.Series(mask_arr))
+            except Exception:
+                pass
 
         if len(pdf) < 5:
             return {}

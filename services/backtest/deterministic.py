@@ -166,34 +166,36 @@ class DeterministicRecovery:
         Returns:
             SystemCheckpoint nesnesi
         """
-        checkpoint_id = f"cp_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
+        with self._lock:
+            self._execution_counter += 1
+            checkpoint_id = f"cp_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}_{self._execution_counter:06d}"
 
-        # Deep copy ile nested yapıların sonradan değiştirilmesini önle
-        checkpoint = SystemCheckpoint(
-            checkpoint_id=checkpoint_id,
-            timestamp=datetime.now(UTC),
-            config_snapshot=copy.deepcopy(config),
-            portfolio_state=copy.deepcopy(portfolio_state),
-            model_state=copy.deepcopy(model_state) if model_state else None,
-            feature_cache_state=copy.deepcopy(feature_cache or {}),
-            random_seed=self._current_seed,
-            execution_counter=self._execution_counter,
-            hash_state="",
-        )
-        checkpoint.hash_state = checkpoint.compute_state_hash()
+            # Deep copy ile nested yapıların sonradan değiştirilmesini önle
+            checkpoint = SystemCheckpoint(
+                checkpoint_id=checkpoint_id,
+                timestamp=datetime.now(UTC),
+                config_snapshot=copy.deepcopy(config),
+                portfolio_state=copy.deepcopy(portfolio_state),
+                model_state=copy.deepcopy(model_state) if model_state else None,
+                feature_cache_state=copy.deepcopy(feature_cache or {}),
+                random_seed=self._current_seed,
+                execution_counter=self._execution_counter,
+                hash_state="",
+            )
+            checkpoint.hash_state = checkpoint.compute_state_hash()
 
-        self._checkpoints.append(checkpoint)
-        if len(self._checkpoints) > 500:
-            self._checkpoints = self._checkpoints[-500:]
-        self._persist_checkpoint(checkpoint)
+            self._checkpoints.append(checkpoint)
+            if len(self._checkpoints) > 500:
+                self._checkpoints = self._checkpoints[-500:]
+            self._persist_checkpoint(checkpoint)
 
-        logger.info(
-            "checkpoint_olusturuldu: id=%s, hash=%s",
-            checkpoint_id,
-            checkpoint.hash_state,
-        )
+            logger.info(
+                "checkpoint_olusturuldu: id=%s, hash=%s",
+                checkpoint_id,
+                checkpoint.hash_state,
+            )
 
-        return checkpoint
+            return checkpoint
 
     def restore_checkpoint(
         self,

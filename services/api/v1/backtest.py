@@ -135,10 +135,10 @@ async def walk_forward(
         HTTPException: Analiz çalıştırılamazsa 500 hatası döner.
     """
     try:
-        from ...backtest.walk_forward import WalkForwardAnalyzer
+        from ...backtest.walk_forward_engine import WalkForwardEngineV5
 
-        analyzer = WalkForwardAnalyzer()
-        result = await analyzer.run(ticker=ticker, n_folds=n_folds)
+        analyzer = WalkForwardEngineV5()
+        result = await analyzer.run_async(ticker=ticker, n_folds=n_folds)
         return {
             "status": "completed",
             "ticker": ticker,

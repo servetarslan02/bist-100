@@ -22,7 +22,6 @@ Kaynak: Du (2026), Huang (2026), Oxford (2023)
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -479,7 +478,7 @@ class PurgeEmbargoWalkForward:
         Returns:
             Ortalama turnover oranı (0-1)
         """
-        if len(predictions) < 2:
+        if len(predictions) < 2 or getattr(predictions, "ndim", 2) < 2:
             return 0.0
 
         prev_top_k = set()
@@ -537,11 +536,7 @@ class PurgeEmbargoWalkForward:
 
 
 # Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
-warnings.warn(
-    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
-    DeprecationWarning,
-    stacklevel=2,
-)
+# Geriye dönük uyumluluk için tembel singleton (import anında uyarı vermez)
 purge_embargo_wf_engine = PurgeEmbargoWalkForward()
 
 __all__ = [
