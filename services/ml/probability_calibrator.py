@@ -171,6 +171,13 @@ class ProbabilityCalibrator:
         self._duckdb_path: str = duckdb_path
         self._lock: threading.RLock = threading.RLock()
         self.calibrator: Any = None
+        self.is_fitted: bool = False
+        self.raw_brier: float = 0.0
+        self.calibrated_brier: float = 0.0
+        self.raw_ece: float = 0.0
+        self.calibrated_ece: float = 0.0
+        self.sample_count: int = 0
+        self._init_duckdb()
 
     def __getstate__(self) -> dict[str, Any]:
         """Pickle serileştirmesinde threading.RLock nesnesini dışlayarak durum döndürür."""
@@ -197,7 +204,11 @@ class ProbabilityCalibrator:
             db_dir = Path(self._duckdb_path).parent
             db_dir.mkdir(parents=True, exist_ok=True)
             with duckdb.connect(self._duckdb_path) as conn:
-                configure_duckdb_wal(conn)
+                # WAL pragma hatası tablo oluşturmayı engellememelidir
+                try:
+                    configure_duckdb_wal(conn)
+                except Exception as pragma_exc:
+                    logger.warning("DuckDB WAL pragma basarisiz, devam ediliyor", hata=str(pragma_exc))
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS probability_calibration_audit (
@@ -220,7 +231,10 @@ class ProbabilityCalibrator:
         try:
             now_iso = datetime.now(UTC).isoformat()
             with duckdb.connect(self._duckdb_path) as conn:
-                configure_duckdb_wal(conn)
+                try:
+                    configure_duckdb_wal(conn)
+                except Exception as pragma_exc:
+                    logger.warning("DuckDB WAL pragma basarisiz, devam ediliyor", hata=str(pragma_exc))
                 conn.execute(
                     """
                     INSERT INTO probability_calibration_audit
