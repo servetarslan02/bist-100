@@ -20,6 +20,8 @@ Modeli her fold'da YENİDEN EĞİTMEZ.
 Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 
+from __future__ import annotations
+
 import warnings
 from dataclasses import dataclass
 
@@ -519,9 +521,8 @@ class PurgeEmbargoWalkForward:
         euler_mascheroni = 0.5772156649
         n = n_trials
 
-        expected_max_z = (
-            (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n)
-            + euler_mascheroni * _norm.ppf(1 - 1.0 / (n * np.e))
+        expected_max_z = (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n) + euler_mascheroni * _norm.ppf(
+            1 - 1.0 / (n * np.e)
         )
 
         # Sharpe standart hatası
@@ -537,8 +538,7 @@ class PurgeEmbargoWalkForward:
 
 # Singleton (DEPRECATED — WalkForwardEngineV5 kullanın)
 warnings.warn(
-    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, "
-    "walk_forward_engine.WalkForwardEngineV5 kullanın",
+    "enhanced_walk_forward.PurgeEmbargoWalkForward deprecated, walk_forward_engine.WalkForwardEngineV5 kullanın",
     DeprecationWarning,
     stacklevel=2,
 )

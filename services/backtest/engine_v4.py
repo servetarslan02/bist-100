@@ -868,14 +868,14 @@ class BacktestEngineV4:
             try:
                 if pl is not None and isinstance(df, pl.DataFrame):
                     date_arr = (
-                        np.array([str(d)[:10] for d in df["Date"].to_list()])
-                        if "Date" in df.columns
-                        else np.array([])
+                        np.array([str(d)[:10] for d in df["Date"].to_list()]) if "Date" in df.columns else np.array([])
                     )
                 elif hasattr(df, "columns") and "Date" in df.columns:
                     date_arr = np.array([str(d)[:10] for d in df["Date"]])
                 elif hasattr(df, "index"):
-                    date_arr = np.array([str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df.index])
+                    date_arr = np.array(
+                        [str(idx.date()) if hasattr(idx, "date") else str(idx)[:10] for idx in df.index]
+                    )
                 else:
                     continue
                 open_arr = df["Open"].to_numpy() if "Open" in df.columns else df["Close"].to_numpy()
@@ -1173,7 +1173,11 @@ class BacktestEngineV4:
             s_val = sorted_dates[effective_lookback]
             start_date = str(s_val.date()) if hasattr(s_val, "date") else str(s_val)[:10]
         else:
-            start_date = (str(sorted_dates[0].date()) if hasattr(sorted_dates[0], "date") else str(sorted_dates[0])[:10]) if sorted_dates else ""
+            start_date = (
+                (str(sorted_dates[0].date()) if hasattr(sorted_dates[0], "date") else str(sorted_dates[0])[:10])
+                if sorted_dates
+                else ""
+            )
 
         if sorted_dates:
             e_val = sorted_dates[-1]
@@ -1604,8 +1608,10 @@ class _FallbackMask:
         Returns:
             mask=None içeren basit nesne
         """
+
         class _Mask:
             """Boş tradability maskesi nesnesi."""
+
             mask = None
 
         return _Mask()
@@ -1631,8 +1637,10 @@ class _FallbackQuality:
         Returns:
             passed=True, quality_score=80.0 içeren nesne
         """
+
         class _Quality:
             """Varsayılan kalite kontrol sonucu."""
+
             passed = True
             quality_score = 80.0
 

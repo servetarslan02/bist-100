@@ -51,12 +51,7 @@ class BiasViolation:
 
     def __repr__(self) -> str:
         """BiasViolation okunabilir temsili."""
-        return (
-            f"BiasViolation("
-            f"type={self.violation_type!r}, "
-            f"severity={self.severity!r}, "
-            f"feature={self.feature_name!r})"
-        )
+        return f"BiasViolation(type={self.violation_type!r}, severity={self.severity!r}, feature={self.feature_name!r})"
 
     def to_dict(self) -> dict[str, Any]:
         """İhlali sözlük formatında döndürür.
@@ -146,11 +141,7 @@ class LookAheadBiasDetector:
         with self._lock:
             critical = sum(1 for v in self.violations if v.severity == "critical")
             total = len(self.violations)
-        return (
-            f"LookAheadBiasDetector("
-            f"violations={total}, "
-            f"critical={critical})"
-        )
+        return f"LookAheadBiasDetector(violations={total}, critical={critical})"
 
     def _record(self, report: BiasReport, violation: BiasViolation) -> None:
         """İhlali hem rapora hem dedektör geçmişine kaydeder.
@@ -192,10 +183,7 @@ class LookAheadBiasDetector:
                     severity="critical",
                     timestamp=decision_timestamp,
                     feature_name=feature_name,
-                    description=(
-                        f"Zaman damgası sütunu '{timestamp_col}' "
-                        f"feature verisinde bulunamadı"
-                    ),
+                    description=(f"Zaman damgası sütunu '{timestamp_col}' feature verisinde bulunamadı"),
                 ),
             )
             return report
@@ -270,21 +258,14 @@ class LookAheadBiasDetector:
         diff_col = "__rolling_diff__"
 
         computed = data.with_columns(
-            pl.col(value_col)
-            .shift(1)
-            .rolling_mean(window_size)
-            .alias(expected_col),
+            pl.col(value_col).shift(1).rolling_mean(window_size).alias(expected_col),
         ).with_columns(
-            (pl.col("rolling_mean") - pl.col(expected_col))
-            .abs()
-            .alias(diff_col),
+            (pl.col("rolling_mean") - pl.col(expected_col)).abs().alias(diff_col),
         )
 
         # Fark 1e-10'dan büyük olan ihlalleri filtrele
         violations_df = computed.filter(
-            pl.col(diff_col).is_not_null()
-            & pl.col(expected_col).is_not_null()
-            & (pl.col(diff_col) > 1e-10)
+            pl.col(diff_col).is_not_null() & pl.col(expected_col).is_not_null() & (pl.col(diff_col) > 1e-10)
         )
 
         for row in violations_df.iter_rows(named=True):
@@ -579,9 +560,7 @@ class BiasDetectorMiddleware:
         # 1. Timestamp validation
         for col in available_data.columns:
             if col.endswith("_score") or col.endswith("_feature"):
-                report = self.detector.validate_feature_timestamps(
-                    available_data, col, decision_timestamp
-                )
+                report = self.detector.validate_feature_timestamps(available_data, col, decision_timestamp)
                 combined_report.total_checks += report.total_checks
                 for v in report.violations:
                     combined_report.add_violation(v)

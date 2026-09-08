@@ -1,5 +1,7 @@
 """Öğrenme API — Uçtan uca Model Training & Performance Learning Servisleri."""
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -31,7 +33,9 @@ async def learning_status(
     try:
         latest = _pipeline.store.get_latest_metrics_all_models()
         active_regime = _pipeline.get_active_regime() if hasattr(_pipeline, "get_active_regime") else "UNKNOWN"
-        fusion_weights = _pipeline.fusion_engine.get_current_weights(active_regime) if active_regime != "UNKNOWN" else {}
+        fusion_weights = (
+            _pipeline.fusion_engine.get_current_weights(active_regime) if active_regime != "UNKNOWN" else {}
+        )
 
         return {
             "status": "active",
@@ -363,12 +367,14 @@ async def drift_detection(
             hit_rate = m.get("hit_rate_pct", 0.0)
             if brier > 0.35 or hit_rate < 45.0:
                 drift_detected = True
-                drift_details.append({
-                    "model_id": m.get("model_id"),
-                    "brier_score": brier,
-                    "hit_rate_pct": hit_rate,
-                    "reason": "Brier skoru eşiği aşıldı" if brier > 0.35 else "Doğruluk eşiğinin altında",
-                })
+                drift_details.append(
+                    {
+                        "model_id": m.get("model_id"),
+                        "brier_score": brier,
+                        "hit_rate_pct": hit_rate,
+                        "reason": "Brier skoru eşiği aşıldı" if brier > 0.35 else "Doğruluk eşiğinin altında",
+                    }
+                )
 
         return {
             "drift_detected": drift_detected,

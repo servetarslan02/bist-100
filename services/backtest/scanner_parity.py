@@ -316,25 +316,29 @@ class BacktestScannerParity:
             # Null / None kontrolü
             if exp_val is None or comp_val is None:
                 if exp_val != comp_val:
-                    mismatches.append({
-                        "anahtar": key,
-                        "beklenen": exp_val,
-                        "hesaplanan": comp_val,
-                        "fark": None,
-                        "sebep": "None uyuşmazlığı",
-                    })
+                    mismatches.append(
+                        {
+                            "anahtar": key,
+                            "beklenen": exp_val,
+                            "hesaplanan": comp_val,
+                            "fark": None,
+                            "sebep": "None uyuşmazlığı",
+                        }
+                    )
                 continue
 
             # NaN kontrolü
             if math.isnan(exp_val) or math.isnan(comp_val):
                 if not (math.isnan(exp_val) and math.isnan(comp_val)):
-                    mismatches.append({
-                        "anahtar": key,
-                        "beklenen": exp_val,
-                        "hesaplanan": comp_val,
-                        "fark": None,
-                        "sebep": "NaN uyuşmazlığı",
-                    })
+                    mismatches.append(
+                        {
+                            "anahtar": key,
+                            "beklenen": exp_val,
+                            "hesaplanan": comp_val,
+                            "fark": None,
+                            "sebep": "NaN uyuşmazlığı",
+                        }
+                    )
                 continue
 
             diff = abs(float(comp_val) - float(exp_val))
@@ -342,13 +346,15 @@ class BacktestScannerParity:
                 max_diff = diff
 
             if diff > tolerance:
-                mismatches.append({
-                    "anahtar": key,
-                    "beklenen": exp_val,
-                    "hesaplanan": comp_val,
-                    "fark": diff,
-                    "sebep": "Tolerans aşımı",
-                })
+                mismatches.append(
+                    {
+                        "anahtar": key,
+                        "beklenen": exp_val,
+                        "hesaplanan": comp_val,
+                        "fark": diff,
+                        "sebep": "Tolerans aşımı",
+                    }
+                )
 
         is_parity = len(mismatches) == 0
 
@@ -357,7 +363,9 @@ class BacktestScannerParity:
             is_parity=is_parity,
             backtest_value=expected_features,
             live_value=computed,
-            difference=max_diff if is_parity or any("fark" in m and m["fark"] is not None for m in mismatches) else None,
+            difference=max_diff
+            if is_parity or any("fark" in m and m["fark"] is not None for m in mismatches)
+            else None,
             tolerance=tolerance,
             details={
                 "uyusmazlik_sayisi": len(mismatches),
@@ -734,7 +742,9 @@ class FeatureVersionLock:
                 "hash": content_hash,
             }
 
-        logger.info("Feature sürümü kaydedildi: %s (Öznitelik: %d, Hash: %s)", version, len(feature_names), content_hash)
+        logger.info(
+            "Feature sürümü kaydedildi: %s (Öznitelik: %d, Hash: %s)", version, len(feature_names), content_hash
+        )
 
     def set_active_version(self, version: str) -> None:
         """
@@ -748,7 +758,9 @@ class FeatureVersionLock:
         """
         with self._lock:
             if version not in self._versions:
-                raise ValueError(f"Bilinmeyen feature versiyonu: {version}. Kayıtlı sürümler: {list(self._versions.keys())}")
+                raise ValueError(
+                    f"Bilinmeyen feature versiyonu: {version}. Kayıtlı sürümler: {list(self._versions.keys())}"
+                )
             self._active_version = version
 
         logger.info("Aktif feature sürümü güncellendi: %s", version)
@@ -813,10 +825,7 @@ class FeatureVersionLock:
 
     def __repr__(self) -> str:
         with self._lock:
-            return (
-                f"FeatureVersionLock(active='{self._active_version}', "
-                f"total_registered={len(self._versions)})"
-            )
+            return f"FeatureVersionLock(active='{self._active_version}', total_registered={len(self._versions)})"
 
 
 # =====================================================================

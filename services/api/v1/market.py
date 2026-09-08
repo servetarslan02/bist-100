@@ -1,5 +1,7 @@
 """Piyasa API — Canlı piyasa verisi, radar, ısı haritası ve enstrüman bilgileri."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from collections import defaultdict
@@ -512,14 +514,16 @@ async def live_intel_analysis(
             for row in sorted_clean_df.tail(120).iter_rows(named=True):
                 dt_val = row.get("Date")
                 date_str = str(dt_val)[:10] if dt_val is not None else ""
-                candles.append({
-                    "time": date_str,
-                    "open": round(float(row["Open"]), 2),
-                    "high": round(float(row["High"]), 2),
-                    "low": round(float(row["Low"]), 2),
-                    "close": round(float(row["Close"]), 2),
-                    "volume": int(row.get("Volume") or 100000),
-                })
+                candles.append(
+                    {
+                        "time": date_str,
+                        "open": round(float(row["Open"]), 2),
+                        "high": round(float(row["High"]), 2),
+                        "low": round(float(row["Low"]), 2),
+                        "close": round(float(row["Close"]), 2),
+                        "volume": int(row.get("Volume") or 100000),
+                    }
+                )
 
         # Mum formasyonları
         from ...intelligence.candle_patterns import candle_engine
@@ -734,17 +738,25 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
             "options": {"lang": "tr"},
             "symbols": {"query": {"types": []}, "tickers": []},
             "columns": [
-                "name", "description", "close", "change", "change_abs",
-                "volume", "high", "low", "open", "RSI", "Recommend.All",
+                "name",
+                "description",
+                "close",
+                "change",
+                "change_abs",
+                "volume",
+                "high",
+                "low",
+                "open",
+                "RSI",
+                "Recommend.All",
             ],
             "sort": {"sortBy": "volume", "sortOrder": "desc"},
             "range": [0, 650],
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         try:
             import httpx
+
             with httpx.Client(timeout=2.0) as client:
                 resp = client.post(url, json=payload, headers=headers)
             if resp.status_code == 200:
@@ -776,18 +788,20 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
                     if pos_ticker in universe:
                         universe[pos_ticker].last_price = close
 
-                    results.append({
-                        "symbol": pos_ticker,
-                        "name": name,
-                        "price": close,
-                        "change": change_pct,
-                        "volume": vol,
-                        "high": high,
-                        "low": low,
-                        "rsi": rsi,
-                        "score": score,
-                        "isBist100": pos_ticker in bist100,
-                    })
+                    results.append(
+                        {
+                            "symbol": pos_ticker,
+                            "name": name,
+                            "price": close,
+                            "change": change_pct,
+                            "volume": vol,
+                            "high": high,
+                            "low": low,
+                            "rsi": rsi,
+                            "score": score,
+                            "isBist100": pos_ticker in bist100,
+                        }
+                    )
 
                 if len(results) > 50:
                     logger.info("tradinglive_tarama_basarili: adet=%d", len(results))
@@ -808,7 +822,7 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
 
         results: list[dict[str, Any]] = []
         chunk_size = 70
-        chunks = [tickers_to_fetch[i:i + chunk_size] for i in range(0, len(tickers_to_fetch), chunk_size)]
+        chunks = [tickers_to_fetch[i : i + chunk_size] for i in range(0, len(tickers_to_fetch), chunk_size)]
 
         for chunk in chunks:
             yf_tickers = [f"{t}.IS" for t in chunk]
@@ -825,7 +839,8 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
                 for pos_ticker, yf_ticker in zip(chunk, yf_tickers, strict=False):
                     try:
                         df = (
-                            raw if len(chunk) == 1
+                            raw
+                            if len(chunk) == 1
                             else (raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None)
                         )
                         if df is None or df.empty or len(df) < 2:
@@ -837,13 +852,25 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
                         prev_close = float(closes[-2])
                         change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
                         volume_clean = df["Volume"].dropna() if "Volume" in df.columns else None
-                        volume = float(volume_clean.iloc[-1]) if volume_clean is not None and not volume_clean.empty else 100000.0
+                        volume = (
+                            float(volume_clean.iloc[-1])
+                            if volume_clean is not None and not volume_clean.empty
+                            else 100000.0
+                        )
 
                         high_clean = df["High"].dropna() if "High" in df.columns else None
-                        high = float(high_clean.iloc[-1]) if high_clean is not None and not high_clean.empty else last_close * 1.02
+                        high = (
+                            float(high_clean.iloc[-1])
+                            if high_clean is not None and not high_clean.empty
+                            else last_close * 1.02
+                        )
 
                         low_clean = df["Low"].dropna() if "Low" in df.columns else None
-                        low = float(low_clean.iloc[-1]) if low_clean is not None and not low_clean.empty else last_close * 0.98
+                        low = (
+                            float(low_clean.iloc[-1])
+                            if low_clean is not None and not low_clean.empty
+                            else last_close * 0.98
+                        )
 
                         rsi = _hesapla_rsi(closes)
                         ma20 = _hesapla_sma(closes, 20)
@@ -851,17 +878,23 @@ async def _fetch_radar_fresh(limit: int = 1000) -> dict[str, Any]:
                         rsi_score = 80 if (rsi and 40 < rsi < 65) else 50
                         mom_score = min(100, max(0, 50 + change_pct * 5))
                         score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
-                        results.append({
-                            "symbol": str(pos_ticker),
-                            "price": float(round(last_close, 2)),
-                            "change": float(change_pct),
-                            "volume": int(volume) if not np.isnan(volume) else 100000,
-                            "high": float(round(high, 2)) if not np.isnan(high) else float(round(last_close * 1.02, 2)),
-                            "low": float(round(low, 2)) if not np.isnan(low) else float(round(last_close * 0.98, 2)),
-                            "rsi": float(rsi),
-                            "score": int(score),
-                            "isBist100": bool(pos_ticker in bist100),
-                        })
+                        results.append(
+                            {
+                                "symbol": str(pos_ticker),
+                                "price": float(round(last_close, 2)),
+                                "change": float(change_pct),
+                                "volume": int(volume) if not np.isnan(volume) else 100000,
+                                "high": float(round(high, 2))
+                                if not np.isnan(high)
+                                else float(round(last_close * 1.02, 2)),
+                                "low": float(round(low, 2))
+                                if not np.isnan(low)
+                                else float(round(last_close * 0.98, 2)),
+                                "rsi": float(rsi),
+                                "score": int(score),
+                                "isBist100": bool(pos_ticker in bist100),
+                            }
+                        )
                     except Exception as exc:
                         logger.debug("hisse_isleme_hatasi: ticker=%s, hata=%s", pos_ticker, exc)
                         continue
@@ -983,7 +1016,13 @@ async def market_heatmap(
                 sec_name = "Savunma & Teknoloji"
             elif "OTO" in raw_sec:
                 sec_name = "Otomotiv & Yan Sanayi"
-            elif "GIDA" in raw_sec or "PERAKENDE" in raw_sec or "ICECEK" in raw_sec or "MAGAZA" in raw_sec or "TARIM" in raw_sec:
+            elif (
+                "GIDA" in raw_sec
+                or "PERAKENDE" in raw_sec
+                or "ICECEK" in raw_sec
+                or "MAGAZA" in raw_sec
+                or "TARIM" in raw_sec
+            ):
                 sec_name = "Perakende, Gıda & İçecek"
             elif "GYO" in raw_sec or "GAYRIMENKUL" in raw_sec or "INSAAT" in raw_sec:
                 sec_name = "GYO & Gayrimenkul"
@@ -991,7 +1030,14 @@ async def market_heatmap(
                 sec_name = "Telekomünikasyon & İletişim"
             elif "CIMENTO" in raw_sec or "MADEN" in raw_sec or "TAS" in raw_sec or "TOPRAK" in raw_sec:
                 sec_name = "Çimento & Madencilik"
-            elif "SANAYI" in raw_sec or "DEMIR" in raw_sec or "CELIK" in raw_sec or "CAM" in raw_sec or "KIMYA" in raw_sec or "TEKSTIL" in raw_sec:
+            elif (
+                "SANAYI" in raw_sec
+                or "DEMIR" in raw_sec
+                or "CELIK" in raw_sec
+                or "CAM" in raw_sec
+                or "KIMYA" in raw_sec
+                or "TEKSTIL" in raw_sec
+            ):
                 sec_name = "Sanayi & Demir-Çelik"
             else:
                 sec_name = "Diğer Sektörler"
@@ -1011,27 +1057,31 @@ async def market_heatmap(
         for it in sorted(items, key=lambda x: x.get("volume", 0), reverse=True)[:16]:
             vol_val = it.get("volume", 0)
             vol_str = f"{(vol_val / 1000000):.1f}M ₺" if vol_val >= 1000000 else f"{(vol_val / 1000):.0f}K ₺"
-            stock_list.append({
-                "symbol": it.get("symbol"),
-                "name": it.get("symbol"),
-                "price": round(float(it.get("price", 100.0)), 2),
-                "change_pct": round(float(it.get("change", 0.0)), 2),
-                "volume": vol_str,
-                "score": it.get("score", 75),
-            })
+            stock_list.append(
+                {
+                    "symbol": it.get("symbol"),
+                    "name": it.get("symbol"),
+                    "price": round(float(it.get("price", 100.0)), 2),
+                    "change_pct": round(float(it.get("change", 0.0)), 2),
+                    "volume": vol_str,
+                    "score": it.get("score", 75),
+                }
+            )
 
         vol_total_str = (
             f"{(total_vol / 1000000000):.1f} Milyar ₺"
             if total_vol >= 1000000000
             else f"{(total_vol / 1000000):.0f} Milyon ₺"
         )
-        sectors.append({
-            "name": sec_name,
-            "weight": weight,
-            "change_pct": avg_chg,
-            "volume_total": vol_total_str,
-            "stocks": stock_list,
-        })
+        sectors.append(
+            {
+                "name": sec_name,
+                "weight": weight,
+                "change_pct": avg_chg,
+                "volume_total": vol_total_str,
+                "stocks": stock_list,
+            }
+        )
 
     res: dict[str, Any] = {"status": "ok", "sectors": sectors}
     _heatmap_cache.set(res)

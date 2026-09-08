@@ -11,11 +11,13 @@ Features:
 - cc_transaction_count: İşlem sayısı
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 def compute_cc_features(cc_data: dict[str, Any], ticker: str) -> dict[str, float]:

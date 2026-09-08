@@ -22,6 +22,8 @@ Features:
 - sat_vegetation_index: Bitki örtüsü indeksi
 """
 
+from __future__ import annotations
+
 import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -31,7 +33,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "SatelliteAdapter",
+]
 
 
 # BIST şirket → koordinat mapping (fabrika/tesis/mağaza lokasyonları)

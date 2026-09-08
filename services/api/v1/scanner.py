@@ -18,6 +18,8 @@ Uç noktalar:
 - POST /scanner/event — Event bildirimi
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -40,8 +42,6 @@ def _get_scan_api() -> Any:
     from ...scanner.scan_api import scan_api
 
     return scan_api
-
-
 
 
 # =====================================================
@@ -82,6 +82,7 @@ async def scanner_signals(
             if not preds or len(preds) == 0 or not preds[0].get("target_price"):
                 try:
                     from ...scanner.bist_ml_scanner import bist_ml_scanner
+
                     preds = bist_ml_scanner.scan_all_opportunities(limit=50)
                     if preds:
                         set_cached("phase18:predictions", preds, ttl=3600)
@@ -106,7 +107,8 @@ async def scanner_signals(
         result_signals = signals
         if category and category != "ALL":
             result_signals = [
-                s for s in result_signals
+                s
+                for s in result_signals
                 if s.get("spec_category") == category
                 or s.get("signal_type") == category
                 or s.get("strategy_type") == category
@@ -117,8 +119,11 @@ async def scanner_signals(
         if search:
             q = search.lower().strip()
             result_signals = [
-                s for s in result_signals
-                if q in s.get("symbol", "").lower() or q in s.get("name", "").lower() or q in s.get("spec_reason", "").lower()
+                s
+                for s in result_signals
+                if q in s.get("symbol", "").lower()
+                or q in s.get("name", "").lower()
+                or q in s.get("spec_reason", "").lower()
             ]
 
         if _signals_cache.etag:
@@ -236,8 +241,14 @@ async def scan_results(
         logger.warning("tarama_sonuc_hatasi: hata=%s", str(exc))
         # Yedek olarak sinyal endpoint'inden dön
         return await scanner_signals(
-            request=request, response=response, limit=limit,
-            category=None, sort_by=None, search=None, user=user, _=_,
+            request=request,
+            response=response,
+            limit=limit,
+            category=None,
+            sort_by=None,
+            search=None,
+            user=user,
+            _=_,
         )
 
 
@@ -306,7 +317,9 @@ async def scanner_performance(user=Depends(get_current_user), _=Depends(check_ra
 
 @router.get("/alerts")
 async def scanner_alerts(
-    limit: int = Query(20, ge=1, le=100, description="Maksimum alarm sayısı"), user=Depends(get_current_user), _=Depends(check_rate_limit)
+    limit: int = Query(20, ge=1, le=100, description="Maksimum alarm sayısı"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
 ) -> Any:
     """Tarayıcı alarmları ve bildirimleri.
 

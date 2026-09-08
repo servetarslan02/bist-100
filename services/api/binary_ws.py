@@ -24,6 +24,8 @@ Kullanım:
     ws.binaryType = 'arraybuffer';
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -59,6 +61,7 @@ def otel_trace(span_name: str) -> Any:
 
     def decorator(func) -> Any:
         """Senkron fonksiyon için OpenTelemetry span sarmalayıcısı."""
+
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs) -> Any:
             """Senkron fonksiyon sarmalayıcısı — span bağlamını yönetir."""
@@ -69,6 +72,7 @@ def otel_trace(span_name: str) -> Any:
 
     def async_decorator(func) -> Any:
         """Asenkron fonksiyon için OpenTelemetry span sarmalayıcısı."""
+
         @functools.wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
             """Asenkron fonksiyon sarmalayıcısı — span bağlamını yönetir."""
@@ -593,7 +597,8 @@ class BinaryWebSocket:
         client_id = id(websocket)
         logger.info(
             "binary_ws_client_connected: client=%s protocol=%s",
-            client_id, "protobuf" if HAS_PROTOBUF else "orjson-fallback",
+            client_id,
+            "protobuf" if HAS_PROTOBUF else "orjson-fallback",
         )
 
         try:
@@ -770,7 +775,9 @@ class BinaryWebSocket:
         self._running = True
         logger.info(
             "binary_ws_baslatiliyor: host=%s port=%s protocol=%s",
-            host, port, "protobuf" if HAS_PROTOBUF else "orjson-fallback",
+            host,
+            port,
+            "protobuf" if HAS_PROTOBUF else "orjson-fallback",
         )
 
         async with websockets.serve(self.handler, host, port):

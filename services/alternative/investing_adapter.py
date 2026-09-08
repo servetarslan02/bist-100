@@ -12,6 +12,8 @@ Features:
 - investing_technical_rating: Teknik rating
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -20,7 +22,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "InvestingAdapter",
+]
 
 
 class InvestingAdapter(BaseAdapter):

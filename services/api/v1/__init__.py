@@ -4,6 +4,8 @@ ALPHA BIST — API v1 Yönlendirici Paketi
 Tüm v1 uç noktaları.
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter
 
 from .agents import router as agents_router

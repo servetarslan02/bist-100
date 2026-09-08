@@ -15,6 +15,8 @@ Kaynaklar:
 8. Web Scraping (5+ feature)
 """
 
+from __future__ import annotations
+
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -30,7 +32,11 @@ from .kariyer_net import kariyer_net_adapter
 from .llm_sentiment import llm_sentiment
 from .reconciliation import reconciler
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "AlternativeFeatureEngine",
+]
 
 
 class AlternativeFeatureEngine:

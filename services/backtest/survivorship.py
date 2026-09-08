@@ -136,7 +136,9 @@ class DelistingEvent:
 
         if self.recovery_rate is not None:
             if not (0.0 <= self.recovery_rate <= 1.0):
-                raise ValueError(f"Geri kazanım oranı (recovery_rate) [0.0, 1.0] aralığında olmalıdır: {self.recovery_rate}")
+                raise ValueError(
+                    f"Geri kazanım oranı (recovery_rate) [0.0, 1.0] aralığında olmalıdır: {self.recovery_rate}"
+                )
         if self.final_price is not None and self.final_price < 0.0:
             raise ValueError(f"Son fiyat negatif olamaz: {self.final_price}")
 
@@ -246,7 +248,7 @@ class SurvivorshipBiasHandler:
         with self._lock:
             self._delisting_events.append(event)
             if len(self._delisting_events) > self._max_events:
-                self._delisting_events = self._delisting_events[-self._max_events:]
+                self._delisting_events = self._delisting_events[-self._max_events :]
 
             self._delisted_tickers[event.ticker] = event.delisting_date
             self._delisting_details[event.ticker] = event
@@ -378,10 +380,12 @@ class SurvivorshipBiasHandler:
             date_expr = pl.col(date_col)
 
         # return sütununu Float64'e normalize et ve geçici tarih sütunu oluştur
-        corrected = returns.with_columns([
-            date_expr.alias("_temp_cmp_dt"),
-            pl.col(return_col).cast(pl.Float64).alias(return_col),
-        ])
+        corrected = returns.with_columns(
+            [
+                date_expr.alias("_temp_cmp_dt"),
+                pl.col(return_col).cast(pl.Float64).alias(return_col),
+            ]
+        )
 
         # Her ilgili delisting olayı için vektörel güncelleme uygula
         for delist in relevant_delistings:
@@ -389,7 +393,9 @@ class SurvivorshipBiasHandler:
 
             # İflas veya recovery_rate belirtilmişse terminal getiri (-1 + recovery_rate)
             if delist.reason == "bankruptcy" or delist.recovery_rate is not None:
-                recovery = delist.recovery_rate if delist.recovery_rate is not None else DEFAULT_BANKRUPTCY_RECOVERY_RATE
+                recovery = (
+                    delist.recovery_rate if delist.recovery_rate is not None else DEFAULT_BANKRUPTCY_RECOVERY_RATE
+                )
                 terminal_return = -1.0 + recovery
 
                 mask = (pl.col(ticker_col) == delist.ticker) & (pl.col("_temp_cmp_dt") >= delist_dt)

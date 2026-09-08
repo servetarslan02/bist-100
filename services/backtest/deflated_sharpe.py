@@ -9,6 +9,8 @@ Referanslar:
 - BACKTEST-NIHAI-SPEC.md - Bölüm 6
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -120,9 +122,8 @@ class DeflatedSharpeCalculator:
             return 0.0, 1.0
 
         n = num_strategies
-        expected_max_z = (
-            (1 - euler_mascheroni) * stats.norm.ppf(1 - 1.0 / n)
-            + euler_mascheroni * stats.norm.ppf(1 - 1.0 / (n * np.e))
+        expected_max_z = (1 - euler_mascheroni) * stats.norm.ppf(1 - 1.0 / n) + euler_mascheroni * stats.norm.ppf(
+            1 - 1.0 / (n * np.e)
         )
 
         # Sharpe'a dönüştür (sqrt(T) ile ölçekle, periods_per_year ile
@@ -170,11 +171,7 @@ class DeflatedSharpeCalculator:
         )
 
         # Deflated Sharpe = (SR - E[max_SR]) / Std[max_SR]
-        deflated_sr = (
-            (observed_sharpe - expected_max_sr) / std_max_sr
-            if std_max_sr > 0
-            else 0.0
-        )
+        deflated_sr = (observed_sharpe - expected_max_sr) / std_max_sr if std_max_sr > 0 else 0.0
 
         # p-value (tek kuyruklu test)
         p_value = 1 - stats.norm.cdf(deflated_sr)
@@ -253,11 +250,7 @@ class DeflatedSharpeCalculator:
         mean_excess = np.mean(excess_returns)
         std_excess = np.std(excess_returns, ddof=1)
 
-        observed_sharpe = (
-            (mean_excess / std_excess * np.sqrt(periods_per_year))
-            if std_excess > 0
-            else 0
-        )
+        observed_sharpe = (mean_excess / std_excess * np.sqrt(periods_per_year)) if std_excess > 0 else 0
 
         # Moments
         skewness = float(stats.skew(returns))
@@ -347,18 +340,12 @@ class ProbabilisticSharpeRatio:
 
         mean_ret = np.mean(returns)
         std_ret = np.std(returns, ddof=1)
-        observed_sharpe = (
-            (mean_ret / std_ret * np.sqrt(periods_per_year))
-            if std_ret > 0
-            else 0
-        )
+        observed_sharpe = (mean_ret / std_ret * np.sqrt(periods_per_year)) if std_ret > 0 else 0
 
         skewness = float(stats.skew(returns))
         kurtosis = float(stats.kurtosis(returns, fisher=False))
 
-        psr = ProbabilisticSharpeRatio.compute(
-            observed_sharpe, benchmark_sharpe, len(returns), skewness, kurtosis
-        )
+        psr = ProbabilisticSharpeRatio.compute(observed_sharpe, benchmark_sharpe, len(returns), skewness, kurtosis)
 
         return {
             "psr": round(psr, 4),

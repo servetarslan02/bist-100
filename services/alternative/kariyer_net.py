@@ -15,6 +15,8 @@ Features:
 - remote_ratio: Uzaktan çalışma oranı
 """
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -22,7 +24,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "KariyerNetAdapter",
+]
 
 
 class KariyerNetAdapter(BaseAdapter):

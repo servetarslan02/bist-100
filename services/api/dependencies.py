@@ -5,6 +5,8 @@ FastAPI bağımlılık enjeksiyonu.
 Kimlik doğrulama, hız sınırı, servis çözümleme.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import time

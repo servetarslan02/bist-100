@@ -25,9 +25,9 @@ logger = structlog.get_logger(__name__)
 # SABİTLER (MAGIC NUMBER TEMİZLİĞİ)
 # =====================================================================
 DEFAULT_MAX_PARTICIPATION_RATE: float = 0.10  # ADV'nin %10'u
-DEFAULT_MARKET_IMPACT_COEFF: float = 0.1      # Square-root impact katsayısı
+DEFAULT_MARKET_IMPACT_COEFF: float = 0.1  # Square-root impact katsayısı
 DEFAULT_MIN_ADV_THRESHOLD: float = 1_000_000.0  # 1M TL minimum hacim
-DEFAULT_MIN_POST_IPO_DAYS: int = 30           # Halka arz sonrası min gün
+DEFAULT_MIN_POST_IPO_DAYS: int = 30  # Halka arz sonrası min gün
 
 
 @dataclass
@@ -234,7 +234,12 @@ class BacktestEnhancements:
         total_impact = temporary_impact + permanent_impact
 
         if not is_feasible:
-            logger.warning("market_impact_asimi: ticker=%s, katilim_orani=%s, max=%s", ticker, round(participation_rate, 4), self.max_participation_rate)
+            logger.warning(
+                "market_impact_asimi: ticker=%s, katilim_orani=%s, max=%s",
+                ticker,
+                round(participation_rate, 4),
+                self.max_participation_rate,
+            )
 
         return MarketImpact(
             ticker=ticker,
@@ -330,7 +335,9 @@ class BacktestEnhancements:
         """Şirket olayı kaydet."""
         with self._lock:
             self._corporate_actions.append(action)
-        logger.info("sirket_olayi_kaydedildi: ticker=%s, tip=%s, tarih=%s", action.ticker, action.action_type, action.ex_date)
+        logger.info(
+            "sirket_olayi_kaydedildi: ticker=%s, tip=%s, tarih=%s", action.ticker, action.action_type, action.ex_date
+        )
 
     def get_corporate_actions(
         self,

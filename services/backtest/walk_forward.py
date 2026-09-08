@@ -281,20 +281,14 @@ class WalkForwardEngine:
                 {
                     "train_start": sorted_dates[train_start_idx],
                     "train_end": sorted_dates[train_end_idx],
-                    "purge_start": (
-                        sorted_dates[purge_start_idx] if purge_start_idx < total_len else sorted_dates[-1]
-                    ),
-                    "purge_end": (
-                        sorted_dates[purge_end_idx] if purge_end_idx < total_len else sorted_dates[-1]
-                    ),
+                    "purge_start": (sorted_dates[purge_start_idx] if purge_start_idx < total_len else sorted_dates[-1]),
+                    "purge_end": (sorted_dates[purge_end_idx] if purge_end_idx < total_len else sorted_dates[-1]),
                     "test_start": sorted_dates[test_start_idx],
                     "test_end": sorted_dates[test_end_idx],
                     "embargo_start": (
                         sorted_dates[embargo_start_idx] if embargo_start_idx < total_len else sorted_dates[-1]
                     ),
-                    "embargo_end": (
-                        sorted_dates[embargo_end_idx] if embargo_end_idx < total_len else sorted_dates[-1]
-                    ),
+                    "embargo_end": (sorted_dates[embargo_end_idx] if embargo_end_idx < total_len else sorted_dates[-1]),
                 }
             )
 
@@ -325,7 +319,9 @@ class WalkForwardEngine:
         if sample_key and isinstance(price_data[sample_key], dict):
             for d, t_dict in price_data.items():
                 if isinstance(t_dict, dict):
-                    actual_returns[str(d)] = {str(k): float(v) for k, v in t_dict.items() if isinstance(v, (int, float))}
+                    actual_returns[str(d)] = {
+                        str(k): float(v) for k, v in t_dict.items() if isinstance(v, (int, float))
+                    }
             return actual_returns
 
         # Senaryo 2: {ticker: [{date, close}, ...]} biçiminde
@@ -419,7 +415,9 @@ class WalkForwardEngine:
 
         min_len = cur_train_days + self.purge_days + cur_test_days
         if len(dates) < min_len:
-            logger.warning("Walk-forward analizi için yeterli tarih verisi bulunamadı (mevcut=%d, asgari=%d)", len(dates), min_len)
+            logger.warning(
+                "Walk-forward analizi için yeterli tarih verisi bulunamadı (mevcut=%d, asgari=%d)", len(dates), min_len
+            )
             return self._empty_result()
 
         folds = self.create_folds(
@@ -437,9 +435,7 @@ class WalkForwardEngine:
             train_preds = [
                 p for p in resolved_preds if fold["train_start"] <= str(p.get("date", "")) <= fold["train_end"]
             ]
-            test_preds = [
-                p for p in resolved_preds if fold["test_start"] <= str(p.get("date", "")) <= fold["test_end"]
-            ]
+            test_preds = [p for p in resolved_preds if fold["test_start"] <= str(p.get("date", "")) <= fold["test_end"]]
 
             train_metrics = self._calculate_fold_metrics(
                 train_preds, resolved_returns, fold["train_start"], fold["train_end"]

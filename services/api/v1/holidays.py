@@ -1,5 +1,7 @@
 """Tatil Yönetimi API — BIST tatil günleri yönetim uç noktaları."""
 
+from __future__ import annotations
+
 import logging
 from datetime import date
 from typing import Any
@@ -15,13 +17,13 @@ router = APIRouter()
 
 # Ulusal tatil tarihleri (ay, gün)
 ULUSAL_TATILLER: set[tuple[int, int]] = {
-    (1, 1),   # Yılbaşı
+    (1, 1),  # Yılbaşı
     (4, 23),  # Ulusal Egemenlik ve Çocuk Bayramı
-    (5, 1),   # Emek ve Dayanışma Günü
+    (5, 1),  # Emek ve Dayanışma Günü
     (5, 19),  # Atatürk'ü Anma, Gençlik ve Spor Bayramı
     (7, 15),  # Demokrasi ve Millî Birlik Günü
     (8, 30),  # Zafer Bayramı
-    (10, 29), # Cumhuriyet Bayramı
+    (10, 29),  # Cumhuriyet Bayramı
 }
 
 

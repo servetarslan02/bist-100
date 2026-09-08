@@ -361,7 +361,8 @@ class MultiAssetBacktestEngine:
             if current_dd > cfg.max_drawdown_pct:
                 logger.warning(
                     "maks_drawdown_asildi: mevcut=%.2f, azami_izin=%.2f",
-                    current_dd, cfg.max_drawdown_pct,
+                    current_dd,
+                    cfg.max_drawdown_pct,
                 )
 
             if current_dd > 0 and drawdown_start is None:
@@ -645,7 +646,10 @@ class MultiAssetBacktestEngine:
 
         logger.info(
             "multi_asset_tamamlandi: run_id=%s, getiri=%.2f%%, sharpe=%.3f, max_dd=%.2f%%",
-            run_id, total_return, round(sharpe, 3), f"{max_dd:.2f}",
+            run_id,
+            total_return,
+            round(sharpe, 3),
+            f"{max_dd:.2f}",
         )
 
         return result

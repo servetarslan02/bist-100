@@ -16,11 +16,13 @@ Features:
 - social_manipulation_score: Manipülasyon skoru
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 def compute_social_features(social_data: dict[str, Any], ticker: str) -> dict[str, float]:

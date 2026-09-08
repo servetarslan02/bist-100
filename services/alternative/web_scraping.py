@@ -12,11 +12,13 @@ Features:
 - search_volume_change: Arama hacmi değişim
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str, float]:

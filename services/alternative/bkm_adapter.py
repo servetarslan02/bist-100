@@ -15,6 +15,8 @@ Features:
 - cc_seasonal_deviation: Mevsimsel sapma
 """
 
+from __future__ import annotations
+
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -23,7 +25,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "BKMAdapter",
+]
 
 
 class BKMAdapter(BaseAdapter):

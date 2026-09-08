@@ -1,5 +1,7 @@
 """System API — Canlı mikroservis, veritabanı deposu, telemetri ve alarm motoru (100% Gerçek Veri)."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -66,9 +68,11 @@ async def get_server_time() -> dict[str, Any]:
     now_utc = datetime.now(UTC)
     try:
         from zoneinfo import ZoneInfo
+
         ist_tz = ZoneInfo("Europe/Istanbul")
     except Exception:
         from datetime import timedelta, timezone
+
         ist_tz = timezone(timedelta(hours=3))
     now_ist = now_utc.astimezone(ist_tz)
 
@@ -133,8 +137,14 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)) ->
         services["clickhouse"] = "unhealthy"
 
     # Core Mikroservisler — bağlantı yoksa "unknown" olarak işaretle
-    for svc_name in ["nats", "intelligence_engine", "risk_parity_engine",
-                     "scanner_pipeline", "portfolio_manager", "ml_learning_worker"]:
+    for svc_name in [
+        "nats",
+        "intelligence_engine",
+        "risk_parity_engine",
+        "scanner_pipeline",
+        "portfolio_manager",
+        "ml_learning_worker",
+    ]:
         services.setdefault(svc_name, "unknown")
 
     all_healthy = all(v == "healthy" for v in services.values())
@@ -430,6 +440,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     # 2. Risk durumu — gerçek veri
     try:
         from ...risk.drawdown_response import drawdown_system
+
         dd_state = drawdown_system.get_state()
         alerts.append(
             {
@@ -448,6 +459,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     # 3. Makro durum — gerçek veri
     try:
         from ...core.redis_helper import get_cached
+
         regime = get_cached("market:regime")
         if regime:
             alerts.append(

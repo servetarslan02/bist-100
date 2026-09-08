@@ -41,7 +41,7 @@ PERCENT_DIVISOR: float = 100.0  # %1 = 0.01
 
 TIER_1_MIN_VOLUME_TL: float = 500_000_000.0  # 500M+ TL (THYAO, GARAN, EREGL vb.)
 TIER_2_MIN_VOLUME_TL: float = 100_000_000.0  # 100M - 500M TL
-TIER_3_MIN_VOLUME_TL: float = 20_000_000.0   # 20M - 100M TL
+TIER_3_MIN_VOLUME_TL: float = 20_000_000.0  # 20M - 100M TL
 
 DEFAULT_DAILY_VOLATILITY: float = 0.02  # BIST için tipik günlük volatilite (%2.0)
 CIRCUIT_BREAKER_SPREAD_MULTIPLIER: float = 1.5  # Devre kesici sonrası spread %50 genişler
@@ -56,10 +56,10 @@ class MarketCapCategory(Enum):
     Şirket piyasa değeri büyüklük kategorileri.
     """
 
-    LARGE_CAP = "large"    # > 10 Milyar TL (BIST 30 omurgası)
-    MID_CAP = "mid"        # 2 - 10 Milyar TL
-    SMALL_CAP = "small"    # 500 Milyon - 2 Milyar TL
-    MICRO_CAP = "micro"    # < 500 Milyon TL
+    LARGE_CAP = "large"  # > 10 Milyar TL (BIST 30 omurgası)
+    MID_CAP = "mid"  # 2 - 10 Milyar TL
+    SMALL_CAP = "small"  # 500 Milyon - 2 Milyar TL
+    MICRO_CAP = "micro"  # < 500 Milyon TL
 
     def __repr__(self) -> str:
         return f"MarketCapCategory.{self.name}"
@@ -98,16 +98,21 @@ class BISTFeeStructure:
     """
 
     broker_commission_pct: float = 0.03  # %0.03 = on binde 3
-    bist_fee_pct: float = 0.0056         # %0.0056 = yüz binde 5.6
-    mkk_fee_pct: float = 0.00109         # %0.00109
-    takasbank_fee_pct: float = 0.0001    # %0.0001
-    min_commission_tl: float = 1.0       # Asgari 1.00 TL
-    bsmv_rate: float = 0.05              # Komisyon üzerinden %5 BSMV
-    stopaj_rate: float = 0.0             # Hisse satış stopajı
+    bist_fee_pct: float = 0.0056  # %0.0056 = yüz binde 5.6
+    mkk_fee_pct: float = 0.00109  # %0.00109
+    takasbank_fee_pct: float = 0.0001  # %0.0001
+    min_commission_tl: float = 1.0  # Asgari 1.00 TL
+    bsmv_rate: float = 0.05  # Komisyon üzerinden %5 BSMV
+    stopaj_rate: float = 0.0  # Hisse satış stopajı
 
     def __post_init__(self) -> None:
         """Komisyon ve oran parametre doğrulaması."""
-        if self.broker_commission_pct < 0.0 or self.bist_fee_pct < 0.0 or self.mkk_fee_pct < 0.0 or self.takasbank_fee_pct < 0.0:
+        if (
+            self.broker_commission_pct < 0.0
+            or self.bist_fee_pct < 0.0
+            or self.mkk_fee_pct < 0.0
+            or self.takasbank_fee_pct < 0.0
+        ):
             raise ValueError("Komisyon ve borsa ücret oranları negatif olamaz.")
         if self.min_commission_tl < 0.0:
             raise ValueError("Asgari komisyon tutarı negatif olamaz.")
@@ -206,7 +211,7 @@ class SpreadModel:
 
         # Hacim çarpanı (düşük hacimde spread genişler)
         if volm_r < 1.0:
-            vol_adj *= (1.0 + (1.0 - volm_r) * self.volume_decay_factor)
+            vol_adj *= 1.0 + (1.0 - volm_r) * self.volume_decay_factor
 
         return float(base_spread * vol_adj)
 
@@ -582,7 +587,9 @@ class TransactionCostEngine:
         eff_exit_price = exit_price if (exit_price is not None and exit_price > 0.0) else entry_price
 
         buy_cost = self.calculate_total_cost("BUY", entry_price, quantity, ticker, avg_daily_volume, volatility_ratio)
-        sell_cost = self.calculate_total_cost("SELL", eff_exit_price, quantity, ticker, avg_daily_volume, volatility_ratio)
+        sell_cost = self.calculate_total_cost(
+            "SELL", eff_exit_price, quantity, ticker, avg_daily_volume, volatility_ratio
+        )
 
         total_round_trip = buy_cost["total_cost"] + sell_cost["total_cost"]
         notional = buy_cost["notional"]
@@ -642,11 +649,13 @@ class TransactionCostEngine:
             raw_tck = row[ticker_col]
 
             if raw_price is None or raw_qty is None or raw_side is None or raw_tck is None:
-                results.append({
-                    "calculated_total_cost": 0.0,
-                    "calculated_cost_pct": 0.0,
-                    "calculated_exec_price": 0.0,
-                })
+                results.append(
+                    {
+                        "calculated_total_cost": 0.0,
+                        "calculated_cost_pct": 0.0,
+                        "calculated_exec_price": 0.0,
+                    }
+                )
                 continue
 
             price = float(raw_price)
@@ -656,11 +665,13 @@ class TransactionCostEngine:
             vol = float(row[volume_col]) if (volume_col and row.get(volume_col) is not None) else 0.0
 
             cost_dict = self.calculate_total_cost(side, price, qty, tck, avg_daily_volume=vol)
-            results.append({
-                "calculated_total_cost": cost_dict["total_cost"],
-                "calculated_cost_pct": cost_dict["total_cost_pct"],
-                "calculated_exec_price": cost_dict["execution_price"],
-            })
+            results.append(
+                {
+                    "calculated_total_cost": cost_dict["total_cost"],
+                    "calculated_cost_pct": cost_dict["total_cost_pct"],
+                    "calculated_exec_price": cost_dict["execution_price"],
+                }
+            )
 
         costs_df = pl.DataFrame(results)
         return pl.concat([trades_df, costs_df], how="horizontal")

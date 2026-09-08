@@ -1,5 +1,7 @@
 """Modeller API — 30 Yıllık BIST Makine Öğrenimi Ensemble Kayıt Defteri."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os

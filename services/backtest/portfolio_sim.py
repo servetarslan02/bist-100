@@ -640,7 +640,9 @@ class PortfolioSimulatorV3:
                 self._drawdown_start_date = None
 
             # Drawdown hesabı
-            drawdown = max(0.0, (self._high_water_mark - equity) / self._high_water_mark) if self._high_water_mark > 0 else 0.0
+            drawdown = (
+                max(0.0, (self._high_water_mark - equity) / self._high_water_mark) if self._high_water_mark > 0 else 0.0
+            )
 
             # Drawdown süresi takibi
             if drawdown > 0 and self._drawdown_start_date is None:
@@ -796,7 +798,9 @@ class PortfolioSimulatorV3:
         """
         with self._lock:
             sell_trades = [t for t in self._trades if t.side == "SELL"]
-            sell_pnls = np.array([t.pnl for t in sell_trades], dtype=float) if sell_trades else np.array([], dtype=float)
+            sell_pnls = (
+                np.array([t.pnl for t in sell_trades], dtype=float) if sell_trades else np.array([], dtype=float)
+            )
 
             winning = int(np.sum(sell_pnls > 0)) if len(sell_pnls) > 0 else 0
             win_rate = (winning / len(sell_pnls) * 100.0) if len(sell_pnls) > 0 else 0.0
@@ -842,7 +846,9 @@ class PortfolioSimulatorV3:
                 }
 
             final_equity = self._equity_curve[-1].equity
-            total_return_pct = ((final_equity / self._initial_capital) - 1.0) * 100.0 if self._initial_capital > 0 else 0.0
+            total_return_pct = (
+                ((final_equity / self._initial_capital) - 1.0) * 100.0 if self._initial_capital > 0 else 0.0
+            )
 
             returns = np.array([s.daily_return for s in self._equity_curve], dtype=float)
 
@@ -933,7 +939,9 @@ class PortfolioSimulatorV3:
             if self._equity_curve:
                 actual_equity = self._equity_curve[-1].equity
                 if abs(actual_equity - computed_equity) > 0.05:
-                    errors.append(f"Özkaynak uyuşmazlığı: Gerçek={actual_equity:.2f} != Hesaplanan={computed_equity:.2f}")
+                    errors.append(
+                        f"Özkaynak uyuşmazlığı: Gerçek={actual_equity:.2f} != Hesaplanan={computed_equity:.2f}"
+                    )
 
             # 3. Pozisyon adet ve alış fiyatı geçerliliği
             for ticker, pos in self._positions.items():

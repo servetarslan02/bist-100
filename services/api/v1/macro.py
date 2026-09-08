@@ -1,5 +1,7 @@
 """Makro API — Canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time

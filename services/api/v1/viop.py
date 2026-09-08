@@ -21,6 +21,8 @@ Kullanım:
     GET  /api/v1/viop/contracts/{symbol}
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

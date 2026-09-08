@@ -18,6 +18,8 @@ NOT: Bu dosya CANONICAL üretim giriş noktasıdır.
 - main.py → KULLANIMDAN KALDIRILMIŞ (eski giriş noktası)
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -43,6 +45,8 @@ from .v1 import v1_router
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("alpha-bist.api_app")
+
+
 async def _startup_services(app: FastAPI = None) -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
     await init_databases()

@@ -1,5 +1,7 @@
 """Ajanlar API — Gerçek servislere bağlı."""
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..dependencies import check_rate_limit, get_current_user
@@ -35,7 +37,9 @@ async def agent_status(user=Depends(get_current_user), _=Depends(check_rate_limi
 
 
 @router.post("/run")
-async def run_agent(agent_name: str = "researcher", user=Depends(get_current_user), _=Depends(check_rate_limit)) -> dict:
+async def run_agent(
+    agent_name: str = "researcher", user=Depends(get_current_user), _=Depends(check_rate_limit)
+) -> dict:
     """Belirtilen ajanı çalıştırır."""
     try:
         from ...agents.agent_system import agent_system

@@ -12,6 +12,8 @@ Hesaplanan metrikler:
 6. Up/Down Capture Ratio — piyasa yükseliş/düşüşlerinde yakalama oranı
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -131,9 +133,7 @@ class BenchmarkComparator:
         br = benchmark_returns[:min_len]
 
         if min_len < 2:
-            raise ValueError(
-                f"Karşılaştırma için en az 2 gözlem gerekli, {min_len} sağlandı"
-            )
+            raise ValueError(f"Karşılaştırma için en az 2 gözlem gerekli, {min_len} sağlandı")
 
         # Toplam getiriler
         strategy_total = (np.prod(1 + sr) - 1) * 100
@@ -165,9 +165,7 @@ class BenchmarkComparator:
         # Bilgi oranı
         active_std = np.std(active_returns, ddof=1)
         information_ratio = (
-            (np.mean(active_returns) / active_std * np.sqrt(periods_per_year))
-            if active_std > 0
-            else 0.0
+            (np.mean(active_returns) / active_std * np.sqrt(periods_per_year)) if active_std > 0 else 0.0
         )
 
         # Göreceli getiri
@@ -178,19 +176,11 @@ class BenchmarkComparator:
         down_days = br < 0
         up_mean_br = np.mean(br[up_days]) if up_days.sum() > 0 else 0.0
         up_mean_sr = np.mean(sr[up_days]) if up_days.sum() > 0 else 0.0
-        up_capture = (
-            (up_mean_sr / up_mean_br * 100)
-            if up_mean_br > 0
-            else 0.0
-        )
+        up_capture = (up_mean_sr / up_mean_br * 100) if up_mean_br > 0 else 0.0
 
         down_mean_br = np.mean(br[down_days]) if down_days.sum() > 0 else 0.0
         down_mean_sr = np.mean(sr[down_days]) if down_days.sum() > 0 else 0.0
-        down_capture = (
-            (down_mean_sr / down_mean_br * 100)
-            if down_mean_br != 0
-            else 0.0
-        )
+        down_capture = (down_mean_sr / down_mean_br * 100) if down_mean_br != 0 else 0.0
 
         result = BenchmarkComparison(
             benchmark_name=benchmark_name,
@@ -208,7 +198,13 @@ class BenchmarkComparator:
             num_observations=min_len,
         )
 
-        logger.info("benchmark_karsilastirma: benchmark=%s, alpha=%s%%, beta=%s, ir=%s", benchmark_name, f"{alpha:.2f}", f"{beta:.2f}", f"{information_ratio:.2f}")
+        logger.info(
+            "benchmark_karsilastirma: benchmark=%s, alpha=%s%%, beta=%s, ir=%s",
+            benchmark_name,
+            f"{alpha:.2f}",
+            f"{beta:.2f}",
+            f"{information_ratio:.2f}",
+        )
 
         return result
 

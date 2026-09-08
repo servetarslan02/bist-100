@@ -21,6 +21,8 @@ Nihai backtest sistemi modülleri:
 - canonical_adapter: Feature'lardan canonical score üretimi
 """
 
+from __future__ import annotations
+
 # Mevcut modüller
 # Faz 6: Ek Modüller
 from .backtest_enhancements import (

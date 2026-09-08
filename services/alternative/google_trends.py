@@ -15,6 +15,8 @@ Features:
 - google_trends_relative: Endekse göre bağıl ilgi
 """
 
+from __future__ import annotations
+
 import asyncio
 from typing import Any
 
@@ -23,7 +25,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "GoogleTrendsAdapter",
+]
 
 
 class GoogleTrendsAdapter(BaseAdapter):

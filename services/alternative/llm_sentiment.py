@@ -12,13 +12,19 @@ Kullanım alanları:
 LLM: Ollama (gemma4:12b-q4_0 veya benzeri Türkçe model)
 """
 
+from __future__ import annotations
+
 import asyncio
 import time
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "LLMSentimentAnalyzer",
+]
 
 
 # Sentiment analiz promptu

@@ -13,6 +13,8 @@ engine_v4.py ile karıştırmayın:
 - engine_v4: Feature → Sinyal → Trade tam pipeline (kendi sinyal üretir)
 """
 
+from __future__ import annotations
+
 import contextlib
 import csv
 import os
@@ -294,7 +296,9 @@ class BacktestEngine:
                     else:
                         logger.warning(
                             "buy_iptal_yetersiz_bakiye: ticker=%s, maliyet=%.2f, bakiye=%.2f",
-                            ticker, cost + commission, capital,
+                            ticker,
+                            cost + commission,
+                            capital,
                         )
 
             elif action == "SELL" and ticker in positions:
@@ -313,7 +317,9 @@ class BacktestEngine:
                 except Exception as e:
                     logger.warning(
                         "tarih_hatasi: entry=%s, exit=%s, hata=%s",
-                        pos["entry_date"], order["signal_date"], str(e),
+                        pos["entry_date"],
+                        order["signal_date"],
+                        str(e),
                     )
                     _holding = 1
                 trades.append(
@@ -433,7 +439,12 @@ class BacktestEngine:
                     quantity=qty,
                     pnl=(gross - comm) - (qty * p["avg_cost"]),
                     pnl_pct=((exit_price / p["avg_cost"]) - 1.0) if p["avg_cost"] > 0 else 0.0,
-                    holding_days=max(1, (datetime.strptime(current_date, "%Y-%m-%d") - datetime.strptime(p["entry_date"], "%Y-%m-%d")).days),
+                    holding_days=max(
+                        1,
+                        (
+                            datetime.strptime(current_date, "%Y-%m-%d") - datetime.strptime(p["entry_date"], "%Y-%m-%d")
+                        ).days,
+                    ),
                     commission=comm,
                 )
             )
@@ -738,7 +749,10 @@ class BacktestEngine:
         stack.close()
 
         metrics = self._compute_metrics(
-            trades, equity_curve, initial_capital, exposure_history,
+            trades,
+            equity_curve,
+            initial_capital,
+            exposure_history,
             backtest_start_date=all_dates[0] if all_dates else "",
             backtest_end_date=all_dates[-1] if all_dates else "",
         )
@@ -922,5 +936,3 @@ __all__ = [
     "DEFAULT_SIGNAL_WEIGHT",
     "DEFAULT_FALLBACK_VOLUME",
 ]
-
-

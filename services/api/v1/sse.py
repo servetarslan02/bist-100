@@ -22,6 +22,8 @@ Kullanım:
     GET /api/v1/sse/radar
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -77,7 +79,7 @@ async def _sse_generator(
 
     # İlk bağlantı event'i — client "bağlandım" doğrulaması alır
     event_counter += 1
-    yield f"id: {event_counter}\nevent: connected\ndata: {{\"channel\":\"{channel}\",\"ts\":{int(time.time())}}}\n\n"
+    yield f'id: {event_counter}\nevent: connected\ndata: {{"channel":"{channel}","ts":{int(time.time())}}}\n\n'
 
     # Client reconnect'te last_event_id gönderdiyse bilgilendir
     if last_event_id:

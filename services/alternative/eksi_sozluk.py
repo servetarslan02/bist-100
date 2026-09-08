@@ -12,6 +12,8 @@ Features:
 - eksi_sentiment_momentum: Sentiment değişim hızı
 """
 
+from __future__ import annotations
+
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -21,7 +23,11 @@ import structlog
 
 from .base import BaseAdapter
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "EksiSozlukAdapter",
+]
 
 
 class EksiSozlukAdapter(BaseAdapter):

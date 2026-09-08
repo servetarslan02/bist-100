@@ -1,5 +1,7 @@
 """Faktörler API — BIST Faktör Analiz ve Exposure Motoru."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

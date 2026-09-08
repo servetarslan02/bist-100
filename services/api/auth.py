@@ -12,6 +12,8 @@ Roller:
 - SYSTEM: Servisler arası (API anahtarı)
 """
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import hmac
@@ -61,10 +63,7 @@ class AuthConfig:
     jwt_expires_hours: int = 24
 
     def __repr__(self) -> str:
-        return (
-            f"AuthConfig(jwt_algorithm='{self.jwt_algorithm}', "
-            f"jwt_expires_hours={self.jwt_expires_hours})"
-        )
+        return f"AuthConfig(jwt_algorithm='{self.jwt_algorithm}', jwt_expires_hours={self.jwt_expires_hours})"
 
 
 @dataclass
@@ -123,8 +122,7 @@ class JWTHandler:
             secret = secret_key or os.getenv("JWT_SECRET_KEY")
             if not secret:
                 raise ValueError(
-                    "JWT_SECRET_KEY ortam değişkeni ayarlanmamış. "
-                    "Güvenlik için varsayılan değer kaldırıldı."
+                    "JWT_SECRET_KEY ortam değişkeni ayarlanmamış. Güvenlik için varsayılan değer kaldırıldı."
                 )
             self.config = AuthConfig(
                 jwt_secret=secret,
@@ -357,8 +355,7 @@ _jwt_secret = os.environ.get("JWT_SECRET") or os.environ.get("JWT_SECRET_KEY")
 if not _jwt_secret:
     if os.environ.get("ALPHA_ENV") == "production":
         raise RuntimeError(
-            "JWT_SECRET ortam değişkeni üretim ortamında zorunludur. "
-            "Güvenlik için varsayılan değer kaldırıldı."
+            "JWT_SECRET ortam değişkeni üretim ortamında zorunludur. Güvenlik için varsayılan değer kaldırıldı."
         )
     logger.warning("JWT_SECRET ortam değişkeni ayarlanmamış — sadece geliştirme ortamında çalışır.")
     _jwt_secret = "dev-only-unsafe-key-do-not-use-in-production"

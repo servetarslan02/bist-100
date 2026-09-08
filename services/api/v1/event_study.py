@@ -1,5 +1,7 @@
 """Olay Çalışması API — KAP ve Makro Olay Analizi (Canlı Veri Akışı)."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import math
@@ -64,18 +66,49 @@ HARIC_TUTULAN_PARANTEZ = {"KAP", "BIST", "FED", "ECB", "TCMB", "TÜİK", "USD", 
 
 # Makro anahtar kelimeler
 MAKRO_ANAHTAR_KELIMELER = [
-    "tcmb", "merkez bankası", "fed", "ecb", "faiz", "enflasyon", "tüik",
-    "ppk", "politika faizi", "rezerv", "cari açık", "hazine", "bütçe açığı",
-    "döviz kuru", "ihracat", "ithalat", "işsizlik", "istihdam",
-    "büyüme oranı", "gdp", "makroekonomi", "küresel piyasa", "wall street",
-    "para politikası", "tüketici güveni", "üretici fiyat",
+    "tcmb",
+    "merkez bankası",
+    "fed",
+    "ecb",
+    "faiz",
+    "enflasyon",
+    "tüik",
+    "ppk",
+    "politika faizi",
+    "rezerv",
+    "cari açık",
+    "hazine",
+    "bütçe açığı",
+    "döviz kuru",
+    "ihracat",
+    "ithalat",
+    "işsizlik",
+    "istihdam",
+    "büyüme oranı",
+    "gdp",
+    "makroekonomi",
+    "küresel piyasa",
+    "wall street",
+    "para politikası",
+    "tüketici güveni",
+    "üretici fiyat",
 ]
 
 # KAP anahtar kelimeler
 KAP_ANAHTAR_KELIMELER = [
-    "kap", "kamuyu aydınlatma", "bildirimi", "pay alım", "pay satım",
-    "sermaye artırımı", "temettü", "genel kurul", "finansal sonuç",
-    "bilanço", "özel durum açıklaması", "devre kesici", "borsa istanbul",
+    "kap",
+    "kamuyu aydınlatma",
+    "bildirimi",
+    "pay alım",
+    "pay satım",
+    "sermaye artırımı",
+    "temettü",
+    "genel kurul",
+    "finansal sonuç",
+    "bilanço",
+    "özel durum açıklaması",
+    "devre kesici",
+    "borsa istanbul",
 ]
 
 
@@ -219,9 +252,15 @@ async def _canli_olaylari_getir(ticker: str | None = None) -> list[dict[str, Any
             if not event_type:
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
 
-                if any(_metin_icinde_var_mi(k, text_check) if " " not in k else k in text_check for k in MAKRO_ANAHTAR_KELIMELER):
+                if any(
+                    _metin_icinde_var_mi(k, text_check) if " " not in k else k in text_check
+                    for k in MAKRO_ANAHTAR_KELIMELER
+                ):
                     event_type = "MACRO"
-                elif matched or any(_metin_icinde_var_mi(k, text_check) if " " not in k else k in text_check for k in KAP_ANAHTAR_KELIMELER):
+                elif matched or any(
+                    _metin_icinde_var_mi(k, text_check) if " " not in k else k in text_check
+                    for k in KAP_ANAHTAR_KELIMELER
+                ):
                     event_type = "KAP"
                 else:
                     event_type = "NEWS"
@@ -320,7 +359,9 @@ async def event_study(
         if len(stock_close) < 20 or len(bm_close) < 20:
             logger.warning(
                 "event_study_yetersiz_veri: ticker=%s, stock=%d, bm=%d",
-                ticker, len(stock_close), len(bm_close),
+                ticker,
+                len(stock_close),
+                len(bm_close),
             )
             raise HTTPException(
                 status_code=503,

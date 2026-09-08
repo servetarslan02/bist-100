@@ -67,12 +67,7 @@ class SystemState:
 
     def __repr__(self) -> str:
         """SystemState okunabilir temsili."""
-        return (
-            f"SystemState("
-            f"cash={self.cash:,.0f}, "
-            f"positions={len(self.positions)}, "
-            f"regime={self.regime!r})"
-        )
+        return f"SystemState(cash={self.cash:,.0f}, positions={len(self.positions)}, regime={self.regime!r})"
 
     def to_dict(self) -> dict[str, Any]:
         """Sistem durumunu sözlük formatına dönüştürür.
@@ -150,12 +145,7 @@ class AuditRecord:
 
     def __repr__(self) -> str:
         """AuditRecord okunabilir temsili."""
-        return (
-            f"AuditRecord("
-            f"id={self.event_id!r}, "
-            f"type={self.event_type!r}, "
-            f"hash={self.hash_chain!r})"
-        )
+        return f"AuditRecord(id={self.event_id!r}, type={self.event_type!r}, hash={self.hash_chain!r})"
 
     def compute_hash(self, prev_hash: str = "") -> str:
         """Audit trail zinciri için hash hesaplar.
@@ -246,11 +236,7 @@ class EnhancedReplayEngine:
         with self._lock:
             audit_len = len(self._audit_trail)
             snap_len = len(self._state_snapshots)
-        return (
-            f"EnhancedReplayEngine("
-            f"audit_events={audit_len}, "
-            f"snapshots={snap_len})"
-        )
+        return f"EnhancedReplayEngine(audit_events={audit_len}, snapshots={snap_len})"
 
     def create_snapshot(
         self,
@@ -399,9 +385,7 @@ class EnhancedReplayEngine:
         if feature_engine:
             for ticker in day_data["ticker"].unique().to_list():
                 # Sadece bu ana kadar olan veriyi kullan
-                available_data = market_data.filter(
-                    (pl.col("date") <= target_date) & (pl.col("ticker") == ticker)
-                )
+                available_data = market_data.filter((pl.col("date") <= target_date) & (pl.col("ticker") == ticker))
                 try:
                     features = feature_engine(available_data, ticker, target_date)
                     features_by_ticker[ticker] = features

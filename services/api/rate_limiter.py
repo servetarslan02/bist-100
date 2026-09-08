@@ -12,6 +12,8 @@ Limitler:
 - WebSocket: 100 mesaj/saniye
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -30,10 +32,7 @@ class RateLimitConfig:
     window_seconds: int
 
     def __repr__(self) -> str:
-        return (
-            f"RateLimitConfig(max_requests={self.max_requests}, "
-            f"window_seconds={self.window_seconds})"
-        )
+        return f"RateLimitConfig(max_requests={self.max_requests}, window_seconds={self.window_seconds})"
 
 
 # Endpoint grup limitleri — Canlı Dashboard ve Sürekli Telemetri Uyumlu

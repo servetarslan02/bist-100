@@ -1,5 +1,7 @@
 """Backtest API — Gerçek servislere bağlı uç noktalar."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

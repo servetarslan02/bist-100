@@ -12,11 +12,13 @@ Features:
 - job_remote_ratio: Uzaktan çalışma oranı
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 def compute_job_features(job_data: dict[str, Any], ticker: str) -> dict[str, float]:

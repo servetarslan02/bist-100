@@ -235,7 +235,6 @@ class BacktestPersistence:
                 logger.error("Backtest çalıştırması kaydedilemedi: run_id=%s, hata=%s", run_id, e)
                 raise RuntimeError(f"Backtest çalıştırması kaydedilemedi (run_id={run_id}): {e}") from e
 
-
     def save_trades(self, run_id: str, trades: list[dict[str, Any]]) -> None:
         """Backtest sırasında gerçekleşen işlemleri toplu olarak kaydeder.
 
@@ -323,8 +322,6 @@ class BacktestPersistence:
             except Exception as e:
                 logger.error("Özkaynak eğrisi kaydedilemedi: run_id=%s, hata=%s", run_id, e)
                 raise RuntimeError(f"Özkaynak eğrisi kaydedilemedi (run_id={run_id}): {e}") from e
-
-
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Belirtilen çalıştırma kimliğine ait üstverileri ve metrikleri getirir.
@@ -485,7 +482,6 @@ class BacktestPersistence:
             except Exception as e:
                 logger.error("Çalıştırma silinemedi: run_id=%s, hata=%s", run_id, e)
                 raise RuntimeError(f"Çalıştırma silinemedi (run_id={run_id}): {e}") from e
-
 
     def health_check(self) -> dict[str, Any]:
         """DuckDB bağlantı ve tablo sağlığını kontrol eder.

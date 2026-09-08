@@ -10,6 +10,8 @@ Alternative data feature'ları için feature store entegrasyonu.
 - Feature manifest
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +20,12 @@ from typing import Any
 import orjson
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "FeatureManifest",
+    "FeatureStore",
+]
 
 
 @dataclass

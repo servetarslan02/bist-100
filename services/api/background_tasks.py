@@ -1,5 +1,7 @@
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -76,7 +78,9 @@ async def paper_trading_scheduler() -> Any:
     try:
         from ...pipeline.startup_catchup import master_catchup
 
-        logger.info("paper_trading_scheduler: Başlangıç Master Catch-up (Tüm eksik seanslar ve eğitimler) başlatılıyor...")
+        logger.info(
+            "paper_trading_scheduler: Başlangıç Master Catch-up (Tüm eksik seanslar ve eğitimler) başlatılıyor..."
+        )
         with tracer.start_as_current_span("background.paper_trading_scheduler.master_catchup"):
             await master_catchup.execute_full_catchup()
     except Exception as e:
@@ -99,7 +103,9 @@ async def paper_trading_scheduler() -> Any:
         sleep_seconds = (target_time - now).total_seconds()
         logger.info(
             "paper_trading_scheduler: %s sn sonra (%s - %s TR) tetiklenecek.",
-            f"{sleep_seconds:.1f}", phase, target_time.strftime('%H:%M')
+            f"{sleep_seconds:.1f}",
+            phase,
+            target_time.strftime("%H:%M"),
         )
         await asyncio.sleep(sleep_seconds)
 

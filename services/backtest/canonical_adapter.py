@@ -12,6 +12,8 @@ Bu adaptör:
 - Mevcut backtest API'sini bozmaz
 """
 
+from __future__ import annotations
+
 import threading
 from typing import Any
 
@@ -61,11 +63,7 @@ def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
     arr = np.array(numeric_values, dtype=np.float64)
     finite_mask = np.isfinite(arr)
 
-    return {
-        keys[numeric_indices[i]]: values[numeric_indices[i]]
-        for i in range(len(numeric_values))
-        if finite_mask[i]
-    }
+    return {keys[numeric_indices[i]]: values[numeric_indices[i]] for i in range(len(numeric_values)) if finite_mask[i]}
 
 
 class BacktestCanonicalAdapter:
@@ -85,11 +83,7 @@ class BacktestCanonicalAdapter:
         """BacktestCanonicalAdapter okunabilir temsili."""
         scoring_loaded = self._scoring is not None
         engine_loaded = self._decision_engine is not None
-        return (
-            f"BacktestCanonicalAdapter("
-            f"scoring_loaded={scoring_loaded}, "
-            f"engine_loaded={engine_loaded})"
-        )
+        return f"BacktestCanonicalAdapter(scoring_loaded={scoring_loaded}, engine_loaded={engine_loaded})"
 
     def _lazy_load(self) -> None:
         """Gerekli servisleri geç yükler (lazy loading).
@@ -139,10 +133,7 @@ class BacktestCanonicalAdapter:
                 from services.ml.training_validator import prepare_features_for_inference
 
                 clean_features = _scalar_features(features)
-                clean_all = {
-                    t: _scalar_features(f)
-                    for t, f in all_day_features.items()
-                }
+                clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
                 features = prepare_features_for_inference(
                     ticker=ticker,
                     raw_features=clean_features,
@@ -185,9 +176,7 @@ class BacktestCanonicalAdapter:
         self._lazy_load()
 
         if ml_model is not None:
-            features = self._apply_feature_parity(
-                features, ml_model, ticker, all_day_features, date_str
-            )
+            features = self._apply_feature_parity(features, ml_model, ticker, all_day_features, date_str)
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,
@@ -225,9 +214,7 @@ class BacktestCanonicalAdapter:
         self._lazy_load()
 
         if ml_model is not None:
-            features = self._apply_feature_parity(
-                features, ml_model, ticker, all_day_features, date_str
-            )
+            features = self._apply_feature_parity(features, ml_model, ticker, all_day_features, date_str)
 
         cs = self._scoring.compute_canonical_score(
             ticker=ticker,

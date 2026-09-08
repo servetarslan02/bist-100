@@ -5,6 +5,8 @@ ALPHA BIST — API Paketi v2.0
 JWT + RBAC + Hız Sınırı + OpenAPI desteği.
 """
 
+from __future__ import annotations
+
 from .app import app, create_app
 from .auth import APIKeyManager, JWTHandler, RBACChecker, Role, api_key_manager, jwt_handler, rbac_checker
 from .dependencies import check_rate_limit, get_current_user, get_service_orchestrator

@@ -678,7 +678,11 @@ class PITDataAdapter:
 
             ticker_str = str(ticker_val)
             rep_date_val = _parse_to_datetime(rep_date_raw)
-            pub_date_val = _parse_to_datetime(row[publish_date_col]) if (has_publish and row.get(publish_date_col) is not None) else rep_date_val
+            pub_date_val = (
+                _parse_to_datetime(row[publish_date_col])
+                if (has_publish and row.get(publish_date_col) is not None)
+                else rep_date_val
+            )
 
             records.append(
                 PITRecord(

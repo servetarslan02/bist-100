@@ -16,6 +16,8 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency
 """
 
+from __future__ import annotations
+
 import copy
 import hashlib
 import threading
@@ -132,12 +134,7 @@ class DeterministicRecovery:
             cp_count = len(self._checkpoints)
             seed = self._current_seed
             counter = self._execution_counter
-        return (
-            f"DeterministicRecovery("
-            f"checkpoints={cp_count}, "
-            f"seed={seed}, "
-            f"counter={counter})"
-        )
+        return f"DeterministicRecovery(checkpoints={cp_count}, seed={seed}, counter={counter})"
 
     def set_seed(self, seed: int = DEFAULT_RANDOM_SEED) -> None:
         """Random seed ayarla (deterministik sonuçlar için).
@@ -169,10 +166,7 @@ class DeterministicRecovery:
         Returns:
             SystemCheckpoint nesnesi
         """
-        checkpoint_id = (
-            f"cp_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
-            f"_{self._execution_counter:06d}"
-        )
+        checkpoint_id = f"cp_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
 
         # Deep copy ile nested yapıların sonradan değiştirilmesini önle
         checkpoint = SystemCheckpoint(
@@ -344,11 +338,7 @@ class DeterministicRecovery:
                                 "original": round(orig, 6),
                                 "reproduction": round(repro, 6),
                                 "difference": round(diff, 6),
-                                "relative_diff_pct": (
-                                    round(diff / abs(orig) * 100, 4)
-                                    if orig != 0
-                                    else float("inf")
-                                ),
+                                "relative_diff_pct": (round(diff / abs(orig) * 100, 4) if orig != 0 else float("inf")),
                             }
                         )
 
@@ -504,10 +494,7 @@ class IdempotencyGuard:
         Returns:
             SHA-256 tabanlı 16 karakterlik hash
         """
-        content = (
-            f"{operation}:"
-            f"{orjson.dumps(params, option=orjson.OPT_SORT_KEYS, default=str).decode()}"
-        )
+        content = f"{operation}:{orjson.dumps(params, option=orjson.OPT_SORT_KEYS, default=str).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def is_already_executed(self, operation: str, params: dict[str, Any]) -> bool:

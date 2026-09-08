@@ -1,5 +1,7 @@
 """Alternatif Veri API — Gerçek servislere bağlı, önbellekli uç noktalar."""
 
+from __future__ import annotations
+
 import logging
 import time
 from typing import Any
@@ -91,12 +93,28 @@ async def sentiment(
         ) from exc
 
     pos_words = [
-        "artış", "büyüme", "kâr", "rekor", "ihale",
-        "anlaşma", "yüksek", "temettü", "başarı", "onay",
+        "artış",
+        "büyüme",
+        "kâr",
+        "rekor",
+        "ihale",
+        "anlaşma",
+        "yüksek",
+        "temettü",
+        "başarı",
+        "onay",
     ]
     neg_words = [
-        "düşüş", "zarar", "ceza", "iptal", "dava",
-        "risk", "kayıp", "soruşturma", "faiz", "borç",
+        "düşüş",
+        "zarar",
+        "ceza",
+        "iptal",
+        "dava",
+        "risk",
+        "kayıp",
+        "soruşturma",
+        "faiz",
+        "borç",
     ]
 
     pos_count = 0

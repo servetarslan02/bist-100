@@ -1,5 +1,7 @@
 """Portföy API — Tüm endpoint'ler gerçek servislere bağlı."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import UTC, datetime
@@ -517,8 +519,7 @@ async def tax_analysis(
         pm = _get_pm()
         trades_list = pm.get_trades()
         trades_data = [
-            {"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)}
-            for t in trades_list
+            {"realized_pnl": t.get("realized_pnl", 0), "holding_days": t.get("holding_days", 0)} for t in trades_list
         ]
 
         result = tax_model.compute_total_tax(
@@ -760,7 +761,9 @@ async def optimize_portfolio(
                 rets = np.diff(prices) / np.array(prices[:-1])
                 returns_list.append(rets)
 
-        returns_matrix = np.column_stack(returns_list) if len(returns_list) > 1 else np.array(returns_list[0]).reshape(-1, 1)
+        returns_matrix = (
+            np.column_stack(returns_list) if len(returns_list) > 1 else np.array(returns_list[0]).reshape(-1, 1)
+        )
 
         c = PortfolioOptimizerConstraints(
             max_position_pct=float(body.get("max_position_pct", 0.10)),
@@ -1009,7 +1012,6 @@ async def deposit_funds(
     except Exception as exc:
         logger.error("nakit_yatirma_hatasi: hata=%s", exc)
         raise HTTPException(status_code=500, detail=f"Nakit yatırılamadı: {exc}") from exc
-
 
 
 @router.get("/alpha")

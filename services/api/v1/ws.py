@@ -13,6 +13,8 @@ Endpoint'ler:
     WS /api/v1/ws/binary   — Binary Protobuf akışı
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime
 from typing import Any

@@ -19,6 +19,8 @@ Uç noktalar:
 - POST /risk/tail-hedge/analyze — Tail hedge analizi
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
