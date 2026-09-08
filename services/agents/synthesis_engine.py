@@ -19,16 +19,18 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from .agent_memory import AgentMemory
-from .agent_system import AgentResult, AgentRole
-from .communication_bus import Resolution
-from .debate_engine import DebateResult
-from .llm_client import BaseLLMClient
 from .prompts import PromptFactory
+
+if TYPE_CHECKING:
+    from .agent_memory import AgentMemory
+    from .agent_system import AgentResult, AgentRole
+    from .communication_bus import Resolution
+    from .debate_engine import DebateResult
+    from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger(__name__)
 

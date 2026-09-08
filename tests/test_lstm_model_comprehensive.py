@@ -13,9 +13,9 @@
 
 import threading
 from pathlib import Path
+
 import numpy as np
 import polars as pl
-import pytest
 import torch
 
 from services.ml.lstm_model import (

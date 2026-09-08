@@ -24,11 +24,12 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from .agent_memory import AgentMemory
+if TYPE_CHECKING:
+    from .agent_memory import AgentMemory
 
 logger = structlog.get_logger(__name__)
 

@@ -12,9 +12,9 @@
 
 import threading
 from pathlib import Path
+
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.ml_backtest import (
     BacktestResult,

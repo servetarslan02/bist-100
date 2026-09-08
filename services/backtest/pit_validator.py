@@ -22,7 +22,7 @@ from __future__ import annotations
 import contextlib
 import threading
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -72,7 +72,7 @@ def _parse_to_datetime(val: Any) -> datetime:
 
     # Timezone-aware ise naive UTC formata normalize et
     if dt.tzinfo is not None:
-        dt = dt.astimezone().replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 

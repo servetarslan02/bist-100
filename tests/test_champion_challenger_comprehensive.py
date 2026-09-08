@@ -14,12 +14,11 @@ Bu test paketi 8 denetim kuralına tam uyumlu olarak ChampionChallenger motorunu
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import orjson
 import polars as pl
-import pytest
 
 from services.ml.champion_challenger import (
     ABTestResult,
@@ -27,6 +26,9 @@ from services.ml.champion_challenger import (
     MultiMetricResult,
     PromotionDecision,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_serialization() -> None:
@@ -43,7 +45,7 @@ def test_dataclasses_serialization() -> None:
         effect_size=0.85,
         power=0.90,
     )
-    ab_dict = ab_orig.to_dict()
+    ab_orig.to_dict()
     ab_bytes = ab_orig.to_orjson_bytes()
     assert isinstance(ab_bytes, bytes)
     ab_restored = ABTestResult.from_dict(orjson.loads(ab_bytes))

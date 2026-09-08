@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import polars as pl
 import pytest
 
 from services.core.fee_calculator import (
-    DEFAULT_BIST_FEE_RATE,
-    DEFAULT_BROKER_RATE,
-    DEFAULT_BSMV_RATE,
-    DEFAULT_MIN_COMMISSION,
-    DEFAULT_MKK_FEE_RATE,
     BreakEvenAnalysis,
-    FeeBreakdown,
     FeeCalculator,
     fee_calculator,
 )

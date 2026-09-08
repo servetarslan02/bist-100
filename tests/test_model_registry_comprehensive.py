@@ -13,8 +13,8 @@
 
 import threading
 from pathlib import Path
+
 import polars as pl
-import pytest
 
 from services.ml.model_registry import (
     ModelEntry,
@@ -79,7 +79,7 @@ def test_promote_and_lifecycle_transitions(tmp_path: Path):
     registry = ModelRegistry(registry_path=str(reg_dir), duckdb_path=str(db_file))
 
     key1 = registry.register(model_id="alpha_net", model="m1", model_type="NN", metrics={"sharpe": 1.2})
-    key2 = registry.register(model_id="alpha_net", model="m2", model_type="NN", metrics={"sharpe": 1.8})
+    registry.register(model_id="alpha_net", model="m2", model_type="NN", metrics={"sharpe": 1.8})
 
     # v1'i şampiyon yap
     assert registry.promote(model_id="alpha_net", version="v1", reason="Ilk model") is True

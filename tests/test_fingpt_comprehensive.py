@@ -13,12 +13,10 @@ Bu test paketi 8 denetim kuralına tam uyumlu olarak FinGPTSentiment motorunu ve
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
 import orjson
 import polars as pl
-import pytest
 
 from services.ml.fingpt import (
     AggregatedSentiment,
@@ -30,6 +28,9 @@ from services.ml.fingpt import (
     read_sentiment_history_polars,
     save_aggregated_sentiment_to_duckdb,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_serialization() -> None:

@@ -13,7 +13,7 @@ services/ml/transformer_model.py için kurumsal denetim testleri:
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
@@ -23,8 +23,10 @@ from services.ml.transformer_model import (
     PositionalEncoding,
     StockTransformer,
     TransformerConfig,
-    configure_duckdb_wal,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_transformer_config_serialization() -> None:
@@ -72,10 +74,7 @@ def test_positional_encoding() -> None:
 
 def test_transformer_training_and_prediction(tmp_path: Path) -> None:
     """StockTransformer eğitim döngüsü, çıkarım ve Polars tahmini testi."""
-    try:
-        import torch
-    except ImportError:
-        pytest.skip("PyTorch kurulu degil")
+    pytest.importorskip("torch")
 
     db_path = tmp_path / "trans_test.duckdb"
     cfg = TransformerConfig(
@@ -132,10 +131,7 @@ def test_transformer_training_and_prediction(tmp_path: Path) -> None:
 
 def test_transformer_train_polars_and_save_load(tmp_path: Path) -> None:
     """Polars ile doğrudan eğitim ve model save/load döngüsü."""
-    try:
-        import torch
-    except ImportError:
-        pytest.skip("PyTorch kurulu degil")
+    pytest.importorskip("torch")
 
     db_path = tmp_path / "trans_polars.duckdb"
     model_file = tmp_path / "stock_transformer.pth"
@@ -184,10 +180,7 @@ def test_transformer_train_polars_and_save_load(tmp_path: Path) -> None:
 
 def test_transformer_thread_safety(tmp_path: Path) -> None:
     """Eşzamanlı thread'lerde tahmin ve denetim güvenliği testi."""
-    try:
-        import torch
-    except ImportError:
-        pytest.skip("PyTorch kurulu degil")
+    pytest.importorskip("torch")
 
     db_path = tmp_path / "trans_thread.duckdb"
     cfg = TransformerConfig(

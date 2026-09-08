@@ -23,7 +23,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -33,13 +33,15 @@ from .circuit_breaker import CircuitBreaker, CircuitBreakerLLMClient
 from .communication_bus import ConflictResolver, Resolution
 from .conflict_detector import ConflictDetector, ConflictReport, ConflictSeverity
 from .debate_engine import DebateEngine, DebateResult
-from .llm_client import BaseLLMClient
 from .parallel_runner import ParallelAgentRunner, ParallelRunResult
 from .prompts import PromptFactory
 from .risk_assessor import RiskAssessment, RiskAssessor
 from .self_evaluator import MultiAgentEvaluator
 from .synthesis_engine import SynthesisEngine, SynthesisResult
 from .trace_context import TraceContext
+
+if TYPE_CHECKING:
+    from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger(__name__)
 

@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import concurrent.futures
 from datetime import date, timedelta
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import orjson
 import polars as pl
-import pytest
 
 from services.ml.feature_engine import (
     FeatureEngine,
@@ -30,6 +29,9 @@ from services.ml.feature_engine import (
     safe_float,
     save_feature_set_to_duckdb,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _generate_synthetic_ohlcv(n_bars: int = 150, base_price: float = 100.0) -> pl.DataFrame:

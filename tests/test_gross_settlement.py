@@ -9,7 +9,6 @@ import polars as pl
 from services.core.gross_settlement import (
     GrossSettlementMonitor,
     GrossSettlementStatus,
-    gross_settlement_monitor,
 )
 
 

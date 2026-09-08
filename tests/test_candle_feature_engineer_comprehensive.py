@@ -8,16 +8,19 @@ eşzamanlılık ve sınır durumlarını doğrular.
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
+
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.candle_feature_engineer import (
     CandleEmpiricalSummary,
     CandleFeatureEngineer,
     candle_feature_engineer,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _generate_synthetic_ohlcv(n_bars: int = 60) -> pl.DataFrame:

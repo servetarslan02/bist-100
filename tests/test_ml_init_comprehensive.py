@@ -8,7 +8,6 @@ ve içe aktarma bütünlüğünü doğrular.
 from __future__ import annotations
 
 import importlib
-import pytest
 
 
 def test_ml_package_import() -> None:
@@ -61,5 +60,5 @@ def test_catboost_fallback_safety() -> None:
     assert hasattr(ml, "CatBoostModel")
     assert hasattr(ml, "CatBoostConfig")
     # CatBoost yüklüyse sınıf olmalı, değilse None olmalı (NameError fırlatmamalı)
-    val = getattr(ml, "CatBoostModel")
+    val = ml.CatBoostModel
     assert val is None or isinstance(val, type)

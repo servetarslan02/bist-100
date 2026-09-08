@@ -220,7 +220,7 @@ class CircuitBreakerLLMClient:
         user_prompt: str,
         temperature: float | None = None,
         max_tokens: int | None = None,
-    ) -> 'LLMResponse':
+    ) -> LLMResponse:
         """Circuit breaker kontrollü LLM çağrısı."""
         if not self._breaker.can_execute():
             logger.warning("Circuit breaker OPEN — LLM call rejected")

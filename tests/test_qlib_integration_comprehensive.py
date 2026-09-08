@@ -14,6 +14,7 @@ tüm mimari, quant, veritabanı ve eşzamanlılık standartlarını kanıtlar:
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 from pathlib import Path
 
 import duckdb
@@ -24,7 +25,6 @@ import pytest
 from services.ml.qlib_integration import (
     QlibBIST,
     QlibConfig,
-    QlibDatasetResult,
     QlibDatasetSplit,
 )
 
@@ -35,16 +35,12 @@ TEST_DB_PATH = "data/test_audit_qlib.duckdb"
 def cleanup_test_db():
     """Test öncesi ve sonrası test DB dosyasını temizler."""
     if Path(TEST_DB_PATH).exists():
-        try:
+        with contextlib.suppress(Exception):
             Path(TEST_DB_PATH).unlink()
-        except Exception:
-            pass
     yield
     if Path(TEST_DB_PATH).exists():
-        try:
+        with contextlib.suppress(Exception):
             Path(TEST_DB_PATH).unlink()
-        except Exception:
-            pass
 
 
 def test_01_zero_data_leakage_and_purge_window():

@@ -14,6 +14,7 @@ tüm sınır koşullarını, algoritmalarını ve veri bütünlüğünü kanıtl
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 from pathlib import Path
 
 import duckdb
@@ -36,16 +37,12 @@ TEST_DB_PATH = "data/test_audit_calibrator.duckdb"
 def cleanup_test_db():
     """Her test öncesi/sonrası test veritabanını temizler."""
     if Path(TEST_DB_PATH).exists():
-        try:
+        with contextlib.suppress(Exception):
             Path(TEST_DB_PATH).unlink()
-        except Exception:
-            pass
     yield
     if Path(TEST_DB_PATH).exists():
-        try:
+        with contextlib.suppress(Exception):
             Path(TEST_DB_PATH).unlink()
-        except Exception:
-            pass
 
 
 def test_01_isotonic_regression_correctness():

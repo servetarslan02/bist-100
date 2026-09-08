@@ -276,7 +276,7 @@ class BenchmarkComparator:
                     "benchmark": best_ir.benchmark_name,
                     "ir": round(best_ir.information_ratio, 2),
                 },
-                "avg_correlation": round(np.mean([c.correlation for c in comparisons]), 4),
+                "avg_correlation": round(float(np.mean([c.correlation for c in comparisons])), 4),
             },
         }
 

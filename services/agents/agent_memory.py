@@ -14,6 +14,7 @@ FAZ 3: Agent Memory
 from __future__ import annotations
 
 import atexit
+import contextlib
 import gzip
 import threading
 import time
@@ -243,10 +244,8 @@ class MemoryWriteBuffer:
             # Thread çalışmıyorsa bile buffer'da kalan varsa yaz
             remaining = self._flush_immediate()
             if remaining > 0:
-                try:
+                with contextlib.suppress(Exception):
                     logger.info("MemoryWriteBuffer shutdown flush", records=remaining)
-                except Exception:
-                    pass
             return
 
         self._stop_event.set()
@@ -255,10 +254,8 @@ class MemoryWriteBuffer:
         self._running = False
         if self._flush_thread and self._flush_thread.is_alive():
             self._flush_thread.join(timeout=5.0)
-        try:
+        with contextlib.suppress(Exception):
             logger.info("MemoryWriteBuffer shutdown", remaining_flushed=remaining)
-        except Exception:
-            pass
 
     def get_metrics(self) -> dict[str, Any]:
         """Buffer istatistiklerini getir."""

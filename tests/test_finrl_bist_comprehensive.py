@@ -14,7 +14,7 @@ Bu test paketi 8 denetim kuralına tam uyumlu olarak BISTTradingEnv ortamını v
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import orjson
@@ -22,13 +22,15 @@ import polars as pl
 import pytest
 
 from services.ml.finrl_bist import (
-    ActionType,
     BISTEnvConfig,
     BISTEnvMetrics,
     BISTStepResult,
     BISTTradingEnv,
     RewardType,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _generate_mock_env_data(n_steps: int = 50, n_stocks: int = 3, n_features: int = 5) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], list[str]]:

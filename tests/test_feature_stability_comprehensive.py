@@ -14,7 +14,7 @@ Bu test paketi 8 denetim kuralına tam uyumlu olarak FeatureStabilityAnalyzer mo
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import orjson
@@ -30,6 +30,9 @@ from services.ml.feature_stability import (
     read_stability_history_polars,
     save_stability_summary_to_duckdb,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_serialization() -> None:

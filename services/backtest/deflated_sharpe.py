@@ -195,8 +195,8 @@ class DeflatedSharpeCalculator:
             num_observations=num_observations,
             skewness=skewness,
             kurtosis=kurtosis,
-            p_value=p_value,
-            is_significant=p_value < 0.05,
+            p_value=float(p_value),
+            is_significant=bool(p_value < 0.05),
             confidence_level=confidence,
         )
 

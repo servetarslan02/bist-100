@@ -11,9 +11,9 @@
 
 import threading
 from pathlib import Path
+
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.lgb_pipeline import (
     LightGBMPipeline,

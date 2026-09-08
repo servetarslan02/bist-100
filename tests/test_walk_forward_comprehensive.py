@@ -13,23 +13,21 @@ from __future__ import annotations
 
 import concurrent.futures
 from datetime import date, timedelta
-from pathlib import Path
-
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.walk_forward import (
+    WalkForwardValidation,
     WFAggregatedMetrics,
     WFResult,
     WFSplit,
     WFSplitConfig,
-    WalkForwardValidation,
-    configure_duckdb_wal,
-    wf_validator,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_wf_dataclasses_serialization() -> None:

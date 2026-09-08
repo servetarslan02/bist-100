@@ -8,7 +8,8 @@ eşzamanlılık (thread-safety) ve sınır durumlarını uçtan uca doğrular.
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
+
 import numpy as np
 import polars as pl
 import pytest
@@ -19,6 +20,9 @@ from services.ml.calibration import (
     ModelCalibration,
     RegimeCalibrationResult,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_serialization_and_roundtrip() -> None:

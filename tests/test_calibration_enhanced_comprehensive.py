@@ -8,7 +8,8 @@ planlayıcısını, DuckDB ve Polars entegrasyonunu, eşzamanlılık ve sınır 
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
+
 import numpy as np
 import polars as pl
 import pytest
@@ -21,6 +22,9 @@ from services.ml.calibration_enhanced import (
     RetrainSchedule,
     calibration_enhanced,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_roundtrip() -> None:

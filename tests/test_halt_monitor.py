@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
@@ -14,7 +14,6 @@ from services.core.halt_monitor import (
     HALT_TYPE_KAP,
     HaltMonitor,
     HaltStatus,
-    halt_monitor,
 )
 
 

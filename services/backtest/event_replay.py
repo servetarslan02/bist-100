@@ -182,6 +182,20 @@ class AuditRecord:
         self.hash_chain = self.compute_hash(prev_hash)
         return self.hash_chain
 
+    def to_dict(self) -> dict[str, Any]:
+        """Denetim kaydını sözlük formatına dönüştürür.
+
+        Returns:
+            Denetim kaydı bilgilerini içeren sözlük
+        """
+        return {
+            "event_id": self.event_id,
+            "timestamp": self.timestamp.isoformat(),
+            "event_type": self.event_type,
+            "data": self.data,
+            "hash_chain": self.hash_chain,
+        }
+
 
 @dataclass
 class ReplaySnapshot:

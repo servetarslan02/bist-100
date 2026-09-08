@@ -50,7 +50,7 @@ class TraceContext:
         self._start_time = datetime.now(UTC)
         self._tokens: list[tuple[ContextVar, Any]] = []
 
-    def __enter__(self) -> "TraceContext":
+    def __enter__(self) -> TraceContext:
         self._tokens = [
             (_trace_id_var, _trace_id_var.set(self.trace_id)),
             (_ticker_var, _ticker_var.set(self.ticker)),

@@ -16,13 +16,11 @@ Bu test paketi 8 denetim kuralına tam uyumlu olarak EnsembleModel motorunu ve v
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import orjson
 import polars as pl
-import pytest
 
 from services.ml.ensemble import (
     BenefitReport,
@@ -31,6 +29,9 @@ from services.ml.ensemble import (
     EnsembleModel,
     EnsembleState,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_dataclasses_serialization() -> None:

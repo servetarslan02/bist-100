@@ -20,7 +20,7 @@ import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -31,7 +31,9 @@ from .agent_system import (
     AIFallback,
     BaseAgent,
 )
-from .llm_client import BaseLLMClient
+
+if TYPE_CHECKING:
+    from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger(__name__)
 
@@ -293,7 +295,7 @@ class AgentPipelineBuilder:
         self._runner = ParallelAgentRunner()
         self._agents: dict[AgentRole, BaseAgent] = {}
 
-    def with_runner(self, runner: ParallelAgentRunner) -> "AgentPipelineBuilder":
+    def with_runner(self, runner: ParallelAgentRunner) -> AgentPipelineBuilder:
         """Custom runner ata.
 
         Args:
@@ -305,7 +307,7 @@ class AgentPipelineBuilder:
         self._runner = runner
         return self
 
-    def with_agent(self, role: AgentRole, agent: BaseAgent) -> "AgentPipelineBuilder":
+    def with_agent(self, role: AgentRole, agent: BaseAgent) -> AgentPipelineBuilder:
         """Tek agent ekle.
 
         Args:
@@ -318,7 +320,7 @@ class AgentPipelineBuilder:
         self._agents[role] = agent
         return self
 
-    def with_default_agents(self) -> "AgentPipelineBuilder":
+    def with_default_agents(self) -> AgentPipelineBuilder:
         """Varsayılan agent'ları ekle (TECHNICAL, FUNDAMENTAL, NEWS, MACRO)."""
         for role in [
             AgentRole.TECHNICAL,

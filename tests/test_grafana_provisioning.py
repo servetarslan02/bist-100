@@ -10,12 +10,10 @@ import polars as pl
 import pytest
 
 from services.core.grafana_provisioning import (
-    DASHBOARD_DIR,
     DashboardVersion,
     DatasourceConfig,
     GrafanaConfig,
     GrafanaProvisioner,
-    grafana_provisioner,
 )
 
 

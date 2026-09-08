@@ -50,7 +50,7 @@ class ConflictSeverity(StrEnum):
     CRITICAL = "CRITICAL"
 
     @classmethod
-    def from_score(cls, score: float) -> "ConflictSeverity":
+    def from_score(cls, score: float) -> ConflictSeverity:
         """Skordan severity seviyesi belirle."""
         if score <= 0.0:
             return cls.NONE

@@ -46,13 +46,13 @@ from .google_trends import GoogleTrendsAdapter, google_trends_adapter
 from .investing_adapter import InvestingAdapter, investing_adapter
 from .jobs import compute_job_features
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
-from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
 
 # === LLM Sentiment ===
 from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
 
 # === Reconciliation ===
 from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
+from .satellite_adapter import SatelliteAdapter, compute_satellite_features, satellite_adapter
 
 # === Legacy Feature Functions (backward compatibility) ===
 # Lazy import: nadiren kullanılan modüller __getattr__ ile yüklenir

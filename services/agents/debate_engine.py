@@ -22,12 +22,14 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
-from .llm_client import BaseLLMClient
+
+if TYPE_CHECKING:
+    from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger(__name__)
 

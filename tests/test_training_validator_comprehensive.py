@@ -12,24 +12,21 @@ services/ml/training_validator.py için kurumsal denetim testleri:
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.training_validator import (
     CrossSectionalNormalizer,
     DataQualityReport,
     SampleMeta,
     TrainingDatasetValidator,
-    ValidationMetrics,
-    configure_duckdb_wal,
-    cross_sectional_normalizer,
     prepare_features_for_inference,
-    training_validator,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_sample_meta_serialization() -> None:

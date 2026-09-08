@@ -11,14 +11,13 @@
 
 import threading
 from pathlib import Path
+
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.model_comparator import (
     ModelComparator,
     ModelResult,
-    model_comparator,
 )
 
 

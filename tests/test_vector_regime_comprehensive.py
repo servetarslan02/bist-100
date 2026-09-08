@@ -13,11 +13,10 @@ services/ml/vector_regime.py için kurumsal denetim testleri:
 from __future__ import annotations
 
 import concurrent.futures
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
-import pytest
 
 from services.ml.vector_regime import (
     FEATURE_DIM,
@@ -25,9 +24,10 @@ from services.ml.vector_regime import (
     MarketRegimeEmbeddingEngine,
     RegimeProtectionAdvice,
     RegimeVector,
-    configure_duckdb_wal,
-    regime_embedding_engine,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_regime_dataclasses_serialization() -> None:

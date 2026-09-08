@@ -8,6 +8,7 @@ eşzamanlılık (thread-safety) ve sınır durumlarını doğrular.
 from __future__ import annotations
 
 import concurrent.futures
+
 import numpy as np
 import polars as pl
 import pytest
@@ -16,7 +17,6 @@ from services.ml.adjusted_loss import (
     DEFAULT_WRONG_DIRECTION_PENALTY,
     AdjustedMSELoss,
     adjusted_loss,
-    to_orjson_bytes,
 )
 
 

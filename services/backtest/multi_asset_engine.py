@@ -244,9 +244,9 @@ class MultiAssetBacktestEngine:
         # kullanılmıyordu - survivorship bias düzeltmesi çağırılsa bile
         # motora hiç ulaşmıyordu; bkz. documentation/14.)
         if universe_tickers is not None:
-            market_data = market_data[market_data["ticker"].isin(universe_tickers)]
-            if signal_data is not None and not signal_data.empty:
-                signal_data = signal_data[signal_data["ticker"].isin(universe_tickers)]
+            market_data = market_data.filter(pl.col("ticker").is_in(list(universe_tickers)))
+            if signal_data is not None and not signal_data.is_empty():
+                signal_data = signal_data.filter(pl.col("ticker").is_in(list(universe_tickers)))
             logger.info(
                 "universe_filtresi_uygulandi: universe_boyut=%s",
                 len(universe_tickers),
@@ -254,11 +254,15 @@ class MultiAssetBacktestEngine:
 
         run_id = hashlib.md5(f"multi_{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12]
 
+        ticker_count = market_data["ticker"].n_unique() if "ticker" in market_data.columns else 0
+        min_date = market_data["date"].min() if "date" in market_data.columns else ""
+        max_date = market_data["date"].max() if "date" in market_data.columns else ""
+
         logger.info(
             "multi_asset_baslatildi: run_id=%s, hisse=%s, tarih_araligi=%s",
             run_id,
-            market_data["ticker"].nunique() if "ticker" in market_data.columns else 0,
-            f"{market_data['date'].min()} - {market_data['date'].max()}",
+            ticker_count,
+            f"{min_date} - {max_date}",
         )
 
         # Config
@@ -276,7 +280,7 @@ class MultiAssetBacktestEngine:
         total_trades = 0
 
         # Get unique dates
-        dates = sorted(market_data["date"].unique())
+        dates = sorted(market_data["date"].unique().to_list())
 
         # T+1 EXECUTION: Sinyal D gününün verisiyle üretilir, ama işlem
         # D gününün KAPANIŞINDA değil, D+1'in AÇILIŞINDA gerçekleşir.
@@ -286,14 +290,14 @@ class MultiAssetBacktestEngine:
         next_date_map: dict[Any, Any] = {dates[i]: dates[i + 1] for i in range(len(dates) - 1)}
         open_price_map: dict[tuple[Any, str], float] = {}
         if "open" in market_data.columns:
-            for row in market_data[["date", "ticker", "open"]].itertuples(index=False):
-                open_price_map[(row.date, row.ticker)] = row.open
+            for row in market_data.select(["date", "ticker", "open"]).iter_rows(named=True):
+                open_price_map[(row["date"], row["ticker"])] = float(row["open"])
 
         # Gap risk kontrolü için önceki kapanış fiyatı haritası
         close_price_map: dict[tuple[Any, str], float] = {}
         if "close" in market_data.columns:
-            for row in market_data[["date", "ticker", "close"]].itertuples(index=False):
-                close_price_map[(row.date, row.ticker)] = row.close
+            for row in market_data.select(["date", "ticker", "close"]).iter_rows(named=True):
+                close_price_map[(row["date"], row["ticker"])] = float(row["close"])
 
         def _gap_locked(ticker: str, signal_date: Any, next_open: float) -> bool:
             """Açılış, önceki kapanışa göre izin verilen bandın dışındaysa
@@ -336,7 +340,7 @@ class MultiAssetBacktestEngine:
             day_market = market_data.filter(pl.col("date") == date)
             day_signals = signal_data.filter(pl.col("date") == date) if signal_data is not None else pl.DataFrame()
 
-            if day_market.empty:
+            if day_market.is_empty():
                 continue
 
             # Current prices
@@ -396,9 +400,9 @@ class MultiAssetBacktestEngine:
             # SELL signals (exit positions)
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
             next_date = next_date_map.get(date)
-            if not day_signals.empty and next_date is not None:
+            if not day_signals.is_empty() and next_date is not None:
                 sell_signals = day_signals.filter(pl.col("score") < 0)  # Düşük skor = sat
-                for _, sig in sell_signals.iterrows():
+                for sig in sell_signals.iter_rows(named=True):
                     ticker = sig["ticker"]
                     if ticker in positions:
                         pos = positions[ticker]
@@ -475,13 +479,14 @@ class MultiAssetBacktestEngine:
 
             # BUY signals (enter positions)
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
-            if not day_signals.empty and len(positions) < cfg.max_positions and next_date is not None:
-                buy_signals = day_signals[
-                    (day_signals["score"] >= 70)  # Yüksek skor = al
-                    & (~day_signals["ticker"].isin(positions.keys()))
-                ].sort("score", ascending=False)
+            if not day_signals.is_empty() and len(positions) < cfg.max_positions and next_date is not None:
+                current_positions = list(positions.keys())
+                buy_signals = day_signals.filter(
+                    (pl.col("score") >= 70)
+                    & (~pl.col("ticker").is_in(current_positions))
+                ).sort("score", descending=True)
 
-                for _, sig in buy_signals.iterrows():
+                for sig in buy_signals.iter_rows(named=True):
                     if len(positions) >= cfg.max_positions:
                         break
 
@@ -647,9 +652,9 @@ class MultiAssetBacktestEngine:
         logger.info(
             "multi_asset_tamamlandi: run_id=%s, getiri=%.2f%%, sharpe=%.3f, max_dd=%.2f%%",
             run_id,
-            total_return,
-            round(sharpe, 3),
-            f"{max_dd:.2f}",
+            float(total_return),
+            float(sharpe),
+            float(max_dd),
         )
 
         return result

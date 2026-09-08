@@ -14,8 +14,8 @@
 
 import threading
 from pathlib import Path
+
 import polars as pl
-import pytest
 
 from services.ml.hybrid_model import (
     HybridAction,
